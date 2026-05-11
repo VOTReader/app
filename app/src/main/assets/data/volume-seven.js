@@ -2797,7 +2797,7 @@ var LETTERS_V7 = [
       },
       {
         "label": "Regarding the Day of The Lord",
-        "url": "http://answersonlygodcangive.com/Regarding_the_Day_of_The_Lord"
+        "url": "https://answersonlygodcangive.com/Regarding_the_Day_of_The_Lord"
       },
       {
         "label": "Regarding the Churches of Men",
@@ -13950,7 +13950,7 @@ var LETTERS_V7 = [
       "1": {
         "type": "note",
         "text": "Also read: \"Darkness of Faces\"",
-        "url": "http://trumpetcallofgodonline.com/index.php5?title=Darkness_of_Faces"
+        "url": "https://trumpetcallofgodonline.com/index.php5?title=Darkness_of_Faces"
       }
     },
     "nkjv": {},
@@ -14578,7 +14578,7 @@ var LETTERS_V7 = [
       "1": {
         "type": "note",
         "text": "Also read: \"Darkness of Faces\"",
-        "url": "http://trumpetcallofgodonline.com/index.php5?title=Darkness_of_Faces"
+        "url": "https://trumpetcallofgodonline.com/index.php5?title=Darkness_of_Faces"
       }
     },
     "nkjv": {},

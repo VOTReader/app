@@ -2046,6 +2046,111 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later 6) — improvement2.txt Day 4-5 polish complete
+
+  Nine UI-polish items, code-first review then verify-as-best-as-we-can.
+
+  D4.1 MATTHEW.chapters.length guard in Settings (~line 11453)
+    Settings → Mark as Read section listed Matthew Study Bible with
+    `total: MATTHEW.chapters.length` — if matthew.js failed to load
+    (cold-boot timing edge case, build error, etc.) this would crash
+    the Settings screen on render. Replaced with
+    `(_matthew()?.chapters?.length || 0)` using the existing helper.
+    Other two MATTHEW.chapters.length references (lines 14666, 15128)
+    are inside guarded paths — left as is.
+
+  D4.2 LinkPicker overlay z-index 8500 → 8502
+    Both .link-picker-overlay and .note-sheet-overlay were at 8500.
+    Bumped LinkPicker to 8502 so if it ever opens over a NoteSheet
+    (e.g., adding a cross-reference link from inside a note) the
+    picker visually stays on top. 8501 reserved for future
+    in-between overlays. Defensive — these don't co-occur today.
+
+  D4.3 Restore keyboard focus indicators
+    Previous global `outline: none` on buttons/links/role=button
+    killed focus rings everywhere, breaking keyboard navigation in
+    the PC browser. Replaced with the standard
+    `:focus:not(:focus-visible) { outline: none; }` +
+    `:focus-visible { outline: 2px solid var(--gold); outline-offset:
+    2px; border-radius: 4px; }` pair. Mouse/touch focus stays clean;
+    Tab/Shift-Tab keyboard navigation shows the gold outline.
+
+    Trap caught and fixed mid-edit: my initial CSS comment used
+    backticks around `:focus:not(:focus-visible)` and `outline: none`
+    for emphasis. Backticks inside the CSS template literal terminate
+    the template — exactly the trap CLAUDE.md §17.11b warns about.
+    Symptom: `CSS` evaluates to `window.CSS`, React renders
+    `[object CSS]` as a child → Minified React error #31, blank page.
+    Removed the backticks; CSS comments now describe selectors in
+    prose only.
+
+  D4.4 cancelDwell on tab switch (~line 13356)
+    switchToTab didn't cancel the dwell timer — if user A was on
+    letter L for 19 seconds (1 second short of the 20-second
+    mark-as-read commit), switching to tab B and waiting 1 more
+    second would commit the read on the WRONG letter when the timer
+    fired against the new active tab's state. Added cancelDwell()
+    inside switchToTab BEFORE the setActiveTabIdx call.
+
+  D4.5 NoteSheet textarea scrollIntoView on focus
+    On Android, the soft keyboard pushes layout up but doesn't scroll
+    the focused element into view. User taps the note textarea, types
+    blind behind the keyboard. Added an onFocus handler that calls
+    textareaRef.current.scrollIntoView({ block: 'nearest', behavior:
+    'smooth' }) after a 220ms delay (waits for the keyboard animation
+    to complete). block:'nearest' avoids jumping the sheet around on
+    desktop where the keyboard isn't a factor.
+
+  D4.6 NotebookPickerSheet title context-aware
+    Header always read "Add to Notebook" regardless of state. Per
+    CLAUDE.md §17.13 spec, should switch to "Manage Notebooks" when
+    the note already has any notebookIds. Implemented:
+    `memberIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"`.
+
+  D4.7 SelectionToolbar + NoteSheet auto-dismiss on screen navigation
+    The always-mounted SelectionToolbar and the conditionally-mounted
+    NoteSheet didn't clean up when the user navigated via letter
+    arrows, hardware back, etc. Stale selInfo / noteSheetTarget would
+    leave them floating over unrelated pages.
+    Fix:
+    - SelectionToolbar installs `window.__hideSelectionToolbar` via
+      useEffect (mount-time), cleans up on unmount.
+    - App-level useEffect watches [screen, letterId, bookId,
+      chapterNum, studyId, studyChapterId] and on any change calls
+      __hideSelectionToolbar() + setNoteSheetTarget(null) +
+      setAnnChip(null) + setMultiNotePayload(null). Consolidates the
+      overlay-cleanup policy in one place.
+    Cleanup runs before the existing applyDOMHighlights effect, so
+    pending-open-note flows (Notes-index → row tap → __pendingOpenNote
+    on window → opens NoteSheet after 60ms) still work — the cleanup
+    sets noteSheetTarget=null FIRST, then the 60ms-deferred open sets
+    it to the new groupId.
+
+  D4.8 6 http:// URLs → https:// across data files
+    Regex pattern `http://((?:www\.)?(?:answersonlygodcangive|
+    trumpetcallofgodonline|thevolumesoftruth|youtube)\.com|youtu\.be)`
+    → `https://\1`.
+    Counts: bible-studies.js 6, letters-flock.js 1, lords-rebuke.js 1,
+    volume-four.js 1, volume-seven.js 3. Total 12 URLs upgraded.
+    check_balance.py PASSES; rescan returns 0 remaining http:// links.
+
+  Verified live throughout the batch — app boots clean, navigation
+  works, all hooks registered as expected.
+
+  ── Pre-existing finding (not introduced by this batch, not blocking)
+  Console shows 12 instances of Minified React error #31 with
+  `args[]=[object CSS]` per page render cycle. Confirmed by stashing
+  ALL Day 4-5 changes and reloading — errors still present. They
+  predate this work and the UI renders correctly despite them
+  (React's reconciler catches them, ErrorBoundary doesn't trigger).
+  Root cause not yet identified — `CSS` const is a 209KB string,
+  `CSS === window.CSS` is false. No React.createElement call passes
+  window.CSS as a child (verified with a runtime patch capturing all
+  children). Likely a subtle DOM property or non-element child being
+  passed somewhere in a rarely-hit render path.
+  TODO: investigate in a future session; not affecting user-visible
+  behavior today.
+
 2026-05-11 (later 5) — WTLB attribution tap-through + single-shot back-pill universal
 
   User directive: "WTLB Part 1 references `[From "The Word of My Mouth" ~

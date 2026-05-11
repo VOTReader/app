@@ -50,7 +50,17 @@
 >     • Android hardware back button (MainActivity.kt — evaluateJavascript window.handleAndroidBack, finish() on "false")
 > - WTLB attribution tap-through (2026-05-11): `[From "Title" ~ Volume N]` inline patterns in WTLB/Blessed are now live letter-links. WtlbEntryView's renderLine got a new split pattern; the parsed volume number maps to "Volume One"..."Volume Seven" via `_attrCollectionLabel` and calls `onInAppLink` with source meta so the destination pill reads "Back to <Part Label> · <Entry>".
 > - All back-pills universally single-shot (2026-05-11): `openInAppLetter` now computes a `destSnapshot` from the resolved letter (studies + regular). The existing prune useEffect + `_destMatches` (from §12 bug #4) now hide the pill the moment the user navigates away from the destination. Every back-pill in the app — Notes index, footnote tap-throughs, attribution links, letter-link segments, addendum cards — is single-shot. Pill persists while on the destination; vanishes on next/prev arrow, chapter jump, or any onward navigation.
-> - Next: Objective C — improvement2.txt Day 4-5 polish (overlays auto-dismiss on nav, focus indicators, NotebookPicker checkbox refresh, MATTHEW guard, soft-keyboard scroll-into-view, dwell-on-tab-switch, z-index 8500 collision, http→https URL cleanup).
+> - improvement2.txt Day 4-5 polish — ALL DONE (2026-05-11):
+>     • MATTHEW.chapters.length guarded via `_matthew()?.chapters?.length || 0`
+>     • LinkPicker overlay z-index 8500 → 8502 (above NoteSheet)
+>     • Keyboard focus indicators restored via `:focus-visible` + `:focus:not(:focus-visible)` pair
+>     • cancelDwell() added to switchToTab (no more wrong-tab mark-as-read)
+>     • NoteSheet textarea scrollIntoView on focus (Android keyboard)
+>     • NotebookPickerSheet title "Add to Notebook" / "Manage Notebooks" context-aware
+>     • SelectionToolbar + NoteSheet + AnnChip + MultiNote all auto-dismiss on screen/letter/book/chapter/study navigation via App-level useEffect + window.__hideSelectionToolbar bridge
+>     • 12 http:// URLs upgraded to https:// across 5 data files (check_balance.py passes)
+> - Known pre-existing (not blocking, not caused by this batch): 12 React #31 warnings per render with `[object CSS]` arg — confirmed by stashing all Day 4-5 changes and re-checking; errors still present. UI renders correctly; ErrorBoundary doesn't trigger. CSS const is a string, not window.CSS. TODO investigate in a future session.
+> - Next: improvement2.txt Day 6+ background tasks (lazy-load bible-studies.js, restore-name overlay polish, etc.) and Objective D shipping prep (real onboarding copy, WebChromeClient.onConsoleMessage, app icon, splash API, signing config).
 
 ## Quick start (app failed to load? read this first)
 

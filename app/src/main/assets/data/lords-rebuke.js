@@ -7920,7 +7920,7 @@ var LETTERS_REBUKE = [
       "Isaiah 65:6-7": "6. “Behold, it is written before Me: I will not keep silence, but will repay— Even repay into their bosom— 7. Your iniquities and the iniquities of your fathers together,” Says the LORD, “Who have burned incense on the mountains And blasphemed Me on the hills; Therefore I will measure their former work into their bosom.”"
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/the-cup-of-the-wrath-of-my-fury-is-come-to-the-full",
-    "videoVoiceUrl": "http://www.youtube.com/watch?v=NCYImxBCfW4&list=PL6D1BC949E9840878&index=30",
+    "videoVoiceUrl": "https://www.youtube.com/watch?v=NCYImxBCfW4&list=PL6D1BC949E9840878&index=30",
     "videoMusicUrl": "https://www.youtube.com/user/trumpetcallofgod",
     "relatedTopics": [
       {

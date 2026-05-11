@@ -144,7 +144,14 @@
       /* Kill lingering tap/focus highlights globally (Android WebView) */
       * { -webkit-tap-highlight-color: transparent; }
       button, a, [role="button"] { -webkit-tap-highlight-color: transparent; outline: none; }
-      button:focus, button:focus-visible, a:focus, a:focus-visible { outline: none; }
+      /* Tap/click clears the focus ring — only keyboard-driven focus
+         should show the gold outline. The :focus:not(:focus-visible)
+         pattern is the standard idiom: suppresses the ring on
+         mouse/touch focus while preserving it for Tab/Shift-Tab
+         keyboard navigation. Replaces the previous global outline:none
+         that killed keyboard focus app-wide. */
+      button:focus:not(:focus-visible), a:focus:not(:focus-visible), [role="button"]:focus:not(:focus-visible) { outline: none; }
+      button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
     
       /* ── TOP NAV ── */
       /* ── SCREEN LAYOUT (nav stays put, content scrolls) ── */
@@ -2757,7 +2764,11 @@
 
     /* ── LINK PICKER SHEET (create new link) ─────────────────────── */
     .link-picker-overlay {
-      position: fixed; inset: 0; z-index: 8500;
+      /* LinkPicker overlay sits ABOVE NoteSheet (z-index 8500) so that if
+         a user opens LinkPicker from inside a NoteSheet they're not
+         visually buried. NoteSheet stays at 8500; LinkPicker bumped to
+         8502. (8501 reserved for any future "in-between" overlay.) */
+      position: fixed; inset: 0; z-index: 8502;
       background: rgba(0,0,0,0.72);
       /* No backdrop-filter blur — caused sub-pixel anti-aliasing on text
          drawn on top of the blurred backdrop in some browsers. Solid 0.72
@@ -5352,6 +5363,18 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest }) {
   const tapTargetRef = useRef(null);
   const tapPosRef = useRef({ x: 0, y: 0 });
 
+  // Expose a hide bridge so the App-level navigation effect can dismiss
+  // the toolbar when the user leaves the screen — otherwise the
+  // always-mounted toolbar would persist with a stale selInfo anchored
+  // to a hlKey that no longer exists.
+  useEffect(() => {
+    window.__hideSelectionToolbar = () => {
+      setVisible(false);
+      try { const s = window.getSelection(); if (s) s.removeAllRanges(); } catch (e) {}
+    };
+    return () => { window.__hideSelectionToolbar = null; };
+  }, []);
+
   useEffect(() => {
     // Compute and show the toolbar from the current selection
     const computeAndShow = () => {
@@ -6670,7 +6693,17 @@ function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpe
             ) : React.createElement("textarea", {
               ref: textareaRef, className: "note-sheet-textarea",
               value: body, onChange: e => setBody(e.target.value),
-              placeholder: "Write your note…"
+              placeholder: "Write your note…",
+              // Android soft keyboard pushes layout up but doesn't scroll
+              // the focused element into view; scrollIntoView fires AFTER
+              // the keyboard animation so the textarea isn't hidden
+              // behind the keyboard. block:'nearest' avoids jumping the
+              // sheet around on desktop where the keyboard doesn't exist.
+              onFocus: () => {
+                setTimeout(() => {
+                  try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+                }, 220);
+              }
             }),
             // Read mode: no Edit footer — use ⋯ → Edit. Edit mode: Cancel + Save.
             mode === 'edit' && React.createElement("div", { className: "note-sheet-footer" },
@@ -6748,7 +6781,7 @@ function NotebookPickerSheet({ groupId, hlTick, setHlTick, onClose }) {
   return React.createElement("div", { className: "nb-picker-overlay", onClick: onClose },
     React.createElement("div", { className: "nb-picker", onClick: e => e.stopPropagation() },
       React.createElement("div", { className: "nb-picker-header" },
-        React.createElement("span", { className: "nb-picker-title" }, "Add to Notebook"),
+        React.createElement("span", { className: "nb-picker-title" }, memberIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"),
         React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "×")
       ),
       React.createElement("div", { className: "nb-picker-new" },
@@ -11450,7 +11483,7 @@ function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHis
     id: "studies", label: "Studies",
     genres: [
     { label: "VOT Study Bible", books: [
-      { id: "matthew", label: "Matthew Study Bible", total: MATTHEW.chapters.length }]
+      { id: "matthew", label: "Matthew Study Bible", total: (_matthew()?.chapters?.length || 0) }]
     },
     ...(_studies().filter((s) => !s.locked && s.chapters && s.chapters.length > 0).length > 0 ? [{
       label: "Bible Letter Studies",
@@ -13302,6 +13335,20 @@ function App() {
   useEffect(() => { window.__openLinkSidebar = openLinkSidebar; }, [openLinkSidebar]);
   useEffect(() => { window.__showAnnChip = (x, y, hlKey, groupId) => setAnnChip({ x, y, hlKey, groupId }); }, []);
   useEffect(() => { window.__showMultiNote = (groupIds, x, y) => setMultiNotePayload({ groupIds, x, y }); }, []);
+  // Auto-dismiss floating overlays whenever the active screen, letter,
+  // book, or study chapter changes. Without this the always-mounted
+  // SelectionToolbar persists with a stale selInfo, and the
+  // noteSheetTarget keeps the NoteSheet visible over an unrelated
+  // page after the user navigates via letter arrows or hardware back.
+  // Also clears the AnnotationActionChip and MultiNote popover for the
+  // same reason. annChip + multiNote already had partial cleanup in
+  // hlTick reset paths; this consolidates the policy in one place.
+  useEffect(() => {
+    if (typeof window.__hideSelectionToolbar === 'function') window.__hideSelectionToolbar();
+    setNoteSheetTarget(null);
+    setAnnChip(null);
+    setMultiNotePayload(null);
+  }, [screen, letterId, bookId, chapterNum, studyId, studyChapterId]);
   useEffect(() => {
     const t = setTimeout(() => {
       applyDOMHighlights();
@@ -13343,6 +13390,10 @@ function App() {
     });
   }, []);
   const switchToTab = React.useCallback((idx) => {
+    // Cancel any in-flight dwell timer BEFORE flipping tabs — otherwise
+    // the previous tab's "read 90%, fire commit" timer would land on the
+    // newly-active tab and mark the wrong letter as read.
+    cancelDwell();
     setActiveTabIdx((prev) => {
       if (idx < 0) return 0;
       return Math.min(idx, tabs.length - 1);

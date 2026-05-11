@@ -220,7 +220,7 @@ var LETTERS_FLOCK = [
       },
       {
         "label": "Regarding Demons (Bible)",
-        "url": "http://trumpetcallofgodonline.com/index.php5?title=Regarding_Demons"
+        "url": "https://trumpetcallofgodonline.com/index.php5?title=Regarding_Demons"
       },
       {
         "label": "Regarding Prophets (True)",
