@@ -9265,6 +9265,19 @@ function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSetti
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   BACK-HINT PILL — shared across all 4 reading views
+═══════════════════════════════════════════════════════════════ */
+function BackHintPill({ backHint, onClick, ariaLabel }) {
+  if (!backHint) return null;
+  return /*#__PURE__*/React.createElement("div", { className: "back-hint-row" }, /*#__PURE__*/
+    React.createElement("button", { className: "back-hint-pill", onClick: onClick, "aria-label": ariaLabel || "Back to source" }, /*#__PURE__*/
+      React.createElement("span", { className: "back-hint-arrow" }, "‹"), "Back to ", /*#__PURE__*/
+      React.createElement("span", { className: "back-hint-title" }, backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title)
+    )
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    CHAPTER VIEW
 ═══════════════════════════════════════════════════════════════ */
 function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, hlTick, onLinkOpen, backHint, onTapThroughBack }) {
@@ -9318,13 +9331,7 @@ function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTi
       prevLabel: "Previous chapter",
       nextLabel: "Next chapter" }
     ),
-    backHint && /*#__PURE__*/
-    React.createElement("div", { className: "back-hint-row" }, /*#__PURE__*/
-      React.createElement("button", { className: "back-hint-pill", onClick: onTapThroughBack, "aria-label": "Back to source" }, /*#__PURE__*/
-        React.createElement("span", { className: "back-hint-arrow" }, "‹"), "Back to ", /*#__PURE__*/
-        React.createElement("span", { className: "back-hint-title" }, backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title)
-      )
-    ),
+    /*#__PURE__*/React.createElement(BackHintPill, { backHint: backHint, onClick: onTapThroughBack, ariaLabel: "Back to source" }),
     /*#__PURE__*/
     React.createElement("header", { className: "hero" }, /*#__PURE__*/
     React.createElement("div", { className: "hero-bg" }), /*#__PURE__*/
@@ -10101,14 +10108,7 @@ function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSetti
       nextLabel: "Next entry" }
     ),
 
-    backHint && /*#__PURE__*/
-    React.createElement("div", { className: "back-hint-row" }, /*#__PURE__*/
-    React.createElement("button", { className: "back-hint-pill", onClick: onBack, "aria-label": "Back to source letter" }, /*#__PURE__*/
-    React.createElement("span", { className: "back-hint-arrow" }, "\u2039"), "Back to", /*#__PURE__*/
-
-    React.createElement("span", { className: "back-hint-title" }, backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title)
-    )
-    ), /*#__PURE__*/
+    /*#__PURE__*/React.createElement(BackHintPill, { backHint: backHint, onClick: onBack, ariaLabel: "Back to source letter" }), /*#__PURE__*/
 
 
     React.createElement("header", { className: "hero" }, /*#__PURE__*/
@@ -10355,14 +10355,7 @@ function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary,
     ),
 
 
-    backHint && /*#__PURE__*/
-    React.createElement("div", { className: "back-hint-row" }, /*#__PURE__*/
-    React.createElement("button", { className: "back-hint-pill", onClick: onBack, "aria-label": "Back to source letter" }, /*#__PURE__*/
-    React.createElement("span", { className: "back-hint-arrow" }, "\u2039"), "Back to", /*#__PURE__*/
-
-    React.createElement("span", { className: "back-hint-title" }, backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title)
-    )
-    ), /*#__PURE__*/
+    /*#__PURE__*/React.createElement(BackHintPill, { backHint: backHint, onClick: onBack, ariaLabel: "Back to source letter" }), /*#__PURE__*/
 
 
 
@@ -12029,13 +12022,7 @@ function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBo
       prevLabel: "Previous chapter",
       nextLabel: "Next chapter" }
     ),
-    backHint && /*#__PURE__*/
-    React.createElement("div", { className: "back-hint-row" }, /*#__PURE__*/
-      React.createElement("button", { className: "back-hint-pill", onClick: onTapThroughBack, "aria-label": "Back to source" }, /*#__PURE__*/
-        React.createElement("span", { className: "back-hint-arrow" }, "‹"), "Back to ", /*#__PURE__*/
-        React.createElement("span", { className: "back-hint-title" }, backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title)
-      )
-    ),
+    /*#__PURE__*/React.createElement(BackHintPill, { backHint: backHint, onClick: onTapThroughBack, ariaLabel: "Back to source" }),
     (() => {
       const titleEffective = showChapterTitle && !titleFocusHidden;
       const canFocusTitle = showChapterTitle && displayChapterTitle;
