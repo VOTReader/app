@@ -1,7 +1,7 @@
 # CLAUDE.md — VOTReader-studio Project Knowledge Base
 
 > Living document. Update after every major examination or change.
-> Last major update: 2026-05-11 (Objective A complete; Objective B substantial — allowBackup=false, app name VOTReader, Export/Import/Clear in Settings, two silent-failure bugs fixed; AI deferred indefinitely per user direction). Previous: 2026-05-10 Notes / Library / Notebooks system landed (parallel session, see §17.13–§17.18); Phase 0 git setup completed — repo at github.com/corbinlythgoe/VOTReader-studio, private, auth cached.
+> Last major update: 2026-05-11 (full Objective C complete: improvement2.txt Day 1 + Day 2 footnote system + 10 §12 critical bugs + WTLB attribution tap-through + universal single-shot back-pill + Day 4-5 polish + 3 footnote audit fixes from a parallel session; About screen + first-run flow gated by `vot-about-seen`; all 9 session commits fast-forward-merged into `origin/main` at `b19f511` so the GitHub repo's `main` is now the canonical "live" version; AI deferred indefinitely per user direction). Previous: 2026-05-10 Notes / Library / Notebooks system landed (parallel session, see §17.13–§17.18); Phase 0 git setup completed — repo at github.com/corbinlythgoe/VOTReader-studio, private, auth cached.
 >
 > **Working dir**: `D:\VOTReader-studio` (canonical). The C: OneDrive path is legacy — `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app` is now a Junction → `D:\VOTReader-studio\app` (set up 2026-05-08, see Section 17.11). Always edit D: files.
 >

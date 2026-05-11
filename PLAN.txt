@@ -2046,6 +2046,51 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later 8) — main caught up: all session work now on origin/main
+
+  Before this session started, all my work was being committed on
+  branch claude/jovial-yalow-bf2629 (worktree branch). The remote
+  origin/main was still at e6c1097 (PLAN.txt §9 quick-start expand) —
+  9 commits behind. User direction: "please make sure this is our
+  main version and it's live and backed up to github."
+
+  Performed a fast-forward merge — claude/jovial-yalow-bf2629 was a
+  clean linear descendant of main (no divergence, no conflicts):
+
+    git -C <main-worktree> restore <3 files>     # discard parallel-session
+                                                  #   uncommitted edits
+                                                  #   (already subsumed)
+    git -C <main-worktree> fetch origin
+    git -C <main-worktree> merge --ff-only claude/jovial-yalow-bf2629
+    git -C <main-worktree> push origin main
+
+  After fast-forward:
+    origin/main                       = b19f511  (was e6c1097)
+    origin/claude/jovial-yalow-bf2629  = b19f511  (unchanged)
+    local main                        = b19f511
+    local claude/jovial-yalow-bf2629  = b19f511
+
+  The 9 commits that landed in main during this session:
+    e4506e5  Home: add `i` info button → new About VOTReader screen
+    9708880  About: match user mockup + first-run flow gated by vot-about-seen
+    af1aa99  Footnote system: silent-blank fallback, prev/next nav, tap-to-scroll-back
+    7e007e4  PLAN.txt §12 critical bugs: all 10 fixed
+    85c8297  WTLB attribution tap-through + universal single-shot back-pill
+    7be5d63  improvement2.txt Day 4-5 polish (9 items)
+    6d90e0b  Footnote audit fixes (3) — broken letterTitle cross-links
+    b19f511  Footnote audit fixes — polish text-field display strings
+    40d8c47  Objective A + B + improvement2 Day 1: visible fixes
+
+  The feature branch claude/jovial-yalow-bf2629 is identical to main
+  now — kept around as a session-history record. Future sessions can
+  start fresh from main; this branch can be deleted whenever the
+  user feels comfortable doing so (gh-cli or GitHub web UI both
+  work).
+
+  Three other branches exist on origin (claude/hopeful-swirles-4b742e,
+  claude/wizardly-elion-0f4e23, claude/epic-jang-637c72) — those are
+  other worktrees from parallel sessions. Not touched.
+
 2026-05-11 (later 7) — Three audit fixes from parallel session
 
   User did a full footnote/nkjv/{{ref}}/cross-link audit in another
