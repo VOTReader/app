@@ -2046,6 +2046,100 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later 3) — improvement2.txt Day 2 (footnote system) complete
+
+  User's stated #1 pain ("footnote bugs") addressed across six items:
+
+  D2.1 — Silent verse-blank fix (FootnoteSheet)
+    Before: when nkjv[fn.ref] was missing, the sheet showed the ref
+    header with NO body and no error. User taps footnote, sees blank.
+    After: a `.fn-sheet-verse-missing` block reads "Verse text isn't
+    available for this reference. The footnote points to <ref>, but
+    no matching entry was found in this letter's scripture dictionary."
+    Also applied to FootnoteListSection ("— verse text not available"
+    inline next to the ref).
+
+  D2.1b — Data-layer scan (one-time)
+    Wrote a balanced-brace scanner that walks every letter in
+    volume-{one..seven}.js + lords-rebuke.js + letters-flock.js +
+    letters-timothy.js + hidden-manna.js and checks every scripture
+    footnote ref against its letter's nkjv dict. Result: ZERO missing
+    entries across the main collections. The renderer fallback above
+    is purely defensive — current data is clean for the silent-blank
+    failure mode.
+
+  D2.2 — fn.link + fn.url precedence
+    Before: if-else chain — `fn.link ?` first, `fn.url ?` second.
+    A footnote with both would silently drop the url.
+    Grepped all data: ZERO footnotes have both fields today.
+    After: Fragment renders fn.text + fn.link + fn.url together when
+    all present; the secondary url label reads "Open external link"
+    when paired with an in-app link.
+
+  D2.3 — Prev/next navigation inside FootnoteSheet
+    Before: user had to close the sheet and find the next bubble in
+    the body manually. With 8+ footnotes this was tedious dead-end UX.
+    After: FootnoteSheet receives `footnotes` (full dict) +
+    `onNavigate(key)` callback. Computes sorted key list (numeric
+    sort with lexical fallback), shows "Footnote N of M" plus two
+    circular ‹/› nav buttons. Buttons disable on first/last.
+    Verified in browser through forward + back navigation across
+    all three footnotes of "The Wide Path" (Volume 2).
+
+  D2.4 — .fn-ref.active visible on touch
+    Two changes:
+      1. CSS: split `.fn-ref.active` OUT of `@media (hover: hover)`
+         so the rule applies on touch devices too.
+      2. Wiring: `activeFn` prop now reads `sheetFn ?? highlightedFn`
+         (was just `highlightedFn`). When the sheet is open via tap,
+         the in-body bubble gold-glows automatically; when prev/next
+         steps through, the glow follows.
+    Verified live: bubble 1 glows on open → bubble 2 glows after
+    Next → both deactivate on sheet close.
+
+  D2.5 — FootnoteListSection tap-to-scroll-back
+    Before: list items at bottom of letter had `id="fn-item-N"` and
+    the .pulse animation on highlightedFn match, but no onClick —
+    user couldn't tap to jump back to the bubble in the body.
+    After: every list item is now `role="button"` + `tabIndex={0}` +
+    onClick + onKeyDown(Enter/Space). Clicking finds the first
+    matching `.fn-ref[data-fn-num="N"]` via querySelector and calls
+    scrollIntoView. Added `data-fn-num` attribute to bubbles in both
+    Segments() (Volumes/Letters/WTLB path) and the Bible verse
+    Segments handler (Bible chapter view).
+    Verified live: tapping list item scrolls bubble into viewport.
+
+  D2.6 — ScriptureVerseText compound-ref convention
+    Added a comment confirming the " | " (space-pipe-space) splitter
+    convention: single-ref scripture text must never contain literal
+    " | "; the data audit confirms this is uniformly upheld. No code
+    change beyond the comment.
+
+  CSS additions:
+    .fn-sheet-num-row (header layout)
+    .fn-sheet-num-of (subtle "of N" suffix)
+    .fn-sheet-nav (button cluster)
+    .fn-sheet-nav-btn (circular nav button, disabled state at 32% opacity)
+    .fn-sheet-verse-missing (italic muted callout with gold left border)
+    .fn-sheet-url-extra (secondary external-link line)
+    .footnote-list-item: now cursor:pointer + hover bg + focus-visible outline
+    .footnote-list-missing (inline italic muted "verse not available")
+    .footnote-list-url-extra (secondary external-link block)
+
+  One bug found + fixed in this batch:
+    My initial FootnoteListSection edit was short by one closing paren.
+    Symptom: silent JS parse failure → entire main script block didn't
+    execute → React never mounted → blank page (root.children.length = 0,
+    typeof App === 'undefined'). Identified by checking that data
+    libraries loaded but App/FootnoteSheet/AboutScreen were undefined.
+    Fixed by adding the missing `)` in the close sequence.
+    Lesson: when changing closures around a multi-line ternary, count
+    closing parens BEFORE running the page.
+
+  Zero console errors after all six fixes coexist; full footnote
+  lifecycle (open via bubble → step via nav → close → open via list
+  tap → scroll-back) verified live in browser on Volume 2 / The Wide Path.
+
 2026-05-11 (later 2) — AboutScreen redesigned to match user mockup
   User provided a screenshot of the exact desired layout and content.
   Redesign + first-run flow landed.

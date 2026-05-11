@@ -36,7 +36,8 @@
 > - Objective B: `allowBackup="false"`, app name + `<title>` = "VOTReader", `migrateAnnotations` silent-flag-on-failure fixed, `vot-state` save warns on quota now, Settings → "Your Data" section with Export / Import / Clear All Personal Data (verified live)
 > - improvement2.txt Day 1: back-pill missing space, handleAndroidBack Library + Notes-Index cases, SCHEMA_VERSION 11→12, removed two no-op settings (`searchFuzzy`/`searchAllTranslations`), welcome catch return value (verified live)
 > - Objective D piece: AboutScreen + home-nav `i` button. Home now has two buttons side-by-side in the upper left — cross icon reopens the splash image (titled "Welcome image"), new `i` icon opens the About VOTReader screen. About uses a card layout with 3-diamond ornaments top + bottom, "ABOUT VOTREADER" Cinzel uppercase heading, 4 EB-Garamond paragraphs, and a gold-outlined CONTINUE button. First-run flow: splash → ✕ → About auto-opens (only once, gated by new `vot-about-seen` localStorage flag) → CONTINUE → home. Subsequent launches go directly to home; the `i` button reopens About on demand.
-> - Next: Objective C — improvement2.txt Day 2 footnote system, then §12 critical bugs.
+> - improvement2.txt Day 2 (footnote system) — silent verse-blank fallback, fn.link+fn.url coexistence, prev/next nav inside the sheet ("Footnote N of M" + circular ‹/› buttons), `.fn-ref.active` visible on touch (`activeFn` now reads `sheetFn ?? highlightedFn`), and tap-to-scroll-back from FootnoteListSection (bubble lookup via new `data-fn-num` attribute). Verified live on Volume 2 / "The Wide Path".
+> - Next: Objective C — §12 critical bugs (Holy Days note routing, Matthew Study note labels, prophecy card persistence, WTLB markdown intros, 21 D8 glued-text bugs, destSnapshot null/undefined, phantom notes, NoteSheet startInEditMode, Android hardware back, translation-tagged inline refs), then Day 4-5 polish.
 
 ## Quick start (app failed to load? read this first)
 
