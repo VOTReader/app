@@ -13827,24 +13827,17 @@ function App() {
     }
     return {
       showReadingDot: false, showSurpriseButton: false, markAsRead: false,
-      showProgressBar: true, searchIncludeNotes: false,
-      // Search v2 (FlexSearch) — fine-grained toggles
-      searchIncludeVerses: true,
-      searchIncludeHeadings: true,
-      searchIncludeStudyNotes: true,
-      searchIncludeCrossRefs: false,
-      searchIncludeFootnotes: true,
-      searchIncludeLetters: true,
-      searchIncludeLetterBody: true,
-      searchIncludeWtlb: true,
-      searchIncludeBlessed: true,
-      searchIncludeHolyDays: true,
-      searchIncludeBibleStudies: true,
-      // Removed 2026-05-11: searchAllTranslations + searchFuzzy were no-op defaults
-      // (no UI toggle, never read by VotSearch.search). If fuzzy search is wanted
-      // later, wire it through both options.fuzzy in search.js executeSearch AND a
-      // real UI toggle. Same for multi-translation: ALT_TRANSLATIONS is already
-      // always indexed regardless.
+      showProgressBar: true,
+      // Search defaults — only the values that are actually wired to
+      // VotSearch.search() at the call site. Previously this block also
+      // declared 12 searchInclude* flags (Notes, Verses, Headings,
+      // StudyNotes, CrossRefs, Footnotes, Letters, LetterBody, Wtlb,
+      // Blessed, HolyDays, BibleStudies) plus searchFuzzy and
+      // searchAllTranslations — all dead defaults (declared, never read,
+      // never exposed in UI). Removed 2026-05-11 so future devs aren't
+      // misled into wiring against them. If granular include/exclude
+      // ever ships, declare AT THAT TIME with both a Settings UI toggle
+      // AND a consumer in the search call.
       searchUseStopWords: true,
       searchCorpus: 'all', // 'all' | 'scriptures' | 'volumes'
       haptic: true,
