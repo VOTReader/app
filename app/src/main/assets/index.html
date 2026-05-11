@@ -1527,15 +1527,25 @@
     .settings-toggle input:checked ~ .settings-toggle-thumb { transform:translateX(18px); }
     .settings-select { appearance:none; -webkit-appearance:none; background:var(--bg); border:1px solid var(--gold-border); border-radius:6px; color:var(--gold); font-family:'Cinzel',serif; font-size:0.72rem; letter-spacing:0.08em; padding:0.45rem 2rem 0.45rem 0.7rem; cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c8a456' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 0.6rem center; }
     body.light .settings-select { background-color:var(--bg); background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a5c10' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
-    /* ── ABOUT SCREEN ── (reuses .settings-screen / .settings-header / .settings-eyebrow / .settings-title / .settings-ornament-*) */
-    .about-body { width:100%; max-width:560px; }
-    .about-body p { font-family:'EB Garamond',Georgia,serif; font-size:1.05rem; line-height:1.7; color:var(--cream-dim); margin:0 0 1.2rem; }
-    .about-body p em { color:var(--gold-bright); font-style:italic; }
-    .about-body p strong { color:var(--gold-bright); font-weight:600; font-style:normal; }
-    .about-body p a { color:var(--tap-ref); text-decoration:underline; text-underline-offset:2px; }
-    .about-body .about-source { font-style:italic; color:var(--cream-muted); font-size:0.95rem; text-align:center; margin-top:2rem; }
+    /* ── ABOUT SCREEN ── */
+    .about-screen { min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1.25rem 4rem; }
+    .about-card { width:100%; max-width:560px; background:var(--bg2); border:1px solid var(--gold-border); border-radius:14px; padding:2rem 1.6rem 2.2rem; text-align:center; }
+    .about-diamonds { display:flex; align-items:center; justify-content:center; gap:1.5rem; margin:0 auto; }
+    .about-diamond { width:6px; height:6px; background:var(--gold); transform:rotate(45deg); display:inline-block; }
+    .about-heading { font-family:'Cinzel',serif; font-size:1.05rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin:1.4rem 0 1.8rem; font-weight:500; }
+    .about-body { text-align:center; }
+    .about-body p { font-family:'EB Garamond',Georgia,serif; font-size:1.05rem; line-height:1.65; color:var(--cream-dim); margin:0 0 1.4rem; }
+    .about-body p:last-child { margin-bottom:0; }
+    .about-body p em { color:var(--cream); font-style:italic; }
+    .about-body p a { color:inherit; text-decoration:none; }
+    .about-body p a em { color:var(--cream); }
+    .about-card > .about-diamonds:last-of-type { margin-top:1.8rem; margin-bottom:1.4rem; }
+    .about-continue { display:inline-block; font-family:'Cinzel',serif; font-size:0.85rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); background:transparent; border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem 2.4rem; cursor:pointer; transition:background 0.18s ease, border-color 0.18s ease; }
+    .about-continue:hover, .about-continue:focus-visible { background:rgba(200,164,86,0.08); border-color:var(--gold); }
+    body.light .about-card { background:var(--bg2); border-color:var(--gold-border); }
     body.light .about-body p { color:#3a3527; }
-    body.light .about-body p em, body.light .about-body p strong { color:var(--gold); }
+    body.light .about-body p em, body.light .about-body p a em { color:#1f1c14; }
+    body.light .about-heading { color:var(--gold); }
     /* ── CUSTOM SELECT FIELD + BOTTOM SHEET ── */
     .select-field {
       display:flex; align-items:center; gap:0.6rem;
@@ -11068,7 +11078,7 @@ function scrollKeyForTab(tab) {
   return s || 'home';
 }
 
-function AboutScreen({ onBack, onSearch, onHistory, theme, onThemeChange }) {
+function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {
   return (/*#__PURE__*/
     React.createElement(ScreenLayout, { navChildren: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
       React.createElement("button", { className: "nav-home nav-back-icon", onClick: onBack, title: "Back", "aria-label": "Back" }, "‹"), /*#__PURE__*/
@@ -11081,35 +11091,36 @@ function AboutScreen({ onBack, onSearch, onHistory, theme, onThemeChange }) {
       ), /*#__PURE__*/
       React.createElement(ThemeBtn, { theme: theme, onThemeChange: onThemeChange })
       ) }, /*#__PURE__*/
-    React.createElement("div", { className: "settings-screen" }, /*#__PURE__*/
-    React.createElement("div", { className: "settings-header" }, /*#__PURE__*/
-    React.createElement("div", { className: "settings-eyebrow" }, "VOT Study Bible"), /*#__PURE__*/
-    React.createElement("h1", { className: "settings-title" }, "About VOTReader"), /*#__PURE__*/
-    React.createElement("div", { className: "settings-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "settings-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "settings-ornament-diamond" }), /*#__PURE__*/
-    React.createElement("div", { className: "settings-ornament-line r" })
-    )
+    React.createElement("div", { className: "about-screen" }, /*#__PURE__*/
+    React.createElement("div", { className: "about-card" }, /*#__PURE__*/
+    React.createElement("div", { className: "about-diamonds", "aria-hidden": "true" }, /*#__PURE__*/
+    React.createElement("span", { className: "about-diamond" }), /*#__PURE__*/
+    React.createElement("span", { className: "about-diamond" }), /*#__PURE__*/
+    React.createElement("span", { className: "about-diamond" })
     ), /*#__PURE__*/
+    React.createElement("h1", { className: "about-heading" }, "About VOTReader"), /*#__PURE__*/
     React.createElement("div", { className: "about-body" }, /*#__PURE__*/
     React.createElement("p", null,
-      "VOTReader is an offline reader for ", /*#__PURE__*/React.createElement("em", null, "The Volumes of Truth"),
-      " and ", /*#__PURE__*/React.createElement("em", null, "The Scriptures of Truth"),
-      " — prophetic letters and the canonical Bible, gathered into one quiet place for reading and personal reflection."
+      "The Volumes of Truth are the Word of The Lord, given through His servant Timothy."
     ), /*#__PURE__*/
     React.createElement("p", null,
-      "What's inside: the seven Volumes, The Lord's Rebuke, Letters to The Little Flock, Letters from Timothy, ",
-      "Words To Live By (Parts One and Two), The Blessed, Regarding The Holy Days, ",
-      "the Matthew Study Bible, additional Bible Studies, and the canonical Bible in NKJV plus seven additional translations."
+      "This reader was made by a disciple for personal study and reflection. It is not the canonical source."
     ), /*#__PURE__*/
     React.createElement("p", null,
-      "Your notes, highlights, notebooks, links, bookmarks, journal entries, marked-as-read progress, reading history, and tabs all stay on this device. ",
-      "No accounts. No cloud sync. No telemetry. Use ", /*#__PURE__*/React.createElement("strong", null, "Settings → Your Data"),
-      " to export a backup file whenever you'd like."
+      "Your notes, journal, and highlights stay on this device. Use Settings → Export to save them to a file you control."
     ), /*#__PURE__*/
-    React.createElement("p", { className: "about-source" },
-      "The wellspring of these texts is ", /*#__PURE__*/React.createElement("a", { href: "https://www.thevolumesoftruth.com", target: "_blank", rel: "noopener noreferrer" }, "thevolumesoftruth.com"), "."
+    React.createElement("p", null,
+      "For the canonical text, audio, video, and PDF files, visit ",
+      /*#__PURE__*/React.createElement("a", { href: "https://www.thevolumesoftruth.com", target: "_blank", rel: "noopener noreferrer" }, /*#__PURE__*/React.createElement("em", null, "thevolumesoftruth.com")),
+      "."
     )
+    ), /*#__PURE__*/
+    React.createElement("div", { className: "about-diamonds", "aria-hidden": "true" }, /*#__PURE__*/
+    React.createElement("span", { className: "about-diamond" }), /*#__PURE__*/
+    React.createElement("span", { className: "about-diamond" }), /*#__PURE__*/
+    React.createElement("span", { className: "about-diamond" })
+    ), /*#__PURE__*/
+    React.createElement("button", { className: "about-continue", onClick: onContinue, "aria-label": "Continue" }, "Continue")
     )
     )
     ));
@@ -13622,6 +13633,15 @@ function App() {
   const dismissWelcome = () => {
     try {localStorage.setItem('vot-welcomed', '1');} catch (e) {}
     setShowWelcome(false);
+    // First-time users see the About intro right after the splash. After
+    // CONTINUE marks `vot-about-seen`, this path becomes a no-op and the
+    // splash just dismisses straight to home on subsequent uses.
+    try {
+      if (!localStorage.getItem('vot-about-seen')) {
+        setNavOrigin({ screen: 'home', bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
+        setScreen('about');
+      }
+    } catch (e) {}
   };
   // Tab-local search/nav breadcrumbs (each tab has its own search context)
   const [searchQuery, setSearchQuery] = tabField('searchQuery');
@@ -14301,7 +14321,7 @@ function App() {
       }
       if (s === "settings") {goNavOrigin();return "true";} else
       if (s === "history") {goNavOrigin();return "true";} else
-      if (s === "about") {goNavOrigin();return "true";} else
+      if (s === "about") {try{localStorage.setItem('vot-about-seen','1');}catch(e){}goNavOrigin();return "true";} else
       if (s === "notes-index") {setScreen("library");return "true";} else
       if (s === "library") {goHome();return "true";} else
       if (s === "search") {goSearchOrigin();return "true";} else
@@ -14778,7 +14798,14 @@ function App() {
 
     screen === "about" && /*#__PURE__*/
     React.createElement(AboutScreen, {
-      onBack: goNavOrigin,
+      onContinue: () => {
+        try { localStorage.setItem('vot-about-seen', '1'); } catch (e) {}
+        goNavOrigin();
+      },
+      onBack: () => {
+        try { localStorage.setItem('vot-about-seen', '1'); } catch (e) {}
+        goNavOrigin();
+      },
       onSearch: goSearch,
       onHistory: goHistory,
       theme: theme, onThemeChange: setTheme }

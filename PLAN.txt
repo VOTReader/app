@@ -2046,6 +2046,59 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later 2) — AboutScreen redesigned to match user mockup
+  User provided a screenshot of the exact desired layout and content.
+  Redesign + first-run flow landed.
+
+  Visual changes (replacing the prior settings-style header):
+    ✓ Card layout: rounded gold-bordered panel centered on screen
+    ✓ Three small gold diamonds top + bottom (replaces single-diamond
+      settings-ornament — purely about-specific)
+    ✓ "ABOUT VOTREADER" heading in Cinzel, uppercase, gold, letter-spaced
+      0.22em (replaces the eyebrow + Cinzel-Decorative title pattern)
+    ✓ Body: 4 EB-Garamond paragraphs, center-aligned, cream
+    ✓ Italicized "thevolumesoftruth.com" link in final paragraph
+    ✓ "CONTINUE" button: gold-outlined rounded rect, Cinzel uppercase,
+      letter-spaced 0.3em
+
+  Body copy (final, matches user mockup verbatim):
+    1. "The Volumes of Truth are the Word of The Lord, given through
+        His servant Timothy."
+    2. "This reader was made by a disciple for personal study and
+        reflection. It is not the canonical source."
+    3. "Your notes, journal, and highlights stay on this device. Use
+        Settings → Export to save them to a file you control."
+    4. "For the canonical text, audio, video, and PDF files, visit
+        thevolumesoftruth.com." (with the .com in italics + linked)
+
+  First-run flow (NEW):
+    ✓ `vot-about-seen` localStorage flag added (separate from
+       `vot-welcomed`)
+    ✓ dismissWelcome (splash ✕ button): now also opens AboutScreen
+       if vot-about-seen is not yet set. After CONTINUE/Back/Android-back
+       the flag is set, so subsequent splash dismissals go straight to
+       home without showing About again.
+    ✓ Three exit paths from About all mark vot-about-seen=1:
+       - onContinue (CONTINUE button) → goNavOrigin
+       - onBack (back arrow) → goNavOrigin
+       - handleAndroidBack ('about' case) → goNavOrigin
+
+  Repeat behavior:
+    - `i` button on home always opens About on demand
+    - Cross button on home always reopens splash
+    - Splash ✕ after first-run goes straight to home
+
+  Verified live in browser through full first-run + repeat flow:
+    - Cleared vot-welcomed + vot-about-seen + vot-state → splash shows
+    - Dismiss splash → About auto-shows
+    - Click Continue → home + vot-about-seen='1'
+    - Reload → home directly (no splash, no About)
+    - Click `i` button → About opens
+    - Click Continue → home
+    - Click cross → splash
+    - Dismiss splash → home (NOT About — flag respected)
+    - Zero console errors throughout
+
 2026-05-11 (later) — About screen + home-nav split (Objective D piece)
   User request landed: "create an i (info button icon) and place it next
   to the cross on the homescreen, when tapped it should pull up the app
@@ -2057,6 +2110,7 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
       gold-ornament divider, 4 EB Garamond paragraphs covering what
       VOTReader is, what's inside, local-only data + Export pointer,
       and the wellspring link to thevolumesoftruth.com
+      (SUPERSEDED by the redesign above — kept here for log continuity)
     ✓ New screen state 'about' wired through:
         - goAbout() in App (sets navOrigin then screen)
         - render block for screen === 'about'
@@ -2066,16 +2120,9 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
           "Welcome image" (was misleadingly labeled "About")
         - NEW `i` icon (info: circle outline + vertical bar + dot above)
           → opens AboutScreen
-    ✓ Reused .settings-screen / .settings-header / .settings-eyebrow /
-      .settings-title / .settings-ornament-* classes for structural
-      consistency. Added small .about-body + .about-source CSS block.
     ✓ Verified live: navigation chain Home → About → Back-button → Home;
       Home → cross → splash → ✕ → Home; Android hardware back from
       About returns to home. Zero console errors.
-
-  Body copy is reasonable placeholder text matching the app's literary
-  tone. User can revise wording at any time — change is local to the
-  AboutScreen function in index.html.
 
 2026-05-11 — Objective A complete + Objective B substantial progress
   Session: fix-focused, working on branch claude/jovial-yalow-bf2629

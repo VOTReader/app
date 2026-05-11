@@ -35,7 +35,7 @@
 > - Objective A: junction verified, NIM proxy infrastructure entirely deleted, 9 `.bak-pre-*` files (~39 MB) + `orama.min.js` (~70 KB) deleted from the asset tree
 > - Objective B: `allowBackup="false"`, app name + `<title>` = "VOTReader", `migrateAnnotations` silent-flag-on-failure fixed, `vot-state` save warns on quota now, Settings → "Your Data" section with Export / Import / Clear All Personal Data (verified live)
 > - improvement2.txt Day 1: back-pill missing space, handleAndroidBack Library + Notes-Index cases, SCHEMA_VERSION 11→12, removed two no-op settings (`searchFuzzy`/`searchAllTranslations`), welcome catch return value (verified live)
-> - Objective D piece: AboutScreen + home-nav `i` button. Home now has two buttons side-by-side in the upper left — cross icon reopens the splash image (titled "Welcome image"), new `i` icon opens the new About VOTReader screen with the introduction message. screen state `'about'` + `goAbout()` + `handleAndroidBack` case wired.
+> - Objective D piece: AboutScreen + home-nav `i` button. Home now has two buttons side-by-side in the upper left — cross icon reopens the splash image (titled "Welcome image"), new `i` icon opens the About VOTReader screen. About uses a card layout with 3-diamond ornaments top + bottom, "ABOUT VOTREADER" Cinzel uppercase heading, 4 EB-Garamond paragraphs, and a gold-outlined CONTINUE button. First-run flow: splash → ✕ → About auto-opens (only once, gated by new `vot-about-seen` localStorage flag) → CONTINUE → home. Subsequent launches go directly to home; the `i` button reopens About on demand.
 > - Next: Objective C — improvement2.txt Day 2 footnote system, then §12 critical bugs.
 
 ## Quick start (app failed to load? read this first)
