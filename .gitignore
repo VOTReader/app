@@ -1,0 +1,81 @@
+# ─── Build artifacts ──────────────────────────────────────────────
+/build/
+/app/build/
+.gradle/
+.kotlin/
+local.properties
+*.iml
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/runConfigurations.xml
+.idea/codeStyles/
+
+# ─── Compiled ────────────────────────────────────────────────────
+*.class
+
+# ─── OS / editor cruft ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.bak
+*.lnk
+
+# ─── Generated build-output mirror of assets (.html/.js auto-copied) ──
+# app/build/intermediates/.../mergeDebugAssets/ duplicates app/src/main/assets/
+# but lives under /app/build/ which is already ignored. Belt-and-suspenders.
+app/build/intermediates/
+
+# ─── OCR pipeline output (~121 MB, generated; not source) ────────
+_ocr_out/
+
+# ─── Backup files (37 MB; git history is the proper backup now) ──
+*.bak-pre-*
+data/*.bak-pre-*
+old_*.bin
+old_*.txt
+old_*.b64.txt
+
+# ─── Secrets and environment (NEVER commit) ──────────────────────
+.env
+.env.*
+!.env.example
+GEMINI_KEYS*.md
+*_KEYS*.md
+*_keys*.py
+test_keys.py
+test_new_keys.py
+ocr_gemini.py
+probe_rate.py
+
+# ─── Logs ────────────────────────────────────────────────────────
+*.log
+
+# ─── Android signing (NEVER commit; loses production keystore = locked out) ──
+*.keystore
+*.jks
+release-keystore.properties
+keystore.properties
+
+# ─── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# ─── Claude Code config (workspace-local, may contain MCP secrets) ──
+.claude/settings.local.json
+
+# ─── WebView runtime cache (created when previewing) ─────────────
+app_webview/
+
+# ─── HTML Archives (38K lines of legacy reference, derivable from data/) ──
+# Keep the content in case we need it later, but skip from git.
+# If you want them tracked, remove the next line.
+HTML\ Archives/
