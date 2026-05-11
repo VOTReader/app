@@ -1449,6 +1449,22 @@
     .garden-warning-btn-cancel:active { background:rgba(255,255,255,0.05); }
     .garden-warning-btn-proceed { background:var(--gold-faint); border:1px solid var(--gold); color:var(--gold-bright); }
     .garden-warning-btn-proceed:active { background:var(--gold-border); }
+
+    /* Welcome About modal — shown after splash dismissal, on top of home */
+    .welcome-about-overlay { position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,0.72); display:flex; align-items:center; justify-content:center; padding:1.5rem; padding-top:calc(var(--inset-top, 0px) + 1.5rem); padding-bottom:calc(var(--inset-bottom, 0px) + 1.5rem); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); overflow-y:auto; }
+    .welcome-about-modal { background:var(--bg2); border:1px solid var(--gold-border); border-radius:12px; max-width:30rem; width:100%; padding:2rem 1.6rem 1.6rem; box-shadow:0 24px 70px rgba(0,0,0,0.7); }
+    .welcome-about-ornament { color:var(--gold-dim); text-align:center; font-family:var(--font-cinzel); letter-spacing:0.6em; font-size:0.85rem; line-height:1; margin:0.4rem 0 1.2rem; user-select:none; }
+    .welcome-about-ornament.bottom { margin:1.4rem 0 1.2rem; }
+    .welcome-about-title { font-family:var(--font-cinzel); font-size:1.1rem; letter-spacing:0.1em; color:var(--gold); text-align:center; margin-bottom:1.2rem; text-transform:uppercase; }
+    .welcome-about-body { font-family:var(--font-garamond); font-size:1rem; line-height:1.6; color:var(--cream-dim); text-align:center; }
+    .welcome-about-body p { margin-bottom:0.9rem; }
+    .welcome-about-body p:last-child { margin-bottom:0; }
+    .welcome-about-body .site { color:var(--cream); font-style:italic; }
+    .welcome-about-actions { display:flex; justify-content:center; margin-top:0.4rem; }
+    .welcome-about-btn { font-family:var(--font-cinzel); font-size:0.85rem; letter-spacing:0.16em; text-transform:uppercase; padding:0.75rem 2.4rem; border-radius:6px; cursor:pointer; transition:background 0.15s, border-color 0.15s; background:transparent; border:1.5px solid var(--gold-border); color:var(--gold); }
+    .welcome-about-btn:active { background:var(--gold-faint); border-color:var(--gold); }
+    @media (hover: hover) { .welcome-about-btn:hover { background:var(--gold-faint); border-color:var(--gold); color:var(--gold-bright); } }
+
     .garden-tier-selector { display:flex; flex-direction:column; gap:0.4rem; margin-bottom:1.2rem; }
     .garden-tier-label { font-family:var(--font-cinzel); font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.3rem; text-align:center; }
     .garden-tier-hint { font-family:var(--font-garamond); font-size:0.8rem; color:var(--cream-dim); font-style:italic; text-align:center; margin-bottom:0.5rem; }
@@ -13405,6 +13421,7 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(() => {
     try {return !localStorage.getItem('vot-welcomed');} catch (e) {return true;}
   });
+  const [splashDismissed, setSplashDismissed] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -14416,7 +14433,7 @@ function App() {
 
 
 
-    showWelcome && /*#__PURE__*/
+    showWelcome && !splashDismissed && /*#__PURE__*/
     React.createElement("div", { style: {
         position: 'fixed', inset: 0, zIndex: 9999,
         backgroundImage: 'url("splash.jpg")',
@@ -14427,7 +14444,8 @@ function App() {
       } }, /*#__PURE__*/
     React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end' } }, /*#__PURE__*/
     React.createElement("button", {
-      onClick: dismissWelcome,
+      onClick: () => setSplashDismissed(true),
+      "aria-label": "Close splash",
       style: {
         margin: 'calc(var(--inset-top, 0px) + 1rem) 1rem 0 0',
         background: 'rgba(0,0,0,0.55)', border: '1.5px solid rgba(255,255,255,0.35)',
@@ -14450,7 +14468,23 @@ function App() {
     )
     ),
 
-
+    showWelcome && splashDismissed && /*#__PURE__*/
+    React.createElement("div", { className: "welcome-about-overlay" }, /*#__PURE__*/
+    React.createElement("div", { className: "welcome-about-modal" }, /*#__PURE__*/
+    React.createElement("div", { className: "welcome-about-ornament" }, "◇  ◇  ◇"), /*#__PURE__*/
+    React.createElement("div", { className: "welcome-about-title" }, "About VOTReader"), /*#__PURE__*/
+    React.createElement("div", { className: "welcome-about-body" }, /*#__PURE__*/
+    React.createElement("p", null, "The Volumes of Truth are the Word of The Lord, given through His servant Timothy, and published at ", /*#__PURE__*/React.createElement("span", { className: "site" }, "thevolumesoftruth.com"), "."), /*#__PURE__*/
+    React.createElement("p", null, "This reader was made by a disciple for personal study and reflection. It is not the canonical source."), /*#__PURE__*/
+    React.createElement("p", null, "Your notes, highlights, and reading position stay on this device. Use Settings → Export to save them to a file you control."), /*#__PURE__*/
+    React.createElement("p", null, "For the canonical text, audio, video, and ", /*#__PURE__*/React.createElement("em", null, "A Return to the Garden"), " in full resolution, visit ", /*#__PURE__*/React.createElement("span", { className: "site" }, "thevolumesoftruth.com"), ".")
+    ), /*#__PURE__*/
+    React.createElement("div", { className: "welcome-about-ornament bottom" }, "◇  ◇  ◇"), /*#__PURE__*/
+    React.createElement("div", { className: "welcome-about-actions" }, /*#__PURE__*/
+    React.createElement("button", { className: "welcome-about-btn", onClick: dismissWelcome }, "Continue")
+    )
+    )
+    ),
 
     settings.tabsEnabled && tabsOverviewOpen && /*#__PURE__*/
     React.createElement("div", { className: "tabs-overview-layer" }, /*#__PURE__*/
