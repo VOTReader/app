@@ -38,7 +38,7 @@ var buildError = null;
 // ─── IndexedDB cache ───
 // Bump SCHEMA_VERSION when doc shape changes OR tokenizer config changes;
 // cache is invalidated automatically because the signature includes this.
-var SCHEMA_VERSION = 11;                    // bumped — multi-translation verse indexing
+var SCHEMA_VERSION = 12;                    // bumped — picks up 54-bug data sweep (body-text fixes invisible to cached indexes)
 var ALT_TRANSLATIONS = ['kjv', 'asv', 'web', 'bsb', 'hnv', 'lsv', 'ylt'];
 
 // ─── Archaic/modern pronoun normalization (bidirectional) ───
