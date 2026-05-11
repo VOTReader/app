@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>SacredUI</title>
+  <title>VOTReader</title>
   <style>
     @font-face { font-family: 'Cinzel'; font-weight: 400; font-style: normal; src: url('fonts/Cinzel-Regular.otf') format('opentype'); font-display: swap; }
     @font-face { font-family: 'Cinzel'; font-weight: 600; font-style: normal; src: url('fonts/Cinzel-Bold.otf') format('opentype'); font-display: swap; }
@@ -3913,8 +3913,7 @@ function migrateAnnotations() {
     }
     localStorage.setItem('vot-ann-migrated', '1');
   } catch (e) {
-    console.warn('annotation migration failed', e);
-    try { localStorage.setItem('vot-ann-migrated', '1'); } catch (e2) {}
+    console.warn('annotation migration failed; will retry next launch', e);
   }
 }
 migrateAnnotations();
@@ -10104,7 +10103,7 @@ function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSetti
     backHint && /*#__PURE__*/
     React.createElement("div", { className: "back-hint-row" }, /*#__PURE__*/
     React.createElement("button", { className: "back-hint-pill", onClick: onBack, "aria-label": "Back to source letter" }, /*#__PURE__*/
-    React.createElement("span", { className: "back-hint-arrow" }, "\u2039"), "Back to", /*#__PURE__*/
+    React.createElement("span", { className: "back-hint-arrow" }, "\u2039"), "Back to ", /*#__PURE__*/
 
     React.createElement("span", { className: "back-hint-title" }, backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title)
     )
@@ -10358,7 +10357,7 @@ function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary,
     backHint && /*#__PURE__*/
     React.createElement("div", { className: "back-hint-row" }, /*#__PURE__*/
     React.createElement("button", { className: "back-hint-pill", onClick: onBack, "aria-label": "Back to source letter" }, /*#__PURE__*/
-    React.createElement("span", { className: "back-hint-arrow" }, "\u2039"), "Back to", /*#__PURE__*/
+    React.createElement("span", { className: "back-hint-arrow" }, "\u2039"), "Back to ", /*#__PURE__*/
 
     React.createElement("span", { className: "back-hint-title" }, backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title)
     )
@@ -11232,6 +11231,92 @@ function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHis
     return next;
   });
 
+  // ===== Personal-data export / import / clear =====
+  const _collectVotKeys = () => {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('vot-') === 0) keys.push(k);
+    }
+    return keys;
+  };
+  const exportPersonalData = () => {
+    try {
+      const data = {};
+      _collectVotKeys().forEach((k) => { data[k] = localStorage.getItem(k); });
+      const payload = {
+        app: 'VOTReader',
+        exportVersion: 1,
+        exportDate: new Date().toISOString(),
+        data: data
+      };
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `votreader-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { try { URL.revokeObjectURL(url); a.remove(); } catch (e) {} }, 0);
+    } catch (e) {
+      console.warn('export failed', e);
+      alert('Export failed. See console for details.');
+    }
+  };
+  const importPersonalData = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        try {
+          const parsed = JSON.parse(re.target.result);
+          if (!parsed || parsed.app !== 'VOTReader' || !parsed.data || typeof parsed.data !== 'object') {
+            alert('This file does not look like a VOTReader backup.');
+            return;
+          }
+          const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
+          const proceed = window.confirm(
+            'Importing the backup from ' + dateLabel + ' will REPLACE all your current notes, highlights, notebooks, journal entries, bookmarks, links, reading progress, history, tabs, and settings on this device. This cannot be undone.\n\nContinue?'
+          );
+          if (!proceed) return;
+          _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+          Object.keys(parsed.data).forEach((k) => {
+            if (k.indexOf('vot-') === 0 && typeof parsed.data[k] === 'string') {
+              try { localStorage.setItem(k, parsed.data[k]); } catch (e) {
+                console.warn('import: localStorage write failed for', k, e);
+              }
+            }
+          });
+          alert('Import complete. The app will now reload.');
+          window.location.reload();
+        } catch (err) {
+          console.warn('import failed', err);
+          alert('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+  const clearAllPersonalData = () => {
+    try {
+      _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+      try { indexedDB.deleteDatabase('vot-thumbs'); } catch (e) {}
+      try { indexedDB.deleteDatabase('vot-search-cache'); } catch (e) {}
+      alert('All personal data cleared. The app will now reload.');
+      window.location.reload();
+    } catch (e) {
+      console.warn('clear all personal data failed', e);
+      alert('Clear failed. See console for details.');
+    }
+  };
+
   return (/*#__PURE__*/
     React.createElement(ScreenLayout, { navChildren: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
       React.createElement("button", { className: "nav-home nav-back-icon", onClick: onBack, title: "Back", "aria-label": "Back" }, "\u2039"), /*#__PURE__*/
@@ -11422,6 +11507,35 @@ function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHis
       })),
       onChange: (v) => onSetting("gardenTier", v) }
     )
+    ), /*#__PURE__*/
+
+    React.createElement("div", { className: "settings-section" }, /*#__PURE__*/
+    React.createElement("div", { className: "settings-section-label" }, "Your Data"), /*#__PURE__*/
+    React.createElement("div", { className: "settings-row" }, /*#__PURE__*/
+    React.createElement("div", { className: "settings-row-text" }, /*#__PURE__*/
+    React.createElement("div", { className: "settings-row-label" }, "Export Your Data"), /*#__PURE__*/
+    React.createElement("div", { className: "settings-row-desc" }, "Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as a single JSON file. No credentials or login info — just your data. Save the file anywhere you control.")
+    ), /*#__PURE__*/
+    React.createElement("button", { className: "settings-clear-btn", onClick: (e) => { e.stopPropagation(); exportPersonalData(); } }, "Export")
+    ), /*#__PURE__*/
+    React.createElement("div", { className: "settings-row" }, /*#__PURE__*/
+    React.createElement("div", { className: "settings-row-text" }, /*#__PURE__*/
+    React.createElement("div", { className: "settings-row-label" }, "Import from Backup"), /*#__PURE__*/
+    React.createElement("div", { className: "settings-row-desc" }, "Restore a previously exported JSON file. Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten.")
+    ), /*#__PURE__*/
+    React.createElement("button", { className: "settings-clear-btn", onClick: (e) => { e.stopPropagation(); importPersonalData(); } }, "Import")
+    ),
+    (() => {
+      const dpStage = getStage("personal-data");
+      const dpLabel = dpStage === 0 ? "Clear All My Data" : CLEAR_LABELS[dpStage];
+      return /*#__PURE__*/React.createElement("div", { className: "settings-row" }, /*#__PURE__*/
+        React.createElement("div", { className: "settings-row-text" }, /*#__PURE__*/
+        React.createElement("div", { className: "settings-row-label" }, "Clear All Personal Data"), /*#__PURE__*/
+        React.createElement("div", { className: "settings-row-desc" }, "Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup.")
+        ), /*#__PURE__*/
+        React.createElement("button", { className: CLEAR_CLASSES[dpStage], onClick: handleClearTap("personal-data", clearAllPersonalData) }, dpLabel)
+      );
+    })()
     ), /*#__PURE__*/
 
     React.createElement("div", { className: "settings-section" }, /*#__PURE__*/
@@ -13394,8 +13508,11 @@ function App() {
       searchIncludeBlessed: true,
       searchIncludeHolyDays: true,
       searchIncludeBibleStudies: true,
-      searchAllTranslations: false,
-      searchFuzzy: 1,
+      // Removed 2026-05-11: searchAllTranslations + searchFuzzy were no-op defaults
+      // (no UI toggle, never read by VotSearch.search). If fuzzy search is wanted
+      // later, wire it through both options.fuzzy in search.js executeSearch AND a
+      // real UI toggle. Same for multi-translation: ALT_TRANSLATIONS is already
+      // always indexed regardless.
       searchUseStopWords: true,
       searchCorpus: 'all', // 'all' | 'scriptures' | 'volumes'
       haptic: true,
@@ -13430,7 +13547,7 @@ function App() {
   const [titleFocusHidden, setTitleFocusHidden] = tabField('titleFocusHidden');
   const [headingsFocusHidden, setHeadingsFocusHidden] = tabField('headingsFocusHidden');
   const [showWelcome, setShowWelcome] = useState(() => {
-    try {return !localStorage.getItem('vot-welcomed');} catch (e) {return false;}
+    try {return !localStorage.getItem('vot-welcomed');} catch (e) {return true;}
   });
   const [isOnline, setIsOnline] = useState(false);
   useEffect(() => {
@@ -13579,7 +13696,7 @@ function App() {
         theme, lastReadChapters, lastReadLetterMap,
         activeReadKey, settings, readItems
       }));
-    } catch (e) {}
+    } catch (e) { console.warn('localStorage write failed for vot-state', e); }
   }, [tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap, activeReadKey, settings, readItems]);
 
   const ALL_BOOKS = { matthew: MATTHEW, ...BOOKS };
@@ -14124,6 +14241,8 @@ function App() {
       }
       if (s === "settings") {goNavOrigin();return "true";} else
       if (s === "history") {goNavOrigin();return "true";} else
+      if (s === "notes-index") {setScreen("library");return "true";} else
+      if (s === "library") {goHome();return "true";} else
       if (s === "search") {goSearchOrigin();return "true";} else
       if (s === "scripture-genre") {goScripturesHome();return "true";} else
       if (s === "scriptures-home") {goHome();return "true";} else

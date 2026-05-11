@@ -1,9 +1,40 @@
 # CLAUDE.md — VOTReader-studio Project Knowledge Base
 
 > Living document. Update after every major examination or change.
-> Last major update: 2026-05-09 (items 6-48 fix pass — 20 items fixed, 23 reviewed+deferred; deep-dive audit + 5 bug fixes — see Section 19; boundaryConfig + READING_CHAIN — see Section 18.17; ErrorBoundary — see 18.16; _matthew()/_studies() helpers + typeof elimination — see 18.3/18.8; IIFE elimination + _navToChapter — see 18.14; _goFirst/_goLast boundary maps — see 18.13; colReadNavProps/colIdxProps — see 18.11; NavButtons — see 18.10; LinkPicker — see 18.12)
+> Last major update: 2026-05-11 (Objective A complete; Objective B substantial — allowBackup=false, app name VOTReader, Export/Import/Clear in Settings, two silent-failure bugs fixed; AI deferred indefinitely per user direction). Previous: 2026-05-10 Notes / Library / Notebooks system landed (parallel session, see §17.13–§17.18); Phase 0 git setup completed — repo at github.com/corbinlythgoe/VOTReader-studio, private, auth cached.
 >
 > **Working dir**: `D:\VOTReader-studio` (canonical). The C: OneDrive path is legacy — `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app` is now a Junction → `D:\VOTReader-studio\app` (set up 2026-05-08, see Section 17.11). Always edit D: files.
+>
+> **CLAUDE.md is NOT the authority — it's a snapshot with known drift.** Trust order:
+> 1. `D:\VOTReader-studio\PLAN.txt` — live strategic working memory (§19 sequencing, §15 confirmed CLAUDE.md drift, §17 lessons)
+> 2. `C:\Users\corbi\OneDrive\Desktop\improvement2.txt` — authoritative verified fix list (831 lines, sequenced by impact)
+> 3. `C:\Users\corbi\OneDrive\Desktop\handoff_for_next_session.txt` — orientation note (read first in a fresh session)
+> 4. CLAUDE.md — the project knowledge base, but **always verify line numbers and specific claims with Grep before acting**.
+>
+> **Known drift in this file** (as of 2026-05-11, per PLAN.txt §15):
+> - Section 2's Screen→Component table line numbers are 2,500–5,000 lines off — current index.html is ~15,300 lines / ~800 KB (was claimed ~13,100 lines / ~780 KB). App() actually starts near line 12762, not 7546.
+> - Section 15 (NIM proxy) describes a FastAPI `proxy.py` that no longer exists; the entire LiteLLM nim-proxy infrastructure is also gone (verified 2026-05-11). AI is deferred indefinitely — see User Policies below. Treat §15 as defunct.
+> - Section 17.11 OneDrive backup claim has never been verified to actually sync D:\ contents to cloud — GitHub is the primary code backup now.
+> - Section 18.17 says "11 boundary blocks" — actual is 14 (V1–V7 + Timothy + Flock + Rebuke + WTLB1/2 + Blessed + HolyDays).
+> - Section 19.3 says "3-4 !important declarations" — actual is ~34.
+> - Section 19.4 says App() is ~2,350 lines — actual is ~2,521.
+> - Section 14 reports "54 D-pattern bugs fixed" — a later UX walkthrough flagged 21 D8 glued-text bugs still present in WTLB/Blessed (CLAUDE.md §14 may be optimistic; PLAN.txt §12 details).
+> - Section 6.7 says all defensive renderer guards are "still needed" — the `ann.style` fallbacks (lines around 4710/4799/5065) are dead after the annotation migration.
+>
+> **User policies (durable directives, override defaults)** — full versions in PLAN.txt §6:
+> - **App name is "VOTReader"** (personal app; multi-user-shaped but no auth, no organization)
+> - **NO AI / NO API KEYS / NO LLM** — deferred indefinitely per user 2026-05-11: *"no ai no nothing, no api keys, etc, those are security risks anyway, we'll defer a.i feature."* The LiteLLM nim-proxy is decommissioned. Do not reintroduce.
+> - **NO credentials / login / auth anywhere.** All personal data stays local on device.
+> - **NO security risks** — anything that could leak personal data or LAN-expose a service is a defect, not a polish item.
+> - `android:allowBackup="false"` — Export/Import in Settings → "Your Data" is the only backup mechanism. JSON file, user-owned, no credentials.
+> - GitHub identity (corbinlythgoe) and Garden image hosting on GitHub Releases are fine for now. Cloudflare R2/similar migration is "if necessary," not blocking.
+> - **Welcome flow target state**: splash + ✕ stays as first-run. On the home screen, add a × button (reopens splash) AND an "i" button next to it (opens the already-finished About screen). Part of Objective D shipping polish.
+> - No Play Store thinking until everything else is done — would also require Timothy's permission first.
+>
+> **Recent landings on `claude/jovial-yalow-bf2629`** (2026-05-11):
+> - Objective A: junction verified, NIM proxy infrastructure entirely deleted, 9 `.bak-pre-*` files (~39 MB) + `orama.min.js` (~70 KB) deleted from the asset tree
+> - Objective B: `allowBackup="false"`, app name + `<title>` = "VOTReader", `migrateAnnotations` silent-flag-on-failure fixed, `vot-state` save warns on quota now, Settings → "Your Data" section with Export / Import / Clear All Personal Data (verified live)
+> - Next: Objective C — improvement2.txt Day 1 visible bugs (back-pill space, Library/Notes-Index hardware back, SCHEMA_VERSION 11→12, lying settings, welcome catch), then Day 2 footnotes, then §12 critical bugs.
 
 ## Quick start (app failed to load? read this first)
 
@@ -117,7 +148,15 @@ The Android shell is a thin WebView that loads `index.html` from assets. All app
 
 ## 2. App architecture (index.html)
 
-`index.html` is **~13,100 lines**, ~780KB. A pre-compiled (Babel-output `React.createElement`) single-file React app. No bundler. No hash routing. Screen state is held per-tab in a tab state machine.
+`index.html` is **~15,287 lines, ~796 KB** (as of 2026-05-10). A pre-compiled (Babel-output `React.createElement`) single-file React app. No bundler. No hash routing. Screen state is held per-tab in a tab state machine.
+
+> ⚠️ **The Screen→Component line numbers below are STALE.** They reflect a pre-2026-05-09 snapshot. After the §18 refactor and the Notes/Library work, real line numbers are 2,500–5,000 lines higher. Use these as relative-order hints only; Grep for the symbol before editing. Approximate current landmarks (per PLAN.txt §16):
+> - App() starts ≈ line 12762 (was 7546)
+> - FootnoteSheet ≈ 7886, ScriptureVerseText ≈ 7930, FootnoteListSection ≈ 8018
+> - LetterView ≈ 10237, WtlbEntryView ≈ 9957, BibleChapterView ≈ 11979, ChapterView ≈ 9323
+> - SettingsScreen ≈ 11063, HomeScreen ≈ 11512
+> - handleAndroidBack ≈ 14104, Welcome screen render ≈ 14444
+> - snapRangeToWords ≈ 4231, applyDOMHighlights ≈ 5025, SelectionToolbar ≈ 5264
 
 ### Screen → Component map
 
@@ -874,7 +913,17 @@ After the main sweep, a final spot check across all 13 collections found 11 addi
 
 **LESSON: audit agents may misattribute line numbers to wrong letter ids.** Always re-grep `^    "id":` boundaries before treating an audit's letter-id claim as authoritative.
 
-## 15. NIM Proxy — free Qwen3-Coder 480B for Claude Code
+## 15. NIM Proxy — FULLY DEFUNCT, AI DEFERRED INDEFINITELY
+
+> ⚠️ **The entire NIM/LiteLLM proxy infrastructure is gone (verified 2026-05-11).** `C:\Users\corbi\.claude\nim-proxy\` contains only two empty 0-byte log files (`proxy-err.log`, `proxy-out.log`). No `proxy.py`, no `litellm-config.yaml`, no startup scripts. Port 4000 has nothing listening.
+>
+> **AI is deferred indefinitely.** Per user direction 2026-05-11: *"no ai no nothing, no api keys, etc, those are security risks anyway, we'll defer a.i feature."* See User Policies at the top of this file and PLAN.txt §5.5 (AI Space — DEFERRED) and §6 (constraints — no AI / no API keys).
+>
+> **Do not reintroduce a proxy.** If a future session is tempted to talk to an LLM backend, surface that to the user first — it is contrary to current direction.
+
+The original content below is preserved for archaeology only; do not act on it.
+
+---
 
 **Added 2026-05-06.** A local proxy at `~/.claude/nim-proxy/proxy.py` lets Claude Code talk to Qwen3-Coder 480B (free cloud inference) instead of Anthropic's API.
 
@@ -1436,6 +1485,8 @@ The Claude Code session CWD is the OLD `C:\Users\corbi\OneDrive\Desktop\VOTReade
 
 **Junction in place** (set up 2026-05-08): `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app` is now a Windows Junction pointing to `D:\VOTReader-studio\app`. Any change to D: appears at C: instantly. The previous C: \app is preserved as `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app.OLD-<timestamp>`.
 
+> ⚠️ **OneDrive backup unverified.** The junction makes the preview tool work, but whether OneDrive actually syncs the *contents* of D:\ (rather than just the symlink) was never confirmed. PLAN.txt §0.10 / §21 list this as one of the unverified critical infrastructure claims. The primary backup is now the private GitHub repo at `github.com/corbinlythgoe/VOTReader-studio` (push works with cached credentials).
+
 This was necessary because the preview tool (`mcp__Claude_Preview__preview_start`) starts `python -m http.server 8090 -d app/src/main/assets` from the CWD (regardless of `--directory` flag in launch.json). So D: is the source of truth for edits, and C: \app → D: \app via junction means the preview tool serves D: edits transparently.
 
 **Future agents**:
@@ -1719,7 +1770,7 @@ All 17 render blocks converted (11 LetterView + 4 WtlbEntryView + 1 bible-study 
 | Dead code: WtlbTextLine removed | ~11 lines | Low — superseded by renderTextWithScripRefs |
 | CSS debris: duplicate .hl-underline rules | ~2 lines | Low — stale palette-transition leftovers |
 | ErrorBoundary class component | +12 lines (new) | Low — wraps App, catches render errors |
-| boundaryConfig() helper + READING_CHAIN | ~80 (11 boundary blocks × ~8 lines) | Medium — verified 7 boundary transitions in browser |
+| boundaryConfig() helper + READING_CHAIN | ~80 (14 boundary blocks × ~8 lines: V1–V7 + Timothy/Flock/Rebuke + WTLB1/2 + Blessed + HolyDays) | Medium — verified 7 boundary transitions in browser |
 | Boundary card eyebrow shows short label | +6 lines (LetterView + WtlbEntryView × 3 sites) | Low — pure label upgrade, fallback preserves old text |
 | Inline link icons via applyDOMLinks | +60 lines (new function + CSS) | Low — replaces per-paragraph icon with per-range icon |
 | Underline highlight skip-ink fix | +1 CSS line | Low — fixes descender clipping in y/g/p/q/j |
@@ -2086,7 +2137,7 @@ New `_validateTabState(s)` function runs on both `s` (legacy) and each `s.tabs[i
 | 29 | ~50 distinct font-size values | Informational. Consolidation to modular scale = large CSS refactor with visual regression risk |
 | 31 | `transition: all` on 30 elements | Changing to explicit properties risks visual regressions. Performance impact negligible |
 | 32 | z-index gaps (600→8000) | Intentional separation between content layers and overlay layers. Reorganizing requires extensive modal testing |
-| 33 | `!important` flags (3-4 declarations) | Each has legitimate specificity reason (responsive override, active state, selector depth). Refactoring selectors risks regressions |
+| 33 | `!important` flags (~34 declarations — was originally counted as 3-4, recount 2026-05-10) | Each has legitimate specificity reason (responsive override, active state, selector depth, annotation-system overrides). The 4 stripping rules on `.hl-note:not(.is-active)` are the best candidates for future cleanup via `:where()` or `@layer`. Refactoring selectors risks regressions |
 | 34 | Quoting style split (V2 unquoted vs JSON-quoted) | Cosmetic. No functional impact. Large mechanical change |
 | 35 | Trailing commas in bible-lsv.js / bible-ylt.js | Valid JS. 4.7MB files each. Cosmetic only |
 | 36 | Minified vs pretty-printed | Informational |
@@ -2108,7 +2159,7 @@ New `_validateTabState(s)` function runs on both `s` (legacy) and each `s.tabs[i
 
 **`navigateToLink` vs `openInAppLetter`:** Both navigate to letters, but they come from different UX flows. `openInAppLetter` handles footnote tap-throughs (knows the source letter title for back-pill label). `navigateToLink` handles cross-reference link card taps (source may be Bible, study, or letter — no guaranteed source title). Now both push onto `fromLetterStack`.
 
-**App() is ~2,350 lines** — the single largest function. Contains all state management, tab handling, navigation, history, settings, scroll management, thumbnails, welcome screen, and the entire render tree. This is the canonical decomposition candidate, but the pre-compiled React.createElement style makes extraction harder than with JSX.
+**App() is ~2,521 lines** (was originally documented as ~2,350 — recount 2026-05-10 after Notes/Library work landed) — the single largest function. Contains all state management, tab handling, navigation, history, settings, scroll management, thumbnails, welcome screen, and the entire render tree. This is the canonical decomposition candidate, but the pre-compiled React.createElement style makes extraction harder than with JSX. PLAN.txt §3.3 + §18.4 + Section 19.4 of this doc enumerate the 7 hooks to extract first.
 
 **Event listener cleanup is solid** — all addEventListener/removeEventListener pairs are properly balanced. No memory leaks from event listeners.
 

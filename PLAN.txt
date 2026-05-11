@@ -4,6 +4,7 @@ VOTReader-studio — Master Improvement Plan & Working Memory
 
 Author: Claude (Opus 4.7, 1M context)
 Started: 2026-05-10
+Last updated: 2026-05-11 (Objective A complete, Objective B substantial; AI deferred)
 Status: ACTIVE WORKING DOCUMENT — kept updated as work progresses
 Companion to: CLAUDE.md (project knowledge base, do not bloat)
 Concurrent work: Notebooks feature SHIPPED 2026-05-10 (parallel session) —
@@ -1060,51 +1061,56 @@ PHASE 0 EXECUTION ORDER (~3 hours sequential):
       Add console.warn + a "storage full" toast UI hint when
       QuotaExceededError fires.
 
-  0.9 (~15 min) Verify LiteLLM nim-proxy binds to 127.0.0.1, not 0.0.0.0.
-      Open C:\Users\corbi\.claude\nim-proxy\litellm-config.yaml.
-      Confirm `host: 127.0.0.1` is set explicitly. If not, add it.
-      If LAN-bound today, anyone on the same wifi can call the proxy
-      with sk-nim-local and burn NIM credits / OpenRouter quota.
-      ALSO: update CLAUDE.md §15 to note the proxy is LiteLLM-based
-      (proxy.py was deleted; CLAUDE.md still describes the old FastAPI
-      version).
+  0.9 ✅ MOOT (2026-05-11). The entire LiteLLM nim-proxy infrastructure
+      has been removed:
+      - C:\Users\corbi\.claude\nim-proxy\ contains only two empty 0-byte
+        log files (proxy-err.log, proxy-out.log)
+      - No proxy.py, no litellm-config.yaml, no start scripts
+      - Port 4000 has nothing listening
+      Nothing to verify, nothing exposed.
+      User direction 2026-05-11: "LiteLLM doesn't need integrated right
+      now, no ai no nothing, no api keys, etc, those are security risks
+      anyway, we'll defer a.i feature." See §6 constraints + §5.5 AI Space.
 
   0.10 (~30 min) Verify OneDrive sync through the junction:
-      - Open OneDrive activity panel
-      - Confirm D: files are actually being uploaded as content
-        (not just the junction symlink)
-      - If NOT syncing, set up an alternate backup: e.g., daily
-        scheduled task that zips D:\VOTReader-studio to a different
-        physical location (USB drive, NAS, second cloud)
-      - Document the backup setup in PLAN.txt + CLAUDE.md
+      Status (2026-05-11): junction confirmed intact via
+      `Get-Item ... LinkType = Junction`. OneDrive client sync of
+      D:\ contents through the junction remains formally unverified
+      (can't introspect OneDrive from Claude Code). Per user:
+      GitHub is now the primary code backup; Export/Import (§B) is the
+      user-data backup mechanism. Manual external copy of _ocr_out/
+      (121 MB, irreplaceable Ollama compute) is recommended but optional;
+      no longer blocking the plan.
 
-  0.11 (~30 min) Delete dead weight before first commit:
-      - 9 bible-studies.js.bak-pre-* files (37 MB total) — git history
-        is the proper backup mechanism now
+  0.11 ✅ DONE (2026-05-11). Deleted from D:\VOTReader-studio\:
+      - 9 bible-studies.js.bak-pre-* files (~39 MB total)
       - orama.min.js (~70 KB, never loaded)
-      - Anything else flagged DEAD by the audits
+      All purged from the data/ and assets/ directories. The dead weight
+      no longer ships in APK builds.
 
   0.12 (~10 min) Add a Backup-Reminder System Setting:
       Settings → Data → "Last backup: <date>". Banner if >30 days old.
       Friendly nudge to use Export Data periodically.
+      Status: deferred — Export/Import shipped 2026-05-11, but the
+      last-backup reminder is a separate polish pass.
 
   ── ROUND 2 ADDITIONS (P0) ──
 
-  0.13 (~5 min) PRIVACY: USER DIRECTION CONFIRMED — disable auto-backup.
-      User said: "I don't want auto backup, this app could go to multiple
-      users in future, I want export personal data option, perhaps to a
-      json blob or whatever is best, no credentials or login info."
-      Action:
-        - app/src/main/AndroidManifest.xml: change
-          android:allowBackup="true" → "false"
-        - Replace cross-device sync responsibility with Phase 0.6
-          Export/Import (already in plan, now THE backup model)
-        - Add a Settings → About note: "All your notes and annotations
-          stay on this device. Use Export to back up to a file you
-          control."
-      No need for dataExtractionRules.xml when allowBackup is false —
-      simpler, clearer, more honest. User can move data via the JSON
-      export if they need to.
+  0.13 ✅ DONE (2026-05-11). PRIVACY: auto-backup disabled.
+      User direction: "I don't want auto backup, this app could go to
+      multiple users in future, I want export personal data option,
+      perhaps to a json blob or whatever is best, no credentials or
+      login info."
+      Done:
+        - app/src/main/AndroidManifest.xml: `android:allowBackup="false"`
+        - Export/Import landed in Settings → "Your Data" section
+          (export emits votreader-backup-YYYY-MM-DD.json wrapping every
+          vot-* localStorage key in {app, exportVersion, exportDate, data})
+        - Clear All Personal Data also in the same section (3-stage
+          tap-confirm + wipes vot-* localStorage + deletes vot-thumbs
+          and vot-search-cache IndexedDB databases)
+      Still TODO (polish): Settings → About note about local-only data;
+      backup-reminder banner (§0.12). The functional path is shipped.
 
   0.14 (~2 min) DATA: Bump SCHEMA_VERSION from 11 to 12 in search.js:41.
       Forces all users to rebuild the search index on next launch.
@@ -1863,52 +1869,35 @@ ORDER & RATIONALE:
     [ ] Picture-in-picture support (browser PiP API)
     [ ] Optional native bridge for system PiP (Android Picture-in-Picture mode)
 
-5.5 AI SPACE — RECONSIDERED (user does not want any API keys, ever)
+5.5 AI SPACE — DEFERRED INDEFINITELY (2026-05-11)
 
-  USER DIRECTION (DIRECT QUOTE):
+  USER DIRECTION (DIRECT QUOTE, 2026-05-11):
+    "LiteLLM doesn't need integrated right now, no ai no nothing, no api
+     keys, etc, those are security risks anyway, we'll defer a.i feature."
+
+  Earlier direction (still in force, 2026-05-10):
     "The app is for reading and personal reflections with features, and
      I don't want to have my own A.I keys or anything else in case I
      ship this app to other users in the future."
 
-  This rules out the original "user provides their own API key" approach.
-  It also rules out any cloud-AI features that would require the developer
-  to host/pay for inference.
+  DECISION: AI features are deferred indefinitely. ALL of the following
+  are OUT OF SCOPE for now:
+    - Cloud LLM inference (any provider, any key model)
+    - Pre-computed embeddings (Option A from prior plan)
+    - On-device models like transformers.js (Option B)
+    - LiteLLM nim-proxy (decommissioned — see §0.9)
+    - "Find letters semantically related" suggestions
+    - Q&A on the texts, semantic search, devotional prompts
 
-  WHAT'S STILL VIABLE (no keys, no cloud):
+  WHAT REPLACES THE GAP: search.js's existing FlexSearch is already excellent.
+  Activate SYNONYM_GROUPS (currently defined-but-unused; closes the
+  "mercy↔compassion" gap without any AI). That work belongs in Objective I
+  (reading-app baseline features) and the §C / improvement2.txt fix pass —
+  NOT under an "AI" banner.
 
-  Option A — Pre-computed embeddings (cloud at build time, local at runtime):
-    - At build time (one-time, on developer machine): generate embeddings
-      for all letters + Bible verses using any embedding model
-    - Ship the embedding vectors as a static .js asset (~few MB)
-    - Runtime: cosine similarity in pure JS — no API calls
-    - User experience: "Find letters semantically related to this passage"
-    - Index needs regeneration when letter content changes; tied to a
-      content-version manifest
-    - Best fit for the "no keys" constraint
-
-  Option B — Tiny local model in WebView (research only):
-    - transformers.js or onnxruntime-web with a small embedding model
-      (e.g., all-MiniLM-L6-v2, ~25 MB ONNX)
-    - Runs entirely in-browser/in-WebView
-    - First-load is slow; memory pressure on Android may be problematic
-    - Probably not viable for Android WebView, but worth a spike
-
-  Option C — Drop AI entirely:
-    - Existing FlexSearch already does excellent text search
-    - SYNONYM_GROUPS (defined but unused per audit) would close most of
-      the "I want X but typed Y" gap without AI
-    - Ship the synonym activation; revisit AI only if users request it
-
-  RECOMMENDED: Option C first (low effort, high return), then Option A
-  if users ask for "find letters about this topic" beyond keyword reach.
-  Skip Option B unless on-device AI becomes a hard requirement.
-
-  Implementation order:
-    [ ] Activate SYNONYM_GROUPS in search.js (Phase 1.5 already covers
-        this, but doubles as the "no AI needed" first move)
-    [ ] (Future) Pre-compute embeddings + ship vectors + cosine search
-    [ ] (Future, lower priority) Suggest "letters related to this passage"
-        sidebar based on the embedding cache
+  If the user ever changes their mind, the original three-option analysis
+  is preserved in git history; this section is the canonical "we're not
+  doing this" record.
 
 5.6 SCRIPTURE-TO-SCRIPTURE LINK SUGGESTIONS (1 week)
 
@@ -1918,10 +1907,10 @@ ORDER & RATIONALE:
         - Existing footnote cross-refs in books.js
         - User's other links from similar passages (collaborative filtering
           across user's own bookmarks)
-        - Phase 5.5 embedding search (if enabled)
+        - ~~Phase 5.5 embedding search~~ — NOT AVAILABLE (AI deferred)
     [ ] "Auto-link" mode: optional setting that pre-creates links between
         verses that share strong textual similarity (e.g., quoted OT
-        prophecies in NT)
+        prophecies in NT) — implementable via lexical matching only
 
 5.7 CLOUD SYNC (3-4 weeks)
 
@@ -1994,6 +1983,7 @@ VERIFICATION (per feature):
 SECTION 6 — CONSTRAINTS & PRINCIPLES (immutable while plan is in flight)
 ───────────────────────────────────────────────────────────────────────────────
 
+  TECHNICAL:
   - NEVER break a working feature mid-refactor. All changes verified live in
     browser before next step.
   - Edits go to D:\ files only. C:\ is a junction; do not edit through it.
@@ -2011,6 +2001,30 @@ SECTION 6 — CONSTRAINTS & PRINCIPLES (immutable while plan is in flight)
   - The user is solo-maintaining. Tooling complexity must pay for itself in
     maintenance savings. No build system unless it ships value immediately.
 
+  USER POLICIES (durable directives from user, override defaults):
+  - App name is "VOTReader". Personal app for the user's own use. Built as
+    if multi-user but no auth layer, no organization, no team.
+  - NO AI / NO API KEYS / NO LLM INTEGRATION. AI features are deferred
+    indefinitely. User direction 2026-05-11: "no ai no nothing, no api keys,
+    etc, those are security risks anyway, we'll defer a.i feature." The
+    LiteLLM nim-proxy is decommissioned; do not reintroduce. This rules out
+    Option A (pre-computed embeddings) and Option B (on-device model) from
+    §5.5 — see §5.5 for the deferral note.
+  - NO CREDENTIALS / LOGIN / AUTH ANYWHERE. Personal data stays local.
+  - NO security risks. Treat anything that could leak personal data or expose
+    a service to the LAN as a defect, not a polish item.
+  - GitHub identity (corbinlythgoe) and Garden image hosting on GitHub
+    Releases are fine for now. Migration to Cloudflare R2/similar is a
+    future "if necessary" item, not blocking.
+  - allowBackup is "false". Export/Import in Settings is the only backup
+    mechanism. JSON file, no credentials, user-owned.
+  - User does NOT want to think about Play Store publishing yet — would also
+    need Timothy's permission first. Finish everything else first.
+  - Welcome flow: splash + ✕ stays as first-run. On the home screen, add a
+    × button that reopens the splash image AND an "i" button next to it that
+    opens the existing (already-finished) About screen. Wire this in as part
+    of Objective D shipping polish.
+
 ───────────────────────────────────────────────────────────────────────────────
 SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 ───────────────────────────────────────────────────────────────────────────────
@@ -2025,12 +2039,95 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
     browser first.
   - Phase 5: In-app video — embed YouTube iframes, or download mp4s, or
     integrate with a library? YouTube embeds are simplest.
-  - Phase 5: AI Space — what does this mean concretely? Q&A on the texts?
-    Search rewriter? Devotional prompts? Need user clarification.
+  - ~~Phase 5: AI Space~~ — RESOLVED 2026-05-11. User: AI deferred entirely
+    (no keys, no LLM, no embeddings). See §6 user policies and §5.5.
 
 ───────────────────────────────────────────────────────────────────────────────
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
+
+2026-05-11 — Objective A complete + Objective B substantial progress
+  Session: fix-focused, working on branch claude/jovial-yalow-bf2629
+  Approach: per user direction, executing Objectives A → B → C → D in
+            sequence per §19; AI deferred indefinitely (see §5.5).
+
+  Objective A — DONE:
+    ✓ GitHub repo verified (corbinlythgoe/VOTReader-studio, private,
+      cached push auth) — already shipped 2026-05-10
+    ✓ Junction C:\...\app → D:\...\app verified intact (LinkType: Junction)
+    ✓ LiteLLM nim-proxy infrastructure entirely gone (no proxy.py, no
+      litellm-config.yaml, port 4000 empty, only two 0-byte log files
+      remain). Verification moot; AI deferred per user.
+    ✓ Deleted 9 bible-studies.js.bak-pre-* files (~39 MB) + orama.min.js
+      (~70 KB) from D:\VOTReader-studio\app\src\main\assets\
+    ⊘ OneDrive backup verification — moot; GitHub is primary code backup,
+      Export/Import is the user-data backup mechanism
+
+  Objective B — substantial:
+    ✓ android:allowBackup="false" in AndroidManifest.xml
+    ✓ app_name = "VOTReader" in strings.xml
+    ✓ <title> = "VOTReader" in index.html
+    ✓ migrateAnnotations: silent-flag-on-failure removed — flag now only
+      set after successful writes; failed migrations retry on next launch
+    ✓ vot-state save: console.warn on quota failure (matches CachedStore
+      convention; user-facing toast deferred to a future global toast
+      component)
+    ✓ Settings → "Your Data" section landed between "A Return to The Garden"
+      and "Mark as Read":
+        - Export Your Data → downloads votreader-backup-YYYY-MM-DD.json
+          wrapping every vot-* localStorage key in
+          {app:"VOTReader", exportVersion:1, exportDate, data:{}}
+        - Import from Backup → file picker + JSON validation + replace
+          flow (window.confirm with date label before overwriting)
+        - Clear All Personal Data → 3-stage tap-confirm using existing
+          CLEAR_LABELS/CLEAR_CLASSES + deletes vot-thumbs and
+          vot-search-cache IndexedDB databases
+    ✓ Verified live in browser:
+        - App boots cleanly (zero React errors, zero console errors)
+        - New section renders with correct dark-theme styling
+        - Export emits valid JSON with correct shape (verified via
+          monkey-patched URL.createObjectURL + a.click intercept)
+    ☐ Last-backup reminder banner (§0.12) — polish, deferred
+    ☐ Global toast component for storage-quota signals — polish, deferred
+
+  CLAUDE.md updates:
+    ✓ Top header now points at PLAN.txt + improvement2.txt as authoritative,
+      lists 7 known drift items
+    ✓ §2 (App architecture): corrected line count + added line-number caveat
+    ✓ §15 (NIM proxy): marked DEFUNCT
+    ✓ §17.11: OneDrive backup caveat added
+    ✓ §18.17: "11 boundary blocks" → 14
+    ✓ §19.3: "3-4 !important" → ~34
+    ✓ §19.4: App() ~2,350 → ~2,521 lines
+
+  User policies captured durably in §6:
+    - App name = "VOTReader" (personal, multi-user-shaped, no auth)
+    - NO AI / NO API KEYS / NO LLM (deferred indefinitely)
+    - NO credentials, login, or auth anywhere
+    - allowBackup="false" + Export/Import as the only backup path
+    - GitHub identity + Garden hosting fine for now
+    - No Play Store thinking until everything else done (would also need
+      Timothy's permission)
+    - Welcome flow: splash + ✕ stays as first-run; add × button on home
+      screen to reopen splash + "i" button next to it to open the
+      already-finished About screen (Objective D polish)
+
+  Worktree branch claude/jovial-yalow-bf2629 ready to commit:
+    modified:   CLAUDE.md (drift fixes)
+    modified:   PLAN.txt (this entry + §0.x DONE marks + §5.5 deferred + §6 policies)
+    modified:   app/src/main/AndroidManifest.xml
+    modified:   app/src/main/assets/index.html
+    modified:   app/src/main/res/values/strings.xml
+    deleted:    app/src/main/assets/orama.min.js
+
+  Next per the sequenced plan:
+    Objective C — improvement2.txt Day 1 visible bugs (~1-2h, autonomous):
+      back-pill space, Library/Notes-Index hardware back, SCHEMA_VERSION
+      11→12, lying settings (wire or remove), welcome catch return value.
+    Then Day 2 footnote system; then the §12 critical bugs (Holy Days
+    routing, Matthew Study labels, prophecy card persistence, WTLB markdown
+    intros, etc.); then Day 4-5 polish.
+
 
 2026-05-10 — PHASE 0 PARTIAL COMPLETION (git setup)
   Time:   This session, after the audit-integration work
@@ -2052,13 +2149,12 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
       app/, gradle/, etc. NONE of the deleted API-key files present.
       No GitHub secret-scanning banner triggered.
 
-  Outstanding Phase 0 items (not yet done):
-    ☐ 0.6 Export/Import in Settings UI (~100 lines of JS)
-    ☐ 0.7 Fix migrateAnnotations silent-flag-on-failure (line 3917)
-    ☐ 0.8 vot-state silent-quota UI feedback (line 13582)
-    ☐ 0.9 Verify LiteLLM nim-proxy binds 127.0.0.1
-    ☐ 0.10 Verify OneDrive backup actually syncs through junction
-            (or set up alternate backup for D: drive)
+  Outstanding Phase 0 items (UPDATED 2026-05-11; see new progress entry above):
+    ✓ 0.6 Export/Import in Settings UI — DONE 2026-05-11
+    ✓ 0.7 migrateAnnotations silent-flag-on-failure — DONE 2026-05-11
+    ✓ 0.8 vot-state silent-quota — partial (console.warn done; toast deferred)
+    ⊘ 0.9 LiteLLM nim-proxy bind — MOOT (proxy entirely gone, AI deferred)
+    ⊘ 0.10 OneDrive backup — MOOT (GitHub is primary, Export/Import is user-data path)
     ☐ 0.11 Delete dead weight (9 bible-studies backup files,
             orama.min.js) — they are gitignored but still on disk
             taking space; can delete after this verification commit
