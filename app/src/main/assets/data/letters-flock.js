@@ -4129,7 +4129,7 @@ var LETTERS_FLOCK = [
     "footnotes": {
       "1": {
         "type": "note",
-        "text": "Also read: \"I Am Calling You Out! (Part 2)... Come Out of the Churches of Men and I Will Receive You! Says The Lord.\"",
+        "text": "Also read: \"I Am Calling You Out! (Part 2)... Come Out of the Churches of Men and I Will Receive You! Says The Lord\"",
         "url": "https://www.thevolumesoftruth.com/I_Am_Calling_You_Out_Part_2",
         "link": { "collection": "Volume Seven", "letterTitle": "I Am Calling You Out! (Part 2)... Come Out of the Churches of Men and I Will Receive You! Says The Lord" }
       }

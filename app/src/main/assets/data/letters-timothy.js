@@ -334,7 +334,7 @@ var LETTERS_TIMOTHY = [
     "footnotes": {
       "1": {
         "type": "note",
-        "text": "Also read: \"Timothy's Vision of YahuShua (Jesus) Standing upon the World\"",
+        "text": "Also read: “Timothy’s Vision of YahuShua (Jesus) Standing upon the World”",
         "url": "https://www.thevolumesoftruth.com/Timothys_Vision_of_YahuShua_Standing_upon_the_World",
         "link": { "collection": "Letters from Timothy", "letterTitle": "Timothy’s Vision of YahuShua (Jesus) Standing upon the World" }
       }
