@@ -2397,6 +2397,12 @@
       opacity: 0.85;
       transition: opacity 0.15s ease, transform 0.15s ease;
       flex-shrink: 0;
+      /* Android WebView: prevent long-press text selection from absorbing
+         the tap; treat as a button-like tap target. */
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
     /* The icon span carries an .hl-color class so its SVG stroke can be
        set per-color via the rules below. Without this transparent
@@ -2787,6 +2793,9 @@
          visually buried. NoteSheet stays at 8500; LinkPicker bumped to
          8502. (8501 reserved for any future "in-between" overlay.) */
       position: fixed; inset: 0; z-index: 8502;
+      /* padding-top reserves space for the Android status bar / camera
+         cutout so the sheet top can never overlap the system chrome. */
+      padding-top: var(--inset-top, 0px);
       background: rgba(0,0,0,0.72);
       /* No backdrop-filter blur — caused sub-pixel anti-aliasing on text
          drawn on top of the blurred backdrop in some browsers. Solid 0.72
@@ -3179,6 +3188,22 @@
       padding: 12px 14px;
       flex-wrap: wrap;
     }
+    /* Inline color row — always visible in edit mode so users can pick
+       a color without first tapping the dot then a menu item. */
+    .note-edit-colors {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 4px 16px 10px;
+    }
+    /* Notebook row in edit mode — tappable, shows current assignment */
+    .note-edit-nb-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px 6px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      border: none; background: none; width: 100%; text-align: left;
+      color: var(--cream-dim); font-size: 0.82rem;
+    }
+    .note-edit-nb-row:active { color: var(--gold); }
+    .note-edit-nb-row svg { flex-shrink: 0; width: 14px; height: 14px; stroke: var(--gold-dim); }
 
     /* ══════════════════════════════════════════════════════════════
        LIBRARY SCREEN — top-level destination with 4 sub-spaces.
@@ -5064,13 +5089,26 @@ function applyNoteIcons() {
     if (entries.length > 1) icon.setAttribute('data-count', String(entries.length));
     icon.title = entries.length > 1 ? (entries.length + ' notes here') : 'Open note';
     icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>';
-    icon.addEventListener('click', function(e) {
-      e.stopPropagation();
+    var _openIcon = function(x, y) {
       if (entries.length > 1 && window.__showMultiNote) {
-        window.__showMultiNote(allGids, e.clientX, e.clientY);
+        window.__showMultiNote(allGids, x, y);
       } else if (window.__openNote) {
         window.__openNote(primary.gid);
       }
+    };
+    icon.addEventListener('click', function(e) {
+      e.stopPropagation();
+      _openIcon(e.clientX, e.clientY);
+    });
+    /* Android WebView sometimes doesn't fire 'click' on inline DOM-injected
+       spans. Adding a touchend handler (with preventDefault to suppress the
+       subsequent synthetic click and prevent text-selection interference)
+       guarantees the icon opens the note on Android. */
+    icon.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var t = e.changedTouches && e.changedTouches[0];
+      _openIcon(t ? t.clientX : 0, t ? t.clientY : 0);
     });
     const ip = primary.ip;
     if (ip.kind === 'beforeNode' && ip.node && ip.node.parentNode) {
@@ -6602,8 +6640,10 @@ function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpe
 
   const cancelEdit = () => {
     setBody(note.body || '');
-    if (!note.body) {
-      // Empty note that was just created — discard it on cancel
+    if (startInEditMode && !note.body) {
+      // Fresh new note, never saved yet — discard on cancel.
+      // (If the user saved a blank note and later reopens it to edit,
+      // startInEditMode is false so cancel just closes edit mode.)
       AnnotationStore.removeGroup(groupId);
       NoteStore.remove(groupId);
       setHlTick(t => t + 1);
@@ -6640,7 +6680,8 @@ function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpe
     onClose();
   };
 
-  const canSave = body.trim().length > 0;
+  // Blank notes are allowed — the body can be empty.
+  const canSave = true;
   // Tapping the header color dot opens the color picker — works in either
   // mode AND closes any other panel that's open (menu, delete confirm).
   const openColorPicker = () => {
@@ -6689,6 +6730,17 @@ function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpe
         : React.createElement(React.Fragment, null,
             // Anchor text (italic quote)
             React.createElement("div", { className: "note-sheet-anchor" }, "“", truncatedAnchor, "”"),
+            // Edit mode: always-visible color row so users can pick a color
+            // without needing to open the ⋯ menu first.
+            mode === 'edit' && React.createElement("div", { className: "note-edit-colors" },
+              HL_COLORS.map(c => React.createElement("button", {
+                key: c,
+                className: "ann-chip-color-btn" + (color === c ? ' active' : ''),
+                "data-color": c,
+                onClick: () => recolor(c),
+                title: c
+              }))
+            ),
             // Notebook chips (only in read mode and only if any are assigned)
             mode === 'read' && (note.notebookIds || []).length > 0 && React.createElement("div", { className: "note-sheet-nb-chips" },
               (note.notebookIds || []).map(id => {
@@ -6707,30 +6759,36 @@ function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpe
             mode === 'read' ? (
               note.body
                 ? React.createElement("div", { className: "note-sheet-body" }, note.body)
-                : React.createElement("div", { className: "note-sheet-empty" }, "No note text yet. Tap ⋯ → Edit to add one.")
+                : React.createElement("div", { className: "note-sheet-empty" }, "Empty note. Tap ⋯ → Edit to add text.")
             ) : React.createElement("textarea", {
               ref: textareaRef, className: "note-sheet-textarea",
               value: body, onChange: e => setBody(e.target.value),
               placeholder: "Write your note…",
-              // Android soft keyboard pushes layout up but doesn't scroll
-              // the focused element into view; scrollIntoView fires AFTER
-              // the keyboard animation so the textarea isn't hidden
-              // behind the keyboard. block:'nearest' avoids jumping the
-              // sheet around on desktop where the keyboard doesn't exist.
               onFocus: () => {
                 setTimeout(() => {
                   try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
                 }, 220);
               }
             }),
+            // Edit mode: notebook assignment row — always visible so users
+            // can assign to a notebook during creation, not just after.
+            mode === 'edit' && React.createElement("button", {
+              className: "note-edit-nb-row",
+              onClick: () => { onOpenNotebookPicker && onOpenNotebookPicker(groupId); }
+            },
+              React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" },
+                React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }),
+                React.createElement("polyline", { points: "15 4 15 9 20 9" })
+              ),
+              (note.notebookIds || []).length > 0
+                ? ((note.notebookIds || []).map(id => { const nb = NotebookStore.get(id); return nb ? nb.name : null; }).filter(Boolean).join(', ') || "Add to notebook…")
+                : "Add to notebook…"
+            ),
             // Read mode: no Edit footer — use ⋯ → Edit. Edit mode: Cancel + Save.
+            // Save is always enabled — blank notes are valid.
             mode === 'edit' && React.createElement("div", { className: "note-sheet-footer" },
               React.createElement("button", { className: "note-sheet-secondary", onClick: cancelEdit }, "Cancel"),
-              React.createElement("button", {
-                className: "note-sheet-save" + (canSave ? '' : ' disabled'),
-                onClick: canSave ? save : undefined,
-                disabled: !canSave
-              }, "Save")
+              React.createElement("button", { className: "note-sheet-save", onClick: save }, "Save")
             ),
             // ⋯ menu panel (read mode only). Color sub-panel was hoisted above
             // so the menu only carries the action items + delete confirm.
@@ -11549,12 +11607,26 @@ function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHis
         data: data
       };
       const json = JSON.stringify(payload, null, 2);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const filename = `votreader-backup-${stamp}.json`;
+      // On Android WebView, blob: URL downloads don't work — use the
+      // AndroidBridge to write directly to the Downloads folder.
+      if (window.AndroidBridge && typeof window.AndroidBridge.saveToDownloads === 'function') {
+        const result = window.AndroidBridge.saveToDownloads(filename, json);
+        if (result === 'ok') {
+          alert('Backup saved to your Downloads folder.');
+        } else {
+          console.warn('saveToDownloads error:', result);
+          alert('Export failed. Please try again.');
+        }
+        return;
+      }
+      // Browser / PC fallback: Blob URL download.
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const stamp = new Date().toISOString().slice(0, 10);
       a.href = url;
-      a.download = `votreader-backup-${stamp}.json`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { try { URL.revokeObjectURL(url); a.remove(); } catch (e) {} }, 0);
@@ -11564,6 +11636,46 @@ function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHis
     }
   };
   const importPersonalData = () => {
+    // Shared logic: parse and apply a VOTReader JSON backup string.
+    const _doImport = (jsonText) => {
+      try {
+        const parsed = JSON.parse(jsonText);
+        if (!parsed || parsed.app !== 'VOTReader' || !parsed.data || typeof parsed.data !== 'object') {
+          alert('This file does not look like a VOTReader backup.');
+          return;
+        }
+        const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
+        const proceed = window.confirm(
+          'Importing the backup from ' + dateLabel + ' will REPLACE all your current notes, highlights, notebooks, journal entries, bookmarks, links, reading progress, history, tabs, and settings on this device. This cannot be undone.\n\nContinue?'
+        );
+        if (!proceed) return;
+        _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+        Object.keys(parsed.data).forEach((k) => {
+          if (k.indexOf('vot-') === 0 && typeof parsed.data[k] === 'string') {
+            try { localStorage.setItem(k, parsed.data[k]); } catch (e) {
+              console.warn('import: localStorage write failed for', k, e);
+            }
+          }
+        });
+        alert('Import complete. The app will now reload.');
+        window.location.reload();
+      } catch (err) {
+        console.warn('import failed', err);
+        alert('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
+      }
+    };
+    // On Android WebView, the native file picker is invoked via AndroidBridge.
+    // Kotlin reads the file, base64-encodes it, and calls window.__onImportFile.
+    if (window.AndroidBridge && typeof window.AndroidBridge.openFilePicker === 'function') {
+      window.__onImportFile = (b64OrNull) => {
+        window.__onImportFile = null;
+        if (!b64OrNull) return; // user cancelled or read error
+        try { _doImport(atob(b64OrNull)); } catch (e) { alert('Import failed: could not decode file.'); }
+      };
+      window.AndroidBridge.openFilePicker();
+      return;
+    }
+    // Browser / PC fallback: <input type="file">.
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json,.json';
@@ -11571,33 +11683,7 @@ function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHis
       const file = ev.target.files && ev.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = (re) => {
-        try {
-          const parsed = JSON.parse(re.target.result);
-          if (!parsed || parsed.app !== 'VOTReader' || !parsed.data || typeof parsed.data !== 'object') {
-            alert('This file does not look like a VOTReader backup.');
-            return;
-          }
-          const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
-          const proceed = window.confirm(
-            'Importing the backup from ' + dateLabel + ' will REPLACE all your current notes, highlights, notebooks, journal entries, bookmarks, links, reading progress, history, tabs, and settings on this device. This cannot be undone.\n\nContinue?'
-          );
-          if (!proceed) return;
-          _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
-          Object.keys(parsed.data).forEach((k) => {
-            if (k.indexOf('vot-') === 0 && typeof parsed.data[k] === 'string') {
-              try { localStorage.setItem(k, parsed.data[k]); } catch (e) {
-                console.warn('import: localStorage write failed for', k, e);
-              }
-            }
-          });
-          alert('Import complete. The app will now reload.');
-          window.location.reload();
-        } catch (err) {
-          console.warn('import failed', err);
-          alert('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
-        }
-      };
+      reader.onload = (re) => { _doImport(re.target.result); };
       reader.readAsText(file);
     };
     input.click();
@@ -14889,7 +14975,7 @@ function App() {
     React.createElement("style", null, CSS),
 
 
-    settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history"].includes(screen) && /*#__PURE__*/
+    settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "about"].includes(screen) && /*#__PURE__*/
     React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /*#__PURE__*/
     React.createElement("span", { className: "rdg-inner" })
     ),

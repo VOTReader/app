@@ -1,9 +1,12 @@
 package com.votreader.sacredui
 
+import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.view.WindowManager
@@ -15,6 +18,8 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.activity.addCallback
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
@@ -41,6 +46,9 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var currentScale = 1f
     // Read by setKeepScreenOn(); flips FLAG_KEEP_SCREEN_ON on/off from JS.
     private var keepScreenOnEnabled = true
+    // Launcher for the import file picker; registered in onCreate before the
+    // WebView is created so it is ready before any JS calls openFilePicker().
+    private lateinit var filePickerLauncher: ActivityResultLauncher<String>
 
     companion object {
         // Allowlist for shouldOverrideUrlLoading — anything not in this list
@@ -53,6 +61,34 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Register the file-picker launcher before the WebView is attached.
+        // The callback fires when the user picks a file (after returning from
+        // the system file chooser). It reads the file content in Kotlin and
+        // delivers it to JS as base64 via window.__onImportFile so that
+        // allowContentAccess=false on the WebView is never a factor.
+        filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                try {
+                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
+                    val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    webView.post {
+                        webView.evaluateJavascript("window.__onImportFile && window.__onImportFile('$b64')", null)
+                    }
+                } catch (e: Exception) {
+                    Log.w("VOTReader", "import file read failed", e)
+                    webView.post {
+                        webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
+                    }
+                }
+            } else {
+                // User cancelled the picker
+                webView.post {
+                    webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
+                }
+            }
+        }
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (keepScreenOnEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -300,6 +336,43 @@ class MainActivity : AppCompatActivity() {
             }
             latch.await(2L, TimeUnit.SECONDS)
             return result
+        }
+
+        /** Open the system JSON file picker. When the user picks a file (or
+         *  cancels), the file content is base64-encoded and delivered back to
+         *  JS as window.__onImportFile(b64) — or null on cancel/error. */
+        @JavascriptInterface
+        fun openFilePicker() {
+            runOnUiThread {
+                filePickerLauncher.launch("application/json")
+            }
+        }
+
+        /** Write [content] (UTF-8 text) to the Downloads folder as [filename].
+         *  Returns "ok" on success or "error:<reason>" on failure. Requires
+         *  Android 10+ (API 29) for the MediaStore Downloads collection; on
+         *  older devices returns "error:requires_android_10". */
+        @JavascriptInterface
+        fun saveToDownloads(filename: String, content: String): String {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                return "error:requires_android_10"
+            }
+            return try {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, filename)
+                    put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                }
+                val uri = contentResolver.insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
+                ) ?: return "error:no_uri"
+                contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(content.toByteArray(Charsets.UTF_8))
+                }
+                "ok"
+            } catch (e: Exception) {
+                Log.w("VOTReader", "saveToDownloads failed", e)
+                "error:${e.message}"
+            }
         }
 
         @JavascriptInterface
