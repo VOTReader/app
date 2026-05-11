@@ -2032,6 +2032,57 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-10 — PHASE 0 PARTIAL COMPLETION (git setup)
+  Time:   This session, after the audit-integration work
+  Actions completed:
+    ✓ Deleted 4 defunct Gemini API key .py files (ocr_gemini.py,
+      test_keys.py, test_new_keys.py, probe_rate.py)
+    ✓ Wrote comprehensive .gitignore at project root
+    ✓ Ran final secret scan on all staged content (zero AIzaSy /
+      OpenAI sk-* / GitHub ghp_/github_pat_ matches)
+    ✓ git init -b main; git config user.name/email per-repo
+    ✓ Created private GitHub repo via Claude in Chrome:
+      → corbinlythgoe/VOTReader-studio (PRIVATE 🔒)
+      → URL: https://github.com/corbinlythgoe/VOTReader-studio
+      → Initialized empty (no README/license/.gitignore — we pushed our own)
+    ✓ Initial commit: 53a1ccb (100 files, ~55 MB after gitignore)
+    ✓ Pushed to origin/main; Git Credential Manager handled auth
+      silently (presumably cached from prior GitHub use on the machine)
+    ✓ Verified via Chrome: repo shows .gitignore, CLAUDE.md, PLAN.txt,
+      app/, gradle/, etc. NONE of the deleted API-key files present.
+      No GitHub secret-scanning banner triggered.
+
+  Outstanding Phase 0 items (not yet done):
+    ☐ 0.6 Export/Import in Settings UI (~100 lines of JS)
+    ☐ 0.7 Fix migrateAnnotations silent-flag-on-failure (line 3917)
+    ☐ 0.8 vot-state silent-quota UI feedback (line 13582)
+    ☐ 0.9 Verify LiteLLM nim-proxy binds 127.0.0.1
+    ☐ 0.10 Verify OneDrive backup actually syncs through junction
+            (or set up alternate backup for D: drive)
+    ☐ 0.11 Delete dead weight (9 bible-studies backup files,
+            orama.min.js) — they are gitignored but still on disk
+            taking space; can delete after this verification commit
+    ☐ 0.12 Backup-reminder system setting
+    ☐ 0.13 Privacy: AndroidManifest allowBackup="false"
+    ☐ 0.14 Bump SCHEMA_VERSION 11 → 12
+    ☐ 0.15 [REMOVED — see retraction]
+    ☐ 0.16 Fix showWelcome catch return false → true
+
+  Repo separation confirmed (verified in user's GitHub account):
+    EXISTING: corbinlythgoe/votreader-assets (Garden book images, KEEP)
+    NEW:      corbinlythgoe/VOTReader-studio (source code, just created)
+    No cross-pollution.
+
+  Next steps:
+    Per user's plan, fixes will continue in a fresh conversation.
+    The next session has:
+      improvement2.txt (831 lines, verified, authoritative fix list)
+      handoff_for_next_session.txt (orientation note)
+      PLAN.txt (this strategic doc, now reflects Phase 0 partial completion)
+      CLAUDE.md (project knowledge with documented drift)
+      The repo is live at github.com/corbinlythgoe/VOTReader-studio
+      with cred manager auth cached, so any push from D:\ just works.
+
 2026-05-10 — Plan creation session (this session)
   Time:    Single session, Opus 4.7 / 1M context
   Agents:  6 parallel research agents (all returned with comprehensive reports)
