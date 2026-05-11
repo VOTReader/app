@@ -2133,33 +2133,166 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
     AI must be search-only, never generative on the source texts
 
 ───────────────────────────────────────────────────────────────────────────────
-SECTION 9 — QUICK-START FOR NEXT SESSION
+SECTION 9 — QUICK-START FOR NEXT SESSION (CANONICAL — read this first)
 ───────────────────────────────────────────────────────────────────────────────
 
-Next time work resumes on this project, do this in order:
+THIS IS THE COMPREHENSIVE PICKUP DOC — supersedes earlier versions.
 
-1. Read this PLAN.txt end to end (you're reading it now — good).
+──── READ ORDER ────
 
-2. Read CONTRIBUTING.md for the practical "how to run things" parts.
+1. C:\Users\corbi\OneDrive\Desktop\handoff_for_next_session.txt (~5 min)
+   The orientation note from the parallel session. Tells you what the
+   user's actual pain is ("feels underfinished, footnotes buggy, UI
+   paper-cuts, shippable to others without keys") and what to ignore
+   from the original encyclopedia-sized audit. Read this FIRST.
 
-3. Check what state the actual code is in:
-   - Does data-normalize.js still exist at app/src/main/assets/?
-   - Has anyone wired it into index.html yet?
-   - Has the parallel Notebooks session landed?
+2. C:\Users\corbi\OneDrive\Desktop\improvement2.txt (~15 min)
+   The AUTHORITATIVE fix list. 831 lines. Verified, not agent-spam.
+   Use this to know what to actually do next. Sequenced by impact-per-effort.
 
-4. Pick up where the last session stopped. Most likely starting point:
-   PHASE 1 — Bug fixes & quick wins. Specifically the 1.1 accessibility
-   fixes (5 lines of CSS) — these are the smallest, lowest-risk improvements
-   and they prove the dev workflow works end-to-end (edit → preview → verify).
+3. D:\VOTReader-studio\PLAN.txt — these sections at minimum:
+     §17 (self-critique — the lessons)
+     §19 (sequencing by objective, not timeline)
+     §21 (infrastructure state — what's verified, what isn't)
+     §15 (CLAUDE.md corrections — what NOT to trust)
 
-5. After Phase 1 is verified done in the browser, move to Phase 2.
-   The skeleton at data-normalize.js is the right starting point — flesh
-   out parseInlineMarkup(), wire it into a couple of WTLB entries first,
-   verify rendering, expand from there.
+4. D:\VOTReader-studio\CONTRIBUTING.md (~5 min)
+   Working principles. Validator usage (check_balance.py).
+   File structure. How to coordinate with parallel sessions.
 
-6. Update Section 8 (Progress Log) with anything you accomplish.
-   Update Section 5 with any phase-internal task completions.
-   Don't bloat CLAUDE.md — keep this file as the in-flight memory.
+5. D:\VOTReader-studio\CLAUDE.md (~SKIM — it has known drift)
+   The project knowledge base. SKIM these sections specifically:
+     §0 Quick start (black-screen failure modes — read carefully)
+     §6.6 D1-D10 bug taxonomy (the data quality patterns)
+     §11 (canonical UX patterns established by Notes session)
+     §17.13-17.18 (the just-shipped Notes/Library/Notebooks system)
+   ⚠️ DO NOT trust specific line numbers in CLAUDE.md — they are
+   2,500-5,000 lines off in many places. PLAN.txt §15 lists confirmed
+   drift; verify any line citation with a fresh Grep before using it.
+
+──── WHAT EXISTS THAT ISN'T OBVIOUS ────
+
+- D:\VOTReader-studio\app\src\main\assets\data-schema.d.ts (18 KB)
+  TypeScript schema declarations for the unified data shape.
+  DESIGN DOCUMENT ONLY — not loaded by the app at runtime.
+  Phase 2 reads from this for the planned data unification.
+
+- D:\VOTReader-studio\app\src\main\assets\data-normalize.js (21 KB)
+  Skeleton normalizer that converts Format A/B/D source data to the
+  unified shape. NOT YET WIRED IN. Phase 2 starts by completing the
+  parseInlineMarkup() helper and wiring this into the asset load order.
+  Note: missing the `~ [From "X" ~ Volume N]` attribution parser per
+  the data audit — add when wiring.
+
+- _ocr_out/ (121 MB) lives at project root but is gitignored.
+  Represents 9.4 hours of irreplaceable Ollama OCR compute. Needs
+  its own backup destination separate from git (see PLAN.txt §17.12).
+
+──── REPO STATE ────
+
+- GitHub: corbinlythgoe/VOTReader-studio (PRIVATE 🔒)
+  https://github.com/corbinlythgoe/VOTReader-studio
+- Git Credential Manager auth is CACHED — push works without prompt
+- Default branch: main
+- Per-repo identity: "Corbin Lythgoe" / corbinlythgoe@users.noreply.github.com
+- Initial commit: 53a1ccb (the first push)
+- Second commit: 3c1be0d (PLAN.txt completion notes)
+- Garden image assets are at corbinlythgoe/votreader-assets (SEPARATE
+  repo, do not pollute with code, do not touch unless changing
+  Garden image hosting strategy)
+
+──── WHAT WAS DELETED FROM PROJECT ROOT (DO NOT RECREATE) ────
+
+- ocr_gemini.py, test_keys.py, test_new_keys.py, probe_rate.py
+  All four contained DEFUNCT Gemini API keys. They are now in
+  .gitignore as a safety net. If OCR is ever needed again, write
+  a fresh script reading from a .env file. Don't put plaintext
+  keys back in code.
+
+──── WHAT REMAINS AT PROJECT ROOT (KEY-FREE, USEFUL) ────
+
+  check_balance.py — RUN THIS after any data file edit. Validates parse
+                     + smart-quote + Unicode-dash. Catches the 3 black-screen bugs.
+  ocr_pipeline.py — Local Ollama-based OCR (no API keys, uses localhost:11434)
+  aggregate_ocr.py — Combines per-page OCR text into all.txt
+  ocr_gap_check.py — Phrase coverage check against existing data
+  excerpt_audit.py — Verify excerpt source titles exist in data
+  misattribution_check.py — MTAM letter-link audit
+  populate_study_nkjv.py — Future: auto-populate bible-studies.js NKJV refs
+  render_pdf_pages.py — PDF → JPG page render
+  run_ocr_all.sh — Sequential OCR runner
+
+──── PREVIEW TOOL ────
+
+  Server config: D:\VOTReader-studio\.claude\launch.json
+  Start: preview_start name="app" (port 8090)
+  serverId changes per session — call preview_list first, don't hardcode.
+  The C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app junction makes
+  this work; edits go to D:\, preview serves through C:\ transparently.
+
+──── WORK STYLE FOR NEXT SESSION ────
+
+DO:
+  - Verify with Grep/Read before editing anything sourced from improvment.txt
+    or improvement2.txt or PLAN.txt §12 (line numbers may have drifted)
+  - Run check_balance.py after any data file edit
+  - Use the preview tool to verify visible behavior after fixes
+  - Update PLAN.txt §8 (progress log) when you finish Phase 0 or Phase 1 items
+  - Stay tight on user's stated pain: footnotes, UI bugs, shipping defaults
+  - Pick the simpler fix when two equally-correct options exist
+
+DON'T:
+  - Dispatch lots of audit agents — the audit is done. If you need agents,
+    dispatch FEW with explicit verification mandate, and re-check their
+    output before propagating into PLAN.txt
+  - Treat improvment.txt as authoritative — it's reference; improvement2.txt is
+  - Touch the snapRangeToWords regex (PLAN.txt §17.1 explains why — bogus claim)
+  - Refactor for code quality alone in this fix-focused session
+  - Make architectural decisions (PWA, allowBackup strategy, AI Space approach,
+    app rename, Garden hosting) without explicit user input
+  - Trust CLAUDE.md line numbers — verify with Grep first
+
+──── PHASE 0 PROGRESS (already partially done) ────
+
+  Done in prior session:
+    ✓ Deleted 4 defunct API key .py files
+    ✓ Wrote .gitignore
+    ✓ git init + commit + push to private GitHub remote
+    ✓ Confirmed no API key signatures in pushed content
+    ✓ Repo separation honored (votreader-assets untouched)
+
+  Remaining Phase 0 items:
+    ☐ Export/Import in Settings UI (improvement2.txt §D3.4)
+    ☐ Fix migrateAnnotations silent-flag-on-failure (improvement2.txt §V2 area)
+    ☐ Fix vot-state silent-quota UI feedback
+    ☐ Verify LiteLLM nim-proxy bind interface
+    ☐ Verify OneDrive backup or alternate
+    ☐ Delete dead weight on disk (9 bible-studies backups, orama.min.js)
+    ☐ allowBackup="false" in AndroidManifest
+    ☐ Bump SCHEMA_VERSION 11 → 12 in search.js
+    ☐ Fix showWelcome catch return false → true
+    ☐ App rename from "SacredUI 2" to user-chosen brand (NEEDS USER INPUT)
+
+  Phase 1+ — see improvement2.txt for full sequenced list.
+
+──── WHAT NEEDS USER INPUT BEFORE EXECUTING ────
+
+  - App name (currently "SacredUI 2" in strings.xml)
+  - Welcome screen copy (replacing splash + ✕)
+  - Garden View hosting strategy (bundle / CDN / opt-in / keep current)
+  - allowBackup decision (recommend "false" + Export/Import; user agreed)
+  - PWA evaluation (PLAN.txt §18.1 — open architectural decision)
+  - AI Space approach (PLAN.txt §5.5 — user said "no API keys ever")
+
+  For all other items in Phase 0/1: just do them. They're either bug
+  fixes or have one clear safe choice.
+
+──── ONE-LINE VERSION ────
+
+Read handoff_for_next_session.txt, then improvement2.txt, then PLAN.txt
+§17/§19/§21, then start fixing things from improvement2.txt that don't
+need user input. Verify before editing. Don't re-audit. Don't trust
+CLAUDE.md line numbers. Don't recreate the deleted .py files.
 
 ───────────────────────────────────────────────────────────────────────────────
 SECTION 10 — TRAPS / GOTCHAS LEARNED (append as discovered)
