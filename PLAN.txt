@@ -2032,6 +2032,98 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-10 — DAY 1 PASS + WELCOME ABOUT (improvement2.txt Day 1 + D3.2/D3.3)
+  Branch:  claude/hopeful-swirles-4b742e (pushed to origin)
+  Working: single fresh conversation, picked up via PLAN.txt §9 quick-start
+  Approach: every claim verified against current code BEFORE editing
+            (per Section 17 lesson); one commit per fix; preview-verified
+            the visible ones (BackHintPill, Welcome modal) in-browser
+
+  Commits (oldest first on branch):
+    572e1f6  Rename app from "SacredUI 2" to "VOTReader"
+             (improvement2.txt D3.2 — strings.xml)
+    6cebd7d  Bump SCHEMA_VERSION 11 → 12 to invalidate stale search caches
+             (improvement2.txt V2/D1.3 — search.js:41; Phase 0.14)
+    93e350c  Set allowBackup=false to keep personal data on device
+             (improvement2.txt V1/D3.1 — AndroidManifest.xml; Phase 0.13)
+    cecd7da  Show welcome on localStorage error (private browsing fix)
+             (improvement2.txt V9/D1.6 — index.html showWelcome catch; Phase 0.16)
+    31ccf80  Wire library + notes-index into handleAndroidBack
+             (improvement2.txt V5/D1.2 — index.html handleAndroidBack)
+    74f0d86  Extract BackHintPill component, fix missing-space bug at 2 of 4 sites
+             (improvement2.txt V4/D1.1 — verified live in browser)
+    b0cb05f  Remove dead search settings (searchFuzzy + searchAllTranslations + searchInclude*)
+             (improvement2.txt V3/D1.4/D1.5 + user direction; only
+              searchUseStopWords and searchCorpus remain — both wired)
+    fc921a8  Add Welcome About modal — disciple-reverent introduction after splash
+             (improvement2.txt V8/D3.3 — full splash → ✕ → About → Continue flow,
+              tone explicitly reverent, points to thevolumesoftruth.com as canonical)
+
+  User decisions logged this session (apply to all future work):
+    - App brand: "VOTReader" (no company, fan/disciple project)
+    - Tone rule: disciple-reverent app-wide. NO marketing or hype lingo,
+      ever. Flag suspicious copy in non-archive files; don't introduce any.
+    - The Volumes / Letters / collections are the Word of The Lord given
+      through His servant Timothy. thevolumesoftruth.com is canonical.
+      This app is unofficial.
+    - PWA conversion: PERMANENTLY deferred (would blur the line between
+      this app and the canonical source — boundary respect, not just
+      "not yet")
+    - Garden View hosting: defer; if shipping to many users, switch to
+      Cloudflare R2 free tier
+    - Dead search settings: remove (don't try to wire). Improve search
+      later if needed.
+    - "Hidden Manna" remains intentionally incomplete by design
+    - Update preference: keep user updated on patterns/options as they
+      arise (CDN choices, polyfill needs, etc.)
+    - "Keep a plan document start to finish; keep CLAUDE.md updated;
+      keep GitHub backup current" — established as standing process
+
+  Phase 0 items now complete (from 2026-05-10 partial-completion list):
+    ✓ 0.13 allowBackup="false"
+    ✓ 0.14 SCHEMA_VERSION bump
+    ✓ 0.16 showWelcome catch returns true on error
+
+  Phase 0 items still outstanding:
+    ☐ 0.6 Export/Import in Settings UI (will be NEXT session priority —
+            it's the ONLY backup path now that allowBackup is off)
+    ☐ 0.7 Fix migrateAnnotations silent-flag-on-failure
+    ☐ 0.8 vot-state silent-quota UI feedback
+    ☐ 0.9 Verify LiteLLM nim-proxy binds 127.0.0.1
+    ☐ 0.10 Verify OneDrive backup syncs through junction (or alt backup)
+    ☐ 0.11 Delete dead weight on disk (gitignored .bak-pre-* + orama.min.js)
+    ☐ 0.12 Backup-reminder Settings entry (pairs with 0.6)
+
+  improvement2.txt Day 1 status: ALL items complete (D1.1 through D1.6).
+  improvement2.txt Day 2 status: NOT STARTED — the footnote system overhaul
+    (D2.1 silent-blank-verse fix + the 4 data scans + active-on-touch CSS
+    + prev/next nav in sheet) is the next batch's focus per user pain
+    ("especially with footnotes").
+
+  Architecture notes:
+    - New shared component: BackHintPill (~line 9270 in index.html).
+      Now used by ChapterView, BibleChapterView, LetterView, WtlbEntryView.
+      Always renders "Back to " with the trailing space. Null-safe.
+    - Welcome flow rewritten: splash + ✕ → About modal → Continue.
+      About modal CSS at lines ~1452-1467 (.welcome-about-* family).
+      New state in App(): splashDismissed (defaults false).
+      Splash X onClick now setSplashDismissed(true), not dismissWelcome.
+      Continue button calls dismissWelcome.
+    - Defaults block (~line 13370) lost 13 dead search fields. Stored
+      values in users' vot-state remain harmless cruft (no readers).
+
+  Working environment confirmed:
+    - Worktree at D:\VOTReader-studio\.claude\worktrees\hopeful-swirles-4b742e
+    - Edit files via worktree path, NOT D:\VOTReader-studio\app\ (main checkout)
+    - index.html has CRLF line endings — Edit tool can struggle with
+      escape-sequence/CRLF interaction; Python in binary mode is the
+      reliable fallback for tricky multi-line replaces
+    - Preview server at port 8090 must be configured to serve the worktree
+      assets path (.claude/launch.json points to worktree)
+    - Push works without prompts (auth cached)
+
+────────────────────────────────────────────────────────────────────────────
+
 2026-05-10 — PHASE 0 PARTIAL COMPLETION (git setup)
   Time:   This session, after the audit-integration work
   Actions completed:

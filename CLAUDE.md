@@ -1,7 +1,8 @@
 # CLAUDE.md — VOTReader-studio Project Knowledge Base
 
 > Living document. Update after every major examination or change.
-> Last major update: 2026-05-09 (items 6-48 fix pass — 20 items fixed, 23 reviewed+deferred; deep-dive audit + 5 bug fixes — see Section 19; boundaryConfig + READING_CHAIN — see Section 18.17; ErrorBoundary — see 18.16; _matthew()/_studies() helpers + typeof elimination — see 18.3/18.8; IIFE elimination + _navToChapter — see 18.14; _goFirst/_goLast boundary maps — see 18.13; colReadNavProps/colIdxProps — see 18.11; NavButtons — see 18.10; LinkPicker — see 18.12)
+> Last major update: 2026-05-10 (Day 1 batch — app renamed VOTReader, SCHEMA_VERSION 12, allowBackup off, BackHintPill component, Welcome About modal, dead search settings removed, library/notes-index Android back wired — see Section 20)
+> Prior major update: 2026-05-09 (items 6-48 fix pass — 20 items fixed, 23 reviewed+deferred; deep-dive audit + 5 bug fixes — see Section 19; boundaryConfig + READING_CHAIN — see Section 18.17; ErrorBoundary — see 18.16; _matthew()/_studies() helpers + typeof elimination — see 18.3/18.8; IIFE elimination + _navToChapter — see 18.14; _goFirst/_goLast boundary maps — see 18.13; colReadNavProps/colIdxProps — see 18.11; NavButtons — see 18.10; LinkPicker — see 18.12)
 >
 > **Working dir**: `D:\VOTReader-studio` (canonical). The C: OneDrive path is legacy — `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app` is now a Junction → `D:\VOTReader-studio\app` (set up 2026-05-08, see Section 17.11). Always edit D: files.
 
@@ -2113,6 +2114,97 @@ New `_validateTabState(s)` function runs on both `s` (legacy) and each `s.tabs[i
 **Event listener cleanup is solid** — all addEventListener/removeEventListener pairs are properly balanced. No memory leaks from event listeners.
 
 **Accessibility is reasonable** — proper `aria-label` usage, semantic `<button>` elements, good color contrast (10.5:1 dark, 5.2:1 light). Main gaps: no focus traps on modals, limited keyboard navigation beyond browser defaults.
+
+---
+
+## 20. Day 1 batch (2026-05-10) — VOTReader brand + visible UI fixes + Welcome rewrite
+
+Committed on branch `claude/hopeful-swirles-4b742e` (pushed to origin):
+
+### 20.1 App identity & shipping defaults
+
+- **App name**: `SacredUI 2` → **`VOTReader`** in `app/src/main/res/values/strings.xml`. User-facing brand. Fan/disciple project, no company name.
+- **`AndroidManifest.xml` allowBackup**: `true` → `false`. Personal data (annotations, notes, notebooks, links, reading history) no longer silently uploads to the user's Google Drive. Per user direction: backup is the user's choice via Settings → Export (to come), not opaque cloud sync.
+- **`search.js` SCHEMA_VERSION**: `11` → `12`. The 54-bug D-pattern body-text sweep was invisible to existing users because IndexedDB cache key keyed on SCHEMA_VERSION + array lengths (not content). Bumping forces a one-time index rebuild on next launch.
+
+### 20.2 Tone rule — disciple-reverent, NEVER marketing
+
+The user explicitly framed this app as an unofficial disciple project that must not appear to compete with or replace **thevolumesoftruth.com** (canonical, run by Timothy). All UI copy from here forward must be reverent and factual. No marketing or hype lingo, ever. When editing existing copy that's marketing-toned, flag it for the user FIRST (it may be from the archived wiki HTML — those at `C:\Users\corbi\Downloads\*.html` are the canonical source). Don't introduce marketing copy in new code.
+
+### 20.3 New shared component: `BackHintPill` (index.html ~line 9270)
+
+Single source for the "‹ Back to ..." pill at the top of reading screens. Replaces 4 duplicate JSX blocks across ChapterView, BibleChapterView, LetterView, WtlbEntryView. Fixes the missing-space bug (`"Back toMy Notes"`) that was present in 2 of 4 sites (LetterView + WtlbEntryView) — now all 4 sites render `"Back to "` with the correct trailing space.
+
+```js
+function BackHintPill({ backHint, onClick, ariaLabel }) {
+  if (!backHint) return null;
+  return createElement("div", { className: "back-hint-row" }, ...);
+}
+```
+
+Props: `backHint` (null-safe), `onClick`, `ariaLabel`. The component is null-aware, so callers can render unconditionally — `React.createElement(BackHintPill, { backHint, onClick: onBack, ariaLabel: "Back to source letter" })`. Original handler names preserved at each call site (`onBack` for WtlbEntryView/LetterView, `onTapThroughBack` for ChapterView/BibleChapterView).
+
+### 20.4 `handleAndroidBack` — library + notes-index wired
+
+Previously the hardware back button **exited the app** when pressed from the Library home or the Notes hub (no cases handled). Now:
+- `screen === 'library'` → `goNavOrigin()` (returns to wherever the user came from, usually Home)
+- `screen === 'notes-index'` → `setScreen('library')` (returns to the Library home)
+
+Mirrors the on-screen back-arrow behavior already in those views.
+
+### 20.5 Dead search settings removed (defaults block)
+
+The Search v2 fine-grained toggle family in the defaults object was declared but never read by anything:
+
+- `searchFuzzy` (no UI; never passed in VotSearch.search options)
+- `searchAllTranslations` (no UI; indexer always includes all translations)
+- `searchIncludeNotes`, `searchIncludeVerses`, `searchIncludeHeadings`, `searchIncludeStudyNotes`, `searchIncludeCrossRefs`, `searchIncludeFootnotes`, `searchIncludeLetters`, `searchIncludeLetterBody`, `searchIncludeWtlb`, `searchIncludeBlessed`, `searchIncludeHolyDays`, `searchIncludeBibleStudies` (no UI; no read sites)
+
+All 14 removed from the defaults. Per user direction: remove now, improve search later if needed. **Kept** (both wired): `searchUseStopWords`, `searchCorpus`. Stored values in users' `vot-state` from prior sessions remain harmless cruft (no readers).
+
+### 20.6 Welcome flow — splash → ✕ → About modal → Continue
+
+The prior welcome was the splash image with a single ✕ that dismissed the whole experience. Users got no introduction.
+
+New flow:
+1. **Splash** (unchanged image, ✕ in same upper-right position) — shown when `showWelcome && !splashDismissed`. Invisible online-only link box over the website URL on the splash IMAGE preserved exactly as it was (`isOnline && createElement("a", ...)` at the same coords).
+2. **Tap ✕ on splash** → `setSplashDismissed(true)` (does NOT call `dismissWelcome`). Splash hides, home renders behind, About modal appears on top.
+3. **About modal** (`.welcome-about-overlay` / `.welcome-about-modal`) — shown when `showWelcome && splashDismissed`. Disciple-reverent introduction. No X / no back affordance — only path forward is Continue.
+4. **Tap Continue** → `dismissWelcome()` (sets `vot-welcomed='1'`, hides modal). Normal home view.
+
+About modal CSS at lines ~1452-1467 (`.welcome-about-*` family), modeled on the existing `.garden-warning-modal` centered-dialog pattern. Diamond ornaments (`◇  ◇  ◇`) top and bottom. Title in Cinzel gold. Body in EB Garamond cream with italic emphasis on `thevolumesoftruth.com` and *A Return to the Garden*. Gold-bordered Continue button centered.
+
+**Welcome catch fix**: `showWelcome` useState catch now returns `true` on localStorage error (was `false`), so private-browsing first-time users see the welcome instead of being silently treated as returning users.
+
+**New App state**: `splashDismissed` (defaults to `false`). Lives alongside `showWelcome`; the two together gate the splash and modal independently.
+
+### 20.7 Permanent decisions (apply across all future work)
+
+- **PWA conversion: permanently deferred.** Not because it's a big lift but because hosting an installable web copy at a URL could blur the line between this app and **thevolumesoftruth.com**. Timothy hosts the canonical site; this app stays Android-only / fan-distribution.
+- **Garden View hosting**: deferred. If user-base grows and GitHub raw-content rate-limits become an issue, switch to Cloudflare R2 free tier.
+- **"Hidden Manna" stays intentionally incomplete** (3 titles declared, 1 letter implemented — by design).
+- **Update preference**: flag pattern/option suggestions (CDN choices, polyfill needs, etc.) proactively as they arise, not just on direct ask.
+- **Plan + CLAUDE.md + GitHub maintenance** is standing process: update `PLAN.txt` §8 progress log every batch, update `CLAUDE.md` for changes future agents need, push to origin after each batch so backup stays current.
+
+### 20.8 Drift corrections
+
+- **§15 (NIM Proxy)** describes a FastAPI `proxy.py` that no longer exists. Actual implementation is LiteLLM-based (`litellm-config.yaml` in `C:\Users\corbi\.claude\nim-proxy\`). Section needs full rewrite — flagged for a future cleanup pass.
+- **§19.3 item 33** says "3-4 declarations" of `!important`. Actual count verified: **34**. All have legitimate annotation-specificity rationale, but the number is wrong in the doc.
+- **Line number drift**: CLAUDE.md's specific line references (e.g., `Segments` at 2252, `VerseWithNumbers` at 2576, App() at 7546) are 2,500-5,000 lines off. Current actual locations: `Segments` line 7547, `VerseWithNumbers` line 7835, App() line 12762. Always Grep-verify before relying on a specific line number.
+
+### 20.9 Working environment reminders (for future Claude sessions)
+
+- This batch was done in a worktree at `D:\VOTReader-studio\.claude\worktrees\<name>`, NOT the main checkout. Edit through the worktree path. Pushing to a worktree branch creates a separate branch on origin — review/merge to main when appropriate.
+- `index.html` uses **CRLF line endings**. The Edit tool can struggle with multi-line patterns that contain escape sequences (`‹` etc.) AND CRLF together. When an Edit fails with "String to replace not found" despite visible exact-match content, the reliable fallback is **Python in binary mode** (`open(path, 'rb')` + literal `b'\r\n'` between lines). Verified working for this batch's BackHintPill block-replace and dead-search-settings removal.
+- Preview server config: `.claude/launch.json` `runtimeArgs` must point at the WORKTREE'S `app/src/main/assets`, not the main checkout's path, or the preview serves stale files. Always check after creating a fresh worktree.
+
+### 20.10 Day 1 status & what's next
+
+**improvement2.txt Day 1 status**: ALL items complete (D1.1 BackHintPill + space, D1.2 handleAndroidBack, D1.3 SCHEMA_VERSION, D1.4/D1.5 dead settings, D1.6 welcome catch).
+
+**Day 2 not started**: the footnote system overhaul is the next batch's focus per the user's stated pain ("especially with footnotes"). Items per improvement2.txt §D2.x: silent-blank-verse fix when `nkjv[fn.ref]` missing, the 4 data scans (orphan markers, missing nkjv keys, unused entries, wider D8 regex), `.fn-ref.active` rule outside `@media (hover: hover)` so touch users see active state, prev/next nav inside the FootnoteSheet.
+
+**Remaining Phase 0 items** (per `PLAN.txt §8`): 0.6 Export/Import in Settings UI (now the ONLY backup path since allowBackup is off — high priority), 0.7 migrateAnnotations silent-flag, 0.8 vot-state quota UI, 0.9 LiteLLM proxy bind verify, 0.10 OneDrive sync verify, 0.11 dead-weight disk cleanup, 0.12 backup-reminder Settings entry.
 
 ---
 
