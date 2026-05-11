@@ -10111,7 +10111,7 @@ function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, o
 
 /* ── Render a line of text, replacing {{ref:...}} with tappable links ── */
 /* ── Words To Live By: entry view ── */
-function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark, isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel, footnotesMode, backHint, onBack, hlTick, onLinkOpen }) {
+function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark, isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel, footnotesMode, backHint, onBack, hlTick, onLinkOpen, onInAppLink }) {
   const [scriptureRef, setScriptureRef] = useState(null);
   const [scriptureText, setScriptureText] = useState(null);
   const [highlightedFn, setHighlightedFn] = useState(null);
@@ -10196,14 +10196,52 @@ function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSetti
   const prevEntry = entry.prevEntry;
   const nextEntry = entry.nextEntry;
 
+  // Map a written volume number (numeric digit or English word) to the
+  // canonical collection label used by VOT_LETTER_REGISTRY / resolveVotLetter.
+  // Returns null when no recognized form is present.
+  const _attrCollectionLabel = (volStr) => {
+    if (!volStr) return null;
+    const s = String(volStr).trim().toLowerCase();
+    const NUMS = { '1':'One', '2':'Two', '3':'Three', '4':'Four', '5':'Five', '6':'Six', '7':'Seven' };
+    if (NUMS[s]) return 'Volume ' + NUMS[s];
+    const WORDS = ['one','two','three','four','five','six','seven'];
+    if (WORDS.includes(s)) return 'Volume ' + s.charAt(0).toUpperCase() + s.slice(1);
+    return null;
+  };
+
   // Render a single line, consuming ref occurrences from the current paragraph's
   // analysis via a per-paragraph counter passed in by caller.
   const renderLine = (line, consumeRef) => {
-    const parts = line.split(/(\*\*.*?\*\*|_.*?_|\{\{ref:[^}]+\}\}|\{\{nav:[^}]+\}\})/g);
+    // Inline split patterns (in priority order — first match wins per segment):
+    //   **bold**           **...**
+    //   _italic_           _..._
+    //   {{ref:...}}        scripture popup
+    //   {{nav:...}}        bible-chapter nav link
+    //   [From "Title" ~ Volume N]   WTLB attribution tap-through to the source letter
+    const parts = line.split(/(\*\*.*?\*\*|_.*?_|\{\{ref:[^}]+\}\}|\{\{nav:[^}]+\}\}|\[From [^\]]+\])/g);
     return parts.map((seg, si) => {
       if (!seg) return null;
       if (seg.startsWith('**') && seg.endsWith('**')) return /*#__PURE__*/React.createElement("strong", { key: si }, renderLine(seg.slice(2, -2), consumeRef));
       if (seg.startsWith('_') && seg.endsWith('_')) return /*#__PURE__*/React.createElement("em", { key: si }, renderLine(seg.slice(1, -1), consumeRef));
+      // [From "Letter Title" ~ Volume N] — WTLB attribution. Smart-quotes or
+      // ASCII quotes accepted around the title; volume can be digit or word.
+      // Renders as a tappable letter-link → openInAppLetter wires the
+      // single-shot back-pill correctly. Falls through to plain text if the
+      // parse fails OR if onInAppLink isn't provided.
+      const attrMatch = seg.match(/^\[From ["“”](.+?)["“”]\s*~\s*Volume\s+(\d+|[A-Za-z]+)\]$/);
+      if (attrMatch && onInAppLink) {
+        const title = attrMatch[1];
+        const collection = _attrCollectionLabel(attrMatch[2]);
+        if (collection) {
+          return /*#__PURE__*/React.createElement("span", { key: si, className: "letter-link-ref",
+            onClick: () => onInAppLink(
+              { collection: collection, letterTitle: title },
+              { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null }
+            ),
+            title: 'Open "' + title + '" in ' + collection },
+            seg);
+        }
+      }
       const refMatch = seg.match(/^\{\{ref:(.+)\}\}$/);
       if (refMatch) {
         const ref = refMatch[1].trim();
@@ -13612,12 +13650,26 @@ function App() {
     // Push source onto the back-nav stack so multi-level tap-throughs
     // unwind correctly (A → B → C → back → B → back → A). Source title +
     // volume label (from meta) populate the back-hint pill on the dest.
+    //
+    // Also compute a destSnapshot — used by the prune effect + _destMatches
+    // to hide the back-pill the moment the user navigates away from the
+    // destination (next/prev chapter or letter, different book, etc.).
+    // ALL back pills in the app are now single-shot per user direction:
+    // the pill is a contextual breadcrumb for THIS landing, not a
+    // permanent fixture that survives onward navigation.
+    let destSnapshot = null;
+    if (dest.isStudy) {
+      destSnapshot = { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: dest.studyId, studyChapterId: dest.studyChapterId };
+    } else {
+      destSnapshot = { screen: dest.screen, bookId: null, chapterNum: null, letterId: dest.id, studyId: null, studyChapterId: null };
+    }
     pushFromLetter({
       sourceScreen: screen, sourceLetterId: letterId,
       sourceBookId: bookId, sourceChapterNum: chapterNum,
       sourceStudyId: studyId, sourceStudyChapterId: studyChapterId,
       sourceLetterTitle: meta && meta.sourceLetterTitle ? meta.sourceLetterTitle : null,
-      sourceVolumeLabel: meta && meta.sourceVolumeLabel ? meta.sourceVolumeLabel : null
+      sourceVolumeLabel: meta && meta.sourceVolumeLabel ? meta.sourceVolumeLabel : null,
+      destSnapshot: destSnapshot
     });
     if (target.excerpt) {
       window.__pendingHighlight = { excerpt: target.excerpt, letterId: dest.id };

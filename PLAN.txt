@@ -2046,6 +2046,73 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later 5) — WTLB attribution tap-through + single-shot back-pill universal
+
+  User directive: "WTLB Part 1 references `[From "The Word of My Mouth" ~
+  Volume 7]` ALL footnotes/references like this should be live and
+  tap-through to the actual letter with correct back pill wiring that
+  only persists on that screen, indeed, all backpills in the entire app
+  should not continue to persist if user navigates away from that screen"
+
+  Two parts:
+
+  Part 1 — WTLB attribution tap-through:
+    Added a new inline split pattern to WtlbEntryView's renderLine:
+      \[From [^\]]+\]
+    Match handling parses `[From "Title" ~ Volume N]` (smart-quote or
+    ASCII quote around title; numeric digit or word for the volume) and
+    maps the volume number through `_attrCollectionLabel` →
+    "Volume One"..."Volume Seven". Renders as a tappable .letter-link-ref
+    span that calls onInAppLink({collection, letterTitle}) with source
+    meta {sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel}
+    so the destination's back-pill reads "Back to <Part Label> · <Entry>".
+    Falls through to plain text when onInAppLink is missing or the
+    volume number doesn't normalize to a known collection.
+
+    WtlbEntryView signature gained an `onInAppLink` destructure — the
+    prop was already in sharedViewProps (set to openInAppLetter) but
+    wasn't being received.
+
+    Data footprint today: ONE attribution in WTLB One intro paragraph 2.
+    The renderer-level fix means any future attributions in WTLB/Blessed/
+    Holy Days entries get tap-through for free.
+
+    Verified live: tapping the attribution navigates to Volume Seven,
+    Letter 32, "The Word of My Mouth"; landing pill reads "Back to
+    Part One · Introduction". Hover tooltip: `Open "The Word of My
+    Mouth" in Volume Seven`.
+
+  Part 2 — All back-pills single-shot (universal destSnapshot):
+    openInAppLetter (used by footnote tap-throughs, attribution links,
+    letter-link segments in studies, and any other "open this in app"
+    flow) previously did NOT set destSnapshot. The pill rendered
+    persistently — it stayed visible after the user navigated forward to
+    the next letter or jumped elsewhere. The destSnapshot mechanism
+    existed only for the Notes-index tap-through path
+    (_navToLinkRef.current).
+
+    Fix: openInAppLetter now computes destSnapshot from the resolved
+    `dest`:
+      - Studies: { screen: 'bible-study-chapter', studyId,
+                   studyChapterId, ... }
+      - Letters: { screen: dest.screen, letterId: dest.id, ... }
+    Passed into pushFromLetter alongside the source fields.
+
+    Effect: every back-pill in the entire app is now single-shot. The
+    existing prune useEffect + _destMatches (already in place from §12
+    bug #4) detect "current state ≠ destSnapshot" and pop the entry,
+    hiding the pill the moment the user navigates away. Pill persists
+    while the user is on the destination screen; vanishes on next/prev
+    arrow, chapter jump, search, home, etc.
+
+    Verified live: clicked attribution → landed on Volume Seven L32 →
+    pill "Back to Part One · Introduction" visible → clicked Next
+    letter arrow → pill GONE (single-shot behavior confirmed).
+
+  Files: app/src/main/assets/index.html (WtlbEntryView renderLine +
+  signature, openInAppLetter destSnapshot computation).
+  Zero console errors after the changes.
+
 2026-05-11 (later 4) — PLAN.txt §12 critical bugs (all 10) — complete
 
   #1 Prophecy card persistence broken (lines ~7624-7638)

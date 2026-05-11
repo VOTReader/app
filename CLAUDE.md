@@ -48,6 +48,8 @@
 >     • 20 D8 glued-text bugs in WTLB One/Two (regex sweep with backslash-aware lookbehind)
 >     • Translation-tagged inline refs (lookupVersesFromBooks honors p.tag + lazy-loads)
 >     • Android hardware back button (MainActivity.kt — evaluateJavascript window.handleAndroidBack, finish() on "false")
+> - WTLB attribution tap-through (2026-05-11): `[From "Title" ~ Volume N]` inline patterns in WTLB/Blessed are now live letter-links. WtlbEntryView's renderLine got a new split pattern; the parsed volume number maps to "Volume One"..."Volume Seven" via `_attrCollectionLabel` and calls `onInAppLink` with source meta so the destination pill reads "Back to <Part Label> · <Entry>".
+> - All back-pills universally single-shot (2026-05-11): `openInAppLetter` now computes a `destSnapshot` from the resolved letter (studies + regular). The existing prune useEffect + `_destMatches` (from §12 bug #4) now hide the pill the moment the user navigates away from the destination. Every back-pill in the app — Notes index, footnote tap-throughs, attribution links, letter-link segments, addendum cards — is single-shot. Pill persists while on the destination; vanishes on next/prev arrow, chapter jump, or any onward navigation.
 > - Next: Objective C — improvement2.txt Day 4-5 polish (overlays auto-dismiss on nav, focus indicators, NotebookPicker checkbox refresh, MATTHEW guard, soft-keyboard scroll-into-view, dwell-on-tab-switch, z-index 8500 collision, http→https URL cleanup).
 
 ## Quick start (app failed to load? read this first)
