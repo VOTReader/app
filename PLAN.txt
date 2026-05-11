@@ -2046,6 +2046,37 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later) — About screen + home-nav split (Objective D piece)
+  User request landed: "create an i (info button icon) and place it next
+  to the cross on the homescreen, when tapped it should pull up the app
+  introduction message (not the splash screen image)."
+
+  Done:
+    ✓ New AboutScreen component (placed just before SettingsScreen)
+      with: eyebrow "VOT Study Bible", title "About VOTReader",
+      gold-ornament divider, 4 EB Garamond paragraphs covering what
+      VOTReader is, what's inside, local-only data + Export pointer,
+      and the wellspring link to thevolumesoftruth.com
+    ✓ New screen state 'about' wired through:
+        - goAbout() in App (sets navOrigin then screen)
+        - render block for screen === 'about'
+        - handleAndroidBack case for 'about' → goNavOrigin
+    ✓ Home-screen nav now has two buttons side-by-side in upper left:
+        - Cross icon (existing) → reopens splash image; title fixed to
+          "Welcome image" (was misleadingly labeled "About")
+        - NEW `i` icon (info: circle outline + vertical bar + dot above)
+          → opens AboutScreen
+    ✓ Reused .settings-screen / .settings-header / .settings-eyebrow /
+      .settings-title / .settings-ornament-* classes for structural
+      consistency. Added small .about-body + .about-source CSS block.
+    ✓ Verified live: navigation chain Home → About → Back-button → Home;
+      Home → cross → splash → ✕ → Home; Android hardware back from
+      About returns to home. Zero console errors.
+
+  Body copy is reasonable placeholder text matching the app's literary
+  tone. User can revise wording at any time — change is local to the
+  AboutScreen function in index.html.
+
 2026-05-11 — Objective A complete + Objective B substantial progress
   Session: fix-focused, working on branch claude/jovial-yalow-bf2629
   Approach: per user direction, executing Objectives A → B → C → D in
