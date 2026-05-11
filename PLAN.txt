@@ -2046,6 +2046,44 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later 7) — Three audit fixes from parallel session
+
+  User did a full footnote/nkjv/{{ref}}/cross-link audit in another
+  conversation. Findings clean overall — only 3 broken cross-links
+  found across all 11 Format A + Format B collections. Applied here:
+
+  letters-timothy.js / the-shadow-of-the-almighty / fn1
+    letterTitle had ASCII apostrophe (U+0027) in "Timothy's Vision...".
+    Actual title in this same file uses curly U+2019. The
+    VOT_LETTER_REGISTRY key is built from `collection + "::" + title`
+    via exact string match, so the lookup silently failed. Changed
+    line 339's `'` to `'`. Verified live:
+      resolveVotLetter('Letters from Timothy', 'Timothy's Vision...')
+      → { id: 'timothy-s-vision-of-yahushua-jesus-standing-upon-the-world',
+          screen: 'vot-timothy-letter' }.
+
+  letters-flock.js / a-wise-servant-and-the-line / fn1
+    letterTitle had trailing `.` not present in the actual V7 title
+    "I Am Calling You Out! (Part 2)... Come Out of the Churches of Men
+    and I Will Receive You! Says The Lord" (no period). Same exact-
+    match registry bug. Removed the trailing period. Verified live:
+    resolveVotLetter returns the correct dest.
+
+  volume-six.js / full-circle / fn2
+    Link object's collection field held the EXTERNAL ARTICLE NAME
+    "The False Doctrine of \"The Trinity\" Exposed - The Holy Spirit
+    is Not a Person" — that's a wiki page section, NOT a VOT letter.
+    The registry has no entry, the fn.link branch always failed, and
+    the FootnoteSheet's branching order (`fn.link` checked before
+    `fn.url`) meant the external URL was never reached either.
+    Fix: removed the link object entirely. The fn.text + fn.url stay,
+    so the footnote sheet renders the "See: ..." text + an "Open
+    external link" for the URL (now reachable per the D2.2 dual-
+    rendering fix).
+
+  check_balance.py PASSES on all data files. Three fixes verified by
+  live resolveVotLetter calls returning expected screens + ids.
+
 2026-05-11 (later 6) — improvement2.txt Day 4-5 polish complete
 
   Nine UI-polish items, code-first review then verify-as-best-as-we-can.

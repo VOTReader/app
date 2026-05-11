@@ -2737,8 +2737,7 @@ var LETTERS_V6 = [
       "2": {
         "type": "note",
         "text": "See: \"You Shall Not Add to nor Take Away\"",
-        "url": "https://www.thevolumesoftruth.com/The_False_Doctrine_of_%E2%80%9CThe_Trinity%E2%80%9D_Exposed_-_The_Holy_Spirit_is_Not_a_Person#You_Shall_Not_Add_to_nor_Take_Away",
-        "link": { "collection": "The False Doctrine of \"The Trinity\" Exposed - The Holy Spirit is Not a Person", "letterTitle": "The False Doctrine of \"The Trinity\" Exposed - The Holy Spirit is Not a Person" }
+        "url": "https://www.thevolumesoftruth.com/The_False_Doctrine_of_%E2%80%9CThe_Trinity%E2%80%9D_Exposed_-_The_Holy_Spirit_is_Not_a_Person#You_Shall_Not_Add_to_nor_Take_Away"
       },
       "3": {
         "type": "scripture",
