@@ -2046,6 +2046,121 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later 9) — Objective D autonomous Kotlin + manifest + CSP batch
+                       (context-running-low wrap-up)
+
+  User reported Android Studio build failure — gradle could not delete
+  intermediate dirs:
+    D:\VOTReader-studio\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir\values
+    ...\merged.dir
+    ...\stripped.dir
+    D:\VOTReader-studio\app\build\intermediates\merged_res_blame_folder\debug\mergeDebugResources\out\multi-v2
+    ...\out\single
+  Standard Windows file-lock symptom — NOT a code bug. Fixed by:
+    1. Stopping any running gradle daemons (./gradlew --stop)
+    2. Deleting D:\VOTReader-studio\app\build\ entirely (file/folder lock
+       in build/ is typically a stale gradle daemon, Android Studio's
+       Build Output viewer, OneDrive sync, or AV scanning)
+  If it recurs: same recipe. Long-term mitigation options:
+    - Tell OneDrive to ignore app/build/ (it's already gitignored but
+      OneDrive doesn't respect .gitignore — it may scan/sync those
+      intermediates and hold handles)
+    - Add Windows Defender exclusion for D:\VOTReader-studio\app\build\
+    - Move build dir to a different drive via gradle settings
+
+  After fixing the build lock, continued with the autonomous remaining
+  Objective D items per user direction to "do pretty much everything
+  tonight, leave judgment calls or user input for me."
+
+  Kotlin side (MainActivity.kt) — four changes in one file:
+
+  1) WebChromeClient.onConsoleMessage override
+     Previously console.log/warn/error from JS were silently discarded.
+     Now routed to Logcat as `WebViewJS` tag at the matching priority
+     (ERROR → Log.ERROR, WARNING → Log.WARN, DEBUG → Log.DEBUG, else
+     Log.INFO). Includes source:line in the message. Run `adb logcat -s
+     WebViewJS` on the device to see them. Critical for diagnosing the
+     pre-existing [object CSS] React #31 warnings on a real device.
+
+  2) URL-scheme allowlist in shouldOverrideUrlLoading
+     Previously ANY non-asset-loader URL was handed to Intent.ACTION_VIEW.
+     A stray `intent://`, `javascript:`, `content:`, or `file:` URI in
+     any data file could launch arbitrary apps or escalate.
+     Now: companion ALLOWED_EXTERNAL_SCHEMES = setOf("https", "http",
+     "mailto", "tel"). Anything else is refused with a Log.w line. The
+     ACTION_VIEW call itself is also try/catch'd against unhandled
+     exceptions (e.g. no app installed for the scheme).
+
+  3) IME (soft-keyboard) inset injection
+     Window-inset listener previously requested systemBars() |
+     displayCutout(). Added Type.ime() so when the soft keyboard opens
+     the bottom inset reflects keyboard height too. Effect: floating
+     UI like the surprise FAB and the back-pill no longer hide behind
+     the keyboard on Android.
+
+  4) AndroidBridge.setKeepScreenOn(enabled: Boolean)
+     New @JavascriptInterface method. Adds/clears the
+     FLAG_KEEP_SCREEN_ON window flag. Default state still keeps screen
+     on (the original behavior); the bridge lets JS turn it off when
+     the user disables the (future) Settings → "Keep screen on while
+     reading" toggle.
+     Companion `@Volatile private var currentScale` adjustment also
+     applied per CLAUDE.md §10.5 / PLAN.txt §1.E [LOW].
+
+  Manifest (AndroidManifest.xml):
+
+  5) launchMode="singleTask"
+     Previously default ("standard") — tapping the launcher icon from
+     notification shade while app open in another task created a SECOND
+     instance with separate localStorage reads. singleTask brings the
+     existing instance to the front instead.
+
+  6) Expanded configChanges
+     Previously "screenSize|orientation|keyboardHidden". Added
+     "smallestScreenSize|uiMode|screenLayout" so foldables /
+     multi-window resize and system dark-mode toggle don't recreate the
+     Activity (which would tear down + reload the WebView + lose all
+     non-localStorage React state).
+
+  HTML side (index.html):
+
+  7) CSP meta tag in <head>
+     Defensive containment. Policy:
+       default-src 'self' https://appassets.androidplatform.net
+       script-src 'self' (asset-loader host) 'unsafe-inline' blob:
+       style-src  'self' (asset-loader host) 'unsafe-inline'
+       img-src    'self' (asset-loader host) data: blob:
+                   https://raw.githubusercontent.com
+                   https://github.com          (Garden View images)
+       font-src   'self' (asset-loader host) data:
+       connect-src 'self' (asset-loader host)
+                   https://www.thevolumesoftruth.com (online-check ping)
+       media-src   'none'
+       object-src  'none'
+       frame-src   'none'
+       base-uri    'self'
+       form-action 'none'
+     unsafe-inline required because all JS+CSS is inline in this
+     single-file build. blob: on script-src supports the Export
+     "Download as JSON" path via Blob URL.
+
+  Files: app/src/main/AndroidManifest.xml, app/src/main/assets/index.html,
+  app/src/main/java/com/votreader/sacredui/MainActivity.kt
+  check_balance.py PASSES.
+
+  NOT yet done (deferred to next session — see new handoff file):
+    ☐ Settings → "Keep screen on while reading" toggle (Kotlin bridge
+      is in place; the JS-side SettingsScreen toggle row + onToggle
+      hook still need adding; should call window.AndroidBridge.
+      setKeepScreenOn(value) when present)
+    ☐ Android 12+ SplashScreen API in MainActivity.onCreate (would
+      need installSplashScreen() before super.onCreate + theme attrs)
+    ☐ App icon + monochrome icon layer for Android 13+ themed icons
+    ☐ Release signing config (deferred until Play Store discussion)
+    ☐ Investigate the pre-existing [object CSS] React #31 warnings —
+      the new WebChromeClient.onConsoleMessage will help surface them
+      with source:line context on a real device
+
 2026-05-11 (later 8) — main caught up: all session work now on origin/main
 
   Before this session started, all my work was being committed on

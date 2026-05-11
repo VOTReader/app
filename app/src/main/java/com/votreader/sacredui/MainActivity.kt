@@ -5,7 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Bundle
 import android.util.Base64
+import android.util.Log
 import android.view.WindowManager
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -36,12 +38,23 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private var savedTopInset = 0
     private var savedBottomInset = 0
-    private var currentScale = 1f
+    @Volatile private var currentScale = 1f
+    // Read by setKeepScreenOn(); flips FLAG_KEEP_SCREEN_ON on/off from JS.
+    private var keepScreenOnEnabled = true
+
+    companion object {
+        // Allowlist for shouldOverrideUrlLoading — anything not in this list
+        // is refused (not handed to Intent.ACTION_VIEW) so a stray
+        // `intent://` or `javascript:` URI in any data file can't launch
+        // arbitrary apps or escalate. Asset-loader URLs are matched by
+        // exact prefix earlier and don't reach this allowlist.
+        private val ALLOWED_EXTERNAL_SCHEMES = setOf("https", "http", "mailto", "tel")
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (keepScreenOnEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         webView = WebView(this)
         setContentView(webView)
@@ -68,7 +81,23 @@ class MainActivity : AppCompatActivity() {
             .build()
 
         webView.addJavascriptInterface(AppInterface(), "AndroidBridge")
-        webView.webChromeClient = WebChromeClient()
+        // Route JS console output to Logcat so production crashes / [object CSS]
+        // React-warning class failures / WebView errors are visible via
+        // `adb logcat -s WebViewJS`. Previously discarded silently.
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
+                val src = msg.sourceId() ?: ""
+                val line = msg.lineNumber()
+                val level = when (msg.messageLevel()) {
+                    ConsoleMessage.MessageLevel.ERROR -> Log.ERROR
+                    ConsoleMessage.MessageLevel.WARNING -> Log.WARN
+                    ConsoleMessage.MessageLevel.DEBUG -> Log.DEBUG
+                    else -> Log.INFO
+                }
+                Log.println(level, "WebViewJS", "${msg.message()}  ($src:$line)")
+                return true
+            }
+        }
         webView.webViewClient = object : WebViewClientCompat() {
             override fun shouldInterceptRequest(
                 view: WebView,
@@ -78,10 +107,24 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                val url = request.url.toString()
+                val url = request.url
+                val urlStr = url.toString()
                 // Asset loader uses https://appassets.androidplatform.net/assets/
-                if (url.startsWith("https://appassets.androidplatform.net/assets/") || url.startsWith("about:")) return false
-                startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                if (urlStr.startsWith("https://appassets.androidplatform.net/assets/") || urlStr.startsWith("about:")) return false
+                // Scheme allowlist — refuse intent://, javascript:, content:,
+                // file:, etc. A compromised data file (or a stray test fixture)
+                // could otherwise trigger Intent.ACTION_VIEW with an
+                // arbitrary scheme and launch unwanted apps.
+                val scheme = url.scheme?.lowercase(Locale.US)
+                if (scheme == null || scheme !in ALLOWED_EXTERNAL_SCHEMES) {
+                    Log.w("VOTReader", "Refused external URL with disallowed scheme: $urlStr")
+                    return true
+                }
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, urlStr.toUri()))
+                } catch (e: Exception) {
+                    Log.w("VOTReader", "ACTION_VIEW failed for $urlStr", e)
+                }
                 return true
             }
 
@@ -97,7 +140,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(webView) { _, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            // Include IME (soft-keyboard) in the bottom inset so floating
+            // UI like the surprise FAB or NoteSheet anchor moves above the
+            // keyboard instead of being hidden behind it.
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars()
+                    or WindowInsetsCompat.Type.displayCutout()
+                    or WindowInsetsCompat.Type.ime()
+            )
             savedTopInset = bars.top
             savedBottomInset = bars.bottom
             injectInsets()
@@ -169,6 +219,18 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 WindowInsetsControllerCompat(window, window.decorView)
                     .isAppearanceLightStatusBars = light
+            }
+        }
+
+        @JavascriptInterface
+        fun setKeepScreenOn(enabled: Boolean) {
+            runOnUiThread {
+                keepScreenOnEnabled = enabled
+                if (enabled) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
             }
         }
 

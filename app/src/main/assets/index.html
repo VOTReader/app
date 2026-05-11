@@ -3,6 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- CSP — defensive containment. All script/style/data is self-hosted; the
+       Garden View loads images from GitHub raw user-content. No external API
+       calls anywhere. unsafe-inline is required because all script and style
+       lives inline in this single-file build. blob: on script-src supports
+       Export "Download as JSON" via Blob URL. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self' https://appassets.androidplatform.net;
+    script-src 'self' https://appassets.androidplatform.net 'unsafe-inline' blob:;
+    style-src 'self' https://appassets.androidplatform.net 'unsafe-inline';
+    img-src 'self' https://appassets.androidplatform.net data: blob: https://raw.githubusercontent.com https://github.com;
+    font-src 'self' https://appassets.androidplatform.net data:;
+    connect-src 'self' https://appassets.androidplatform.net https://www.thevolumesoftruth.com;
+    media-src 'none';
+    object-src 'none';
+    frame-src 'none';
+    base-uri 'self';
+    form-action 'none';
+  " />
   <title>VOTReader</title>
   <style>
     @font-face { font-family: 'Cinzel'; font-weight: 400; font-style: normal; src: url('fonts/Cinzel-Regular.otf') format('opentype'); font-display: swap; }
