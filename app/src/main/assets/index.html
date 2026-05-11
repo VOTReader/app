@@ -13430,7 +13430,7 @@ function App() {
   const [titleFocusHidden, setTitleFocusHidden] = tabField('titleFocusHidden');
   const [headingsFocusHidden, setHeadingsFocusHidden] = tabField('headingsFocusHidden');
   const [showWelcome, setShowWelcome] = useState(() => {
-    try {return !localStorage.getItem('vot-welcomed');} catch (e) {return false;}
+    try {return !localStorage.getItem('vot-welcomed');} catch (e) {return true;}
   });
   const [isOnline, setIsOnline] = useState(false);
   useEffect(() => {
