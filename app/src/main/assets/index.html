@@ -4164,13 +4164,23 @@ function noteSourceLabel(note) {
   const parts0 = first.split(':');
   const kind = parts0[0];
   if (kind === 'bible' || kind === 'study') {
-    // bible:bookId:chapter:verse  /  study:matthew-ch:verse
+    // Key shapes differ:
+    //   bible:bookId:chapter:verse   (4 parts)
+    //   study:bookId-chapter:verse   (3 parts — chapter is fused into p[1])
     const byChap = new Map();
     keys.forEach(k => {
       const p = k.split(':');
-      const book = p[1];
-      const chap = p[2];
-      const verse = parseInt(p[3] || '0', 10);
+      let book, chap, verse;
+      if (kind === 'study') {
+        // p[1] = "matthew-22" (book + chap fused); p[2] = verse
+        book = p[1];
+        chap = (p[1].match(/-(\d+)$/) || [])[1] || '';
+        verse = parseInt(p[2] || '0', 10);
+      } else {
+        book = p[1];
+        chap = p[2];
+        verse = parseInt(p[3] || '0', 10);
+      }
       const ck = book + ':' + chap;
       if (!byChap.has(ck)) byChap.set(ck, []);
       byChap.get(ck).push(verse);
@@ -4179,13 +4189,12 @@ function noteSourceLabel(note) {
     byChap.forEach((verses, ck) => {
       const [book, chap] = ck.split(':');
       const title = kind === 'bible' ? _bookTitle(book) :
-        // study key shape e.g. "matthew-22"; split off the chapter half
+        // study key shape e.g. "matthew-22"; strip off the chapter half
         (function() {
           const m = book.match(/^(.+)-(\d+)$/);
           return m ? (m[1].charAt(0).toUpperCase() + m[1].slice(1)) : book;
         })();
-      const studyChap = kind === 'study' ? (book.match(/-(\d+)$/) || [])[1] : null;
-      segs.push(title + ' ' + (studyChap || chap) + ':' + _verseRangeLabel(verses.filter(Boolean)));
+      segs.push(title + ' ' + chap + ':' + _verseRangeLabel(verses.filter(Boolean)));
     });
     return segs.join(' · ');
   }
@@ -4439,6 +4448,22 @@ function findEntryContext(id, kindHint) {
     if (!Array.isArray(arr)) continue;
     const f = arr.find(e => e && e.id === id);
     if (f) return { kind: col.kind, screen: col.letterScreen, collection: col.label, title: f.title || id, entry: f };
+  }
+  // Holy Days letter-type entries are rendered via LetterView and produce
+  // hlKeys with the `letter:<id>:N` prefix — so notes anchored to them
+  // arrive here with kindHint === 'letter'. But their ids only exist in
+  // HOLY_DAYS, not in any letter-kind collection. Fall back to a HD lookup
+  // so the source label resolves and noteSourceNav can return a navigable
+  // endpoint (screen === 'holy-days-entry').
+  if (kindHint === 'letter') {
+    const hdCol = COL_BY_KEY && COL_BY_KEY.get ? COL_BY_KEY.get('holydays') : null;
+    if (hdCol) {
+      const arr = colLetters(hdCol);
+      if (Array.isArray(arr)) {
+        const f = arr.find(e => e && e.id === id);
+        if (f) return { kind: 'holy-days', screen: hdCol.letterScreen, collection: hdCol.label, title: f.title || id, entry: f };
+      }
+    }
   }
   if (kindHint && kindHint !== 'letter') return null;
   var _bs = _studies();
@@ -5676,6 +5701,13 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest }) {
       const container = document.querySelector('[data-hl-key="' + selInfo.hlKey.replace(/"/g, '\\"') + '"]');
       const containerText = container ? container.textContent : selInfo.text;
       const snap = snapRangeToWords(containerText, selInfo.start, selInfo.end);
+      // Empty / whitespace-only / collapsed selection — bail before we create
+      // a zero-width annotation (would render as nothing but persist forever).
+      if (snap.start >= snap.end) {
+        window.getSelection().removeAllRanges();
+        setVisible(false);
+        return;
+      }
       const existing = AnnotationStore.get(selInfo.hlKey).find(h =>
         h.start <= snap.start && h.end >= snap.end && h.kind !== 'note'
       );
@@ -5693,8 +5725,20 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest }) {
         });
       }
     }
-    // Build/refresh the NoteStore record
+    // Build/refresh the NoteStore record — but only if at least one
+    // segment actually exists for this groupId. The multi-container loop
+    // above skips any container whose snapped range collapses to empty;
+    // if ALL containers did so, no segments got added and we'd otherwise
+    // persist a phantom note with empty keys[] and fullText that's
+    // unremovable through the UI (row tap routes through noteSourceNav
+    // which returns null for keys:[], and the sheet returns null because
+    // segs.length === 0 → closes instantly).
     const segs = AnnotationStore.getByGroup(groupId);
+    if (segs.length === 0) {
+      window.getSelection().removeAllRanges();
+      setVisible(false);
+      return;
+    }
     const fullText = segs.map(s => s.ann.text || '').join(' … ');
     const keys = [...new Set(segs.map(s => s.key))];
     const existingNote = NoteStore.get(groupId);
@@ -7625,9 +7669,18 @@ function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, statesRef, 
   // Read initial state from persistent ref, default to expanded (true)
   const stored = statesRef && statesRef.current[stateKey];
   const [expanded, setExpandedRaw] = useState(stored !== undefined ? stored : true);
+  // setExpanded must handle BOTH a raw boolean value AND an updater function
+  // like real React setState — the toggle path at the header uses
+  // `setExpanded((e) => !e)`, which would otherwise store the function itself
+  // into statesRef and JSON.stringify it to `{}` → empty saved blob → all
+  // cards reset to expanded on next reload. Resolve the updater first, then
+  // persist the resolved boolean.
   const setExpanded = (val) => {
-    setExpandedRaw(val);
-    if (statesRef) {statesRef.current[stateKey] = val;onSaveStates && onSaveStates();}
+    setExpandedRaw((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (statesRef) { statesRef.current[stateKey] = next; onSaveStates && onSaveStates(); }
+      return next;
+    });
   };
   // React to external expand/collapse all signal
   useEffect(() => {
@@ -7736,14 +7789,39 @@ function lookupVersesFromBooks(ref) {
   if (!p || p.verse == null) return null;
   const bookKey = findBook(p.rawBook);
   if (!bookKey) return null;
+  const vEnd = p.verseEnd || p.verse;
+
+  // Translation-tagged refs (e.g. "John 14:6 (KJV)") read from the matching
+  // alt-translation when it's already loaded. If the user hasn't activated
+  // that translation yet, trigger a lazy load and fall back to NKJV for
+  // this render — the next time the sheet is opened, the tagged data is in
+  // memory and the correct translation renders. (Previously the tag was
+  // parsed and silently dropped → every tagged inline ref showed NKJV
+  // forever.)
+  if (p.tag) {
+    const code = String(p.tag).toLowerCase();
+    if (code !== 'nkjv') {
+      const data = (typeof window !== 'undefined') ? window['BIBLE_' + code.toUpperCase()] : null;
+      if (data && data[bookKey] && data[bookKey][p.chapter]) {
+        const altList = data[bookKey][p.chapter].filter(v => v.n >= p.verse && v.n <= vEnd);
+        if (altList.length) {
+          return altList.length === 1 ? altList[0].text : altList.map(v => `${v.n}. ${v.text}`).join(' ');
+        }
+      } else if (typeof loadTranslation === 'function') {
+        // Fire-and-forget; user re-tap shows correct text next time.
+        try { loadTranslation(code); } catch (e) {}
+      }
+    }
+  }
+
+  // Default NKJV path
   const books = _allBooks();
   const book = books[bookKey];
-  const chapter = (book.chapters || []).find(c => c.num === p.chapter);
+  const chapter = (book && book.chapters || []).find(c => c.num === p.chapter);
   if (!chapter) return null;
   const allVerses = chapter.sections ?
     chapter.sections.flatMap(s => s.verses || []) :
     chapter.verses || [];
-  const vEnd = p.verseEnd || p.verse;
   const verses = allVerses.filter(v => v.n >= p.verse && v.n <= vEnd);
   if (!verses.length) return null;
   return verses.length === 1 ? verses[0].text : verses.map(v => `${v.n}. ${v.text}`).join(' ');
@@ -13483,19 +13561,28 @@ function App() {
   // recorded destination (next chapter, different book, etc.), pop the entry
   // so the pill doesn't reappear if they happen to land back on the dest
   // later, and so Android-back doesn't trigger a confusing jump.
+  // destSnapshot uses BOTH null (push paths explicitly null out unused
+  // fields) and undefined (legacy entries without a recorded field), and
+  // both should mean "don't care about this field". Loose-equal nullish
+  // check (`!= null`) catches both — strict `=== undefined` missed the
+  // null case and matched against stale state, so the single-shot back
+  // pill was being silently pruned in the primary cross-screen flow
+  // (Notes index → Bible/Study → expected "Back to My Notes" pill).
+  const _destMatches = (dest) => {
+    if (!dest) return true;
+    if (dest.screen !== screen) return false;
+    if (dest.bookId != null && dest.bookId !== bookId) return false;
+    if (dest.chapterNum != null && dest.chapterNum !== chapterNum) return false;
+    if (dest.letterId != null && dest.letterId !== letterId) return false;
+    if (dest.studyId != null && dest.studyId !== studyId) return false;
+    if (dest.studyChapterId != null && dest.studyChapterId !== studyChapterId) return false;
+    return true;
+  };
   useEffect(() => {
     if (fromLetterStack.length === 0) return;
     const top = fromLetterStack[fromLetterStack.length - 1];
-    const dest = top.destSnapshot;
-    if (!dest) return;
-    const matches =
-      dest.screen === screen &&
-      (dest.bookId === undefined || dest.bookId === bookId) &&
-      (dest.chapterNum === undefined || dest.chapterNum === chapterNum) &&
-      (dest.letterId === undefined || dest.letterId === letterId) &&
-      (dest.studyId === undefined || dest.studyId === studyId) &&
-      (dest.studyChapterId === undefined || dest.studyChapterId === studyChapterId);
-    if (!matches) {
+    if (!top.destSnapshot) return;
+    if (!_destMatches(top.destSnapshot)) {
       setFromLetterStack((prev) => prev.slice(0, -1));
     }
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, fromLetterStack]);
@@ -13507,16 +13594,6 @@ function App() {
   // the pill is single-shot, not persistent. Legacy entries without a
   // destSnapshot show the pill unconditionally (preserves the existing
   // letter→letter tap-through multi-level back behavior).
-  const _destMatches = (dest) => {
-    if (!dest) return true;
-    if (dest.screen !== screen) return false;
-    if (dest.bookId !== undefined && dest.bookId !== bookId) return false;
-    if (dest.chapterNum !== undefined && dest.chapterNum !== chapterNum) return false;
-    if (dest.letterId !== undefined && dest.letterId !== letterId) return false;
-    if (dest.studyId !== undefined && dest.studyId !== studyId) return false;
-    if (dest.studyChapterId !== undefined && dest.studyChapterId !== studyChapterId) return false;
-    return true;
-  };
   const backHint = fromLetterStack.length > 0 ?
   (() => {
     const top = fromLetterStack[fromLetterStack.length - 1];
@@ -15542,6 +15619,12 @@ function App() {
       }
     }),
     noteSheetTarget && React.createElement(NoteSheet, {
+      // key forces a remount whenever the target group OR the edit-mode
+      // intent changes — otherwise the internal `useState(startInEditMode ?
+      // 'edit' : 'read')` captures the first prop value and never updates,
+      // so opening a fresh note in edit mode after reading another note
+      // would silently land in read mode.
+      key: noteSheetTarget.groupId + ':' + (noteSheetTarget.startInEditMode ? 'edit' : 'read'),
       groupId: noteSheetTarget.groupId,
       startInEditMode: noteSheetTarget.startInEditMode,
       hlTick: hlTick, setHlTick: setHlTick, onClose: closeNoteSheet,

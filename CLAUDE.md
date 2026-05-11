@@ -37,7 +37,18 @@
 > - improvement2.txt Day 1: back-pill missing space, handleAndroidBack Library + Notes-Index cases, SCHEMA_VERSION 11→12, removed two no-op settings (`searchFuzzy`/`searchAllTranslations`), welcome catch return value (verified live)
 > - Objective D piece: AboutScreen + home-nav `i` button. Home now has two buttons side-by-side in the upper left — cross icon reopens the splash image (titled "Welcome image"), new `i` icon opens the About VOTReader screen. About uses a card layout with 3-diamond ornaments top + bottom, "ABOUT VOTREADER" Cinzel uppercase heading, 4 EB-Garamond paragraphs, and a gold-outlined CONTINUE button. First-run flow: splash → ✕ → About auto-opens (only once, gated by new `vot-about-seen` localStorage flag) → CONTINUE → home. Subsequent launches go directly to home; the `i` button reopens About on demand.
 > - improvement2.txt Day 2 (footnote system) — silent verse-blank fallback, fn.link+fn.url coexistence, prev/next nav inside the sheet ("Footnote N of M" + circular ‹/› buttons), `.fn-ref.active` visible on touch (`activeFn` now reads `sheetFn ?? highlightedFn`), and tap-to-scroll-back from FootnoteListSection (bubble lookup via new `data-fn-num` attribute). Verified live on Volume 2 / "The Wide Path".
-> - Next: Objective C — §12 critical bugs (Holy Days note routing, Matthew Study note labels, prophecy card persistence, WTLB markdown intros, 21 D8 glued-text bugs, destSnapshot null/undefined, phantom notes, NoteSheet startInEditMode, Android hardware back, translation-tagged inline refs), then Day 4-5 polish.
+> - §12 critical bugs — ALL 10 LANDED (2026-05-11):
+>     • Prophecy card persistence (setExpanded now handles updater fn)
+>     • Matthew Study note labels (verse at p[2] not p[3] for studies)
+>     • NoteSheet startInEditMode (key prop forces remount on groupId change)
+>     • destSnapshot null/undefined matcher (loose-equal nullish — pill now shows)
+>     • Phantom empty notes (zero-segment + zero-width guards in handleNote)
+>     • Holy Days letter-type note routing (findEntryContext HD fallback)
+>     • WTLB Part 1 + 2 intros (data-level — emphasis spans now line-contained)
+>     • 20 D8 glued-text bugs in WTLB One/Two (regex sweep with backslash-aware lookbehind)
+>     • Translation-tagged inline refs (lookupVersesFromBooks honors p.tag + lazy-loads)
+>     • Android hardware back button (MainActivity.kt — evaluateJavascript window.handleAndroidBack, finish() on "false")
+> - Next: Objective C — improvement2.txt Day 4-5 polish (overlays auto-dismiss on nav, focus indicators, NotebookPicker checkbox refresh, MATTHEW guard, soft-keyboard scroll-into-view, dwell-on-tab-switch, z-index 8500 collision, http→https URL cleanup).
 
 ## Quick start (app failed to load? read this first)
 

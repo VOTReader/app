@@ -2046,6 +2046,150 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-11 (later 4) — PLAN.txt §12 critical bugs (all 10) — complete
+
+  #1 Prophecy card persistence broken (lines ~7624-7638)
+    setExpanded(val) blindly stored val into statesRef. The header tap
+    passed `(e) => !e`, so a FUNCTION was stored, JSON.stringify-ed to
+    `{}`, then localStorage held `{}` → every Bible Study session
+    started with all prophecy cards expanded.
+    Fix: setExpanded now handles BOTH updater-function form and direct
+    boolean form (resolves the updater first, then persists the boolean).
+    Standard React setState pattern.
+
+  #2 Matthew Study Bible note labels broken (noteSourceLabel, ~line 4159)
+    Study keys are `study:matthew-22:6` (3 parts) but the code read
+    verse from p[3], which is undefined. Result: every Study note
+    labeled "Matthew 22:" with no verse.
+    Fix: branch the verse/chapter extraction by kind. For studies,
+    p[1]="matthew-22" (book-chapter fused), p[2]=verse; for bibles
+    the original 4-part split still applies. Verified live via
+    noteSourceLabel({ keys: ['study:matthew-22:11'] }) → "Matthew 22:11".
+
+  #3 NoteSheet startInEditMode prop ignored on groupId change
+    useState(startInEditMode ? 'edit' : 'read') captures the FIRST prop
+    value and never re-runs. Opening note B in edit mode after reading
+    note A would land in read mode.
+    Fix: add `key={groupId + ':' + (startInEditMode?'edit':'read')}`
+    to the NoteSheet createElement. React remounts the component on
+    every change → useState re-initializes with the new prop value.
+
+  #4 destSnapshot null vs undefined matcher — back pill broken
+    The push paths (_navToLinkRef.current) explicitly set unused fields
+    to `null`, but the matchers used `=== undefined` to mean "ignore".
+    Since `null !== undefined`, dest.letterId=null still triggered the
+    "letterId mismatch" branch when the user's prior state had a stale
+    letterId. Result: single-shot "Back to My Notes" pill was suppressed
+    + the entry was pruned the moment the destination effect ran.
+    Fix: changed all six comparisons from `=== undefined` to `!= null`
+    (loose-equal nullish check). Both null and undefined now correctly
+    mean "don't care about this field". Also consolidated the matcher
+    logic — the prune useEffect now calls _destMatches directly so the
+    two former-duplicate checks stay in sync.
+
+  #5 Phantom empty notes — unremovable through UI
+    Two surfaces:
+    (a) handleNote multi-container path: if EVERY container's snapped
+        range collapsed to empty (whitespace-only selection across
+        paragraphs), no segments got added but NoteStore.set still ran
+        with empty keys[] and fullText. Resulting record had no anchors;
+        Notes index row tap routed through noteSourceNav which returns
+        null for keys:[], fell back to onOpenNote, sheet returned null
+        because segs.length===0 → sheet closed instantly. Phantom note
+        accumulated in NoteStore.list() with no way to delete.
+    (b) handleNote single-container path: NO snap.start >= snap.end
+        guard at all (the multi-container path had one). Collapsed
+        selection at position 0 of a paragraph starting with whitespace
+        stored a zero-width annotation.
+    Fix:
+    - Single-container path: bail early if snap.start >= snap.end.
+    - Both paths: after annotation creation, check segs.length === 0
+      and bail BEFORE NoteStore.set if no segments materialized.
+
+  #6 Holy Days letter-type notes silent nav failure (11 of 16 entries)
+    Holy Days entries with type:'letter' render via LetterView with
+    hlKeys like `letter:do-this-in-remembrance-of-me:0`. But that id
+    only exists in HOLY_DAYS, not in any letter-kind collection. So
+    findEntryContext with kindHint='letter' returned null → label fell
+    back to raw id → tap routed through noteSourceNav which returned a
+    nav object with screen:null → navigation silently no-op.
+    Fix: findEntryContext now, when kindHint === 'letter' and no match
+    was found in letter-kind collections, falls back to a Holy Days
+    lookup. Returns kind:'holy-days' + screen:'holy-days-entry' so the
+    downstream navigation routes correctly. Verified live via the
+    "Walking in the Footsteps of The Messiah's Passion" HD entry.
+
+  #7 WTLB Part 1 + Part 2 intros render literal `**markdown**` chars
+    The intros had emphasis spans that crossed `\n\n` blank-line breaks
+    within the same paragraph. renderLine splits on `\n` per-line and
+    runs `.*?` (non-greedy, single-line) regexes for `**...**` and
+    `_..._` — the closing markers landed on a different line than the
+    openers, so neither side parsed and the literal chars rendered.
+    Fix (data-level — safer than renderer change): rewrote each intro
+    so every emphasis span is line-contained.
+    - WTLB One: split the multi-line `**...**` wrap into per-line
+      `**...**` + per-line `_**...**_` spans for the subtitle pair.
+    - WTLB Two: split the cross-blank-line `**WORDS TO LIVE BY\n\nPART
+      TWO**` into `**WORDS TO LIVE BY**\n\n**PART TWO**`.
+    Verified live: WTLB One intro renders "WORDS TO LIVE BY..." bold,
+    "More Words of Wisdom" + "From The Lord, Our God and Savior" both
+    bold-italic. Zero literal `**` or `_` in the rendered body. 3
+    `<strong>` + 2 `<em>` elements present.
+
+  #8 20 D8 glued-text bugs in WTLB/Blessed (mechanical sweep)
+    Earlier audit's regex `\w\{\{ref:` only matched word-char before
+    `{{ref:`. The expanded pattern also catches punctuation-before-ref
+    cases (`!{{ref:`, `.{{ref:`, `?{{ref:`, `"{{ref:`, etc.) which the
+    previous sweep missed.
+    Pattern used: `(?<!\\)([a-zA-Z0-9.,!?:;'"\)\]])\{\{ref:` →
+    `\1 {{ref:`. The negative lookbehind protects escape sequences
+    (\n, \t, \") — without it, `\n{{ref:` would incorrectly become
+    `\n {{ref:`, breaking the intended newline-then-ref rendering.
+    Counts:
+    - wtlb-one.js:    5 fixes (Amos 9:13, Hosea 4:6, Micah 6:8,
+                              Luke 7:35, Matthew 13:12)
+    - wtlb-two.js:   15 fixes (across 15 entries — 2 Cor 6:17,
+                              Zechariah 12:10, Proverbs 9:10 ×2,
+                              Colossians 3:9-10, Genesis 2:3,
+                              Matthew 24:32-34, Ecclesiastes 9:2-3,
+                              etc.)
+    - the-blessed.js: 0 (clean)
+    Total: 20 fixes. check_balance.py passes; rescan returns 0
+    remaining occurrences.
+
+  #9 Translation-tagged inline refs silently rendered NKJV
+    parseRefStr extracted `tag` from `{{ref:John 14:6 (KJV)}}` but
+    lookupVersesFromBooks always read from _allBooks() (NKJV master).
+    Result: any KJV/ASV/CJB/etc tagged inline ref showed NKJV text.
+    Fix: when p.tag is set and code !== 'nkjv', look up the matching
+    `window['BIBLE_<TAG>']`. If the translation IS loaded, use its
+    verses. If NOT yet loaded, fire loadTranslation(code) as a side
+    effect (fire-and-forget) and fall back to NKJV for this render —
+    next tap shows correct text. Verified live: KJV-tagged John 14:6
+    returns "Jesus saith unto him..." after loadTranslation('kjv')
+    resolves, distinct from NKJV's "Jesus said to him...".
+
+  #10 Android hardware back button no-op (MainActivity.kt:114-116)
+    `onBackPressedDispatcher.addCallback { if (webView.canGoBack())
+    webView.goBack() }` — but ALL nav in this app is JS-driven via
+    window.handleAndroidBack. The WebView's history stack is always
+    empty (single URL, no document changes), so canGoBack() always
+    returns false → callback does nothing → fall through to Android's
+    default back handler → activity finishes → APP EXITS on hardware
+    back from any screen.
+    Fix: callback now does
+      webView.evaluateJavascript("(typeof window.handleAndroidBack ===
+          'function') ? window.handleAndroidBack() : 'false'") { result ->
+        if (result != "\"true\"") finish()
+      }
+    JS returns "true" when consumed (sheet closed, fromLetterStack
+    popped, screen → navOrigin, etc.) → callback intercepts. JS returns
+    "false" when nothing to pop (already on home, etc.) → activity
+    finishes normally. Verified by reading the JS handler at line
+    14443 onward — every branch returns "true" or "false" string.
+    Live Android verification deferred to user (preview tool runs in
+    Chrome, not Android).
+
 2026-05-11 (later 3) — improvement2.txt Day 2 (footnote system) complete
 
   User's stated #1 pain ("footnote bugs") addressed across six items:

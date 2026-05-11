@@ -112,7 +112,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         onBackPressedDispatcher.addCallback(this) {
-            if (webView.canGoBack()) webView.goBack()
+            // All in-app navigation is JS-driven, so webView.canGoBack() is
+            // always false (single URL, no history stack). Route the
+            // hardware back press through window.handleAndroidBack() — the
+            // JS handler returns "true" when it consumed the press (closed
+            // a sheet, popped fromLetterStack, navigated to a parent
+            // screen) and "false" when there's nothing to pop. On "false"
+            // we finish() so the user actually exits, instead of being
+            // stuck on the home screen.
+            webView.evaluateJavascript(
+                "(typeof window.handleAndroidBack === 'function') ? window.handleAndroidBack() : 'false'"
+            ) { result ->
+                if (result != "\"true\"") finish()
+            }
         }
     }
 
