@@ -1,7 +1,7 @@
 # CLAUDE.md — VOTReader-studio Project Knowledge Base
 
 > Living document. Update after every major examination or change.
-> Last major update: 2026-05-11 (Objective E Android polish batch — 5 fixes; see §20 below). Previous: 2026-05-11 full Objective C complete: improvement2.txt Day 1 + Day 2 footnote system + 10 §12 critical bugs + WTLB attribution tap-through + universal single-shot back-pill + Day 4-5 polish + 3 footnote audit fixes from a parallel session; About screen + first-run flow gated by `vot-about-seen`; all 9 session commits fast-forward-merged into `origin/main` at `b19f511` so the GitHub repo's `main` is now the canonical "live" version; AI deferred indefinitely per user direction). Previous: 2026-05-10 Notes / Library / Notebooks system landed (parallel session, see §17.13–§17.18); Phase 0 git setup completed — repo at github.com/corbinlythgoe/VOTReader-studio, private, auth cached.
+> Last major update: 2026-05-12 (Objective D autonomous finish — Android 12+ SplashScreen API holds until WebView's first paint, JS-side "Keep Screen On While Reading" toggle in Settings → Reading Experience bridging the Kotlin setKeepScreenOn at ac439b3, [object CSS] React #31 investigation closed as Android-only or already silenced by the Objective E batch; see PLAN.txt §8 2026-05-12 entry). Previous: 2026-05-11 (Objective E Android polish batch — 5 fixes; see §20 below). Previous: 2026-05-11 full Objective C complete: improvement2.txt Day 1 + Day 2 footnote system + 10 §12 critical bugs + WTLB attribution tap-through + universal single-shot back-pill + Day 4-5 polish + 3 footnote audit fixes from a parallel session; About screen + first-run flow gated by `vot-about-seen`; all 9 session commits fast-forward-merged into `origin/main` at `b19f511` so the GitHub repo's `main` is now the canonical "live" version; AI deferred indefinitely per user direction). Previous: 2026-05-10 Notes / Library / Notebooks system landed (parallel session, see §17.13–§17.18); Phase 0 git setup completed — repo at github.com/corbinlythgoe/VOTReader-studio, private, auth cached.
 >
 > **Working dir**: `D:\VOTReader-studio` (canonical). The C: OneDrive path is legacy — `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app` is now a Junction → `D:\VOTReader-studio\app` (set up 2026-05-08, see Section 17.11). Always edit D: files.
 >
@@ -2243,6 +2243,83 @@ Five targeted fixes applied to `index.html` and `MainActivity.kt`:
 ### 20.5 Reading dot excluded from special screens
 
 Added `"library"`, `"notes-index"`, and `"about"` to the screen exclusion list in the `settings.showReadingDot` condition. The dot now correctly hides on the Library hub, Notes index, and About VOTReader screens (in addition to the previously excluded `settings`, `history`, `search`, `garden-view`, `bible-ch`, `matthew-ch`, and all letter/WTLB/etc. reading screens via `LETTER_SCREEN_SET`).
+
+---
+
+## 21. Objective D autonomous finish (2026-05-12)
+
+Three remaining autonomous items from `handoff_for_next_session_2026-05-11.txt` §3 landed this session. Main was at `641b031` (Objective E Android polish) entering; working tree had a ~505-line uncommitted `index.html` diff from an active parallel session (LinkPicker rewrite with red ✕ undo + green ✓ confirm, one-icon-per-block applyDOMLinks, snapRangeToWords no longer expands forward, bidirectional LinkStore prefix match, NoteSheet cancelEdit converts to highlight instead of removing). All edits this session routed around that parallel work into disjoint line ranges.
+
+### 21.1 Android 12+ SplashScreen API (no JS overlap)
+
+Five files, fully self-contained:
+
+- `gradle/libs.versions.toml`: new `coreSplashscreen = "1.0.1"` + `androidx-core-splashscreen` library entry.
+- `app/build.gradle.kts`: added `implementation(libs.androidx.core.splashscreen)`.
+- `app/src/main/res/values/styles.xml`: new `Theme.VotReader.Splash` with parent `Theme.SplashScreen`, black `windowSplashScreenBackground`, `@drawable/ic_launcher_foreground` icon, and `postSplashScreenTheme=@style/Theme.VotReader` so the activity transitions to the existing dark theme once the splash dismisses.
+- `app/src/main/AndroidManifest.xml`: activity `android:theme` changed `@style/Theme.VotReader` → `@style/Theme.VotReader.Splash`.
+- `app/src/main/java/com/votreader/sacredui/MainActivity.kt`:
+  - import `androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen`
+  - new `@Volatile var splashHolding = true`
+  - `installSplashScreen()` BEFORE `super.onCreate()`, then `splash.setKeepOnScreenCondition { splashHolding }`
+  - in `onPageFinished`: `view.postDelayed({ splashHolding = false }, 80L)` — holds the splash through the cold-boot beat where the WebView has loaded but React hasn't mounted yet. 80 ms covers the gap without making the splash feel slow.
+
+`core-splashscreen` backports the Android 12+ SplashScreen API to API 23+; we target 26+, so the backport is just future-proofing for older devices that might still be paired with the app.
+
+Live verification deferred to user — preview tool runs Chrome, not Android.
+
+### 21.2 JS-side "Keep Screen On While Reading" toggle
+
+The Kotlin bridge for this landed at `ac439b3` but no JS-side Settings UI was wired. Now closed in three edits in `index.html`, well-separated from the parallel session's link/note system rewrite:
+
+1. Settings defaults block: added `keepScreenOn: true,` next to `haptic: true,` (~line 13950).
+2. SettingsScreen Reading Experience section: added a `SettingsRow` ("Keep Screen On While Reading" / "Don't let the screen dim or lock while the app is open. Helpful for long reading sessions; turn off to save battery. Has no effect on desktop browsers.") as the last row in the section, immediately before the "Tabs, Search & History" divider (~line 11849).
+3. App() useEffect that toggles body classes + calls `setLightStatusBar`: added
+   ```js
+   if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === 'function') {
+     window.AndroidBridge.setKeepScreenOn(settings.keepScreenOn !== false);
+   }
+   ```
+   so the Kotlin bridge fires whenever settings mutate. On PC the bridge is `undefined` and the call is no-op.
+
+Verified live in Chrome preview: row renders at the correct spot, default state is on (checkbox `checked`), one click flips it off and persists `keepScreenOn: false` into `vot-state.settings`, second click flips it back to `true`, zero React warnings or console errors.
+
+### 21.3 [object CSS] React #31 warnings — closed as not reproducible
+
+The handoff reported "12 instances per render" of Minified React error #31 with `args=[object CSS]`, pre-existing and stable across page changes. Investigation this session:
+
+- Patched `window.React.createElement` to capture any call with a CSS-typed child (`window.CSS` or `constructor.name === 'CSS'`).
+- Drove the app through Home → Volumes Home → Volume One Index → preface letter → "The Wide Path" letter, watching the capture buffer and `console.error` / `console.warn` streams.
+- Result: **zero** CSS-typed-child captures, **zero** React #31 firings, **zero** render-time warnings.
+
+Two equally-likely explanations:
+
+1. **Android-WebView only.** The handoff's testing was on a device; the prod React render path may differ subtly enough on Android WebView to produce the warning only there. Now diagnosable via `adb logcat -s WebViewJS` (the `WebChromeClient.onConsoleMessage` routing landed at `ac439b3`).
+2. **Already silenced by the Objective E batch (`641b031`).** That batch heavily rewrote `NoteSheet` (color picker on creation, notebook on creation, blank-notes allowed, `cancelEdit` converts to highlight instead of removing). Could have inadvertently removed whatever was passing the CSS const as a child in a rare render path.
+
+Closing the investigation as not actionable without a real Android device. If errors re-appear on device, run `adb logcat -s WebViewJS` while triggering the navigation that produces them — the message's `source:line` will pinpoint the call site.
+
+### 21.4 Working-tree state at end of this session
+
+- **Splash API batch (5 files)** can be committed as a self-contained unit — zero JS overlap with the parallel session's in-flight work.
+- **`index.html`** sits mixed in the working tree: parallel session's ~505-line LinkPicker/snapRange/applyDOMLinks rewrite PLUS my 3 keepScreenOn edits. The two changes are disjoint by line range (parallel: lines 2653-6661 + 13403-15833; mine: 11849-11856 + 13948 + 14131), so a `git add -p` could in principle split them but it's fiddly. Recommended path: let the parallel session land its commit first, then my keepScreenOn additions sit cleanly atop and can be committed without conflict.
+- `.idea/caches/deviceStreaming.xml` + `.idea/vcs.xml`: cosmetic IDE state, ignored.
+
+### 21.5 Outstanding from handoff §3 + PLAN.txt §19
+
+Remaining Objective D items needing user input or design assets (not autonomous):
+
+- ☐ App icon + monochrome icon layer for Android 13+ themed icons (needs design assets).
+- ☐ Release signing config (deferred until Play Store discussion — Timothy's permission first per user policy).
+
+Bigger objectives still open (PLAN.txt §19):
+
+- ☐ E — Data unified (wire `data-normalize.js`, unified `resolveScriptureText`, migrate 28 files).
+- ☐ F — Code modular (split `index.html` into ~40 modules + `cat-modules.py`, slim `App()` to ~400 lines).
+- ☐ G — Build + tests (esbuild, JSDoc, Playwright smoke, `check_balance.py` pre-commit hook).
+- ☐ H — Library completes (Bookmarks, Journal, Highlights & Underlines tiles).
+- ☐ I — Reading-app baseline (TTS, in-app video, synonyms, sepia, font controls).
+- ☐ K — PWA evaluation (architectural decision pending user input).
 
 ---
 

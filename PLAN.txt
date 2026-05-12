@@ -2046,6 +2046,144 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-12 — Objective D autonomous finish: SplashScreen API + JS KeepScreenOn
+             + [object CSS] investigation
+
+  Context entering: handoff_for_next_session_2026-05-11.txt §3 listed three
+  remaining autonomous Objective D items. Worked main branch directly
+  (no worktree). Main was at 641b031 (Objective E Android polish batch
+  landed since the handoff was authored). Working tree had ~505-line
+  uncommitted index.html diff from an active parallel session
+  (sharp-elgamal-d3c103 worktree — visible LinkPicker rewrite: red ✕
+  undo + green ✓ confirm header, one-icon-per-block applyDOMLinks,
+  snapRangeToWords stops forward-expanding, bidirectional
+  LinkStore.getForKeyPrefix, NoteSheet cancelEdit converts to highlight
+  instead of removing, lastLinkCreated state in App, ...). Routed
+  around it; only edited disjoint sections.
+
+  1) Android 12+ SplashScreen API (5 files — zero JS overlap)
+
+    libs.versions.toml: added `coreSplashscreen = "1.0.1"` version +
+      `androidx-core-splashscreen` library entry.
+    app/build.gradle.kts: added `implementation(libs.androidx.core.splashscreen)`.
+    res/values/styles.xml: new `Theme.VotReader.Splash` style with
+      parent="Theme.SplashScreen", black `windowSplashScreenBackground`,
+      `@drawable/ic_launcher_foreground` icon, and
+      `postSplashScreenTheme=@style/Theme.VotReader` so the activity
+      transitions to the existing dark theme after the splash dismisses.
+    AndroidManifest.xml: activity android:theme changed
+      @style/Theme.VotReader → @style/Theme.VotReader.Splash.
+    MainActivity.kt:
+      - import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+      - new @Volatile var splashHolding = true
+      - installSplashScreen() BEFORE super.onCreate(), then
+        splash.setKeepOnScreenCondition { splashHolding }
+      - In onPageFinished: view.postDelayed({ splashHolding = false }, 80L)
+        so the splash holds until React mounts (no flash of empty black
+        between system splash dismissal and WebView's first paint).
+    core-splashscreen backports the Android 12+ SplashScreen API to API
+    23+; we target 26+. Live verification deferred to user — preview
+    tool runs Chrome, not Android.
+
+  2) JS-side "Keep Screen On While Reading" Settings toggle
+    (closes the gap the Kotlin bridge at ac439b3 left open)
+
+    index.html:
+      - Settings defaults block: added `keepScreenOn: true,` next to
+        `haptic: true,` (around line 13950)
+      - SettingsScreen Reading Experience section: added a new
+        SettingsRow ("Keep Screen On While Reading" / "Don't let the
+        screen dim or lock while the app is open. Helpful for long
+        reading sessions; turn off to save battery. Has no effect on
+        desktop browsers.") as the last row before the section closes,
+        right after "History in Top Nav" (around line 11849)
+      - App() useEffect that toggles body classes + calls
+        setLightStatusBar: added a paired
+        `if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === 'function') {
+           window.AndroidBridge.setKeepScreenOn(settings.keepScreenOn !== false);
+         }`
+        so the Kotlin bridge fires whenever settings mutate. On PC the
+        bridge is undefined and the call no-ops — exactly what we want.
+
+    Verified live in preview (Chrome):
+      - Toggle row renders at end of Reading Experience section,
+        immediately before "Tabs, Search & History" section divider
+      - Checkbox starts checked (default true)
+      - Click → state flips to false, persists to localStorage
+        (vot-state.settings.keepScreenOn === false)
+      - Click again → state back to true, persists
+      - Zero console errors, zero React warnings during round trip
+      - AndroidBridge gracefully absent on PC (no-op as designed)
+
+  3) [object CSS] React #31 investigation (read-only diagnostic)
+
+    Patched window.React.createElement to capture any call passing a
+    CSS-typed value (window.CSS or `constructor.name === 'CSS'`) as a
+    child. Drove the app through home → Volumes Home → Volume One
+    Index → preface letter → "The Wide Path" navigation chain while
+    also watching console.error / console.warn streams.
+    Result: ZERO `[object CSS]` captures, ZERO React error #31 firings,
+    ZERO render-time warnings.
+
+    The handoff said these fire "12 instances per render" but no longer
+    reproduce in PC preview. Two equally-likely hypotheses:
+      (a) Android-WebView-only — the prod React build's render path
+          differs subtly enough on Android that something passes
+          CSS-typed children only there. Now diagnosable on a real
+          device via `adb logcat -s WebViewJS` (the
+          WebChromeClient.onConsoleMessage routing landed at ac439b3).
+      (b) Already silenced by the Objective E batch (641b031), which
+          heavily rewrote NoteSheet — color picker + notebook row on
+          creation, blank-notes allowed, cancelEdit converts to
+          highlight instead of removing. Could have inadvertently
+          removed whatever was passing the CSS const.
+
+    Either way: no actionable lead without a real device. Closing the
+    investigation. If errors re-appear on Android, run `adb logcat -s
+    WebViewJS` while triggering the navigation that produces them, and
+    the source:line in the message will pinpoint the call site.
+
+  Working-tree state at end of this batch:
+
+    Committed cleanly (separate commit, zero JS overlap):
+      [PENDING this session] libs.versions.toml + app/build.gradle.kts +
+        res/values/styles.xml + AndroidManifest.xml + MainActivity.kt
+        — the SplashScreen API as a self-contained batch
+
+    Still uncommitted in working tree, mixed:
+      app/src/main/assets/index.html — contains the parallel session's
+      ~505-line LinkPicker/snapRange/applyDOMLinks rewrite PLUS my 3
+      keepScreenOn edits. The two changes are disjoint by line range
+      (parallel: lines 2653-6661 + 13403-15833 link/note system;
+      mine: lines 11849-11856 SettingsRow + 13948 default + 14131 useEffect).
+      Cannot be split via `git add -p` cleanly without manual hunk
+      review. RECOMMEND: let the parallel session land its work first,
+      then my keepScreenOn additions will sit cleanly atop their commit
+      and can be committed without conflict.
+
+    .idea/caches/deviceStreaming.xml + .idea/vcs.xml: cosmetic IDE state,
+    not relevant.
+
+  Outstanding from handoff §3 (next session):
+    ☐ App icon + monochrome icon layer (needs design assets — not
+      autonomous)
+    ☐ Release signing config (deferred until Play Store discussion —
+      Timothy's permission first per user policy)
+
+  Outstanding from PLAN.txt §19 (the big runways):
+    ☐ Objective E — Data unified (Phase 2): wire data-normalize.js,
+      complete the inline-markup parser (incl. ~ [From "X" ~ Volume N]
+      attribution), unified resolveScriptureText, migrate 28 data files
+    ☐ Objective F — Code modular (Phase 3): split index.html into ~40
+      modules with cat-modules.py, slim App() to ~400 lines
+    ☐ Objective G — Build + tests (Phase 4): esbuild, JSDoc types,
+      Playwright smoke, check_balance pre-commit hook
+    ☐ Objective H — Library completes (Phase 5): Bookmarks, Journal,
+      Highlights & Underlines tiles
+    ☐ Objective I — Reading-app baseline: TTS, in-app video, synonyms,
+      sepia, font controls
+    ☐ Objective K — PWA evaluation (architectural decision)
+
 2026-05-11 (later 9) — Objective D autonomous Kotlin + manifest + CSP batch
                        (context-running-low wrap-up)
 

@@ -23,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -46,6 +47,10 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var currentScale = 1f
     // Read by setKeepScreenOn(); flips FLAG_KEEP_SCREEN_ON on/off from JS.
     private var keepScreenOnEnabled = true
+    // Held true while the system splash screen should remain on top. Flipped
+    // false after onPageFinished + a short delay to let React mount, so the
+    // cold-boot transition is splash → first frame with no black flash.
+    @Volatile private var splashHolding = true
     // Launcher for the import file picker; registered in onCreate before the
     // WebView is created so it is ready before any JS calls openFilePicker().
     private lateinit var filePickerLauncher: ActivityResultLauncher<String>
@@ -60,6 +65,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install the system splash BEFORE super.onCreate. Held visible until
+        // the WebView's first paint (see splashHolding + onPageFinished
+        // below) so the cold-boot transition is launcher icon → splash icon
+        // → first frame with no flash of empty black. core-splashscreen
+        // backports the Android 12+ API to API 23+; we target 26+.
+        val splash = installSplashScreen()
+        splash.setKeepOnScreenCondition { splashHolding }
         super.onCreate(savedInstanceState)
 
         // Register the file-picker launcher before the WebView is attached.
@@ -167,6 +179,11 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
                 injectInsets()
+                // Release the splash after a short delay — React mounts a
+                // tick or two after onPageFinished, so 80ms covers the gap
+                // without making the splash feel slow. If it's already
+                // dismissed (config change re-load), this is a no-op.
+                view.postDelayed({ splashHolding = false }, 80L)
             }
 
             override fun onScaleChanged(view: WebView, oldScale: Float, newScale: Float) {

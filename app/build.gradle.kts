@@ -36,4 +36,5 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.webkit)
+    implementation(libs.androidx.core.splashscreen)
 }
