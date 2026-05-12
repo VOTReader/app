@@ -5075,6 +5075,7 @@ function _insertLinkIconAt(container, hlKey, endPos, count) {
   function isSkip(el) {
     return el && el.nodeType === 1 && el.className && SKIP_RX.test(el.className);
   }
+  function isPhraseChar(c) { return !!c && (WORD.test(c) || CLOSE_PUNCT.test(c)); }
 
   /* Starting from `node`, walk forward through the DOM looking for the
      first "insertable" position that isn't directly before a skip element.
@@ -5100,21 +5101,31 @@ function _insertLinkIconAt(container, hlKey, endPos, count) {
     return null;
   }
 
-  // Find the text node + local offset matching endPos.
-  var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-  var charPos = 0;
-  var node = null, localOffset = 0;
-  while (walker.nextNode()) {
-    var n = walker.currentNode;
-    var nodeEnd = charPos + n.length;
+  // Collect all text nodes in document order. We slide across text-node
+  // boundaries (through inline emphasis wrappers like <em>/<strong>/<i>)
+  // when there's no visible whitespace between them — Android selection
+  // handles often snap to text-node boundaries, so a user dragging into
+  // an italicised phrase like "...become the <em>same?</em>..." can land
+  // the selection END at the boundary BEFORE the <em>. Without the cross-
+  // node slide the icon ends up at "...become the [icon]same?" — exactly
+  // the bug the user reported. With the slide we follow the phrase into
+  // the next text node until reaching real whitespace.
+  var textNodes = [];
+  var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+  while (w.nextNode()) textNodes.push(w.currentNode);
+
+  // Find the text node + local offset for endPos.
+  var charPos = 0, nodeIdx = -1, localOffset = 0;
+  for (var i = 0; i < textNodes.length; i++) {
+    var nodeEnd = charPos + textNodes[i].length;
     if (endPos > charPos && endPos <= nodeEnd) {
-      node = n;
+      nodeIdx = i;
       localOffset = endPos - charPos;
       break;
     }
     charPos = nodeEnd;
   }
-  if (!node) {
+  if (nodeIdx < 0) {
     container.appendChild(_buildLinkIcon(hlKey, count));
     return;
   }
@@ -5122,7 +5133,7 @@ function _insertLinkIconAt(container, hlKey, endPos, count) {
   // If endPos landed INSIDE a skip element (fn-ref bubble's "1" text node,
   // a letter-link's label text, etc.), slide past the whole skip element
   // instead of placing the icon inside it.
-  var ancestor = node.parentElement;
+  var ancestor = textNodes[nodeIdx].parentElement;
   var skipAncestor = null;
   while (ancestor && ancestor !== container) {
     if (isSkip(ancestor)) skipAncestor = ancestor;
@@ -5136,33 +5147,72 @@ function _insertLinkIconAt(container, hlKey, endPos, count) {
     return;
   }
 
-  // 1. Mid-word slide: between two word chars → advance until we exit the word.
-  var text = node.nodeValue;
-  while (localOffset > 0 && localOffset < text.length
-      && WORD.test(text[localOffset - 1]) && WORD.test(text[localOffset])) {
-    localOffset++;
-  }
-  // 2. Punctuation slide: past closing punctuation immediately after the word.
-  while (localOffset < text.length && CLOSE_PUNCT.test(text[localOffset])) {
-    localOffset++;
+  // Block-level tags that visually break the reading flow. When sliding
+  // across text-node boundaries, we STOP if the path between two adjacent
+  // text nodes contains any of these — but we KEEP going through inline
+  // emphasis wrappers (em/strong/i/b/span/etc.) so a phrase like
+  // "...the <em>same?</em> Therefore..." reads as one continuous unit
+  // for icon-placement purposes.
+  var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
+  function hasBlockBetween(prevTextNode, nextTextNode) {
+    var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null, false);
+    bw.currentNode = prevTextNode;
+    var n;
+    while ((n = bw.nextNode())) {
+      if (n === nextTextNode) return false;
+      if (n.nodeType === 1 && BLOCK_TAGS.test(n.tagName)) return true;
+    }
+    return true;
   }
 
-  // 3. Element slide: when we'd land at end of the text node, walk through
-  // siblings (and up through parents as needed) until we find a non-skip
-  // insertion point — so the icon lands AFTER any adjacent fn-ref / ref-link
-  // chain regardless of whether they sit at the same DOM depth as the text.
+  // Slide forward through phrase characters (word chars + closing
+  // punctuation), crossing text-node boundaries whenever the next text
+  // node is in the SAME inline context — i.e., no block element on the
+  // DOM path between them. This is what makes the icon flow through an
+  // <em>-wrapped phrase even when Android's selection handle dropped at
+  // the text-node boundary BEFORE the <em>.
+  // Skip elements (fn-ref, etc.) are jumped over by advancing the
+  // node index past any of their child text nodes — they're part of
+  // the visible reading flow but the icon shouldn't land inside them.
+  while (true) {
+    var text = textNodes[nodeIdx].nodeValue;
+    while (localOffset < text.length && isPhraseChar(text[localOffset])) {
+      localOffset++;
+    }
+    if (localOffset < text.length) break;          // stopped at whitespace mid-node
+    var nextNodeIdx = nodeIdx + 1;
+    while (nextNodeIdx < textNodes.length) {
+      var na = textNodes[nextNodeIdx].parentElement;
+      var inSkip = false;
+      while (na && na !== container) {
+        if (isSkip(na)) { inSkip = true; break; }
+        na = na.parentElement;
+      }
+      if (!inSkip) break;
+      nextNodeIdx++;
+    }
+    if (nextNodeIdx >= textNodes.length) break;     // no more nodes
+    if (hasBlockBetween(textNodes[nodeIdx], textNodes[nextNodeIdx])) break;
+    nodeIdx = nextNodeIdx;
+    localOffset = 0;
+  }
+
+  // Final placement.
+  var finalNode = textNodes[nodeIdx];
+  var finalText = finalNode.nodeValue;
   var insertBeforeNode = null;
-  if (localOffset >= text.length) {
-    insertBeforeNode = nextInsertionPoint(node);
+  if (localOffset >= finalText.length) {
+    insertBeforeNode = nextInsertionPoint(finalNode);
+  } else if (localOffset === 0) {
+    insertBeforeNode = finalNode;
   } else {
-    insertBeforeNode = node.splitText(localOffset);
+    insertBeforeNode = finalNode.splitText(localOffset);
   }
-
-  var icon = _buildLinkIcon(hlKey, count);
+  var iconEl = _buildLinkIcon(hlKey, count);
   if (insertBeforeNode) {
-    insertBeforeNode.parentNode.insertBefore(icon, insertBeforeNode);
+    insertBeforeNode.parentNode.insertBefore(iconEl, insertBeforeNode);
   } else {
-    container.appendChild(icon);
+    container.appendChild(iconEl);
   }
 }
 
