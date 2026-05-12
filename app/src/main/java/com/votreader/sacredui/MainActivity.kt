@@ -235,9 +235,15 @@ class MainActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         val topDp = String.format(Locale.US, "%.2f", savedTopInset / density)
         val bottomDp = String.format(Locale.US, "%.2f", savedBottomInset / density)
+        // Guard documentElement — the WindowInsets listener fires during the
+        // initial layout pass before loadUrl finishes parsing the document,
+        // so documentElement can be null on the first 1-3 invocations. Without
+        // the guard, every cold boot logged 3× "Uncaught TypeError: Cannot
+        // read properties of null (reading 'style')" to Logcat / WebViewJS.
         val js = """
             (function() {
-                var r = document.documentElement.style;
+                var r = document.documentElement && document.documentElement.style;
+                if (!r) return;
                 r.setProperty('--inset-top',    '${topDp}px');
                 r.setProperty('--inset-bottom', '${bottomDp}px');
             })();
