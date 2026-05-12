@@ -2651,7 +2651,12 @@
     }
     .verse-link-icon:active, .verse-link-icon:hover { opacity: 1; }
     .verse-link-icon svg { width: 16px; height: 16px; stroke: var(--gold-dim); fill: none; stroke-width: 1.8; }
-    /* Inline link icon — injected by applyDOMLinks() at the end of each linked text range */
+    /* Inline link icon — injected by applyDOMLinks() at (or as close as possible to)
+       the end of each linked text range. user-select is intentionally NOT set to
+       'none' here — the span has no selectable text content (only an SVG, which
+       browsers treat as non-selectable by default), and leaving user-select at
+       its inherited 'auto' lets Android's drag-selection pass across the icon
+       without the hard boundary that 'none' would create. */
     .inline-link-icon {
       display: inline-block;
       width: 16px; height: 16px; margin: 0 1px 0 2px;
@@ -2659,7 +2664,6 @@
       opacity: 0.85; transition: opacity 0.15s ease, transform 0.15s ease;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
-      -webkit-user-select: none; user-select: none;
       background: transparent !important;
     }
     .inline-link-icon:active, .inline-link-icon:hover { opacity: 1; transform: scale(1.12); }
@@ -4951,33 +4955,188 @@ function HighlightableText({ text, hlKey, hlTick }) {
 /* Inject inline chain icons at the end of each linked text range inside
    [data-hl-dom] containers. Re-runs on every hlTick. Click → onLinkOpen(blockKey)
    which opens the sidebar showing all links touching that block. */
+/* Inline link icons — placed at (or as close as possible to) the END
+   of each linked text range. The icon "slides off" three kinds of bad
+   placement so it never interrupts content:
+
+     1. Mid-word — slide forward to the end of the current word.
+        (Defensive: snapRangeToWords already aligns starts on word
+        boundaries, but the parallel-session change to snapRangeToWords
+        deliberately leaves END exactly where the user released — so
+        the user can intentionally end mid-word but the icon shouldn't.)
+     2. Closing punctuation — slide past `.,;:!?)…—` and friends so
+        the icon reads as belonging to the word, not splitting the
+        punctuation off ("word."[icon] instead of "word"[icon]".").
+     3. Adjacent fn-ref / scripture-ref / letter-link / note-icon /
+        verse-link-icon — slide PAST these inline elements so the
+        icon never lands directly before one (where, on Android, the
+        icon would block the tap target — the original bug that drove
+        the parallel session to end-of-paragraph placement).
+
+   Multiple links ending at the same offset merge into one icon with
+   a `title` count; tapping any icon opens the link sidebar for the
+   block, which lists every link touching it.
+
+   CSS: `.inline-link-icon` no longer sets `user-select: none` — the
+   span is empty (SVG paths can't be selected anyway), and dropping
+   the `none` lets drag-selection pass across the icon on Android
+   without breaking. */
 function applyDOMLinks() {
   document.querySelectorAll('[data-hl-key][data-hl-dom]').forEach(function(container) {
     var hlKey = container.getAttribute('data-hl-key');
     container.querySelectorAll('.inline-link-icon').forEach(function(el) { el.remove(); });
+    container.normalize();
 
     var links = LinkStore.getForKeyPrefix(hlKey);
     if (!links.length) return;
 
-    /* One icon per block, always at the END of the container. Placing mid-text
-       at a specific char offset caused two Android bugs:
-       1. A user-select:none span creates a hard selection boundary, so dragging
-          to select text that crosses an icon would silently fail on Android.
-       2. The icon could land right before a .fn-ref bubble, blocking its tap target.
-       End-of-block placement avoids both: text selection is never interrupted,
-       and fn-ref bubbles always precede the icon (they're inside the text flow). */
-    var icon = document.createElement('span');
-    icon.className = 'inline-link-icon';
-    icon.title = links.length + ' link' + (links.length > 1 ? 's' : '');
-    icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
-    var openSidebar = function(e) {
-      e.preventDefault(); e.stopPropagation();
-      if (window.__openLinkSidebar) window.__openLinkSidebar(hlKey);
-    };
-    icon.addEventListener('click', openSidebar);
-    icon.addEventListener('touchend', openSidebar);
-    container.appendChild(icon);
+    // Collect end positions for endpoints attached to this container
+    // (either the block itself or a more-specific subkey), merging
+    // duplicates so two links ending at the same offset become one
+    // icon with count=2.
+    var keyPrefix = hlKey + ':';
+    var byEndPos = {};
+    links.forEach(function(link) {
+      [link.a, link.b].forEach(function(ep) {
+        if (!ep || !ep.key) return;
+        if (ep.key !== hlKey && ep.key.indexOf(keyPrefix) !== 0) return;
+        var m = ep.key.match(/:(\d+)-(\d+)$/);
+        if (!m) return;
+        var endPos = parseInt(m[2], 10);
+        byEndPos[endPos] = (byEndPos[endPos] || 0) + 1;
+      });
+    });
+    if (Object.keys(byEndPos).length === 0) {
+      // Legacy link (no :start-end suffix) — fall back to one icon at
+      // end of block, same as the prior end-of-paragraph behavior.
+      container.appendChild(_buildLinkIcon(hlKey, links.length));
+      return;
+    }
+
+    // Process highest position first so each insertion doesn't shift the
+    // character offsets of earlier (lower-offset) insertions still pending.
+    var positions = Object.keys(byEndPos).map(Number).sort(function(a, b) { return b - a; });
+    positions.forEach(function(endPos) {
+      _insertLinkIconAt(container, hlKey, endPos, byEndPos[endPos]);
+    });
   });
+}
+
+function _buildLinkIcon(hlKey, count) {
+  var icon = document.createElement('span');
+  icon.className = 'inline-link-icon';
+  icon.title = count + ' link' + (count > 1 ? 's' : '');
+  icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+  var openSidebar = function(e) {
+    e.preventDefault(); e.stopPropagation();
+    if (window.__openLinkSidebar) window.__openLinkSidebar(hlKey);
+  };
+  icon.addEventListener('click', openSidebar);
+  icon.addEventListener('touchend', openSidebar);
+  return icon;
+}
+
+function _insertLinkIconAt(container, hlKey, endPos, count) {
+  var WORD = /[\w’'\-]/;
+  var CLOSE_PUNCT = /[.,;:!?)\]}”’…—]/;
+  // Inline elements the icon must NOT land directly before — sliding
+  // past keeps their tap targets clear and matches user intent
+  // (icons should bracket the linked phrase, not interrupt
+  // reference / footnote markers).
+  var SKIP_RX = /\b(fn-ref|tap-ref|letter-link-ref|verse-link-icon|hl-note-icon)\b/;
+
+  function isSkip(el) {
+    return el && el.nodeType === 1 && el.className && SKIP_RX.test(el.className);
+  }
+
+  /* Starting from `node`, walk forward through the DOM looking for the
+     first "insertable" position that isn't directly before a skip element.
+     A skip element is jumped over as a unit. When the current node has no
+     nextSibling, walk UP to the parent and try again — this handles cases
+     like `<span>...written.</span><span class="fn-ref">1</span>` where the
+     fn-ref is a sibling of the text's wrapper, not of the text itself.
+     Returns the DOM node to insert before, or null to append to container. */
+  function nextInsertionPoint(node) {
+    var cur = node;
+    while (cur && cur !== container) {
+      var sib = cur.nextSibling;
+      if (sib === null) {
+        cur = cur.parentElement;
+        continue;
+      }
+      if (isSkip(sib)) {
+        cur = sib;
+        continue;
+      }
+      return sib;
+    }
+    return null;
+  }
+
+  // Find the text node + local offset matching endPos.
+  var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+  var charPos = 0;
+  var node = null, localOffset = 0;
+  while (walker.nextNode()) {
+    var n = walker.currentNode;
+    var nodeEnd = charPos + n.length;
+    if (endPos > charPos && endPos <= nodeEnd) {
+      node = n;
+      localOffset = endPos - charPos;
+      break;
+    }
+    charPos = nodeEnd;
+  }
+  if (!node) {
+    container.appendChild(_buildLinkIcon(hlKey, count));
+    return;
+  }
+
+  // If endPos landed INSIDE a skip element (fn-ref bubble's "1" text node,
+  // a letter-link's label text, etc.), slide past the whole skip element
+  // instead of placing the icon inside it.
+  var ancestor = node.parentElement;
+  var skipAncestor = null;
+  while (ancestor && ancestor !== container) {
+    if (isSkip(ancestor)) skipAncestor = ancestor;
+    ancestor = ancestor.parentElement;
+  }
+  if (skipAncestor) {
+    var ref = nextInsertionPoint(skipAncestor);
+    var icon = _buildLinkIcon(hlKey, count);
+    if (ref) ref.parentNode.insertBefore(icon, ref);
+    else container.appendChild(icon);
+    return;
+  }
+
+  // 1. Mid-word slide: between two word chars → advance until we exit the word.
+  var text = node.nodeValue;
+  while (localOffset > 0 && localOffset < text.length
+      && WORD.test(text[localOffset - 1]) && WORD.test(text[localOffset])) {
+    localOffset++;
+  }
+  // 2. Punctuation slide: past closing punctuation immediately after the word.
+  while (localOffset < text.length && CLOSE_PUNCT.test(text[localOffset])) {
+    localOffset++;
+  }
+
+  // 3. Element slide: when we'd land at end of the text node, walk through
+  // siblings (and up through parents as needed) until we find a non-skip
+  // insertion point — so the icon lands AFTER any adjacent fn-ref / ref-link
+  // chain regardless of whether they sit at the same DOM depth as the text.
+  var insertBeforeNode = null;
+  if (localOffset >= text.length) {
+    insertBeforeNode = nextInsertionPoint(node);
+  } else {
+    insertBeforeNode = node.splitText(localOffset);
+  }
+
+  var icon = _buildLinkIcon(hlKey, count);
+  if (insertBeforeNode) {
+    insertBeforeNode.parentNode.insertBefore(icon, insertBeforeNode);
+  } else {
+    container.appendChild(icon);
+  }
 }
 
 /* Find the nearest word-boundary insertion point AFTER a mark. If the
