@@ -2653,15 +2653,21 @@
     .verse-link-icon svg { width: 16px; height: 16px; stroke: var(--gold-dim); fill: none; stroke-width: 1.8; }
     /* Inline link icon — injected by applyDOMLinks() at the end of each linked text range */
     .inline-link-icon {
-      display: inline-flex; align-items: center; justify-content: center;
+      display: inline-block;
       width: 16px; height: 16px; margin: 0 1px 0 2px;
-      vertical-align: middle; cursor: pointer;
-      opacity: 0.55; transition: opacity 0.15s;
+      vertical-align: -2px; cursor: pointer;
+      opacity: 0.85; transition: opacity 0.15s ease, transform 0.15s ease;
       -webkit-tap-highlight-color: transparent;
-      color: var(--gold);
+      touch-action: manipulation;
+      -webkit-user-select: none; user-select: none;
+      background: transparent !important;
     }
-    .inline-link-icon:active, .inline-link-icon:hover { opacity: 1; }
-    .inline-link-icon svg { width: 13px; height: 13px; }
+    .inline-link-icon:active, .inline-link-icon:hover { opacity: 1; transform: scale(1.12); }
+    .inline-link-icon svg {
+      width: 100%; height: 100%;
+      stroke: var(--gold-dim); fill: none;
+      stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+    }
 
     /* ── LINK SIDEBAR ────────────────────────────────────────────── */
     .link-sidebar-overlay {
@@ -2814,7 +2820,7 @@
       animation: navpickFadeIn 0.22s ease-out forwards;
       opacity: 1;
       display: flex; flex-direction: column;
-      max-height: 92vh; min-height: 60vh;
+      max-height: calc(100vh - var(--inset-top, 0px)); min-height: 60vh;
     }
     @keyframes navpickFadeIn {
       from { opacity: 0; }
@@ -2841,6 +2847,13 @@
       font-size: 1.8rem; line-height: 1; padding: 0 6px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
+    .navpick-close-undo { color: #e85555; }
+    .navpick-confirm-green {
+      background: none; border: none; padding: 0 6px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      color: #4caf50;
+    }
+    .navpick-confirm-green svg { width: 24px; height: 24px; display: block; }
     .navpick-search-wrap {
       padding: 4px 18px 12px;
     }
@@ -2951,7 +2964,7 @@
     }
     .picker-header {
       display: flex; align-items: center; gap: 14px;
-      padding: 16px 18px 12px;
+      padding: calc(var(--inset-top, 0px) + 16px) 18px 12px;
       border-bottom: 1px solid rgba(110,98,76,0.18);
       flex-shrink: 0;
     }
@@ -4294,8 +4307,8 @@ const LinkStore = Object.assign(CachedStore('vot-links', []), {
   },
   getForKeyPrefix(prefix) {
     return this._load().filter(lnk => {
-      const aMatch = lnk.a.key === prefix || lnk.a.key.startsWith(prefix + ':');
-      const bMatch = lnk.b.key === prefix || lnk.b.key.startsWith(prefix + ':');
+      const aMatch = lnk.a.key === prefix || lnk.a.key.startsWith(prefix + ':') || prefix.startsWith(lnk.a.key + ':');
+      const bMatch = lnk.b.key === prefix || lnk.b.key.startsWith(prefix + ':') || prefix.startsWith(lnk.b.key + ':');
       return aMatch || bMatch;
     });
   },
@@ -4324,9 +4337,10 @@ function snapRangeToWords(text, start, end) {
   if (!text || typeof text !== 'string') return { start, end };
   start = Math.max(0, Math.min(start, text.length));
   end = Math.max(0, Math.min(end, text.length));
-  const isWord = (c) => !!c && /[\w’'-]/.test(c);
+  const isWord = (c) => !!c && /[\w’’-]/.test(c);
+  // Only snap start backward to include the full beginning word.
+  // End is left exactly where the user released — no forward expansion.
   while (start > 0 && isWord(text[start - 1]) && isWord(text[start])) start--;
-  while (end < text.length && isWord(text[end - 1]) && isWord(text[end])) end++;
   return { start, end };
 }
 
@@ -4941,50 +4955,28 @@ function applyDOMLinks() {
   document.querySelectorAll('[data-hl-key][data-hl-dom]').forEach(function(container) {
     var hlKey = container.getAttribute('data-hl-key');
     container.querySelectorAll('.inline-link-icon').forEach(function(el) { el.remove(); });
-    container.normalize();
 
     var links = LinkStore.getForKeyPrefix(hlKey);
     if (!links.length) return;
 
-    var byEndPos = {};
-    var keyPrefix = hlKey + ':';
-    links.forEach(function(link) {
-      [link.a, link.b].forEach(function(ep) {
-        if (!ep || !ep.key || ep.key.indexOf(keyPrefix) !== 0) return;
-        var m = ep.key.match(/:(\d+)-(\d+)$/);
-        if (!m) return;
-        var endPos = parseInt(m[2], 10);
-        byEndPos[endPos] = (byEndPos[endPos] || 0) + 1;
-      });
-    });
-
-    // Process from highest to lowest so prior insertions don't shift later positions
-    var positions = Object.keys(byEndPos).map(Number).sort(function(a, b) { return b - a; });
-    positions.forEach(function(endPos) {
-      var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-      var charPos = 0;
-      while (walker.nextNode()) {
-        var node = walker.currentNode;
-        var nodeEnd = charPos + node.length;
-        if (endPos > charPos && endPos <= nodeEnd) {
-          var localOffset = endPos - charPos;
-          var afterNode = localOffset < node.length ? node.splitText(localOffset) : null;
-          var icon = document.createElement('span');
-          icon.className = 'inline-link-icon';
-          icon.title = byEndPos[endPos] + ' link' + (byEndPos[endPos] > 1 ? 's' : '');
-          icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
-          icon.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (window.__openLinkSidebar) window.__openLinkSidebar(hlKey);
-          });
-          if (afterNode) node.parentNode.insertBefore(icon, afterNode);
-          else if (node.nextSibling) node.parentNode.insertBefore(icon, node.nextSibling);
-          else node.parentNode.appendChild(icon);
-          break;
-        }
-        charPos = nodeEnd;
-      }
-    });
+    /* One icon per block, always at the END of the container. Placing mid-text
+       at a specific char offset caused two Android bugs:
+       1. A user-select:none span creates a hard selection boundary, so dragging
+          to select text that crosses an icon would silently fail on Android.
+       2. The icon could land right before a .fn-ref bubble, blocking its tap target.
+       End-of-block placement avoids both: text selection is never interrupted,
+       and fn-ref bubbles always precede the icon (they're inside the text flow). */
+    var icon = document.createElement('span');
+    icon.className = 'inline-link-icon';
+    icon.title = links.length + ' link' + (links.length > 1 ? 's' : '');
+    icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+    var openSidebar = function(e) {
+      e.preventDefault(); e.stopPropagation();
+      if (window.__openLinkSidebar) window.__openLinkSidebar(hlKey);
+    };
+    icon.addEventListener('click', openSidebar);
+    icon.addEventListener('touchend', openSidebar);
+    container.appendChild(icon);
   });
 }
 
@@ -5441,7 +5433,17 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest }) {
         return;
       }
       const range = sel.getRangeAt(0);
-      const text = sel.toString().trim();
+      // Strip .fn-ref bubbles and .hl-note-icon elements from the selection text
+      // so footnote numbers and note icons don't bleed into the link preview.
+      const text = (() => {
+        try {
+          const frag = range.cloneContents();
+          frag.querySelectorAll('.fn-ref, .hl-note-icon').forEach(function(el) { el.remove(); });
+          return frag.textContent.trim();
+        } catch (e) {
+          return sel.toString().trim();
+        }
+      })();
       if (!text) { setVisible(false); return; }
       const container = findHlContainer(range.startContainer);
       const endContainer = findHlContainer(range.endContainer);
@@ -5552,7 +5554,7 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest }) {
           }
         }
       }
-      setTimeout(computeAndShow, 60);
+      setTimeout(computeAndShow, 150);
     };
 
     // Android long-press / right-click: same routing as tap.
@@ -6043,6 +6045,12 @@ function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
     () => isBlockScope ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
     [hlKey, hlTick, isBlockScope]
   );
+  useEffect(() => {
+    if (!hlKey) return;
+    const prev = window.__closeSheet;
+    window.__closeSheet = onClose;
+    return () => { window.__closeSheet = prev || null; };
+  }, [hlKey, onClose]);
   if (!hlKey) return null;
   // Format date like "Fri, May 8, 2026"
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -6175,16 +6183,20 @@ function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sou
   return { type: parts[0], key: sourceKey, label: sourceLabel || sourceKey, ...excerpt };
 }
 
-/* Persist a link, dedup'ing if the exact pair already exists. Returns true if
-   a new link was added, false if it was a duplicate. */
+/* Persist a link, dedup'ing if the exact pair already exists.
+   Returns the link object on success OR when the link already exists
+   (so callers can show the green ✓ either way). Returns null only when
+   sourceEndpoint.key is missing. */
 function persistLink(sourceEndpoint, targetEndpoint) {
   const existing = LinkStore.getForKey(sourceEndpoint.key);
-  if (existing.some(l => l.a.key === targetEndpoint.key || l.b.key === targetEndpoint.key)) return false;
-  LinkStore.add({ id: lnkId(), a: sourceEndpoint, b: targetEndpoint, created: Date.now() });
-  return true;
+  const dup = existing.find(l => l.a.key === targetEndpoint.key || l.b.key === targetEndpoint.key);
+  if (dup) return dup; // already exists — return it so the green ✓ still shows
+  const link = { id: lnkId(), a: sourceEndpoint, b: targetEndpoint, created: Date.now() };
+  LinkStore.add(link);
+  return link;
 }
 
-function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, hlTick, setHlTick, onClose, onRequestRefine }) {
+function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, hlTick, setHlTick, onClose, onRequestRefine, lastCreatedLink, onLinkCreated }) {
   const [input, setInput] = useState('');
   const inputRef = useRef(null);
   // Re-read RecentNavStore every render so newly-added picks float to the top
@@ -6193,27 +6205,17 @@ function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText
   const [, setRecentTick] = useState(0);
   const bumpRecent = useCallback(() => setRecentTick(t => t + 1), []);
   const recent = RecentNavStore.list();
-  // Confirmation flash — shows "Linked: X" for a moment after a link is added,
-  // so the user gets feedback even though the picker stays open.
-  const [justLinked, setJustLinked] = useState(null);
-
   useEffect(() => {
     if (inputRef.current) setTimeout(() => inputRef.current.focus(), 50);
   }, []);
 
-  // After a refinement screen confirms a link it stashes the new link's label
-  // on window so we can flash it on remount. Drains the channel after reading
-  // so it doesn't fire twice.
+  // Android back button closes the picker (same save/restore pattern as every
+  // other overlay in the app — picks up the previous closer on unmount).
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.__linkPickerFlash) {
-      const lbl = window.__linkPickerFlash;
-      window.__linkPickerFlash = null;
-      setJustLinked(lbl);
-      setHlTick(t => t + 1); // keep recent list fresh
-      const t = setTimeout(() => setJustLinked(null), 1800);
-      return () => clearTimeout(t);
-    }
-  }, [hlTick]);
+    const prev = window.__closeSheet;
+    window.__closeSheet = onClose;
+    return () => { window.__closeSheet = prev || null; };
+  }, [onClose]);
 
   // Compute search results (or empty when input is empty)
   const results = useMemo(() => {
@@ -6244,19 +6246,15 @@ function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText
       return; // refinement screen takes over (it leaves us back here on confirm)
     }
 
-    // Direct create: target already specifies a verse. Stay open so the user
-    // can keep linking the same source to additional targets — clear the
-    // input, refresh recent, and flash a confirmation.
+    // Direct create: stay open so user can confirm (✓) or undo (×).
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
-    if (persistLink(sourceEndpoint, target)) {
+    const newLink = persistLink(sourceEndpoint, target);
+    if (newLink) {
       setHlTick(t => t + 1);
-      setJustLinked(target.label);
-      setInput('');
       bumpRecent();
-      if (inputRef.current) inputRef.current.focus();
-      setTimeout(() => setJustLinked(null), 1800);
+      onLinkCreated(newLink);
     }
-  }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, bumpRecent]);
+  }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, bumpRecent, onLinkCreated]);
 
   // Render a row for a nav item (used in both Results and Recent lists)
   const renderItemRow = (item, key) => {
@@ -6281,13 +6279,29 @@ function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText
 
   return React.createElement("div", { className: "link-picker-overlay", onClick: onClose },
     React.createElement("div", { className: "link-picker-sheet navpick-sheet", onClick: e => e.stopPropagation() },
-      // Header: check icon + "Link" title (matches reference design)
+      // Header: title + red × (undo last link) + green ✓ (confirm & close)
       React.createElement("div", { className: "navpick-header" },
-        React.createElement("svg", { className: "navpick-check", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
-          React.createElement("polyline", { points: "20 6 9 17 4 12" })
-        ),
         React.createElement("span", { className: "navpick-title" }, "Link"),
-        React.createElement("button", { className: "navpick-close", onClick: onClose, "aria-label": "Close" }, "×")
+        React.createElement("button", {
+          className: "navpick-close navpick-close-undo",
+          onClick: () => {
+            if (lastCreatedLink) {
+              LinkStore.remove(lastCreatedLink.id);
+              onLinkCreated(null);
+            }
+            onClose();
+          },
+          "aria-label": "Cancel"
+        }, "×"),
+        lastCreatedLink && React.createElement("button", {
+          className: "navpick-confirm-green",
+          onClick: onClose,
+          "aria-label": "Done"
+        },
+          React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
+            React.createElement("polyline", { points: "20 6 9 17 4 12" })
+          )
+        )
       ),
       // Search input (rounded pill matching reference)
       React.createElement("div", { className: "navpick-search-wrap" },
@@ -6297,14 +6311,6 @@ function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText
           value: input, onChange: e => setInput(e.target.value),
           onKeyDown: e => { if (e.key === 'Enter' && results.length > 0) createLinkTo(results[0]); }
         })
-      ),
-      // Confirmation flash — appears under the search bar after a successful
-      // link, then fades. The picker stays open so the user can keep linking.
-      justLinked && React.createElement("div", { className: "navpick-flash" },
-        React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" },
-          React.createElement("polyline", { points: "20 6 9 17 4 12" })
-        ),
-        React.createElement("span", null, "Linked: " + justLinked)
       ),
       // Body: Recent OR Results
       React.createElement("div", { className: "navpick-body" },
@@ -6366,6 +6372,13 @@ function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart,
     return [];
   }, [chapter]);
 
+  // Android back button goes back to LinkPicker (same save/restore pattern).
+  useEffect(() => {
+    const prev = window.__closeSheet;
+    window.__closeSheet = () => onClose(null);
+    return () => { window.__closeSheet = prev || null; };
+  }, [onClose]);
+
   const handleVerseTap = useCallback((vn) => {
     // 1st tap: anchor; 2nd tap (different verse): range; 3rd tap (anchor again): clear
     if (selStart == null) { setSelStart(vn); setSelEnd(vn); return; }
@@ -6400,11 +6413,9 @@ function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart,
     if (v) refinedTarget.preview = v.text;
 
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
-    const created = persistLink(sourceEndpoint, refinedTarget);
-    if (created) setHlTick(t => t + 1);
-    // Pass the link label to onClose so LinkPicker can flash a confirmation
-    // when it re-mounts. User keeps the picker open and can add more.
-    onClose(created ? refinedTarget.label : null);
+    const newLink = persistLink(sourceEndpoint, refinedTarget);
+    if (newLink) setHlTick(t => t + 1);
+    onClose(newLink || null);
   }, [selStart, selEnd, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose]);
 
   if (!chapter) {
@@ -6508,25 +6519,34 @@ function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sour
     return [];
   }, [entry]);
 
+  // Android back button goes back to LinkPicker (same save/restore pattern).
+  useEffect(() => {
+    const prev = window.__closeSheet;
+    window.__closeSheet = () => onClose(null);
+    return () => { window.__closeSheet = prev || null; };
+  }, [onClose]);
+
   // Capture native selection on mouseup/touchend; compute char offsets
   // relative to the block element the selection lives in.
   const captureSelection = useCallback(() => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    // Find which block contains the start
-    const startNode = range.startContainer;
-    const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest('[data-block-key]') : startNode.closest && startNode.closest('[data-block-key]');
-    if (!blockEl || !bodyRef.current || !bodyRef.current.contains(blockEl)) return;
-    const blockKey = blockEl.dataset.blockKey;
-    // Compute offsets within the block element's text
-    const fullText = blockEl.textContent;
-    const preRange = document.createRange();
-    preRange.selectNodeContents(blockEl);
-    preRange.setEnd(range.startContainer, range.startOffset);
-    const start = preRange.toString().length;
-    const end = start + range.toString().length;
-    setSelInfo({ blockKey, start, end, text: fullText.slice(start, end) });
+    setTimeout(function() {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const startNode = range.startContainer;
+      const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest('[data-block-key]') : startNode.closest && startNode.closest('[data-block-key]');
+      if (!blockEl || !bodyRef.current || !bodyRef.current.contains(blockEl)) return;
+      const blockKey = blockEl.dataset.blockKey;
+      const fullText = blockEl.textContent;
+      const preRange = document.createRange();
+      preRange.selectNodeContents(blockEl);
+      preRange.setEnd(range.startContainer, range.startOffset);
+      var start = preRange.toString().length;
+      var end = start + range.toString().length;
+      var snapped = snapRangeToWords(fullText, start, end);
+      start = snapped.start;
+      setSelInfo({ blockKey, start, end, text: fullText.slice(start, end) });
+    }, 150);
   }, []);
 
   const confirmLink = useCallback(() => {
@@ -6542,9 +6562,9 @@ function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sour
       refinedTarget.key = baseKey + ':' + selInfo.blockKey + ':' + selInfo.start + '-' + selInfo.end;
     }
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
-    const created = persistLink(sourceEndpoint, refinedTarget);
-    if (created) setHlTick(t => t + 1);
-    onClose(created ? refinedTarget.label : null);
+    const newLink = persistLink(sourceEndpoint, refinedTarget);
+    if (newLink) setHlTick(t => t + 1);
+    onClose(newLink || null);
   }, [selInfo, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose]);
 
   if (!entry) {
@@ -6641,10 +6661,9 @@ function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpe
   const cancelEdit = () => {
     setBody(note.body || '');
     if (startInEditMode && !note.body) {
-      // Fresh new note, never saved yet — discard on cancel.
-      // (If the user saved a blank note and later reopens it to edit,
-      // startInEditMode is false so cancel just closes edit mode.)
-      AnnotationStore.removeGroup(groupId);
+      // Fresh new note, never saved — convert back to a plain highlight
+      // so the selection the user made is preserved on screen.
+      AnnotationStore.convertGroup(groupId, 'highlight');
       NoteStore.remove(groupId);
       setHlTick(t => t + 1);
       onClose();
@@ -11827,6 +11846,12 @@ function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHis
       onToggle: () => onToggle("historyInNav"),
       disabled: settings.historyEnabled === false,
       disabledReason: "Turn on History to enable this." }
+    ), /*#__PURE__*/
+    React.createElement(SettingsRow, {
+      label: "Keep Screen On While Reading",
+      desc: "Don't let the screen dim or lock while the app is open. Helpful for long reading sessions; turn off to save battery. Has no effect on desktop browsers.",
+      checked: settings.keepScreenOn !== false,
+      onToggle: () => onToggle("keepScreenOn") }
     )
     ), /*#__PURE__*/
 
@@ -13384,6 +13409,7 @@ function App() {
   const [linkSidebarKey, setLinkSidebarKey] = useState(null);   // hlKey or null
   const [linkPickerSource, setLinkPickerSource] = useState(null); // { key, label } or null
   const [linkRefineRequest, setLinkRefineRequest] = useState(null); // { kind, target, item } or null
+  const [lastLinkCreated, setLastLinkCreated] = useState(null); // most recently created link, for undo
   const [noteSheetTarget, setNoteSheetTarget] = useState(null);  // { groupId, startInEditMode } or null
   const [notebookPickerTarget, setNotebookPickerTarget] = useState(null); // groupId or null
   const [multiNotePayload, setMultiNotePayload] = useState(null); // { groupIds, x, y } or null
@@ -13392,6 +13418,7 @@ function App() {
   const closeLinkSidebar = useCallback(() => setLinkSidebarKey(null), []);
   const openLinkPicker = useCallback((selInfo) => {
     const hlKey = typeof selInfo === 'string' ? selInfo : selInfo.hlKey;
+    if (!hlKey) return;
     const parts = hlKey.split(':');
     let label = hlKey;
     if (parts[0] === 'bible') {
@@ -13412,7 +13439,7 @@ function App() {
       : { key: hlKey, label, start: selInfo.start, end: selInfo.end, text: selInfo.text };
     setLinkPickerSource(src);
   }, []);
-  const closeLinkPicker = useCallback(() => { setLinkPickerSource(null); setLinkRefineRequest(null); }, []);
+  const closeLinkPicker = useCallback(() => { setLinkPickerSource(null); setLinkRefineRequest(null); setLastLinkCreated(null); setHlTick(t => t + 1); }, []);
   // Expose openLinkPicker globally so the SelectionToolbar can invoke it
   // from anywhere (Bible/Letter/WTLB views), and so tests / hardware-back
   // handling can interact with it without prop-drilling.
@@ -13927,6 +13954,7 @@ function App() {
       searchUseStopWords: true,
       searchCorpus: 'all', // 'all' | 'scriptures' | 'volumes'
       haptic: true,
+      keepScreenOn: true,
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
       showSettingsGear: false, translation: "nkjv", restoredNames: false,
       showChapterTitle: true, showSectionHeadings: true, showInlineEchoes: true,
@@ -14108,6 +14136,12 @@ function App() {
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');
     document.body.classList.toggle("arrows-off", settings.arrowLayout === 'off');
     if (window.AndroidBridge) window.AndroidBridge.setLightStatusBar(theme === "light");
+    // Mirror the keep-screen-on setting to the Android window flag. On PC the
+    // bridge method is absent and this no-ops. Defaults to true (matches the
+    // pre-toggle behavior — the Kotlin side also defaults to keep-on).
+    if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === 'function') {
+      window.AndroidBridge.setKeepScreenOn(settings.keepScreenOn !== false);
+    }
     try {
       localStorage.setItem("vot-state", JSON.stringify({
         // Tab-backed reading state
@@ -15791,7 +15825,8 @@ function App() {
       sourceStart: linkPickerSource.start, sourceEnd: linkPickerSource.end,
       sourceText: linkPickerSource.text,
       hlTick: hlTick, setHlTick: setHlTick, onClose: closeLinkPicker,
-      onRequestRefine: setLinkRefineRequest
+      onRequestRefine: setLinkRefineRequest,
+      lastCreatedLink: lastLinkCreated, onLinkCreated: setLastLinkCreated
     }),
     linkRefineRequest && linkRefineRequest.kind === 'verse' && linkPickerSource && React.createElement(VersePickerScreen, {
       refineRequest: linkRefineRequest,
@@ -15799,12 +15834,10 @@ function App() {
       sourceStart: linkPickerSource.start, sourceEnd: linkPickerSource.end,
       sourceText: linkPickerSource.text,
       setHlTick: setHlTick,
-      // Both back-button and confirm route here. The refine state clears, but
-      // linkPickerSource stays — so the LinkPicker re-appears underneath, ready
-      // for another target. User taps × on LinkPicker to close fully.
-      onClose: (linkedLabel) => {
+      // Confirm passes new link object; back button passes null → return to LinkPicker.
+      onClose: (newLink) => {
         setLinkRefineRequest(null);
-        if (linkedLabel) window.__linkPickerFlash = linkedLabel;
+        if (newLink) setLastLinkCreated(newLink);
       }
     }),
     linkRefineRequest && linkRefineRequest.kind === 'excerpt' && linkPickerSource && React.createElement(LetterExcerptPickerScreen, {
@@ -15813,9 +15846,10 @@ function App() {
       sourceStart: linkPickerSource.start, sourceEnd: linkPickerSource.end,
       sourceText: linkPickerSource.text,
       setHlTick: setHlTick,
-      onClose: (linkedLabel) => {
+      // Confirm passes new link object; back button passes null → return to LinkPicker.
+      onClose: (newLink) => {
         setLinkRefineRequest(null);
-        if (linkedLabel) window.__linkPickerFlash = linkedLabel;
+        if (newLink) setLastLinkCreated(newLink);
       }
     }),
     noteSheetTarget && React.createElement(NoteSheet, {
