@@ -4994,15 +4994,34 @@ function applyDOMLinks() {
     // (either the block itself or a more-specific subkey), merging
     // duplicates so two links ending at the same offset become one
     // icon with count=2.
+    //
+    // End position can live in two places depending on how the endpoint
+    // was built:
+    //   (a) A `:N-M` suffix on the key — used by target endpoints that
+    //       went through verse-picker / excerpt-picker refinement
+    //       (e.g. "letter:foo:2:42-87" or "bible:genesis:1:1").
+    //   (b) Separate `start`/`end` fields on the endpoint object — used
+    //       by SOURCE endpoints, which carry the user's selection range
+    //       but keep the key bare (e.g. key="letter:workers:1",
+    //       start=42, end=87, text="…sentence…").
+    //
+    // Without the (b) fallback, the icon for the source side of an
+    // excerpt-to-excerpt link couldn't find its position and slid all
+    // the way to end-of-paragraph — the regression the user reported.
     var keyPrefix = hlKey + ':';
     var byEndPos = {};
     links.forEach(function(link) {
       [link.a, link.b].forEach(function(ep) {
         if (!ep || !ep.key) return;
         if (ep.key !== hlKey && ep.key.indexOf(keyPrefix) !== 0) return;
+        var endPos = null;
         var m = ep.key.match(/:(\d+)-(\d+)$/);
-        if (!m) return;
-        var endPos = parseInt(m[2], 10);
+        if (m) {
+          endPos = parseInt(m[2], 10);
+        } else if (typeof ep.end === 'number') {
+          endPos = ep.end;
+        }
+        if (endPos == null) return;
         byEndPos[endPos] = (byEndPos[endPos] || 0) + 1;
       });
     });
