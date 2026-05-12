@@ -2758,6 +2758,14 @@
       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    /* "From: " prefix shown when LinkCard falls back to the source side's
+       excerpt because the destination has no excerpt of its own. Subtle
+       so the actual excerpt text still reads as the primary content. */
+    .link-card-from-label {
+      font-family: 'Cinzel', serif; font-style: normal;
+      font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--gold-dim); margin-right: 4px;
+    }
     .link-card-remove {
       display: inline-block;
       font-family: 'Cinzel', serif; font-size: 0.52rem;
@@ -6167,8 +6175,18 @@ function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
   const [expanded, setExpanded] = useState(false);
   const matchesSide = (k) => isBlockScope ? (k === hlKey || k.startsWith(hlKey + ':')) : k === hlKey;
   const other = matchesSide(lnk.a.key) ? lnk.b : lnk.a;
+  const thisSide = matchesSide(lnk.a.key) ? lnk.a : lnk.b;
   const preview = resolveVerseText(other);
-  const rawText = other.text || preview || '';
+  // Preview chain: prefer the OTHER side's text (what we linked TO),
+  // then resolveVerseText (Bible/study lookup), then fall back to
+  // THIS side's text (what we linked FROM) so the card never appears
+  // empty when one side has an excerpt and the other doesn't —
+  // e.g. user selects a sentence here, links to a whole letter
+  // without refining excerpt → other.text empty → fall back to
+  // showing what they linked FROM, prefixed with "From: ".
+  const otherText = other.text || preview || '';
+  const usingFromFallback = !otherText && !!thisSide.text;
+  const rawText = otherText || thisSide.text || '';
   const isLong = rawText.length > 150;
   const chainSvg = React.createElement("svg", { className: "link-card-chain", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" },
     React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
@@ -6194,6 +6212,7 @@ function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
       style: expanded ? { display: 'block', WebkitLineClamp: 'unset', overflow: 'visible' } : undefined
     },
       ((other.type === 'bible' || other.type === 'study') && other.verse) && React.createElement("strong", null, other.verse + " "),
+      usingFromFallback && React.createElement("em", { className: "link-card-from-label" }, "From: "),
       rawText
     ),
     React.createElement("div", { className: "link-card-actions" },
@@ -6704,46 +6723,62 @@ function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sour
     return () => { window.__closeSheet = prev || null; };
   }, [onClose]);
 
-  // Capture native selection on mouseup/touchend; compute char offsets
-  // relative to the block element the selection lives in.
+  // Capture native selection. Two paths:
+  //   captureSelectionSync — runs immediately, returns selInfo or null.
+  //     Used as the fallback inside confirmLink so a fast user (select →
+  //     tap ✓ within 150 ms) doesn't lose their excerpt to the race
+  //     between the touchend timeout and React's state commit.
+  //   captureSelection — deferred 150 ms, calls the sync fn then commits
+  //     to state for UI (selection-hint quote). The delay is preserved
+  //     because on Android the native selection occasionally isn't
+  //     finalized immediately on touchend.
+  const captureSelectionSync = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    const startNode = range.startContainer;
+    const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest('[data-block-key]') : startNode.closest && startNode.closest('[data-block-key]');
+    if (!blockEl || !bodyRef.current || !bodyRef.current.contains(blockEl)) return null;
+    const blockKey = blockEl.dataset.blockKey;
+    const fullText = blockEl.textContent;
+    const preRange = document.createRange();
+    preRange.selectNodeContents(blockEl);
+    preRange.setEnd(range.startContainer, range.startOffset);
+    var start = preRange.toString().length;
+    var end = start + range.toString().length;
+    var snapped = snapRangeToWords(fullText, start, end);
+    start = snapped.start;
+    return { blockKey, start, end, text: fullText.slice(start, end) };
+  }, []);
   const captureSelection = useCallback(() => {
     setTimeout(function() {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
-      const range = sel.getRangeAt(0);
-      const startNode = range.startContainer;
-      const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest('[data-block-key]') : startNode.closest && startNode.closest('[data-block-key]');
-      if (!blockEl || !bodyRef.current || !bodyRef.current.contains(blockEl)) return;
-      const blockKey = blockEl.dataset.blockKey;
-      const fullText = blockEl.textContent;
-      const preRange = document.createRange();
-      preRange.selectNodeContents(blockEl);
-      preRange.setEnd(range.startContainer, range.startOffset);
-      var start = preRange.toString().length;
-      var end = start + range.toString().length;
-      var snapped = snapRangeToWords(fullText, start, end);
-      start = snapped.start;
-      setSelInfo({ blockKey, start, end, text: fullText.slice(start, end) });
+      const info = captureSelectionSync();
+      if (info) setSelInfo(info);
     }, 150);
-  }, []);
+  }, [captureSelectionSync]);
 
   const confirmLink = useCallback(() => {
     const refinedTarget = { ...target };
-    if (selInfo) {
-      refinedTarget.blockKey = selInfo.blockKey;
-      refinedTarget.start = selInfo.start;
-      refinedTarget.end = selInfo.end;
-      refinedTarget.text = selInfo.text;
-      refinedTarget.preview = selInfo.text;
+    // Fall back to a fresh synchronous capture so a tap-confirm-faster-
+    // than-150-ms doesn't lose the excerpt. window.getSelection() still
+    // holds the user's selection at the moment the ✓ button is tapped
+    // (button taps don't clear native text selection by default).
+    var info = selInfo || captureSelectionSync();
+    if (info) {
+      refinedTarget.blockKey = info.blockKey;
+      refinedTarget.start = info.start;
+      refinedTarget.end = info.end;
+      refinedTarget.text = info.text;
+      refinedTarget.preview = info.text;
       // Refine the key so per-block link icons are scoped correctly
       const baseKey = target.key.split(':').slice(0, 2).join(':');
-      refinedTarget.key = baseKey + ':' + selInfo.blockKey + ':' + selInfo.start + '-' + selInfo.end;
+      refinedTarget.key = baseKey + ':' + info.blockKey + ':' + info.start + '-' + info.end;
     }
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
     const newLink = persistLink(sourceEndpoint, refinedTarget);
     if (newLink) setHlTick(t => t + 1);
     onClose(newLink || null);
-  }, [selInfo, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose]);
+  }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose]);
 
   if (!entry) {
     return React.createElement("div", { className: "picker-screen" },
