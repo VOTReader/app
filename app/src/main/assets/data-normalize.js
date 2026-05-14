@@ -257,8 +257,6 @@
 
   function parseInlineMarkup(text) {
     if (!text) return [];
-    // Phase 2 will implement this fully. For now, this is a high-fidelity
-    // skeleton that the test suite (normalize-tests.html) will exercise.
     var out = [];
     var i = 0;
     var len = text.length;
@@ -302,6 +300,33 @@
           }
           i = endIdx + 2;
           continue;
+        }
+      }
+
+      // [From "Title" ~ Volume N] (WTLB attribution)
+      if (text[i] === '[' && text.substring(i, i + 6) === '[From ') {
+        var attrEnd = text.indexOf(']', i + 6);
+        if (attrEnd !== -1) {
+          var innerAttr = text.substring(i + 1, attrEnd);
+          var tildeIdx = innerAttr.indexOf('~');
+          if (tildeIdx !== -1) {
+            var label = innerAttr.trim();
+            var titlePart = innerAttr.substring(6, tildeIdx).trim();
+            // strip quotes around title
+            titlePart = titlePart.replace(/^['"]|['"]$/g, '');
+            var volPart = innerAttr.substring(tildeIdx + 1).trim();
+            var volLabel = attrCollectionLabel(volPart);
+            if (volLabel) {
+              flushText();
+              out.push({
+                type: 'letter-link',
+                text: '[' + label + ']',
+                link: { collection: volLabel, letterTitle: titlePart }
+              });
+              i = attrEnd + 1;
+              continue;
+            }
+          }
         }
       }
 
@@ -372,6 +397,16 @@
 
     flushText();
     return out;
+  }
+
+  function attrCollectionLabel(volStr) {
+    if (!volStr) return null;
+    var s = String(volStr).trim().toLowerCase();
+    var NUMS = { '1': 'One', '2': 'Two', '3': 'Three', '4': 'Four', '5': 'Five', '6': 'Six', '7': 'Seven',
+                 'one': 'One', 'two': 'Two', 'three': 'Three', 'four': 'Four', 'five': 'Five', 'six': 'Six', 'seven': 'Seven' };
+    var base = s.replace(/^volume\s+/, '');
+    if (NUMS[base]) return 'Volume ' + NUMS[base];
+    return null;
   }
 
   // ────────────────────────────────────────────────────────────────────────
@@ -478,10 +513,72 @@
   // Expose
   // ────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Normalize all collections in the registry.
+   * This is the main entry point to be called from index.html at app load.
+   *
+   * @param {Array} collections    The COLLECTIONS array from index.html
+   */
+  function normalizeAll(collections) {
+    if (!Array.isArray(collections)) return;
+    collections.forEach(function (col) {
+      var rawEntries = window[col.globalName];
+      var rawPreface = col.prefaceGlobal ? window[col.prefaceGlobal] : undefined;
+      if (rawEntries || rawPreface) {
+        col.normalized = normalizeCollection(col, rawEntries, rawPreface);
+        // Also attach normalized entries to the global for easier access/debugging
+        window[col.globalName + '_NORMALIZED'] = col.normalized.entries;
+        if (col.prefaceGlobal) {
+          window[col.prefaceGlobal + '_NORMALIZED'] = col.normalized.preface;
+        }
+      }
+    });
+  }
+
+  /**
+   * Adapts a Format C Bible chapter into a Block[] view for the unified renderer.
+   *
+   * @param {object} chapter     The raw chapter object
+   * @param {object} book        The parent book object
+   * @param {object} [ctx]       Optional context
+   * @returns {Array}            Block[]
+   */
+  function bibleChapterToBlocks(chapter, book, ctx) {
+    if (!chapter || !chapter.sections) return [];
+    var blocks = [];
+    chapter.sections.forEach(function (sec, si) {
+      if (sec.heading || sec.letter) {
+        blocks.push({
+          type: 'heading',
+          level: 3,
+          text: sec.heading || '',
+          id: sec.letter ? 'hebrew-letter-' + sec.letter : undefined,
+          sublabel: sec.letter || undefined
+        });
+      }
+      var verses = (sec.verses || []).map(function (v) {
+        return {
+          type: 'scripture-ref',
+          ref: book.id + ' ' + chapter.num + ':' + v.n,
+          text: v.text,
+          n: v.n
+        };
+      });
+      // Group verses into a paragraph-like block
+      blocks.push({
+        type: 'paragraph',
+        content: verses
+      });
+    });
+    return blocks;
+  }
+
   window.VotNormalize = {
     normalize: normalize,
     normalizeCollection: normalizeCollection,
+    normalizeAll: normalizeAll,
     parseInlineMarkup: parseInlineMarkup,
+    bibleChapterToBlocks: bibleChapterToBlocks,
     // Sub-functions exposed for tests
     _normalizeLetter: normalizeLetter,
     _normalizeWtlb: normalizeWtlb,

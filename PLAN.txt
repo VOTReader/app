@@ -2046,6 +2046,24 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-12 (later) — UI Refinement: Backpill/Arrow overlap + Redundant Footnotes + Navigation Stability
+
+  1) Fixed back-pill overlap with sticky navigation arrows. Added a
+     `back-pill-active` class to the body in App.js when `backHint` is
+     present. Updated `.chapter-nav-sticky` CSS to bump down when this
+     class is active.
+
+  2) Implemented `isRedundantNote(text, link, url)` helper. Suppresses
+     footnote body text when it identically matches the destination
+     link's title or the URL link label. Cleaned up both `FootnoteSheet`
+     and `FootnoteListSection`.
+
+  3) Fixed "Something went wrong" (Minified React error #31 / DOMException)
+     during navigation. Added unique `key` props to `LetterView`,
+     `WtlbEntryView`, and `ChapterView` using their content IDs. This
+     forces React to mount a fresh, clean DOM for every letter, preventing
+     reconciliation conflicts with manually injected icons and highlights.
+
 2026-05-12 — Objective D autonomous finish: SplashScreen API + JS KeepScreenOn
              + [object CSS] investigation
 

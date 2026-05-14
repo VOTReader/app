@@ -63,7 +63,11 @@
 >     • SelectionToolbar + NoteSheet + AnnChip + MultiNote all auto-dismiss on screen/letter/book/chapter/study navigation via App-level useEffect + window.__hideSelectionToolbar bridge
 >     • 12 http:// URLs upgraded to https:// across 5 data files (check_balance.py passes)
 > - Known pre-existing (not blocking, not caused by this batch): 12 React #31 warnings per render with `[object CSS]` arg — confirmed by stashing all Day 4-5 changes and re-checking; errors still present. UI renders correctly; ErrorBoundary doesn't trigger. CSS const is a string, not window.CSS. TODO investigate in a future session.
-> - Next: improvement2.txt Day 6+ background tasks (lazy-load bible-studies.js, restore-name overlay polish, etc.) and Objective D shipping prep (real onboarding copy, WebChromeClient.onConsoleMessage, app icon, splash API, signing config).
+> - **Latest landings (this session)**: 
+    • Fixed back-pill overlap with sticky navigation arrows (`<>`) by adding a `back-pill-active` body class and bumping the arrows' `top` position.
+    • Implemented `isRedundantNote` logic to suppress footnote static text that purely duplicates link information (fixes "double gold link" or "text then link" redundancy).
+    • Added unique `key` props to `LetterView`, `WtlbEntryView`, and `ChapterView` to force full unmount/remount on navigation, resolving "Something went wrong" React reconciliation crashes caused by manual DOM manipulation (icons/highlights).
+- Next: improvement2.txt Day 6+ background tasks (lazy-load bible-studies.js, restore-name overlay polish, etc.) and Objective D shipping prep (real onboarding copy, WebChromeClient.onConsoleMessage, app icon, splash API, signing config).
 
 ## Quick start (app failed to load? read this first)
 
