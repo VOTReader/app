@@ -2673,6 +2673,11 @@
       stroke: var(--gold-dim); fill: none;
       stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
     }
+    /* Source icons (container is where the user originated the link) render
+       at the brighter gold weight — "primary annotation, I made this."
+       Target icons (container is a destination pointed to by another passage)
+       stay at the default gold-dim — "secondary, something links here." */
+    .inline-link-icon-source svg { stroke: var(--gold); }
 
     /* ── LINK SIDEBAR ────────────────────────────────────────────── */
     .link-sidebar-overlay {
@@ -2758,6 +2763,13 @@
       color: var(--cream-dim); line-height: 1.45;
       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+    /* Directional eyebrow ("to " / "from ") prepended to the ref label.
+       Lowercase, gold-dim, so it reads as metadata rather than content. */
+    .link-card-direction {
+      font-family: 'Cinzel', serif; font-style: normal;
+      font-size: 0.6rem; letter-spacing: 0.12em; text-transform: lowercase;
+      color: var(--gold-dim); margin-right: 2px; opacity: 0.8;
     }
     /* "From: " prefix shown when LinkCard falls back to the source side's
        excerpt because the destination has no excerpt of its own. Subtle
@@ -4315,14 +4327,41 @@ function noteSourceNav(note) {
 }
 
 const LinkStore = Object.assign(CachedStore('vot-links', []), {
+  /* Override _load to migrate legacy {a,b} records to {source,target} on
+     first access. Migration is one-time per user: after it runs the
+     persisted data is already in the new shape, so subsequent loads are
+     no-ops in the migration branch. */
+  _load() {
+    if (this._cache) return this._cache;
+    try { this._cache = JSON.parse(localStorage.getItem('vot-links') || '[]'); }
+    catch (e) { this._cache = []; }
+
+    // Migrate legacy {a, b} records → {source, target}.
+    let migrated = false;
+    this._cache = this._cache.filter(function(lnk) {
+      if (lnk.source && lnk.target) return true; // already new shape
+      if (!lnk.a || !lnk.b) {
+        console.warn('[LinkStore] dropping malformed record (missing a/b):', lnk.id);
+        return false;
+      }
+      lnk.source = lnk.a;
+      lnk.target = lnk.b;
+      delete lnk.a;
+      delete lnk.b;
+      migrated = true;
+      return true;
+    });
+    if (migrated) this._save();
+    return this._cache;
+  },
   getForKey(key) {
-    return this._load().filter(lnk => lnk.a.key === key || lnk.b.key === key);
+    return this._load().filter(lnk => lnk.source.key === key || lnk.target.key === key);
   },
   getForKeyPrefix(prefix) {
     return this._load().filter(lnk => {
-      const aMatch = lnk.a.key === prefix || lnk.a.key.startsWith(prefix + ':') || prefix.startsWith(lnk.a.key + ':');
-      const bMatch = lnk.b.key === prefix || lnk.b.key.startsWith(prefix + ':') || prefix.startsWith(lnk.b.key + ':');
-      return aMatch || bMatch;
+      const srcMatch = lnk.source.key === prefix || lnk.source.key.startsWith(prefix + ':') || prefix.startsWith(lnk.source.key + ':');
+      const tgtMatch = lnk.target.key === prefix || lnk.target.key.startsWith(prefix + ':') || prefix.startsWith(lnk.target.key + ':');
+      return srcMatch || tgtMatch;
     });
   },
   all() { return this._load(); },
@@ -5018,9 +5057,17 @@ function applyDOMLinks() {
     // excerpt-to-excerpt link couldn't find its position and slid all
     // the way to end-of-paragraph — the regression the user reported.
     var keyPrefix = hlKey + ':';
+    // byEndPos tracks { count, anySource } per character offset.
+    // anySource=true means at least one link has THIS container as its origin
+    // (source side) — icon renders at full gold. False means container is
+    // only ever a destination (target side) — renders dimmer (gold-dim).
     var byEndPos = {};
     links.forEach(function(link) {
-      [link.a, link.b].forEach(function(ep) {
+      // isSourceHere = the source endpoint belongs to this container
+      var srcKey = link.source ? link.source.key : null;
+      var isSourceHere = srcKey && (srcKey === hlKey || srcKey.indexOf(keyPrefix) === 0);
+
+      [link.source, link.target].forEach(function(ep) {
         if (!ep || !ep.key) return;
         if (ep.key !== hlKey && ep.key.indexOf(keyPrefix) !== 0) return;
         var endPos = null;
@@ -5031,13 +5078,22 @@ function applyDOMLinks() {
           endPos = ep.end;
         }
         if (endPos == null) return;
-        byEndPos[endPos] = (byEndPos[endPos] || 0) + 1;
+        var prev = byEndPos[endPos] || { count: 0, anySource: false };
+        byEndPos[endPos] = {
+          count: prev.count + 1,
+          // Once any link marks this position as source, keep it source.
+          anySource: prev.anySource || !!isSourceHere
+        };
       });
     });
     if (Object.keys(byEndPos).length === 0) {
       // Legacy link (no :start-end suffix) — fall back to one icon at
       // end of block, same as the prior end-of-paragraph behavior.
-      container.appendChild(_buildLinkIcon(hlKey, links.length));
+      // For the legacy path, check if any link is sourced from this container.
+      var legacyAnySource = links.some(function(l) {
+        return l.source && (l.source.key === hlKey || l.source.key.indexOf(keyPrefix) === 0);
+      });
+      container.appendChild(_buildLinkIcon(hlKey, links.length, legacyAnySource));
       return;
     }
 
@@ -5045,14 +5101,20 @@ function applyDOMLinks() {
     // character offsets of earlier (lower-offset) insertions still pending.
     var positions = Object.keys(byEndPos).map(Number).sort(function(a, b) { return b - a; });
     positions.forEach(function(endPos) {
-      _insertLinkIconAt(container, hlKey, endPos, byEndPos[endPos]);
+      _insertLinkIconAt(container, hlKey, endPos, byEndPos[endPos].count, byEndPos[endPos].anySource);
     });
   });
 }
 
-function _buildLinkIcon(hlKey, count) {
+/* Build an inline chain icon span.
+   isSource=true  → this container originated the link; render at full gold (--gold).
+   isSource=false → this container is a link destination; render dimmer (--gold-dim).
+   The visual distinction lets the user see at a glance "I anchored this" vs
+   "something else points here". Both icons are still fully tappable. */
+function _buildLinkIcon(hlKey, count, isSource) {
   var icon = document.createElement('span');
-  icon.className = 'inline-link-icon';
+  // Apply source/target distinction via CSS class; default is dim (target role).
+  icon.className = 'inline-link-icon' + (isSource ? ' inline-link-icon-source' : '');
   icon.title = count + ' link' + (count > 1 ? 's' : '');
   icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
   var openSidebar = function(e) {
@@ -5064,7 +5126,7 @@ function _buildLinkIcon(hlKey, count) {
   return icon;
 }
 
-function _insertLinkIconAt(container, hlKey, endPos, count) {
+function _insertLinkIconAt(container, hlKey, endPos, count, isSource) {
   var WORD = /[\w’'\-]/;
   var CLOSE_PUNCT = /[.,;:!?)\]}”’…—]/;
   // Inline elements the icon must NOT land directly before — sliding
@@ -5127,7 +5189,7 @@ function _insertLinkIconAt(container, hlKey, endPos, count) {
     charPos = nodeEnd;
   }
   if (nodeIdx < 0) {
-    container.appendChild(_buildLinkIcon(hlKey, count));
+    container.appendChild(_buildLinkIcon(hlKey, count, isSource));
     return;
   }
 
@@ -5142,7 +5204,7 @@ function _insertLinkIconAt(container, hlKey, endPos, count) {
   }
   if (skipAncestor) {
     var ref = nextInsertionPoint(skipAncestor);
-    var icon = _buildLinkIcon(hlKey, count);
+    var icon = _buildLinkIcon(hlKey, count, isSource);
     if (ref) ref.parentNode.insertBefore(icon, ref);
     else container.appendChild(icon);
     return;
@@ -5209,7 +5271,7 @@ function _insertLinkIconAt(container, hlKey, endPos, count) {
   } else {
     insertBeforeNode = finalNode.splitText(localOffset);
   }
-  var iconEl = _buildLinkIcon(hlKey, count);
+  var iconEl = _buildLinkIcon(hlKey, count, isSource);
   if (insertBeforeNode) {
     insertBeforeNode.parentNode.insertBefore(iconEl, insertBeforeNode);
   } else {
@@ -6225,8 +6287,14 @@ function LinkIcon({ hlKey, hlTick, onClick, prefix }) {
 function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
   const [expanded, setExpanded] = useState(false);
   const matchesSide = (k) => isBlockScope ? (k === hlKey || k.startsWith(hlKey + ':')) : k === hlKey;
-  const other = matchesSide(lnk.a.key) ? lnk.b : lnk.a;
-  const thisSide = matchesSide(lnk.a.key) ? lnk.a : lnk.b;
+  // Determine which side is "us" (this container) and which is "other" (the linked passage).
+  // source = where the user originated the link; target = the destination they picked.
+  const isSource = matchesSide(lnk.source.key);
+  const other = isSource ? lnk.target : lnk.source;
+  const thisSide = isSource ? lnk.source : lnk.target;
+  // isOutbound = true when THIS container is the source of the link.
+  // Shown as a subtle directional eyebrow in the card header.
+  const isOutbound = isSource;
   const preview = resolveVerseText(other);
   // Preview chain: prefer the OTHER side's text (what we linked TO),
   // then resolveVerseText (Bible/study lookup), then fall back to
@@ -6245,7 +6313,10 @@ function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
   );
   return React.createElement("div", { className: "link-card", onClick: () => onNavigate && onNavigate(other) },
     React.createElement("div", { className: "link-card-header" },
-      React.createElement("div", { className: "link-card-ref" }, other.label),
+      React.createElement("div", { className: "link-card-ref" },
+        React.createElement("span", { className: "link-card-direction" }, isOutbound ? "to " : "from "),
+        other.label
+      ),
       chainSvg
     ),
     React.createElement("div", { className: "link-card-cat" },
@@ -6436,10 +6507,14 @@ function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sou
    (so callers can show the green ✓ either way). Returns null only when
    sourceEndpoint.key is missing. */
 function persistLink(sourceEndpoint, targetEndpoint) {
+  if (!sourceEndpoint || !sourceEndpoint.key) return null;
   const existing = LinkStore.getForKey(sourceEndpoint.key);
-  const dup = existing.find(l => l.a.key === targetEndpoint.key || l.b.key === targetEndpoint.key);
+  // Dedup: a link exists if either endpoint on any existing record touches
+  // the desired target key (so we don't create duplicate pairs regardless
+  // of which side was "source" when the prior link was made).
+  const dup = existing.find(l => l.source.key === targetEndpoint.key || l.target.key === targetEndpoint.key);
   if (dup) return dup; // already exists — return it so the green ✓ still shows
-  const link = { id: lnkId(), a: sourceEndpoint, b: targetEndpoint, created: Date.now() };
+  const link = { id: lnkId(), source: sourceEndpoint, target: targetEndpoint, created: Date.now() };
   LinkStore.add(link);
   return link;
 }
