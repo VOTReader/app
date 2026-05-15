@@ -9,6 +9,11 @@
        id:      string,    // bkmId()
        hlKey:   string,    // container hlKey, with optional ":start-end" suffix
        label:   string,    // user-provided OR auto-derived from selection text
+       thought: string,    // optional free-text — the user's reason WHY they
+                           //   bookmarked this passage. Empty by default;
+                           //   editable from the BookmarkPopover and
+                           //   BookmarksScreen rows. Deliberately not called
+                           //   "note" — notes are a separate feature.
        created: number,    // Date.now() at creation
        updated: number     // Date.now() at last edit
      }>

@@ -150,7 +150,9 @@ function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onE
             placeholder: 'Bookmark label',
             maxLength: 200
           })
-        : React.createElement('span', { className: 'bkm-row-label' }, bkm.label || '(no label)')
+        : React.createElement('span', { className: 'bkm-row-label' }, bkm.label || '(no label)'),
+      // Thought — italic dim line if the user has written one (the "why")
+      !isEditing && bkm.thought && bkm.thought.trim() && React.createElement('span', { className: 'bkm-row-thought' }, bkm.thought)
     ),
     // Date + long-press affordance (three dots)
     React.createElement('div', { className: 'bkm-row-meta' },
@@ -170,16 +172,38 @@ function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onE
 }
 
 /* ── BookmarkRowActionSheet ──────────────────────────────────── */
-/* Bottom sheet with: Open / Edit Label / Delete.
-   Delete follows the tap-confirm-strip pattern (PLAN.txt §11.1). */
-function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onDelete }) {
+/* Bottom sheet with: Open / Edit Label / Edit Thought / Delete.
+   Delete follows the tap-confirm-strip pattern (PLAN.txt §11.1).
+   Edit Thought toggles into an inline textarea (no separate screen). */
+function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onEditThought, onDelete }) {
   var useState = React.useState;
 
   var _state = useState(false);
   var confirming = _state[0];
   var setConfirming = _state[1];
 
+  // Thought-edit mode within the action sheet
+  var _te = useState(false); var editingThought = _te[0]; var setEditingThought = _te[1];
+  var _tt = useState(''); var thoughtText = _tt[0]; var setThoughtText = _tt[1];
+
   if (!bkm) return null;
+  var hasThought = !!(bkm.thought && bkm.thought.trim());
+
+  function startEditThought() {
+    setThoughtText(bkm.thought || '');
+    setEditingThought(true);
+    setConfirming(false);
+  }
+  function saveThought() {
+    BookmarkStore.update(bkm.id, { thought: thoughtText });
+    if (typeof onEditThought === 'function') onEditThought();
+    setEditingThought(false);
+    onClose();
+  }
+  function cancelEditThought() {
+    setEditingThought(false);
+    setThoughtText('');
+  }
 
   var doDelete = function() {
     BookmarkStore.remove(bkm.id);
@@ -196,7 +220,7 @@ function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onDelet
       onClick: function(e) { e.stopPropagation(); }
     },
       React.createElement('div', { className: 'link-action-handle' }),
-      !confirming && React.createElement(React.Fragment, null,
+      !confirming && !editingThought && React.createElement(React.Fragment, null,
         // Open
         React.createElement('button', {
           className: 'link-action-btn',
@@ -220,6 +244,16 @@ function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onDelet
           ),
           React.createElement('span', null, 'Edit Label')
         ),
+        // Edit/Add thought — the user's "why" — speech-bubble icon to differentiate from Edit Label
+        React.createElement('button', {
+          className: 'link-action-btn',
+          onClick: startEditThought
+        },
+          React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
+            React.createElement('path', { d: 'M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z' })
+          ),
+          React.createElement('span', null, hasThought ? 'Edit Thought' : 'Add Thought')
+        ),
         // Delete
         React.createElement('button', {
           className: 'link-action-btn link-action-btn-danger',
@@ -232,6 +266,31 @@ function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onDelet
             React.createElement('path', { d: 'M14 11v6' })
           ),
           React.createElement('span', null, 'Delete Bookmark')
+        )
+      ),
+      // Inline thought-edit mode
+      editingThought && !confirming && React.createElement('div', { className: 'bkm-action-thought-edit' },
+        React.createElement('div', { className: 'bkm-action-thought-prompt' }, 'Why did you bookmark this?'),
+        React.createElement('textarea', {
+          className: 'bkm-popover-thought-textarea',
+          autoFocus: true,
+          value: thoughtText,
+          placeholder: 'A few words for your future self…',
+          onChange: function(e) { setThoughtText(e.target.value); },
+          onKeyDown: function(e) {
+            if (e.key === 'Escape') { e.preventDefault(); cancelEditThought(); }
+          }
+        }),
+        React.createElement('div', { className: 'bkm-action-thought-actions' },
+          React.createElement('button', {
+            className: 'link-action-btn',
+            onClick: cancelEditThought
+          }, React.createElement('span', null, 'Cancel')),
+          React.createElement('button', {
+            className: 'link-action-btn',
+            onClick: saveThought,
+            style: { color: 'var(--gold)' }
+          }, React.createElement('span', null, 'Save'))
         )
       ),
       // Tap-confirm strip
@@ -252,36 +311,56 @@ function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onDelet
 
 /* ── BookmarkPopover ─────────────────────────────────────────── */
 /* Small popover shown when tapping an inline bookmark icon.
-   Shows bookmark label(s) and offers Open / Delete per bookmark.
-   Positioned near the tap point. */
+   For each bookmark at the tap point: shows label, date, optional
+   thought (the user's "why I bookmarked this" — deliberately NOT
+   called a note), and three actions: Open / Add-or-Edit Thought /
+   Delete. Delete uses the tap-confirm-strip pattern.
+   Thought editing is inline within the popover via a textarea. */
 function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
   var useState = React.useState;
-  var confirmingId = useState(null);
-  var setConfirmingId = confirmingId[1];
-  confirmingId = confirmingId[0];
+  var _ci = useState(null); var confirmingId = _ci[0]; var setConfirmingId = _ci[1];
+  var _ei = useState(null); var editingId = _ei[0]; var setEditingId = _ei[1];
+  var _et = useState(''); var editText = _et[0]; var setEditText = _et[1];
+  // Refresh signal so the popover re-renders after we mutate the store
+  // (BookmarkStore.update doesn't notify React on its own).
+  var _tick = useState(0); var tick = _tick[0]; var setTick = _tick[1];
+  function bump() { setTick(function(t) { return t + 1; }); }
 
   if (!bkmIds || !bkmIds.length) return null;
   var bookmarks = bkmIds.map(function(id) { return BookmarkStore.get(id); }).filter(Boolean);
   if (!bookmarks.length) { onClose(); return null; }
 
-  var doDelete = function(bkm) {
+  function doDelete(bkm) {
     BookmarkStore.remove(bkm.id);
     onDeleteDone && onDeleteDone();
     if (bookmarks.length <= 1) onClose();
     else setConfirmingId(null);
-  };
+  }
+  function startEditThought(bkm) {
+    setEditingId(bkm.id);
+    setEditText(bkm.thought || '');
+    setConfirmingId(null);
+  }
+  function saveThought(bkm) {
+    BookmarkStore.update(bkm.id, { thought: editText });
+    setEditingId(null);
+    bump();
+  }
+  function cancelEditThought() {
+    setEditingId(null);
+    setEditText('');
+  }
 
   // Position popover: left-align at tap x, below tap y. Clamp to viewport.
-  var popX = Math.max(8, Math.min(x - 80, window.innerWidth - 220));
+  // Popovers with thoughts get wider; up to 320px to give the textarea room.
+  var popX = Math.max(8, Math.min(x - 80, window.innerWidth - 320));
   var popY = Math.max(8, y);
 
   return React.createElement(React.Fragment, null,
-    // Backdrop
     React.createElement('div', {
       style: { position: 'fixed', inset: 0, zIndex: 8800 },
       onClick: onClose
     }),
-    // Popover
     React.createElement('div', {
       className: 'bkm-popover',
       style: { left: popX, top: popY, zIndex: 8801 },
@@ -289,24 +368,57 @@ function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
     },
       bookmarks.map(function(bkm) {
         var isConfirming = confirmingId === bkm.id;
+        var isEditing = editingId === bkm.id;
+        var dateStr = (typeof relativeDate === 'function') ? relativeDate(bkm.created) : '';
+        var hasThought = !!(bkm.thought && bkm.thought.trim().length);
+
         return React.createElement('div', { key: bkm.id, className: 'bkm-popover-item' },
-          !isConfirming && React.createElement(React.Fragment, null,
+          !isConfirming && !isEditing && React.createElement(React.Fragment, null,
             React.createElement('div', { className: 'bkm-popover-label' }, bkm.label || '(no label)'),
+            dateStr && React.createElement('div', { className: 'bkm-popover-date' }, dateStr),
+            hasThought && React.createElement('div', { className: 'bkm-popover-thought' }, bkm.thought),
             React.createElement('div', { className: 'bkm-popover-actions' },
               React.createElement('button', {
                 className: 'bkm-popover-btn',
                 onClick: function() { onNavigate(bkm); onClose(); }
               }, 'Open'),
               React.createElement('button', {
+                className: 'bkm-popover-btn',
+                onClick: function() { startEditThought(bkm); }
+              }, hasThought ? 'Edit Thought' : 'Add Thought'),
+              React.createElement('button', {
                 className: 'bkm-popover-btn bkm-popover-btn-danger',
                 onClick: function() { setConfirmingId(bkm.id); }
               }, 'Delete')
             )
           ),
+          isEditing && React.createElement('div', { className: 'bkm-popover-thought-edit' },
+            React.createElement('div', { className: 'bkm-popover-label' }, bkm.label || '(no label)'),
+            React.createElement('textarea', {
+              className: 'bkm-popover-thought-textarea',
+              autoFocus: true,
+              value: editText,
+              placeholder: 'Why did you bookmark this?',
+              onChange: function(e) { setEditText(e.target.value); },
+              onKeyDown: function(e) {
+                if (e.key === 'Escape') { e.preventDefault(); cancelEditThought(); }
+              }
+            }),
+            React.createElement('div', { className: 'bkm-popover-actions' },
+              React.createElement('button', {
+                className: 'bkm-popover-btn',
+                onClick: cancelEditThought
+              }, 'Cancel'),
+              React.createElement('button', {
+                className: 'bkm-popover-btn bkm-popover-btn-primary',
+                onClick: function() { saveThought(bkm); }
+              }, 'Save')
+            )
+          ),
           isConfirming && React.createElement('div', { className: 'ann-chip-confirm', style: { padding: '8px 10px' } },
-            React.createElement('span', { className: 'ann-chip-confirm-q' }, 'Delete?'),
-            React.createElement('button', { className: 'ann-chip-confirm-btn ann-chip-confirm-cancel', onClick: function() { setConfirmingId(null); } }, 'No'),
-            React.createElement('button', { className: 'ann-chip-confirm-btn ann-chip-confirm-yes', onClick: function() { doDelete(bkm); } }, 'Yes')
+            React.createElement('span', { className: 'ann-chip-confirm-q' }, 'Delete this bookmark?'),
+            React.createElement('button', { className: 'ann-chip-confirm-btn ann-chip-confirm-cancel', onClick: function() { setConfirmingId(null); } }, 'Cancel'),
+            React.createElement('button', { className: 'ann-chip-confirm-btn ann-chip-confirm-yes', onClick: function() { doDelete(bkm); } }, 'Yes, delete')
           )
         );
       })
@@ -517,6 +629,7 @@ function BookmarksScreen(props) {
         onClose: function() { setActionTarget(null); },
         onNavigate: function(bkm) { navigateToBookmark(bkm); setActionTarget(null); },
         onEditLabel: function(id) { setEditingId(id); setActionTarget(null); },
+        onEditThought: function() { if (setHlTick) setHlTick(function(t){ return t + 1; }); },
         onDelete: onDeleteDone
       })
     )

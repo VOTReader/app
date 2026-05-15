@@ -24,7 +24,13 @@
    Tap opens the bookmark popover via window.__openBookmarkPopover(ids, x, y).
 ═══════════════════════════════════════════════════════════════ */
 
+/* Window (ms) during which a freshly-created bookmark gets the .just-created
+   class so its icon plays the creation-pulse animation. Re-renders of the
+   same icon (after the window expires) drop the class. */
+var BOOKMARK_PULSE_WINDOW_MS = 3000;
+
 function applyDOMBookmarks() {
+  var nowMs = Date.now();
   document.querySelectorAll('[data-hl-key][data-hl-dom]').forEach(function(container) {
     var hlKey = container.getAttribute('data-hl-key');
     container.querySelectorAll('.inline-bookmark-icon').forEach(function(el) { el.remove(); });
@@ -32,6 +38,10 @@ function applyDOMBookmarks() {
 
     var bookmarks = BookmarkStore.getForKeyPrefix(hlKey);
     if (!bookmarks.length) return;
+
+    // Build a quick lookup: bkm.id → bkm so we can check `.created` per icon.
+    var bkmById = {};
+    bookmarks.forEach(function(b) { bkmById[b.id] = b; });
 
     // Collect end positions, merging duplicates so multiple bookmarks at
     // the same offset share one icon.  We track the list of bookmark ids at
@@ -58,9 +68,20 @@ function applyDOMBookmarks() {
       byEndPos[endPos].push(bkm.id);
     });
 
+    // Helper: does this group include any bookmark created within the
+    // pulse window? Drives the .just-created class on the rendered icon.
+    function anyJustCreated(bkmIds) {
+      return bkmIds.some(function(id) {
+        var b = bkmById[id];
+        return b && b.created && (nowMs - b.created) < BOOKMARK_PULSE_WINDOW_MS;
+      });
+    }
+
     // End-of-block fallback (no ":start-end" in key)
     if (byEndPos[-1] && byEndPos[-1].length > 0) {
-      container.appendChild(_buildBookmarkIcon(hlKey, byEndPos[-1]));
+      var endBlockIcon = _buildBookmarkIcon(hlKey, byEndPos[-1]);
+      if (anyJustCreated(byEndPos[-1])) endBlockIcon.classList.add('just-created');
+      container.appendChild(endBlockIcon);
       delete byEndPos[-1];
     }
 
@@ -69,7 +90,7 @@ function applyDOMBookmarks() {
     // Process highest position first so earlier insertions don't shift offsets.
     var positions = Object.keys(byEndPos).map(Number).sort(function(a, b) { return b - a; });
     positions.forEach(function(endPos) {
-      _insertBookmarkIconAt(container, hlKey, endPos, byEndPos[endPos]);
+      _insertBookmarkIconAt(container, hlKey, endPos, byEndPos[endPos], anyJustCreated(byEndPos[endPos]));
     });
   });
 }
@@ -104,7 +125,7 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
   return icon;
 }
 
-function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds) {
+function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds, justCreated) {
   var WORD = /[\w''\-]/;
   var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
   // Elements the icon must NOT land directly before — reuses the same
@@ -149,7 +170,9 @@ function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds) {
     charPos = nodeEnd;
   }
   if (nodeIdx < 0) {
-    container.appendChild(_buildBookmarkIcon(hlKey, bkmIds));
+    var fallbackIcon = _buildBookmarkIcon(hlKey, bkmIds);
+    if (justCreated) fallbackIcon.classList.add('just-created');
+    container.appendChild(fallbackIcon);
     return;
   }
 
@@ -163,6 +186,7 @@ function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds) {
   if (skipAncestor) {
     var ref = nextInsertionPoint(skipAncestor);
     var icon = _buildBookmarkIcon(hlKey, bkmIds);
+    if (justCreated) icon.classList.add('just-created');
     if (ref) ref.parentNode.insertBefore(icon, ref);
     else container.appendChild(icon);
     return;
@@ -215,6 +239,7 @@ function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds) {
     insertBeforeNode = finalNode.splitText(localOffset);
   }
   var iconEl = _buildBookmarkIcon(hlKey, bkmIds);
+  if (justCreated) iconEl.classList.add('just-created');
   if (insertBeforeNode) {
     insertBeforeNode.parentNode.insertBefore(iconEl, insertBeforeNode);
   } else {

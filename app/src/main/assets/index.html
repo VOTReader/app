@@ -2758,6 +2758,13 @@
       font-family: 'EB Garamond', serif; font-size: 0.72rem;
       color: var(--cream-muted); margin-bottom: 6px;
     }
+    /* Created date stamp under the category line. Same visual treatment as
+       other date affordances across the app (Cinzel caps, gold-dim). */
+    .link-card-date {
+      font-family: 'Cinzel', serif; font-size: 0.55rem;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--gold-dim); margin-bottom: 6px;
+    }
     .link-card-preview {
       font-family: 'EB Garamond', serif; font-size: 0.88rem;
       color: var(--cream-dim); line-height: 1.45;
@@ -3144,6 +3151,13 @@
       padding: 8px 12px; margin-bottom: 12px;
       border-left: 2px solid var(--gold-border);
       background: rgba(200,164,86,0.04); border-radius: 0 6px 6px 0;
+    }
+    /* Relative date under the anchor in NoteSheet read mode. */
+    .note-sheet-date {
+      font-family: 'Cinzel', serif; font-size: 0.55rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--gold-dim);
+      margin: -8px 0 12px;
     }
     .note-sheet-body {
       font-family: 'EB Garamond', serif;
@@ -4009,22 +4023,50 @@
        icons (gold). touch-action: manipulation prevents Android long-
        press text selection from firing on the icon. */
     .inline-bookmark-icon {
-      display: inline-block; vertical-align: middle;
-      width: 12px; height: 12px;
-      margin: 0 1px; cursor: pointer;
+      display: inline-block; vertical-align: -2px;
+      width: 14px; height: 14px;
+      margin: 0 2px; cursor: pointer;
       color: var(--gold-dim);
       touch-action: manipulation;
       user-select: none; -webkit-user-select: none;
       -webkit-tap-highlight-color: transparent;
-      transition: color 0.15s;
+      transition: color 0.15s, transform 0.15s;
     }
-    .inline-bookmark-icon:hover { color: var(--gold); }
+    .inline-bookmark-icon:hover, .inline-bookmark-icon:active { color: var(--gold); transform: scale(1.12); }
     .inline-bookmark-icon svg {
-      width: 12px; height: 12px;
+      width: 100%; height: 100%;
       stroke: currentColor; fill: currentColor;
       stroke-width: 1.6;
     }
     .inline-bookmark-icon-multi { color: var(--gold); }
+    /* Top-nav "bookmark this chapter" button. Sits alongside the standard
+       settings/history/search/theme cluster on reading screens. Dim flag by
+       default; gold filled when the current chapter is already bookmarked. */
+    .nav-bookmark-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--gold-dim);
+      padding: 6px 8px;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.15s, transform 0.15s;
+    }
+    .nav-bookmark-btn:hover, .nav-bookmark-btn:active { color: var(--gold); transform: scale(1.08); }
+    .nav-bookmark-btn-active { color: var(--gold); }
+    .nav-bookmark-btn svg { width: 18px; height: 18px; display: block; }
+    /* Creation-pulse: when a bookmark was just added (within ~3s), the
+       freshly-injected icon plays a brief glow + scale animation so the user
+       gets unambiguous "it worked" feedback at the spot of action. The
+       class is added by applyDOMBookmarks() based on the bookmark's created
+       timestamp and auto-strips when the animation completes. */
+    .inline-bookmark-icon.just-created {
+      animation: bookmark-pulse 2.4s ease-out 1;
+    }
+    @keyframes bookmark-pulse {
+      0%   { color: var(--gold-bright); transform: scale(0.6); filter: drop-shadow(0 0 0 var(--gold)); }
+      18%  { color: var(--gold-bright); transform: scale(1.6); filter: drop-shadow(0 0 8px var(--gold)); }
+      45%  { color: var(--gold-bright); transform: scale(1.15); filter: drop-shadow(0 0 4px var(--gold)); }
+      80%  { color: var(--gold);        transform: scale(1.05); filter: drop-shadow(0 0 1px var(--gold-dim)); }
+      100% { color: var(--gold-dim);    transform: scale(1);    filter: none; }
+    }
 
     /* ── Bookmarks Screen ── */
     .bkm-screen {
@@ -4065,6 +4107,18 @@
       font-size: 0.97rem; color: var(--cream-dim);
       line-height: 1.3; white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Optional "why" thought displayed under the label on a row.
+       Subtler than the label; truncates to a single line. */
+    .bkm-row-thought {
+      display: block;
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.82rem; color: var(--cream-muted);
+      line-height: 1.3; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+      margin-top: 2px;
+      padding-left: 8px;
+      border-left: 2px solid var(--gold-faint);
     }
     .bkm-row-edit-input {
       width: 100%; background: var(--bg3);
@@ -4128,6 +4182,50 @@
     .bkm-popover-btn:active, .bkm-popover-btn:hover { background: var(--gold-faint); color: var(--gold); }
     .bkm-popover-btn-danger { color: #ef9a9a; }
     .bkm-popover-btn-danger:active, .bkm-popover-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); }
+    .bkm-popover-btn-primary { color: var(--gold); }
+    /* Relative date below the bookmark label, subtle Cinzel caps. */
+    .bkm-popover-date {
+      font-family: 'Cinzel', serif; font-size: 0.55rem;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--gold-dim); padding: 0 12px 6px;
+    }
+    /* User's optional reflection on why they bookmarked the passage.
+       Italic Garamond, dim, gold-bordered left rail to distinguish from
+       the auto-derived label above. */
+    .bkm-popover-thought {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.85rem; color: var(--cream-muted);
+      padding: 4px 12px 8px 14px; margin: 0 8px 6px;
+      border-left: 2px solid var(--gold-faint);
+      line-height: 1.35;
+    }
+    /* Inline thought-edit mode inside the popover. */
+    .bkm-popover-thought-edit { padding: 6px 0 8px; }
+    .bkm-popover-thought-textarea {
+      width: calc(100% - 24px); margin: 4px 12px 6px;
+      min-height: 70px; max-height: 140px; resize: vertical;
+      box-sizing: border-box;
+      background: var(--bg2); color: var(--cream-dim);
+      border: 1px solid var(--gold-border); border-radius: 6px;
+      padding: 8px 10px;
+      font-family: 'EB Garamond', serif; font-size: 0.9rem;
+      line-height: 1.35;
+      outline: none;
+    }
+    .bkm-popover-thought-textarea:focus { border-color: var(--gold); }
+    /* Inline thought-edit inside the action sheet (long-press flow). */
+    .bkm-action-thought-edit { padding: 12px 14px 8px; }
+    .bkm-action-thought-prompt {
+      font-family: 'Cinzel', serif; font-size: 0.6rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--gold-dim); margin-bottom: 6px;
+    }
+    .bkm-action-thought-actions {
+      display: flex; gap: 0.5rem; margin-top: 4px;
+    }
+    .bkm-action-thought-actions .link-action-btn {
+      flex: 1; justify-content: center;
+    }
 
     /* Invisible word-joiner injected at mark boundaries that fall MID-WORD
        so the browser cannot break a word across the mark/text seam. The
@@ -6138,7 +6236,7 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onB
       storedKey = hlKey + ':' + snap.start + '-' + snap.end;
     }
 
-    var bkm = { id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()), hlKey: storedKey, label: labelText, created: Date.now(), updated: Date.now() };
+    var bkm = { id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()), hlKey: storedKey, label: labelText, thought: '', created: Date.now(), updated: Date.now() };
     if (typeof BookmarkStore !== 'undefined') BookmarkStore.add(bkm);
 
     window.getSelection().removeAllRanges();
@@ -6330,6 +6428,11 @@ function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
       other.type === 'blessed' ? 'The Blessed' :
       other.type === 'holy-days' ? 'Holy Days' :
       ''
+    ),
+    // Created-date row — subtle Cinzel caps so the user can see when they
+    // anchored the link without having to open the full Links browser.
+    lnk.created && React.createElement("div", { className: "link-card-date" },
+      relativeDate(lnk.created)
     ),
     React.createElement("div", {
       className: "link-card-preview",
@@ -7093,6 +7196,12 @@ function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpe
         : React.createElement(React.Fragment, null,
             // Anchor text (italic quote)
             React.createElement("div", { className: "note-sheet-anchor" }, "“", truncatedAnchor, "”"),
+            // Date row — read mode only. Shows when the note was last edited
+            // (or when it was created if never edited). Subtle Cinzel caps
+            // so it doesn't compete with the body content.
+            mode === 'read' && (note.updated || note.created) && React.createElement("div", { className: "note-sheet-date" },
+              relativeDate(note.updated || note.created)
+            ),
             // Edit mode: always-visible color row so users can pick a color
             // without needing to open the ⋯ menu first.
             mode === 'edit' && React.createElement("div", { className: "note-edit-colors" },
@@ -9187,7 +9296,65 @@ const SCRIPTURE_GENRES = {
 
 };
 
-function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading }) {
+/* Inline chapter-bookmark button rendered alongside the standard nav cluster
+   on reading screens. When `chapterBookmark = { hlKey, label }` is provided,
+   the button checks BookmarkStore to determine if this chapter is already
+   bookmarked, renders a bright vs dim flag accordingly, and toggles on tap:
+     - Not bookmarked → creates a chapter-level bookmark (no :start-end suffix)
+       and bumps hlTick so inline icons re-render. The user sees the same
+       creation-pulse animation as the SelectionToolbar bookmark flow.
+     - Already bookmarked → opens the BookmarkPopover for that bookmark via
+       the existing window.__openBookmarkPopover bridge (offers Open /
+       Add/Edit Thought / Delete).
+   The flag visually flips gold-bright when active, providing clear status
+   feedback right in the nav so the user can tell at a glance whether
+   they've already marked the page. */
+function ChapterBookmarkBtn({ chapterBookmark, hlTick }) {
+  if (!chapterBookmark || !chapterBookmark.hlKey || typeof BookmarkStore === 'undefined') return null;
+  // React.useMemo so we re-derive only when hlTick changes (after a create/delete).
+  const existing = React.useMemo(
+    () => BookmarkStore.getForKey(chapterBookmark.hlKey),
+    [chapterBookmark.hlKey, hlTick]
+  );
+  const isBookmarked = existing.length > 0;
+
+  const onClick = (e) => {
+    e.stopPropagation();
+    if (isBookmarked) {
+      // Open the popover near the button so the user can edit thought / delete.
+      const rect = e.currentTarget.getBoundingClientRect();
+      const ids = existing.map(b => b.id);
+      if (window.__openBookmarkPopover) {
+        window.__openBookmarkPopover(ids, rect.left + rect.width / 2, rect.bottom + 4, chapterBookmark.hlKey);
+      }
+      return;
+    }
+    // Create the chapter-level bookmark
+    BookmarkStore.add({
+      id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
+      hlKey: chapterBookmark.hlKey,
+      label: chapterBookmark.label || 'Chapter bookmark',
+      thought: '',
+      created: Date.now(),
+      updated: Date.now()
+    });
+    // Trigger re-renders + apply-DOM effect so inline pulse fires
+    if (window.__bumpHlTick) window.__bumpHlTick();
+  };
+
+  return React.createElement("button", {
+    className: "nav-bookmark-btn" + (isBookmarked ? " nav-bookmark-btn-active" : ""),
+    onClick: onClick,
+    title: isBookmarked ? "Open bookmark options" : "Bookmark this chapter",
+    "aria-label": isBookmarked ? "Open bookmark options" : "Bookmark this chapter"
+  },
+    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
+      React.createElement("path", { d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z", fill: isBookmarked ? "currentColor" : "none" })
+    )
+  );
+}
+
+function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick }) {
   return React.createElement(React.Fragment, null, /*#__PURE__*/
     React.createElement("button", { className: "settings-gear-btn", onClick: onSettings, title: "Settings" }, /*#__PURE__*/
     React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /*#__PURE__*/React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))), /*#__PURE__*/
@@ -9195,6 +9362,7 @@ function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, rea
     React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /*#__PURE__*/React.createElement("polyline", { points: "1 4 1 10 7 10" }), /*#__PURE__*/React.createElement("path", { d: "M3.51 15a9 9 0 1 0 .49-5.01" }))), /*#__PURE__*/
     React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /*#__PURE__*/
     React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))), /*#__PURE__*/
+    chapterBookmark && React.createElement(ChapterBookmarkBtn, { chapterBookmark: chapterBookmark, hlTick: hlTick }),
     React.createElement(ThemeBtn, { theme: theme, onThemeChange: onThemeChange }));
 }
 
@@ -9954,7 +10122,9 @@ function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTi
         onClick: () => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary(),
         title: "Next", "aria-label": "Next chapter" }, "\u203A")
       ), /*#__PURE__*/
-      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true })
+      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true,
+        chapterBookmark: chapter ? { hlKey: 'study:matthew-' + chapter.num, label: 'Matthew ' + chapter.num + ' (Study)' } : null,
+        hlTick: hlTick })
       ) }, /*#__PURE__*/
     React.createElement(StickyChapterNav, {
       onPrev: () => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary(),
@@ -10775,7 +10945,9 @@ function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSetti
         onClick: () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary(),
         title: "Next", "aria-label": "Next entry" }, "\u203A")
       ), /*#__PURE__*/
-      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true })
+      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true,
+        chapterBookmark: entry ? { hlKey: 'wtlb:' + entry.id, label: entry.title || (partLabel ? partLabel + ' \u2014 Entry ' + entry.num : 'Bookmark') } : null,
+        hlTick: hlTick })
       ) }, /*#__PURE__*/
     React.createElement(StickyChapterNav, {
       onPrev: () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary(),
@@ -11028,7 +11200,9 @@ function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary,
         onClick: () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary(),
         title: "Next", "aria-label": "Next letter" }, "\u203A")
       ), /*#__PURE__*/
-      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true })
+      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true,
+        chapterBookmark: letter ? { hlKey: 'letter:' + letter.id, label: letter.title || 'Letter bookmark' } : null,
+        hlTick: hlTick })
       ) }, /*#__PURE__*/
     React.createElement(StickyChapterNav, {
       onPrev: () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary(),
@@ -12924,7 +13098,9 @@ function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBo
         onClick: () => nextCh ? onNavigate(nextCh.num) : onNextBook && onNextBook(),
         title: "Next", "aria-label": "Next chapter" }, "\u203A")
       ), /*#__PURE__*/
-      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true })
+      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true,
+        chapterBookmark: (book && chapter) ? { hlKey: 'bible:' + book.id + ':' + chapter.num, label: (book.title || book.id) + ' ' + chapter.num } : null,
+        hlTick: hlTick })
       ) }, /*#__PURE__*/
     React.createElement(StickyChapterNav, {
       onPrev: () => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook(),
@@ -13852,6 +14028,11 @@ function App() {
   useEffect(() => { window.__showAnnChip = (x, y, hlKey, groupId) => setAnnChip({ x, y, hlKey, groupId }); }, []);
   useEffect(() => { window.__showMultiNote = (groupIds, x, y) => setMultiNotePayload({ groupIds, x, y }); }, []);
   useEffect(() => { window.__openBookmarkPopover = (bkmIds, x, y, hlKey) => setBookmarkPopoverPayload({ bkmIds, x, y, hlKey }); return () => { delete window.__openBookmarkPopover; }; }, []);
+  // Lightweight escape hatch for inline components (e.g. the chapter
+  // bookmark button in NavButtons) to trigger a hlTick bump without prop-
+  // drilling. Used after store writes that aren't otherwise tied to React
+  // state — so the apply-DOM effect re-runs and inline icons refresh.
+  useEffect(() => { window.__bumpHlTick = () => setHlTick(t => t + 1); return () => { delete window.__bumpHlTick; }; }, []);
   // Auto-dismiss floating overlays whenever the active screen, letter,
   // book, or study chapter changes. Without this the always-mounted
   // SelectionToolbar persists with a stale selInfo, and the
