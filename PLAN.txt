@@ -2046,6 +2046,78 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-14 — Sonnet 4.6 batch: lazy-load bible-studies.js + pre-commit hook
+
+  Coordinator: Opus 4.7 1M (parent). Worker: Sonnet 4.6 (dispatched
+  general-purpose agent, ~155K tokens / 129 tool calls / 12 min wall
+  time — comfortable within Sonnet's 200K window, no compaction).
+
+  Started after reverting Gemini's broken refactor attempt (see
+  commit 21576e6 on the gemini-refactor-attempt branch, preserved
+  on origin for future-self reference). Main was at e59db21.
+
+  1) Lazy-load bible-studies.js (commit b9b769b)
+    Eager <script src="data/bible-studies.js"> removed from index.html.
+    New loadBibleStudies() helper modeled on existing
+    loadTranslation() — dynamically injects the <script> tag, promise-
+    cached so repeated reads don't re-inject. Hooked at three entry
+    points:
+      - StudiesHome render — triggers fire-and-forget load on mount
+      - bible-study-index screen guard — shows gold-pulsing
+        "Loading studies…" centered indicator until BIBLE_STUDIES defined
+      - bible-study-chapter screen guard — same loading state
+    App() gained `studiesTick` + `studiesLoading` useState, plus a
+    useEffect on `screen` that triggers the load when the user opens
+    any studies route. Cold-boot is visibly faster — 4.3 MB / 67K lines
+    of JS parse skipped on every session that doesn't open Studies.
+    Verified live: navigate to Studies, lazy load triggers, 7 studies
+    render. Re-navigation hits the cache (no re-inject). Zero console
+    errors. check_balance.py ALL OK.
+
+    Known limitation: VOT_LETTER_REGISTRY is computed at module-load
+    time, so cross-references from Matthew Study Bible into bible-
+    studies chapters via tap-through won't resolve until the user has
+    opened Studies at least once (BIBLE_STUDIES defined). Niche
+    double-layered navigation — Matthew Study has the cross-refs but
+    the user has to have visited Studies. Documented in commit body
+    for future cleanup; would be fixed by either making the registry
+    lazy or rebuilding it post-load.
+
+  2) check_balance.py pre-commit hook (commit 8a7e866)
+    New .git/hooks/pre-commit script:
+      - Runs `python check_balance.py` only when staged diff includes
+        files under app/src/main/assets/data/ (skip optimization for
+        commits not touching data)
+      - Blocks commit on non-zero exit with clear error message
+      - Detected via `git diff --cached --name-only` filtered against
+        data/ prefix
+      - POSIX-shell syntax for Git Bash on Windows compatibility
+    CLAUDE.md Quick start section updated to document the hook +
+    Recent landings header bumped.
+
+    Validated all three paths:
+      - Nothing staged → silent exit 0
+      - Data file with esprima error staged → blocks with fix instructions
+      - Non-data file (e.g., CLAUDE.md) staged → skips silently
+
+  Out-of-scope flags found by Sonnet (worth tracking, not blocking):
+    • check_balance.py hardcodes DATA_DIR to the C: junction path
+      (C:/Users/corbi/OneDrive/Desktop/VOTReader-studio/app/src/main/
+      assets/data/). Works because that's a junction → D:. If the
+      junction breaks, the validator silently SKIPs all files because
+      they're not found. Should add a `DATA_DIR exists + has files`
+      sanity check at the top of check_balance.py.
+    • VOT_LETTER_REGISTRY is an IIFE at module load time. Doesn't
+      include bible-studies entries until BIBLE_STUDIES is defined
+      (post-lazy-load). Niche regression noted above. Cleanest fix is
+      to make the registry lazy or rebuild after studies load.
+
+  Both commits pushed to origin/main. Next dispatch: Sonnet B (as
+  Opus 4.7 1M, given task scale: schema migration + multi-file refactor
+  + new modules + extracted helpers) for the Links system overhaul —
+  source/target schema, inline-icon visual distinction, Links Library
+  tile, LinksScreen browser, first incremental module extractions.
+
 2026-05-12 — Objective D autonomous finish: SplashScreen API + JS KeepScreenOn
              + [object CSS] investigation
 
