@@ -2046,6 +2046,102 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-14 (later) — Sonnet 4.6: Links schema + visual + first module extractions
+
+  Coordinator: Opus 4.7 1M. Worker: Sonnet 4.6 (~155K tokens / 125 tool
+  calls / 13 min — within Sonnet's 200K window, no compaction). Three
+  commits, all clean.
+
+  1) Schema migration: {a,b} → {source,target} (commit d54ee30)
+    LinkStore._load() now contains a one-time-per-user migration: legacy
+    records with `a`/`b` get rewritten to `source`/`target` (preserving
+    semantic order — `a` was always the originator side by call-site
+    convention in persistLink). Malformed records (missing a or b)
+    are dropped with console.warn rather than propagated as crashes.
+    Migrated records are persisted back to localStorage so subsequent
+    sessions read the new shape clean.
+
+    Visual distinction on inline icons:
+      - Source-side (this passage is where the user originated a link):
+        gold-bright stroke (`--gold`) via new `inline-link-icon-source`
+        CSS class.
+      - Target-side (this passage is destination of someone else's
+        link): gold-dim stroke (`--gold-dim`) — the existing default.
+      - Mixed (container is BOTH source-of-X and target-of-Y): brighter
+        wins. The aggregated count badge still functions identically.
+      - Tap behavior unchanged on both sides; direction is informational.
+
+    LinkCard + LinkSidebar updated to read `source`/`target` everywhere.
+    Added small "to" / "from" eyebrow above the destination label in
+    each link card, gold-dim Cinzel caps — subtle direction hint.
+
+    `persistLink` rebuilt to construct {id, source, target, created}
+    directly. Dedup check covers either-side match. Added defensive
+    null guard on sourceEndpoint.key (was missing; could crash if
+    a caller passed undefined).
+
+    applyDOMLinks now tracks role per character offset: anySource
+    aggregation drives which icon class gets applied. Doesn't break
+    the existing slide-off rules (mid-word / closing-punct / fn-ref /
+    cross-inline emphasis); those continue to function as verified.
+
+  2) Module extraction: link-store.js (commit a65bb82)
+    First incremental modularization. LinkStore + persistLink + lnkId
+    + hlId moved to app/src/main/assets/src/stores/link-store.js.
+    Loaded via <script src="src/stores/link-store.js"></script> after
+    the upstream CachedStore definition. Confirms the extraction
+    workflow (no import/export, shared global scope, manual <script>
+    tag, verify console clean) works as designed.
+
+    Note: persistLink was 2130 lines away from LinkStore in the
+    original file; moving it adjacent before extraction was necessary
+    and safe (only depends on LinkStore + lnkId, both in the new module).
+    hlId is technically annotation-system, not link-system, but lives
+    in link-store.js because it sat adjacent to LinkStore and is a
+    pure ID generator with no system coupling. Fine to refile later.
+
+  3) Module extraction: dom-links.js (commit 810470d)
+    Second incremental modularization. applyDOMLinks + _buildLinkIcon
+    + _insertLinkIconAt + helpers moved to
+    app/src/main/assets/src/renderer/dom-links.js. CSS dependency
+    documented in the module header (the inline-link-icon-source rule
+    lives in the CSS template literal in index.html, not in the JS
+    module). Loaded after link-store.js so LinkStore is defined.
+
+    Trap encountered + fixed: the Edit tool passed UTF-8 smart-quote
+    delimiters (\xe2\x80\x9d) into the <script src> attribute,
+    causing the browser to URL-encode the path and fail to load.
+    Detected via document.querySelectorAll('script[src]') showing
+    %E2%80%9D in the URL. Fixed with binary-replace. Future agents:
+    when editing JSX-style attribute strings, ALWAYS verify the
+    output via browser load, not just file diff.
+
+  Validation:
+    - Legacy {a,b} injection test: migrated to {source,target} on
+      next _load(), persisted back to localStorage, a/b fields
+      deleted. Idempotent on re-load.
+    - New link creation: persistLink stores {source,target}.
+    - Dedup: re-linking same source→target pair returns the existing
+      record (powers the green ✓ confirm UI).
+    - Inline icon visual: tested via injected source-only and
+      target-only link records; brighter / dimmer renders as designed.
+    - All globals defined post-extraction: LinkStore, persistLink,
+      lnkId, hlId, applyDOMLinks, _buildLinkIcon, _insertLinkIconAt.
+    - Zero console errors throughout boot + navigation.
+    - check_balance.py ALL OK.
+
+  Adjacent fixes still pending (Sonnet flagged, deferred to next batch):
+    • link-card-remove uses inline onClick with no confirm step.
+      Violates PLAN.txt §11.1 "no instant delete." Should become
+      tap-confirm-strip when we touch the link card next (natural
+      slot: Links Library tile + LinksScreen batch).
+    • LinkSidebar header shows hardcoded today's date instead of the
+      link's `created` timestamp (or hides the date entirely if a
+      sidebar shows links from multiple dates).
+
+  Pushed to origin/main. Next: Sonnet 4.6 batch for Links Library tile
+  + LinksScreen browser + the two adjacent fixes above.
+
 2026-05-14 — Sonnet 4.6 batch: lazy-load bible-studies.js + pre-commit hook
 
   Coordinator: Opus 4.7 1M (parent). Worker: Sonnet 4.6 (dispatched
