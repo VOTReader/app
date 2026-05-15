@@ -4002,6 +4002,133 @@
     .link-action-btn-danger:active { background: rgba(244,143,177,0.12); color: var(--accent-pink); }
     @media (hover: hover) { .link-action-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); } }
 
+    /* ── Bookmark inline icons ── */
+    /* Small flag icon injected at the end of a bookmarked range in
+       [data-hl-dom] containers. Styled gold-dim so it reads as a
+       soft affordance, not competing with link icons (gold) or note
+       icons (gold). touch-action: manipulation prevents Android long-
+       press text selection from firing on the icon. */
+    .inline-bookmark-icon {
+      display: inline-block; vertical-align: middle;
+      width: 12px; height: 12px;
+      margin: 0 1px; cursor: pointer;
+      color: var(--gold-dim);
+      touch-action: manipulation;
+      user-select: none; -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.15s;
+    }
+    .inline-bookmark-icon:hover { color: var(--gold); }
+    .inline-bookmark-icon svg {
+      width: 12px; height: 12px;
+      stroke: currentColor; fill: currentColor;
+      stroke-width: 1.6;
+    }
+    .inline-bookmark-icon-multi { color: var(--gold); }
+
+    /* ── Bookmarks Screen ── */
+    .bkm-screen {
+      max-width: 720px; margin: 0 auto;
+      padding: 1.2rem 1rem 4rem;
+      width: 100%;
+    }
+    /* One bookmark row */
+    .bkm-row {
+      display: flex; align-items: flex-start; gap: 0.4rem;
+      background: var(--bg2);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      margin-bottom: 0.55rem;
+      overflow: hidden;
+      transition: border-color 0.18s ease;
+    }
+    @media (hover: hover) { .bkm-row:hover { border-color: var(--gold); } }
+    .bkm-row-content {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 0.2rem;
+      padding: 0.85rem 0 0.85rem 1rem;
+      background: transparent; border: none;
+      text-align: left; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+    }
+    .bkm-row-content:active { background: var(--gold-faint); }
+    @media (hover: hover) { .bkm-row-content:hover:not(:disabled) { background: var(--gold-faint); } }
+    .bkm-row-content:disabled { cursor: default; }
+    .bkm-row-source {
+      font-family: 'Cinzel', serif; font-size: 0.6rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--gold);
+    }
+    .bkm-row-label {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.97rem; color: var(--cream-dim);
+      line-height: 1.3; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .bkm-row-edit-input {
+      width: 100%; background: var(--bg3);
+      border: 1px solid var(--gold-border); border-radius: 6px;
+      color: var(--cream-dim); font-family: 'EB Garamond', serif;
+      font-size: 0.97rem; padding: 4px 8px;
+      outline: none;
+    }
+    .bkm-row-edit-input:focus { border-color: var(--gold); }
+    .bkm-row-meta {
+      display: flex; flex-direction: column; align-items: flex-end;
+      gap: 0.25rem; padding: 0.7rem 0.6rem 0.7rem 0.3rem;
+      flex-shrink: 0;
+    }
+    .bkm-row-date {
+      font-size: 0.7rem; color: var(--cream-muted);
+      white-space: nowrap;
+    }
+    .bkm-row-more {
+      background: none; border: none; cursor: pointer;
+      color: var(--cream-muted); padding: 2px;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.12s;
+    }
+    .bkm-row-more:active, .bkm-row-more:hover { color: var(--gold); }
+    .bkm-row-more svg { width: 16px; height: 16px; display: block; }
+
+    /* ── Bookmark inline popover ── */
+    .bkm-popover {
+      position: fixed; z-index: 8801;
+      background: var(--bg3);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      min-width: 180px; max-width: 280px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+      overflow: hidden;
+      animation: selectSheetSlideUp 0.18s cubic-bezier(0.32,0.72,0,1);
+    }
+    .bkm-popover-item {
+      border-bottom: 1px solid rgba(232,192,80,0.08);
+    }
+    .bkm-popover-item:last-child { border-bottom: none; }
+    .bkm-popover-label {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.93rem; color: var(--cream-dim);
+      padding: 10px 12px 6px; line-height: 1.3;
+    }
+    .bkm-popover-actions {
+      display: flex; gap: 0; padding: 0 8px 8px;
+    }
+    .bkm-popover-btn {
+      flex: 1; padding: 6px 8px;
+      background: none; border: none; cursor: pointer;
+      font-family: 'Cinzel', serif; font-size: 0.6rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--gold-dim);
+      -webkit-tap-highlight-color: transparent;
+      border-radius: 6px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .bkm-popover-btn:active, .bkm-popover-btn:hover { background: var(--gold-faint); color: var(--gold); }
+    .bkm-popover-btn-danger { color: #ef9a9a; }
+    .bkm-popover-btn-danger:active, .bkm-popover-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); }
+
     /* Invisible word-joiner injected at mark boundaries that fall MID-WORD
        so the browser cannot break a word across the mark/text seam. The
        pseudo-content is not part of any text node, so TreeWalker and
@@ -4456,6 +4583,8 @@ function noteSourceNav(note) {
   </script>
   <!-- LinkStore, persistLink, lnkId, hlId — extracted to src/stores/link-store.js -->
   <script src="src/stores/link-store.js"></script>
+  <!-- BookmarkStore, bkmId — extracted to src/stores/bookmark-store.js -->
+  <script src="src/stores/bookmark-store.js"></script>
   <script>
 /* hlId and lnkId are now defined in src/stores/link-store.js */
 
@@ -5085,6 +5214,8 @@ function HighlightableText({ text, hlKey, hlTick }) {
    src/renderer/dom-links.js — see <script src> below. */
   </script>
   <script src="src/renderer/dom-links.js"></script>
+  <!-- applyDOMBookmarks, _buildBookmarkIcon, _insertBookmarkIconAt — extracted to dom-bookmarks.js -->
+  <script src="src/renderer/dom-bookmarks.js"></script>
   <script>
 /* Find the nearest word-boundary insertion point AFTER a mark. If the
    mark ends in the middle of a word, the icon slides forward to the
@@ -5483,7 +5614,7 @@ function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }) {
   );
 }
 
-function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest }) {
+function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [selInfo, setSelInfo] = useState(null); // { hlKey, start, end, text, existingHl, multiVerse }
@@ -5962,6 +6093,61 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest }) {
     if (window.__goSearch) window.__goSearch();
   }, [selInfo]);
 
+  const handleBookmark = useCallback(() => {
+    if (!selInfo) return;
+    // Determine the hlKey: single-container uses selInfo.hlKey;
+    // multi-container uses the first container's key.
+    var hlKey = selInfo.hlKey;
+    if (selInfo.multiVerse && selInfo.multiContainers && selInfo.multiContainers.length > 0) {
+      hlKey = selInfo.multiContainers[0].dataset.hlKey;
+    }
+    if (!hlKey) { window.getSelection().removeAllRanges(); setVisible(false); return; }
+
+    // Snap selection range to word boundaries (single-container only;
+    // multi-container bookmarks use the first-container start as a proxy).
+    var container = document.querySelector('[data-hl-key="' + hlKey.replace(/"/g, '\\"') + '"]');
+    var containerText = container ? container.textContent : (selInfo.text || '');
+    var snap = (typeof snapRangeToWords === 'function')
+      ? snapRangeToWords(containerText, selInfo.start || 0, selInfo.end || 0)
+      : { start: selInfo.start || 0, end: selInfo.end || 0 };
+
+    // Derive label: prefer snapped selection text; fall back to source label.
+    var labelText = '';
+    if (snap.end > snap.start) {
+      labelText = containerText.slice(snap.start, snap.end).trim();
+    }
+    // Truncate very long auto-labels to 120 chars so they read as a short tag
+    if (labelText.length > 120) labelText = labelText.slice(0, 117) + '...';
+    if (!labelText) {
+      // Build a human-readable fallback from the container key kind
+      var parts = hlKey.split(':');
+      var kind = parts[0];
+      if (kind === 'bible' || kind === 'study') {
+        labelText = 'Bookmark';
+      } else if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
+        var ctx = (typeof findEntryContext === 'function') ? findEntryContext(parts[1], kind) : null;
+        labelText = ctx && ctx.title ? ('Bookmark in ' + ctx.title) : 'Bookmark';
+      } else {
+        labelText = 'Bookmark';
+      }
+    }
+
+    // Build the stored hlKey: append :start-end if we have a valid range.
+    var storedKey = hlKey;
+    if (snap.end > snap.start) {
+      storedKey = hlKey + ':' + snap.start + '-' + snap.end;
+    }
+
+    var bkm = { id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()), hlKey: storedKey, label: labelText, created: Date.now(), updated: Date.now() };
+    if (typeof BookmarkStore !== 'undefined') BookmarkStore.add(bkm);
+
+    window.getSelection().removeAllRanges();
+    setVisible(false);
+    if (typeof setHlTick === 'function') setHlTick(function(t) { return t + 1; });
+    // Notify App so the popover can be shown or any other feedback fired.
+    if (typeof onBookmarkRequest === 'function') onBookmarkRequest(bkm);
+  }, [selInfo, setHlTick, onBookmarkRequest]);
+
   if (!visible || !selInfo) return null;
 
   const svgIcon = (paths, extra) => React.createElement("svg", Object.assign({ viewBox: "0 0 24 24" }, extra || {}), paths);
@@ -6054,6 +6240,12 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest }) {
           React.createElement("line", { key: "b", x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
         ]),
         React.createElement("span", null, "Search")
+      ),
+      React.createElement("button", { className: "sel-action-btn", onClick: handleBookmark, title: "Bookmark" },
+        svgIcon([
+          React.createElement("path", { key: "a", d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" })
+        ]),
+        React.createElement("span", null, "Bookmark")
       )
     )
   );
@@ -7199,9 +7391,10 @@ function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
    Notes is active; Journal / Bookmarks / Highlights & Underlines
    render as Coming-Soon placeholders with the same tile chrome.
 ═══════════════════════════════════════════════════════════════ */
-function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, hlTick, theme, onThemeChange, onSearch, onHistory, historyEnabled }) {
+function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, hlTick, theme, onThemeChange, onSearch, onHistory, historyEnabled }) {
   const noteCount = useMemo(() => NoteStore.count(), [hlTick]);
   const linkCount = useMemo(() => LinkStore.all().length, [hlTick]);
+  const bookmarkCount = useMemo(() => (typeof BookmarkStore !== 'undefined' ? BookmarkStore.count() : 0), [hlTick]);
   const noteDetail = noteCount === 0 ? 'No notes yet' : (noteCount + (noteCount === 1 ? ' note' : ' notes'));
   const linkDetail = linkCount === 0 ? 'No links yet' : (linkCount + (linkCount === 1 ? ' link' : ' links'));
 
@@ -7244,10 +7437,10 @@ function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, hlTick, theme, onThem
     },
     {
       id: 'bookmarks',
-      eyebrow: 'Coming Soon',
+      eyebrow: 'My Bookmarks',
       title: 'Bookmarks',
-      detail: 'Saved passages',
-      placeholder: true,
+      detail: bookmarkCount === 0 ? 'No bookmarks yet' : (bookmarkCount + (bookmarkCount === 1 ? ' bookmark' : ' bookmarks')),
+      onClick: onOpenBookmarks,
       icon: React.createElement("svg", { viewBox: "0 0 24 24" },
         React.createElement("path", { d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" })
       )
@@ -13604,6 +13797,7 @@ function App() {
   const [noteSheetTarget, setNoteSheetTarget] = useState(null);  // { groupId, startInEditMode } or null
   const [notebookPickerTarget, setNotebookPickerTarget] = useState(null); // groupId or null
   const [multiNotePayload, setMultiNotePayload] = useState(null); // { groupIds, x, y } or null
+  const [bookmarkPopoverPayload, setBookmarkPopoverPayload] = useState(null); // { bkmIds, x, y, hlKey } or null
 
   const openLinkSidebar = useCallback((hlKey) => setLinkSidebarKey(hlKey), []);
   const closeLinkSidebar = useCallback(() => setLinkSidebarKey(null), []);
@@ -13657,6 +13851,7 @@ function App() {
   useEffect(() => { window.__openLinkSidebar = openLinkSidebar; }, [openLinkSidebar]);
   useEffect(() => { window.__showAnnChip = (x, y, hlKey, groupId) => setAnnChip({ x, y, hlKey, groupId }); }, []);
   useEffect(() => { window.__showMultiNote = (groupIds, x, y) => setMultiNotePayload({ groupIds, x, y }); }, []);
+  useEffect(() => { window.__openBookmarkPopover = (bkmIds, x, y, hlKey) => setBookmarkPopoverPayload({ bkmIds, x, y, hlKey }); return () => { delete window.__openBookmarkPopover; }; }, []);
   // Auto-dismiss floating overlays whenever the active screen, letter,
   // book, or study chapter changes. Without this the always-mounted
   // SelectionToolbar persists with a stale selInfo, and the
@@ -13670,11 +13865,13 @@ function App() {
     setNoteSheetTarget(null);
     setAnnChip(null);
     setMultiNotePayload(null);
+    setBookmarkPopoverPayload(null);
   }, [screen, letterId, bookId, chapterNum, studyId, studyChapterId]);
   useEffect(() => {
     const t = setTimeout(() => {
       applyDOMHighlights();
       applyDOMLinks();
+      applyDOMBookmarks();
       applyNoteIcons();
       applyActiveNoteState();
       // If we navigated here from the Notes index by tapping a row, the
@@ -14394,6 +14591,7 @@ function App() {
   const goLibrary = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("library");};
   const goNotesIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("notes-index");};
   const goLinksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("links-index");};
+  const goBookmarksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("bookmarks-index");};
   // Capture a thumbnail of the ACTIVE tab's current visible screen.
   // Fast path: native AndroidBridge.takeScreenshot (~30-80ms on UI thread).
   // Fallback: html2canvas (~500-1500ms, used when not in the Android app).
@@ -14904,6 +15102,7 @@ function App() {
       if (s === "about") {try{localStorage.setItem('vot-about-seen','1');}catch(e){}goNavOrigin();return "true";} else
       if (s === "notes-index") {setScreen("library");return "true";} else
       if (s === "links-index") {setScreen("library");return "true";} else
+      if (s === "bookmarks-index") {setScreen("library");return "true";} else
       if (s === "library") {goHome();return "true";} else
       if (s === "search") {goSearchOrigin();return "true";} else
       if (s === "scripture-genre") {goScripturesHome();return "true";} else
@@ -15215,7 +15414,7 @@ function App() {
     React.createElement("style", null, CSS),
 
 
-    settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "about"].includes(screen) && /*#__PURE__*/
+    settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "about"].includes(screen) && /*#__PURE__*/
     React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /*#__PURE__*/
     React.createElement("span", { className: "rdg-inner" })
     ),
@@ -15429,6 +15628,7 @@ function App() {
       onBack: goHome,
       onOpenNotes: goNotesIndex,
       onOpenLinks: goLinksIndex,
+      onOpenBookmarks: goBookmarksIndex,
       onSearch: goSearch,
       onHistory: goHistory,
       historyEnabled: settings.historyEnabled !== false,
@@ -15466,6 +15666,22 @@ function App() {
         if (endpoint) {
           setNavOrigin({ screen: 'links-index' });
           navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
+        }
+      },
+      onSearch: goSearch,
+      onHistory: goHistory,
+      historyEnabled: settings.historyEnabled !== false,
+      hlTick: hlTick, setHlTick: setHlTick,
+      theme: theme, onThemeChange: setTheme
+    }),
+
+    screen === "bookmarks-index" && /*#__PURE__*/
+    React.createElement(BookmarksScreen, {
+      onBack: () => setScreen('library'),
+      onNavigateToSource: (endpoint, meta) => {
+        if (endpoint) {
+          setNavOrigin({ screen: 'bookmarks-index' });
+          navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Bookmarks' });
         }
       },
       onSearch: goSearch,
@@ -16039,7 +16255,8 @@ function App() {
     React.createElement(SelectionToolbar, {
       hlTick: hlTick, setHlTick: setHlTick,
       onLinkRequest: openLinkPicker,
-      onNoteRequest: openNoteSheet
+      onNoteRequest: openNoteSheet,
+      onBookmarkRequest: function(bkm) { /* bookmark created; icon injected via applyDOMBookmarks */ }
     }),
     annChip && React.createElement(AnnotationActionChip, {
       chip: annChip, setHlTick: setHlTick,
@@ -16103,6 +16320,17 @@ multiNotePayload && React.createElement(MultiNotePopover, {
       payload: multiNotePayload,
       onClose: () => setMultiNotePayload(null),
       onPick: (gid) => { setMultiNotePayload(null); setNoteSheetTarget({ groupId: gid, startInEditMode: false }); }
+    }),
+    bookmarkPopoverPayload && React.createElement(BookmarkPopover, {
+      payload: bookmarkPopoverPayload,
+      hlTick: hlTick, setHlTick: setHlTick,
+      onNavigateToSource: (endpoint, meta) => {
+        if (endpoint) {
+          setBookmarkPopoverPayload(null);
+          navigateToLink(endpoint, meta || { sourceLetterTitle: 'Bookmark' });
+        }
+      },
+      onClose: () => setBookmarkPopoverPayload(null)
     })
     ));
 
@@ -16115,6 +16343,10 @@ multiNotePayload && React.createElement(MultiNotePopover, {
   <!-- All references are resolved at React render time, not at parse time, so -->
   <!-- loading here (before root.render) is safe even though callee is defined above. -->
   <script src="src/ui/screens/LinksScreen.js"></script>
+  <!-- BookmarksScreen, BookmarkRow, BookmarkRowActionSheet, BookmarkPopover — extracted to src/ui/screens/BookmarksScreen.js -->
+  <!-- Depends on: BookmarkStore (bookmark-store.js), ScreenLayout, ThemeBtn, relativeDate, -->
+  <!--             bookCategory, findEntryContext, _allBooks, _matthew (all defined above). -->
+  <script src="src/ui/screens/BookmarksScreen.js"></script>
   <script>
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(App, null)));
