@@ -2046,6 +2046,62 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-15 (later) — Sonnet 4.6: Bookmarks Library tile + browser
+
+  Coordinator: Opus 4.7 1M. Worker: Sonnet 4.6 (~103K tokens / 126 tool
+  calls / 14.5 min — well within Sonnet's window, no compaction).
+  Three commits on main: bf39528, 52ac90b, 03c9fd3. Pushed to
+  origin/main after coordinator verification.
+
+  1) Stores + renderer (commit bf39528)
+    New src/stores/bookmark-store.js (CachedStore-backed, full CRUD,
+    bkmId() generator, getForKey / getForKeyPrefix mirroring LinkStore).
+    New src/renderer/dom-bookmarks.js — applyDOMBookmarks reuses the
+    inline-icon slide-off rules from applyDOMLinks: word boundaries,
+    closing-punct slide, skip past fn-ref / tap-ref / letter-link /
+    verse-link-icon / hl-note-icon chains, cross-inline-emphasis
+    crossing through <em>/<strong>/etc., block boundaries stop the
+    slide. byEndPos aggregation with count badge when multiple
+    bookmarks share an end position. Special-cased byEndPos[-1]
+    fallback for hlKeys stored without a :start-end range.
+
+  2) BookmarksScreen (commit 52ac90b)
+    src/ui/screens/BookmarksScreen.js (~524 lines). Search bar
+    (filters source label + label + preview text). Sort menu:
+    Recent / Oldest / Source A-Z / Label A-Z. Row chrome: source
+    label in Cinzel gold, italic label preview, relative date.
+    Long-press row → action sheet (Open / Edit Label / Delete with
+    tap-confirm-strip per §11.1). Inline label-edit flow: tap Edit
+    → row morphs to input → Enter saves, Esc cancels.
+    BookmarkPopover (lightweight fixed-position popover) opens on
+    inline flag-icon tap — label + Open / Delete, both confirm-strip.
+    Empty states for "no bookmarks yet" and "no matches" follow
+    the NotesIndex / LinksScreen patterns.
+
+  3) Wire-up (commit 03c9fd3)
+    index.html: CSS for all bookmark row classes, three new
+    <script src> tags, goBookmarksIndex helper, handleAndroidBack
+    case for 'bookmarks-index' → 'library', screen render dispatch
+    alongside the Library sub-screens, reading-dot exclusion,
+    Library tile activated (Bookmarks moves from placeholder to
+    live with live count via hlTick), SelectionToolbar gains the
+    sixth action (Bookmark) wired to BookmarkStore.add via
+    snapRangeToWords. If selection is collapsed or whitespace-only,
+    label falls back to "Bookmark in [container label]".
+
+  Validation (coordinator-verified in browser preview before push):
+    - 5 tiles render in Library: Notes (active), Links (active),
+      Journal (placeholder), Bookmarks (active, "No bookmarks yet"),
+      Highlights & Underlines (placeholder).
+    - BookmarksScreen renders with "My Bookmarks" header + empty state.
+    - All new globals defined: BookmarkStore, bkmId, applyDOMBookmarks,
+      BookmarksScreen, BookmarkPopover.
+    - check_balance.py ALL OK. Zero console errors.
+
+  Tiles still placeholder: Journal (needs a body-text store with
+  date-grouping) and Highlights & Underlines (smallest remaining —
+  reads existing AnnotationStore, no new store needed).
+
 2026-05-15 — Sonnet 4.6: LinksScreen module + Library tile + adjacent fixes
 
   Coordinator: Opus 4.7 1M. Worker: Sonnet 4.6 (split across two context
