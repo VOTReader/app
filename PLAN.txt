@@ -2046,6 +2046,95 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-15 (later 3) — Opus hands-on: keyboard-aware sheets + bookmark
+                       inline-tap edit flow (IN PROGRESS at autocompact)
+
+  User feedback after device test of the BookmarksCreateSheet batch:
+    (a) Tapping an inline bookmark icon "does nothing" on Android. Want
+        it to open the same sheet that's used for creation (label +
+        thought editable, Delete + Open + Save). The BookmarkPopover
+        likely renders off-viewport for icons near page bottom; also
+        the user wants a single coherent edit UI, not popover-then-
+        action-sheet for two clicks.
+    (b) Soft keyboard covers the bottom sheet on Android. Same issue
+        affects LinkPicker. Want dynamic detection — sheet lifts above
+        the keyboard regardless of keyboard app / Android version,
+        then settles back down when the keyboard dismisses.
+
+  LANDED (this commit):
+    - visualViewport API listener in App. On `resize` and `scroll`,
+      computes `Math.max(0, window.innerHeight - vv.height)` and exposes
+      as `--keyboard-height` CSS var on `<html>`. Clamp at 80px so
+      browser noise doesn't cause spurious shifts. Cleanup on unmount.
+      Cross-platform: works on any Android version, any keyboard app,
+      AND in PWA-mode browsers (the Kotlin --inset-bottom bridge
+      handles the SystemBars / gesture / camera-cutout; this handles
+      IME specifically).
+    - .link-picker-overlay (used by LinkPicker AND BookmarkCreateSheet):
+      `padding-bottom: max(var(--keyboard-height), var(--inset-bottom))`
+      with a 0.18s ease transition. Sheet visibly lifts when keyboard
+      opens, settles when it closes.
+    - .note-sheet-overlay: same treatment for the note edit flow.
+
+  IN PROGRESS (next, before autocompact:
+    - Extend BookmarkCreateSheet to support EDIT mode. Schema:
+        pending = {
+          // CREATE mode (existing):
+          hlKey, sourceLabel, excerpt, defaultLabel
+          // EDIT mode (new, when editId is set):
+          editId, currentLabel, currentThought, currentBkm
+        }
+      Title swaps "New Bookmark" → "Edit Bookmark". Show Delete and
+      Open buttons in the body in edit mode. On Save: if editId,
+      BookmarkStore.update(editId, { label, thought }); else add new.
+    - Add window.__bookmarkEdit(bkmId) bridge in App that opens the
+      sheet in edit mode for a given bookmark id.
+    - Update _buildBookmarkIcon openPopover handler in dom-bookmarks.js:
+      if bkmIds.length === 1 → call __bookmarkEdit(bkmIds[0]);
+      else → existing popover for multi-disambiguation.
+    - Keep BookmarkPopover for the multi-bookmark case (rare).
+
+  Verification pending:
+    - Tap a freshly-created bookmark on Android → edit sheet opens
+    - Type in label/thought field on Android → sheet lifts above
+      keyboard, text is visible while typing
+    - Dismiss keyboard → sheet eases back down
+    - Same for LinkPicker on Android
+
+2026-05-15 (later 2) — Opus hands-on: Android bookmark icon fix +
+                       read-more thoughts + pre-commit create sheet (commit 006acb8)
+
+  Three asks landed in one diff:
+
+  (1) Inline bookmark icon invisible on Android (worked in Chrome
+      preview, blank on device). Root cause: SVG `<path>` had no
+      explicit fill/stroke attributes and relied on CSS `fill:
+      currentColor` from parent <svg>. Android WebView doesn't
+      reliably propagate that through to innerHTML-injected children.
+      Fix: set `fill="currentColor"` + `stroke="currentColor"` as
+      attributes directly on the path AND the parent <svg>. Cross-
+      WebView safe.
+
+  (2) Long bookmark thoughts truncated to single line with no way to
+      read the rest without entering edit mode. Added read-more:
+      thoughts > 80 chars get .is-collapsible class + tappable
+      "· More" suffix. Tap → wraps to full + flips to "· Less" via
+      .is-expanded class. stopPropagation so the parent navigation
+      handler doesn't fire. .bkm-row-content changed from <button>
+      to <div role="button"> so the nested clickable thought isn't a
+      validity violation; keyboard nav preserved.
+
+  (3) Bookmark creation was silent (BookmarkStore.add at action time,
+      no opportunity to refine label or add thought). Replaced with
+      pre-commit BookmarkCreateSheet (new module
+      src/ui/sheets/BookmarkCreateSheet.js). Mirrors LinkPicker chrome:
+      red × cancel · "New Bookmark" title · green ✓ save. Source
+      eyebrow + italic excerpt + label input (pre-populated, focused)
+      + optional thought textarea. App state
+      `bookmarkCreatePending` + `window.__bookmarkCreate` bridge.
+      ChapterBookmarkBtn flipped to same flow on create-tap (popover
+      behavior on tap-when-bookmarked unchanged).
+
 2026-05-15 (later) — Sonnet 4.6: Bookmarks Library tile + browser
 
   Coordinator: Opus 4.7 1M. Worker: Sonnet 4.6 (~103K tokens / 126 tool

@@ -2834,6 +2834,14 @@
       /* padding-top reserves space for the Android status bar / camera
          cutout so the sheet top can never overlap the system chrome. */
       padding-top: var(--inset-top, 0px);
+      /* padding-bottom lifts the sheet above the soft keyboard. The
+         --keyboard-height variable is updated live by App's visualViewport
+         listener whenever the IME opens/closes — independent of Android
+         version, WebView quirks, or keyboard app. Falls through to the
+         Kotlin-side --inset-bottom for the gesture-bar / system nav
+         when no keyboard is up. */
+      padding-bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
+      transition: padding-bottom 0.18s ease;
       background: rgba(0,0,0,0.72);
       /* No backdrop-filter blur — caused sub-pixel anti-aliasing on text
          drawn on top of the blurred backdrop in some browsers. Solid 0.72
@@ -3104,6 +3112,10 @@
       background: rgba(0,0,0,0.72);
       /* No backdrop-filter blur — caused fuzzy text rendering. */
       display: flex; align-items: flex-end; justify-content: center;
+      /* Lift the sheet above the soft keyboard when the textarea is
+         focused (see App's visualViewport listener). */
+      padding-bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
+      transition: padding-bottom 0.18s ease;
       animation: selectSheetBackdropIn 0.22s ease;
     }
     .note-sheet {
@@ -14141,6 +14153,36 @@ function App() {
   // drilling. Used after store writes that aren't otherwise tied to React
   // state — so the apply-DOM effect re-runs and inline icons refresh.
   useEffect(() => { window.__bumpHlTick = () => setHlTick(t => t + 1); return () => { delete window.__bumpHlTick; }; }, []);
+  // Track soft-keyboard height via the visualViewport API and expose it
+  // to CSS as `--keyboard-height`. Overlays that own inputs/textareas
+  // (BookmarkCreateSheet, LinkPicker, NoteSheet) use this variable as
+  // padding-bottom so the sheet lifts above the keyboard when it opens
+  // and settles back down when it closes — works the same on any
+  // Android version, any keyboard app, and PWA-mode browsers. The
+  // Kotlin-side `--inset-bottom` covers system bars / camera cutout;
+  // this covers IME specifically and is independent of WebView quirks.
+  useEffect(() => {
+    if (!window.visualViewport) return;
+    const vv = window.visualViewport;
+    const root = document.documentElement;
+    const update = () => {
+      // Difference between layout viewport and visual viewport ≈ keyboard.
+      // Some browsers (notably older Android WebViews) report a small
+      // residual diff (~1-3px) even when the keyboard is closed — clamp
+      // anything under 80px to 0 so we don't shift overlays for noise.
+      const diff = Math.max(0, window.innerHeight - vv.height);
+      const kh = diff > 80 ? diff : 0;
+      root.style.setProperty('--keyboard-height', kh + 'px');
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      root.style.setProperty('--keyboard-height', '0px');
+    };
+  }, []);
   // Bridge for SelectionToolbar + ChapterBookmarkBtn to open the
   // pre-commit BookmarkCreateSheet instead of silently adding to the
   // store. `info` shape: { hlKey, sourceLabel, excerpt, defaultLabel }.
