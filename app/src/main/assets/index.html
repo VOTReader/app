@@ -49,7 +49,8 @@
   <!-- Alt-translation Bible files (~4.5 MB each, 7 files = ~32 MB of JS parse time).
        Loaded on demand via loadTranslation() below — not upfront — so app startup is fast.
        Users stay on NKJV unless they change translations, so typically zero extra load. -->
-  <script src="data/bible-studies.js"></script>
+  <!-- bible-studies.js (~4.3 MB) is loaded on demand via loadBibleStudies() below.
+       Most sessions never open a Bible Study, so this keeps cold-boot fast. -->
   <script src="data/volume-one.js"></script>
   <script src="data/volume-two.js"></script>
   <script src="data/volume-three.js"></script>
@@ -9619,9 +9620,10 @@ function ChapterIndex({ book, onSelect, onBack, onSearch, onHistory, onSettings,
 /* ═══════════════════════════════════════════════════════════════
    BIBLE LETTER STUDIES — home screen
 ═══════════════════════════════════════════════════════════════ */
-function StudiesHome({ studies, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+function StudiesHome({ studies, studiesLoading, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // `studies` is the pre-ordered UNIFIED_CHAIN from App — heavy → light,
   // Matthew Study Bible already inserted at its weighted position.
+  // studiesLoading is true while bible-studies.js is fetched the first time.
   const list = studies || [];
   return (/*#__PURE__*/
     React.createElement(ScreenLayout, { navChildren: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
@@ -9639,7 +9641,9 @@ function StudiesHome({ studies, onSelectStudy, onBack, onSearch, onHistory, onSe
     )
     ), /*#__PURE__*/
     React.createElement("div", { className: "chapter-cards" },
-    list.length === 0 && /*#__PURE__*/
+    list.length === 0 && studiesLoading && /*#__PURE__*/
+    React.createElement("div", { className: "sc-sheet-loading", style: { textAlign: "center", padding: "1.5rem 0" } }, "Loading studies…"),
+    list.length === 0 && !studiesLoading && /*#__PURE__*/
     React.createElement("div", { className: "studies-empty" }, "Letter Studies coming soon."),
 
     list.map((s, i) => {
@@ -12730,6 +12734,24 @@ function loadTranslation(code) {
   });
   return _translationPromises[code];
 }
+
+// bible-studies.js (~4.3 MB) is lazy-loaded the first time the user opens Studies.
+// Modeled on loadTranslation() — same caching / promise pattern.
+// Once loaded, window.BIBLE_STUDIES is defined and _studies() returns the array.
+let _bibleStudiesPromise = null;
+function loadBibleStudies() {
+  if (typeof BIBLE_STUDIES !== 'undefined') return Promise.resolve();
+  if (_bibleStudiesPromise) return _bibleStudiesPromise;
+  _bibleStudiesPromise = new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'data/bible-studies.js';
+    script.async = true;
+    script.onload = () => { resolve(); };
+    script.onerror = () => { resolve(); }; // silent fail — STUDIES stays []
+    document.head.appendChild(script);
+  });
+  return _bibleStudiesPromise;
+}
 const TRANSLATION_OPTIONS = [
 { id: 'nkjv', label: 'NKJV', desc: 'New King James Version — default' },
 { id: 'web', label: 'WEB', desc: 'World English Bible — modern, public domain' },
@@ -13661,6 +13683,11 @@ function App() {
   // Increments each time an alt translation finishes loading — forces a
   // re-render so translateVerse() starts returning the loaded text.
   const [translationTick, setTranslationTick] = useState(0);
+  // Increments when bible-studies.js finishes loading — forces a re-render so
+  // STUDIES = _studies() picks up the new data. studiesLoading tracks the
+  // in-flight state so StudiesHome can show a brief loading indicator.
+  const [studiesTick, setStudiesTick] = useState(0);
+  const [studiesLoading, setStudiesLoading] = useState(false);
 
   /* ═══════════════════════════════════════════════════════════════
      HIGHLIGHT & LINK STATE
@@ -14242,6 +14269,19 @@ function App() {
     if (!code || code === 'nkjv') return;
     loadTranslation(code).then(() => setTranslationTick((v) => v + 1));
   }, [settings.translation]);
+
+  // Lazy-load bible-studies.js the first time the user opens any Studies screen.
+  // Covers: Studies home, a study index, or a direct tap-through to a study chapter.
+  useEffect(() => {
+    const needsStudies = screen === 'studies-home' || screen === 'bible-study-index' || screen === 'bible-study-chapter';
+    if (!needsStudies) return;
+    if (typeof BIBLE_STUDIES !== 'undefined') return; // already loaded
+    setStudiesLoading(true);
+    loadBibleStudies().then(() => {
+      setStudiesLoading(false);
+      setStudiesTick((v) => v + 1);
+    });
+  }, [screen]);
   // Reset Clear-all confirmation stage whenever overview opens/closes
   useEffect(() => {setClearAllStage(0);}, [tabsOverviewOpen]);
 
@@ -15610,6 +15650,7 @@ function App() {
     screen === "studies-home" && /*#__PURE__*/
     React.createElement(StudiesHome, {
       studies: UNIFIED_CHAIN,
+      studiesLoading: studiesLoading,
       onSelectStudy: (slug) => {
         if (slug === 'matthew-study') {
           setFromStudies(true);
@@ -15629,7 +15670,7 @@ function App() {
 
     screen === "bible-study-index" && studyId && (() => {
       const study = getStudyById(studyId);
-      if (!study) return null;
+      if (!study) return studiesLoading ? React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading…") : null;
       return (/*#__PURE__*/
         React.createElement(BibleStudyIndex, {
           study: study,
@@ -15729,7 +15770,7 @@ function App() {
     screen === "bible-study-chapter" && studyId && studyChapterId && (() => {
       const study = getStudyById(studyId);
       const ch = getStudyChapter(study, studyChapterId);
-      if (!study || !ch) return null;
+      if (!study || !ch) return studiesLoading ? React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading…") : null;
       const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
       const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
       const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
