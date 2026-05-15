@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VOTReader Journal — UI Scaffolding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold: #d4b772;
+  --gold-bright: #e8cd8b;
+  --gold-dim: #9a8550;
+  --gold-faint: rgba(212, 183, 114, 0.15);
+  --gold-border: rgba(212, 183, 114, 0.3);
+  --gold-glow: rgba(212, 183, 114, 0.4);
+  --cream: #f5ecd6;
+  --cream-dim: #d8cdb0;
+  --cream-faint: rgba(216, 205, 176, 0.5);
+  --bg: #14110d;
+  --bg2: #1c1814;
+  --bg3: #25201a;
+  --bg4: #2e2820;
+  --border: rgba(255, 255, 255, 0.08);
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --font-cinzel: 'Cinzel', serif;
+  --font-garamond: 'EB Garamond', serif;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--cream-dim);
+  font-family: var(--font-garamond);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+body { min-height: 100vh; display: flex; justify-content: center; }
+.app-frame {
+  width: 100%; max-width: 440px; min-height: 100vh;
+  background: var(--bg); position: relative;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+@media (min-width: 600px) {
+  body { background: #0a0907; padding: 24px 0; }
+  .app-frame { min-height: calc(100vh - 48px); border-radius: 12px; border: 1px solid var(--border); }
+}
+.screen { display: none; flex-direction: column; min-height: 100vh; animation: screenIn 0.25s ease-out; }
+.screen.active { display: flex; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 18px 12px; position: sticky; top: 0;
+  background: var(--bg); z-index: 50;
+  border-bottom: 1px solid var(--border);
+}
+.topbar-back {
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: none; color: var(--gold);
+  font-family: var(--font-garamond); font-size: 16px;
+  cursor: pointer; padding: 4px 8px; margin-left: -8px; border-radius: 6px;
+}
+.topbar-back:hover { background: var(--gold-faint); }
+.topbar-actions { display: flex; gap: 6px; align-items: center; }
+.topbar-actions button {
+  background: none; border: none; color: var(--gold-dim);
+  width: 36px; height: 36px; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, background 0.15s; position: relative;
+}
+.topbar-actions button:hover { color: var(--gold); background: var(--gold-faint); }
+.topbar-actions svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.page-heading { padding: 8px 22px 4px; }
+.page-heading h1 {
+  font-family: var(--font-cinzel); font-weight: 600;
+  color: var(--gold); font-size: 24px;
+  text-transform: uppercase; letter-spacing: 0.06em; margin: 0;
+}
+.page-heading .subhead {
+  font-family: var(--font-garamond); font-style: italic;
+  color: var(--gold-dim); font-size: 14px; margin-top: 4px;
+}
+.stats-strip {
+  margin: 14px 18px 8px; padding: 14px 16px;
+  background: linear-gradient(135deg, var(--bg3), var(--bg2));
+  border: 1px solid var(--gold-border); border-radius: 12px;
+}
+.streak-row {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-garamond); font-size: 15px; color: var(--cream-dim);
+}
+.streak-flame { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--gold); }
+.streak-flame svg { width: 22px; height: 22px; fill: currentColor; }
+.streak-value { color: var(--gold-bright); font-weight: 500; }
+.streak-sep { color: var(--gold-dim); margin: 0 2px; }
+.streak-meta { color: var(--gold-dim); font-size: 13px; font-style: italic; }
+.milestones-row {
+  display: flex; gap: 8px; margin-top: 12px;
+  overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+}
+.milestones-row::-webkit-scrollbar { display: none; }
+.milestone-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; background: var(--gold-faint);
+  border: 1px solid var(--gold-border); border-radius: 999px;
+  font-family: var(--font-cinzel); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--gold); white-space: nowrap; flex-shrink: 0;
+}
+.milestone-badge::before { content: '✦'; font-size: 12px; color: var(--gold-bright); }
+.tab-strip {
+  display: flex; border-bottom: 1px solid var(--border);
+  padding: 0 18px; margin-top: 16px;
+}
+.tab-btn {
+  background: none; border: none; padding: 12px 14px 14px;
+  font-family: var(--font-cinzel); text-transform: uppercase;
+  letter-spacing: 0.08em; font-size: 11px;
+  color: var(--gold-dim); cursor: pointer; position: relative;
+  transition: color 0.2s;
+}
+.tab-btn.active { color: var(--gold); }
+.tab-btn.active::after {
+  content: ''; position: absolute; bottom: -1px;
+  left: 14px; right: 14px; height: 2px;
+  background: var(--gold); border-radius: 2px 2px 0 0;
+}
+.tab-btn:hover { color: var(--gold); }
+.controls-row { display: flex; gap: 10px; padding: 12px 18px; align-items: center; }
+.controls-row button {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--cream-dim); font-family: var(--font-garamond);
+  font-size: 13px; padding: 6px 12px; border-radius: 6px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+.controls-row button:hover { border-color: var(--gold-border); color: var(--gold); }
+.controls-row .search-pill {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 6px 14px;
+  display: flex; align-items: center; gap: 8px;
+  color: var(--cream-faint); font-style: italic; font-size: 13px;
+}
+.controls-row .search-pill svg { width: 14px; height: 14px; opacity: 0.6; }
+.entry-list { padding: 0 14px 100px; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.entry-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px 14px 22px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  position: relative;
+}
+.entry-card:hover { background: var(--bg3); border-color: var(--gold-border); }
+.entry-card:active { transform: scale(0.99); }
+.entry-card.pinned::before {
+  content: ''; position: absolute; top: 14px; right: 14px;
+  width: 7px; height: 7px; background: var(--gold);
+  transform: rotate(45deg); box-shadow: 0 0 8px var(--gold-glow);
+}
+.entry-card .ec-mood {
+  position: absolute; left: 8px; top: 14px; bottom: 14px;
+  width: 3px; border-radius: 2px; background: var(--gold);
+}
+.entry-card .ec-mood.silver { background: #b8b8b8; }
+.entry-card .ec-mood.deep { background: #a8543f; }
+.entry-card .ec-mood.quiet { background: #6b8593; }
+.ec-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.ec-title { font-family: var(--font-garamond); font-size: 17px; font-weight: 500; color: var(--cream); margin: 0; }
+.ec-title.untitled { font-style: italic; color: var(--cream-faint); }
+.ec-date {
+  font-family: var(--font-cinzel); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--gold-dim); white-space: nowrap;
+}
+.ec-preview {
+  font-family: var(--font-garamond); font-size: 14px;
+  color: var(--cream-dim); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; margin: 0;
+}
+.ec-attachments { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.ec-attach {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; background: var(--gold-faint); border-radius: 4px;
+  font-size: 10px; font-family: var(--font-cinzel);
+  text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold);
+}
+.ec-attach svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.ec-meta {
+  display: flex; gap: 8px; margin-top: 8px; font-size: 11px;
+  font-family: var(--font-cinzel); text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--gold-dim); align-items: center;
+}
+.ec-meta-sep { color: var(--gold-dim); opacity: 0.5; }
+.ec-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.ec-tag {
+  color: var(--gold); font-style: italic;
+  font-family: var(--font-garamond); font-size: 12px;
+  text-transform: none; letter-spacing: 0;
+}
+.notebook-grid { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.notebook-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px 16px; cursor: pointer; min-height: 120px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  transition: border-color 0.15s, background 0.15s;
+}
+.notebook-card:hover { border-color: var(--gold-border); background: var(--bg3); }
+.notebook-card.uncategorized { border-style: dashed; border-color: var(--gold-dim); }
+.notebook-card.new {
+  border-style: dashed; border-color: var(--gold-dim);
+  align-items: center; justify-content: center; color: var(--gold-dim);
+}
+.notebook-card.new .plus { font-size: 28px; color: var(--gold-dim); font-family: var(--font-cinzel); margin-bottom: 4px; }
+.notebook-card.new .label {
+  font-family: var(--font-cinzel); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim);
+}
+.nc-eyebrow {
+  font-family: var(--font-cinzel); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim);
+}
+.nc-title {
+  font-family: var(--font-cinzel); color: var(--gold);
+  font-size: 16px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0;
+}
+.nc-count { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: 13px; }
+.lib-grid { padding: 24px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.lib-tile {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px 18px; cursor: pointer; min-height: 140px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  text-align: left; transition: border-color 0.15s, background 0.15s; position: relative;
+}
+.lib-tile:hover { border-color: var(--gold-border); background: var(--bg3); }
+.lib-tile .icon { color: var(--gold); }
+.lib-tile .icon svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.lib-tile .title {
+  font-family: var(--font-cinzel); font-size: 16px; font-weight: 600;
+  color: var(--gold); text-transform: uppercase;
+  letter-spacing: 0.05em; margin: 12px 0 4px;
+}
+.lib-tile .meta { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: 13px; }
+.lib-tile.ghost { opacity: 0.55; }
+.lib-tile.ghost::after {
+  content: 'Coming Soon'; position: absolute; top: 14px; right: 14px;
+  font-family: var(--font-cinzel); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim);
+  background: var(--gold-faint); padding: 3px 7px; border-radius: 4px;
+}
+.fab {
+  position: fixed; bottom: 22px; right: calc(50% - 220px + 22px);
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--gold); border: none; color: var(--bg);
+  font-size: 28px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-cinzel); font-weight: 600;
+  box-shadow: 0 6px 20px rgba(212, 183, 114, 0.35);
+  transition: transform 0.15s; z-index: 40;
+}
+@media (max-width: 480px) { .fab { right: 22px; } }
+.fab:hover { transform: scale(1.05); }
+.fab:active { transform: scale(0.96); }
+.editor-shell, .viewer-shell { flex: 1; display: flex; flex-direction: column; }
+.editor-meta { padding: 20px 22px 8px; }
+.editor-title-input { width: 100%; background: none; border: none; color: var(--gold); font-family: var(--font-cinzel); font-size: 22px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; outline: none; padding: 0; }
+.editor-title-input::placeholder { color: var(--gold-dim); opacity: 0.6; font-style: italic; text-transform: none; letter-spacing: 0.02em; font-weight: 400; }
+.editor-date-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); }
+.mood-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--gold); border: 1px solid var(--gold-border); cursor: pointer; }
+.mood-dot.silver { background: #b8b8b8; }
+.mood-dot.deep { background: #a8543f; }
+.mood-dot.quiet { background: #6b8593; }
+.mood-dot.none { background: transparent; border: 1px dashed var(--gold-dim); }
+.editor-save-indicator { font-style: italic; color: var(--gold-dim); font-family: var(--font-garamond); font-size: 12px; text-transform: none; letter-spacing: 0; padding: 0 8px; }
+.editor-blocks { padding: 0 18px 24px; display: flex; flex-direction: column; gap: 8px; }
+.block { position: relative; padding: 4px 0; }
+.block-textarea { width: 100%; background: none; border: none; color: var(--cream-dim); font-family: var(--font-garamond); font-size: 17px; line-height: 1.65; resize: none; outline: none; padding: 6px 4px; border-radius: 4px; transition: background 0.15s; }
+.block-textarea:focus { background: rgba(255, 255, 255, 0.02); }
+.block-textarea.h2 { font-family: var(--font-cinzel); color: var(--gold); font-size: 17px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.block-quote { border-left: 3px solid var(--gold); padding: 10px 0 10px 18px; margin: 4px 0; }
+.block-quote textarea { width: 100%; background: none; border: none; color: var(--cream); font-family: var(--font-garamond); font-style: italic; font-size: 17px; line-height: 1.6; resize: none; outline: none; padding: 2px 0; }
+.block-quote .cite { font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); margin-top: 8px; }
+.block-divider { text-align: center; padding: 16px 0; color: var(--gold); letter-spacing: 1em; font-size: 14px; user-select: none; }
+.embed-card { background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 8px; padding: 14px 16px; cursor: pointer; position: relative; transition: background 0.15s, border-color 0.15s; }
+.embed-card:hover { border-color: var(--gold); background: var(--bg4); }
+.embed-card .ec-eyebrow { font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); margin-bottom: 4px; }
+.embed-card h4 { font-family: var(--font-cinzel); color: var(--cream); font-size: 16px; font-weight: 500; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.embed-card .ec-body { font-family: var(--font-garamond); color: var(--cream-dim); font-size: 14px; line-height: 1.5; font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.embed-card .ec-card-date { position: absolute; top: 12px; right: 14px; font-family: var(--font-cinzel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); }
+.embed-card .ec-delete { position: absolute; bottom: 8px; right: 8px; background: none; border: none; color: var(--gold-dim); width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 14px; display: none; align-items: center; justify-content: center; }
+.embed-card:hover .ec-delete { display: flex; }
+.embed-card .ec-delete:hover { background: rgba(255, 100, 100, 0.15); color: #ff8888; }
+.embed-image { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); position: relative; }
+.embed-image .img-placeholder { width: 100%; height: 220px; background: linear-gradient(135deg, #4a3d2a 0%, #6b5a3f 35%, #5a4530 70%, #3d2e1f 100%); display: flex; align-items: center; justify-content: center; position: relative; }
+.embed-image .img-placeholder::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at top, rgba(232,205,139,0.18), transparent 55%); }
+.embed-image .img-placeholder svg { width: 32px; height: 32px; color: rgba(255, 255, 255, 0.25); stroke: currentColor; fill: none; stroke-width: 1.5; z-index: 1; }
+.embed-image .img-caption { padding: 8px 14px; background: var(--bg2); font-family: var(--font-garamond); font-style: italic; font-size: 13px; color: var(--cream-dim); }
+.embed-image .img-delete { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); color: var(--cream); width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; }
+.embed-audio { background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; position: relative; }
+.embed-audio .play-btn { width: 38px; height: 38px; border-radius: 50%; background: var(--gold); border: none; color: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.embed-audio .play-btn svg { width: 14px; height: 14px; fill: currentColor; margin-left: 2px; }
+.embed-audio .audio-body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.embed-audio .waveform { height: 28px; display: flex; align-items: center; gap: 2px; }
+.embed-audio .waveform .bar { width: 2px; background: var(--gold-dim); border-radius: 1px; flex-shrink: 0; }
+.embed-audio .audio-meta { font-family: var(--font-cinzel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); display: flex; justify-content: space-between; }
+.editor-toolbar { position: sticky; bottom: 0; background: var(--bg2); border-top: 1px solid var(--border); padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.editor-toolbar .group { display: flex; gap: 6px; align-items: center; }
+.editor-toolbar button { background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--cream-dim); cursor: pointer; padding: 8px 12px; font-family: var(--font-garamond); font-size: 14px; display: inline-flex; align-items: center; gap: 6px; transition: border-color 0.15s, color 0.15s; }
+.editor-toolbar button:hover { border-color: var(--gold-border); color: var(--gold); }
+.editor-toolbar button.primary { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); }
+.editor-toolbar button svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.between-block-add { display: flex; align-items: center; height: 0; margin: -4px 0; position: relative; opacity: 0; transition: opacity 0.15s, height 0.15s, margin 0.15s; cursor: pointer; }
+.editor-blocks:hover .between-block-add { opacity: 1; height: 20px; margin: 0; }
+.between-block-add::before { content: ''; position: absolute; left: 30px; right: 30px; top: 50%; height: 1px; background: var(--gold-border); }
+.between-block-add .plus { margin-left: 12px; z-index: 1; background: var(--bg); color: var(--gold); border: 1px solid var(--gold-border); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-cinzel); font-size: 14px; }
+.viewer-meta { padding: 22px 22px 12px; }
+.viewer-title { font-family: var(--font-cinzel); font-size: 24px; font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+.viewer-date { font-family: var(--font-cinzel); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 6px; }
+.viewer-blocks { padding: 8px 22px 100px; display: flex; flex-direction: column; gap: 12px; }
+.viewer-blocks .block-p { font-family: var(--font-garamond); font-size: 17px; line-height: 1.7; color: var(--cream-dim); margin: 4px 0; }
+.viewer-blocks .inline-letter, .viewer-blocks .inline-bookmark, .viewer-blocks .inline-journal { color: var(--gold); border-bottom: 1px dotted var(--gold-border); cursor: pointer; padding-bottom: 1px; }
+.viewer-blocks .inline-letter:hover, .viewer-blocks .inline-bookmark:hover, .viewer-blocks .inline-journal:hover { color: var(--gold-bright); border-bottom-color: var(--gold); }
+.viewer-blocks .inline-ref { color: var(--gold); font-family: var(--font-cinzel); font-size: 0.92em; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; padding: 1px 4px; background: var(--gold-faint); border-radius: 3px; margin: 0 1px; }
+.back-pill-row { padding: 14px 18px 6px; }
+.back-pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px 6px 10px; background: var(--gold-faint); border: 1px solid var(--gold-border); border-radius: 999px; color: var(--gold); font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.back-pill:hover { background: rgba(212, 183, 114, 0.2); border-color: var(--gold); }
+.back-pill svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+.journal-chip { position: relative; }
+.journal-chip svg { color: var(--gold); }
+.journal-chip .chip-badge { position: absolute; top: 0; right: 0; min-width: 16px; height: 16px; border-radius: 8px; background: var(--gold); color: var(--bg); font-family: var(--font-cinzel); font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid var(--bg); }
+.sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 100; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.sheet-overlay.active { opacity: 1; pointer-events: auto; }
+.sheet { width: 100%; max-width: 440px; background: var(--bg2); border-radius: 18px 18px 0 0; border: 1px solid var(--border); border-bottom: none; max-height: 88vh; overflow-y: auto; transform: translateY(20px); transition: transform 0.25s ease-out; padding-bottom: env(safe-area-inset-bottom); }
+.sheet-overlay.active .sheet { transform: translateY(0); }
+.sheet-handle { width: 36px; height: 4px; background: var(--gold-dim); border-radius: 2px; margin: 10px auto 4px; opacity: 0.5; }
+.sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 20px 12px; border-bottom: 1px solid var(--border); }
+.sheet-title { font-family: var(--font-cinzel); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); }
+.sheet-close { background: none; border: none; color: var(--gold-dim); cursor: pointer; width: 30px; height: 30px; border-radius: 50%; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.sheet-close:hover { background: var(--bg3); color: var(--gold); }
+.insert-section { padding: 14px 20px 8px; }
+.insert-section h4 { font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--gold-dim); margin: 0 0 10px; }
+.insert-list { display: flex; flex-direction: column; gap: 2px; }
+.insert-item { display: flex; align-items: center; gap: 14px; padding: 12px 10px; border-radius: 8px; cursor: pointer; transition: background 0.12s; }
+.insert-item:hover { background: var(--bg3); }
+.insert-item .icon { width: 36px; height: 36px; border-radius: 8px; background: var(--gold-faint); display: flex; align-items: center; justify-content: center; color: var(--gold); flex-shrink: 0; font-family: var(--font-cinzel); font-size: 13px; }
+.insert-item .icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.insert-item .text { display: flex; flex-direction: column; }
+.insert-item .label { font-family: var(--font-garamond); font-size: 16px; color: var(--cream); }
+.insert-item .desc { font-family: var(--font-garamond); font-style: italic; font-size: 12px; color: var(--gold-dim); }
+.recording-content { padding: 32px 24px; text-align: center; }
+.recording-status { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-cinzel); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #ff6b6b; }
+.recording-status::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: #ff6b6b; animation: pulseRecord 1s ease-in-out infinite; }
+@keyframes pulseRecord { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.recording-time { font-family: var(--font-cinzel); font-size: 42px; font-weight: 500; color: var(--cream); letter-spacing: 0.05em; margin: 20px 0; }
+.recording-waveform { display: flex; align-items: flex-end; justify-content: center; height: 60px; gap: 3px; margin: 20px 0; }
+.recording-waveform .bar { width: 3px; background: var(--gold); border-radius: 1px; transition: height 0.15s; }
+.recording-actions { display: flex; justify-content: center; gap: 14px; margin-top: 32px; }
+.recording-actions button { padding: 10px 24px; border-radius: 999px; font-family: var(--font-cinzel); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; }
+.recording-actions .cancel { background: none; border: 1px solid var(--gold-dim); color: var(--gold-dim); }
+.recording-actions .stop { background: var(--gold); border: 1px solid var(--gold); color: var(--bg); display: inline-flex; align-items: center; gap: 6px; }
+.inbound-list { padding: 6px 14px 20px; display: flex; flex-direction: column; gap: 8px; }
+.inbound-item { padding: 12px 14px; background: var(--bg3); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; }
+.inbound-item:hover { border-color: var(--gold-border); }
+.ib-title { font-family: var(--font-garamond); font-size: 15px; color: var(--cream); font-weight: 500; }
+.ib-date { font-family: var(--font-cinzel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); margin-top: 2px; }
+.ib-preview { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: 13px; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.parallel-shell { display: flex; flex-direction: column; min-height: 100vh; }
+.parallel-top { flex: 0 0 55%; overflow-y: auto; border-bottom: 1px solid var(--border); position: relative; }
+.parallel-bottom { flex: 0 0 45%; display: flex; flex-direction: column; overflow-y: auto; background: var(--bg2); }
+.parallel-divider { height: 6px; background: var(--gold-faint); border-top: 1px solid var(--gold-border); border-bottom: 1px solid var(--gold-border); cursor: ns-resize; display: flex; align-items: center; justify-content: center; }
+.parallel-divider::before { content: ''; width: 32px; height: 2px; background: var(--gold); border-radius: 1px; }
+.letter-mock { padding: 16px 22px 30px; }
+.letter-mock .eyebrow { font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); }
+.letter-mock h1 { font-family: var(--font-cinzel); font-size: 22px; color: var(--gold); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0 4px; }
+.letter-mock .from { font-family: var(--font-garamond); font-style: italic; font-size: 13px; color: var(--gold-dim); }
+.letter-mock p { font-family: var(--font-garamond); font-size: 16px; line-height: 1.65; margin: 14px 0; color: var(--cream-dim); }
+.letter-mock .ornament { text-align: center; color: var(--gold); letter-spacing: 1em; margin: 20px 0; font-size: 14px; }
+.letter-mock-toolbar { position: sticky; top: 0; background: var(--bg); z-index: 5; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+.letter-mock-toolbar h2 { font-family: var(--font-cinzel); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); margin: 0; font-weight: 500; }
+.parallel-bottom-header { padding: 10px 18px 6px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.parallel-bottom-header h3 { font-family: var(--font-cinzel); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); margin: 0; font-weight: 500; }
+.parallel-bottom-header .actions { display: flex; gap: 4px; }
+.parallel-bottom-header .actions button { background: none; border: none; color: var(--gold-dim); cursor: pointer; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.parallel-bottom-header .actions button:hover { color: var(--gold); background: var(--gold-faint); }
+.parallel-bottom-header .actions svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.selection-toolbar-mock { position: absolute; top: 180px; left: 30px; background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 999px; padding: 6px 8px; display: flex; gap: 4px; align-items: center; box-shadow: var(--shadow); z-index: 6; animation: stbIn 0.2s; }
+@keyframes stbIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.selection-toolbar-mock button { background: none; border: none; color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; padding: 4px 10px; border-radius: 999px; }
+.selection-toolbar-mock button:hover { background: var(--gold-faint); color: var(--gold); }
+.selection-toolbar-mock button.primary { background: var(--gold); color: var(--bg); }
+.selected-text { background: var(--gold-faint); border-radius: 2px; box-shadow: 0 0 0 1px var(--gold-border); }
+.toast { position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%); background: var(--bg3); border: 1px solid var(--gold); color: var(--gold-bright); padding: 10px 18px; border-radius: 999px; font-family: var(--font-cinzel); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+.toast .ornament { color: var(--gold-bright); font-size: 14px; }
+.demo-banner { background: linear-gradient(90deg, var(--gold-faint), transparent); border-bottom: 1px solid var(--gold-border); padding: 6px 14px; font-family: var(--font-cinzel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--gold-dim); text-align: center; }
+</style>
+</head>
+<body>
+<div class="app-frame">
+  <div class="demo-banner">VOTReader Journal · UI Scaffolding Demo</div>
+
+  <div class="screen active" id="screen-library">
+    <div class="topbar">
+      <button class="topbar-back">‹ Home</button>
+      <div class="topbar-actions">
+        <button title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg></button>
+        <button title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></button>
+      </div>
+    </div>
+    <div class="page-heading">
+      <h1>Library</h1>
+      <div class="subhead">Your personal study companion</div>
+    </div>
+    <div class="lib-grid">
+      <button class="lib-tile ghost">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 4h12a3 3 0 013 3v13H7a3 3 0 01-3-3V4z"/><path d="M4 17a3 3 0 013-3h12"/></svg></div>
+        <div><div class="title">Notes</div><div class="meta">42 notes</div></div>
+      </button>
+      <button class="lib-tile" onclick="goScreen('screen-journal-hub')">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 012 2v14l-7-3-7 3V6a2 2 0 012-2z"/><path d="M9 9h6M9 13h4"/></svg></div>
+        <div><div class="title">Journal</div><div class="meta">12 entries · 7-day streak</div></div>
+      </button>
+      <button class="lib-tile ghost">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/></svg></div>
+        <div><div class="title">Bookmarks</div><div class="meta">8 saved</div></div>
+      </button>
+      <button class="lib-tile ghost">
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M3 8l4-4h10l4 4v12a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M3 8h18M9 4v4M15 4v4"/></svg></div>
+        <div><div class="title">Highlights</div><div class="meta">Coming soon</div></div>
+      </button>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-journal-hub">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goScreen('screen-library')">‹ Library</button>
+      <div class="topbar-actions">
+        <button title="Search" onclick="showToast('Search coming in Phase 1')"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg></button>
+        <button title="Settings" onclick="showToast('Settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></button>
+      </div>
+    </div>
+    <div class="page-heading">
+      <h1>My Journal</h1>
+      <div class="subhead">12 entries · 7-day streak</div>
+    </div>
+    <div class="stats-strip">
+      <div class="streak-row">
+        <div class="streak-flame"><svg viewBox="0 0 24 24"><path d="M12 2c-1 2-2 3-2 5 0 1 1 2 2 2-2 1-4 3-4 6 0 4 3 7 6 7s6-3 6-7c0-3-2-5-4-6 1 0 2-1 2-2 0-2-2-3-3-5-1 1-2 0-3 0z"/></svg></div>
+        <span class="streak-value">7 days</span><span class="streak-sep">·</span><span class="streak-meta">longest: 23</span>
+      </div>
+      <div class="milestones-row">
+        <span class="milestone-badge">First entry</span>
+        <span class="milestone-badge">10 entries</span>
+        <span class="milestone-badge">7-day streak</span>
+      </div>
+    </div>
+    <div class="tab-strip">
+      <button class="tab-btn active" onclick="switchTab(this, 'all-entries')">All Entries</button>
+      <button class="tab-btn" onclick="switchTab(this, 'notebooks')">Notebooks</button>
+      <button class="tab-btn" onclick="switchTab(this, 'pinned')">Pinned</button>
+    </div>
+    <div id="tab-all-entries" class="tab-pane">
+      <div class="controls-row">
+        <div class="search-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg><span>Search entries…</span></div>
+        <button>Newest ↓</button>
+      </div>
+      <div class="entry-list">
+        <div class="entry-card pinned" onclick="goScreen('screen-journal-viewer')">
+          <div class="ec-mood"></div>
+          <div class="ec-row"><h3 class="ec-title">Reflection on The Wide Path</h3><span class="ec-date">May 14</span></div>
+          <p class="ec-preview">Today's reading struck me deeply. The Lord speaks of the way that seems right to a man, but the end thereof is destruction. I've been thinking about how often I walk that path without realizing…</p>
+          <div class="ec-attachments">
+            <span class="ec-attach"><svg viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 012 2v14l-7-3-7 3V6a2 2 0 012-2z"/></svg> Volume Two</span>
+            <span class="ec-attach"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg> 1 image</span>
+          </div>
+        </div>
+        <div class="entry-card" onclick="showToast('Open entry')">
+          <div class="ec-mood silver"></div>
+          <div class="ec-row"><h3 class="ec-title">Morning Prayer</h3><span class="ec-date">May 13</span></div>
+          <p class="ec-preview">A short prayer recorded before reading today. Father, prepare my heart to receive what You would speak…</p>
+          <div class="ec-attachments">
+            <span class="ec-attach"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 013 3v7a3 3 0 01-6 0V5a3 3 0 013-3z"/><path d="M19 11a7 7 0 01-14 0M12 18v4M8 22h8"/></svg> Voice · 0:47</span>
+          </div>
+        </div>
+        <div class="entry-card" onclick="showToast('Open entry')">
+          <div class="ec-mood"></div>
+          <div class="ec-row"><h3 class="ec-title">Notes on Volume Two Letters</h3><span class="ec-date">May 12</span></div>
+          <p class="ec-preview">Working through the early letters of Volume Two. I want to understand the through-line — what does the Lord keep returning to?</p>
+          <div class="ec-attachments"><span class="ec-attach">3 letter cards</span><span class="ec-attach">2 quotes</span></div>
+          <div class="ec-meta"><span>Volume Two Study</span><span class="ec-meta-sep">·</span><div class="ec-tags"><span class="ec-tag">#study</span><span class="ec-tag">#prophecy</span></div></div>
+        </div>
+        <div class="entry-card" onclick="showToast('Open entry')">
+          <div class="ec-mood deep"></div>
+          <div class="ec-row"><h3 class="ec-title">On Repentance</h3><span class="ec-date">May 11</span></div>
+          <p class="ec-preview">Conviction this morning. The bookmark I saved last week kept returning to mind. Reading Isaiah 55 alongside the letter…</p>
+          <div class="ec-attachments"><span class="ec-attach"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/></svg> Bookmark</span><span class="ec-attach">Isaiah 55</span></div>
+        </div>
+        <div class="entry-card" onclick="showToast('Open entry')">
+          <div class="ec-mood"></div>
+          <div class="ec-row"><h3 class="ec-title untitled">Untitled</h3><span class="ec-date">May 10</span></div>
+          <p class="ec-preview">The sun rising over the field this morning — couldn't stop thinking of the verse about His mercies being new every morning.</p>
+          <div class="ec-attachments"><span class="ec-attach"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg> 1 image</span></div>
+        </div>
+        <div class="entry-card" onclick="showToast('Open entry')">
+          <div class="ec-mood quiet"></div>
+          <div class="ec-row"><h3 class="ec-title">Questions for later study</h3><span class="ec-date">May 8</span></div>
+          <p class="ec-preview">Several things came up while reading the Flock letters that I want to come back to. Particularly the recurring theme of separation…</p>
+          <div class="ec-meta"><div class="ec-tags"><span class="ec-tag">#questions</span><span class="ec-tag">#flock</span></div></div>
+        </div>
+        <div class="entry-card" onclick="showToast('Open entry')">
+          <div class="ec-mood"></div>
+          <div class="ec-row"><h3 class="ec-title">Fasting reflections</h3><span class="ec-date">May 5</span></div>
+          <p class="ec-preview">Day two of the fast. Body weak, spirit clearer than it has been in weeks. The Word reads differently when the flesh is silenced…</p>
+        </div>
+      </div>
+    </div>
+    <div id="tab-notebooks" class="tab-pane" style="display:none">
+      <div class="notebook-grid">
+        <div class="notebook-card uncategorized" onclick="showToast('Drill into Uncategorized')">
+          <div class="nc-eyebrow">Default</div><div class="nc-title">Uncategorized</div><div class="nc-count">4 entries</div>
+        </div>
+        <div class="notebook-card" onclick="showToast('Drill into notebook')">
+          <div class="nc-eyebrow">Notebook</div><div class="nc-title">Volume Two Study</div><div class="nc-count">3 entries</div>
+        </div>
+        <div class="notebook-card" onclick="showToast('Drill into notebook')">
+          <div class="nc-eyebrow">Notebook</div><div class="nc-title">Prayers</div><div class="nc-count">2 entries</div>
+        </div>
+        <div class="notebook-card" onclick="showToast('Drill into notebook')">
+          <div class="nc-eyebrow">Notebook</div><div class="nc-title">2026 Reflections</div><div class="nc-count">3 entries</div>
+        </div>
+        <div class="notebook-card new" onclick="showToast('Create notebook')">
+          <div class="plus">+</div><div class="label">New Notebook</div>
+        </div>
+      </div>
+    </div>
+    <div id="tab-pinned" class="tab-pane" style="display:none">
+      <div class="entry-list" style="padding-top:16px">
+        <div class="entry-card pinned" onclick="goScreen('screen-journal-viewer')">
+          <div class="ec-mood"></div>
+          <div class="ec-row"><h3 class="ec-title">Reflection on The Wide Path</h3><span class="ec-date">May 14</span></div>
+          <p class="ec-preview">Today's reading struck me deeply. The Lord speaks of the way that seems right to a man…</p>
+        </div>
+      </div>
+    </div>
+    <button class="fab" onclick="goScreen('screen-journal-editor')">+</button>
+  </div>
+  <div class="screen" id="screen-journal-viewer">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goScreen('screen-journal-hub')">‹ My Journal</button>
+      <div class="topbar-actions">
+        <button title="Edit" onclick="goScreen('screen-journal-editor')"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z"/></svg></button>
+        <button title="Pin"><svg viewBox="0 0 24 24"><path d="M12 17v5M5 12l7-9 7 9-3 1 3 5H8l3-5z"/></svg></button>
+        <button title="More"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button>
+      </div>
+    </div>
+    <div class="viewer-shell">
+      <div class="viewer-meta">
+        <h1 class="viewer-title">Reflection on The Wide Path</h1>
+        <div class="viewer-date">May 14, 2026 · Pinned</div>
+      </div>
+      <div class="viewer-blocks">
+        <div class="embed-card" onclick="goScreen('screen-letter-view')">
+          <div class="ec-card-date">3/28/05</div>
+          <div class="ec-eyebrow">Volume Two</div>
+          <h4>The Wide Path</h4>
+          <div class="ec-body">Thus says The Lord: Peoples of the earth, why have you forsaken Me, in favor of broad paths that lead to your own destruction?</div>
+        </div>
+        <p class="block-p">Today's reading struck me deeply. The Lord speaks of <em>the way that seems right to a man</em>, but the end thereof is destruction. I've been thinking about how often I walk that path without realizing — choosing what feels right, what feels comfortable, what looks like wisdom from where I'm standing.</p>
+        <p class="block-p">The verse that kept returning was <span class="inline-ref" onclick="showToast('Open scripture sheet')">Proverbs 14:12</span>, and reading it with the letter open beside me, I see now that the Lord has been gently pointing me to this for weeks.</p>
+        <div class="embed-image">
+          <div class="img-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div>
+          <div class="img-caption">The path I walked this morning — a fitting reminder.</div>
+        </div>
+        <div class="block-quote">
+          <div style="font-style:italic;color:var(--cream);font-family:var(--font-garamond);font-size:17px;line-height:1.6">Therefore, turn from this wide path, return to the narrow way, the way of righteousness…</div>
+          <div class="cite">Volume Two · The Wide Path</div>
+        </div>
+        <div class="embed-audio">
+          <button class="play-btn" onclick="showToast('Playback (demo)')"><svg viewBox="0 0 24 24"><path d="M5 3v18l16-9z"/></svg></button>
+          <div class="audio-body">
+            <div class="waveform" id="viewer-waveform"></div>
+            <div class="audio-meta"><span>Voice memo</span><span>0:47</span></div>
+          </div>
+        </div>
+        <div class="block-divider">❖ ❖ ❖</div>
+        <p class="block-p">I want to come back to this entry. Linking it for later: <span class="inline-journal" onclick="showToast('Open linked entry')">On Repentance (May 11)</span> — there's a thread running between them.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-journal-editor">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goScreen('screen-journal-viewer')">‹ Done</button>
+      <div class="topbar-actions">
+        <span class="editor-save-indicator" id="save-indicator">Saved</span>
+        <button title="More"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button>
+      </div>
+    </div>
+    <div class="editor-shell">
+      <div class="editor-meta">
+        <input class="editor-title-input" value="Reflection on The Wide Path" placeholder="Untitled" oninput="markUnsaved()">
+        <div class="editor-date-row">
+          <span>May 14, 2026</span>
+          <span style="opacity:0.4">·</span>
+          <div class="mood-dot" title="Mood" onclick="cycleMood(this)"></div>
+        </div>
+      </div>
+      <div class="editor-blocks">
+        <div class="block">
+          <div class="embed-card">
+            <button class="ec-delete">✕</button>
+            <div class="ec-card-date">3/28/05</div>
+            <div class="ec-eyebrow">Volume Two</div>
+            <h4>The Wide Path</h4>
+            <div class="ec-body">Thus says The Lord: Peoples of the earth, why have you forsaken Me…</div>
+          </div>
+        </div>
+        <div class="between-block-add" onclick="openInsertSheet()"><span class="plus">+</span></div>
+        <div class="block">
+          <textarea class="block-textarea" rows="4" oninput="markUnsaved(); autoGrow(this)">Today's reading struck me deeply. The Lord speaks of _the way that seems right to a man_, but the end thereof is destruction. I've been thinking about how often I walk that path without realizing — choosing what feels right, what feels comfortable, what looks like wisdom from where I'm standing.</textarea>
+        </div>
+        <div class="between-block-add" onclick="openInsertSheet()"><span class="plus">+</span></div>
+        <div class="block">
+          <textarea class="block-textarea" rows="2" oninput="markUnsaved(); autoGrow(this)">The verse that kept returning was {{ref:Proverbs 14:12}}, and reading it with the letter open beside me, I see now that the Lord has been gently pointing me to this for weeks.</textarea>
+        </div>
+        <div class="between-block-add" onclick="openInsertSheet()"><span class="plus">+</span></div>
+        <div class="block">
+          <div class="embed-image">
+            <button class="img-delete">✕</button>
+            <div class="img-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div>
+            <input class="img-caption" style="width:100%;background:var(--bg2);border:none;border-top:1px solid var(--border);color:var(--cream-dim);font-family:var(--font-garamond);font-style:italic;font-size:13px;padding:8px 14px;outline:none" value="The path I walked this morning — a fitting reminder." placeholder="Caption (optional)">
+          </div>
+        </div>
+        <div class="between-block-add" onclick="openInsertSheet()"><span class="plus">+</span></div>
+        <div class="block">
+          <div class="block-quote">
+            <textarea rows="2" oninput="autoGrow(this); markUnsaved()">Therefore, turn from this wide path, return to the narrow way, the way of righteousness…</textarea>
+            <div class="cite">Volume Two · The Wide Path</div>
+          </div>
+        </div>
+        <div class="between-block-add" onclick="openInsertSheet()"><span class="plus">+</span></div>
+        <div class="block">
+          <div class="embed-audio">
+            <button class="play-btn" onclick="showToast('Playback (demo)')"><svg viewBox="0 0 24 24"><path d="M5 3v18l16-9z"/></svg></button>
+            <div class="audio-body">
+              <div class="waveform" id="editor-waveform"></div>
+              <div class="audio-meta"><span>Voice memo</span><span>0:47</span></div>
+            </div>
+            <button class="ec-delete" style="display:flex;position:relative;top:0;right:0;background:none;color:var(--gold-dim);font-size:16px;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer">✕</button>
+          </div>
+        </div>
+      </div>
+      <div class="editor-toolbar">
+        <div class="group">
+          <button title="Undo"><svg viewBox="0 0 24 24"><path d="M3 7v6h6M3 13a9 9 0 0115-7"/></svg></button>
+          <button onclick="openInsertSheet()" class="primary"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Insert</button>
+        </div>
+        <div class="group">
+          <button onclick="showToast('Tags')"><svg viewBox="0 0 24 24"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L2 12V2h10l8.6 8.6a2 2 0 010 2.8z"/><circle cx="7" cy="7" r="1.5"/></svg></button>
+          <button onclick="showToast('Notebook')"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 012-2h11l3 3v13a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M8 7h6"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="screen" id="screen-letter-view">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goScreen('screen-journal-viewer')">‹ Back</button>
+      <div class="topbar-actions">
+        <button class="journal-chip" title="Journal entries on this letter" onclick="openSheet('sheet-inbound')">
+          <svg viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 012 2v14l-7-3-7 3V6a2 2 0 012-2z"/><path d="M9 9h6M9 13h4"/></svg>
+          <span class="chip-badge">3</span>
+        </button>
+        <button title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></button>
+      </div>
+    </div>
+    <div class="back-pill-row">
+      <button class="back-pill" onclick="goScreen('screen-journal-viewer')">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        Back to My Journal · Reflection on The Wide Path
+      </button>
+    </div>
+    <div class="letter-mock">
+      <div class="eyebrow">Volume Two · Letter 1</div>
+      <h1>The Wide Path</h1>
+      <div class="from">From The Lord, Our God and Savior · 3/28/05</div>
+      <p><em>Thus says The Lord:</em> Peoples of the earth, why have you forsaken Me, in favor of broad paths that lead to your own destruction? Why do you build your houses upon the sand, when I have given you the Rock?</p>
+      <p>The way that seems right to a man — its end is the way of death. I have spoken plainly through My servants, yet you would not listen. I have called, yet you would not answer. <em>Return to Me</em>, and I will return to you.</p>
+      <div class="ornament">❖ ❖ ❖</div>
+      <p>Therefore, turn from this wide path, return to the narrow way, the way of righteousness, that you may live and not perish in the day of My fierce anger.</p>
+    </div>
+    <button class="fab" title="Journal about this letter" onclick="goScreen('screen-parallel')" style="font-size:20px">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z"/></svg>
+    </button>
+  </div>
+
+  <div class="screen" id="screen-parallel">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goScreen('screen-letter-view')">‹ Exit Parallel</button>
+      <div class="topbar-actions">
+        <button title="Swap layout" onclick="showToast('Swap to side-by-side')"><svg viewBox="0 0 24 24"><path d="M3 7h12l-3-3M21 17H9l3 3"/></svg></button>
+        <button title="More"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button>
+      </div>
+    </div>
+    <div class="parallel-shell">
+      <div class="parallel-top">
+        <div class="letter-mock-toolbar">
+          <h2>Volume Two · The Wide Path</h2>
+          <span style="font-family:var(--font-cinzel);font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold-dim)">3/28/05</span>
+        </div>
+        <div class="letter-mock">
+          <p><em>Thus says The Lord:</em> Peoples of the earth, why have you forsaken Me, in favor of broad paths that lead to your own destruction?</p>
+          <p>The way that seems right to a man — <span class="selected-text">its end is the way of death</span>. I have spoken plainly through My servants, yet you would not listen. Return to Me, and I will return to you.</p>
+          <p>Therefore, turn from this wide path, return to the narrow way…</p>
+        </div>
+        <div class="selection-toolbar-mock">
+          <button onclick="showToast('Highlight')">Highlight</button>
+          <button onclick="showToast('Note')">Note</button>
+          <button class="primary" onclick="quoteInJournal()">Quote in Journal</button>
+        </div>
+      </div>
+      <div class="parallel-divider"></div>
+      <div class="parallel-bottom">
+        <div class="parallel-bottom-header">
+          <h3>New Entry · Auto-saved</h3>
+          <div class="actions">
+            <button title="Insert" onclick="openInsertSheet()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button title="Expand" onclick="goScreen('screen-journal-editor')"><svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+          </div>
+        </div>
+        <div class="editor-meta" style="padding:14px 18px 4px">
+          <input class="editor-title-input" style="font-size:18px" placeholder="Reflection on The Wide Path">
+        </div>
+        <div class="editor-blocks" style="padding-bottom:30px">
+          <div class="block" style="padding:4px 0">
+            <div class="embed-card" style="padding:10px 12px">
+              <div class="ec-eyebrow">Volume Two</div>
+              <h4 style="font-size:14px;margin:2px 0">The Wide Path</h4>
+            </div>
+          </div>
+          <div class="block">
+            <textarea class="block-textarea" rows="3" placeholder="What is the Lord speaking through this letter?" id="parallel-textarea"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="sheet-overlay" id="sheet-insert" onclick="if(event.target===this) closeSheet('sheet-insert')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">Insert</div>
+      <button class="sheet-close" onclick="closeSheet('sheet-insert')">✕</button>
+    </div>
+    <div class="insert-section">
+      <h4>Text</h4>
+      <div class="insert-list">
+        <div class="insert-item" onclick="insertBlock('heading')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M6 4v16M18 4v16M6 12h12"/></svg></div>
+          <div class="text"><div class="label">Heading</div><div class="desc">Section title (H2)</div></div>
+        </div>
+        <div class="insert-item" onclick="insertBlock('quote')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M7 7c-2 1-3 3-3 6h4v6H2v-6c0-3 1-5 5-7zM17 7c-2 1-3 3-3 6h4v6h-6v-6c0-3 1-5 5-7z"/></svg></div>
+          <div class="text"><div class="label">Block Quote</div><div class="desc">Quoted passage with citation</div></div>
+        </div>
+        <div class="insert-item" onclick="insertBlock('divider')">
+          <div class="icon" style="letter-spacing:0.15em">❖</div>
+          <div class="text"><div class="label">Divider</div><div class="desc">3-diamond ornament</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="insert-section">
+      <h4>From Your Library</h4>
+      <div class="insert-list">
+        <div class="insert-item" onclick="insertBlock('letter')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 012 2v14l-7-3-7 3V6a2 2 0 012-2z"/></svg></div>
+          <div class="text"><div class="label">Letter</div><div class="desc">Embed a card from any collection</div></div>
+        </div>
+        <div class="insert-item" onclick="insertBlock('chapter')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 8h16M9 4v16"/></svg></div>
+          <div class="text"><div class="label">Bible chapter</div><div class="desc">Embed a chapter card</div></div>
+        </div>
+        <div class="insert-item" onclick="insertBlock('bookmark')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/></svg></div>
+          <div class="text"><div class="label">Bookmark</div><div class="desc">Pull in a saved passage</div></div>
+        </div>
+        <div class="insert-item" onclick="insertBlock('note')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M14 2l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zM14 2v6h6"/></svg></div>
+          <div class="text"><div class="label">Note</div><div class="desc">Reference one of your annotations</div></div>
+        </div>
+        <div class="insert-item" onclick="insertBlock('verse')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg></div>
+          <div class="text"><div class="label">Scripture verse</div><div class="desc">Insert a full verse block</div></div>
+        </div>
+        <div class="insert-item" onclick="insertBlock('journal-link')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg></div>
+          <div class="text"><div class="label">Link to journal entry</div><div class="desc">Connect to another entry</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="insert-section">
+      <h4>Capture</h4>
+      <div class="insert-list">
+        <div class="insert-item" onclick="closeSheet('sheet-insert'); showToast('File picker (demo)')">
+          <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div>
+          <div class="text"><div class="label">Image</div><div class="desc">From device gallery</div></div>
+        </div>
+        <div class="insert-item" onclick="closeSheet('sheet-insert'); openSheet('sheet-recording')">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 013 3v7a3 3 0 01-6 0V5a3 3 0 013-3z"/><path d="M19 11a7 7 0 01-14 0M12 18v4M8 22h8"/></svg></div>
+          <div class="text"><div class="label">Voice recording</div><div class="desc">Record a memo or prayer</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="insert-section" style="padding-bottom:20px">
+      <h4>Inline</h4>
+      <div class="insert-list">
+        <div class="insert-item" onclick="closeSheet('sheet-insert'); showToast('Insert {{ref:...}}')">
+          <div class="icon">{ }</div>
+          <div class="text"><div class="label">Scripture reference</div><div class="desc">Tappable inline citation</div></div>
+        </div>
+        <div class="insert-item" onclick="closeSheet('sheet-insert'); showToast('Insert [[letter:...]]')">
+          <div class="icon">[ ]</div>
+          <div class="text"><div class="label">Inline letter-link</div><div class="desc">Link to a letter mid-sentence</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="sheet-recording" onclick="if(event.target===this) closeSheet('sheet-recording')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">Voice Recording</div>
+      <button class="sheet-close" onclick="closeSheet('sheet-recording')">✕</button>
+    </div>
+    <div class="recording-content">
+      <div class="recording-status">Recording</div>
+      <div class="recording-time" id="rec-time">0:12</div>
+      <div class="recording-waveform" id="rec-waveform"></div>
+      <div class="recording-actions">
+        <button class="cancel" onclick="closeSheet('sheet-recording')">Cancel</button>
+        <button class="stop" onclick="closeSheet('sheet-recording'); showToast('Recording saved')">
+          <span style="width:8px;height:8px;background:currentColor;display:inline-block"></span>
+          Stop
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="sheet-inbound" onclick="if(event.target===this) closeSheet('sheet-inbound')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title">3 Journal Entries</div>
+      <button class="sheet-close" onclick="closeSheet('sheet-inbound')">✕</button>
+    </div>
+    <div class="inbound-list">
+      <div class="inbound-item" onclick="closeSheet('sheet-inbound'); goScreen('screen-journal-viewer')">
+        <div class="ib-title">Reflection on The Wide Path</div>
+        <div class="ib-date">May 14, 2026</div>
+        <div class="ib-preview">Today's reading struck me deeply. The Lord speaks of the way that seems right…</div>
+      </div>
+      <div class="inbound-item" onclick="closeSheet('sheet-inbound'); showToast('Open entry')">
+        <div class="ib-title">Notes on Volume Two Letters</div>
+        <div class="ib-date">May 12, 2026</div>
+        <div class="ib-preview">Working through the early letters of Volume Two. I want to understand…</div>
+      </div>
+      <div class="inbound-item" onclick="closeSheet('sheet-inbound'); showToast('Open entry')">
+        <div class="ib-title">Untitled</div>
+        <div class="ib-date">April 22, 2026</div>
+        <div class="ib-preview">First time reading this letter. Couldn't put it down.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span class="ornament">✦</span>
+  <span id="toast-text">Saved</span>
+</div>
+<script>
+function goScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('active');
+    window.scrollTo(0, 0);
+  }
+}
+function switchTab(btn, key) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+  document.getElementById('tab-' + key).style.display = '';
+}
+function openInsertSheet() { openSheet('sheet-insert'); }
+function openSheet(id) { document.getElementById(id).classList.add('active'); }
+function closeSheet(id) { document.getElementById(id).classList.remove('active'); }
+let toastTimeout;
+function showToast(text) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  t.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => t.classList.remove('show'), 1800);
+}
+function insertBlock(type) {
+  closeSheet('sheet-insert');
+  showToast('Inserted ' + type);
+}
+const moodCycle = ['gold', 'silver', 'deep', 'quiet', 'none'];
+function cycleMood(el) {
+  let cur = 'gold';
+  for (const m of moodCycle) { if (el.classList.contains(m)) { cur = m; break; } }
+  const idx = moodCycle.indexOf(cur);
+  const next = moodCycle[(idx + 1) % moodCycle.length];
+  moodCycle.forEach(m => el.classList.remove(m));
+  if (next !== 'gold') el.classList.add(next);
+}
+let saveTimer;
+function markUnsaved() {
+  const ind = document.getElementById('save-indicator');
+  if (!ind) return;
+  ind.textContent = 'Saving…';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { ind.textContent = 'Saved'; }, 800);
+}
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + 2) + 'px';
+}
+function quoteInJournal() {
+  const ta = document.getElementById('parallel-textarea');
+  if (!ta) return;
+  ta.value = (ta.value || '') + '\n> its end is the way of death\n> — Volume Two · The Wide Path\n\n';
+  autoGrow(ta);
+  ta.focus();
+  showToast('Quote inserted');
+  const stb = document.querySelector('.selection-toolbar-mock');
+  if (stb) stb.style.display = 'none';
+  const sel = document.querySelector('.selected-text');
+  if (sel) sel.classList.remove('selected-text');
+}
+function buildWaveform(el, count, max) {
+  if (!el) return;
+  const bars = [];
+  for (let i = 0; i < count; i++) {
+    const h = Math.round(4 + Math.random() * (max - 4));
+    bars.push('<div class="bar" style="height:' + h + 'px"></div>');
+  }
+  el.innerHTML = bars.join('');
+}
+buildWaveform(document.getElementById('viewer-waveform'), 32, 22);
+buildWaveform(document.getElementById('editor-waveform'), 32, 22);
+buildWaveform(document.getElementById('rec-waveform'), 40, 56);
+setInterval(() => {
+  const sheet = document.getElementById('sheet-recording');
+  if (sheet && sheet.classList.contains('active')) {
+    document.querySelectorAll('#rec-waveform .bar').forEach(b => {
+      if (Math.random() > 0.4) b.style.height = (8 + Math.random() * 50) + 'px';
+    });
+  }
+}, 180);
+let recSeconds = 12;
+setInterval(() => {
+  const sheet = document.getElementById('sheet-recording');
+  if (sheet && sheet.classList.contains('active')) {
+    recSeconds = (recSeconds + 1) % 600;
+    const m = Math.floor(recSeconds / 60);
+    const s = String(recSeconds % 60).padStart(2, '0');
+    const el = document.getElementById('rec-time');
+    if (el) el.textContent = m + ':' + s;
+  }
+}, 1000);
+window.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('textarea').forEach(autoGrow);
+});
+</script>
+</body>
+</html>

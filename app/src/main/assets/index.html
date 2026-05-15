@@ -964,13 +964,13 @@
     .fn-sheet-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:200; backdrop-filter:blur(3px); }
     .fn-sheet-backdrop.open { display:block; }
     /* Bottom-anchored sheet for footnotes + inline scripture refs.
-       `bottom` tracks max(--keyboard-height, --inset-bottom) so the sheet
-       lifts above the soft keyboard and stays above the gesture bar on
-       devices that need it. max-height subtracts the top inset so a tall
-       sheet never crosses the camera cutout. The bottom-padding stays at
-       2.5rem (design baseline ergonomic spacing); the OS-driven bottom
-       safe area is handled by the `bottom` offset itself, so the two add
-       cleanly without doubling. */
+       The bottom property tracks max(--keyboard-height, --inset-bottom)
+       so the sheet lifts above the soft keyboard and stays above the
+       gesture bar on devices that need it. max-height subtracts the
+       top inset so a tall sheet never crosses the camera cutout. The
+       bottom-padding stays at 2.5rem (design baseline ergonomic
+       spacing); the OS-driven bottom safe area is handled by the
+       bottom offset itself, so the two add cleanly without doubling. */
     .fn-sheet { position:fixed; bottom:max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)); left:0; right:0; z-index:201; background:var(--bg3); border-top:1px solid var(--gold-border); border-radius:14px 14px 0 0; padding:1rem 1.5rem 2.5rem; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.32,0.72,0,1), bottom 0.18s ease; max-height:calc(67vh - var(--inset-top, 0px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--gold-border) transparent; }
     .fn-sheet::-webkit-scrollbar { width:3px; }
     .fn-sheet::-webkit-scrollbar-track { background:transparent; }
@@ -2891,9 +2891,9 @@
          to the safe area. With align-items:flex-end on the overlay,
          the sheet's top never crosses the camera cutout and its bottom
          never tucks under the gesture bar / keyboard. The earlier
-         `calc(100vh - var(--inset-top))` only handled the top inset,
-         so the sheet could still climb into the cutout whenever
-         --inset-bottom or --keyboard-height pushed it upward. */
+         calc 100vh minus inset-top only handled the top inset, so the
+         sheet could still climb into the cutout whenever inset-bottom
+         or keyboard-height pushed it upward. */
       max-height: 100%; min-height: min(60vh, 100%);
     }
     @keyframes navpickFadeIn {
@@ -4852,6 +4852,24 @@ function noteSourceNav(note) {
   <script src="src/stores/link-store.js"></script>
   <!-- BookmarkStore, bkmId — extracted to src/stores/bookmark-store.js -->
   <script src="src/stores/bookmark-store.js"></script>
+  <!-- ─── JOURNAL FEATURE — segregated module set ───
+       All depend on CachedStore (defined above) + React (loaded earlier).
+       Load order matters: styles → stores → helpers → sheets → screens → chip. -->
+  <script src="src/styles/journal-styles.js"></script>
+  <script src="src/stores/journal-media-store.js"></script>
+  <script src="src/stores/journal-stats-store.js"></script>
+  <script src="src/stores/journal-index-store.js"></script>
+  <script src="src/data/journal-helpers.js"></script>
+  <script src="src/stores/journal-store.js"></script>
+  <script src="src/ui/sheets/JournalRecordingSheet.js"></script>
+  <script src="src/ui/sheets/JournalInsertSheet.js"></script>
+  <script src="src/ui/sheets/JournalNotebookSheet.js"></script>
+  <script src="src/ui/sheets/JournalInboundSheet.js"></script>
+  <script src="src/ui/screens/JournalHubScreen.js"></script>
+  <script src="src/ui/screens/JournalViewerScreen.js"></script>
+  <script src="src/ui/screens/JournalEditorScreen.js"></script>
+  <script src="src/renderer/dom-journal-chip.js"></script>
+  <!-- ─── /JOURNAL ─── -->
   <script>
 /* hlId and lnkId are now defined in src/stores/link-store.js */
 
@@ -7717,10 +7735,12 @@ function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
    Notes is active; Journal / Bookmarks / Highlights & Underlines
    render as Coming-Soon placeholders with the same tile chrome.
 ═══════════════════════════════════════════════════════════════ */
-function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, hlTick, theme, onThemeChange, onSearch, onHistory, historyEnabled }) {
+function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, hlTick, theme, onThemeChange, onSearch, onHistory, historyEnabled }) {
   const noteCount = useMemo(() => NoteStore.count(), [hlTick]);
   const linkCount = useMemo(() => LinkStore.all().length, [hlTick]);
   const bookmarkCount = useMemo(() => (typeof BookmarkStore !== 'undefined' ? BookmarkStore.count() : 0), [hlTick]);
+  const journalCount = useMemo(() => (typeof JournalStore !== 'undefined' ? JournalStore.count() : 0), [hlTick]);
+  const journalStreak = useMemo(() => (typeof JournalStatsStore !== 'undefined' ? (JournalStatsStore.get().currentStreak || 0) : 0), [hlTick]);
   const noteDetail = noteCount === 0 ? 'No notes yet' : (noteCount + (noteCount === 1 ? ' note' : ' notes'));
   const linkDetail = linkCount === 0 ? 'No links yet' : (linkCount + (linkCount === 1 ? ' link' : ' links'));
 
@@ -7751,10 +7771,12 @@ function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, hlTi
     },
     {
       id: 'journal',
-      eyebrow: 'Coming Soon',
+      eyebrow: 'My Journal',
       title: 'Journal',
-      detail: 'Daily reflections',
-      placeholder: true,
+      detail: journalCount === 0
+        ? 'No entries yet'
+        : (journalCount + (journalCount === 1 ? ' entry' : ' entries') + (journalStreak > 0 ? ' · ' + journalStreak + '-day streak' : '')),
+      onClick: onOpenJournal,
       icon: React.createElement("svg", { viewBox: "0 0 24 24" },
         React.createElement("path", { d: "M19 4H8a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h11z" }),
         React.createElement("line", { x1: "9", y1: "9", x2: "16", y2: "9" }),
@@ -9583,7 +9605,7 @@ function ChapterBookmarkBtn({ chapterBookmark, hlTick }) {
   );
 }
 
-function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick }) {
+function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey, journalRefLabel }) {
   return React.createElement(React.Fragment, null, /*#__PURE__*/
     React.createElement("button", { className: "settings-gear-btn", onClick: onSettings, title: "Settings" }, /*#__PURE__*/
     React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /*#__PURE__*/React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))), /*#__PURE__*/
@@ -11431,6 +11453,9 @@ function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary,
       ), /*#__PURE__*/
       React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true,
         chapterBookmark: letter ? { hlKey: 'letter:' + letter.id, label: letter.title || 'Letter bookmark' } : null,
+        // Match the eyebrow convention: undefined volumeLabel defaults to "Volume Two"
+        journalRefKey: (typeof jrnRefKeyForLetterByLabel === 'function') ? jrnRefKeyForLetterByLabel(volumeLabel || 'Volume Two', letter && letter.id) : null,
+        journalRefLabel: letter && letter.title,
         hlTick: hlTick })
       ) }, /*#__PURE__*/
     React.createElement(StickyChapterNav, {
@@ -13329,6 +13354,8 @@ function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBo
       ), /*#__PURE__*/
       React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange, reading: true,
         chapterBookmark: (book && chapter) ? { hlKey: 'bible:' + book.id + ':' + chapter.num, label: (book.title || book.id) + ' ' + chapter.num } : null,
+        journalRefKey: (book && chapter && typeof jrnRefKeyForChapter === 'function') ? jrnRefKeyForChapter(book.id, chapter.num) : null,
+        journalRefLabel: (book && chapter) ? ((book.title || book.id) + ' ' + chapter.num) : null,
         hlTick: hlTick })
       ) }, /*#__PURE__*/
     React.createElement(StickyChapterNav, {
@@ -14086,6 +14113,9 @@ function App() {
     if (s.screen === "scripture-genre" && !s.genreId) s.screen = "scriptures-home";
     if (s.screen === "bible-study-chapter" && (!s.studyId || !s.studyChapterId)) s.screen = "studies-home";
     if (s.screen === "bible-study-index" && !s.studyId) s.screen = "studies-home";
+    // Journal screens require entryId which lives in local state (not tab
+    // state), so they can't be reliably restored on reload. Bounce to hub.
+    if (s.screen === "journal-viewer" || s.screen === "journal-editor") s.screen = "journal-home";
     return s;
   }
   const saved = React.useMemo(() => {
@@ -14297,6 +14327,13 @@ function App() {
   // pre-commit BookmarkCreateSheet instead of silently adding to the
   // store. `info` shape: { hlKey, sourceLabel, excerpt, defaultLabel }.
   useEffect(() => { window.__bookmarkCreate = (info) => setBookmarkCreatePending(info || null); return () => { delete window.__bookmarkCreate; }; }, []);
+  // Journal inbound sheet bridge — opened from JournalChip in NavButtons.
+  // payload: { refKey: 'letter:two/the-wide-path', label: 'The Wide Path' }
+  const [inboundJournalPayload, setInboundJournalPayload] = useState(null);
+  useEffect(() => {
+    window.__openJournalInbound = (refKey, label) => setInboundJournalPayload(refKey ? { refKey, label } : null);
+    return () => { delete window.__openJournalInbound; };
+  }, []);
   // Bridge for the inline bookmark icon (single-bookmark tap) and the
   // BookmarksScreen row's edit-from-action-sheet path to open the same
   // BookmarkCreateSheet in EDIT mode. Looks up the existing record and
@@ -15067,6 +15104,18 @@ function App() {
   const goHistory = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("history");};
   const goAbout = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("about");};
   const goLibrary = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("library");};
+  // ── Journal nav helpers ──
+  const [journalEntryId, setJournalEntryId] = useState(null);
+  const goJournalHub = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("journal-home");};
+  const goJournalViewer = (eid) => {if (eid) {setJournalEntryId(eid);setScreen("journal-viewer");}};
+  const goJournalEditor = (eid) => {if (eid) {setJournalEntryId(eid);setScreen("journal-editor");}};
+  const createAndEditJournal = () => {
+    if (typeof JournalStore === 'undefined') return;
+    const e = JournalStore.add();
+    setHlTick(t => t + 1);
+    setJournalEntryId(e.id);
+    setScreen("journal-editor");
+  };
   const goNotesIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("notes-index");};
   const goLinksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("links-index");};
   const goBookmarksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("bookmarks-index");};
@@ -15581,6 +15630,9 @@ function App() {
       if (s === "notes-index") {setScreen("library");return "true";} else
       if (s === "links-index") {setScreen("library");return "true";} else
       if (s === "bookmarks-index") {setScreen("library");return "true";} else
+      if (s === "journal-home") {setScreen("library");return "true";} else
+      if (s === "journal-viewer") {setScreen("journal-home");return "true";} else
+      if (s === "journal-editor") {goJournalViewer(journalEntryId);return "true";} else
       if (s === "library") {goHome();return "true";} else
       if (s === "search") {goSearchOrigin();return "true";} else
       if (s === "scripture-genre") {goScripturesHome();return "true";} else
@@ -15892,7 +15944,7 @@ function App() {
     React.createElement("style", null, CSS),
 
 
-    settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "about"].includes(screen) && /*#__PURE__*/
+    settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && /*#__PURE__*/
     React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /*#__PURE__*/
     React.createElement("span", { className: "rdg-inner" })
     ),
@@ -16107,10 +16159,53 @@ function App() {
       onOpenNotes: goNotesIndex,
       onOpenLinks: goLinksIndex,
       onOpenBookmarks: goBookmarksIndex,
+      onOpenJournal: goJournalHub,
       onSearch: goSearch,
       onHistory: goHistory,
       historyEnabled: settings.historyEnabled !== false,
       hlTick: hlTick,
+      theme: theme, onThemeChange: setTheme
+    }),
+
+    screen === "journal-home" && typeof JournalHubScreen !== 'undefined' && /*#__PURE__*/
+    React.createElement(JournalHubScreen, {
+      onBack: () => setScreen('library'),
+      onOpenEntry: (eid) => goJournalViewer(eid),
+      onCreateEntry: createAndEditJournal,
+      onSearch: goSearch,
+      onHistory: goHistory,
+      historyEnabled: settings.historyEnabled !== false,
+      hlTick: hlTick, setHlTick: setHlTick,
+      theme: theme, onThemeChange: setTheme
+    }),
+
+    screen === "journal-viewer" && typeof JournalViewerScreen !== 'undefined' && /*#__PURE__*/
+    React.createElement(JournalViewerScreen, {
+      entryId: journalEntryId,
+      onBack: () => setScreen('journal-home'),
+      onEdit: () => setScreen('journal-editor'),
+      onNavigateToLink: (endpoint, meta) => {
+        if (endpoint) {
+          setNavOrigin({ screen: 'journal-viewer' });
+          navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Journal' });
+        }
+      },
+      onOpenJournalEntry: (eid) => goJournalViewer(eid),
+      onSearch: goSearch,
+      onHistory: goHistory,
+      historyEnabled: settings.historyEnabled !== false,
+      hlTick: hlTick, setHlTick: setHlTick,
+      theme: theme, onThemeChange: setTheme
+    }),
+
+    screen === "journal-editor" && typeof JournalEditorScreen !== 'undefined' && /*#__PURE__*/
+    React.createElement(JournalEditorScreen, {
+      entryId: journalEntryId,
+      onBack: () => goJournalViewer(journalEntryId),
+      onSearch: goSearch,
+      onHistory: goHistory,
+      historyEnabled: settings.historyEnabled !== false,
+      hlTick: hlTick, setHlTick: setHlTick,
       theme: theme, onThemeChange: setTheme
     }),
 
@@ -16815,6 +16910,18 @@ multiNotePayload && React.createElement(MultiNotePopover, {
     // bookmark NavButton (both via window.__bookmarkCreate). Saving
     // commits to BookmarkStore + bumps hlTick so the inline icon
     // pulse fires on the source passage.
+    // Journal inbound sheet — triggered by tapping the journal chip in
+    // letter/chapter nav (or anywhere else that calls __openJournalInbound).
+    inboundJournalPayload && typeof JournalInboundSheet !== 'undefined' && React.createElement(JournalInboundSheet, {
+      refKey: inboundJournalPayload.refKey,
+      resourceLabel: inboundJournalPayload.label,
+      onClose: () => setInboundJournalPayload(null),
+      onOpenEntry: (entry) => {
+        setInboundJournalPayload(null);
+        if (entry && entry.id) goJournalViewer(entry.id);
+      }
+    }),
+
     bookmarkCreatePending && React.createElement(BookmarkCreateSheet, {
       pending: bookmarkCreatePending,
       onCancel: () => setBookmarkCreatePending(null),
