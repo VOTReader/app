@@ -2892,8 +2892,16 @@
       background: none; border: none; padding: 0 6px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       color: #4caf50;
+      transition: opacity 0.15s ease;
     }
     .navpick-confirm-green svg { width: 24px; height: 24px; display: block; }
+    /* Disabled state — gates the BookmarkCreateSheet's Save button when no
+       edit has been made (EDIT mode) or the label is empty (CREATE mode). */
+    .navpick-confirm-green[disabled] {
+      opacity: 0.32;
+      cursor: not-allowed;
+      color: var(--cream-dim);
+    }
     .navpick-search-wrap {
       padding: 4px 18px 12px;
     }
@@ -6318,10 +6326,25 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onB
       ? snapRangeToWords(containerText, selInfo.start || 0, selInfo.end || 0)
       : { start: selInfo.start || 0, end: selInfo.end || 0 };
 
-    // Derive label: prefer snapped selection text; fall back to source label.
+    // Derive label from the highlighted text. Two-strategy approach so the
+    // label is reliably the user's actual selection across every selection
+    // shape:
+    //   1. Container slice with word-boundary snap — preferred when we have
+    //      the source container and a valid offset range. Keeps the label
+    //      tidy when the user's drag ends mid-word.
+    //   2. Raw selInfo.text fallback — needed for multi-container
+    //      selections (start/end are 0 in that branch — see the
+    //      setSelInfo({hlKey:null,start:0,end:0,...}) call in the
+    //      SelectionToolbar's compute path) and for the rare case where
+    //      the container DOM has unmounted between selection and tap.
+    //   3. Source-style fallback ("Bookmark in <Title>") only if both
+    //      above produced nothing — defensive last resort.
     var labelText = '';
-    if (snap.end > snap.start) {
+    if (container && snap.end > snap.start) {
       labelText = containerText.slice(snap.start, snap.end).trim();
+    }
+    if (!labelText && selInfo.text) {
+      labelText = selInfo.text.trim();
     }
     // Truncate very long auto-labels to 120 chars so they read as a short tag
     if (labelText.length > 120) labelText = labelText.slice(0, 117) + '...';
@@ -6345,12 +6368,16 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onB
       storedKey = hlKey + ':' + snap.start + '-' + snap.end;
     }
 
-    // Excerpt: the snapped selection text, truncated for the preview block.
+    // Excerpt: same two-strategy pattern as labelText so the preview block
+    // in the BookmarkCreateSheet always shows the actual highlight.
     var excerpt = '';
-    if (snap.end > snap.start) {
+    if (container && snap.end > snap.start) {
       excerpt = containerText.slice(snap.start, snap.end);
-      if (excerpt.length > 220) excerpt = excerpt.slice(0, 217) + '...';
     }
+    if (!excerpt && selInfo.text) {
+      excerpt = selInfo.text;
+    }
+    if (excerpt.length > 220) excerpt = excerpt.slice(0, 217) + '...';
 
     // Source label: re-use the same derivation that BookmarksScreen rows do.
     var sourceLabel = (typeof _bookmarkSourceLabel === 'function')

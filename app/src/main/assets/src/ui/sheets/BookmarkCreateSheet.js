@@ -68,6 +68,14 @@ function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen })
   var _confirmDel = useState(false);
   var confirmingDelete = _confirmDel[0]; var setConfirmingDelete = _confirmDel[1];
 
+  // Track the values the sheet opened with so we can gate the Save button
+  // on an actual change. In EDIT mode this prevents accidental no-op writes
+  // (the user opens, glances, taps ✓ out of habit → silent no-op + 'updated'
+  // timestamp bump). In CREATE mode we still want Save tappable on first
+  // glance, so this ref just records the auto-derived defaults; the canSave
+  // rule below treats CREATE differently (any non-empty label is fine).
+  var initialRef = useRef({ label: '', thought: '' });
+
   // Re-sync local state if a different `pending` arrives. The two-key
   // dependency captures both mode (editId) and instance (hlKey), so
   // back-to-back opens (e.g. close edit → open create on another spot)
@@ -77,9 +85,17 @@ function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen })
     if (pending.editId) {
       setLabel(pending.currentLabel || '');
       setThought(pending.currentThought || '');
+      initialRef.current = {
+        label: pending.currentLabel || '',
+        thought: pending.currentThought || ''
+      };
     } else {
       setLabel(pending.defaultLabel || '');
       setThought('');
+      initialRef.current = {
+        label: pending.defaultLabel || '',
+        thought: ''
+      };
     }
     setConfirmingDelete(false);
     // Focus the label input on mount so users can immediately refine it
@@ -91,6 +107,19 @@ function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen })
       }
     }, 60);
   }, [pending && pending.editId, pending && pending.hlKey]);
+
+  // canSave drives both the visual disabled state and the keyboard-shortcut
+  // guard. EDIT-mode: only if at least one field differs from what we
+  // opened with (whitespace-tolerant). CREATE-mode: a non-empty label is
+  // enough — the auto-derived default satisfies this on first render so
+  // the fast "highlight → ✓" path stays one tap.
+  var canSave;
+  if (isEditMode) {
+    canSave = label.trim() !== initialRef.current.label.trim()
+           || thought.trim() !== initialRef.current.thought.trim();
+  } else {
+    canSave = label.trim().length > 0;
+  }
 
   // Wire Android hardware back to dismiss (same save/restore pattern
   // every overlay in the app uses).
@@ -143,9 +172,10 @@ function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen })
         React.createElement('span', { className: 'navpick-title' }, title),
         React.createElement('button', {
           className: 'navpick-confirm-green',
-          onClick: commit,
+          onClick: canSave ? commit : undefined,
+          disabled: !canSave,
           'aria-label': saveTitle,
-          title: saveTitle
+          title: canSave ? saveTitle : (isEditMode ? 'No changes to save' : 'Add a label')
         },
           React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
             React.createElement('polyline', { points: '20 6 9 17 4 12' })
@@ -165,7 +195,7 @@ function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen })
           value: label,
           onChange: function(e) { setLabel(e.target.value); },
           onKeyDown: function(e) {
-            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Enter') { e.preventDefault(); if (canSave) commit(); }
             else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
           },
           placeholder: 'A short name for this bookmark…',
@@ -182,7 +212,7 @@ function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen })
           onChange: function(e) { setThought(e.target.value); },
           onKeyDown: function(e) {
             if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-            else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); }
+            else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (canSave) commit(); }
           },
           placeholder: 'A few words for your future self…',
           rows: 4
