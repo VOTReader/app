@@ -220,8 +220,15 @@ function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen })
 
         // Edit-mode actions: Open Source + Delete (tap-confirm). Only
         // rendered when we're editing an existing bookmark.
+        // `pending.atSource` is set true by callers who know the user is
+        // already on the bookmarked passage (currently: inline-icon tap
+        // in dom-bookmarks.js). In that case the Open Source button is
+        // a no-op so we hide it — keeps the EDIT sheet tighter and
+        // avoids the dead-action confusion. Future callers from a list
+        // surface (e.g. BookmarksScreen → row → Edit, if/when wired)
+        // will leave atSource unset and get the Open button by default.
         isEditMode && React.createElement('div', { className: 'bkm-create-edit-actions' },
-          React.createElement('button', {
+          !pending.atSource && React.createElement('button', {
             className: 'bkm-create-edit-btn',
             onClick: handleOpen,
             title: 'Open this passage'

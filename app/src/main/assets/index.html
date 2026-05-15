@@ -963,7 +963,15 @@
     /* ── MOBILE FOOTNOTE SHEET ── */
     .fn-sheet-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:200; backdrop-filter:blur(3px); }
     .fn-sheet-backdrop.open { display:block; }
-    .fn-sheet { position:fixed; bottom:0; left:0; right:0; z-index:201; background:var(--bg3); border-top:1px solid var(--gold-border); border-radius:14px 14px 0 0; padding:1rem 1.5rem 2.5rem; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.32,0.72,0,1); max-height:67vh; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--gold-border) transparent; }
+    /* Bottom-anchored sheet for footnotes + inline scripture refs.
+       `bottom` tracks max(--keyboard-height, --inset-bottom) so the sheet
+       lifts above the soft keyboard and stays above the gesture bar on
+       devices that need it. max-height subtracts the top inset so a tall
+       sheet never crosses the camera cutout. The bottom-padding stays at
+       2.5rem (design baseline ergonomic spacing); the OS-driven bottom
+       safe area is handled by the `bottom` offset itself, so the two add
+       cleanly without doubling. */
+    .fn-sheet { position:fixed; bottom:max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)); left:0; right:0; z-index:201; background:var(--bg3); border-top:1px solid var(--gold-border); border-radius:14px 14px 0 0; padding:1rem 1.5rem 2.5rem; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.32,0.72,0,1), bottom 0.18s ease; max-height:calc(67vh - var(--inset-top, 0px)); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--gold-border) transparent; }
     .fn-sheet::-webkit-scrollbar { width:3px; }
     .fn-sheet::-webkit-scrollbar-track { background:transparent; }
     .fn-sheet::-webkit-scrollbar-thumb { background:var(--gold-dim); border-radius:2px; }
@@ -1479,7 +1487,11 @@
     .garden-arrow-btn:active { background:rgba(255,255,255,0.15); }
     .garden-arrow-btn:disabled { opacity:0.25; pointer-events:none; }
     .garden-arrow-btn svg { width:1.3rem; height:1.3rem; }
-    .garden-warning-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; padding:1.5rem; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+    /* Centered confirmation overlay — padding uses max(<design>,<inset>)
+       on each edge so the 1.5rem ergonomic gutter is preserved on devices
+       without cutouts and auto-expands on phones with notches / gesture
+       bars / soft keyboards. Same pattern as .disable-tabs-overlay. */
+    .garden-warning-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; padding:max(1.5rem, var(--inset-top, 0px)) 1.5rem max(1.5rem, max(var(--keyboard-height, 0px), var(--inset-bottom, 0px))); transition: padding-bottom 0.18s ease; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
     .garden-warning-modal { background:var(--bg2); border:1px solid var(--gold-border); border-radius:12px; max-width:24rem; width:100%; padding:1.8rem 1.6rem 1.4rem; box-shadow:0 20px 60px rgba(0,0,0,0.6); }
     .garden-warning-title { font-family:var(--font-cinzel); font-size:1.05rem; letter-spacing:0.08em; color:var(--gold); text-align:center; margin-bottom:1rem; text-transform:uppercase; }
     .garden-warning-body { font-family:var(--font-garamond); font-size:1rem; line-height:1.55; color:var(--cream-muted); text-align:center; margin-bottom:1.4rem; }
@@ -2062,7 +2074,10 @@
       position:fixed; inset:0; z-index:400;
       background:var(--bg);
     }
-    .tabs-overview { max-width:880px; margin:0 auto; padding:1.5rem 1rem 5rem; }
+    /* Top/bottom padding uses calc(<design> + <inset>) so the tab-management
+       chrome clears the status bar / camera cutout AND the gesture bar /
+       system nav on every device. */
+    .tabs-overview { max-width:880px; margin:0 auto; padding:calc(1.5rem + var(--inset-top, 0px)) 1rem calc(5rem + var(--inset-bottom, 0px)); }
     .tabs-overview-header { text-align:center; margin-bottom:1.8rem; padding:0 0.5rem; }
     .tabs-overview-eyebrow {
       font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.28em;
@@ -2230,7 +2245,12 @@
       position:fixed; inset:0; z-index:600;
       background:rgba(0,0,0,0.68); backdrop-filter:blur(3px);
       display:flex; align-items:center; justify-content:center;
-      padding:1.5rem;
+      /* Per-edge padding uses max(<design>, <inset>) so the design's
+         1.5rem ergonomic gutter is preserved on devices with no
+         cutouts, but expands automatically on phones with notches /
+         gesture bars / open keyboards. */
+      padding: max(1.5rem, var(--inset-top, 0px)) 1.5rem max(1.5rem, max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)));
+      transition: padding-bottom 0.18s ease;
       animation:selectSheetBackdropIn 0.22s ease;
     }
     .disable-tabs-dialog {
@@ -2687,7 +2707,12 @@
       animation: selectSheetBackdropIn 0.2s ease;
     }
     .link-sidebar {
-      position: fixed; top: 0; right: 0; bottom: 0; z-index: 8001;
+      position: fixed; right: 0; z-index: 8001;
+      /* top/bottom track the system insets so the panel never overlaps
+         the camera cutout or the gesture bar / soft keyboard. */
+      top: var(--inset-top, 0px);
+      bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
+      transition: bottom 0.18s ease;
       width: min(360px, 85vw);
       background: var(--bg2); border-left: 1px solid var(--gold-border);
       display: flex; flex-direction: column;
@@ -2860,7 +2885,16 @@
       animation: navpickFadeIn 0.22s ease-out forwards;
       opacity: 1;
       display: flex; flex-direction: column;
-      max-height: calc(100vh - var(--inset-top, 0px)); min-height: 60vh;
+      /* max-height:100% binds to the overlay's CONTENT area, which the
+         overlay's own padding-top (--inset-top) and padding-bottom
+         (max(--keyboard-height, --inset-bottom)) have already shrunk
+         to the safe area. With align-items:flex-end on the overlay,
+         the sheet's top never crosses the camera cutout and its bottom
+         never tucks under the gesture bar / keyboard. The earlier
+         `calc(100vh - var(--inset-top))` only handled the top inset,
+         so the sheet could still climb into the cutout whenever
+         --inset-bottom or --keyboard-height pushed it upward. */
+      max-height: 100%; min-height: min(60vh, 100%);
     }
     @keyframes navpickFadeIn {
       from { opacity: 0; }
@@ -3120,8 +3154,13 @@
       background: rgba(0,0,0,0.72);
       /* No backdrop-filter blur — caused fuzzy text rendering. */
       display: flex; align-items: flex-end; justify-content: center;
-      /* Lift the sheet above the soft keyboard when the textarea is
-         focused (see App's visualViewport listener). */
+      /* Top inset reserves space for status bar / camera cutout so the
+         sheet's top can never overlap system chrome. Bottom uses the
+         max(--keyboard-height, --inset-bottom) pattern: soft keyboard
+         lifts the sheet via the visualViewport listener; otherwise the
+         Kotlin-injected --inset-bottom keeps it clear of the gesture
+         bar / system nav. */
+      padding-top: var(--inset-top, 0px);
       padding-bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
       transition: padding-bottom 0.18s ease;
       animation: selectSheetBackdropIn 0.22s ease;
@@ -3131,7 +3170,9 @@
       background: var(--bg3); border-top: 1px solid var(--gold-border);
       border-radius: 18px 18px 0 0; padding: 16px 18px 22px;
       animation: selectSheetSlideUp 0.28s cubic-bezier(0.32,0.72,0,1);
-      max-height: 85vh; overflow-y: auto;
+      /* 100% binds to the overlay's content area (viewport minus both
+         insets) so the sheet always sits inside the safe region. */
+      max-height: 100%; overflow-y: auto;
     }
     body.light .note-sheet { background: var(--bg3); }
     .note-sheet-header {
@@ -3718,6 +3759,12 @@
       position: fixed; inset: 0; z-index: 8600;
       background: rgba(0,0,0,0.72);
       display: flex; align-items: flex-end; justify-content: center;
+      /* Safe-area insets baked in — same pattern as link-picker-overlay
+         and note-sheet-overlay. Top: status bar / camera cutout.
+         Bottom: gesture bar OR soft keyboard, whichever is taller. */
+      padding-top: var(--inset-top, 0px);
+      padding-bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
+      transition: padding-bottom 0.18s ease;
       animation: selectSheetBackdropIn 0.22s ease;
     }
     .nb-picker {
@@ -3727,7 +3774,7 @@
       border-radius: 18px 18px 0 0;
       padding: 18px 16px 24px;
       animation: selectSheetSlideUp 0.28s cubic-bezier(0.32,0.72,0,1);
-      max-height: 80vh; overflow-y: auto;
+      max-height: 100%; overflow-y: auto;
     }
     .nb-picker-header {
       display: flex; align-items: center; gap: 10px;
@@ -4000,6 +4047,10 @@
       position: fixed; inset: 0; z-index: 8550;
       background: rgba(0,0,0,0.65);
       display: flex; align-items: flex-end; justify-content: center;
+      /* Safe-area insets — also reused by BookmarkRowActionSheet. */
+      padding-top: var(--inset-top, 0px);
+      padding-bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
+      transition: padding-bottom 0.18s ease;
       animation: selectSheetBackdropIn 0.2s ease;
     }
     .link-action-sheet {
@@ -4009,6 +4060,7 @@
       border-radius: 18px 18px 0 0;
       padding: 12px 0 28px;
       animation: selectSheetSlideUp 0.25s cubic-bezier(0.32,0.72,0,1);
+      max-height: 100%; overflow-y: auto;
     }
     .link-action-handle {
       width: 36px; height: 4px;
@@ -14251,7 +14303,7 @@ function App() {
   // builds the `pending` shape with editId + currentLabel/currentThought
   // populated so the sheet renders preloaded.
   useEffect(() => {
-    window.__bookmarkEdit = (bkmId) => {
+    window.__bookmarkEdit = (bkmId, opts) => {
       if (!bkmId || typeof BookmarkStore === 'undefined') return;
       const bkm = BookmarkStore.get(bkmId);
       if (!bkm) return;
@@ -14259,6 +14311,12 @@ function App() {
       const sourceLabel = (typeof _bookmarkSourceLabel === 'function')
         ? _bookmarkSourceLabel(bkm.hlKey)
         : '';
+      // `atSource` lets callers signal that the user is already on the
+      // bookmarked passage (set by the inline-icon tap in
+      // dom-bookmarks.js). The sheet uses it to hide the "Open Source"
+      // button, which would otherwise be a redundant no-op. Future
+      // callers from a list surface (e.g. BookmarksScreen row's action
+      // sheet) can omit it and the Open button is shown by default.
       setBookmarkCreatePending({
         editId: bkm.id,
         hlKey: bkm.hlKey,
@@ -14266,7 +14324,8 @@ function App() {
         excerpt: '',
         defaultLabel: bkm.label || '',
         currentLabel: bkm.label || '',
-        currentThought: bkm.thought || ''
+        currentThought: bkm.thought || '',
+        atSource: !!(opts && opts.atSource)
       });
     };
     return () => { delete window.__bookmarkEdit; };

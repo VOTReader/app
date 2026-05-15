@@ -122,9 +122,12 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
     if (ids.length === 1) {
       // Single bookmark at this position — open the full create/edit
       // sheet so the user gets the same UI as creation: editable label
-      // + thought + Open + Delete. Consistent UX whether they're making
-      // a new bookmark or revisiting an existing one.
-      if (window.__bookmarkEdit) { window.__bookmarkEdit(ids[0]); return; }
+      // + thought + Delete. Consistent UX whether they're making a new
+      // bookmark or revisiting an existing one.
+      // atSource:true tells the sheet to suppress the "Open Source"
+      // button — the user tapped the icon AT the source, so navigation
+      // there would be a no-op.
+      if (window.__bookmarkEdit) { window.__bookmarkEdit(ids[0], { atSource: true }); return; }
     }
     // Multi-bookmark or fallback: the popover still serves
     // disambiguation. Tapping a popover row routes onward to whatever
