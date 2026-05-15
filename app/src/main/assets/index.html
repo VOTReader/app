@@ -3874,6 +3874,134 @@
       color: var(--cream-muted);
     }
 
+    /* ── Links Screen ── */
+    .links-screen {
+      max-width: 720px; margin: 0 auto;
+      padding: 1.2rem 1rem 4rem;
+      width: 100%;
+    }
+    /* Link row: two tappable endpoint buttons (source / target) connected
+       by a chain icon in between. */
+    .link-row {
+      display: flex; flex-direction: column;
+      background: var(--bg2);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: border-color 0.18s ease, background 0.18s ease;
+    }
+    @media (hover: hover) { .link-row:hover { border-color: var(--gold); } }
+    .link-row-side {
+      display: flex; flex-direction: column; gap: 0.2rem;
+      width: 100%; padding: 0.85rem 1rem 0.8rem;
+      background: transparent; border: none;
+      text-align: left; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+    }
+    .link-row-side:active { background: var(--gold-faint); }
+    @media (hover: hover) { .link-row-side:hover { background: var(--gold-faint); } }
+    .link-row-source { border-bottom: 1px solid var(--gold-border); }
+    .link-row-side-eyebrow {
+      font-family: 'Cinzel', serif; font-size: 0.48rem;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--gold-dim); margin-bottom: 0.1rem;
+    }
+    .link-row-source .link-row-side-eyebrow { color: var(--gold); }
+    .link-row-side-label {
+      font-family: 'Cinzel', serif; font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      color: var(--cream-dim);
+      line-height: 1.25;
+    }
+    .link-row-source .link-row-side-label { color: var(--gold-bright); }
+    body.light .link-row-source .link-row-side-label { color: var(--gold); }
+    .link-row-side-cat {
+      font-family: 'Cinzel', serif; font-size: 0.54rem;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--cream-muted);
+    }
+    .link-row-side-preview {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.85rem; color: var(--cream-muted);
+      line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+      margin-top: 0.15rem;
+    }
+    .link-row-mid {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.6rem;
+      padding: 6px 1rem;
+      background: rgba(232,192,80,0.04);
+    }
+    .link-row-chain {
+      width: 14px; height: 14px;
+      stroke: var(--gold-dim); flex-shrink: 0;
+    }
+    .link-row-date {
+      font-family: 'Cinzel', serif; font-size: 0.52rem;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--cream-muted);
+    }
+    /* Broken-links passive callout */
+    .links-broken-callout {
+      display: flex; align-items: flex-start; gap: 0.7rem;
+      padding: 0.85rem 1rem;
+      background: rgba(244,143,177,0.07);
+      border: 1px solid rgba(239,154,154,0.22);
+      border-radius: 10px;
+      margin: 0.85rem 0 0;
+    }
+    .links-broken-icon {
+      flex-shrink: 0; color: #ef9a9a; margin-top: 1px;
+    }
+    .links-broken-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+    .links-broken-text {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.92rem; color: var(--cream-muted); line-height: 1.45;
+    }
+    /* Link action sheet (long-press) */
+    .link-action-overlay {
+      position: fixed; inset: 0; z-index: 8550;
+      background: rgba(0,0,0,0.65);
+      display: flex; align-items: flex-end; justify-content: center;
+      animation: selectSheetBackdropIn 0.2s ease;
+    }
+    .link-action-sheet {
+      width: 100%; max-width: 480px;
+      background: var(--bg3);
+      border-top: 1px solid var(--gold-border);
+      border-radius: 18px 18px 0 0;
+      padding: 12px 0 28px;
+      animation: selectSheetSlideUp 0.25s cubic-bezier(0.32,0.72,0,1);
+    }
+    .link-action-handle {
+      width: 36px; height: 4px;
+      background: var(--gold-border);
+      border-radius: 2px;
+      margin: 0 auto 12px;
+    }
+    .link-action-btn {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; padding: 14px 20px;
+      background: transparent; border: none;
+      text-align: left; cursor: pointer;
+      font-family: 'Cinzel', serif; font-size: 0.68rem;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--cream-dim);
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+    }
+    .link-action-btn + .link-action-btn { border-top: 1px solid rgba(232,192,80,0.06); }
+    .link-action-btn:active { background: var(--gold-faint); color: var(--gold); }
+    @media (hover: hover) { .link-action-btn:hover { background: var(--gold-faint); color: var(--gold); } }
+    .link-action-btn svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--gold-dim); }
+    .link-action-btn-danger { color: #ef9a9a; }
+    .link-action-btn-danger svg { color: #ef9a9a; }
+    .link-action-btn-danger:active { background: rgba(244,143,177,0.12); color: var(--accent-pink); }
+    @media (hover: hover) { .link-action-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); } }
+
     /* Invisible word-joiner injected at mark boundaries that fall MID-WORD
        so the browser cannot break a word across the mark/text seam. The
        pseudo-content is not part of any text node, so TreeWalker and
@@ -5965,6 +6093,8 @@ function LinkIcon({ hlKey, hlTick, onClick, prefix }) {
 ═══════════════════════════════════════════════════════════════ */
 function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
   const [expanded, setExpanded] = useState(false);
+  // confirmRemove: false | true — governs the tap-confirm strip (§11.1: no instant delete).
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const matchesSide = (k) => isBlockScope ? (k === hlKey || k.startsWith(hlKey + ':')) : k === hlKey;
   // Determine which side is "us" (this container) and which is "other" (the linked passage).
   // source = where the user originated the link; target = the destination they picked.
@@ -5990,7 +6120,8 @@ function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
     React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
     React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })
   );
-  return React.createElement("div", { className: "link-card", onClick: () => onNavigate && onNavigate(other) },
+  const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); setHlTick(t => t + 1); };
+  return React.createElement("div", { className: "link-card", onClick: confirmRemove ? undefined : (() => onNavigate && onNavigate(other)) },
     React.createElement("div", { className: "link-card-header" },
       React.createElement("div", { className: "link-card-ref" },
         React.createElement("span", { className: "link-card-direction" }, isOutbound ? "to " : "from "),
@@ -6016,19 +6147,34 @@ function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
       usingFromFallback && React.createElement("em", { className: "link-card-from-label" }, "From: "),
       rawText
     ),
-    React.createElement("div", { className: "link-card-actions" },
+    // Actions row: show-more toggle + remove (with tap-confirm per §11.1)
+    !confirmRemove && React.createElement("div", { className: "link-card-actions" },
       isLong && React.createElement("span", {
         className: "link-card-show-more",
         onClick: (e) => { e.stopPropagation(); setExpanded(x => !x); }
       }, expanded ? "Show less" : "Show more"),
       React.createElement("span", {
         className: "link-card-remove",
-        onClick: (e) => {
-          e.stopPropagation();
-          LinkStore.remove(lnk.id);
-          setHlTick(t => t + 1);
-        }
+        onClick: (e) => { e.stopPropagation(); setConfirmRemove(true); }
       }, "Remove link")
+    ),
+    // Tap-confirm strip — replaces the actions row when confirmRemove=true.
+    // First tap on "Remove link" → strip morphs into this. Second tap on
+    // "Yes, remove" → actually deletes. Cancel returns to the normal view.
+    confirmRemove && React.createElement("div", {
+      className: "ann-chip-confirm",
+      style: { padding: '10px 12px' },
+      onClick: (e) => e.stopPropagation()
+    },
+      React.createElement("span", { className: "ann-chip-confirm-q" }, "Remove this link?"),
+      React.createElement("button", {
+        className: "ann-chip-confirm-btn ann-chip-confirm-cancel",
+        onClick: (e) => { e.stopPropagation(); setConfirmRemove(false); }
+      }, "Cancel"),
+      React.createElement("button", {
+        className: "ann-chip-confirm-btn ann-chip-confirm-yes",
+        onClick: doRemove
+      }, "Yes, remove")
     )
   );
 }
@@ -6050,8 +6196,11 @@ function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
     return () => { window.__closeSheet = prev || null; };
   }, [hlKey, onClose]);
   if (!hlKey) return null;
-  // Format date like "Fri, May 8, 2026"
-  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  // Show a count subtitle instead of a hardcoded date. The sidebar can contain
+  // links created on different days (multiple links on one passage), so a
+  // fixed "today" date would be actively misleading. A count is always correct
+  // and tells the user at a glance how many links are on this passage.
+  const countStr = links.length === 0 ? 'No links' : (links.length === 1 ? '1 link' : links.length + ' links');
   return React.createElement(React.Fragment, null,
     React.createElement("div", { className: "link-sidebar-overlay", onClick: onClose }),
     React.createElement("div", { className: "link-sidebar" },
@@ -6059,7 +6208,7 @@ function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
         React.createElement("button", { className: "link-sidebar-close", onClick: onClose, title: "Close" }, "×"),
         React.createElement("span", { className: "link-sidebar-title" }, "Links")
       ),
-      React.createElement("div", { className: "link-sidebar-date" }, dateStr),
+      React.createElement("div", { className: "link-sidebar-date" }, countStr),
       React.createElement("div", { className: "link-sidebar-body" },
         links.length === 0 && React.createElement("div", { className: "link-sidebar-empty" }, "No links yet"),
         links.map(lnk => React.createElement(LinkCard, { key: lnk.id, lnk, hlKey, isBlockScope, onNavigate, setHlTick }))
@@ -7050,22 +7199,35 @@ function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
    Notes is active; Journal / Bookmarks / Highlights & Underlines
    render as Coming-Soon placeholders with the same tile chrome.
 ═══════════════════════════════════════════════════════════════ */
-function LibraryScreen({ onBack, onOpenNotes, hlTick, theme, onThemeChange, onSearch, onHistory, historyEnabled }) {
+function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, hlTick, theme, onThemeChange, onSearch, onHistory, historyEnabled }) {
   const noteCount = useMemo(() => NoteStore.count(), [hlTick]);
-  const detail = noteCount === 0 ? 'No notes yet' : (noteCount + (noteCount === 1 ? ' note' : ' notes'));
+  const linkCount = useMemo(() => LinkStore.all().length, [hlTick]);
+  const noteDetail = noteCount === 0 ? 'No notes yet' : (noteCount + (noteCount === 1 ? ' note' : ' notes'));
+  const linkDetail = linkCount === 0 ? 'No links yet' : (linkCount + (linkCount === 1 ? ' link' : ' links'));
 
   const tiles = [
     {
       id: 'notes',
       eyebrow: 'My Notes',
       title: 'Notes',
-      detail,
+      detail: noteDetail,
       onClick: onOpenNotes,
       icon: React.createElement("svg", { viewBox: "0 0 24 24" },
         React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
         React.createElement("polyline", { points: "14 2 14 8 20 8" }),
         React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }),
         React.createElement("line", { x1: "8", y1: "17", x2: "16", y2: "17" })
+      )
+    },
+    {
+      id: 'links',
+      eyebrow: 'My Links',
+      title: 'Links',
+      detail: linkDetail,
+      onClick: onOpenLinks,
+      icon: React.createElement("svg", { viewBox: "0 0 24 24" },
+        React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
+        React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })
       )
     },
     {
@@ -14231,6 +14393,7 @@ function App() {
   const goAbout = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("about");};
   const goLibrary = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("library");};
   const goNotesIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("notes-index");};
+  const goLinksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("links-index");};
   // Capture a thumbnail of the ACTIVE tab's current visible screen.
   // Fast path: native AndroidBridge.takeScreenshot (~30-80ms on UI thread).
   // Fallback: html2canvas (~500-1500ms, used when not in the Android app).
@@ -14740,6 +14903,7 @@ function App() {
       if (s === "history") {goNavOrigin();return "true";} else
       if (s === "about") {try{localStorage.setItem('vot-about-seen','1');}catch(e){}goNavOrigin();return "true";} else
       if (s === "notes-index") {setScreen("library");return "true";} else
+      if (s === "links-index") {setScreen("library");return "true";} else
       if (s === "library") {goHome();return "true";} else
       if (s === "search") {goSearchOrigin();return "true";} else
       if (s === "scripture-genre") {goScripturesHome();return "true";} else
@@ -15051,7 +15215,7 @@ function App() {
     React.createElement("style", null, CSS),
 
 
-    settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "about"].includes(screen) && /*#__PURE__*/
+    settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "about"].includes(screen) && /*#__PURE__*/
     React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /*#__PURE__*/
     React.createElement("span", { className: "rdg-inner" })
     ),
@@ -15264,6 +15428,7 @@ function App() {
     React.createElement(LibraryScreen, {
       onBack: goHome,
       onOpenNotes: goNotesIndex,
+      onOpenLinks: goLinksIndex,
       onSearch: goSearch,
       onHistory: goHistory,
       historyEnabled: settings.historyEnabled !== false,
@@ -15279,6 +15444,28 @@ function App() {
         if (endpoint) {
           setNavOrigin({ screen: 'notes-index' });
           navigateToLink(endpoint, { sourceLetterTitle: 'My Notes' });
+        }
+      },
+      onSearch: goSearch,
+      onHistory: goHistory,
+      historyEnabled: settings.historyEnabled !== false,
+      hlTick: hlTick, setHlTick: setHlTick,
+      theme: theme, onThemeChange: setTheme
+    }),
+
+    screen === "links-index" && /*#__PURE__*/
+    React.createElement(LinksScreen, {
+      onBack: () => setScreen('library'),
+      onNavigateToSource: (endpoint, meta) => {
+        if (endpoint) {
+          setNavOrigin({ screen: 'links-index' });
+          navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
+        }
+      },
+      onNavigateToTarget: (endpoint, meta) => {
+        if (endpoint) {
+          setNavOrigin({ screen: 'links-index' });
+          navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
         }
       },
       onSearch: goSearch,
@@ -15921,6 +16108,14 @@ multiNotePayload && React.createElement(MultiNotePopover, {
 
 }
 
+  </script>
+  <!-- LinksScreen — extracted to src/ui/screens/LinksScreen.js -->
+  <!-- Depends on: LinkStore (link-store.js), ScreenLayout, ThemeBtn, relativeDate, -->
+  <!--             bookCategory, findEntryContext, _allBooks, _matthew (all defined above). -->
+  <!-- All references are resolved at React render time, not at parse time, so -->
+  <!-- loading here (before root.render) is safe even though callee is defined above. -->
+  <script src="src/ui/screens/LinksScreen.js"></script>
+  <script>
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(App, null)));
 </script>
