@@ -115,18 +115,30 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
   // the attributes directly is the safer cross-WebView path.
   icon.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor"><path fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
 
-  var openPopover = function(e) {
+  var openIcon = function(e) {
     e.preventDefault();
     e.stopPropagation();
+    var ids = (icon.getAttribute('data-bkm-ids') || '').split(',').filter(Boolean);
+    if (ids.length === 1) {
+      // Single bookmark at this position — open the full create/edit
+      // sheet so the user gets the same UI as creation: editable label
+      // + thought + Open + Delete. Consistent UX whether they're making
+      // a new bookmark or revisiting an existing one.
+      if (window.__bookmarkEdit) { window.__bookmarkEdit(ids[0]); return; }
+    }
+    // Multi-bookmark or fallback: the popover still serves
+    // disambiguation. Tapping a popover row routes onward to whatever
+    // single-bookmark UI is wired (currently still the popover's own
+    // Open/Delete actions — that's intentional for the rare overlap case).
     var rect = icon.getBoundingClientRect();
     var x = rect.left + rect.width / 2;
     var y = rect.bottom + 4;
     if (window.__openBookmarkPopover) {
-      window.__openBookmarkPopover((icon.getAttribute('data-bkm-ids') || '').split(',').filter(Boolean), x, y, hlKey);
+      window.__openBookmarkPopover(ids, x, y, hlKey);
     }
   };
-  icon.addEventListener('click', openPopover);
-  icon.addEventListener('touchend', openPopover);
+  icon.addEventListener('click', openIcon);
+  icon.addEventListener('touchend', openIcon);
   return icon;
 }
 

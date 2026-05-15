@@ -4094,6 +4094,37 @@
     }
     .bkm-create-label-input:focus,
     .bkm-create-thought-input:focus { border-color: var(--gold); }
+    /* Edit-mode action row at the bottom of the body: Open Source + Delete.
+       Buttons share the same chrome as the existing link-action-btn family
+       so the visual language stays consistent across sheets. */
+    .bkm-create-edit-actions {
+      display: flex; gap: 0.6rem; margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--gold-border);
+    }
+    .bkm-create-edit-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      gap: 0.45rem; padding: 10px 12px;
+      background: var(--bg2); color: var(--cream-dim);
+      border: 1px solid var(--gold-border); border-radius: 8px;
+      font-family: 'Cinzel', serif; font-size: 0.65rem;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .bkm-create-edit-btn:hover, .bkm-create-edit-btn:active {
+      background: var(--gold-faint); border-color: var(--gold); color: var(--gold);
+    }
+    .bkm-create-edit-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .bkm-create-edit-btn-danger { color: #ef9a9a; }
+    .bkm-create-edit-btn-danger:hover, .bkm-create-edit-btn-danger:active {
+      background: rgba(244,143,177,0.12); border-color: var(--accent-pink);
+      color: var(--accent-pink);
+    }
+    .bkm-create-edit-confirm {
+      flex: 1; padding: 8px 12px;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
     /* Top-nav "bookmark this chapter" button. Sits alongside the standard
        settings/history/search/theme cluster on reading screens. Dim flag by
        default; gold filled when the current chapter is already bookmarked. */
@@ -14187,6 +14218,32 @@ function App() {
   // pre-commit BookmarkCreateSheet instead of silently adding to the
   // store. `info` shape: { hlKey, sourceLabel, excerpt, defaultLabel }.
   useEffect(() => { window.__bookmarkCreate = (info) => setBookmarkCreatePending(info || null); return () => { delete window.__bookmarkCreate; }; }, []);
+  // Bridge for the inline bookmark icon (single-bookmark tap) and the
+  // BookmarksScreen row's edit-from-action-sheet path to open the same
+  // BookmarkCreateSheet in EDIT mode. Looks up the existing record and
+  // builds the `pending` shape with editId + currentLabel/currentThought
+  // populated so the sheet renders preloaded.
+  useEffect(() => {
+    window.__bookmarkEdit = (bkmId) => {
+      if (!bkmId || typeof BookmarkStore === 'undefined') return;
+      const bkm = BookmarkStore.get(bkmId);
+      if (!bkm) return;
+      // Source label reuses the BookmarksScreen helper for consistency.
+      const sourceLabel = (typeof _bookmarkSourceLabel === 'function')
+        ? _bookmarkSourceLabel(bkm.hlKey)
+        : '';
+      setBookmarkCreatePending({
+        editId: bkm.id,
+        hlKey: bkm.hlKey,
+        sourceLabel: sourceLabel,
+        excerpt: '',
+        defaultLabel: bkm.label || '',
+        currentLabel: bkm.label || '',
+        currentThought: bkm.thought || ''
+      });
+    };
+    return () => { delete window.__bookmarkEdit; };
+  }, []);
   // Auto-dismiss floating overlays whenever the active screen, letter,
   // book, or study chapter changes. Without this the always-mounted
   // SelectionToolbar persists with a stale selInfo, and the
@@ -16677,16 +16734,36 @@ multiNotePayload && React.createElement(MultiNotePopover, {
       onCancel: () => setBookmarkCreatePending(null),
       onConfirm: (bkm) => {
         if (!bkm || !bkm.hlKey) { setBookmarkCreatePending(null); return; }
-        BookmarkStore.add({
-          id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
-          hlKey: bkm.hlKey,
-          label: bkm.label,
-          thought: bkm.thought || '',
-          created: Date.now(),
-          updated: Date.now()
-        });
+        if (bkm.editId) {
+          // EDIT mode — update existing record.
+          BookmarkStore.update(bkm.editId, { label: bkm.label, thought: bkm.thought || '' });
+        } else {
+          // CREATE mode — insert new.
+          BookmarkStore.add({
+            id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
+            hlKey: bkm.hlKey,
+            label: bkm.label,
+            thought: bkm.thought || '',
+            created: Date.now(),
+            updated: Date.now()
+          });
+        }
         setBookmarkCreatePending(null);
         setHlTick(t => t + 1);
+      },
+      onDelete: (editId) => {
+        if (editId && typeof BookmarkStore !== 'undefined') BookmarkStore.remove(editId);
+        setBookmarkCreatePending(null);
+        setHlTick(t => t + 1);
+      },
+      onOpen: (editId) => {
+        if (!editId) return;
+        const bkm = BookmarkStore.get(editId);
+        if (!bkm) { setBookmarkCreatePending(null); return; }
+        // Navigate to the bookmark's source. Mirror BookmarkPopover's nav path.
+        const endpoint = (typeof _bookmarkSourceEndpoint === 'function') ? _bookmarkSourceEndpoint(bkm.hlKey) : null;
+        setBookmarkCreatePending(null);
+        if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: 'Bookmark' });
       }
     })
     ));
