@@ -4039,6 +4039,49 @@
       stroke-width: 1.6;
     }
     .inline-bookmark-icon-multi { color: var(--gold); }
+    /* Bookmark create sheet — pre-commit form, reuses link-picker overlay
+       chrome (navpick-sheet) for consistency with the new-link flow. */
+    .bkm-create-sheet { min-height: auto; }
+    .bkm-create-body { padding: 4px 20px 22px; overflow-y: auto; }
+    .bkm-create-source {
+      font-family: 'Cinzel', serif; font-size: 0.62rem;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--gold-dim); margin-bottom: 4px;
+    }
+    .bkm-create-excerpt {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.94rem; color: var(--cream-muted);
+      line-height: 1.45;
+      padding: 8px 12px; margin-bottom: 18px;
+      border-left: 2px solid var(--gold-border);
+      background: rgba(200,164,86,0.04); border-radius: 0 6px 6px 0;
+      max-height: 110px; overflow-y: auto;
+    }
+    .bkm-create-field-label {
+      font-family: 'Cinzel', serif; font-size: 0.6rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--gold-dim); margin: 14px 0 6px;
+    }
+    .bkm-create-field-hint {
+      letter-spacing: 0.08em; color: var(--cream-muted);
+      font-size: 0.55rem; text-transform: none;
+    }
+    .bkm-create-label-input,
+    .bkm-create-thought-input {
+      width: 100%; box-sizing: border-box;
+      background: var(--bg2); color: var(--cream);
+      border: 1px solid var(--gold-border); border-radius: 8px;
+      padding: 10px 12px;
+      font-family: 'EB Garamond', serif;
+      outline: none; transition: border-color 0.15s;
+    }
+    .bkm-create-label-input { font-size: 1rem; }
+    .bkm-create-thought-input {
+      font-size: 0.95rem; line-height: 1.4;
+      min-height: 96px; max-height: 240px; resize: vertical;
+    }
+    .bkm-create-label-input:focus,
+    .bkm-create-thought-input:focus { border-color: var(--gold); }
     /* Top-nav "bookmark this chapter" button. Sits alongside the standard
        settings/history/search/theme cluster on reading screens. Dim flag by
        default; gold filled when the current chapter is already bookmarked. */
@@ -4109,16 +4152,39 @@
       overflow: hidden; text-overflow: ellipsis;
     }
     /* Optional "why" thought displayed under the label on a row.
-       Subtler than the label; truncates to a single line. */
+       Subtler than the label; truncates to a single line by default.
+       Long thoughts (>80 chars) become tappable for read-more expansion;
+       the expanded mode drops the ellipsis and wraps. */
     .bkm-row-thought {
       display: block;
       font-family: 'EB Garamond', serif; font-style: italic;
       font-size: 0.82rem; color: var(--cream-muted);
-      line-height: 1.3; white-space: nowrap;
+      line-height: 1.35; white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis;
       margin-top: 2px;
       padding-left: 8px;
       border-left: 2px solid var(--gold-faint);
+    }
+    .bkm-row-thought.is-collapsible {
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.12s, border-color 0.12s;
+    }
+    .bkm-row-thought.is-collapsible:hover,
+    .bkm-row-thought.is-collapsible:active {
+      color: var(--cream-dim);
+      border-left-color: var(--gold-border);
+    }
+    .bkm-row-thought.is-expanded {
+      white-space: normal; overflow: visible; text-overflow: clip;
+    }
+    /* Tiny "· More" / "· Less" affordance at the end of a collapsible
+       thought line. Cinzel caps so it reads as UI rather than content. */
+    .bkm-row-thought-toggle {
+      font-family: 'Cinzel', serif; font-style: normal;
+      font-size: 0.55rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--gold-dim);
+      white-space: nowrap;
     }
     .bkm-row-edit-input {
       width: 100%; background: var(--bg3);
@@ -6236,14 +6302,43 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onB
       storedKey = hlKey + ':' + snap.start + '-' + snap.end;
     }
 
-    var bkm = { id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()), hlKey: storedKey, label: labelText, thought: '', created: Date.now(), updated: Date.now() };
-    if (typeof BookmarkStore !== 'undefined') BookmarkStore.add(bkm);
+    // Excerpt: the snapped selection text, truncated for the preview block.
+    var excerpt = '';
+    if (snap.end > snap.start) {
+      excerpt = containerText.slice(snap.start, snap.end);
+      if (excerpt.length > 220) excerpt = excerpt.slice(0, 217) + '...';
+    }
+
+    // Source label: re-use the same derivation that BookmarksScreen rows do.
+    var sourceLabel = (typeof _bookmarkSourceLabel === 'function')
+      ? _bookmarkSourceLabel(storedKey)
+      : '';
 
     window.getSelection().removeAllRanges();
     setVisible(false);
-    if (typeof setHlTick === 'function') setHlTick(function(t) { return t + 1; });
-    // Notify App so the popover can be shown or any other feedback fired.
-    if (typeof onBookmarkRequest === 'function') onBookmarkRequest(bkm);
+
+    // Open the pre-commit BookmarkCreateSheet — replaces the previous
+    // silent BookmarkStore.add. The sheet lets the user refine the
+    // auto-derived label and add an optional thought BEFORE persisting,
+    // then commits on its own (App-level onConfirm wires the store write).
+    if (typeof window.__bookmarkCreate === 'function') {
+      window.__bookmarkCreate({
+        hlKey: storedKey,
+        sourceLabel: sourceLabel,
+        excerpt: excerpt,
+        defaultLabel: labelText
+      });
+    } else {
+      // Fallback: defensive path if the App-level bridge wasn't installed
+      // yet — directly persist so we never lose the user's intent.
+      BookmarkStore.add({
+        id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
+        hlKey: storedKey, label: labelText, thought: '',
+        created: Date.now(), updated: Date.now()
+      });
+      if (typeof setHlTick === 'function') setHlTick(function(t) { return t + 1; });
+    }
+    if (typeof onBookmarkRequest === 'function') onBookmarkRequest(storedKey);
   }, [selInfo, setHlTick, onBookmarkRequest]);
 
   if (!visible || !selInfo) return null;
@@ -9329,17 +9424,29 @@ function ChapterBookmarkBtn({ chapterBookmark, hlTick }) {
       }
       return;
     }
-    // Create the chapter-level bookmark
-    BookmarkStore.add({
-      id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
-      hlKey: chapterBookmark.hlKey,
-      label: chapterBookmark.label || 'Chapter bookmark',
-      thought: '',
-      created: Date.now(),
-      updated: Date.now()
-    });
-    // Trigger re-renders + apply-DOM effect so inline pulse fires
-    if (window.__bumpHlTick) window.__bumpHlTick();
+    // Open the pre-commit create sheet so the user can refine label +
+    // attach a thought before persisting. Same flow as the
+    // SelectionToolbar bookmark action — consistent experience whether
+    // the user bookmarks a phrase or a whole chapter.
+    if (window.__bookmarkCreate) {
+      window.__bookmarkCreate({
+        hlKey: chapterBookmark.hlKey,
+        sourceLabel: chapterBookmark.label || '',
+        excerpt: '',
+        defaultLabel: chapterBookmark.label || 'Chapter bookmark'
+      });
+    } else {
+      // Fallback (bridge missing): silent-add so the action is never lost.
+      BookmarkStore.add({
+        id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
+        hlKey: chapterBookmark.hlKey,
+        label: chapterBookmark.label || 'Chapter bookmark',
+        thought: '',
+        created: Date.now(),
+        updated: Date.now()
+      });
+      if (window.__bumpHlTick) window.__bumpHlTick();
+    }
   };
 
   return React.createElement("button", {
@@ -13974,6 +14081,7 @@ function App() {
   const [notebookPickerTarget, setNotebookPickerTarget] = useState(null); // groupId or null
   const [multiNotePayload, setMultiNotePayload] = useState(null); // { groupIds, x, y } or null
   const [bookmarkPopoverPayload, setBookmarkPopoverPayload] = useState(null); // { bkmIds, x, y, hlKey } or null
+  const [bookmarkCreatePending, setBookmarkCreatePending] = useState(null);   // { hlKey, sourceLabel, excerpt, defaultLabel } or null
 
   const openLinkSidebar = useCallback((hlKey) => setLinkSidebarKey(hlKey), []);
   const closeLinkSidebar = useCallback(() => setLinkSidebarKey(null), []);
@@ -14033,6 +14141,10 @@ function App() {
   // drilling. Used after store writes that aren't otherwise tied to React
   // state — so the apply-DOM effect re-runs and inline icons refresh.
   useEffect(() => { window.__bumpHlTick = () => setHlTick(t => t + 1); return () => { delete window.__bumpHlTick; }; }, []);
+  // Bridge for SelectionToolbar + ChapterBookmarkBtn to open the
+  // pre-commit BookmarkCreateSheet instead of silently adding to the
+  // store. `info` shape: { hlKey, sourceLabel, excerpt, defaultLabel }.
+  useEffect(() => { window.__bookmarkCreate = (info) => setBookmarkCreatePending(info || null); return () => { delete window.__bookmarkCreate; }; }, []);
   // Auto-dismiss floating overlays whenever the active screen, letter,
   // book, or study chapter changes. Without this the always-mounted
   // SelectionToolbar persists with a stale selInfo, and the
@@ -16512,6 +16624,28 @@ multiNotePayload && React.createElement(MultiNotePopover, {
         }
       },
       onClose: () => setBookmarkPopoverPayload(null)
+    }),
+    // BookmarkCreateSheet — pre-commit form for new bookmarks. Opens
+    // from SelectionToolbar's Bookmark action and from the chapter-
+    // bookmark NavButton (both via window.__bookmarkCreate). Saving
+    // commits to BookmarkStore + bumps hlTick so the inline icon
+    // pulse fires on the source passage.
+    bookmarkCreatePending && React.createElement(BookmarkCreateSheet, {
+      pending: bookmarkCreatePending,
+      onCancel: () => setBookmarkCreatePending(null),
+      onConfirm: (bkm) => {
+        if (!bkm || !bkm.hlKey) { setBookmarkCreatePending(null); return; }
+        BookmarkStore.add({
+          id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
+          hlKey: bkm.hlKey,
+          label: bkm.label,
+          thought: bkm.thought || '',
+          created: Date.now(),
+          updated: Date.now()
+        });
+        setBookmarkCreatePending(null);
+        setHlTick(t => t + 1);
+      }
     })
     ));
 
@@ -16528,6 +16662,11 @@ multiNotePayload && React.createElement(MultiNotePopover, {
   <!-- Depends on: BookmarkStore (bookmark-store.js), ScreenLayout, ThemeBtn, relativeDate, -->
   <!--             bookCategory, findEntryContext, _allBooks, _matthew (all defined above). -->
   <script src="src/ui/screens/BookmarksScreen.js"></script>
+  <!-- BookmarkCreateSheet — pre-commit form opened by SelectionToolbar's
+       Bookmark action and the chapter-bookmark NavButton on reading
+       screens. Lets the user refine label + add an optional thought
+       BEFORE the bookmark is persisted (replaces the silent add). -->
+  <script src="src/ui/sheets/BookmarkCreateSheet.js"></script>
   <script>
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(App, null)));

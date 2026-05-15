@@ -106,9 +106,14 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
   var count = (bkmIds || []).length;
   icon.title = count === 1 ? 'Bookmark' : count + ' bookmarks';
 
-  // Bookmark flag SVG — a filled bookmark shape, gold-dim by default.
-  // Slightly smaller than inline-link-icon to feel lightweight.
-  icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+  // Bookmark flag SVG. Note: explicit `fill="currentColor"` and
+  // `stroke="currentColor"` ATTRIBUTES on the path (not just CSS) —
+  // Android WebView (notably older Chromium-derived versions) does NOT
+  // reliably inherit CSS `fill` from the parent <svg> through to child
+  // <path> elements injected via innerHTML, leaving the path invisible
+  // on device even though the preview works fine on desktop. Setting
+  // the attributes directly is the safer cross-WebView path.
+  icon.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor"><path fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
 
   var openPopover = function(e) {
     e.preventDefault();

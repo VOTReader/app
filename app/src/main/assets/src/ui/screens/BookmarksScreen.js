@@ -85,7 +85,10 @@ function _bookmarkSourceEndpoint(hlKey) {
 
 /* ── BookmarkRow component ───────────────────────────────────── */
 /* One row in the bookmarks browser. Shows source label, bookmark label,
-   and date. Long-press surfaces the action sheet. */
+   and date. Tapping the source/label area navigates to the source.
+   Tapping the thought (if any) toggles expand/collapse without
+   navigating — single-line truncated by default, full wrapping when
+   expanded. Long-press surfaces the action sheet. */
 function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onEditSave, onEditCancel }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
@@ -97,9 +100,20 @@ function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onE
   var editValue = _editState[0];
   var setEditValue = _editState[1];
 
+  // Thought expand/collapse — local to this row, ephemeral (resets on
+  // re-mount / search filter / sort change, which is fine UX).
+  var _thoughtExp = useState(false);
+  var thoughtExpanded = _thoughtExp[0];
+  var setThoughtExpanded = _thoughtExp[1];
+
   var isEditing = editingId === bkm.id;
   var sourceLabel = _bookmarkSourceLabel(bkm.hlKey);
   var date = (typeof relativeDate === 'function') ? relativeDate(bkm.updated || bkm.created) : '';
+  var hasThought = !isEditing && bkm.thought && bkm.thought.trim();
+  // "Long" is anything that would visibly truncate. Conservative threshold
+  // since the actual truncation point depends on viewport width; ~80 chars
+  // is roughly where single-line wrapping starts to bite on a phone.
+  var thoughtIsLong = hasThought && bkm.thought.length > 80;
 
   // Keep editValue in sync when we switch to editing this row
   useEffect(function() {
@@ -125,14 +139,27 @@ function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onE
     else if (e.key === 'Escape') { onEditCancel(); }
   };
 
+  function toggleThought(e) {
+    e.stopPropagation();
+    if (thoughtIsLong) setThoughtExpanded(function(v) { return !v; });
+  }
+
   return React.createElement('div', {
     className: 'bkm-row',
     onContextMenu: function(e) { e.preventDefault(); if (onLongPress) onLongPress(bkm, e); }
   },
-    React.createElement('button', {
-      className: 'bkm-row-content',
+    // Inner container is a div with role=button so the thought can be its
+    // own tappable child (nested <button> elements aren't valid HTML).
+    React.createElement('div', {
+      className: 'bkm-row-content' + (isEditing ? ' is-disabled' : ''),
+      role: 'button',
+      tabIndex: isEditing ? -1 : 0,
       onClick: function() { if (!isEditing && onNavigate) onNavigate(bkm); },
-      disabled: isEditing
+      onKeyDown: function(e) {
+        if ((e.key === 'Enter' || e.key === ' ') && !isEditing && onNavigate) {
+          e.preventDefault(); onNavigate(bkm);
+        }
+      }
     },
       // Source label — Cinzel gold, always visible
       React.createElement('span', { className: 'bkm-row-source' }, sourceLabel),
@@ -151,8 +178,21 @@ function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onE
             maxLength: 200
           })
         : React.createElement('span', { className: 'bkm-row-label' }, bkm.label || '(no label)'),
-      // Thought — italic dim line if the user has written one (the "why")
-      !isEditing && bkm.thought && bkm.thought.trim() && React.createElement('span', { className: 'bkm-row-thought' }, bkm.thought)
+      // Thought — italic dim block if the user has written one. Tappable
+      // for expand/collapse when long. stopPropagation so the outer
+      // navigation handler doesn't fire.
+      hasThought && React.createElement('span', {
+        className: 'bkm-row-thought' + (thoughtExpanded ? ' is-expanded' : '') + (thoughtIsLong ? ' is-collapsible' : ''),
+        onClick: toggleThought,
+        role: thoughtIsLong ? 'button' : undefined,
+        tabIndex: thoughtIsLong ? 0 : undefined,
+        title: thoughtIsLong ? (thoughtExpanded ? 'Tap to collapse' : 'Tap to read more') : undefined
+      },
+        bkm.thought,
+        thoughtIsLong && React.createElement('span', { className: 'bkm-row-thought-toggle' },
+          thoughtExpanded ? ' · Less' : ' · More'
+        )
+      )
     ),
     // Date + long-press affordance (three dots)
     React.createElement('div', { className: 'bkm-row-meta' },
