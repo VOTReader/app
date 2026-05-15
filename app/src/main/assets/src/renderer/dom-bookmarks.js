@@ -1,0 +1,223 @@
+/* ═══════════════════════════════════════════════════════════════
+   DOM BOOKMARK ICONS — inline flag icon injection for [data-hl-dom] containers
+   ═══════════════════════════════════════════════════════════════
+   Global-scope module. Concatenates with index.html; no import/export.
+   Depends on: BookmarkStore (defined in src/stores/bookmark-store.js).
+
+   applyDOMBookmarks() is called from the post-render useEffect in App()
+   after every hlTick change (same effect that calls applyDOMLinks).
+   It:
+     1. Removes any existing .inline-bookmark-icon elements
+     2. Finds all bookmarks that touch each [data-hl-dom] container
+     3. Inserts a small flag icon at the bookmarked text range endpoint
+
+   Icon placement reuses the same slide-off rules as applyDOMLinks:
+     1. Mid-word → slide forward to word boundary
+     2. Closing punctuation → slide past (., ; : ! ? etc.)
+     3. Adjacent skip elements (fn-ref, tap-ref, letter-link-ref,
+        note-icon, verse-link-icon, inline-link-icon) → jump past
+
+   Multiple bookmarks ending at the same offset merge into one icon
+   with a count badge.
+
+   CSS: .inline-bookmark-icon is defined in the main index.html CSS block.
+   Tap opens the bookmark popover via window.__openBookmarkPopover(ids, x, y).
+═══════════════════════════════════════════════════════════════ */
+
+function applyDOMBookmarks() {
+  document.querySelectorAll('[data-hl-key][data-hl-dom]').forEach(function(container) {
+    var hlKey = container.getAttribute('data-hl-key');
+    container.querySelectorAll('.inline-bookmark-icon').forEach(function(el) { el.remove(); });
+    container.normalize();
+
+    var bookmarks = BookmarkStore.getForKeyPrefix(hlKey);
+    if (!bookmarks.length) return;
+
+    // Collect end positions, merging duplicates so multiple bookmarks at
+    // the same offset share one icon.  We track the list of bookmark ids at
+    // each position so the tap handler can surface all of them.
+    var keyPrefix = hlKey + ':';
+    var byEndPos = {}; // endPos → [bkmId, ...]
+    bookmarks.forEach(function(bkm) {
+      if (!bkm.hlKey) return;
+      var k = bkm.hlKey;
+      if (k !== hlKey && k.indexOf(keyPrefix) !== 0) return;
+
+      var endPos = null;
+      var m = k.match(/:(\d+)-(\d+)$/);
+      if (m) {
+        endPos = parseInt(m[2], 10);
+      }
+      // Bookmarks without a ":start-end" suffix land at end-of-block
+      if (endPos == null) {
+        if (!byEndPos[-1]) byEndPos[-1] = [];
+        byEndPos[-1].push(bkm.id);
+        return;
+      }
+      if (!byEndPos[endPos]) byEndPos[endPos] = [];
+      byEndPos[endPos].push(bkm.id);
+    });
+
+    // End-of-block fallback (no ":start-end" in key)
+    if (byEndPos[-1] && byEndPos[-1].length > 0) {
+      container.appendChild(_buildBookmarkIcon(hlKey, byEndPos[-1]));
+      delete byEndPos[-1];
+    }
+
+    if (Object.keys(byEndPos).length === 0) return;
+
+    // Process highest position first so earlier insertions don't shift offsets.
+    var positions = Object.keys(byEndPos).map(Number).sort(function(a, b) { return b - a; });
+    positions.forEach(function(endPos) {
+      _insertBookmarkIconAt(container, hlKey, endPos, byEndPos[endPos]);
+    });
+  });
+}
+
+/* Build the inline bookmark flag icon element.
+   bkmIds is an array of bookmark IDs at this position. */
+function _buildBookmarkIcon(hlKey, bkmIds) {
+  var icon = document.createElement('span');
+  icon.className = 'inline-bookmark-icon';
+  if (bkmIds && bkmIds.length > 1) icon.className += ' inline-bookmark-icon-multi';
+  icon.setAttribute('data-bkm-ids', (bkmIds || []).join(','));
+  icon.setAttribute('data-hl-key', hlKey);
+  var count = (bkmIds || []).length;
+  icon.title = count === 1 ? 'Bookmark' : count + ' bookmarks';
+
+  // Bookmark flag SVG — a filled bookmark shape, gold-dim by default.
+  // Slightly smaller than inline-link-icon to feel lightweight.
+  icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+
+  var openPopover = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var rect = icon.getBoundingClientRect();
+    var x = rect.left + rect.width / 2;
+    var y = rect.bottom + 4;
+    if (window.__openBookmarkPopover) {
+      window.__openBookmarkPopover((icon.getAttribute('data-bkm-ids') || '').split(',').filter(Boolean), x, y, hlKey);
+    }
+  };
+  icon.addEventListener('click', openPopover);
+  icon.addEventListener('touchend', openPopover);
+  return icon;
+}
+
+function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds) {
+  var WORD = /[\w''\-]/;
+  var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
+  // Elements the icon must NOT land directly before — reuses the same
+  // skip list as _insertLinkIconAt.
+  var SKIP_RX = /\b(fn-ref|tap-ref|letter-link-ref|verse-link-icon|hl-note-icon|inline-link-icon|inline-bookmark-icon)\b/;
+
+  function isSkip(el) {
+    return el && el.nodeType === 1 && el.className && SKIP_RX.test(el.className);
+  }
+  function isPhraseChar(c) { return !!c && (WORD.test(c) || CLOSE_PUNCT.test(c)); }
+
+  function nextInsertionPoint(node) {
+    var cur = node;
+    while (cur && cur !== container) {
+      var sib = cur.nextSibling;
+      if (sib === null) {
+        cur = cur.parentElement;
+        continue;
+      }
+      if (isSkip(sib)) {
+        cur = sib;
+        continue;
+      }
+      return sib;
+    }
+    return null;
+  }
+
+  // Gather all text nodes in document order.
+  var textNodes = [];
+  var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+  while (w.nextNode()) textNodes.push(w.currentNode);
+
+  var charPos = 0, nodeIdx = -1, localOffset = 0;
+  for (var i = 0; i < textNodes.length; i++) {
+    var nodeEnd = charPos + textNodes[i].length;
+    if (endPos > charPos && endPos <= nodeEnd) {
+      nodeIdx = i;
+      localOffset = endPos - charPos;
+      break;
+    }
+    charPos = nodeEnd;
+  }
+  if (nodeIdx < 0) {
+    container.appendChild(_buildBookmarkIcon(hlKey, bkmIds));
+    return;
+  }
+
+  // If endPos is inside a skip element, slide past it.
+  var ancestor = textNodes[nodeIdx].parentElement;
+  var skipAncestor = null;
+  while (ancestor && ancestor !== container) {
+    if (isSkip(ancestor)) skipAncestor = ancestor;
+    ancestor = ancestor.parentElement;
+  }
+  if (skipAncestor) {
+    var ref = nextInsertionPoint(skipAncestor);
+    var icon = _buildBookmarkIcon(hlKey, bkmIds);
+    if (ref) ref.parentNode.insertBefore(icon, ref);
+    else container.appendChild(icon);
+    return;
+  }
+
+  var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
+  function hasBlockBetween(prev, next) {
+    var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null, false);
+    bw.currentNode = prev;
+    var n;
+    while ((n = bw.nextNode())) {
+      if (n === next) return false;
+      if (n.nodeType === 1 && BLOCK_TAGS.test(n.tagName)) return true;
+    }
+    return true;
+  }
+
+  // Slide forward through phrase characters, crossing inline boundaries.
+  while (true) {
+    var text = textNodes[nodeIdx].nodeValue;
+    while (localOffset < text.length && isPhraseChar(text[localOffset])) {
+      localOffset++;
+    }
+    if (localOffset < text.length) break;
+    var nextNodeIdx = nodeIdx + 1;
+    while (nextNodeIdx < textNodes.length) {
+      var na = textNodes[nextNodeIdx].parentElement;
+      var inSkip = false;
+      while (na && na !== container) {
+        if (isSkip(na)) { inSkip = true; break; }
+        na = na.parentElement;
+      }
+      if (!inSkip) break;
+      nextNodeIdx++;
+    }
+    if (nextNodeIdx >= textNodes.length) break;
+    if (hasBlockBetween(textNodes[nodeIdx], textNodes[nextNodeIdx])) break;
+    nodeIdx = nextNodeIdx;
+    localOffset = 0;
+  }
+
+  var finalNode = textNodes[nodeIdx];
+  var finalText = finalNode.nodeValue;
+  var insertBeforeNode = null;
+  if (localOffset >= finalText.length) {
+    insertBeforeNode = nextInsertionPoint(finalNode);
+  } else if (localOffset === 0) {
+    insertBeforeNode = finalNode;
+  } else {
+    insertBeforeNode = finalNode.splitText(localOffset);
+  }
+  var iconEl = _buildBookmarkIcon(hlKey, bkmIds);
+  if (insertBeforeNode) {
+    insertBeforeNode.parentNode.insertBefore(iconEl, insertBeforeNode);
+  } else {
+    container.appendChild(iconEl);
+  }
+}
