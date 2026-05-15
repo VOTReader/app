@@ -2046,6 +2046,86 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-15 — Sonnet 4.6: LinksScreen module + Library tile + adjacent fixes
+
+  Coordinator: Opus 4.7 1M. Worker: Sonnet 4.6 (split across two context
+  windows due to prior session running to context limit mid-validation;
+  second window resumed from summary and completed validation + commits).
+  Commit: 00d13da.
+
+  1) LinksScreen (src/ui/screens/LinksScreen.js, ~446 lines)
+    Third incremental module extraction. Pattern confirmed: global-scope
+    module loaded after main script closes, before root.render().
+
+    Design decisions:
+      - Single "All Links" flat view; no By-Source / By-Target tabs.
+        Direction is shown inline on every row (SOURCE eyebrow gold on
+        top, TARGET eyebrow cream-dim on bottom) so tabs add no value.
+      - Both SOURCE and TARGET sides are independently tappable buttons
+        within each row — navigates to that side's passage.
+      - Single-shot "Back to My Links" pill: navigateToLink + setNavOrigin
+        + destSnapshot via the existing tapThroughBack() + fromLetterStack
+        mechanism. Verified for both letter (vot-letter screen) and Bible
+        chapter (bible-ch screen) destinations.
+      - Long-press → LinkRowActionSheet bottom sheet:
+          Open Source / Open Target / Delete Link
+          Delete uses ann-chip-confirm strip (PLAN.txt §11.1 pattern),
+          not instant delete. Cancel returns to main buttons.
+      - Sort menu: Recent (default) / Oldest / Source A–Z / Target A–Z.
+        Reuses notes-index-sort-btn + notes-sort-menu CSS classes.
+      - Broken-link callout (passive): endpoints that no longer resolve
+        via _endpointResolves() are listed at top with count + hint.
+        Never auto-deleted. Shown only when search is empty.
+      - Empty states: "No Links Yet" (zero stored links) and
+        "No Matches" (search/filter yields nothing).
+
+  2) Library tile — "My Links" (5th active tile)
+    Chain icon SVG, live count via LinkStore.all().length keyed on hlTick.
+    Detail text: "No links yet" / "1 link" / "N links".
+    onOpenLinks prop → goLinksIndex.
+
+  3) App wire-up
+    - goLinksIndex: setNavOrigin + setScreen('links-index').
+    - handleAndroidBack: links-index → library (between notes-index
+      and library cases in the if-chain).
+    - Screen render dispatch: onNavigateToSource + onNavigateToTarget
+      both route through navigateToLink with setNavOrigin('links-index')
+      so the back-pill is properly anchored.
+    - Reading dot exclusion: "links-index" added to the array.
+
+  4) Adjacent fix 1 — LinkCard instant-delete → tap-confirm
+    link-card-remove onClick no longer calls onRemove directly.
+    First tap sets confirmRemove=true → ann-chip-confirm strip renders
+    ("Remove this link?" + Cancel + "Yes, remove"). Cancel restores
+    the remove button. Yes, remove calls onRemove + setHlTick.
+    Matches the tap-confirm pattern used everywhere else.
+
+  5) Adjacent fix 2 — LinkSidebar header date → link count
+    Replaced hardcoded `new Date().toLocaleDateString(...)` (wrong for
+    links created on past dates) with "N links" / "1 link" / "No links"
+    count derived from links.length. Always correct for any link age.
+
+  Validation:
+    - Library: 5 tiles render, "1 link" detail shows.
+    - LinksScreen: search, sort, link row render.
+    - Tap source → navigates to "The Wide Path" with "Back to My Links"
+      pill; tap pill → returns to My Links. Pill single-shot.
+    - Tap target → navigates to Bible chapter with pill; pill returns.
+    - Long-press → action sheet renders Open Source / Open Target / Delete.
+    - Delete → confirm strip; Cancel → main buttons restored; Yes → link
+      deleted, empty state shows.
+    - Adjacent fix 1: "Remove link" in LinkSidebar shows confirm strip,
+      not instant delete. Cancel restores. Link not deleted.
+    - Adjacent fix 2: header shows "1 link" not today's date.
+    - check_balance.py ALL OK. Zero console errors.
+
+  Note: test link endpoints require `screen` and `letterId` fields to
+  navigate correctly — `navigateToLink` routes letter-type endpoints via
+  endpoint.screen. Real links created by the app via buildSourceEndpoint
+  always include these fields. Manual test data must be complete.
+
+  Not pushed to origin (coordinator's job after review).
+
 2026-05-14 (later) — Sonnet 4.6: Links schema + visual + first module extractions
 
   Coordinator: Opus 4.7 1M. Worker: Sonnet 4.6 (~155K tokens / 125 tool
