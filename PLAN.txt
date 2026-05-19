@@ -2112,7 +2112,27 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   module has no hidden cross-block dep. Smoke-gate vs green baseline:
   IDENTICAL — globals ok (60), data ok, 12/12 screens ok 0 crash,
   annotation ok (133 marks / 13 icons, no crash on open or next/prev),
-  0 console.error. Zero regression. NEXT: P2 (CSS-in-JS → src/styles/).
+  0 console.error. Zero regression.
+
+  P2 — DONE (2026-05-19). CSS-in-JS fully removed. The ~4.4k-line
+  `const CSS = ` + backtick + `...` template literal (index.html 79-4494)
+  is now a plain static app.css loaded via <link rel="stylesheet"> in
+  <head> (CSP style-src 'self' allows it). The React consumer
+  `createElement("style",null,CSS)` → a no-op `null` child. This is the
+  FOUNDATIONAL fix the plan intended: the const-CSS backtick-in-comment
+  black-screen footgun is ELIMINATED, not relocated — there is no
+  template literal anymore, app.css needs no JS escaping. Provably safe:
+  0 `${}` interpolations; the only backslash sequences in 4.4k lines
+  were the 2 `\\2060` word-joiner lines, correctly un-escaped to `\2060`
+  for real CSS (guarded extraction script refused-to-write unless all
+  invariants held). index.html 905KB→661KB / ~17.2k→12.8k lines.
+  Verified: app.css = 1470 parsed rules; --gold/--cream-dim/--gold-border
+  + body font resolve on deep screens; no crash on home/Volumes/Library/
+  Bookmarks; smoke core identical to baseline (globals ok, data ok,
+  annotation 133 marks/13 icons no crash, 0 console.error). NEXT: P3
+  (scripture/data resolution — also Objective E's home).
+
+  NEXT (superseded): P2 (CSS-in-JS → src/styles/).
 
   NEXT (superseded): begin P1 (annotation engine extraction).
 
