@@ -56,14 +56,42 @@ function JournalEditorScreen(props) {
   var _showRec = useState(false);
   var showRec = _showRec[0]; var setShowRec = _showRec[1];
 
-  var _showNb = useState(false);
-  var showNb = _showNb[0]; var setShowNb = _showNb[1];
+  var _confirmAudioDelete = useState(null);  // idx of audio block awaiting delete confirm
+  var confirmAudioDelete = _confirmAudioDelete[0]; var setConfirmAudioDelete = _confirmAudioDelete[1];
 
-  var _insertAfter = useState(null);  // index of block to insert AFTER
-  var insertAfter = _insertAfter[0]; var setInsertAfter = _insertAfter[1];
+  // Per-block delete confirmation (any non-audio block) — holds the index
+  // currently awaiting confirm, or null. Audio uses confirmAudioDelete
+  // because its inline waveform layout already has a custom confirm strip.
+  var _confirmDel = useState(null);
+  var confirmDelIdx = _confirmDel[0]; var setConfirmDelIdx = _confirmDel[1];
+  // Two-step inline delete: step 1 = "Delete?", step 2 = "Are you sure?".
+  // The first ✓ advances the step; only the second ✓ actually removes.
+  var _confirmDelStep = useState(1);
+  var confirmDelStep = _confirmDelStep[0]; var setConfirmDelStep = _confirmDelStep[1];
+
+  // Tap anywhere outside the inline "Delete?" strip fully cancels it.
+  // Capture phase so the gesture is seen even if a child stops propagation;
+  // taps inside .jrn-block-confirm (its own × / ✓) are ignored here and
+  // handled by those buttons' own onClick. The opening tap has finished
+  // propagating by the time this effect attaches, so it never self-cancels.
+  useEffect(function() {
+    if (confirmDelIdx === null) return;
+    function onDocDown(e) {
+      var t = e.target;
+      if (t && t.closest && t.closest('.jrn-block-confirm')) return;
+      setConfirmDelIdx(null);
+      setConfirmDelStep(1);
+    }
+    document.addEventListener('pointerdown', onDocDown, true);
+    return function() { document.removeEventListener('pointerdown', onDocDown, true); };
+  }, [confirmDelIdx]);
 
   var fileInputRef = useRef(null);
+  // activeTextareaRef tracks { idx, el, caret } so insertion knows where to
+  // split. caret stays current via onSelect/onKeyUp/onClick on the textarea.
   var activeTextareaRef = useRef(null);
+  var blocksContainerRef = useRef(null);
+  var pendingFocusIdRef = useRef(null);  // block id to focus after the next render
   var firstRunRef = useRef(true);
 
   // Always-fresh refs that mirror the latest state. Used by the unmount
@@ -128,14 +156,36 @@ function JournalEditorScreen(props) {
     setBlocks(function(arr) {
       var next = arr.slice();
       var removed = next.splice(idx, 1)[0];
-      // If image/audio, drop the media blob too
+      // Drop the media blob too — but ONLY when nothing else needs it:
+      //  1. not an embed of another entry's media (sourceJournalId set), AND
+      //  2. no OTHER entry embeds this same mediaId (symmetric protection —
+      //     deleting the SOURCE block must not orphan embeds elsewhere), AND
+      //  3. this entry doesn't reuse the same mediaId in another block.
       if (removed && (removed.type === 'image' || removed.type === 'audio') && removed.mediaId) {
-        try { JournalMediaStore.delete(removed.mediaId); } catch (e) {}
+        var isLinkedEmbed = !!removed.sourceJournalId;
+        var reusedHere = next.some(function(bb) {
+          return (bb.type === 'image' || bb.type === 'audio') && bb.mediaId === removed.mediaId;
+        });
+        var referencedElsewhere = false;
+        try {
+          referencedElsewhere = (typeof JournalStore !== 'undefined' && JournalStore.isMediaReferencedElsewhere)
+            ? JournalStore.isMediaReferencedElsewhere(removed.mediaId, entryIdRef.current)
+            : false;
+        } catch (e) {}
+        if (!isLinkedEmbed && !reusedHere && !referencedElsewhere) {
+          try { JournalMediaStore.delete(removed.mediaId); } catch (e) {}
+        }
       }
       return next.length === 0 ? JournalHelpers.defaultBlocks() : next;
     });
+    setConfirmDelIdx(null);
+    setConfirmDelStep(1);
+    setConfirmAudioDelete(null);
     scheduleSave();
   }
+
+  function requestDeleteBlock(idx) { setConfirmDelIdx(idx); setConfirmDelStep(1); }
+  function cancelDeleteBlock() { setConfirmDelIdx(null); setConfirmDelStep(1); }
   function insertBlockAt(idx, block) {
     setBlocks(function(arr) {
       var next = arr.slice();
@@ -145,14 +195,74 @@ function JournalEditorScreen(props) {
     scheduleSave();
   }
 
+  // ─── Cursor-aware insertion ─────────────────────────────────
+  // The "single body surface" UX: when the user picks a media/card from
+  // the FAB +, we split the focused paragraph at the cursor, drop the
+  // new block in between, and create a continuation paragraph that we
+  // auto-focus so typing keeps flowing.
+  function insertAtCursor(block) {
+    var info = activeTextareaRef.current;
+    var idx = info && info.idx != null ? info.idx : -1;
+    var cur = idx >= 0 ? blocks[idx] : null;
+    var supportsSplit = cur && (cur.type === 'p' || cur.type === 'h2' || cur.type === 'quote');
+    if (!supportsSplit) {
+      // No useful caret context (e.g. picker insert with no focused
+      // textarea). Append the block, then ensure EXACTLY ONE trailing
+      // empty paragraph to keep writing in — never one-per-insert, which
+      // previously littered the entry with blank gaps after several embeds.
+      var tailIdNoSplit = JournalHelpers.blockId();
+      setBlocks(function(arr) {
+        var next = arr.slice();
+        // Reuse a trailing empty paragraph if there already is one.
+        var last = next[next.length - 1];
+        if (last && last.type === 'p' && !(last.text || '').trim()) {
+          next.splice(next.length - 1, 0, block); // insert before the blank p
+        } else {
+          next.push(block);
+          next.push({ id: tailIdNoSplit, type: 'p', text: '' });
+        }
+        return next;
+      });
+      pendingFocusIdRef.current = tailIdNoSplit;
+      scheduleSave();
+      return;
+    }
+    var caret = info.caret != null ? info.caret : (info.el ? info.el.selectionStart : (cur.text || '').length);
+    var text = cur.text || '';
+    var head = text.slice(0, caret);
+    var tail = text.slice(caret);
+    var tailId = JournalHelpers.blockId();
+    var tailBlock = { id: tailId, type: cur.type === 'h2' ? 'p' : cur.type, text: tail };
+    if (cur.type === 'quote') tailBlock.cite = '';
+    setBlocks(function(arr) {
+      var next = arr.slice();
+      next[idx] = Object.assign({}, next[idx], { text: head });
+      next.splice(idx + 1, 0, block);
+      next.splice(idx + 2, 0, tailBlock);
+      return next;
+    });
+    pendingFocusIdRef.current = tailId;
+    scheduleSave();
+  }
+
+  // After every render, if pendingFocusIdRef is set, focus that block's
+  // textarea and move the caret to the start of the tail text.
+  useEffect(function() {
+    var pid = pendingFocusIdRef.current;
+    if (!pid) return;
+    pendingFocusIdRef.current = null;
+    var el = blocksContainerRef.current && blocksContainerRef.current.querySelector('[data-block-id="' + pid + '"] textarea');
+    if (el) {
+      try { el.focus(); el.setSelectionRange(0, 0); } catch (e) {}
+    }
+  });
+
   // ─── Insert sheet ───────────────────────────────────────────
-  function openInsertSheet(afterIdx) {
-    setInsertAfter(afterIdx != null ? afterIdx : blocks.length - 1);
+  function openInsertSheet() {
     setShowInsert(true);
   }
   function handleBlockInsert(block) {
-    var at = insertAfter != null ? insertAfter : blocks.length - 1;
-    insertBlockAt(at, block);
+    insertAtCursor(block);
   }
   function handleInsertImage() {
     if (fileInputRef.current) fileInputRef.current.click();
@@ -161,19 +271,22 @@ function JournalEditorScreen(props) {
     setShowRec(true);
   }
   function handleInsertInline(token) {
-    // Append into the last-focused textarea if available, otherwise into
-    // the last paragraph block.
-    var ta = activeTextareaRef.current;
-    if (ta && ta.idx != null) {
-      var idx = ta.idx;
+    // Inline tokens (e.g. {{ref:…}}) go into the focused textarea at the
+    // caret position when possible. The FAB → Inline path is mostly a
+    // power-user shortcut; default flow uses block-level cards.
+    var info = activeTextareaRef.current;
+    if (info && info.idx != null) {
+      var idx = info.idx;
       var cur = blocks[idx];
       if (cur && (cur.type === 'p' || cur.type === 'h2' || cur.type === 'quote')) {
-        var newText = (cur.text || '') + (cur.text && !cur.text.endsWith(' ') ? ' ' : '') + token;
+        var caret = info.caret != null ? info.caret : (info.el ? info.el.selectionStart : (cur.text || '').length);
+        var text = cur.text || '';
+        var pad = (caret > 0 && !/\s$/.test(text.slice(0, caret))) ? ' ' : '';
+        var newText = text.slice(0, caret) + pad + token + text.slice(caret);
         patchBlock(idx, { text: newText });
         return;
       }
     }
-    // Fallback: append a new paragraph
     insertBlockAt(blocks.length - 1, JournalHelpers.newBlock('p', { text: token }));
   }
 
@@ -192,7 +305,7 @@ function JournalEditorScreen(props) {
         height: out.height
       });
     }).then(function(mid) {
-      insertBlockAt(blocks.length - 1, JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
+      insertAtCursor(JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
     }).catch(function(err) {
       console.warn('Image insert failed', err);
       alert('Could not load that image.');
@@ -203,24 +316,67 @@ function JournalEditorScreen(props) {
   function onRecordingSaved(info) {
     setShowRec(false);
     if (!info || !info.mediaId) return;
-    insertBlockAt(blocks.length - 1, JournalHelpers.newBlock('audio', { mediaId: info.mediaId, duration: info.duration, caption: '' }));
+    insertAtCursor(JournalHelpers.newBlock('audio', { mediaId: info.mediaId, duration: info.duration, caption: '', samples: info.samples || null }));
   }
 
-  // ─── Mood cycling ───────────────────────────────────────────
-  var moodOrder = [null, 'silver', 'deep', 'quiet'];
-  function cycleMood() {
-    var i = moodOrder.indexOf(mood);
-    var next = moodOrder[(i + 1) % moodOrder.length];
-    setMood(next);
-    scheduleSave();
+  // ─── Caret tracking ─────────────────────────────────────────
+  function trackCaret(idx, el) {
+    if (!el) return;
+    activeTextareaRef.current = { idx: idx, el: el, caret: el.selectionStart };
   }
-  var moodClass = mood ? mood : 'none';
+  function focusTextarea(idx, el) {
+    activeTextareaRef.current = { idx: idx, el: el, caret: el ? el.selectionStart : 0 };
+  }
+
+  // ─── Shared delete affordance ─────────────────────────────
+  // Renders a small × in the corner of every editable block. Tap once →
+  // an inline confirm strip replaces the × in the same spot. Audio blocks
+  // route through their own onRequestDelete callback (the waveform layout
+  // owns the strip), so we don't render a duplicate × on audio.
+  function blockDeleteUI(idx) {
+    if (confirmDelIdx === idx) {
+      var step2 = confirmDelStep === 2;
+      return React.createElement('div', { className: 'jrn-block-confirm' + (step2 ? ' jrn-block-confirm-step2' : ''), onClick: function(e) { e.stopPropagation(); } },
+        React.createElement('span', { className: 'jrn-block-confirm-q' }, step2 ? 'Are you sure?' : 'Delete?'),
+        React.createElement('button', {
+          className: 'jrn-block-confirm-cancel',
+          onClick: function(e) { e.stopPropagation(); cancelDeleteBlock(); },
+          'aria-label': 'Cancel'
+        }, '×'),
+        React.createElement('button', {
+          className: 'jrn-block-confirm-yes',
+          onClick: function(e) {
+            e.stopPropagation();
+            if (step2) { deleteBlock(idx); }
+            else { setConfirmDelStep(2); }
+          },
+          'aria-label': step2 ? 'Confirm delete' : 'Continue'
+        },
+          React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.4', strokeLinecap: 'round', strokeLinejoin: 'round' },
+            React.createElement('polyline', { points: '20 6 9 17 4 12' })
+          )
+        )
+      );
+    }
+    return React.createElement('button', {
+      className: 'jrn-block-del-btn',
+      onClick: function(e) { e.stopPropagation(); requestDeleteBlock(idx); },
+      title: 'Delete block',
+      'aria-label': 'Delete block'
+    },
+      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round' },
+        React.createElement('line', { x1: '18', y1: '6', x2: '6', y2: '18' }),
+        React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
+      )
+    );
+  }
 
   // ─── Block render — editable variants ───────────────────────
   function renderEditableBlock(b, idx) {
     var common = {
       key: b.id,
-      className: 'jrn-block'
+      className: 'jrn-block jrn-block-edit',
+      'data-block-id': b.id
     };
     if (b.type === 'p' || b.type === 'h2') {
       return React.createElement('div', common,
@@ -228,12 +384,16 @@ function JournalEditorScreen(props) {
           className: 'jrn-block-textarea' + (b.type === 'h2' ? ' h2' : ''),
           rows: 1,
           value: b.text || '',
-          placeholder: b.type === 'h2' ? 'Heading…' : 'Write…',
-          onChange: function(e) { patchBlock(idx, { text: e.target.value }); },
-          onFocus: function() { activeTextareaRef.current = { idx: idx }; },
-          onBlur: function() { commitSave(); },
+          placeholder: idx === 0 ? 'Start writing…' : '',
+          onChange: function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); },
+          onFocus: function(e) { focusTextarea(idx, e.target); },
+          onSelect: function(e) { trackCaret(idx, e.target); },
+          onKeyUp: function(e) { trackCaret(idx, e.target); },
+          onClick: function(e) { trackCaret(idx, e.target); },
+          onBlur: function(e) { trackCaret(idx, e.target); commitSave(); },
           ref: function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }
-        })
+        }),
+        blockDeleteUI(idx)
       );
     }
     if (b.type === 'quote') {
@@ -243,34 +403,37 @@ function JournalEditorScreen(props) {
             rows: 1,
             value: b.text || '',
             placeholder: 'Quoted text…',
-            onChange: function(e) { patchBlock(idx, { text: e.target.value }); },
-            onFocus: function() { activeTextareaRef.current = { idx: idx }; },
-            onBlur: function() { commitSave(); },
+            onChange: function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); },
+            onFocus: function(e) { focusTextarea(idx, e.target); },
+            onSelect: function(e) { trackCaret(idx, e.target); },
+            onKeyUp: function(e) { trackCaret(idx, e.target); },
+            onClick: function(e) { trackCaret(idx, e.target); },
+            onBlur: function(e) { trackCaret(idx, e.target); commitSave(); },
             ref: function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }
           }),
           React.createElement('input', {
             type: 'text',
             className: 'jrn-block-quote-cite',
-            style: { width: '100%', background: 'none', border: 'none', outline: 'none', fontFamily: 'Cinzel, serif', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gold-dim)', marginTop: '8px' },
             value: b.cite || '',
             placeholder: 'Citation (optional)',
             onChange: function(e) { patchBlock(idx, { cite: e.target.value }); },
             onBlur: function() { commitSave(); }
           })
         ),
-        React.createElement('button', { className: 'jrn-emb-delete', onClick: function() { deleteBlock(idx); }, title: 'Delete', 'aria-label': 'Delete' }, '×')
+        blockDeleteUI(idx)
       );
     }
     if (b.type === 'divider') {
       return React.createElement('div', common,
         React.createElement('div', { className: 'jrn-divider' }, '❖  ❖  ❖'),
-        React.createElement('button', { className: 'jrn-emb-delete', onClick: function() { deleteBlock(idx); }, title: 'Delete' }, '×')
+        blockDeleteUI(idx)
       );
     }
     if (b.type === 'image') {
       return React.createElement('div', common,
         React.createElement('div', { className: 'jrn-embed-image' },
-          React.createElement('button', { className: 'jrn-img-delete', onClick: function() { deleteBlock(idx); }, 'aria-label': 'Delete' }, '×'),
+          // Linked-from-journal embed surfaces the source attribution
+          b.sourceJournalId && b.sourceJournalTitle && React.createElement('div', { className: 'jrn-linked-badge' }, 'From: ' + b.sourceJournalTitle),
           React.createElement(JournalImageBlock, { mediaId: b.mediaId }),
           React.createElement('input', {
             type: 'text',
@@ -280,33 +443,68 @@ function JournalEditorScreen(props) {
             onChange: function(e) { patchBlock(idx, { caption: e.target.value }); },
             onBlur: function() { commitSave(); }
           })
-        )
+        ),
+        blockDeleteUI(idx)
       );
     }
     if (b.type === 'audio') {
+      var confirming = confirmAudioDelete === idx;
       return React.createElement('div', common,
-        React.createElement(JournalAudioBlock, { mediaId: b.mediaId, duration: b.duration, caption: b.caption }),
-        React.createElement('button', { className: 'jrn-emb-delete', onClick: function() { deleteBlock(idx); }, style: { display: 'flex' }, title: 'Delete' }, '×')
+        b.sourceJournalId && b.sourceJournalTitle && React.createElement('div', { className: 'jrn-linked-badge' }, 'From: ' + b.sourceJournalTitle),
+        React.createElement(JournalAudioBlock, {
+          mediaId: b.mediaId, duration: b.duration, caption: b.caption, samples: b.samples,
+          editable: true,
+          onRequestDelete: function() { setConfirmAudioDelete(idx); },
+          onCancelDelete: function() { setConfirmAudioDelete(null); },
+          onConfirmDelete: function() { setConfirmAudioDelete(null); deleteBlock(idx); },
+          confirming: confirming
+        })
       );
     }
-    // letter-card, chapter-card, verse-block, bookmark-card, note-card, journal-card: read-only embed view + delete
+    // Everything else (letter-card, chapter-card, verse-block, bookmark-card,
+    // note-card, journal-card, journal-excerpt) renders via JournalBlockView
+    // for parity with the viewer, then gets the unified delete button.
     return React.createElement('div', common,
       React.createElement(JournalBlockView, { block: b, callbacks: {} }),
-      React.createElement('button', { className: 'jrn-emb-delete', onClick: function() { deleteBlock(idx); }, title: 'Delete', 'aria-label': 'Delete' }, '×')
+      blockDeleteUI(idx)
     );
   }
 
-  var entryNbIds = useMemo(function() {
-    var e = JournalStore.get(entryId);
-    return new Set((e && e.notebookIds) || []);
-  }, [entryId, props.hlTick]);
+  // ─── Body click → focus last text block ─────────────────────
+  function focusLastTextBlock(e) {
+    // Only fire when the user taps blank space (not a block child).
+    if (e.target !== e.currentTarget) return;
+    var container = blocksContainerRef.current;
+    if (!container) return;
+    var tas = container.querySelectorAll('.jrn-block-textarea');
+    if (tas.length > 0) {
+      var last = tas[tas.length - 1];
+      try { last.focus(); last.setSelectionRange(last.value.length, last.value.length); } catch (e) {}
+      return;
+    }
+    // No text block exists — append a fresh paragraph.
+    var newId = JournalHelpers.blockId();
+    pendingFocusIdRef.current = newId;
+    setBlocks(function(arr) { return arr.concat([{ id: newId, type: 'p', text: '' }]); });
+    scheduleSave();
+  }
 
-  // ─── Nav ────────────────────────────────────────────────────
-  var navChildren = React.createElement(React.Fragment, null,
-    React.createElement('button', { className: 'nav-home nav-back-icon', onClick: function() { commitSave(); onBack && onBack(); }, title: 'Done', 'aria-label': 'Done' }, '‹'),
-    React.createElement('span', { className: 'jrn-saved-ind' }, savedLabel),
-    React.createElement(ThemeBtn, { theme: props.theme, onThemeChange: props.onThemeChange })
-  );
+  // ─── Nav (back left; saved indicator + right cluster) ───────
+  var onHome = props.onHome;
+  // Standard app-wide Library nav. Editor specifics preserved: "Done"
+  // back label, commitSave() before every navigation, and the "Saved"
+  // status chip as a leftExtra (stays on the left, next to Home). The
+  // textareas also commit on blur, so the bare HomeBtn is data-safe.
+  var navChildren = LibraryNav({
+    onBack: function() { commitSave(); onBack && onBack(); },
+    backTitle: 'Done',
+    leftExtras: React.createElement('span', { className: 'jrn-saved-ind' }, savedLabel),
+    onSearch: props.onSearch ? function() { commitSave(); props.onSearch(); } : undefined,
+    onHistory: props.onHistory ? function() { commitSave(); props.onHistory(); } : undefined,
+    onSettings: props.onSettings ? function() { commitSave(); props.onSettings(); } : undefined,
+    theme: props.theme,
+    onThemeChange: props.onThemeChange
+  });
 
   return React.createElement(ScreenLayout, { navChildren: navChildren },
     React.createElement('div', { className: 'jrn-editor' },
@@ -316,38 +514,24 @@ function JournalEditorScreen(props) {
           className: 'jrn-editor-title',
           type: 'text',
           value: title,
-          placeholder: 'Untitled',
+          placeholder: 'Title',
           onChange: function(e) { setTitle(e.target.value); scheduleSave(); },
           onBlur: function() { commitSave(); }
-        }),
-        React.createElement('div', { className: 'jrn-editor-row' },
-          React.createElement('span', null, JournalHelpers.longDate(initial && initial.created)),
-          React.createElement('span', { style: { opacity: 0.4 } }, '·'),
-          React.createElement('div', { className: 'jrn-mood-dot ' + moodClass, title: 'Mood', onClick: cycleMood })
-        )
-      ),
-      React.createElement('div', { className: 'jrn-blocks' },
-        blocks.map(function(b, idx) {
-          return React.createElement(React.Fragment, { key: b.id },
-            renderEditableBlock(b, idx),
-            React.createElement('div', { className: 'jrn-between-add', onClick: function() { openInsertSheet(idx); }, title: 'Insert' },
-              React.createElement('span', { className: 'plus' }, '+')
-            )
-          );
         })
       ),
-      React.createElement('div', { className: 'jrn-toolbar' },
-        React.createElement('div', { className: 'jrn-toolbar-group' },
-          React.createElement('button', { className: 'primary', onClick: function() { openInsertSheet(blocks.length - 1); } },
-            React.createElement('svg', { viewBox: '0 0 24 24' }, React.createElement('path', { d: 'M12 5v14M5 12h14' })),
-            ' Insert'
-          )
-        ),
-        React.createElement('div', { className: 'jrn-toolbar-group' },
-          React.createElement('button', { onClick: function() { setShowNb(true); }, title: 'Notebooks' },
-            React.createElement('svg', { viewBox: '0 0 24 24' }, React.createElement('path', { d: 'M4 5a2 2 0 012-2h11l3 3v13a2 2 0 01-2 2H6a2 2 0 01-2-2z' }), React.createElement('path', { d: 'M8 7h6' }))
-          )
-        )
+      React.createElement('div', { ref: blocksContainerRef, className: 'jrn-blocks jrn-body-surface', onClick: focusLastTextBlock },
+        blocks.map(function(b, idx) { return renderEditableBlock(b, idx); })
+      )
+    ),
+    // Single + FAB. Voice recording is reached via + → Voice Recording
+    // (the standalone mic FAB was removed per user direction).
+    !showRec && React.createElement('button', {
+      className: 'jrn-fab jrn-fab-plus',
+      onClick: openInsertSheet,
+      title: 'Insert', 'aria-label': 'Insert'
+    },
+      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.2', strokeLinecap: 'round' },
+        React.createElement('path', { d: 'M12 5v14M5 12h14' })
       )
     ),
     showInsert && React.createElement(JournalInsertSheet, {
@@ -361,12 +545,6 @@ function JournalEditorScreen(props) {
     showRec && React.createElement(JournalRecordingSheet, {
       onSave: onRecordingSaved,
       onClose: function() { setShowRec(false); }
-    }),
-    showNb && React.createElement(JournalNotebookSheet, {
-      entryId: entryId,
-      memberIds: entryNbIds,
-      onClose: function() { setShowNb(false); commitSave(); },
-      onChanged: function() { if (setHlTick) setHlTick(function(t) { return t + 1; }); }
     })
   );
 }

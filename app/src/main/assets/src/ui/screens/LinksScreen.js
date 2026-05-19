@@ -60,6 +60,12 @@ function _endpointResolves(ep) {
     if (!M) return true; // matthew may not be loaded yet — don't mark broken
     return !!(M.chapters && M.chapters.find(function(c) { return c.num === ep.chapter; }));
   }
+  // Journal endpoints: the entry may have been deleted — verify it exists.
+  if (ep.type === 'journal') {
+    if (typeof JournalStore === 'undefined') return true; // can't verify
+    var jid = ep.entryId || (ep.key && ep.key.split(':')[1]) || null;
+    return !!(jid && JournalStore.get(jid));
+  }
   // For letter/wtlb/blessed/holy-days, try findEntryContext
   if (typeof findEntryContext === 'function') {
     var kind = ep.type === 'letter' ? 'letter' : ep.type === 'wtlb' ? 'wtlb' : ep.type === 'blessed' ? 'blessed' : ep.type === 'holy-days' ? 'holy-days' : null;
@@ -221,6 +227,7 @@ function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateTarget, 
 */
 function LinksScreen(props) {
   var onBack = props.onBack;
+  var onHome = props.onHome;
   var onNavigateToSource = props.onNavigateToSource;
   var onNavigateToTarget = props.onNavigateToTarget;
   var hlTick = props.hlTick;
@@ -318,29 +325,12 @@ function LinksScreen(props) {
   };
 
   // Nav buttons (mirrors NotesIndexScreen)
-  var navChildren = React.createElement(React.Fragment, null,
-    React.createElement('button', {
-      className: 'nav-home nav-back-icon',
-      onClick: onBack, title: 'Back', 'aria-label': 'Back'
-    }, '‹'),
-    React.createElement('button', {
-      className: 'nav-search-btn', onClick: onSearch, title: 'Search'
-    },
-      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6' },
-        React.createElement('circle', { cx: '11', cy: '11', r: '8' }),
-        React.createElement('line', { x1: '21', y1: '21', x2: '16.65', y2: '16.65' })
-      )
-    ),
-    historyEnabled !== false && React.createElement('button', {
-      className: 'nav-search-btn', onClick: onHistory, title: 'History'
-    },
-      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
-        React.createElement('circle', { cx: '12', cy: '12', r: '9' }),
-        React.createElement('polyline', { points: '12 7 12 12 15 15' })
-      )
-    ),
-    React.createElement(ThemeBtn, { theme: theme, onThemeChange: onThemeChange })
-  );
+  // Standard app-wide Library nav (back + Home left, icon cluster right).
+  var navChildren = LibraryNav({
+    onBack: onBack, onSearch: onSearch, onHistory: onHistory,
+    onSettings: props.onSettings,
+    theme: theme, onThemeChange: onThemeChange
+  });
 
   return React.createElement(ScreenLayout, { navChildren: navChildren },
     React.createElement('div', { className: 'links-screen' },
@@ -363,30 +353,14 @@ function LinksScreen(props) {
         onChange: function(e) { setSearchQuery(e.target.value); }
       }),
 
-      // Controls row: sort button
+      // Controls row: single sort TOGGLE (replaces the unreliable dropdown).
       React.createElement('div', { className: 'notes-index-controls', style: { marginTop: '0.7rem' } },
-        React.createElement('div', { style: { position: 'relative', marginLeft: 'auto' } },
-          React.createElement('button', {
-            className: 'notes-index-sort-btn',
-            onClick: function() { setShowSortMenu(function(v) { return !v; }); },
-            title: 'Sort order'
-          }, 'Sort: ' + (sortLabels[sortMode] || 'Recent') + ' ▾'),
-          showSortMenu && React.createElement(React.Fragment, null,
-            React.createElement('div', {
-              style: { position: 'fixed', inset: 0, zIndex: 3099 },
-              onClick: function() { setShowSortMenu(false); }
-            }),
-            React.createElement('div', { className: 'notes-sort-menu', style: { right: 0, top: '100%' } },
-              ['recent', 'oldest', 'source-az', 'target-az'].map(function(mode) {
-                return React.createElement('button', {
-                  key: mode,
-                  className: 'notes-sort-menu-item' + (sortMode === mode ? ' active' : ''),
-                  onClick: function() { setSortMode(mode); setShowSortMenu(false); }
-                }, sortLabels[mode]);
-              })
-            )
-          )
-        )
+        React.createElement('button', {
+          className: 'notes-index-sort-btn',
+          style: { marginLeft: 'auto' },
+          onClick: function() { setSortMode(function(m) { return m === 'oldest' ? 'recent' : 'oldest'; }); },
+          title: 'Toggle sort order'
+        }, sortMode === 'oldest' ? 'Sort: Oldest ↑' : 'Sort: Newest ↓')
       ),
 
       // Broken links callout (passive — shown only when broken links exist
@@ -401,8 +375,10 @@ function LinksScreen(props) {
         ),
         React.createElement('span', { className: 'links-broken-text' },
           brokenLinks.length,
-          brokenLinks.length === 1 ? ' link leads to a passage that can no longer be found.' : ' links lead to passages that can no longer be found.',
-          ' Long-press each to remove.'
+          brokenLinks.length === 1
+            ? ' link points to content that can no longer be found (the source or target was deleted).'
+            : ' links point to content that can no longer be found (a source or target was deleted).',
+          ' Long-press a link to remove it.'
         )
       ),
 

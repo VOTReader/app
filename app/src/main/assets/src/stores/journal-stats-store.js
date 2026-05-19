@@ -144,6 +144,9 @@ var JournalStatsStore = Object.assign(CachedStore('vot-journal-stats', {
   }
 });
 
+/* Run once on page load: break the streak if the user skipped a day. */
+JournalStatsStore.recomputeFromLoad();
+
 /* Toast helper — pop a small in-app toast at the top of the screen when
    a milestone unlocks. The element is auto-created on first use. */
 function jrnShowMilestoneToast(milestone) {

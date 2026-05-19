@@ -1,45 +1,115 @@
 /* ═══════════════════════════════════════════════════════════════
-   JOURNAL HUB SCREEN — entry list + stats + notebooks
+   JOURNAL HUB SCREEN — entry list + tabs
    ═══════════════════════════════════════════════════════════════
    Global-scope module. Concatenates with index.html via <script src>.
-   Depends on: React, ScreenLayout, ThemeBtn, JournalStore,
-     JournalStatsStore, JournalNotebookStore, JournalHelpers.
+   Depends on: React, ScreenLayout, ThemeBtn, JournalStore, JournalHelpers.
 
-   Three tabs:
-     - All Entries: flat chronological list
-     - Notebooks: card grid (Uncategorized + user notebooks + New)
-     - Pinned: filtered list of pinned entries
+   Two tabs: All Entries · Pinned.
 
-   FAB creates a new entry and opens the editor.
+   Interaction model (per user direction):
+     • The "+" insert FAB belongs ONLY to the editor (editing an actual
+       entry). The hub has a clear "New Entry" pill instead.
+     • Each card has a ⋯ (3-dot) menu → Open · Edit · Pin/Unpin ·
+       Delete. Delete uses the Settings-style triple-confirm because a
+       journal entry is precious.
 
    Props:
-     onBack()
-     onOpenEntry(entryId)
-     onCreateEntry()         — opens editor with a fresh entry pre-created
-     onSearch()
-     onHistory()
-     historyEnabled
-     hlTick                  — bump signal to recompute
-     setHlTick               — caller's setter, bumped on store mutations
+     onBack(), onHome()
+     onOpenEntry(entryId)     — open the read-only viewer
+     onEditEntry(entryId)     — open the editor directly
+     onCreateEntry()          — create a fresh entry + open editor
+     onSearch(), onHistory(), historyEnabled
+     hlTick, setHlTick
      theme, onThemeChange
 ═══════════════════════════════════════════════════════════════ */
+
+/* Per-card action sheet: Open · Edit · Pin/Unpin · Delete (triple
+   confirm). Modeled on the bookmark/link action sheets (reuses the
+   .link-action-* shell so it looks native to the app). */
+function JournalCardMenu(props) {
+  var useState = React.useState;
+  var entry = props.entry;
+  var _step = useState(0); // 0 idle, 1/2/3 delete-confirm steps
+  var step = _step[0]; var setStep = _step[1];
+  var _typed = useState('');
+  var typed = _typed[0]; var setTyped = _typed[1];
+  if (!entry) return null;
+
+  function close() { props.onClose && props.onClose(); }
+
+  return React.createElement('div', { className: 'link-action-overlay', onClick: close },
+    React.createElement('div', { className: 'link-action-sheet', onClick: function(e) { e.stopPropagation(); } },
+      React.createElement('div', { className: 'link-action-handle' }),
+      step === 0 && React.createElement(React.Fragment, null,
+        React.createElement('button', { className: 'link-action-btn', onClick: function() { close(); props.onOpen(); } },
+          React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
+            React.createElement('path', { d: 'M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z' }),
+            React.createElement('circle', { cx: '12', cy: '12', r: '3' })
+          ),
+          React.createElement('span', null, 'Open Entry')
+        ),
+        React.createElement('button', { className: 'link-action-btn', onClick: function() { close(); props.onEdit(); } },
+          React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
+            React.createElement('path', { d: 'M12 20h9' }),
+            React.createElement('path', { d: 'M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z' })
+          ),
+          React.createElement('span', null, 'Edit Entry')
+        ),
+        React.createElement('button', { className: 'link-action-btn', onClick: function() { props.onTogglePin(); close(); } },
+          React.createElement('svg', { viewBox: '0 0 24 24', fill: entry.pinned ? 'currentColor' : 'none', stroke: 'currentColor', strokeWidth: '1.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
+            React.createElement('path', { d: 'M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z' }),
+            React.createElement('path', { d: 'M8 12 L3 19' })
+          ),
+          React.createElement('span', null, entry.pinned ? 'Unpin Entry' : 'Pin Entry')
+        ),
+        React.createElement('button', { className: 'link-action-btn link-action-btn-danger', onClick: function() { setStep(1); setTyped(''); } },
+          React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
+            React.createElement('polyline', { points: '3 6 5 6 21 6' }),
+            React.createElement('path', { d: 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6' }),
+            React.createElement('path', { d: 'M10 11v6M14 11v6' })
+          ),
+          React.createElement('span', null, 'Delete Entry')
+        )
+      ),
+      step > 0 && React.createElement('div', { className: 'jrn-tripledel', style: { margin: '6px 4px 4px' } },
+        React.createElement('div', { className: 'jrn-tripledel-step-label' }, 'Step ' + step + ' of 3'),
+        React.createElement('div', { className: 'jrn-tripledel-question' },
+          step === 1 ? 'Delete this entry?'
+            : step === 2 ? 'Are you sure? This cannot be undone.'
+            : 'Type DELETE to permanently remove this entry.'),
+        step === 3 && React.createElement('input', {
+          type: 'text', className: 'jrn-tripledel-input', placeholder: 'Type DELETE',
+          value: typed, autoFocus: true, onChange: function(e) { setTyped(e.target.value); }
+        }),
+        React.createElement('div', { className: 'jrn-tripledel-actions' },
+          React.createElement('button', { className: 'jrn-tripledel-cancel', onClick: function() { setStep(0); setTyped(''); } }, 'Cancel'),
+          step < 3 && React.createElement('button', { className: 'jrn-tripledel-next', onClick: function() { setStep(step + 1); } },
+            step === 1 ? 'Continue' : 'I am sure'),
+          step === 3 && React.createElement('button', {
+            className: 'jrn-tripledel-final',
+            disabled: typed.trim().toUpperCase() !== 'DELETE',
+            onClick: function() { props.onDelete(); close(); }
+          }, 'Delete forever')
+        )
+      )
+    )
+  );
+}
 
 function JournalHubScreen(props) {
   var useState = React.useState;
   var useMemo = React.useMemo;
-  var useEffect = React.useEffect;
 
   var onBack = props.onBack;
+  var onHome = props.onHome;
   var onOpenEntry = props.onOpenEntry;
+  var onEditEntry = props.onEditEntry;
   var onCreateEntry = props.onCreateEntry;
   var hlTick = props.hlTick;
   var setHlTick = props.setHlTick;
 
-  var _tab = useState('all');           // 'all' | 'notebooks' | 'pinned'
+  var _tab = useState('all');
   var tab = _tab[0]; var setTab = _tab[1];
-
-  var _drilled = useState(null);        // notebook id (or 'uncategorized') we've drilled into
-  var drilled = _drilled[0]; var setDrilled = _drilled[1];
 
   var _q = useState('');
   var query = _q[0]; var setQuery = _q[1];
@@ -47,53 +117,18 @@ function JournalHubScreen(props) {
   var _sortNewest = useState(true);
   var sortNewest = _sortNewest[0]; var setSortNewest = _sortNewest[1];
 
-  var _newNbInline = useState(false);
-  var newNbInline = _newNbInline[0]; var setNewNbInline = _newNbInline[1];
-  var _newNbName = useState('');
-  var newNbName = _newNbName[0]; var setNewNbName = _newNbName[1];
-
-  var _renaming = useState(null);
-  var renaming = _renaming[0]; var setRenaming = _renaming[1];
-  var _renameVal = useState('');
-  var renameVal = _renameVal[0]; var setRenameVal = _renameVal[1];
-
-  var _confirmDel = useState(null);
-  var confirmDel = _confirmDel[0]; var setConfirmDel = _confirmDel[1];
-
-  // Streak recompute on mount (in case a day was missed)
-  useEffect(function() {
-    if (typeof JournalStatsStore !== 'undefined') JournalStatsStore.recomputeFromLoad();
-  }, []);
+  // The entry whose ⋯ action sheet is open (or null).
+  var _menuEntry = useState(null);
+  var menuEntry = _menuEntry[0]; var setMenuEntry = _menuEntry[1];
 
   var allEntries = useMemo(function() {
     return JournalStore.all();
   }, [hlTick]);
 
-  var stats = useMemo(function() {
-    return JournalStatsStore.get();
-  }, [hlTick]);
-
-  var milestones = useMemo(function() {
-    return JournalStatsStore.unlockedMilestones();
-  }, [hlTick]);
-
-  var notebooks = useMemo(function() {
-    return JournalNotebookStore.list();
-  }, [hlTick]);
-
-  // Notebook entry counts
-  var notebookCounts = useMemo(function() {
-    var counts = { uncategorized: 0 };
-    notebooks.forEach(function(nb) { counts[nb.id] = 0; });
-    allEntries.forEach(function(e) {
-      var nbIds = e.notebookIds || [];
-      if (nbIds.length === 0) counts.uncategorized++;
-      else nbIds.forEach(function(id) { if (counts[id] != null) counts[id]++; });
-    });
-    return counts;
-  }, [allEntries, notebooks]);
-
   function bump() { if (setHlTick) setHlTick(function(t) { return t + 1; }); }
+
+  function deleteEntry(id) { JournalStore.remove(id); bump(); }
+  function togglePin(id) { JournalStore.togglePin(id); bump(); }
 
   // ─── Entry card render ─────────────────────────────────────
   function renderCard(entry) {
@@ -101,23 +136,46 @@ function JournalHubScreen(props) {
     var preview = JournalHelpers.previewText(entry, 160);
     var attachments = JournalHelpers.attachmentSummary(entry);
     var moodClass = entry.mood ? entry.mood : '';
-    var nbNames = (entry.notebookIds || [])
-      .map(function(id) { var n = JournalNotebookStore.get(id); return n ? n.name : null; })
-      .filter(Boolean)
-      .slice(0, 2);
 
     return React.createElement('div', {
       key: entry.id,
       className: 'jrn-card' + (entry.pinned ? ' pinned' : ''),
       role: 'button',
       tabIndex: 0,
-      onClick: function() { onOpenEntry && onOpenEntry(entry.id); },
-      onKeyDown: function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenEntry(entry.id); } }
+      onClick: function(e) {
+        if (e.target.closest && e.target.closest('.jrn-card-menu-btn')) return;
+        onOpenEntry && onOpenEntry(entry.id);
+      },
+      onKeyDown: function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenEntry(entry.id); }
+      }
     },
       React.createElement('span', { className: 'jrn-card-mood ' + moodClass }),
+      entry.pinned && React.createElement('div', { className: 'jrn-card-pin-marker', title: 'Pinned' },
+        React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.9', strokeLinecap: 'round', strokeLinejoin: 'round' },
+          React.createElement('path', { d: 'M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z' }),
+          React.createElement('path', { d: 'M8 12 L3 19' })
+        )
+      ),
+      // 3-dot menu button (upper right). Stops propagation so it doesn't
+      // also open the entry.
+      React.createElement('button', {
+        className: 'jrn-card-menu-btn',
+        onClick: function(e) { e.stopPropagation(); setMenuEntry(entry); },
+        'aria-label': 'Entry options', title: 'Options'
+      },
+        React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' },
+          React.createElement('circle', { cx: '12', cy: '5', r: '1.6' }),
+          React.createElement('circle', { cx: '12', cy: '12', r: '1.6' }),
+          React.createElement('circle', { cx: '12', cy: '19', r: '1.6' })
+        )
+      ),
       React.createElement('div', { className: 'jrn-card-row' },
         React.createElement('h3', { className: 'jrn-card-title' + (title ? '' : ' untitled') }, title || 'Untitled'),
-        React.createElement('span', { className: 'jrn-card-date' }, JournalHelpers.shortDate(entry.updated || entry.created))
+        React.createElement('span', { className: 'jrn-card-date' },
+          JournalHelpers.shortDate(entry.updated || entry.created),
+          React.createElement('span', { className: 'jrn-card-time' }, ' · ' + JournalHelpers.shortTime(entry.updated || entry.created))
+        )
       ),
       preview && React.createElement('p', { className: 'jrn-card-preview' }, preview),
       attachments.length > 0 && React.createElement('div', { className: 'jrn-card-attachments' },
@@ -125,173 +183,16 @@ function JournalHubScreen(props) {
           return React.createElement('span', { key: i, className: 'jrn-attach' }, a.label);
         })
       ),
-      (nbNames.length > 0 || (entry.tags && entry.tags.length)) && React.createElement('div', { className: 'jrn-card-meta' },
-        nbNames.length > 0 && React.createElement('span', null, nbNames.join(', ')),
-        nbNames.length > 0 && entry.tags && entry.tags.length > 0 && React.createElement('span', { className: 'jrn-card-meta-sep' }, '·'),
-        entry.tags && entry.tags.length > 0 && React.createElement('div', { className: 'jrn-tags' },
+      entry.tags && entry.tags.length > 0 && React.createElement('div', { className: 'jrn-card-meta' },
+        React.createElement('div', { className: 'jrn-tags' },
           entry.tags.slice(0, 4).map(function(t, i) { return React.createElement('span', { key: i, className: 'jrn-tag' }, '#' + t); })
         )
       )
     );
   }
 
-  // ─── Stats strip ────────────────────────────────────────────
-  function renderStats() {
-    return React.createElement('div', { className: 'jrn-stats' },
-      React.createElement('div', { className: 'jrn-stats-streak' },
-        React.createElement('div', { className: 'jrn-stats-flame' },
-          React.createElement('svg', { viewBox: '0 0 24 24' },
-            React.createElement('path', { d: 'M12 2c-1 2-2 3-2 5 0 1 1 2 2 2-2 1-4 3-4 6 0 4 3 7 6 7s6-3 6-7c0-3-2-5-4-6 1 0 2-1 2-2 0-2-2-3-3-5-1 1-2 0-3 0z' })
-          )
-        ),
-        React.createElement('span', { className: 'jrn-stats-value' }, (stats.currentStreak || 0) + (stats.currentStreak === 1 ? ' day' : ' days')),
-        stats.longestStreak > 0 && React.createElement(React.Fragment, null,
-          React.createElement('span', { className: 'jrn-stats-sep' }, '·'),
-          React.createElement('span', { className: 'jrn-stats-meta' }, 'longest: ' + stats.longestStreak)
-        )
-      ),
-      milestones.length > 0 && React.createElement('div', { className: 'jrn-stats-milestones' },
-        milestones.map(function(m) {
-          return React.createElement('span', { key: m.key, className: 'jrn-badge' }, m.label);
-        })
-      )
-    );
-  }
-
-  // ─── Notebooks tab ──────────────────────────────────────────
-  function renderNotebooks() {
-    if (drilled) return renderDrilled();
-
-    return React.createElement('div', null,
-      React.createElement('div', { className: 'jrn-nb-grid' },
-        // Uncategorized always-first
-        React.createElement('div', {
-          className: 'jrn-nb-card uncategorized',
-          role: 'button',
-          onClick: function() { setDrilled('uncategorized'); }
-        },
-          React.createElement('div', { className: 'jrn-nb-eyebrow' }, 'Default'),
-          React.createElement('div', { className: 'jrn-nb-title' }, 'Uncategorized'),
-          React.createElement('div', { className: 'jrn-nb-count' }, (notebookCounts.uncategorized || 0) + (notebookCounts.uncategorized === 1 ? ' entry' : ' entries'))
-        ),
-        // User notebooks
-        notebooks.map(function(nb) {
-          return React.createElement('div', {
-            key: nb.id,
-            className: 'jrn-nb-card',
-            role: 'button',
-            onClick: function() { setDrilled(nb.id); }
-          },
-            React.createElement('div', { className: 'jrn-nb-eyebrow' }, 'Notebook'),
-            React.createElement('div', { className: 'jrn-nb-title' }, nb.name),
-            React.createElement('div', { className: 'jrn-nb-count' }, (notebookCounts[nb.id] || 0) + ((notebookCounts[nb.id] || 0) === 1 ? ' entry' : ' entries'))
-          );
-        }),
-        // New notebook tile
-        newNbInline
-          ? React.createElement('div', { className: 'jrn-nb-card new', style: { gap: '8px', justifyContent: 'center', flexDirection: 'column' } },
-              React.createElement('input', {
-                className: 'jrn-rename-input',
-                autoFocus: true, type: 'text', placeholder: 'Notebook name', value: newNbName,
-                onChange: function(e) { setNewNbName(e.target.value); },
-                onClick: function(e) { e.stopPropagation(); },
-                onKeyDown: function(e) {
-                  if (e.key === 'Enter') { e.preventDefault(); commitNewNb(); }
-                  if (e.key === 'Escape') { setNewNbInline(false); setNewNbName(''); }
-                }
-              }),
-              React.createElement('div', { style: { display: 'flex', gap: '6px', justifyContent: 'center' } },
-                React.createElement('button', { className: 'jrn-nb-action', onClick: function(e) { e.stopPropagation(); setNewNbInline(false); setNewNbName(''); } }, 'Cancel'),
-                React.createElement('button', { className: 'jrn-nb-action', onClick: function(e) { e.stopPropagation(); commitNewNb(); }, disabled: !newNbName.trim() }, 'Create')
-              )
-            )
-          : React.createElement('div', {
-              className: 'jrn-nb-card new',
-              role: 'button',
-              onClick: function() { setNewNbInline(true); }
-            },
-              React.createElement('div', { className: 'plus' }, '+'),
-              React.createElement('div', { className: 'label' }, 'New Notebook')
-            )
-      )
-    );
-  }
-
-  function commitNewNb() {
-    var trimmed = newNbName.trim();
-    if (!trimmed) return;
-    JournalNotebookStore.add(trimmed);
-    setNewNbName('');
-    setNewNbInline(false);
-    bump();
-  }
-
-  // ─── Drilled-in notebook view ───────────────────────────────
-  function renderDrilled() {
-    var nb = drilled === 'uncategorized' ? null : JournalNotebookStore.get(drilled);
-    if (drilled !== 'uncategorized' && !nb) {
-      // Notebook was deleted — bail back
-      setDrilled(null);
-      return null;
-    }
-    var nbEntries = allEntries.filter(function(e) {
-      if (drilled === 'uncategorized') return !(e.notebookIds && e.notebookIds.length);
-      return (e.notebookIds || []).indexOf(drilled) >= 0;
-    });
-    nbEntries.sort(function(a, b) {
-      return sortNewest
-        ? (b.updated || b.created || 0) - (a.updated || a.created || 0)
-        : (a.created || 0) - (b.created || 0);
-    });
-
-    var title = drilled === 'uncategorized' ? 'Uncategorized' : nb.name;
-
-    return React.createElement(React.Fragment, null,
-      React.createElement('div', { className: 'jrn-nb-drill-header' },
-        React.createElement('button', { className: 'jrn-nb-action', onClick: function() { setDrilled(null); setRenaming(null); setConfirmDel(null); } }, '‹ Back'),
-        renaming === drilled
-          ? React.createElement('input', {
-              className: 'jrn-rename-input', autoFocus: true, type: 'text', value: renameVal,
-              onChange: function(e) { setRenameVal(e.target.value); },
-              onBlur: function() { commitRename(); },
-              onKeyDown: function(e) {
-                if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
-                if (e.key === 'Escape') { setRenaming(null); }
-              },
-              style: { flex: 1 }
-            })
-          : React.createElement('div', { className: 'jrn-nb-drill-title' }, title),
-        drilled !== 'uncategorized' && renaming !== drilled && React.createElement('button', { className: 'jrn-nb-action', onClick: function() { setRenameVal(nb.name); setRenaming(drilled); } }, 'Rename'),
-        drilled !== 'uncategorized' && React.createElement('button', { className: 'jrn-nb-action danger', onClick: function() { setConfirmDel(drilled); } }, 'Delete')
-      ),
-      confirmDel === drilled && React.createElement('div', { className: 'jrn-inline-confirm' },
-        React.createElement('span', { className: 'jrn-inline-confirm-q' }, 'Delete "', nb.name, '"? Entries will move to Uncategorized.'),
-        React.createElement('button', { onClick: function() { setConfirmDel(null); } }, 'Cancel'),
-        React.createElement('button', { className: 'danger', onClick: function() { JournalNotebookStore.remove(drilled); setDrilled(null); setConfirmDel(null); bump(); } }, 'Yes, delete')
-      ),
-      React.createElement('div', { className: 'jrn-controls' },
-        React.createElement('button', { className: 'jrn-sort-btn', onClick: function() { setSortNewest(function(v) { return !v; }); } }, sortNewest ? 'Newest first ↓' : 'Oldest first ↑')
-      ),
-      nbEntries.length === 0
-        ? React.createElement('div', { className: 'jrn-empty' },
-            React.createElement('div', { className: 'jrn-empty-title' }, 'No Entries Yet'),
-            React.createElement('div', { className: 'jrn-empty-hint' }, drilled === 'uncategorized' ? 'Every new entry starts here until you assign it a notebook.' : 'Add entries to this notebook from the editor.')
-          )
-        : React.createElement('div', { className: 'jrn-list' }, nbEntries.map(renderCard))
-    );
-  }
-
-  function commitRename() {
-    var v = renameVal.trim();
-    if (v && drilled !== 'uncategorized') {
-      JournalNotebookStore.rename(drilled, v);
-      bump();
-    }
-    setRenaming(null);
-  }
-
   // ─── All-entries / Pinned tabs ──────────────────────────────
-  function renderEntries(list) {
+  function renderEntries(list, isPinnedTab) {
     var q = query.trim().toLowerCase();
     var filtered = q ? list.filter(function(e) {
       if ((e.title || '').toLowerCase().indexOf(q) >= 0) return true;
@@ -300,10 +201,17 @@ function JournalHubScreen(props) {
       if (e.tags && e.tags.join(' ').toLowerCase().indexOf(q) >= 0) return true;
       return false;
     }) : list;
+    // Sort by the SAME field both ways (updated||created) and just flip
+    // the sign, with a stable id tiebreak. The old code keyed "newest" on
+    // updated||created but "oldest" on created — so toggling didn't cleanly
+    // reverse (looked broken). Entries store ms timestamps, so this is exact.
     filtered = filtered.slice().sort(function(a, b) {
-      return sortNewest
-        ? (b.updated || b.created || 0) - (a.updated || a.created || 0)
-        : (a.created || 0) - (b.created || 0);
+      var ad = a.updated || a.created || 0;
+      var bd = b.updated || b.created || 0;
+      if (ad !== bd) return sortNewest ? (bd - ad) : (ad - bd);
+      if (a.id === b.id) return 0;
+      var cmp = a.id < b.id ? -1 : 1;
+      return sortNewest ? cmp : -cmp;
     });
 
     return React.createElement(React.Fragment, null,
@@ -312,36 +220,37 @@ function JournalHubScreen(props) {
           className: 'jrn-search', type: 'text', placeholder: 'Search entries…',
           value: query, onChange: function(e) { setQuery(e.target.value); }
         }),
-        React.createElement('button', { className: 'jrn-sort-btn', onClick: function() { setSortNewest(function(v) { return !v; }); } }, sortNewest ? 'Newest ↓' : 'Oldest ↑')
+        React.createElement('button', {
+          // Standardized sort control — same class + wording as every
+          // other Library list (Notes/Bookmarks/Links/Highlights).
+          className: 'notes-index-sort-btn',
+          onClick: function() { setSortNewest(function(v) { return !v; }); },
+          title: 'Toggle sort order'
+        }, sortNewest ? 'Sort: Newest ↓' : 'Sort: Oldest ↑')
       ),
       filtered.length === 0
         ? React.createElement('div', { className: 'jrn-empty' },
-            React.createElement('div', { className: 'jrn-empty-title' }, list.length === 0 ? 'No Entries Yet' : 'No Matches'),
-            React.createElement('div', { className: 'jrn-empty-hint' }, list.length === 0
-              ? 'Tap the + button below to write your first reflection. You can embed letters, bookmarks, images, and voice recordings.'
-              : 'Try a different search term.')
+            React.createElement('div', { className: 'jrn-empty-title' }, isPinnedTab
+              ? (list.length === 0 ? 'No Pinned Entries' : 'No Matches')
+              : (list.length === 0 ? 'No Entries Yet' : 'No Matches')),
+            React.createElement('div', { className: 'jrn-empty-hint' },
+              isPinnedTab && list.length === 0
+                ? 'Pin your favorite or most-used journal entries here to access them easily.'
+                : list.length === 0
+                  ? 'Tap "New Entry" below to write your first reflection. You can embed letters, bookmarks, images, and voice recordings.'
+                  : 'Try a different search term.')
           )
         : React.createElement('div', { className: 'jrn-list' }, filtered.map(renderCard))
     );
   }
 
-  // ─── Nav children ───────────────────────────────────────────
-  var navChildren = React.createElement(React.Fragment, null,
-    React.createElement('button', { className: 'nav-home nav-back-icon', onClick: onBack, title: 'Back', 'aria-label': 'Back' }, '‹'),
-    React.createElement('button', { className: 'nav-search-btn', onClick: props.onSearch, title: 'Search' },
-      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6' },
-        React.createElement('circle', { cx: '11', cy: '11', r: '8' }),
-        React.createElement('line', { x1: '21', y1: '21', x2: '16.65', y2: '16.65' })
-      )
-    ),
-    props.historyEnabled !== false && React.createElement('button', { className: 'nav-search-btn', onClick: props.onHistory, title: 'History' },
-      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
-        React.createElement('circle', { cx: '12', cy: '12', r: '9' }),
-        React.createElement('polyline', { points: '12 7 12 12 15 15' })
-      )
-    ),
-    React.createElement(ThemeBtn, { theme: props.theme, onThemeChange: props.onThemeChange })
-  );
+  // ─── Nav children — back left, everything else right ────────
+  // Standard app-wide Library nav (back + Home left, icon cluster right).
+  var navChildren = LibraryNav({
+    onBack: onBack, onSearch: props.onSearch, onHistory: props.onHistory,
+    onSettings: props.onSettings,
+    theme: props.theme, onThemeChange: props.onThemeChange
+  });
 
   var pinnedEntries = allEntries.filter(function(e) { return e.pinned; });
 
@@ -351,24 +260,33 @@ function JournalHubScreen(props) {
         React.createElement('h1', { className: 'jrn-hub-title' }, 'My Journal'),
         React.createElement('span', { className: 'jrn-hub-count' }, allEntries.length + (allEntries.length === 1 ? ' entry' : ' entries'))
       ),
-      (stats.totalEntries > 0 || stats.currentStreak > 0) && renderStats(),
-      drilled
-        ? renderNotebooks()
-        : React.createElement(React.Fragment, null,
-            React.createElement('div', { className: 'jrn-tabs' },
-              React.createElement('button', { className: 'jrn-tab' + (tab === 'all' ? ' active' : ''), onClick: function() { setTab('all'); } }, 'All Entries'),
-              React.createElement('button', { className: 'jrn-tab' + (tab === 'notebooks' ? ' active' : ''), onClick: function() { setTab('notebooks'); } }, 'Notebooks'),
-              React.createElement('button', { className: 'jrn-tab' + (tab === 'pinned' ? ' active' : ''), onClick: function() { setTab('pinned'); } }, 'Pinned')
-            ),
-            tab === 'all' && renderEntries(allEntries),
-            tab === 'notebooks' && renderNotebooks(),
-            tab === 'pinned' && renderEntries(pinnedEntries)
-          ),
-      React.createElement('button', { className: 'jrn-fab', onClick: onCreateEntry, title: 'New entry', 'aria-label': 'New entry' },
-        React.createElement('svg', { viewBox: '0 0 24 24' },
-          React.createElement('path', { d: 'M12 5v14M5 12h14' })
-        )
-      )
+      React.createElement('div', { className: 'jrn-tabs' },
+        React.createElement('button', { className: 'jrn-tab' + (tab === 'all' ? ' active' : ''), onClick: function() { setTab('all'); } }, 'All Entries'),
+        React.createElement('button', { className: 'jrn-tab' + (tab === 'pinned' ? ' active' : ''), onClick: function() { setTab('pinned'); } }, 'Pinned')
+      ),
+      tab === 'all' && renderEntries(allEntries, false),
+      tab === 'pinned' && renderEntries(pinnedEntries, true),
+      // "New Entry" pill — replaces the old +/edit FAB. The "+" insert
+      // affordance now lives ONLY in the editor.
+      React.createElement('button', {
+        className: 'jrn-fab jrn-fab-newentry',
+        onClick: function() { onCreateEntry && onCreateEntry(); },
+        title: 'New Entry', 'aria-label': 'New Entry'
+      },
+        React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.9', strokeLinecap: 'round', strokeLinejoin: 'round' },
+          React.createElement('path', { d: 'M12 20h9' }),
+          React.createElement('path', { d: 'M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z' })
+        ),
+        React.createElement('span', { className: 'jrn-fab-newentry-label' }, 'New Entry')
+      ),
+      menuEntry && React.createElement(JournalCardMenu, {
+        entry: menuEntry,
+        onClose: function() { setMenuEntry(null); },
+        onOpen: function() { onOpenEntry && onOpenEntry(menuEntry.id); },
+        onEdit: function() { onEditEntry ? onEditEntry(menuEntry.id) : (onOpenEntry && onOpenEntry(menuEntry.id)); },
+        onTogglePin: function() { togglePin(menuEntry.id); },
+        onDelete: function() { deleteEntry(menuEntry.id); }
+      })
     )
   );
 }

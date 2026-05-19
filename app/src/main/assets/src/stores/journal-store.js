@@ -2,8 +2,8 @@
    JOURNAL STORE — entries CRUD + auto-index updates
    ═══════════════════════════════════════════════════════════════
    Global-scope module. Concatenates with index.html via <script src>.
-   Depends on: CachedStore, JournalIndexStore, JournalStatsStore,
-     JournalHelpers (collectRefs, defaultBlocks).
+   Depends on: CachedStore, JournalIndexStore, JournalHelpers
+     (collectRefs, defaultBlocks).
 
    Data model — vot-journal:
      { list: Array<JournalEntry> }
@@ -92,12 +92,6 @@ var JournalStore = Object.assign(CachedStore('vot-journal', { list: [] }), {
     data.list.push(entry);
     this._save();
     this._reindex(entry);
-    if (typeof JournalStatsStore !== 'undefined') {
-      var unlocked = JournalStatsStore.recordNewEntry(ts);
-      if (unlocked && unlocked.length && typeof jrnShowMilestoneToast === 'function') {
-        unlocked.forEach(function(m, i) { setTimeout(function() { jrnShowMilestoneToast(m); }, i * 3200); });
-      }
-    }
     return entry;
   },
 
@@ -189,6 +183,25 @@ var JournalStore = Object.assign(CachedStore('vot-journal', { list: [] }), {
       }
     }
     return ids;
+  },
+
+  /* True if `mediaId` is referenced by a block in ANY entry other than
+     `exceptEntryId`. The editor calls this before hard-deleting a media
+     blob: a journal→journal embed shares the source's mediaId, so wiping
+     the blob just because the SOURCE block is deleted would break every
+     embed of it. Shared-media protection must be symmetric. */
+  isMediaReferencedElsewhere(mediaId, exceptEntryId) {
+    if (!mediaId) return false;
+    var list = (this._load().list || []);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === exceptEntryId) continue;
+      var blocks = list[i].blocks || [];
+      for (var j = 0; j < blocks.length; j++) {
+        var b = blocks[j];
+        if ((b.type === 'image' || b.type === 'audio') && b.mediaId === mediaId) return true;
+      }
+    }
+    return false;
   },
 
   _reindex(entry) {

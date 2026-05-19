@@ -181,31 +181,87 @@ var JournalMediaStore = (function() {
     },
 
     /* Image compression helper. Pass a File or Blob; returns a compressed
-       Blob plus computed dimensions. Caller then `put`s the result. */
+       Blob plus computed dimensions. Caller then `put`s the result.
+
+       EXIF: older Android WebViews do NOT auto-apply EXIF orientation to
+       <img>, so phone photos (orientation 6/8) would store sideways. When
+       createImageBitmap supports imageOrientation:'from-image' we use it so
+       the baked pixels are upright. Falls back to the <img> path otherwise. */
     compressImage: function(fileOrBlob, opts) {
       opts = opts || {};
       var maxDim = opts.maxDim || 1600;
       var quality = opts.quality || 0.8;
-      return new Promise(function(resolve, reject) {
-        var url = URL.createObjectURL(fileOrBlob);
-        var img = new Image();
-        img.onload = function() {
-          var w = img.naturalWidth, h = img.naturalHeight;
+
+      function encodeFrom(source, w, h, cleanup) {
+        return new Promise(function(resolve, reject) {
+          if (!w || !h) { cleanup && cleanup(); reject(new Error('Image has zero dimensions')); return; }
           var scale = Math.min(1, maxDim / Math.max(w, h));
-          var nw = Math.round(w * scale), nh = Math.round(h * scale);
+          var nw = Math.max(1, Math.round(w * scale));
+          var nh = Math.max(1, Math.round(h * scale));
           var canvas = document.createElement('canvas');
           canvas.width = nw; canvas.height = nh;
           var ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, nw, nh);
+          if (!ctx) { cleanup && cleanup(); reject(new Error('Canvas 2D unavailable')); return; }
+          try { ctx.drawImage(source, 0, 0, nw, nh); }
+          catch (e) { cleanup && cleanup(); reject(new Error('Image draw failed')); return; }
+          if (!canvas.toBlob) {
+            // Pre-toBlob WebView fallback: dataURL → Blob.
+            cleanup && cleanup();
+            try {
+              var durl = canvas.toDataURL('image/jpeg', quality);
+              var bin = atob(durl.split(',')[1]);
+              var arr = new Uint8Array(bin.length);
+              for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+              resolve({ blob: new Blob([arr], { type: 'image/jpeg' }), width: nw, height: nh });
+            } catch (e2) { reject(new Error('Image encoding failed')); }
+            return;
+          }
           canvas.toBlob(function(blob) {
-            URL.revokeObjectURL(url);
-            if (!blob) { reject(new Error('Image encoding failed')); return; }
+            cleanup && cleanup();
+            if (!blob || !blob.size) { reject(new Error('Image encoding failed')); return; }
             resolve({ blob: blob, width: nw, height: nh });
           }, 'image/jpeg', quality);
-        };
-        img.onerror = function(e) { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
-        img.src = url;
-      });
+        });
+      }
+
+      // Reject obviously-empty input early (0-byte file).
+      if (fileOrBlob && typeof fileOrBlob.size === 'number' && fileOrBlob.size === 0) {
+        return Promise.reject(new Error('Image file is empty'));
+      }
+
+      var canBitmap = (typeof createImageBitmap === 'function');
+      if (canBitmap) {
+        return createImageBitmap(fileOrBlob, { imageOrientation: 'from-image' })
+          .then(function(bmp) {
+            return encodeFrom(bmp, bmp.width, bmp.height, function() {
+              try { bmp.close && bmp.close(); } catch (e) {}
+            });
+          })
+          .catch(function() {
+            // imageOrientation option unsupported or decode failed — retry
+            // without the option, then fall back to the <img> path.
+            return createImageBitmap(fileOrBlob).then(function(bmp) {
+              return encodeFrom(bmp, bmp.width, bmp.height, function() {
+                try { bmp.close && bmp.close(); } catch (e) {}
+              });
+            }).catch(function() { return imgPath(); });
+          });
+      }
+      return imgPath();
+
+      function imgPath() {
+        return new Promise(function(resolve, reject) {
+          var url = URL.createObjectURL(fileOrBlob);
+          var img = new Image();
+          img.onload = function() {
+            encodeFrom(img, img.naturalWidth, img.naturalHeight, function() {
+              URL.revokeObjectURL(url);
+            }).then(resolve, reject);
+          };
+          img.onerror = function() { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+          img.src = url;
+        });
+      }
     },
 
     mediaId: mediaId

@@ -41,29 +41,34 @@ const LinkStore = Object.assign(CachedStore('vot-links', []), {
     try { this._cache = JSON.parse(localStorage.getItem('vot-links') || '[]'); }
     catch (e) { this._cache = []; }
 
-    // Migrate legacy {a, b} records → {source, target}.
+    // Migrate legacy {a, b} records → {source, target}. Coalesce FIRST so a
+    // half-migrated record (source set but a still present, or vice-versa —
+    // e.g. an interrupted prior migration or a hand-edited export) is
+    // healed instead of silently dropped (was real data-loss).
     let migrated = false;
     this._cache = this._cache.filter(function(lnk) {
-      if (lnk.source && lnk.target) return true; // already new shape
-      if (!lnk.a || !lnk.b) {
-        console.warn('[LinkStore] dropping malformed record (missing a/b):', lnk.id);
+      if (!lnk || typeof lnk !== 'object') return false;
+      if (!lnk.source && lnk.a) { lnk.source = lnk.a; migrated = true; }
+      if (!lnk.target && lnk.b) { lnk.target = lnk.b; migrated = true; }
+      if (lnk.a) { delete lnk.a; migrated = true; }
+      if (lnk.b) { delete lnk.b; migrated = true; }
+      // A record is only unusable if BOTH endpoints (with .key) are missing.
+      if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) {
+        console.warn('[LinkStore] dropping malformed record (incomplete endpoints):', lnk.id);
         return false;
       }
-      lnk.source = lnk.a;
-      lnk.target = lnk.b;
-      delete lnk.a;
-      delete lnk.b;
-      migrated = true;
       return true;
     });
     if (migrated) this._save();
     return this._cache;
   },
   getForKey(key) {
-    return this._load().filter(lnk => lnk.source.key === key || lnk.target.key === key);
+    return this._load().filter(lnk =>
+      (lnk.source && lnk.source.key === key) || (lnk.target && lnk.target.key === key));
   },
   getForKeyPrefix(prefix) {
     return this._load().filter(lnk => {
+      if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) return false;
       const srcMatch = lnk.source.key === prefix || lnk.source.key.startsWith(prefix + ':') || prefix.startsWith(lnk.source.key + ':');
       const tgtMatch = lnk.target.key === prefix || lnk.target.key.startsWith(prefix + ':') || prefix.startsWith(lnk.target.key + ':');
       return srcMatch || tgtMatch;

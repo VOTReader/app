@@ -73,6 +73,9 @@ var JournalHelpers = (function() {
         case 'journal-card':
           if (b.entryId) push('journal:' + b.entryId);
           break;
+        case 'notebook-card':
+          if (b.notebookId) push('notebook:' + b.notebookId);
+          break;
         case 'p':
         case 'h2':
         case 'quote': {
@@ -136,6 +139,18 @@ var JournalHelpers = (function() {
       if (b2.type === 'verse-block') return '[' + (b2.ref || 'Scripture') + ']';
       if (b2.type === 'bookmark-card') return '[Bookmark]';
       if (b2.type === 'note-card') return '[Note]';
+      if (b2.type === 'journal-excerpt') {
+        var ex = (b2.text || '').replace(/\s+/g, ' ').trim();
+        if (ex) return ex.length > maxLen ? ex.substring(0, maxLen).trim() + '…' : ex;
+        return '[Linked excerpt]';
+      }
+      // Don't recurse into the linked entry — that risks an A→B→A loop and
+      // is also visually noisy. A bare label is enough for the card preview.
+      if (b2.type === 'journal-card') return '[Linked journal entry]';
+      if (b2.type === 'notebook-card') {
+        var rnb = resolveNotebookCard(b2.notebookId);
+        return rnb ? '[Notebook: ' + rnb.title + ']' : '[Notebook]';
+      }
       if (b2.type === 'divider') continue;
     }
     return '';
@@ -177,16 +192,29 @@ var JournalHelpers = (function() {
   }
 
   /* Resolve a letter-card refKey into a human label + body preview.
-     Returns { title, eyebrow, body, date } or null. */
-  function resolveLetterCard(volKey, letterId) {
+     `excerpt` (optional) overrides the default derived body — used by the
+     "+ → Excerpt" flow so the card displays the user-selected text.
+     Returns { title, eyebrow, body, date, isExcerpt } or null. */
+  function resolveLetterCard(volKey, letterId, excerpt) {
     if (typeof COL_BY_KEY === 'undefined' || typeof findEntryContext !== 'function') return null;
     var col = COL_BY_KEY.get(volKey);
     if (!col) return null;
     var ctx = findEntryContext(letterId, col.kind === 'letter' ? 'letter' : col.kind);
     if (!ctx || !ctx.entry) return null;
     var e = ctx.entry;
-    var body = '';
-    // Best-effort body excerpt
+    var body;
+    if (excerpt && typeof excerpt === 'string' && excerpt.trim().length) {
+      // Don't truncate here — the viewer renderer handles collapse/expand
+      // for long bodies via JrnExpandable.
+      return {
+        title: e.title || ctx.title || letterId,
+        eyebrow: col.label,
+        body: excerpt,
+        date: e.date || '',
+        isExcerpt: true
+      };
+    }
+    body = '';
     if (e.blocks && e.blocks.length) {
       for (var i = 0; i < e.blocks.length; i++) {
         var b = e.blocks[i];
@@ -239,9 +267,121 @@ var JournalHelpers = (function() {
     };
   }
 
-  /* Resolve a verse-block ref to verse text — uses the existing
-     resolveVerseText if available. Otherwise falls back to label only. */
-  function resolveVerseBlock(ref) {
+  /* Resolve a notebook-card. notebookId may be the literal
+     'uncategorized' (the system bucket) or a NotebookStore id. */
+  function resolveNotebookCard(notebookId) {
+    if (notebookId === 'uncategorized') {
+      return { title: 'Uncategorized', eyebrow: 'Notebook', deleted: false };
+    }
+    if (typeof NotebookStore === 'undefined') return null;
+    var nb = NotebookStore.get(notebookId);
+    if (!nb) return { title: '(Deleted notebook)', eyebrow: 'Notebook', deleted: true };
+    return { title: nb.name || 'Notebook', eyebrow: 'Notebook', deleted: false };
+  }
+
+  /* Look up a single block by its (entryId, blockId) — used by the
+     journal-to-journal embed flow to read the source block's data
+     (image mediaId, audio mediaId, text content). */
+  function getBlockFromEntry(entryId, blockId) {
+    if (typeof JournalStore === 'undefined') return null;
+    var e = JournalStore.get(entryId);
+    if (!e) return null;
+    var blocks = e.blocks || [];
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i].id === blockId) return blocks[i];
+    }
+    return null;
+  }
+
+  /* For the block-picker UI: produce a short label describing a block
+     ("Image", "Voice memo · 0:42", first 60 chars of text, etc.). */
+  function describeBlock(block) {
+    if (!block) return '';
+    switch (block.type) {
+      case 'image':         return '[Image]' + (block.caption ? ' — ' + block.caption : '');
+      case 'audio':         return '[Voice memo' + (block.duration ? ' · ' + formatDuration(block.duration) : '') + ']' + (block.caption ? ' — ' + block.caption : '');
+      case 'p':
+      case 'h2':            {
+        var t = (block.text || '').replace(/\{\{ref:([^}]+)\}\}/g, '$1').replace(/\[\[(letter|bookmark|journal):[^\]]+\]\]/g, '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/_(.+?)_/g, '$1').replace(/\s+/g, ' ').trim();
+        return t.length > 90 ? t.substring(0, 90) + '…' : t;
+      }
+      case 'quote':         {
+        var q = (block.text || '').replace(/\s+/g, ' ').trim();
+        return '“' + (q.length > 80 ? q.substring(0, 80) + '…' : q) + '”';
+      }
+      case 'divider':       return '— Divider —';
+      case 'letter-card':   return '[Letter card]';
+      case 'chapter-card':  return '[Chapter card]';
+      case 'verse-block':   return '[' + (block.ref || 'Scripture') + ']';
+      case 'bookmark-card': return '[Bookmark]';
+      case 'note-card':     return '[Note]';
+      case 'journal-card':  return '[Linked journal entry]';
+      case 'notebook-card': {
+        var rb = resolveNotebookCard(block.notebookId);
+        return '[Notebook: ' + (rb ? rb.title : 'Notebook') + ']';
+      }
+      case 'journal-excerpt': {
+        var qe = (block.text || '').replace(/\s+/g, ' ').trim();
+        return qe.length > 80 ? qe.substring(0, 80) + '…' : qe;
+      }
+    }
+    return block.type;
+  }
+
+  /* Whether a block can be embedded into another journal as a standalone
+     excerpt. Excludes structural pieces (dividers) and externally-resolved
+     cards that have their own embed flow (Card / Excerpt buttons). */
+  function isEmbeddableBlock(block) {
+    if (!block) return false;
+    return ['p', 'h2', 'quote', 'image', 'audio'].indexOf(block.type) >= 0;
+  }
+
+  /* Build the inserted-block shape for a journal-block embed. `source`
+     is the source entry; `block` is the source block. Returns a new
+     block (with its own id) that carries source attribution + shares
+     the same mediaId for image/audio. The editor's deleteBlock checks
+     for `sourceJournalId` and skips JournalMediaStore.delete so the
+     source's media isn't wiped from IDB when the embed is removed. */
+  function embedBlockFromJournal(source, block) {
+    if (!source || !block) return null;
+    var meta = {
+      sourceJournalId: source.id,
+      sourceBlockId: block.id,
+      sourceJournalTitle: entryDisplayTitle(source) || 'Untitled'
+    };
+    if (block.type === 'image') {
+      return newBlock('image', Object.assign({}, meta, {
+        mediaId: block.mediaId,
+        caption: block.caption || ''
+      }));
+    }
+    if (block.type === 'audio') {
+      return newBlock('audio', Object.assign({}, meta, {
+        mediaId: block.mediaId,
+        duration: block.duration,
+        caption: block.caption || '',
+        samples: block.samples || null
+      }));
+    }
+    if (block.type === 'p' || block.type === 'h2' || block.type === 'quote') {
+      return newBlock('journal-excerpt', Object.assign({}, meta, {
+        text: block.text || '',
+        originType: block.type,
+        cite: block.cite || ''
+      }));
+    }
+    return null;
+  }
+
+  /* Resolve a verse-block ref to verse text. When `overrideText` is
+     provided (Excerpt picker captured a user-selected span), it wins —
+     the verse-block renders the exact text the user picked even if it
+     starts mid-verse or spans multiple verses. Otherwise we fall back
+     to the centralized resolveVerseText lookup. */
+  function resolveVerseBlock(ref, overrideText) {
+    if (overrideText && typeof overrideText === 'string' && overrideText.trim().length) {
+      return { cite: ref, text: overrideText, isExcerpt: true };
+    }
     var text = '';
     if (typeof window.resolveVerseText === 'function') {
       try { text = window.resolveVerseText(ref) || ''; } catch (e) {}
@@ -313,6 +453,19 @@ var JournalHelpers = (function() {
     return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
   }
 
+  /* Very concise time, e.g. "4:54p" / "11:08a" — shown subtly next to
+     the date. Entries already store millisecond `created`/`updated`, so
+     this is purely a display concern (the sort always had the precision). */
+  function shortTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    var h = d.getHours();
+    var m = d.getMinutes();
+    var ap = h < 12 ? 'a' : 'p';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + (m < 10 ? '0' + m : m) + ap;
+  }
+
   return {
     blockId: blockId,
     newBlock: newBlock,
@@ -325,10 +478,17 @@ var JournalHelpers = (function() {
     resolveChapterCard: resolveChapterCard,
     resolveBookmarkCard: resolveBookmarkCard,
     resolveNoteCard: resolveNoteCard,
+    resolveNotebookCard: resolveNotebookCard,
     resolveVerseBlock: resolveVerseBlock,
     refKeyToEndpoint: refKeyToEndpoint,
     entryDisplayTitle: entryDisplayTitle,
     shortDate: shortDate,
-    longDate: longDate
+    shortTime: shortTime,
+    longDate: longDate,
+    // Journal-to-journal block embed helpers
+    getBlockFromEntry: getBlockFromEntry,
+    describeBlock: describeBlock,
+    isEmbeddableBlock: isEmbeddableBlock,
+    embedBlockFromJournal: embedBlockFromJournal
   };
 })();

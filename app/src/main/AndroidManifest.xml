@@ -2,6 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Microphone — required for in-app voice recording (journal voice memos).
+         Runtime permission is requested via ActivityResultContracts.RequestPermission
+         on API 23+. WebChromeClient.onPermissionRequest grants the WebView
+         RESOURCE_AUDIO_CAPTURE once the OS grant is in place. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- MODIFY_AUDIO_SETTINGS — a "normal" (non-runtime) permission. WebView's
+         internal Chromium audio pipeline calls AudioManager.setMode() when it
+         opens an AudioRecord session for getUserMedia. Without this permission
+         that call silently no-ops, the audio subsystem stays in the wrong mode,
+         AudioRecord fails to acquire the mic, and getUserMedia rejects with
+         NotReadableError even though RECORD_AUDIO is granted and no other app
+         is recording. Required for in-app voice recording to work on Android. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:allowBackup="false"

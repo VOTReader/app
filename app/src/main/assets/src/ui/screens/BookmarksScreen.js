@@ -59,6 +59,18 @@ function _bookmarkSourceLabel(hlKey) {
     }
     return id;
   }
+  if (kind === 'journal') {
+    // journal:<entryId>:<blockIdx>
+    var eid = parts[1];
+    var je = (typeof JournalStore !== 'undefined') ? JournalStore.get(eid) : null;
+    if (je) {
+      var title = (typeof JournalHelpers !== 'undefined' && JournalHelpers.entryDisplayTitle)
+        ? (JournalHelpers.entryDisplayTitle(je) || 'Untitled')
+        : (je.title || 'Untitled');
+      return 'Journal · ' + title;
+    }
+    return 'Journal Entry';
+  }
 
   return hlKey;
 }
@@ -79,6 +91,9 @@ function _bookmarkSourceEndpoint(hlKey) {
   if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
     var ctx = (typeof findEntryContext === 'function') ? findEntryContext(parts[1], kind) : null;
     return { type: kind, key: hlKey, letterId: parts[1], entryId: parts[1], screen: ctx ? ctx.screen : null };
+  }
+  if (kind === 'journal') {
+    return { type: 'journal', key: hlKey, entryId: parts[1], screen: 'journal-viewer' };
   }
   return null;
 }
@@ -178,21 +193,18 @@ function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onE
             maxLength: 200
           })
         : React.createElement('span', { className: 'bkm-row-label' }, bkm.label || '(no label)'),
-      // Thought — italic dim block if the user has written one. Tappable
-      // for expand/collapse when long. stopPropagation so the outer
-      // navigation handler doesn't fire.
-      hasThought && React.createElement('span', {
-        className: 'bkm-row-thought' + (thoughtExpanded ? ' is-expanded' : '') + (thoughtIsLong ? ' is-collapsible' : ''),
-        onClick: toggleThought,
-        role: thoughtIsLong ? 'button' : undefined,
-        tabIndex: thoughtIsLong ? 0 : undefined,
-        title: thoughtIsLong ? (thoughtExpanded ? 'Tap to collapse' : 'Tap to read more') : undefined
-      },
-        bkm.thought,
-        thoughtIsLong && React.createElement('span', { className: 'bkm-row-thought-toggle' },
-          thoughtExpanded ? ' · Less' : ' · More'
-        )
-      )
+      // Thought — italic dim block if the user has written one. Uses the
+      // shared JrnExpandable for a proper "Show more / Show less" button
+      // when the text exceeds the visible-on-card threshold.
+      hasThought && (typeof JrnExpandable !== 'undefined'
+        ? React.createElement('div', { className: 'bkm-row-thought', onClick: function(e) { e.stopPropagation(); } },
+            React.createElement(JrnExpandable, {
+              text: bkm.thought,
+              threshold: 140,
+              className: 'bkm-row-thought-body'
+            })
+          )
+        : React.createElement('span', { className: 'bkm-row-thought' }, bkm.thought))
     ),
     // Date + long-press affordance (three dots)
     React.createElement('div', { className: 'bkm-row-meta' },
@@ -475,6 +487,7 @@ function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
 */
 function BookmarksScreen(props) {
   var onBack = props.onBack;
+  var onHome = props.onHome;
   var onNavigateToSource = props.onNavigateToSource;
   var hlTick = props.hlTick;
   var setHlTick = props.setHlTick;
@@ -562,29 +575,12 @@ function BookmarksScreen(props) {
   };
 
   // Nav buttons (mirrors LinksScreen)
-  var navChildren = React.createElement(React.Fragment, null,
-    React.createElement('button', {
-      className: 'nav-home nav-back-icon',
-      onClick: onBack, title: 'Back', 'aria-label': 'Back'
-    }, String.fromCharCode(8249)), // ‹
-    React.createElement('button', {
-      className: 'nav-search-btn', onClick: onSearch, title: 'Search'
-    },
-      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6' },
-        React.createElement('circle', { cx: '11', cy: '11', r: '8' }),
-        React.createElement('line', { x1: '21', y1: '21', x2: '16.65', y2: '16.65' })
-      )
-    ),
-    historyEnabled !== false && React.createElement('button', {
-      className: 'nav-search-btn', onClick: onHistory, title: 'History'
-    },
-      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
-        React.createElement('circle', { cx: '12', cy: '12', r: '9' }),
-        React.createElement('polyline', { points: '12 7 12 12 15 15' })
-      )
-    ),
-    React.createElement(ThemeBtn, { theme: theme, onThemeChange: onThemeChange })
-  );
+  // Standard app-wide Library nav (back + Home left, icon cluster right).
+  var navChildren = LibraryNav({
+    onBack: onBack, onSearch: onSearch, onHistory: onHistory,
+    onSettings: props.onSettings,
+    theme: theme, onThemeChange: onThemeChange
+  });
 
   return React.createElement(ScreenLayout, { navChildren: navChildren },
     React.createElement('div', { className: 'bkm-screen' },
@@ -607,30 +603,15 @@ function BookmarksScreen(props) {
         onChange: function(e) { setSearchQuery(e.target.value); }
       }),
 
-      // Controls row: sort
+      // Controls row: a single sort TOGGLE (the old dropdown was unreliable;
+      // user wants one clear button that names what's shown).
       React.createElement('div', { className: 'notes-index-controls', style: { marginTop: '0.7rem' } },
-        React.createElement('div', { style: { position: 'relative', marginLeft: 'auto' } },
-          React.createElement('button', {
-            className: 'notes-index-sort-btn',
-            onClick: function() { setShowSortMenu(function(v) { return !v; }); },
-            title: 'Sort order'
-          }, 'Sort: ' + (sortLabels[sortMode] || 'Recent') + ' ▾'),
-          showSortMenu && React.createElement(React.Fragment, null,
-            React.createElement('div', {
-              style: { position: 'fixed', inset: 0, zIndex: 3099 },
-              onClick: function() { setShowSortMenu(false); }
-            }),
-            React.createElement('div', { className: 'notes-sort-menu', style: { right: 0, top: '100%' } },
-              ['recent', 'oldest', 'source-az', 'label-az'].map(function(mode) {
-                return React.createElement('button', {
-                  key: mode,
-                  className: 'notes-sort-menu-item' + (sortMode === mode ? ' active' : ''),
-                  onClick: function() { setSortMode(mode); setShowSortMenu(false); }
-                }, sortLabels[mode]);
-              })
-            )
-          )
-        )
+        React.createElement('button', {
+          className: 'notes-index-sort-btn',
+          style: { marginLeft: 'auto' },
+          onClick: function() { setSortMode(function(m) { return m === 'oldest' ? 'recent' : 'oldest'; }); },
+          title: 'Toggle sort order'
+        }, sortMode === 'oldest' ? 'Sort: Oldest ↑' : 'Sort: Newest ↓')
       ),
 
       // Empty state: no bookmarks at all

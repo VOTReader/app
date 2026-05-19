@@ -1,7 +1,7 @@
 # CLAUDE.md — VOTReader-studio Project Knowledge Base
 
 > Living document. Update after every major examination or change.
-> Last major update: 2026-05-15 (Library hub feature push — Links system (schema migration {a,b}→{source,target} with source/target visual distinction on inline icons, LinksScreen browser, Library "My Links" tile, two adjacent fixes); Bookmarks system (full Library tile + BookmarksScreen browser, BookmarkStore + applyDOMBookmarks with creation-pulse animation, `thought` field on every bookmark with inline edit in popover + action sheet, chapter-level NavButton on every reading screen, date surfacing across BookmarkPopover / NoteSheet / LinkSidebar cards, Android SVG-fill icon visibility fix, read-more / collapse for long thoughts, pre-commit BookmarkCreateSheet replacing silent-add); IN PROGRESS: visualViewport keyboard-height tracking so sheets lift above the soft keyboard, plus extending BookmarkCreateSheet for an edit-mode that the inline icon tap opens directly. Three modules now extracted to src/: link-store, dom-links, LinksScreen, bookmark-store, dom-bookmarks, BookmarksScreen, BookmarkCreateSheet. See PLAN.txt §8 newest entries.). Previous: 2026-05-14 (startup perf + safety net: bible-studies.js now lazy-loaded via loadBibleStudies() saving 4.3 MB from cold-boot; .git/hooks/pre-commit wired to run check_balance.py on data-file commits; see commit b9b769b). Previous: 2026-05-12 (Objective D autonomous finish — Android 12+ SplashScreen API holds until WebView's first paint, JS-side "Keep Screen On While Reading" toggle in Settings → Reading Experience bridging the Kotlin setKeepScreenOn at ac439b3, [object CSS] React #31 investigation closed as Android-only or already silenced by the Objective E batch; see PLAN.txt §8 2026-05-12 entry). Previous: 2026-05-11 (Objective E Android polish batch — 5 fixes; see §20 below). Previous: 2026-05-11 full Objective C complete: improvement2.txt Day 1 + Day 2 footnote system + 10 §12 critical bugs + WTLB attribution tap-through + universal single-shot back-pill + Day 4-5 polish + 3 footnote audit fixes from a parallel session; About screen + first-run flow gated by `vot-about-seen`; all 9 session commits fast-forward-merged into `origin/main` at `b19f511` so the GitHub repo's `main` is now the canonical "live" version; AI deferred indefinitely per user direction). Previous: 2026-05-10 Notes / Library / Notebooks system landed (parallel session, see §17.13–§17.18); Phase 0 git setup completed — repo at github.com/corbinlythgoe/VOTReader-studio, private, auth cached.
+> Last major update: 2026-05-15 (Journal voice recording rearchitected + cross-platform mic fixes — root-caused two separate failures via parallel research agents and fixed both. DESKTOP: `index.html` CSP had `media-src 'none'` which silently blocked EVERY `<audio>` blob: URL on all platforms — recordings captured fine but never played (preview AND after-save); changed to `media-src blob:` (live-verified); also waveform amplification `rms*3`→`rms*8`. ANDROID: replaced the unreliable WebView `getUserMedia` path with a NATIVE Kotlin `MediaRecorder` bridge (AAC/.m4a in cacheDir) — `nativeRecordStart/Pause/Resume/Stop/Cancel/Amplitude` `@JavascriptInterface` methods + `postNativeComplete` → `window.__onNativeRecordingComplete(base64,durMs,mime)` handoff; `JournalRecordingSheet.js` `startCapture()` dispatches native(Android)/getUserMedia(desktop); live waveform restored on Android via `MediaRecorder.getMaxAmplitude()` polling. Pre-native WebView hardening also landed and is now harmless dead-defense on Android: `MODIFY_AUDIO_SETTINGS` manifest perm, `startAudioSession/endAudioSession` AudioManager MODE_IN_COMMUNICATION bridge, `onPermissionRequest` 250ms grace delay, `getUserMedia` NotReadableError retry+backoff, isAndroid analyser guard. See §22 below. Desktop verified in preview; Android needs on-device APK test. Working tree only — not committed.). Previous: 2026-05-15 (Library hub feature push — Links system (schema migration {a,b}→{source,target} with source/target visual distinction on inline icons, LinksScreen browser, Library "My Links" tile, two adjacent fixes); Bookmarks system (full Library tile + BookmarksScreen browser, BookmarkStore + applyDOMBookmarks with creation-pulse animation, `thought` field on every bookmark with inline edit in popover + action sheet, chapter-level NavButton on every reading screen, date surfacing across BookmarkPopover / NoteSheet / LinkSidebar cards, Android SVG-fill icon visibility fix, read-more / collapse for long thoughts, pre-commit BookmarkCreateSheet replacing silent-add); IN PROGRESS: visualViewport keyboard-height tracking so sheets lift above the soft keyboard, plus extending BookmarkCreateSheet for an edit-mode that the inline icon tap opens directly. Three modules now extracted to src/: link-store, dom-links, LinksScreen, bookmark-store, dom-bookmarks, BookmarksScreen, BookmarkCreateSheet. See PLAN.txt §8 newest entries.). Previous: 2026-05-14 (startup perf + safety net: bible-studies.js now lazy-loaded via loadBibleStudies() saving 4.3 MB from cold-boot; .git/hooks/pre-commit wired to run check_balance.py on data-file commits; see commit b9b769b). Previous: 2026-05-12 (Objective D autonomous finish — Android 12+ SplashScreen API holds until WebView's first paint, JS-side "Keep Screen On While Reading" toggle in Settings → Reading Experience bridging the Kotlin setKeepScreenOn at ac439b3, [object CSS] React #31 investigation closed as Android-only or already silenced by the Objective E batch; see PLAN.txt §8 2026-05-12 entry). Previous: 2026-05-11 (Objective E Android polish batch — 5 fixes; see §20 below). Previous: 2026-05-11 full Objective C complete: improvement2.txt Day 1 + Day 2 footnote system + 10 §12 critical bugs + WTLB attribution tap-through + universal single-shot back-pill + Day 4-5 polish + 3 footnote audit fixes from a parallel session; About screen + first-run flow gated by `vot-about-seen`; all 9 session commits fast-forward-merged into `origin/main` at `b19f511` so the GitHub repo's `main` is now the canonical "live" version; AI deferred indefinitely per user direction). Previous: 2026-05-10 Notes / Library / Notebooks system landed (parallel session, see §17.13–§17.18); Phase 0 git setup completed — repo at github.com/corbinlythgoe/VOTReader-studio, private, auth cached.
 >
 > **Working dir**: `D:\VOTReader-studio` (canonical). The C: OneDrive path is legacy — `C:\Users\corbi\OneDrive\Desktop\VOTReader-studio\app` is now a Junction → `D:\VOTReader-studio\app` (set up 2026-05-08, see Section 17.11). Always edit D: files.
 >
@@ -2323,6 +2323,87 @@ Bigger objectives still open (PLAN.txt §19):
 - ☐ H — Library completes (Bookmarks, Journal, Highlights & Underlines tiles).
 - ☐ I — Reading-app baseline (TTS, in-app video, synonyms, sepia, font controls).
 - ☐ K — PWA evaluation (architectural decision pending user input).
+
+## 22. Journal voice recording — dual-path architecture (2026-05-15)
+
+The journal voice-memo recorder (`app/src/main/assets/src/ui/sheets/JournalRecordingSheet.js`)
+had two **independent** failures, root-caused by two parallel research agents and fixed
+together. This section is the canonical reference for how recording works now.
+
+### 22.1 The two original bugs
+
+| Platform | Symptom | Root cause | Fix |
+|---|---|---|---|
+| **Desktop** (Chrome/FF/Edge) | Mic permission granted, but waveform flat, preview silent, saved audio silent | `index.html` CSP line had `media-src 'none'` — this blocks **every** `<audio>`/`<video>` `src`, including `blob:` URLs, on all browsers + Android WebView. Recording always worked; playback could never load the blob. Live-tested error: `MEDIA_ELEMENT_ERROR: Media load rejected by URL safety check`. | `media-src 'none'` → `media-src blob:` (index.html ~line 18). Verified live: `<audio>` reaches `readyState 4`. |
+| **Desktop** (secondary) | Waveform barely moved even when audio captured | `var lvl = Math.min(1, rms * 3)` — speech RMS is ~0.02–0.06, so 3× → ~4–10px bars on a 56px max (reads as flat) | `rms * 3` → `rms * 8` |
+| **Android** (Pixel 9 Pro, all OEMs) | "Requesting…" ~2s → "Could not open the microphone" | WebView Chromium `getUserMedia` rejects with `NotReadableError`/`TrackStartError` even with RECORD_AUDIO granted + no other app recording. Causes: missing `MODIFY_AUDIO_SETTINGS` (WebView's internal `AudioManager.setMode()` silently no-ops), immediate `onPermissionRequest` grant racing the privacy-indicator mic hold, and `AudioContext`+`MediaRecorder` dual-consumer on one stream → `AAUDIO_ERROR_DISCONNECTED` on Pixel 6+ | **Rearchitected to a native Kotlin recorder** (see §22.3). The WebView hardening below also landed first and is now harmless dead-defense on Android. |
+
+### 22.2 WebView getUserMedia hardening (still active on desktop; dead-defense on Android)
+
+These were the first-pass Android fixes. The native path (§22.3) supersedes them on
+Android, but they're kept (zero cost, still protect the desktop getUserMedia path):
+
+- `AndroidManifest.xml`: `<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />` (normal perm; lets WebView's internal `setMode()` work)
+- `MainActivity.kt` `AppInterface.startAudioSession()` / `endAudioSession()` — sets `AudioManager.MODE_IN_COMMUNICATION` during capture, restores prior mode before playback. JS calls `startAudioSession()` after `getUserMedia` resolves, `endAudioSession()` in `rec.onstop` + `cleanup()`. (Native path does NOT call these — MODE_IN_COMMUNICATION is wrong for MediaRecorder.)
+- `MainActivity.kt` `onPermissionRequest` already-granted fast-path: 250ms `webView.postDelayed` before `request.grant()` (matches the delay in `micPermissionLauncher` / `micPrepLauncher`)
+- `JournalRecordingSheet.js` `beginCapture()`: `getUserMedia` retries `NotReadableError`/`TrackStartError`/`AbortError` 3× with 400/800/1200ms back-off; watchdog re-armed per attempt; error copy no longer falsely says "in use by another app"
+- `JournalRecordingSheet.js`: the `AudioContext`/analyser block is wrapped in `if (!isAndroid)` (`isAndroid = !!window.AndroidBridge`) — the dual-consumer stream is what crashes AAUDIO devices
+
+### 22.3 The native Android recorder (the robust path — current production design)
+
+**Why:** WebView `getUserMedia` is the single fragile component across the Android
+version / WebView-build / OEM-audio-HAL matrix. Native `android.media.MediaRecorder`
+is the same OS API every voice-memo app uses — reliable everywhere, and exposes
+`getMaxAmplitude()` so the live waveform works on Android again.
+
+**Kotlin (`MainActivity.kt`)** — state fields guarded by `recLock` (the
+`@JavascriptInterface` methods run on a binder thread, not main):
+`nativeRecorder: MediaRecorder?`, `nativeRecordFile: File?`, start/pause-accum timestamps.
+Records **AAC in MPEG-4 (`.m4a`)** via `MediaRecorder` (`MIC` → `MPEG_4` → `AAC`,
+96 kbps / 44.1 kHz) to a temp file in `cacheDir`. Bridge methods on `AppInterface`:
+
+| Method | Returns | Purpose |
+|---|---|---|
+| `nativeRecordStart()` | `"ok"` / `"error:<reason>"` | rechecks RECORD_AUDIO, creates+prepares+starts MediaRecorder |
+| `nativeRecordPause()` / `nativeRecordResume()` | `"ok"`/`"error:…"` | `MediaRecorder.pause()`/`resume()` (API 24+, minSdk is 26) |
+| `nativeRecordAmplitude()` | `Int` 0..32767 | `MediaRecorder.getMaxAmplitude()` — drives the waveform |
+| `nativeRecordStop()` | (async) | stops, reads file, base64, → `postNativeComplete()` |
+| `nativeRecordCancel()` | — | stop+release+delete temp file, no callback |
+
+`postNativeComplete(base64, durationMs)` is a private `MainActivity` method (touches
+`webView`): `webView.post { evaluateJavascript("window.__onNativeRecordingComplete(arg,dur,'audio/mp4')") }`,
+`arg` is `null` on failure. `onDestroy()` releases a still-running recorder + deletes
+its temp file. `MediaRecorder(context)` ctor on API 31+, deprecated `MediaRecorder()` below.
+
+**JS (`JournalRecordingSheet.js`)** — `startCapture()` is the dispatcher:
+`window.AndroidBridge.nativeRecordStart` exists → `beginNativeCapture()`; else
+(desktop) → `beginCapture()` (the unchanged getUserMedia path). The 4 post-permission
+call sites in the permission gate were changed from `beginCapture()` → `startCapture()`.
+`beginNativeCapture()` mirrors the existing UI state machine (requesting → recording
+⇄ paused → preview → save/discard): a `tickRef` duration timer keyed off
+`nativeStateRef` ('recording'|'paused'|'inactive') and an `ampRef` 80ms interval
+polling `nativeRecordAmplitude()` (`lvl = Math.min(1, Math.sqrt(amp/32767)*1.8)`) into
+the same `samplesAccumRef`/`setWaveLive` buffer. `window.__onNativeRecordingComplete`
+(registered in the mount `useEffect`, deleted in its cleanup alongside
+`__onMicPermissionResult`) builds a `Blob` from the base64 and feeds the **unchanged**
+preview / `JournalMediaStore.put` / `onSave` pipeline — it honours `pendingSaveRef`
+exactly like the getUserMedia `rec.onstop` did (Save tapped before the blob arrived).
+`pauseRecording`/`resumeRecording`/`stopRecording` branch on `nativeRef.current` first.
+`cleanup()` calls `nativeRecordCancel()` (idempotent — Kotlin no-ops on null recorder)
+and clears `ampRef`. New refs: `nativeRef`, `nativeStateRef`, `ampRef`.
+
+**Downstream unchanged:** `.m4a`/`audio/mp4` is universally playable by `<audio>` and
+stores as a `Blob` exactly like the old WebM, so `JournalMediaStore`, the viewer's
+`JournalAudioBlock`, and previously-saved recordings are unaffected. The base64-over-
+`evaluateJavascript` handoff matches the existing import/export bridge pattern; fine
+for typical memos, heavy only near the 5-min cap (acceptable, not yet optimized).
+
+### 22.4 Status / caveats
+
+- **Desktop**: verified live in the preview (CSP `media-src blob:` confirmed; `<audio>` blob reaches `readyState 4`; `startCapture()` confirmed routing to `beginCapture()` when no `AndroidBridge`; app loads with zero console errors; JS syntactically valid). No regression.
+- **Android**: NOT testable from the preview (desktop Chrome, no `AndroidBridge`). Requires an on-device APK build + `adb logcat -s VOTReader WebViewJS`. Expected: prompt → recording with moving waveform → preview playback → save.
+- All of the above is **working-tree only — not committed**. There was also an unrelated in-flight parallel-session diff in `index.html` per the older handoff notes; these recording edits are in disjoint regions (CSP `<head>`, plus the `src/` modules + Kotlin).
+- minSdk = 26 (gradle), so `MediaRecorder.pause()/resume()` (API 24+) are always available.
 
 ---
 
