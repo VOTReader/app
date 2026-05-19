@@ -2046,6 +2046,64 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-19 (later) — Objective E/F kickoff: scope agreed + Phase-0 net
+
+  Branch: refactor/modularize-incremental (off main @ 492b696, pushed
+  to origin as backup). All modularization work happens here, not main.
+
+  AGREED SCOPE (user-confirmed this session):
+
+  • DELIVERY MODEL = live `<script src="src/…">` global-scope modules.
+    This is now THE standard, not a half-step toward cat-modules.py.
+    Rationale: 23 modules already use it and work on Android WebView;
+    zero build step; instant edit→reload→test. cat-modules.py single-
+    file concat is explicitly NOT adopted (only revisit if a future
+    file:// or perf need arises). Discipline required: correct <script>
+    load ORDER (a file using CachedStore must load after it) and no
+    global-name collisions — the smoke harness's globals audit catches
+    both.
+
+  • APPROACH = incremental, verify-each-step, NOT a big-bang split.
+    Reason: zero automated tests on a 17.6k-line file → a big-bang is
+    the single largest regression risk in the project. Mirror how the
+    Library subsystem was extracted (one cohesive unit at a time,
+    smoke-verified before the next).
+
+  • PHASE 0 — DONE this session. Smoke safety net committed at
+    tools/smoke.js (+ tools/SMOKE.md). NOT shipped (outside the asset
+    path). Runs IN the app page (preview_eval or chrome://inspect on
+    device). Checks: globals audit (bare-name eval probe — resolves the
+    global-LEXICAL consts/classes like AnnotationStore/COLLECTIONS/
+    StaticSubtree/ErrorBoundary that are NOT window props), COLLECTIONS
+    data-wiring, a 12-screen render walk (crash vs unreached), and an
+    annotation round-trip (seed→navigate→next/prev→assert marks→ALWAYS
+    restore localStorage; guards the 2db70f5 crash class). GREEN
+    BASELINE captured today: globals ok, data ok, 12/12 screens ok,
+    0 crash, annotation ok (133 marks, no crash), 0 console.error.
+    Discipline: run before+after every extraction; new missing/crashed/
+    console.error ⇒ stop and fix before proceeding. If a known-good
+    build flags a global, fix EXPECTED_GLOBALS, not the app.
+
+  PHASED PLAN (lowest-risk-first; each phase smoke-gated, own commit):
+    P1  Annotation engine — applyDOMHighlights/applyNoteIcons/
+        applyActiveNoteState/StaticSubtree/SelectionToolbar/
+        findNoteIconInsertionPoint (~1.5k lines, self-contained,
+        highest churn, freshly hardened → best workability ROI).
+    P2  CSS-in-JS block → src/styles/ modules (also kills the
+        `const CSS = \`…\`` backtick-in-comment black-screen footgun).
+    P3  Scripture/data resolution — parseRefStr/findBook/_allBooks/
+        _matthew/_studies/COLLECTIONS/lookupVersesFromBooks. This is
+        also Objective E's natural home (unify the schema the renderer
+        consumes before modularizing the renderer).
+    P4  Big screen components — LetterView/WtlbEntryView/
+        BibleChapterView/ChapterView, then hook extraction to slim
+        App() (~2.5k lines today).
+  Tradeoff accepted: codebase is "half-modular" between phases
+  (some logic in src/, some inline) — inconsistent but every step is
+  shippable and smoke-verified, vs. a clean-but-risky big-bang.
+
+  NEXT: begin P1 (annotation engine extraction), smoke-gated.
+
 2026-05-19 — Status truth-up + stale-flag clearance (Opus)
 
   Supersedes the 2026-05-15 "IN PROGRESS at autocompact" entry below.
