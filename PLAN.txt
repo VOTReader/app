@@ -2104,6 +2104,30 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
 
   NEXT: begin P1 (annotation engine extraction), smoke-gated.
 
+  P1 EXTRACTION MAP (validated read-only before cutting):
+    Target → src/renderer/annotation-engine.js, <script src> inserted
+    right BEFORE the big inline script (after dom-journal-chip.js).
+    Call-time resolution is safe: every one of these is only invoked
+    from a useEffect or a React render callback that fires AFTER the
+    inline script defines AnnotationStore/NoteStore and App mounts —
+    nothing executes at module-load time.
+    MOVE these 9 (cohesive unit):
+      snapRangeToWords, annMarkClass, HighlightableText,
+      findNoteIconInsertionPoint, _markCharEnd, applyNoteIcons,
+      applyActiveNoteState, applyDOMHighlights, StaticSubtree
+    LEAVE (intentionally, avoid scope creep):
+      • Segments — calls renderTextWithScripRefs (not in the set);
+        moving it would drag in the whole inline-markup renderer.
+      • _fnTextRedundantWithLink — footnote infra, not engine; no
+        annotation-engine code calls it.
+    Outbound deps (all call-time, all in scope when invoked):
+      React/useMemo, AnnotationStore.get, window.__openNote /
+      __showMultiNote / __activeNoteGroup. No CSS-in-JS moved
+      (engine only emits class-name strings; CSS stays in const CSS).
+    Smoke-gate: re-run votSmoke walk+annotation, diff vs the green
+    baseline (globals must still be ok — these become real window
+    globals once in a src file; screens 0 crash; annotation ok).
+
 2026-05-19 — Status truth-up + stale-flag clearance (Opus)
 
   Supersedes the 2026-05-15 "IN PROGRESS at autocompact" entry below.
