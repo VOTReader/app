@@ -2102,7 +2102,19 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   (some logic in src/, some inline) — inconsistent but every step is
   shippable and smoke-verified, vs. a clean-but-risky big-bang.
 
-  NEXT: begin P1 (annotation engine extraction), smoke-gated.
+  P1 — DONE (2026-05-19). Annotation engine (9 symbols, ~345 lines)
+  extracted to src/renderer/annotation-engine.js, wired via <script src>
+  at the canonical renderer point (after dom-bookmarks.js, before the
+  block-B inline script — same pattern dom-links/dom-bookmarks use).
+  index.html: 0 engine defs remain, 5 breadcrumb stubs left, 29 caller
+  refs intact. One self-containment tweak: HighlightableText now uses
+  React.useMemo (was the inline script's destructured useMemo) so the
+  module has no hidden cross-block dep. Smoke-gate vs green baseline:
+  IDENTICAL — globals ok (60), data ok, 12/12 screens ok 0 crash,
+  annotation ok (133 marks / 13 icons, no crash on open or next/prev),
+  0 console.error. Zero regression. NEXT: P2 (CSS-in-JS → src/styles/).
+
+  NEXT (superseded): begin P1 (annotation engine extraction).
 
   P1 EXTRACTION MAP (validated read-only before cutting):
     Target → src/renderer/annotation-engine.js, <script src> inserted
