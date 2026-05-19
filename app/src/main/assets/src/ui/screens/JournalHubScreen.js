@@ -77,6 +77,13 @@ function JournalCardMenu(props) {
           step === 1 ? 'Delete this entry?'
             : step === 2 ? 'Are you sure? This cannot be undone.'
             : 'Type DELETE to permanently remove this entry.'),
+        (function () {
+          var summary = (typeof JournalStore !== 'undefined' && JournalStore.associatedDataSummary)
+            ? JournalStore.associatedDataSummary(entry.id) : null;
+          return summary && React.createElement('div', { className: 'jrn-tripledel-cascade' },
+            'This will also permanently delete ' + summary +
+            ' you placed inside this entry.');
+        })(),
         step === 3 && React.createElement('input', {
           type: 'text', className: 'jrn-tripledel-input', placeholder: 'Type DELETE',
           value: typed, autoFocus: true, onChange: function(e) { setTyped(e.target.value); }

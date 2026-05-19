@@ -357,6 +357,8 @@
   R('.jrn-tripledel-step-label { font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #c75c4a; margin-bottom: 6px; }');
   R('.jrn-tripledel-question { font-family: var(--font-garamond); font-size: 15px; line-height: 1.4; color: var(--cream); margin-bottom: 12px; }');
   R('body.light .jrn-tripledel-question { color: #2a2520; }');
+  R('.jrn-tripledel-cascade { font-family: var(--font-garamond); font-size: 13.5px; line-height: 1.45; color: #d98a6a; background: rgba(199, 92, 74, 0.10); border-left: 2px solid rgba(199, 92, 74, 0.55); padding: 8px 12px; margin: -4px 0 12px; border-radius: 0 6px 6px 0; }');
+  R('body.light .jrn-tripledel-cascade { color: #a8442f; }');
   R('.jrn-tripledel-input { width: 100%; box-sizing: border-box; background: var(--bg2); border: 1px solid rgba(199, 92, 74, 0.55); color: var(--cream); font-family: var(--font-cinzel); font-size: 14px; padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; outline: none; text-transform: uppercase; letter-spacing: 0.06em; }');
   R('.jrn-tripledel-input:focus { border-color: #c75c4a; }');
   R('body.light .jrn-tripledel-input { background: #fff; color: #2a2520; }');

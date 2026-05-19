@@ -110,8 +110,112 @@ var JournalStore = Object.assign(CachedStore('vot-journal', { list: [] }), {
     return list[idx];
   },
 
+  /* Personal data the user created INSIDE a journal entry is keyed by
+     `journal:<entryId>:<blockIdx>` (annotations/bookmarks) or carries a
+     journal endpoint (links). If the entry is deleted without cleaning
+     these up they dangle — still listed in the Library hubs but tapping
+     them navigates nowhere. _scanAssociated enumerates every such
+     record so the delete flow can both REPORT it (informed consent) and
+     CASCADE-remove it. Counts are per logical mark (a multi-block
+     highlight = 1), matching how the Library hubs count. Never throws —
+     a counting hiccup must not block a deletion the user asked for. */
+  _scanAssociated(id) {
+    var prefix = 'journal:' + id + ':';
+    var hlG = {}, ulG = {}, noteG = {}, annKeys = [], bkmIds = [], linkIds = [];
+    try {
+      if (typeof AnnotationStore !== 'undefined') {
+        var all = AnnotationStore.all() || {};
+        Object.keys(all).forEach(function(k) {
+          if (k.indexOf(prefix) !== 0) return;
+          annKeys.push(k);
+          (all[k] || []).forEach(function(a) {
+            var gid = a.groupId || a.id;
+            if (a.kind === 'note') noteG[gid] = 1;
+            else if (a.kind === 'underline') ulG[gid] = 1;
+            else hlG[gid] = 1;
+          });
+        });
+      }
+      if (typeof NoteStore !== 'undefined' && NoteStore._load) {
+        var nraw = NoteStore._load() || {};
+        Object.keys(nraw).forEach(function(gid) {
+          var keys = (nraw[gid] && nraw[gid].keys) || [];
+          if (keys.some(function(k) { return String(k).indexOf(prefix) === 0; })) noteG[gid] = 1;
+        });
+      }
+      if (typeof BookmarkStore !== 'undefined' && BookmarkStore.getForKeyPrefix) {
+        // getForKeyPrefix appends its own ':' (matches k.indexOf(prefix+':')),
+        // so pass the entry prefix WITHOUT the trailing colon. The extra ':'
+        // it adds also prevents substring-id false matches
+        // (journal:j_1_ab vs journal:j_1_abc).
+        (BookmarkStore.getForKeyPrefix('journal:' + id) || []).forEach(function(b) { bkmIds.push(b.id); });
+      }
+      if (typeof LinkStore !== 'undefined') {
+        (LinkStore.all() || []).forEach(function(ln) {
+          var s = ln.source || {}, t = ln.target || {};
+          var hit =
+            (s.key && String(s.key).indexOf(prefix) === 0) ||
+            (t.key && String(t.key).indexOf(prefix) === 0) ||
+            (s.type === 'journal' && s.entryId === id) ||
+            (t.type === 'journal' && t.entryId === id);
+          if (hit) linkIds.push(ln.id);
+        });
+      }
+    } catch (e) { /* counting must never block deletion */ }
+    return {
+      annKeys: annKeys, noteGroupIds: Object.keys(noteG),
+      bookmarkIds: bkmIds, linkIds: linkIds,
+      highlights: Object.keys(hlG).length, underlines: Object.keys(ulG).length,
+      notes: Object.keys(noteG).length, bookmarks: bkmIds.length, links: linkIds.length
+    };
+  },
+
+  associatedDataCounts(id) {
+    var s = this._scanAssociated(id);
+    return {
+      highlights: s.highlights, underlines: s.underlines, notes: s.notes,
+      bookmarks: s.bookmarks, links: s.links,
+      total: s.highlights + s.underlines + s.notes + s.bookmarks + s.links
+    };
+  },
+
+  /* Human phrase for the delete confirmation, or null if nothing tied. */
+  associatedDataSummary(id) {
+    var c = this.associatedDataCounts(id);
+    if (!c.total) return null;
+    var parts = [];
+    function p(n, s) { if (n > 0) parts.push(n + ' ' + s + (n === 1 ? '' : 's')); }
+    p(c.highlights, 'highlight'); p(c.underlines, 'underline'); p(c.notes, 'note');
+    p(c.bookmarks, 'bookmark'); p(c.links, 'link');
+    var last = parts.pop();
+    return parts.length ? parts.join(', ') + ' and ' + last : last;
+  },
+
+  _purgeAssociated(id) {
+    var s = this._scanAssociated(id);
+    try {
+      s.noteGroupIds.forEach(function(gid) {
+        if (typeof NoteStore !== 'undefined') NoteStore.remove(gid);
+        if (typeof AnnotationStore !== 'undefined') AnnotationStore.removeGroup(gid);
+      });
+      if (typeof AnnotationStore !== 'undefined') {
+        s.annKeys.forEach(function(k) { AnnotationStore.removeAllForKey(k); });
+      }
+      if (typeof BookmarkStore !== 'undefined') {
+        s.bookmarkIds.forEach(function(bid) { BookmarkStore.remove(bid); });
+      }
+      if (typeof LinkStore !== 'undefined') {
+        s.linkIds.forEach(function(lid) { LinkStore.remove(lid); });
+      }
+    } catch (e) { /* best-effort cascade; entry deletion still proceeds */ }
+  },
+
   remove(id) {
     if (!id) return;
+    // Cascade FIRST so journal-scoped annotations/bookmarks/links can't
+    // dangle. Centralized here because every delete path (hub card menu,
+    // viewer) routes through remove() — it cannot be bypassed.
+    this._purgeAssociated(id);
     var data = this._load();
     data.list = (data.list || []).filter(function(e) { return e.id !== id; });
     this._save();

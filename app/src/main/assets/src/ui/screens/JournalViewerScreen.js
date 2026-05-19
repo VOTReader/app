@@ -629,6 +629,13 @@ function JournalViewerScreen(props) {
     return React.createElement('div', { className: 'jrn-tripledel jrn-tripledel-step' + confirmStep },
       React.createElement('div', { className: 'jrn-tripledel-step-label' }, stepLabel),
       React.createElement('div', { className: 'jrn-tripledel-question' }, question),
+      (function () {
+        var summary = (typeof JournalStore !== 'undefined' && JournalStore.associatedDataSummary)
+          ? JournalStore.associatedDataSummary(entryId) : null;
+        return summary && React.createElement('div', { className: 'jrn-tripledel-cascade' },
+          'This will also permanently delete ' + summary +
+          ' you placed inside this entry.');
+      })(),
       confirmStep === 3 && React.createElement('input', {
         type: 'text',
         className: 'jrn-tripledel-input',
