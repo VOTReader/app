@@ -2046,8 +2046,61 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-19 — Status truth-up + stale-flag clearance (Opus)
+
+  Supersedes the 2026-05-15 "IN PROGRESS at autocompact" entry below.
+  User-confirmed on real device this session; flags cleared:
+
+  RESOLVED (the 05-15 "IN PROGRESS (next, before autocompact)" list):
+    - Keyboard-aware sheets: visualViewport `--keyboard-height` lift on
+      LinkPicker / NoteSheet / BookmarkCreateSheet etc. — COMPLETE and
+      user-verified on Android (keyboard no longer draws over inputs).
+    - BookmarkCreateSheet EDIT mode + `window.__bookmarkEdit` bridge +
+      dom-bookmarks single-id inline-tap routing — COMPLETE (landed in
+      commits 9f60e7c / 46fcf3a / 006acb8 / cf2c556).
+
+  ALSO CONFIRMED THIS SESSION (user, on PC + Android):
+    - Journal voice recording works on BOTH platforms — clears the
+      CLAUDE.md §22 "Android needs on-device APK test" caveat.
+    - App icon finalized to user's satisfaction. Objective D is now
+      FULLY complete; only release-signing remains, deferred by policy
+      (Play Store needs Timothy's permission per §6).
+
+  LANDED IN COMMIT 2db70f5 (2026-05-19, one bundled commit per user):
+    - Annotation-nav crash + stale-content corruption ROOT fix:
+      StaticSubtree freezes each [data-hl-dom] block after mount +
+      content-keyed remount (letter/entry id), so React never
+      reconciles the text nodes applyDOMHighlights splits/re-parents
+      → kills both the removeChild NotFoundError crash AND the
+      prev-letter-bleeds-into-next corruption. Footnote active-state
+      moved to a DOM class toggle (frozen subtree can't re-render it);
+      setSheetFn made functional; pipeline wrapped in per-layer
+      try/catch + stale-node guards (defense in depth).
+    - Footnote de-dup: a note whose text is just `See: "Title"`
+      duplicating the linked letter title is suppressed
+      (_fnTextRedundantWithLink); bottom-of-page list link button now
+      shows the destination title (was a bare "Open in App").
+    - Library: onSettings threaded to all 7 sub-screens (the settings
+      gear was a dead no-op everywhere under Library).
+    - Journal stats: orphaned journal-stats-store.js now loaded;
+      streak recompute on boot; record new entries / deletions.
+    - Bundled the parallel-session native voice-recording rearchitecture.
+
+  STATE OF THE PLAN (Objectives A–K, §19):
+    - A,B,C,D: COMPLETE (D only deferring release-signing by policy).
+    - H (Library): effectively COMPLETE — all 5 tiles functional
+      (Notes, Links, Bookmarks, Journal, Highlights & Underlines);
+      keyboard-over-sheets polish done. Only loose end is the benign
+      pre-existing [object CSS] React #31 console warnings.
+    - E (data unify) + F (modularize index.html) + G (build/tests):
+      NOT STARTED — this is the next real frontier. index.html is
+      still one ~17.5k-line file; data-normalize.js not wired.
+    - I (reading baseline), J (cloud sync), K (PWA): later / optional.
+    NEXT: scope E/F modularization + code-health pass.
+
 2026-05-15 (later 3) — Opus hands-on: keyboard-aware sheets + bookmark
-                       inline-tap edit flow (IN PROGRESS at autocompact)
+                       inline-tap edit flow (RESOLVED — see 2026-05-19
+                       entry above; was "IN PROGRESS at autocompact")
 
   User feedback after device test of the BookmarksCreateSheet batch:
     (a) Tapping an inline bookmark icon "does nothing" on Android. Want
