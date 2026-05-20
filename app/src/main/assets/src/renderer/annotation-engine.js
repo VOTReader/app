@@ -41,7 +41,7 @@
    selection always commits to whole words. This also eliminates the
    mid-word wrap problem entirely, because mark elements now always
    align with word boundaries in the rendered text. */
-function snapRangeToWords(text, start, end) {
+export function snapRangeToWords(text, start, end) {
   if (!text || typeof text !== 'string') return { start, end };
   start = Math.max(0, Math.min(start, text.length));
   end = Math.max(0, Math.min(end, text.length));
@@ -83,7 +83,7 @@ function annMarkClass(ann, isFirst, isLast) {
    segment that it spans). applyNoteIcons treats the LAST mark per group
    in document order as the icon anchor — so a single icon still emits
    for the whole annotation, even when it spans several segments. */
-function HighlightableText({ text, hlKey, hlTick }) {
+export function HighlightableText({ text, hlKey, hlTick }) {
   const annotations = React.useMemo(() => AnnotationStore.get(hlKey), [hlKey, hlTick]);
   if (!text) return null;
   if (!annotations || annotations.length === 0) {
@@ -183,7 +183,7 @@ function HighlightableText({ text, hlKey, hlTick }) {
    The mark's data range is unchanged — only the visual icon position
    shifts; the wavy active-state underline still reflects what was
    actually selected. */
-function findNoteIconInsertionPoint(mark) {
+export function findNoteIconInsertionPoint(mark) {
   const container = mark.closest('[data-hl-key]');
   if (!container) return { kind: 'afterMark' };
   // Boundary chars: any whitespace OR closing punctuation (so a mark
@@ -238,7 +238,7 @@ function _markCharEnd(mark) {
   } catch (e) { return -1; }
 }
 
-function applyNoteIcons() {
+export function applyNoteIcons() {
   document.querySelectorAll('.hl-note-icon').forEach(el => el.remove());
   // Per-group last mark in document order
   const lastByGroup = new Map();
@@ -332,7 +332,7 @@ function applyNoteIcons() {
    groupId matches window.__activeNoteGroup. Called after DOM rebuilds
    (so freshly-rendered marks pick up the active state) and from the
    App effect when noteSheetTarget changes. */
-function applyActiveNoteState() {
+export function applyActiveNoteState() {
   document.querySelectorAll('.hl-note.is-active, .hl-note-icon.is-active')
     .forEach(el => el.classList.remove('is-active'));
   const gid = window.__activeNoteGroup;
@@ -342,7 +342,7 @@ function applyActiveNoteState() {
     .forEach(el => el.classList.add('is-active'));
 }
 
-function applyDOMHighlights() {
+export function applyDOMHighlights() {
   document.querySelectorAll('[data-hl-key]').forEach(function(container) {
     // Skip React-managed containers (HighlightableText)
     if (container.querySelector('mark.hl-mark[data-hl-id]') || container.childElementCount === 0 && container.textContent && !container.querySelector('mark.hl-dom')) {
@@ -464,7 +464,7 @@ function applyDOMHighlights() {
    a fresh one — stale content is never shown. Props that legitimately
    change within a single letter (footnote active-state) are reapplied
    imperatively against the live DOM instead of via React re-render. */
-class StaticSubtree extends React.Component {
+export class StaticSubtree extends React.Component {
   shouldComponentUpdate() { return false; }
   render() { return this.props.children; }
 }

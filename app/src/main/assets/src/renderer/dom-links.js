@@ -52,7 +52,7 @@
    span is empty (SVG paths can't be selected anyway), and dropping
    the `none` lets drag-selection pass across the icon on Android
    without breaking. */
-function applyDOMLinks() {
+export function applyDOMLinks() {
   document.querySelectorAll('[data-hl-key][data-hl-dom]').forEach(function(container) {
     var hlKey = container.getAttribute('data-hl-key');
     container.querySelectorAll('.inline-link-icon').forEach(function(el) { el.remove(); });

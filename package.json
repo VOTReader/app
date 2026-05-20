@@ -5,8 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "python tools/build.py",
-    "build:esbuild": "echo 'reserved for G.2.1+ — esbuild bundling of ES modules'"
+    "build": "python tools/build.py && npm run build:c",
+    "build:c": "esbuild app/src/main/assets/src/renderer/_entry.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-c.js"
   },
   "devDependencies": {
     "esbuild": "^0.28.0"

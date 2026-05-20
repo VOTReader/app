@@ -29,7 +29,7 @@
    same icon (after the window expires) drop the class. */
 var BOOKMARK_PULSE_WINDOW_MS = 3000;
 
-function applyDOMBookmarks() {
+export function applyDOMBookmarks() {
   var nowMs = Date.now();
   document.querySelectorAll('[data-hl-key][data-hl-dom]').forEach(function(container) {
     var hlKey = container.getAttribute('data-hl-key');

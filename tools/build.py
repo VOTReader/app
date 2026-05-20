@@ -82,12 +82,12 @@ B = [
     'src/data/letter-linking.js',
 ]
 
-# Cluster C — renderer
-C = [
-    'src/renderer/dom-links.js',
-    'src/renderer/dom-bookmarks.js',
-    'src/renderer/annotation-engine.js',
-]
+# Cluster C — renderer (NOW BUNDLED VIA ESBUILD as of G.2.1).
+# This list is kept for reference; tools/build.py no longer emits bundle-c.js.
+# See tools/build-esbuild.sh (or package.json `build:c`) for the esbuild
+# invocation. The classic-script concat is dead for this cluster — the
+# source files use ES `export` syntax now.
+C = []  # intentionally empty; esbuild owns bundle-c.js
 
 # Cluster D — extracted screens/sheets/components/utils (loads after App)
 D = [
@@ -205,12 +205,12 @@ def bundle(name, files):
 
 
 def main():
-    print('Building 4 cluster bundles --> ' + DIST)
+    print('Building 3 classic-script bundles --> ' + DIST)
+    print('  (cluster C is bundled by esbuild; run `npm run build:c` separately)')
     bundle('a', A)
     bundle('b', B)
-    bundle('c', C)
     bundle('d', D)
-    print('Done. Update index.html to reference dist/bundle-{a,b,c,d}.js.')
+    print('Done. (bundle-c.js belongs to esbuild now.)')
 
 
 if __name__ == '__main__':

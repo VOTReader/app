@@ -65,12 +65,20 @@ bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.
 
 if [ -n "$bundle_source_changed" ]; then
   echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js..."
-  python tools/build.py
+  # `npm run build` chains both bundlers in one command:
+  #   1. python tools/build.py  → bundle-a.js, bundle-b.js, bundle-d.js (classic-script concat)
+  #   2. esbuild                → bundle-c.js (ES modules, G.2.1+ converted clusters)
+  # Both must succeed before we stage. Node is required on PATH for the
+  # esbuild half — git on Windows inherits system PATH where Node was
+  # installed by winget, so this works in fresh shells.
+  npm run build
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
     echo "---------------------------------------------------------------"
     echo "Bundle rebuild FAILED — see output above."
+    echo "If npm or node is missing, install Node LTS from nodejs.org"
+    echo "(or via winget install OpenJS.NodeJS.LTS) and try again."
     echo "Fix the build error, re-stage, then retry the commit."
     echo "---------------------------------------------------------------"
     exit 1
