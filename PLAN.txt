@@ -2216,11 +2216,71 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   Cumulative reduction across P1-P4: ~600 KB / ~7,700 lines extracted
   into 40+ cohesive modules.
 
-  NEXT: P5 (hook extraction to slim App() — extract useTabField / use
-  Settings / etc. from the App component, per PLAN §3.6). Optional
-  also: consolidate shared inline components (Segments, ProphecyGroup,
-  FootnoteSheet, etc.) that all the now-extracted screens depend on.
+  P5a — DONE (2026-05-19). Extracted 9 remaining inline screens to
+  src/ui/screens/: LibraryScreen, NotesIndexScreen, VolumesHome,
+  StudiesHome, HistoryScreen, AboutScreen, SettingsScreen (~38 KB
+  alone — by far the biggest), HomeScreen, SearchScreen. Total ~123
+  KB / ~3,000 lines extracted in one batch. 20 hook calls upgraded
+  to React.useX form. Extraction order respected the terminator-
+  still-inline rule (AboutScreen → SettingsScreen → HomeScreen
+  cascade; all others independent). Verified live: app mounts to
+  HomeScreen rendering from the new module, Library hub renders all
+  5 tiles (My Notes/Links/Journal/Bookmarks/Marks), Settings +
+  History render, annotation round-trip identical to baseline (133
+  marks / 13 icons / 0 console.error). Commit ed5603d.
 
+  P5b — DONE (2026-05-19). Extracted 23 shared inline components to
+  src/ui/components/: Segments, ProphecyCard, ProphecyGroup,
+  ProphecyExpandToggle, VerseWithNumbers, InAppLinkButton,
+  FootnoteSheet, ScriptureVerseText, ScriptureSheet, ExpandableVerse,
+  FootnoteListSection, ThemeBtn, HomeBtn, TabsNavBtn, StickyChapter
+  Nav, ScreenLayout, ModeToggle, InlineNotes, InlineEcho, StudyPanels,
+  ChapterBookmarkBtn, NavButtons, LibraryNav. Total ~88 KB extracted
+  in two passes (17 first batch + 6 retry after extractor hardening).
+
+  Three root-cause hardenings to the P4 extractor during P5b (no
+  bandaids — refused to write on failure, then fixed the script):
+    • Start anchor now accepts BOTH `function X({` AND `function X(`
+      (HomeBtn, TabsNavBtn, LibraryNav use bare paren — old anchor
+      missed them).
+    • Size floor lowered from 1000 B → 300 B (ProphecyExpandToggle
+      and StickyChapterNav are genuinely small utilities at 700-800 B
+      — the old floor false-positived).
+    • Closing-brace detection: prefer `\n}\n`, fall back to `\n}` for
+      functions adjacent to the next without blank line (Footnote
+      ListSection sits directly against StickyChapterNav).
+  Also added a parameterized `<subdir>` arg so extractor can target
+  `src/ui/components/` instead of `src/ui/screens/` (third positional
+  arg, defaults to ui/screens).
+
+  Verified live (post-P5b): annotation round-trip identical to
+  baseline (133 marks / 13 icons / no crash on open or next/prev /
+  0 console.error). Commit 36657e5.
+
+  Cumulative P1-P5b: index.html ~944 KB / ~17.2k lines → 419 KB / 8,244
+  lines. **95+ modules** under src/ (up from 12 at start of refactor).
+  Branch refactor/modularize-incremental is now 11 commits ahead of
+  main, all pushed to origin (full backup).
+
+  CURRENT NEXT: P6 (App() hook extraction). App() is now the only
+  big inline component left in index.html (~2,500 of its ~8.2k lines).
+  Extract its custom hooks (useTabField, settings persistence, scroll
+  handlers, history tracking, thumbnail capture, visualViewport
+  keyboard tracking, etc.) into src/hooks/ so App() drops to ~400
+  lines. This is the riskiest single refactor in the whole plan —
+  real semantic surgery (closure dependencies, React hook ordering,
+  state passing between newly-separated hooks). DEFER to a dedicated
+  focused session with full attention, NOT the tail-end of a marathon.
+
+  OPTIONAL ALSO P5c: ~12 remaining sheet/picker components in
+  index.html (LinkPicker, NoteSheet, NotebookPickerSheet, Annotation
+  ActionChip, SelectionToolbar, LinkSidebar, MultiNotePopover,
+  TabActionSheet, TabsOverview, VersePickerScreen, LetterExcerpt
+  PickerScreen). Same mechanical pattern as P5a/P5b — extractor
+  is ready; low risk; further slims index.html. Independent of P6.
+  Can go before P6 (more cleanup) or after (focus on hooks first).
+
+  NEXT (superseded): P5 (mechanical screens + shared components — DONE).
   NEXT (superseded): P4 (big screen components).
   NEXT (superseded): P3.5 (stores extraction + data relocation).
   NEXT (superseded): P3 (scripture/data resolution).
