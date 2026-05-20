@@ -2604,48 +2604,80 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   useTabs, useAndroidBack) are MEDIUM-to-HIGH risk and benefit from
   a fresh branch + fresh session with full attention.
 
-  STRATEGIC RECOMMENDATION (user-confirmed during P6c session):
+  THE ORIGINAL SIN IS TWO PROBLEMS, NOT ONE (user-clarified 2026-05-20):
 
-    Before continuing P6 medium/high-risk work, consider tackling
-    Objective G (esbuild bundler) FIRST. Rationale:
+    What looked like a single "pre-compiled HTML monolith" constraint
+    is actually two distinct problems with different fix costs and
+    different sequencing constraints. Naming them clearly because they
+    move independently.
 
-      - The current manual <script src> sequencing in index.html
-        (135+ tags, with hand-managed load order) is exactly what a
-        bundler solves at zero ongoing cost.
-      - The window-mirror script for 11 lexical-only consts is a
-        symptom of having no module system. ES modules with explicit
-        imports/exports make this disappear.
-      - The Python extraction scripts (_p4_extract_view.py,
-        _p5e_bundle_helpers.py) are surgical tools for pre-compiled
-        Babel output. Standard JS refactoring tools work directly on
-        ES modules. P6 high-risk work in a real module system is
-        significantly less risky.
-      - One-time cost: bundler config + initial conversion. Ongoing
-        win: every future change is easier.
+    Problem 1: NO BUILD SYSTEM
+      Symptoms:
+        - 135+ <script src> tags with hand-managed load order
+        - window.* global proliferation (modules can only talk to
+          each other via window because there's no module system)
+        - The P5g window-mirror for 11 lexical-only consts is exactly
+          this symptom — needed BECAUSE there's no import/export
+        - The P5e load-order bug (letter-linking.js had to precede
+          the big inline block) would have been impossible to make
+          with an import graph
+      Fix cost: LOW — esbuild is on the roadmap (Objective G). One-
+        time setup + a mostly-mechanical conversion sweep:
+          - package.json + esbuild config (~30 lines)
+          - Each <script src="src/X.js"> becomes `import './X.js'`
+            in an entry file (or, better, replace with explicit
+            named imports where consumers live)
+          - Each `window.XYZ = XYZ` export becomes `export const XYZ`
+          - Each `window.XYZ` call site becomes `import { XYZ }`
+        Output: ONE bundled app.js. Works offline in WebView exactly
+        like today; the WebView doesn't care about tag count.
+      Risk: real but bounded — modules are already isolated, so this
+        is rewiring not redesign. Smoke harness catches regressions.
+      Sequencing: BEFORE P6 medium/high-risk work. Once esbuild is
+        in, the manual load-order problem and window-mirror script
+        both disappear. Hook ordering during P6 becomes a standard
+        ES-module problem instead of a load-graph puzzle.
 
-    Cheapest viable bundler path: esbuild as a concatenator first
-    (preserves classic-script semantics, just emits one app.js with
-    files in the right order). Then incrementally convert each src/
-    module from classic-script-mutates-globals to ES-module-with-
-    imports. Then P6 high-risk work in the new world.
+    Problem 2: NO JSX
+      Symptoms:
+        - Babel-compiled `React.createElement(Type, props, ...children)`
+          chains as the canonical source — not JSX
+        - Standard React refactoring tools (ast-grep, jscodeshift,
+          react-codemod) don't recognize this as React
+        - The Python extraction scripts (_p4_extract_view.py and
+          _p5e_bundle_helpers.py) had to exist because no off-the-
+          shelf tool could find function bodies inside the file
+      Fix cost: SIGNIFICANT — each module's render tree is a forest
+        of nested createElement calls that has to be rewritten as
+        JSX by hand (or via a one-shot converter, but those exist
+        and need babel config + careful review). NOT a single sweep.
+      Risk: each module is independent so the conversion can be
+        incremental, but each conversion needs visual review +
+        smoke verification.
+      Sequencing: AFTER P6 lands. By then App() is ~400 lines of
+        hooks + render tree; converting it is feasible. Convert
+        outside-in: leaf components (already extracted, simpler
+        render trees) first, App() last. esbuild's built-in JSX
+        transform makes the runtime side free — no config beyond
+        a file rename or .jsx extension.
+      WHAT TO LEAVE ALONE: do NOT big-bang-rewrite. The annotation
+        engine, boundary navigation, scripture resolution have been
+        debugged carefully over months. Incremental JSX conversion
+        preserves all that correctness; a rewrite would lose it.
 
-    Sequence going forward (proposed, NOT final):
-      1. [DONE] Land P1-P6c on main (modularization foundation)
-      2. [NEXT] Objective G: esbuild bundler (one-time setup +
-         classic-script concatenation as v1; ES module conversion
-         as v2 if/when worth the work)
-      3. P6 medium/high-risk hooks on top of the new bundler
-      4. P7 sync-ref audit (when triggered per Direction 3 above)
-      5. Whichever Objective I user-facing feature comes next
-         (TTS / font controls / sepia / better search relevance)
-
-  ALTERNATIVE if Objective G feels premature:
-    Continue P6 mechanical extraction on a fresh branch. The
-    toolchain is proven; each step is small. Just understand that
-    every hook extracted before the bundler arrives is a hook that
-    needs revisiting once the bundler arrives (window globals → ES
-    imports). That's not wasted work — the hooks themselves don't
-    move — but it's two-pass work.
+  HONEST SEQUENCING (user-confirmed 2026-05-20):
+      NOW:    Objective G — esbuild + ES imports
+              (the higher-leverage move; before P6 high-risk)
+      THEN:   P6 — App() hook extraction
+              (on top of the new module system)
+      THEN:   JSX conversion, module by module, outside-in
+              (after P6 is stable; each module independently)
+      LATER:  Vite for HMR dev experience (optional;
+              esbuild output already works without it)
+      AS-TRIGGERED:  P7 sync-ref audit (per Direction 3 calendar)
+      INTERLEAVED:   Objective I user-facing features
+                     (TTS / font controls / sepia / search tuning)
+                     — sequence by user value, not by "after P6"
 
   ═════════════════════════════════════════════════════════════════════
   END POST-P6c REASSESSMENT

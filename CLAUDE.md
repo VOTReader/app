@@ -1,9 +1,21 @@
 # CLAUDE.md — VOTReader-studio Project Knowledge Base
 
 > Living document. Update after every major examination or change.
-> Last major update: 2026-05-20 (MODULARIZATION PUSH P1-P5g — full sweep complete; P6 next).
+> Last major update: 2026-05-20 (MODULARIZATION PUSH P1-P6c LANDED ON MAIN — next: Objective G bundler before P6 high-risk).
 >
-> **index.html: 17,200 lines / 944 KB → 4,237 lines / 224 KB.** ~13,000 lines / ~720 KB extracted into **130+ cohesive modules** under `src/`. All work on branch `refactor/modularize-incremental` (~22 commits ahead of `main`, fully pushed to origin as backup).
+> **index.html: 17,200 lines / 944 KB → 4,237 lines / 224 KB.** ~13,000 lines / ~720 KB extracted into **130+ cohesive modules** under `src/`. The whole modularization push (P1 through P6c + recon + P7 calendar) landed on `origin/main` at commit `c9e6ae4` via fast-forward merge — clean baseline for whatever comes next.
+>
+> **THE "ORIGINAL SIN" IS TWO PROBLEMS, NOT ONE** (clarified during P6c reassessment, see PLAN.txt §Post-P6c):
+> 1. **No build system** — 135+ `<script src>` tags, hand-managed load order, `window.*` global proliferation. Symptom: P5g window-mirror, P5e load-order bug, the manual ordering of dozens of script tags. **Fix: Objective G (esbuild). LOW cost, BEFORE P6 high-risk.**
+> 2. **No JSX** — Babel-compiled `React.createElement` chains as canonical source. Symptom: the Python extraction scripts had to exist because ast-grep / jscodeshift / react-codemod don't recognize the source as React. **Fix: incremental module-by-module JSX conversion, SIGNIFICANT cost, AFTER P6 lands.** Do NOT big-bang rewrite — annotation engine + boundary nav + scripture resolution have been debugged carefully over months; incremental preserves that correctness.
+>
+> **Honest sequencing going forward**:
+> - **NOW**: Objective G (esbuild + ES imports). Higher-leverage move than continuing P6 mechanically; once it lands the load-order problem and window-mirror both disappear.
+> - **THEN**: P6 medium/high-risk hooks (P6d-l) on top of the new module system.
+> - **THEN**: JSX conversion, outside-in, module-by-module.
+> - **LATER**: Vite for HMR (optional; esbuild output already ships fine).
+> - **AS-TRIGGERED**: P7 sync-ref audit per the calendar in PLAN.txt §P6 Direction 3 (fires the session any of {React 19 upgrade, first `<Suspense>`, first `startTransition()`, lib using Suspense internally} arrives).
+> - **INTERLEAVED**: Objective I user-facing work (TTS, font controls, sepia, search relevance) — sequence by user value, not by "after P6."
 >
 > **PHASES LANDED (this session):**
 > - **Phase-0 (`cedd7ed`)** — smoke harness (`tools/smoke.js` + `tools/SMOKE.md`). Globals audit + COLLECTIONS data-wiring + 12-screen render walk + annotation round-trip. Lives outside the shipped asset path; runs IN the app page via `preview_eval` or `chrome://inspect`. Green baseline captured here; every subsequent phase verified against it.
