@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useHistory — app-global reading-history state + mutators
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
+   Global-scope module. Bundled into dist/bundle-b.js via tools/build.py.
 
    OWNS:
      - readHistory state (persisted to localStorage['vot-history'])
