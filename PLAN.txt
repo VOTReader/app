@@ -2272,13 +2272,34 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   state passing between newly-separated hooks). DEFER to a dedicated
   focused session with full attention, NOT the tail-end of a marathon.
 
-  OPTIONAL ALSO P5c: ~12 remaining sheet/picker components in
-  index.html (LinkPicker, NoteSheet, NotebookPickerSheet, Annotation
-  ActionChip, SelectionToolbar, LinkSidebar, MultiNotePopover,
-  TabActionSheet, TabsOverview, VersePickerScreen, LetterExcerpt
-  PickerScreen). Same mechanical pattern as P5a/P5b — extractor
-  is ready; low risk; further slims index.html. Independent of P6.
-  Can go before P6 (more cleanup) or after (focus on hooks first).
+  P5c — DONE (2026-05-19, later). Extracted 11 remaining sheet/picker
+  components to src/ui/sheets/: SelectionToolbar (~34 KB — by far
+  the largest), NoteSheet (~12 KB), VersePickerScreen (~12 KB),
+  LetterExcerptPickerScreen (~9 KB), LinkPicker (~8 KB), TabsOverview
+  (~6 KB), AnnotationActionChip (~6 KB), NotebookPickerSheet (~5 KB),
+  TabActionSheet (~4 KB), LinkSidebar (~3 KB), MultiNotePopover (~3 KB).
+  Total ~92 KB / ~1,900 lines.
+
+  Bottom-up extraction order so each function's named terminator stayed
+  inline until after the function was gone (TabsOverview → tabContentKey
+  first, then TabActionSheet → tabContentKey, … all the way up to
+  AnnotationActionChip → LinkIcon last). All 11 modules pass extractor
+  invariants (signature, closing brace, no React.React. double-prefix,
+  zero bare hook calls, single script src, zero inline residue).
+
+  Live-verified post-reload: all 11 globals typeof === 'function',
+  React root mounts, LetterView renders ("VOLUME ONE · PREFACE · A Word
+  of Warning"), zero NEW console errors introduced. Commit 8cf2081.
+
+  Surfaced (NOT caused by P5c): WtlbEntryView.js:33 throws 7 times on
+  initial mount with "Cannot read properties of undefined (reading
+  'useMemo')". Reproduces on pristine pre-P5c state. App still renders
+  correctly (ErrorBoundary swallows it). Root cause unclear — React is
+  defined globally, no local shadowing. Flagged for a dedicated
+  investigation when P6 begins.
+
+  Cumulative P1-P5c: index.html ~944 KB / ~17.2k lines →
+  ~320 KB / 6,340 lines. **106 modules** under src/.
 
   NEXT (superseded): P5 (mechanical screens + shared components — DONE).
   NEXT (superseded): P4 (big screen components).
