@@ -160,6 +160,7 @@ const HL_COLORS = ['yellow','green','pink','red','orange','blue','purple','teal'
   <script src="src/hooks/useMarkAsRead.js"></script>
   <script src="src/hooks/use-saved-state.js"></script>
   <script src="src/hooks/use-ref-mirror.js"></script>
+  <script src="src/hooks/use-history.js"></script>
   <!-- ─── JOURNAL FEATURE — segregated module set ───
        All depend on CachedStore (defined above) + React (loaded earlier).
        Load order matters: styles → stores → helpers → sheets → screens → chip. -->
@@ -2011,10 +2012,10 @@ function App() {
   const [searchContext, setSearchContext] = tabField('searchContext');
   const [navOrigin, setNavOrigin] = tabField('navOrigin');
 
-  // App-global: read history shared across all tabs
-  const [readHistory, setReadHistory] = useState(() => {
-    try {return JSON.parse(localStorage.getItem('vot-history') || '[]');} catch {return [];}
-  });
+  // App-global: read history shared across all tabs.
+  // State + mutators extracted to useHistory(); auto-track effect stays
+  // below (depends on tab-local nav state).
+  const { readHistory, addToHistory, clearHistory, pruneHistoryDay } = useHistory(settings.historyEnabled);
   const navOriginRef = useRefMirror(navOrigin);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
 
@@ -2383,45 +2384,7 @@ function App() {
     return () => { window.__goSearch = null; };
   });
 
-  const addToHistory = (entry) => {
-    // Don't record anything while History is disabled. Existing entries
-    // are preserved (user can re-enable and still have their past trail).
-    if (settings.historyEnabled === false) return;
-    const key = entry.type === 'letter' ? `lt:${entry.letterId}` : `ch:${entry.bookId}:${entry.chapterNum}`;
-    setReadHistory((prev) => {
-      // No dedup: every visit is recorded. User prunes per-day manually.
-      const next = [{ ...entry, key, ts: Date.now() }, ...prev].slice(0, 2000);
-      localStorage.setItem('vot-history', JSON.stringify(next));
-      return next;
-    });
-  };
-
-  // Clear all history entries.
-  const clearHistory = () => {
-    setReadHistory([]);
-    localStorage.setItem('vot-history', '[]');
-  };
-
-  // Prune duplicates within a single calendar day (keeps most-recent entry per key).
-  const pruneHistoryDay = (year, month, day) => {
-    const dayStart = new Date(year, month, day).getTime();
-    const dayEnd = new Date(year, month, day + 1).getTime();
-    setReadHistory((prev) => {
-      // History is newest-first, so the first occurrence IS the most-recent visit.
-      const seen = new Set();
-      const out = [];
-      for (const e of prev) {
-        const inDay = e.ts >= dayStart && e.ts < dayEnd;
-        if (inDay) {
-          if (seen.has(e.key)) continue;
-          seen.add(e.key);
-        }
-        out.push(e);
-      }
-      localStorage.setItem('vot-history', JSON.stringify(out));
-      return out;
-    });
-  };
+  /* addToHistory · clearHistory · pruneHistoryDay → extracted to src/hooks/use-history.js (P6c) */
   const goSearchOrigin = () => {
     const o = searchOriginRef.current;
     if (o) {setSearchOrigin(null);setScreen(o.screen);if (o.bookId !== undefined) setBookId(o.bookId);if (o.chapterNum !== undefined) setChapterNum(o.chapterNum);if (o.letterId !== undefined) setLetterId(o.letterId);} else

@@ -83,7 +83,9 @@
       // P6a: useSavedState hook + its colocated _validateTabState helper
       'useSavedState', '_validateTabState',
       // P6b: useRefMirror — 15 sites in App() now route through it
-      'useRefMirror'
+      'useRefMirror',
+      // P6c: useHistory — App-global reading-history state + mutators
+      'useHistory'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',
