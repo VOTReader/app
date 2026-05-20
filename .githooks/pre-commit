@@ -66,11 +66,31 @@ bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.
 if [ -n "$bundle_source_changed" ]; then
   echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js..."
   # `npm run build` chains both bundlers in one command:
-  #   1. python tools/build.py  → bundle-a.js, bundle-b.js, bundle-d.js (classic-script concat)
-  #   2. esbuild                → bundle-c.js (ES modules, G.2.1+ converted clusters)
-  # Both must succeed before we stage. Node is required on PATH for the
-  # esbuild half — git on Windows inherits system PATH where Node was
-  # installed by winget, so this works in fresh shells.
+  #   1. python tools/build.py  → bundle-a.js, bundle-d.js (classic-script concat)
+  #   2. esbuild                → bundle-b.js (G.2.2), bundle-c.js (G.2.1)
+  # Both must succeed before we stage.
+  #
+  # Node is required on PATH for the esbuild half. The original assumption
+  # was that git-bash on Windows inherits the system PATH containing
+  # C:\Program Files\nodejs (the winget install location). In practice
+  # that's not always true — winget installs don't refresh PATH for
+  # already-running shells, and git-bash invoked from File Explorer /
+  # an IDE inherits the parent process's PATH, which may pre-date the
+  # Node install. So we probe known install locations and prepend the
+  # first one that exists.
+  if ! command -v npm >/dev/null 2>&1; then
+    for candidate in \
+        "/c/Program Files/nodejs" \
+        "/c/Program Files (x86)/nodejs" \
+        "$LOCALAPPDATA/Programs/Node.js" \
+        "$HOME/AppData/Roaming/npm"; do
+      if [ -x "$candidate/npm" ] || [ -x "$candidate/npm.cmd" ]; then
+        export PATH="$candidate:$PATH"
+        echo "[pre-commit] Added $candidate to PATH (npm not on inherited PATH)"
+        break
+      fi
+    done
+  fi
   npm run build
   status=$?
   if [ $status -ne 0 ]; then
