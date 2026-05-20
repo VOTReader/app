@@ -2705,6 +2705,174 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   END POST-P6c REASSESSMENT
   ═════════════════════════════════════════════════════════════════════
 
+  ═══════════════════════════════════════════════════════════════════════
+  OBJECTIVE G PROGRESS LOG (2026-05-20, on main, current state at 894b996)
+  ═══════════════════════════════════════════════════════════════════════
+
+  G.1 — DONE (commit f919017)
+    Pure Python concatenator. 139 <script src> tags in index.html
+    → 4 cluster bundles in app/src/main/assets/dist/:
+      bundle-a.js  12 MB    27 files — vendor + raw corpus + search
+      bundle-b.js  324 KB   29 files — stores + components + hooks +
+                                       journal + scripture-resolution +
+                                       letter-linking
+      bundle-c.js   52 KB    3 files — renderer (replaced in G.2.1)
+      bundle-d.js  588 KB   81 files — extracted screens/sheets/utils
+    Cluster boundaries determined by inline <script> block positions
+    in index.html. Inline blocks declare symbols used by following
+    externals AND reference symbols from prior externals, so the load
+    order between externals and inlines can't be shuffled.
+
+    tools/build.py reads four hardcoded ordered file lists, concatenates
+    each into dist/bundle-{a,b,c,d}.js with a separator comment per file.
+    No transformation, no minification — byte-equivalent to the prior
+    classic-script load. Smoke PASS identically.
+
+  HOOK FIX + UPGRADE — DONE (commit 47a87ee)
+    .git/hooks/pre-commit was checking the pre-P3.5b data path
+    (app/src/main/assets/data/ instead of app/src/main/assets/src/data/)
+    — silently dead since the relocation. No bug slipped through
+    (corpus files weren't edited in the window) but the validator
+    was structurally broken.
+
+    Two changes:
+      1. Versioned the hook: moved to .githooks/pre-commit (in git).
+         Per-clone setup: `git config core.hooksPath .githooks`.
+         check_balance.py path is now _HERE-relative so it survives
+         any clone location.
+      2. Extended the hook with a SECOND step. If any bundle-source
+         file is staged (src/**/*.js, search.js, search-data.js,
+         react.min.js, etc.), run `npm run build` and restage the
+         regenerated dist/bundle-*.js. The commit lands with bundles
+         in sync with source — no "remember to rebuild" trap.
+
+    USER-CONFIRMED DEFERRAL: do NOT add a Gradle exec block to call
+    tools/build.py during Android builds (yet). Preconditions
+    aren't met:
+      - The esbuild step is brand new; verify on real Android builds
+        first, automate at the build level second.
+      - Gradle exec PATH is unreliable in Android Studio on Windows
+        — daemon env differs from terminal PATH. That's a debugging
+        session waiting to happen mid-build.
+      - Pre-commit catches the same problem (committed bundles stale)
+        at a less risky moment.
+    The Gradle preBuild block becomes correct when (a) bundle output
+    is proven stable across many real Android builds, (b) CI is
+    building the APK (GitHub Actions), and (c) the gitignore dist/
+    pattern is established and trusted. Until then: committed bundles
+    + pre-commit hook is right.
+
+  G.2.0 — DONE (commit 47d1b70)
+    Node 24.15.0 installed via `winget install OpenJS.NodeJS.LTS`.
+    esbuild 0.28.0 added as devDep via `npm install esbuild --save-dev`.
+    package.json + package-lock.json committed; node_modules/ gitignored.
+    PowerShell execution policy blocks npm.ps1; all npm operations
+    route through bash/git-bash which uses npm.cmd directly. Future
+    sessions: `npm install` once after clone restores node_modules.
+    esbuild installed but NOT YET INVOKED. Smoke PASS identically.
+
+  G.2.1 — DONE (commit 894b996)
+    FIRST real ES-module conversion. Cluster C (renderer) chosen
+    because it was smallest (3 files, 52 KB classic) and its
+    consumers all live in OTHER files — blast radius bounded.
+
+    Changes:
+      src/renderer/dom-links.js         — `export function applyDOMLinks`
+      src/renderer/dom-bookmarks.js     — `export function applyDOMBookmarks`
+      src/renderer/annotation-engine.js — 7 exports:
+        snapRangeToWords, HighlightableText, findNoteIconInsertionPoint,
+        applyNoteIcons, applyActiveNoteState, applyDOMHighlights,
+        StaticSubtree. Internal helpers (annMarkClass, _markCharEnd,
+        _buildLinkIcon, _insertLinkIconAt, _buildBookmarkIcon,
+        _insertBookmarkIconAt) stay non-exported — esbuild keeps
+        them inside the IIFE.
+
+      src/renderer/_entry.js  NEW
+        Imports all 9 public symbols and Object.assigns them to
+        window. This is the bridge from the new ES-module world to
+        the still-classic-script rest of the app (clusters A, B, D
+        and the inline App() block). When clusters B and D are also
+        converted (G.2.2, G.2.3), the window assignment progressively
+        goes away — consumers will import directly.
+
+      tools/build.py — Cluster C list emptied (C = []). main() builds
+        3 classic-script bundles (A, B, D) only. The function body
+        stays so re-enabling is one line if needed.
+
+      package.json scripts:
+        build    = `python tools/build.py && npm run build:c`
+        build:c  = `esbuild app/src/main/assets/src/renderer/_entry.js
+                    --bundle --format=iife
+                    --outfile=app/src/main/assets/dist/bundle-c.js`
+
+      .githooks/pre-commit — calls `npm run build` (was python directly).
+        Surfaces a clear error if Node is missing.
+
+    Bundle size: 49 KB classic-concat → 26.5 KB esbuild IIFE.
+    Smaller because esbuild strips comment headers and trims module
+    boilerplate; behavior identical.
+
+    Live-verified: PASS in 20.9s, all 9 cluster-C symbols typeof
+    'function' on window, both annotation round-trips work end-to-end.
+
+  G.2.2 — NEXT (NOT STARTED)
+    Convert Cluster B (stores + components + hooks + journal + scripture-
+    resolution + letter-linking; 29 files, 324 KB). Same pattern as G.2.1:
+      1. Add `export` to each public symbol in each module
+      2. Create src/_entry-b.js (or similar) that imports all + Object.assigns
+         to window
+      3. Update tools/build.py to skip Cluster B (B = [])
+      4. Update package.json: build:b = esbuild ... → dist/bundle-b.js
+      5. Update build script to chain all three esbuild calls
+      6. Smoke must PASS identically
+
+    Cluster B's public symbols that need to land on window (per the
+    smoke harness EXPECTED_GLOBALS + grep of consumers):
+      Stores: CachedStore, AnnotationStore, NoteStore, LinkStore,
+              BookmarkStore, NotebookStore, RecentNavStore,
+              JournalStore, JournalStatsStore, JournalIndexStore,
+              JournalMediaStore
+      Hooks: useMarkAsRead, useSavedState, _validateTabState,
+             useRefMirror, useHistory
+      Components: ExpandableText, ErrorBoundary
+      Data: COLLECTIONS, COL_BY_*, scripture resolution functions
+            (parseRefStr, findBook, _allBooks, _matthew, _studies,
+            parseScriptureRef, lookupVersesFromBooks, findEntryContext),
+            colLetterArr, colPreface, colLetters, LETTER_SCREEN_SET,
+            READING_CHAIN, _boundaryShort, _BOUNDARY_SHORT*,
+            _isWtlbFamily, linkPreface, linkWtlbEntries,
+            resolveVotLetter, isHiddenManna
+      Journal: All Journal* sheets/screens, journal helpers
+      Renderer: dom-journal-chip's exported function(s)
+
+    Cluster B has MORE cross-references than C (each store interacts
+    with others; the scripture-resolution module uses COLLECTIONS).
+    Within-cluster imports are clean ES syntax once converted; the
+    OUTPUT bundle exposes everything to window for cross-cluster
+    bridging until G.2.3 lands.
+
+  G.2.3 — AFTER G.2.2
+    Convert Cluster D (81 files: extracted screens, sheets, utils,
+    remaining components). LARGEST cluster. Same pattern, but the
+    extraction will need careful naming of within-D imports
+    (e.g., LetterView imports Segments from './ui/components/Segments.js').
+
+    After G.2.3 lands, the window-mirror script at the bottom of
+    index.html becomes mostly unnecessary — only Cluster A and the
+    inline App() block need it. Trim it then.
+
+  CLUSTER A — NEVER CONVERTED (intentional)
+    React + react-dom + html2canvas are minified vendor binaries;
+    raw corpus data files (volume-*.js, books.js, etc.) are
+    plain `var X = {...}` data declarations. Converting them to
+    ES modules is pure busywork — no readability gain, no
+    refactoring tool gain (it's data, not code). They stay as
+    classic-script forever, bundled by tools/build.py.
+
+  ═════════════════════════════════════════════════════════════════════
+  END OBJECTIVE G PROGRESS LOG
+  ═════════════════════════════════════════════════════════════════════
+
   CURRENT NEXT: P6 (App() hook extraction). App() is now the only
   big inline component left in index.html (~2,500 of its ~4,237 lines).
   Extract its custom hooks (useTabField, settings persistence, scroll

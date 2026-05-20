@@ -1,21 +1,54 @@
 # CLAUDE.md — VOTReader-studio Project Knowledge Base
 
 > Living document. Update after every major examination or change.
-> Last major update: 2026-05-20 (MODULARIZATION PUSH P1-P6c LANDED ON MAIN — next: Objective G bundler before P6 high-risk).
+> Last major update: 2026-05-20 (G.1 + G.2.0 + G.2.1 LANDED ON MAIN — Cluster C now ES modules via esbuild; next: G.2.2 Cluster B).
 >
-> **index.html: 17,200 lines / 944 KB → 4,237 lines / 224 KB.** ~13,000 lines / ~720 KB extracted into **130+ cohesive modules** under `src/`. The whole modularization push (P1 through P6c + recon + P7 calendar) landed on `origin/main` at commit `c9e6ae4` via fast-forward merge — clean baseline for whatever comes next.
+> **CURRENT STATE (origin/main at `894b996`)**:
+> - **index.html**: 4,043 lines / 212 KB (down from 17,200 / 944 KB pre-modularization)
+> - **130+ modules** under `app/src/main/assets/src/`
+> - **4 cluster bundles** in `app/src/main/assets/dist/` — 3 classic-script (A/B/D) + 1 ES-module (C)
+> - **esbuild 0.28.0** installed via npm; Node 24.15.0 via winget; package.json + node_modules/ at repo root
+> - **Pre-commit hook** at `.githooks/pre-commit` (activate: `git config core.hooksPath .githooks`) — runs check_balance.py on data changes + `npm run build` (chains python tools/build.py + esbuild) on bundle-source changes, restages dist/*
+> - **Smoke harness**: `tools/smoke.js` — paste into preview_eval or DevTools; runs globals audit + 12-screen render walk + LetterView + WtlbEntryView annotation round-trips + resource-error capture. Latest run PASS in 20.9s.
+> - **tabField stability probe** baked into App() — surfaces setter-identity regressions via console.error (caught by smoke).
 >
-> **THE "ORIGINAL SIN" IS TWO PROBLEMS, NOT ONE** (clarified during P6c reassessment, see PLAN.txt §Post-P6c):
-> 1. **No build system** — 135+ `<script src>` tags, hand-managed load order, `window.*` global proliferation. Symptom: P5g window-mirror, P5e load-order bug, the manual ordering of dozens of script tags. **Fix: Objective G (esbuild). LOW cost, BEFORE P6 high-risk. Internal sequence: G.1 esbuild-as-concatenator FIRST (no module changes, just bundle the existing `<script src>` order; smoke must PASS identically), THEN G.2 ES imports cluster-by-cluster — debug one thing at a time.**
-> 2. **No JSX** — Babel-compiled `React.createElement` chains as canonical source. Symptom: the Python extraction scripts had to exist because ast-grep / jscodeshift / react-codemod don't recognize the source as React. **Fix: incremental module-by-module JSX conversion, SIGNIFICANT cost, AFTER P6 lands.** Do NOT big-bang rewrite — annotation engine + boundary nav + scripture resolution have been debugged carefully over months; incremental preserves that correctness.
+> **THE "ORIGINAL SIN" IS TWO PROBLEMS, NOT ONE**:
+> 1. **No build system** — was 135+ `<script src>` tags. **G.1 (commit `f919017`)** collapsed to 4 cluster bundles via `tools/build.py` (Python concatenator). **G.2.0 (`47d1b70`)** installed esbuild toolchain. **G.2.1 (`894b996`)** converted Cluster C (renderer, 3 files) to ES modules + esbuild IIFE bundle. Cluster A (vendor+data) intentionally stays classic-script forever. Clusters B (stores+hooks+journal) and D (screens/sheets/utils) are next.
+> 2. **No JSX** — Babel-compiled `React.createElement` chains as canonical source. Standard React tooling (ast-grep, jscodeshift, react-codemod) doesn't recognize it. Fix: incremental module-by-module JSX conversion, AFTER P6 lands. Do NOT big-bang rewrite — the annotation engine + boundary nav + scripture resolution have been debugged carefully over months.
 >
-> **Honest sequencing going forward**:
-> - **NOW**: Objective G (esbuild + ES imports). Higher-leverage move than continuing P6 mechanically; once it lands the load-order problem and window-mirror both disappear.
-> - **THEN**: P6 medium/high-risk hooks (P6d-l) on top of the new module system.
+> **CURRENT SEQUENCING (user-confirmed, refined through G.2.1)**:
+> - **NOW**: **G.2.2 — Cluster B → ES modules + esbuild bundle** (stores + hooks + journal subsystem + scripture-resolution + letter-linking; 29 files). Same pattern as G.2.1: add `export` to public symbols, write `src/stores/_entry.js` (or similar) that imports + Object.assigns to window, update tools/build.py to skip B, update package.json `build:b` script, smoke must PASS identically.
+> - **THEN**: G.2.3 — Cluster D (largest, 81 files; screens + sheets + utils + remaining components). Same pattern.
+> - **SKIP**: Cluster A (React + react-dom + html2canvas + 21 raw corpus data files + flexsearch). Vendor + data; ES module conversion is busywork without benefit. Stays classic-script forever.
+> - **THEN**: Continue P6 (P6d–P6l) — App() hook extraction on top of a real module system. The recon in PLAN.txt §P6 stands.
 > - **THEN**: JSX conversion, outside-in, module-by-module.
-> - **LATER**: Vite for HMR (optional; esbuild output already ships fine).
-> - **AS-TRIGGERED**: P7 sync-ref audit per the calendar in PLAN.txt §P6 Direction 3 (fires the session any of {React 19 upgrade, first `<Suspense>`, first `startTransition()`, lib using Suspense internally} arrives).
-> - **INTERLEAVED**: Objective I user-facing work (TTS, font controls, sepia, search relevance) — sequence by user value, not by "after P6."
+> - **LATER**: Vite for HMR (optional; esbuild output ships fine on Android WebView).
+> - **AS-TRIGGERED**: P7 sync-ref audit per the calendar in PLAN.txt §P6 Direction 3.
+> - **INTERLEAVED**: Objective I user-facing features (TTS, font controls, sepia, search relevance).
+>
+> **OBJECTIVE G LANDED COMMITS**:
+> - **G.1 (`f919017`)** — `tools/build.py` concatenates 139 `<script src>` tags into 4 cluster bundles (`dist/bundle-{a,b,c,d}.js`). Pure Python. byte-equivalent output to pre-G.1 load order. Smoke PASS identically.
+> - **Pre-commit hook fix (`47a87ee`)** — relocated `.git/hooks/pre-commit` → `.githooks/pre-commit` (versioned). Per-clone setup: `git config core.hooksPath .githooks`. Path inside `check_balance.py` updated to use `_HERE`-relative resolution (was stale `C:\` absolute path since P3.5b — silently dead validator). Extended hook with bundle-rebuild step: if any bundle source is staged, run `npm run build` and restage `dist/`.
+> - **G.2.0 (`47d1b70`)** — installed Node 24.15.0 (via `winget install OpenJS.NodeJS.LTS`) + esbuild 0.28.0 (via `npm install esbuild --save-dev`). `package.json` + `package-lock.json` committed; `node_modules/` gitignored. Toolchain installed, NOT yet invoked. Smoke PASS identically.
+> - **G.2.1 (`894b996`)** — Cluster C (renderer) → ES modules. 9 public exports across `dom-links.js`, `dom-bookmarks.js`, `annotation-engine.js`. New `src/renderer/_entry.js` is esbuild's entry — imports all + `Object.assign(window, {...})` for classic-script interop with the still-unconverted rest of the app. `tools/build.py` skips cluster C (`C = []`). `package.json` scripts: `build` = `python tools/build.py && npm run build:c`; `build:c` = `esbuild ... --bundle --format=iife`. `dist/bundle-c.js` shrunk 49 KB classic-concat → 26.5 KB esbuild IIFE. Smoke PASS in 20.9s — all 9 cluster-C symbols on `window`, both annotation round-trips work.
+>
+> **WORKING-DIRECTORY HEALTH CHECK** (run after fresh clone):
+> ```sh
+> # 1. activate the pre-commit hook
+> git config core.hooksPath .githooks
+> # 2. install Node deps (node_modules/ is gitignored)
+> npm install
+> # 3. verify the toolchain
+> node --version    # expect v20+
+> npx esbuild --version    # expect 0.28+
+> # 4. rebuild bundles from source (proves the build pipeline works)
+> npm run build
+> # 5. open app/src/main/assets/index.html via preview tool;
+> #    paste tools/smoke.js into preview_eval and call votSmoke()
+> #    expect PASS line with globals ok, data ok, screens 0 crashed,
+> #    letterAnn ok, wtlbAnn ok, console.error 0, resource404 0
+> ```
+> If Node is missing on Windows: `winget install OpenJS.NodeJS.LTS`. Use bash/git-bash for npm commands (PowerShell execution policy blocks `npm.ps1`).
 >
 > **PHASES LANDED (this session):**
 > - **Phase-0 (`cedd7ed`)** — smoke harness (`tools/smoke.js` + `tools/SMOKE.md`). Globals audit + COLLECTIONS data-wiring + 12-screen render walk + annotation round-trip. Lives outside the shipped asset path; runs IN the app page via `preview_eval` or `chrome://inspect`. Green baseline captured here; every subsequent phase verified against it.
