@@ -2528,27 +2528,49 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   App() (mostly the render tree which is ~1,000 lines + handler glue).
 
   ═════════════════════════════════════════════════════════════════════
-  RISKS / OPEN QUESTIONS:
+  RISKS / DECISIONS (user-confirmed 2026-05-20):
   ═════════════════════════════════════════════════════════════════════
 
-  - tabField identity stability under hook refactor — needs a smoke
-    that explicitly tests "tab thumbnail count stable across re-renders"
-  - handleAndroidBack has cyclic dependencies on every other hook's
-    setters → may need a "router" hook layer that orchestrates them,
-    OR pass the entire return-value of all earlier hooks down. Defer
-    P6l decision until P6a-k are landed and the dependency graph is
-    visible.
-  - Several refs (xRef.current = x DURING render) violate React's
-    "no side effects during render" rule. They work because xRef is
-    a useRef (not state) and the assignment is idempotent. But future
-    React Strict Mode + Concurrent Mode could expose this. Don't fix
-    in P6 — flag for a separate audit.
-  - The `tabField()` helper is NOT a hook — it's a plain function called
-    inside App() that returns a [state, setter] tuple. If P6 extracts
-    useTabs(), tabField needs to stay callable from App() OR each
-    `[screen, setScreen] = tabField('screen')` becomes `const screen =
-    tabs.activeTab.screen; const setScreen = useTabSetter('screen');`.
-    Pick a direction up-front.
+  DIRECTION 1 — `tabField` stays inline as a closure
+    `useTabSetter('screen')` only makes sense when fields are consumed
+    by child components needing a few fields each. App() has ~121 call
+    sites all in one function — turning them into hook calls would
+    violate the rules-of-hooks spirit AND be impractical. tabField
+    isn't a hook, it's a derived-value accessor over the existing
+    useState arrays. KEEP IT AS-IS. When useTabs() ships, thread
+    tabField as a plain argument into any extracted hooks that need
+    per-tab fields — don't try to recreate it inside each hook.
+
+  DIRECTION 2 — Flat hook for useAndroidBack, no router layer
+    handleAndroidBack already IS the router. Adding a router layer on
+    top is indirection for its own sake. The flat hook works using
+    the existing codebase pattern: pass stable setters as arguments,
+    read mutable state through refs (`fromLetterRef.current`, etc.)
+    so the returned handler never goes stale. That pattern is already
+    proven in tapThroughBack / _navToLinkRef. A router layer would
+    only pay off if back-handling ever needs unit-testing in
+    isolation — not on the roadmap. SHIP AS A FLAT HOOK.
+
+  DIRECTION 3 — Sync ref mutations: flag + defer past P6
+    The app uses createRoot (Concurrent Mode capable) but no Suspense
+    or startTransition, so the `xRef.current = x` mutations during
+    render are benign today — renders commit synchronously in
+    practice. But they're formally wrong and will bite if Suspense
+    or startTransition is ever added. The right fix is move to
+    useLayoutEffect for refs that event handlers need synchronously,
+    useEffect otherwise — that's a DISTINCT refactor pass. Mixing it
+    in would widen P6's blast radius at the worst possible time.
+    DO NOT FIX IN P6. After P6 stabilizes, run a dedicated "sync ref
+    audit" pass (call it P7?) that converts each xRef = x assignment
+    into the appropriate effect.
+
+  REMAINING TRUE RISK (no decision needed yet — just monitor):
+  - tabField identity stability under hook refactor needs a smoke
+    assertion: "the same setter function instance is returned for the
+    same key across renders." The current harness doesn't probe this.
+    Adding such a probe to wtlbAnnotationRoundTrip (or a new
+    tabFieldStabilityProbe) is the safety net for the P6k useTabs
+    extraction. Plan to add the probe BEFORE starting P6k.
 
   ═════════════════════════════════════════════════════════════════════
   END P6 RECONNAISSANCE
