@@ -161,7 +161,15 @@ These are the THREE classes of bugs that brace-counting alone misses and any of 
 
 3. **Run `check_balance.py` after every batch edit**. Single-file edits via `Edit` tool generally don't introduce these, but agent-generated content frequently does (especially OCR-style transcription).
 
-   **Pre-commit hook is wired** (as of 2026-05-14): `.git/hooks/pre-commit` automatically runs `check_balance.py` before any commit that touches `app/src/main/assets/data/`. Commits that only modify non-data files (index.html, gradle, CLAUDE.md, etc.) skip the check entirely. If the hook blocks a commit, fix the flagged file, re-stage it, and retry. To bypass in an emergency: `git commit --no-verify` (not recommended — use only for no-data-file commits the hook shouldn't catch).
+   **Pre-commit hook is wired and VERSIONED** (originally 2026-05-14; relocated to `.githooks/` and extended 2026-05-20). The hook is at `.githooks/pre-commit` (in git). Per-clone one-time setup:
+   ```sh
+   git config core.hooksPath .githooks
+   ```
+   The hook does two things, each gated on what's staged:
+   1. **check_balance.py** — fires when any `app/src/main/assets/src/data/*.js` is staged. Catches the three black-screen failure modes (esprima parse errors, smart-quote delimiters, non-ASCII dashes in verse ranges). Path updated 2026-05-20 — the previous hook referenced the pre-P3.5b location and had been silently dead for ~6 weeks (no real corpus edits in that window, so no bug slipped through, but the validator was structurally broken).
+   2. **tools/build.py** — fires when any bundle-source file is staged (anything under `app/src/main/assets/src/`, plus `search.js`, `search-data.js`, `react.min.js`, etc.). Regenerates `dist/bundle-{a,b,c,d}.js` and stages the output so the commit lands with bundles in sync with source. No Gradle change — committed bundles stay fresh without touching the Android build pipeline.
+
+   Commits that only modify docs/gradle/PLAN-style files skip both checks entirely. Emergency bypass: `git commit --no-verify` (not recommended).
 
 4. **Footnote NKJV text uses decimal verse markers** (`"19. text 20. text"`) for multi-verse refs, never Unicode superscripts (`¹⁹text ²⁰text`). The `verse-sup` gold inlay rendering at `index.html:2576` only fires when Strategy 0 (decimal) or Strategy 0b (superscript-with-clean-range) succeeds. Mixed formats fall through to the white-text fallback.
 
