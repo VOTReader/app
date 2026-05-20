@@ -3136,150 +3136,14 @@ function renderTextWithScripRefs(text, baseClassName, onScripClick, highlightTex
 
 /* StaticSubtree → extracted to src/renderer/annotation-engine.js */
 
-function Segments({ segments, activeFn, onFnClick, onScripClick, onLetterClick, onInAppLink, studyMode, footnotes, highlightText }) {
-  return segments.map((seg, i) => {
-    if (seg.t === "fn") {
-      // Always render as a gold circled number (Volumes style). Studies
-      // and Volumes now use the exact same footnote affordance: tap the
-      // number → FootnoteSheet shows scripture text / in-app link /
-      // external URL depending on the footnote type.
-      return (/*#__PURE__*/
-        React.createElement("span", { key: i, className: `fn-ref${activeFn === seg.v ? " active" : ""}`,
-          "data-fn-num": seg.v,
-          onClick: () => onFnClick(seg.v), title: `Footnote ${seg.v}` }, seg.v));
-
-    }
-    if (seg.t === "letter-link") {
-      // Two tap-through mechanisms:
-      //   (a) seg.link { collection, letterTitle } — cross-volume via
-      //       openInAppLetter, with back-stack routing + back-hint pill.
-      //   (b) seg.letterId + seg.screen — legacy matthew.js path.
-      if (seg.link && onInAppLink) {
-        return (/*#__PURE__*/
-          React.createElement("span", { key: i, className: "letter-link-ref",
-            onClick: () => onInAppLink(seg.link) }, seg.label));
-
-      }
-      return (/*#__PURE__*/
-        React.createElement("span", { key: i, className: "letter-link-ref",
-          onClick: () => onLetterClick && onLetterClick(seg.letterId, seg.screen) }, seg.label));
-
-    }
-    if (seg.t === "stanza-break") return /*#__PURE__*/React.createElement("div", { key: i, className: "stanza-break" });
-    // Collision guard: inject a leading space when the previous segment ended with
-    // a non-whitespace character and this segment starts with a word char, opening
-    // paren/bracket, or opening quote. Avoids false positives before trailing
-    // punctuation (commas, periods, etc.) that the fetch script split into segments.
-    const prevV = i > 0 ? segments[i - 1].v || '' : '';
-    const v = seg.v && /^[\w(\[{"\u201c\u2018]/.test(seg.v) && /\S$/.test(prevV) ? ' ' + seg.v : seg.v || '';
-    if (seg.t === "bold-italic") return /*#__PURE__*/React.createElement(React.Fragment, { key: i }, renderTextWithScripRefs(v, "bold-italic", onScripClick, highlightText));
-    if (seg.t === "italic") return /*#__PURE__*/React.createElement(React.Fragment, { key: i }, renderTextWithScripRefs(v, "italic-text", onScripClick, highlightText));
-    if (seg.t === "caps") return /*#__PURE__*/React.createElement("span", { key: i, style: { fontWeight: 600, letterSpacing: '0.03em' } }, v);
-    return /*#__PURE__*/React.createElement(React.Fragment, { key: i }, renderTextWithScripRefs(v, null, onScripClick, highlightText));
-  });
-}
+/* Segments → extracted to src/ui/components/Segments.js */
 
 /* ── PROPHECY GROUP (collapsible stacked cards) ── */
-function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, statesRef, onSaveStates, expandSignal }) {
-  // Read initial state from persistent ref, default to expanded (true)
-  const stored = statesRef && statesRef.current[stateKey];
-  const [expanded, setExpandedRaw] = useState(stored !== undefined ? stored : true);
-  // setExpanded must handle BOTH a raw boolean value AND an updater function
-  // like real React setState — the toggle path at the header uses
-  // `setExpanded((e) => !e)`, which would otherwise store the function itself
-  // into statesRef and JSON.stringify it to `{}` → empty saved blob → all
-  // cards reset to expanded on next reload. Resolve the updater first, then
-  // persist the resolved boolean.
-  const setExpanded = (val) => {
-    setExpandedRaw((prev) => {
-      const next = typeof val === 'function' ? val(prev) : val;
-      if (statesRef) { statesRef.current[stateKey] = next; onSaveStates && onSaveStates(); }
-      return next;
-    });
-  };
-  // React to external expand/collapse all signal
-  useEffect(() => {
-    if (expandSignal !== undefined && expandSignal !== null && expandSignal !== 0) {
-      const newVal = expandSignal > 0;
-      setExpandedRaw(newVal);
-      if (statesRef) statesRef.current[stateKey] = newVal;
-    }
-  }, [expandSignal]);
-  const cls = `prophecy-card pc-${type}`;
-  const cardFnProps = fnProps;
-  return (/*#__PURE__*/
-    React.createElement("div", { className: cls }, /*#__PURE__*/
-    React.createElement("div", { className: "prophecy-card-header", onClick: () => setExpanded(e => !e) }, /*#__PURE__*/
-    React.createElement("span", { className: "prophecy-card-tag" }, tag), /*#__PURE__*/
-    React.createElement("span", { className: `prophecy-card-chevron${expanded ? "" : " collapsed"}` }, "\u25BC")
-    ), /*#__PURE__*/
-    React.createElement("div", { className: `prophecy-card-body${expanded ? "" : " collapsed"}` },
-    label && /*#__PURE__*/React.createElement("div", { className: "prophecy-card-sublabel" }, label),
-    blocks.map((block, bi) => {
-      if (block.type === "para") return (/*#__PURE__*/
-        React.createElement("p", { key: bi, className: "letter-para" }, /*#__PURE__*/
-        React.createElement(Segments, _extends({ segments: block.segments }, cardFnProps))
-        ));
+/* ProphecyCard → extracted to src/ui/components/ProphecyCard.js */
 
-      if (block.type === "poetry") return (/*#__PURE__*/
-        React.createElement("div", { key: bi, className: "letter-poetry" },
-        block.lines.map((line, li) => /*#__PURE__*/
-        React.createElement("div", { key: li, className: "poetry-line" }, /*#__PURE__*/
-        React.createElement(Segments, _extends({ segments: line }, fnProps))
-        )
-        )
-        ));
+/* ProphecyGroup → extracted to src/ui/components/ProphecyGroup.js */
 
-      if (block.type === "heading") return (/*#__PURE__*/
-        React.createElement("h2", { key: bi, className: `study-heading study-heading-l${block.level || 3}` }, block.text));
-
-      return null;
-    })
-    )
-    ));
-
-}
-
-function ProphecyGroup({ block, fnProps, expandSignal, groupKey, statesRef, onSaveStates }) {
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "prophecy-group" },
-    block.label && /*#__PURE__*/React.createElement("div", { className: "prophecy-group-label" }, block.label),
-    block.intro && block.intro.length > 0 && /*#__PURE__*/
-    React.createElement(ProphecyCard, { type: "intro", tag: "Introduction", blocks: block.intro, fnProps: fnProps, expandSignal: expandSignal, stateKey: groupKey + ":intro", statesRef: statesRef, onSaveStates: onSaveStates }),
-
-    block.ot && block.ot.blocks && block.ot.blocks.length > 0 && /*#__PURE__*/
-    React.createElement(ProphecyCard, { type: "ot", tag: "Old Testament Prophecy", label: block.ot.label, blocks: block.ot.blocks, fnProps: fnProps, expandSignal: expandSignal, stateKey: groupKey + ":ot", statesRef: statesRef, onSaveStates: onSaveStates }),
-
-    block.nt && block.nt.blocks && block.nt.blocks.length > 0 && /*#__PURE__*/
-    React.createElement(ProphecyCard, { type: "nt", tag: "Fulfilled in the New Testament", label: block.nt.label, blocks: block.nt.blocks, fnProps: fnProps, expandSignal: expandSignal, stateKey: groupKey + ":nt", statesRef: statesRef, onSaveStates: onSaveStates }),
-
-    block.vot && block.vot.blocks && block.vot.blocks.length > 0 && /*#__PURE__*/
-    React.createElement(ProphecyCard, { type: "vot", tag: "Fulfillment in the Volumes of Truth", label: block.vot.label, blocks: block.vot.blocks, fnProps: fnProps, expandSignal: expandSignal, stateKey: groupKey + ":vot", statesRef: statesRef, onSaveStates: onSaveStates })
-
-    ));
-
-}
-
-function ProphecyExpandToggle({ allExpanded, onToggle }) {
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "mode-toggle-wrap" }, /*#__PURE__*/
-    React.createElement("div", { className: "mode-toggle" }, /*#__PURE__*/
-    React.createElement("button", {
-      className: "mode-btn active",
-      onClick: () => onToggle(!allExpanded),
-      title: allExpanded ? "Collapse all cards" : "Expand all cards" }, /*#__PURE__*/
-
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /*#__PURE__*/
-    allExpanded ?
-    React.createElement("polyline", { points: "6 15 12 9 18 15" }) :
-    React.createElement("polyline", { points: "6 9 12 15 18 9" })
-    ), allExpanded ? "Collapse" : "Expand"
-
-    )
-    )
-    ));
-
-}
+/* ProphecyExpandToggle → extracted to src/ui/components/ProphecyExpandToggle.js */
 
 // Parse a ref string like "John 3:16", "Romans 1:1-5", "Psalm 50:3-4",
 // or comma-separated "1 Cor 7:7, 9". Returns { start, end, verses? } or null.
@@ -3418,373 +3282,25 @@ function splitIntoVerses(text, ref) {
   return segments;
 }
 
-function VerseWithNumbers({ text, refStr }) {
-  const segments = splitIntoVerses(text, refStr);
-  if (!segments) {
-    // Single-verse ref — strip ALL Unicode superscript digits so a data
-    // regression (stray ¹ ² ³ in the middle of verse text) never renders
-    // as a plain white character.
-    const cleaned = (text || "").replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, "");
-    return /*#__PURE__*/React.createElement("span", null, cleaned);
-  }
-  return (/*#__PURE__*/
-    React.createElement("span", null,
-    segments.map((seg, i) => /*#__PURE__*/
-    React.createElement("span", { key: i }, /*#__PURE__*/
-    React.createElement("sup", { className: "verse-sup" }, seg.vNum),
-    seg.text.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, ''), i < segments.length - 1 ? " " : ""
-    )
-    )
-    ));
+/* VerseWithNumbers → extracted to src/ui/components/VerseWithNumbers.js */
 
-}
+/* InAppLinkButton → extracted to src/ui/components/InAppLinkButton.js */
 
-/* Shared tap-through button used in footnote sheet + list. Receives a link
-   descriptor {collection, letterTitle, excerpt?}; onActivate resolves it. */
-/* A note-type footnote frequently carries BOTH a `text` that is just a
-   pointer — e.g.  See: "Some Letter Title"  /  Also read: 'X' — AND a
-   `link` whose letterTitle IS that same title. The InAppLinkButton
-   already renders the title (under an "Open in App" eyebrow), so showing
-   the note text too prints the title twice in one footnote (the duplicate
-   the user sees). ~100 footnotes across the corpus author this pointer
-   style; it isn't bad data (the note is legitimate prose), it's a
-   presentation concern: never show the same title twice in one footnote.
-   Detect the PURE-pointer case — text is only a lead-in phrase plus the
-   linked title, nothing else — and suppress the redundant text. Notes
-   that add real commentary beyond the title are left untouched. */
-function _fnTextRedundantWithLink(text, link) {
-  if (!text || !link || !link.letterTitle) return false;
-  const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const payload = String(text)
-    .replace(/^\s*(see also|also see|also read|see)\s*:?\s*/i, '')
-    .trim()
-    .replace(/^["“‘']+/, '')
-    .replace(/["”’'.\s]+$/, '');
-  return norm(payload) === norm(link.letterTitle);
-}
-
-function InAppLinkButton({ link, onActivate, compact, label }) {
-  if (!link || !onActivate) return null;
-  const title = link.letterTitle || label || "Open in App";
-  if (compact) {
-    return (/*#__PURE__*/
-      React.createElement("button", {
-        type: "button",
-        className: "footnote-list-link-btn fn-list-rich",
-        onClick: (e) => {e.preventDefault();e.stopPropagation();onActivate(link);} }, /*#__PURE__*/
-      React.createElement("span", { className: "fn-list-rich-body" }, /*#__PURE__*/
-      React.createElement("span", { className: "fn-list-rich-eyebrow" }, "Open in App"), /*#__PURE__*/
-      React.createElement("span", { className: "fn-list-rich-title" }, title)
-      ), /*#__PURE__*/
-      React.createElement("span", { className: "chev" }, "\u203A")
-      ));
-
-  }
-  return (/*#__PURE__*/
-    React.createElement("button", {
-      type: "button",
-      className: "fn-sheet-link-btn",
-      onClick: (e) => {e.preventDefault();e.stopPropagation();onActivate(link);} }, /*#__PURE__*/
-
-    React.createElement("span", { className: "fn-sheet-link-body" }, /*#__PURE__*/
-    React.createElement("span", { className: "fn-sheet-link-eyebrow" }, "Open in App"), /*#__PURE__*/
-    React.createElement("span", { className: "fn-sheet-link-title" }, title)
-    ), /*#__PURE__*/
-    React.createElement("span", { className: "fn-sheet-link-chevron" }, "\u203A")
-    ));
-
-}
-
-function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate }) {
-  const isOpen = num !== null;
-  const verse = fn?.type === "scripture" ? nkjv?.[fn.ref] || null : null;
-  // Build ordered key list once we know the footnotes dict; keys are
-  // typically numeric strings ("1", "2", "10"), so sort numerically when
-  // possible and fall back to lexical order for unusual keys.
-  const orderedKeys = footnotes ? Object.keys(footnotes).sort((a, b) => {
-    const na = parseInt(a, 10), nb = parseInt(b, 10);
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    return a.localeCompare(b);
-  }) : [];
-  const curIdx = num != null ? orderedKeys.indexOf(String(num)) : -1;
-  const prevKey = curIdx > 0 ? orderedKeys[curIdx - 1] : null;
-  const nextKey = curIdx >= 0 && curIdx < orderedKeys.length - 1 ? orderedKeys[curIdx + 1] : null;
-  const total = orderedKeys.length;
-  const showNav = total > 1 && onNavigate && curIdx !== -1;
-  return (/*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("div", { className: `fn-sheet-backdrop${isOpen ? " open" : ""}`, onClick: onClose }), /*#__PURE__*/
-    React.createElement("div", { className: `fn-sheet${isOpen ? " open" : ""}` }, /*#__PURE__*/
-    React.createElement("div", { className: "fn-sheet-handle" }),
-    fn && /*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("div", { className: "fn-sheet-num-row" }, /*#__PURE__*/
-    React.createElement("div", { className: "fn-sheet-num" }, "Footnote ", num, showNav && /*#__PURE__*/React.createElement("span", { className: "fn-sheet-num-of" }, " of ", total)),
-    showNav && /*#__PURE__*/React.createElement("div", { className: "fn-sheet-nav" }, /*#__PURE__*/
-    React.createElement("button", {
-      className: "fn-sheet-nav-btn",
-      onClick: () => prevKey != null && onNavigate(prevKey),
-      disabled: prevKey == null,
-      "aria-label": "Previous footnote",
-      title: "Previous footnote" }, "‹"), /*#__PURE__*/
-    React.createElement("button", {
-      className: "fn-sheet-nav-btn",
-      onClick: () => nextKey != null && onNavigate(nextKey),
-      disabled: nextKey == null,
-      "aria-label": "Next footnote",
-      title: "Next footnote" }, "›")
-    )
-    ),
-    fn.type === "scripture" ? /*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("span", { className: "fn-sheet-ref" }, fn.ref),
-    verse ? /*#__PURE__*/React.createElement("div", { className: "fn-sheet-verse" }, /*#__PURE__*/React.createElement(ScriptureVerseText, { text: verse, cite: fn.ref })) :
-    /*#__PURE__*/React.createElement("div", { className: "fn-sheet-verse-missing" }, "Verse text isn't available for this reference. The footnote points to ", /*#__PURE__*/React.createElement("strong", null, fn.ref), ", but no matching entry was found in this letter's scripture dictionary."),
-    fn.seeAlso && /*#__PURE__*/
-    React.createElement("div", { className: "fn-sheet-see-also" }, /*#__PURE__*/
-    React.createElement("span", { className: "fn-sheet-see-also-label" }, "Also see"), /*#__PURE__*/
-    React.createElement(InAppLinkButton, {
-      link: { collection: fn.seeAlso.collection, letterTitle: fn.seeAlso.letterTitle, excerpt: fn.seeAlso.excerpt },
-      onActivate: onInAppLink,
-      label: fn.seeAlso.label || fn.seeAlso.letterTitle }
-    )
-    )
-
-    ) :
-    /*#__PURE__*/React.createElement(React.Fragment, null,
-      fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && /*#__PURE__*/React.createElement("div", { className: "fn-sheet-note" }, fn.text),
-      fn.link && /*#__PURE__*/React.createElement(InAppLinkButton, { link: fn.link, onActivate: onInAppLink }),
-      fn.url && /*#__PURE__*/React.createElement("div", { className: (fn.link || fn.text) ? "fn-sheet-url-extra" : "fn-sheet-note" }, /*#__PURE__*/React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link" }, (fn.link || fn.text) ? "Open external link" : fn.url)),
-      !fn.text && !fn.link && !fn.url && /*#__PURE__*/React.createElement("div", { className: "fn-sheet-verse-missing" }, "This footnote has no content attached.")
-    )
-
-    )
-
-    )
-    ));
-
-}
+/* FootnoteSheet → extracted to src/ui/components/FootnoteSheet.js */
 
 /* ── ScriptureVerseText: handles plain and compound (pipe-separated) refs ── */
-function ScriptureVerseText({ text, cite }) {
-  // Compound citations are stored as "Book X:Y — verse text | Book X:Y — verse text".
-  // CONVENTION: single-ref scripture text must never contain literal " | " (space-pipe-space).
-  // The data audit (PLAN.txt §12 Phase 1 data state) confirms this is uniformly upheld;
-  // if a future edit violates it, the split will fire and the part(s) without " — "
-  // will fall through to the unlabeled VerseWithNumbers branch below.
-  const parts = text.split(" | ");
-  if (parts.length > 1) {
-    // Only render compound-part labels when they differ from the outer cite.
-    // The outer cite (sheet header or footnote-list-ref) already identifies
-    // the ref — showing the same label inside each compound-part duplicates it.
-    const normalizedCite = (cite || '').trim();
-    return (/*#__PURE__*/
-      React.createElement("div", { className: "sc-sheet-compound" },
-      parts.map((part, i) => {
-        const dashIdx = part.indexOf(" \u2014 ");
-        if (dashIdx !== -1) {
-          const label = part.slice(0, dashIdx).trim();
-          const verse = part.slice(dashIdx + 3);
-          const showLabel = label && label !== normalizedCite;
-          return (/*#__PURE__*/
-            React.createElement("div", { key: i, className: "sc-sheet-compound-part" },
-            showLabel && /*#__PURE__*/React.createElement("span", { className: "sc-sheet-compound-label" }, label), /*#__PURE__*/
-            React.createElement(VerseWithNumbers, { text: verse, refStr: label || cite })
-            ));
-
-        }
-        return /*#__PURE__*/React.createElement("div", { key: i, className: "sc-sheet-compound-part" }, /*#__PURE__*/React.createElement(VerseWithNumbers, { text: part, refStr: cite }));
-      })
-      ));
-
-  }
-  return /*#__PURE__*/React.createElement(VerseWithNumbers, { text: text, refStr: cite });
-}
+/* ScriptureVerseText → extracted to src/ui/components/ScriptureVerseText.js */
 
 /* ── Scripture Sheet (Matthew) ── */
-function ScriptureSheet({ activeRef, onClose }) {
-  const isOpen = activeRef !== null;
-  const verseText = activeRef ? MATTHEW_NKJV[activeRef.cite] : null;
-  return (/*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("div", { className: `fn-sheet-backdrop${isOpen ? " open" : ""}`, onClick: onClose }), /*#__PURE__*/
-    React.createElement("div", { className: `fn-sheet${isOpen ? " open" : ""}` }, /*#__PURE__*/
-    React.createElement("div", { className: "fn-sheet-handle" }),
-    activeRef && verseText && /*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("span", { className: "sc-sheet-tag" }, "Scripture Reference \xB7 ", activeRef.ref), /*#__PURE__*/
-    React.createElement("span", { className: "sc-sheet-cite" }, activeRef.cite), /*#__PURE__*/
-    React.createElement("div", { className: "sc-sheet-verse" }, /*#__PURE__*/
-    React.createElement(ScriptureVerseText, { text: verseText, cite: activeRef.cite })
-    )
-    )
-
-    )
-    ));
-
-}
+/* ScriptureSheet → extracted to src/ui/components/ScriptureSheet.js */
 
 const EXPAND_THRESHOLD = 130;
 const MIN_HIDDEN_WORDS = 20; // only collapse if hiding at least this many whole words
 
-function ExpandableVerse({ text, refStr }) {
-  const [expanded, setExpanded] = useState(false);
+/* ExpandableVerse → extracted to src/ui/components/ExpandableVerse.js */
 
-  // Compound refs store text as "partLabel \u2014 verse text | partLabel \u2014 verse text".
-  // VerseWithNumbers doesn't split on " | ", so the raw string would make the
-  // "18:20-33 \u2014 " chapter-label render as plain white text in the truncated preview.
-  // Extract just the first part's verse content and its label (e.g. "18:20-33")
-  // as the preview ref, so Strategy 0 verse-number detection works correctly.
-  let previewText = text;
-  let previewRef = refStr;
-  if (text.includes(" | ")) {
-    const firstPart = text.split(" | ")[0];
-    const dashIdx = firstPart.indexOf(" \u2014 ");
-    if (dashIdx !== -1) {
-      previewRef = firstPart.slice(0, dashIdx).trim();
-      previewText = firstPart.slice(dashIdx + 3);
-    } else {
-      previewText = firstPart;
-    }
-  }
-
-  const hiddenPortion = previewText.slice(EXPAND_THRESHOLD).trim();
-  const hiddenWords = hiddenPortion.split(/\s+/).filter(Boolean).length;
-  const isLong = text.length > EXPAND_THRESHOLD && hiddenWords >= MIN_HIDDEN_WORDS;
-
-  const fullContent = /*#__PURE__*/React.createElement(ScriptureVerseText, { text: text, cite: refStr });
-  const truncatedContent = /*#__PURE__*/React.createElement(VerseWithNumbers, { text: previewText.slice(0, EXPAND_THRESHOLD).trimEnd() + "\u2026", refStr: previewRef });
-
-  return (/*#__PURE__*/
-    React.createElement("span", { className: "footnote-list-verse" },
-    isLong && !expanded ? truncatedContent : fullContent,
-    isLong && /*#__PURE__*/
-    React.createElement("button", {
-      // stopPropagation: the parent .footnote-list-item card has an onClick
-      // that calls scrollToBubble(num) — without this, tapping Read more
-      // ALSO scrolls the page up to the in-body footnote bubble.
-      onClick: (e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v); },
-      style: {
-        display: "inline-block", marginLeft: "0.5em",
-        background: "none", border: "none", cursor: "pointer",
-        color: "var(--gold)", fontFamily: "'Cinzel', serif",
-        fontSize: "0.72rem", letterSpacing: "0.1em",
-        textTransform: "uppercase", padding: "0",
-        verticalAlign: "middle", lineHeight: 1
-      } },
-
-    expanded ? "Show less \u25b2" : "Read more \u25bc"
-    )
-
-    ));
-
-}
-
-function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLink }) {
-  const entries = Object.entries(footnotes);
-  if (entries.length === 0) return null;
-  const scrollToBubble = (num) => {
-    // Find the first in-body bubble matching this footnote number and scroll
-    // it into view. Brief pulse handled by the bubble's `.active` state if
-    // the parent wires `highlightedFn`; we just do the scroll here.
-    try {
-      const el = document.querySelector(`.fn-ref[data-fn-num="${num}"]`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } catch (e) {}
-  };
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "footnote-list" }, /*#__PURE__*/
-    React.createElement("div", { className: "footnote-list-header" }, "Footnotes"),
-    entries.map(([num, fn]) => /*#__PURE__*/
-    React.createElement("div", {
-      key: num,
-      id: `fn-item-${num}`,
-      className: `footnote-list-item${highlightedFn === num ? " pulse" : ""}`,
-      role: "button",
-      tabIndex: 0,
-      onClick: () => scrollToBubble(num),
-      onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToBubble(num); } },
-      title: `Jump back to footnote ${num} in the body` }, /*#__PURE__*/
-    React.createElement("div", { className: "footnote-list-num" }, num, "."), /*#__PURE__*/
-    React.createElement("div", null,
-    fn.type === "scripture" ? /*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("span", { className: "footnote-list-ref" }, fn.ref),
-    nkjv[fn.ref] ? /*#__PURE__*/React.createElement(ExpandableVerse, { text: nkjv[fn.ref], refStr: fn.ref }) :
-    /*#__PURE__*/React.createElement("span", { className: "footnote-list-missing" }, " — verse text not available"),
-    fn.seeAlso && /*#__PURE__*/
-    React.createElement("div", { style: { marginTop: "0.5rem" } }, /*#__PURE__*/
-    React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" } }, "Also see:"), /*#__PURE__*/
-    React.createElement("span", { style: { fontStyle: "italic" } }, fn.seeAlso.label || fn.seeAlso.letterTitle), /*#__PURE__*/
-    React.createElement(InAppLinkButton, { compact: true, link: { collection: fn.seeAlso.collection, letterTitle: fn.seeAlso.letterTitle, excerpt: fn.seeAlso.excerpt }, onActivate: onInAppLink })
-    )
-
-    ) :
-    /*#__PURE__*/React.createElement(React.Fragment, null,
-      fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && /*#__PURE__*/React.createElement("span", { className: "footnote-list-note-text" }, fn.text, fn.link && " "),
-      fn.link && /*#__PURE__*/React.createElement(InAppLinkButton, { compact: true, link: fn.link, onActivate: onInAppLink }),
-      fn.url && /*#__PURE__*/React.createElement("span", { className: (fn.link || fn.text) ? "footnote-list-url-extra" : "footnote-list-note-text" }, /*#__PURE__*/React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link", onClick: (e) => e.stopPropagation() }, (fn.link || fn.text) ? "Open external link" : fn.url)),
-      !fn.text && !fn.link && !fn.url && /*#__PURE__*/React.createElement("span", { className: "footnote-list-missing" }, "(no content attached)")
-    )
-
-    )
-    )
-    )
-    ));
-
-};
-/* ═══════════════════════════════════════════════════════════════
-   MATTHEW / BIBLE READER COMPONENTS
-   (ThemeBtn, ModeToggle, InlineNotes, StudyPanels,
-    BookSelector, ChapterIndex, ChapterView)
-═══════════════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════════════
-   MODE TOGGLE
-═══════════════════════════════════════════════════════════════ */
-function ThemeBtn({ theme, onThemeChange }) {
-  const next = theme === "dark" ? "light" : "dark";
-  const title = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
-  return (/*#__PURE__*/
-    React.createElement("button", { className: "nav-theme-btn", onClick: () => onThemeChange(next), title: title },
-    theme === "dark" ? /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /*#__PURE__*/
-    React.createElement("circle", { cx: "12", cy: "12", r: "5" }), /*#__PURE__*/
-    React.createElement("line", { x1: "12", y1: "1", x2: "12", y2: "3" }), /*#__PURE__*/
-    React.createElement("line", { x1: "12", y1: "21", x2: "12", y2: "23" }), /*#__PURE__*/
-    React.createElement("line", { x1: "4.22", y1: "4.22", x2: "5.64", y2: "5.64" }), /*#__PURE__*/
-    React.createElement("line", { x1: "18.36", y1: "18.36", x2: "19.78", y2: "19.78" }), /*#__PURE__*/
-    React.createElement("line", { x1: "1", y1: "12", x2: "3", y2: "12" }), /*#__PURE__*/
-    React.createElement("line", { x1: "21", y1: "12", x2: "23", y2: "12" }), /*#__PURE__*/
-    React.createElement("line", { x1: "4.22", y1: "19.78", x2: "5.64", y2: "18.36" }), /*#__PURE__*/
-    React.createElement("line", { x1: "18.36", y1: "5.64", x2: "19.78", y2: "4.22" })
-    ) : /*#__PURE__*/
-
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /*#__PURE__*/
-    React.createElement("path", { d: "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" })
-    )
-
-    ));
-
-}
-
-/* ── Global Home button. Calls window.__goHome which App sets on mount. ── */
-function HomeBtn() {
-  return (/*#__PURE__*/
-    React.createElement("button", { className: "nav-search-btn", onClick: () => window.__goHome && window.__goHome(), title: "Home", "aria-label": "Home" }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /*#__PURE__*/
-    React.createElement("path", { d: "M3 10.5L12 3l9 7.5" }), /*#__PURE__*/
-    React.createElement("path", { d: "M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" })
-    )
-    ));
-
-}
-
-/* ── Inset bridge: MainActivity calls this after page load so CSS
-   variables reflect the real device camera cutout / status bar height ── */
-window.__setInsets = function (top, bottom) {
-  document.documentElement.style.setProperty('--inset-top', top + 'px');
-  document.documentElement.style.setProperty('--inset-bottom', bottom + 'px');
-};
+/* FootnoteListSection → extracted to src/ui/components/FootnoteListSection.js */
+;
 
 /* ── Global scroll container ref ── */
 let __scrollEl = null;
@@ -3792,311 +3308,25 @@ let __scrollEl = null;
 // Tabs control surfaced through context so ScreenLayout can auto-inject
 // the tab button into every screen's nav without per-screen prop drilling.
 const TabsContext = React.createContext(null);
-function TabsNavBtn() {
-  const ctx = React.useContext(TabsContext);
-  if (!ctx || !ctx.enabled) return null;
-  const { count, onOpen, isOnTabsScreen } = ctx;
-  const label = count > 99 ? '99+' : String(count);
-  return (/*#__PURE__*/
-    React.createElement("button", {
-      className: `tabs-nav-btn${isOnTabsScreen ? ' active' : ''}`,
-      onClick: onOpen,
-      title: `${count} tab${count === 1 ? '' : 's'} open`,
-      "aria-label": `Open tabs (${count} open)` }, /*#__PURE__*/
-
-    React.createElement("span", { className: "tabs-nav-btn-glyph" }, "\u25A2"), /*#__PURE__*/
-    React.createElement("span", { className: "tabs-nav-btn-count" }, label)
-    ));
-
-}
+/* TabsNavBtn → extracted to src/ui/components/TabsNavBtn.js */
 
 // Sticky chapter/letter prev-next arrows. Renders inside the scroll
 // container, stuck at top — always visible just below the top nav
 // as the user scrolls through a chapter or letter.
-function StickyChapterNav({ onPrev, onNext, prevDisabled, nextDisabled, prevLabel, nextLabel }) {
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "chapter-nav-sticky" }, /*#__PURE__*/
-    React.createElement("button", {
-      className: "chapter-nav-sticky-arrow",
-      disabled: !!prevDisabled,
-      onClick: onPrev,
-      title: prevLabel || "Previous",
-      "aria-label": prevLabel || "Previous" },
-    "\u2039"), /*#__PURE__*/
-    React.createElement("button", {
-      className: "chapter-nav-sticky-arrow",
-      disabled: !!nextDisabled,
-      onClick: onNext,
-      title: nextLabel || "Next",
-      "aria-label": nextLabel || "Next" },
-    "\u203A")
-    ));
+/* StickyChapterNav → extracted to src/ui/components/StickyChapterNav.js */
 
-}
+/* ScreenLayout → extracted to src/ui/components/ScreenLayout.js */
 
-function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn }) {
-  const ref = React.useCallback((el) => {__scrollEl = el;}, []);
+/* ModeToggle → extracted to src/ui/components/ModeToggle.js */
 
-  React.useEffect(() => {
-    if (!showProgress) return;
-    const onScroll = () => {
-      if (!__scrollEl) return;
-      const { scrollTop, scrollHeight, clientHeight } = __scrollEl;
-      const sentinel = __scrollEl.querySelector('.reading-end');
-      let max;
-      if (sentinel) {
-        const containerTop = __scrollEl.getBoundingClientRect().top;
-        const sentinelTop = sentinel.getBoundingClientRect().top;
-        const sentinelOffset = sentinelTop - containerTop + scrollTop;
-        max = Math.max(sentinelOffset - clientHeight, 1);
-      } else {
-        max = Math.max(scrollHeight - clientHeight, 1);
-      }
-      const pct = Math.min(scrollTop / max, 1);
-      if (pct >= 0.9 && window.__onReadingComplete) window.__onReadingComplete();
-    };
-    let el = null;
-    const attach = () => {
-      if (__scrollEl !== el) {
-        if (el) el.removeEventListener("scroll", onScroll);
-        el = __scrollEl;
-        if (el) el.addEventListener("scroll", onScroll, { passive: true });
-      }
-    };
-    attach();
-    const poll = setInterval(attach, 300);
-    return () => {
-      clearInterval(poll);
-      if (el) el.removeEventListener("scroll", onScroll);
-    };
-  }, [showProgress]);
+/* InlineNotes → extracted to src/ui/components/InlineNotes.js */
 
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "screen-layout" }, /*#__PURE__*/
-    React.createElement("nav", { className: "top-nav" }, navChildren, hideTabsBtn ? null : /*#__PURE__*/React.createElement(TabsNavBtn, null)), /*#__PURE__*/
-    React.createElement("div", { className: "screen-scroll", ref: ref },
-    children
-    )
-    ));
-
-}
-
-function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
-  if (!showStudy) {
-    return (/*#__PURE__*/
-      React.createElement("div", { className: "mode-toggle-wrap" }, /*#__PURE__*/
-      React.createElement("div", { className: "mode-toggle" }, /*#__PURE__*/
-      React.createElement("button", {
-        className: "mode-btn active",
-        onClick: () => onShowStudyChange(true),
-        title: "Show study notes, references, and further reading" }, /*#__PURE__*/
-
-      React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /*#__PURE__*/
-      React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /*#__PURE__*/
-      React.createElement("path", { d: "M9 12l2 2 4-4" })
-      ), "On"
-
-      )
-      )
-      ));
-
-  }
-  const isPdf = mode === "pdf";
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "mode-toggle-wrap" }, /*#__PURE__*/
-    React.createElement("div", { className: "mode-toggle" }, /*#__PURE__*/
-    React.createElement("button", {
-      className: "mode-btn active",
-      onClick: () => onChange(isPdf ? "inline" : "pdf"),
-      title: isPdf ? "PDF Mode \u2014 tap to switch to Inline" : "Inline Mode \u2014 tap to switch to PDF" }, /*#__PURE__*/
-
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" },
-    isPdf ? /*#__PURE__*/React.createElement("path", { d: "M2 6h20M2 12h20M2 18h12" }) : /*#__PURE__*/React.createElement("path", { d: "M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" })
-    ), isPdf ? "PDF" : "Inline"
-
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "mode-divider" }), /*#__PURE__*/
-    React.createElement("button", {
-      className: "mode-btn",
-      onClick: () => onShowStudyChange(false),
-      title: "Hide study notes, references, and further reading" }, /*#__PURE__*/
-
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /*#__PURE__*/
-    React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /*#__PURE__*/
-    React.createElement("line", { x1: "4.5", y1: "4.5", x2: "19.5", y2: "19.5" })
-    ), "Off"
-
-    )
-    )
-    ));
-
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   INLINE NOTES COMPONENT
-═══════════════════════════════════════════════════════════════ */
-// Commentary cites (non-lookup scripture notes) may embed inline refs like
-// "(Matthew 11:14)". Detect Book-Ch:Vs patterns and style them gold.
-function renderCommentaryCite(text) {
-  if (!text) return text;
-  // Matches "Matthew 11:14", "1 John 2:15-17", "Psalm 22:1", etc.
-  const rx = /\b((?:[123]\s)?[A-Z][a-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:[-,\s\d]+)?)\b/g;
-  const parts = [];
-  let last = 0,m;
-  while ((m = rx.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    parts.push(/*#__PURE__*/React.createElement("span", { key: m.index, className: "inline-scrip-ref" }, m[0]));
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts.length ? parts : text;
-}
-
-function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
-  if (!scriptures.length && !votNotes.length) return null;
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "inline-notes" },
-    scriptures.map((s, i) => {
-      const hasVerse = !!MATTHEW_NKJV[s.cite];
-      return hasVerse ? /*#__PURE__*/
-      React.createElement("button", { key: `s${i}`, className: "inline-note-scripture", onClick: () => onScriptureClick && onScriptureClick(s) }, /*#__PURE__*/
-      React.createElement("span", { className: "inline-note-tag" }, s.ref), /*#__PURE__*/
-      React.createElement("span", { className: "inline-note-cite" }, s.cite), /*#__PURE__*/
-      React.createElement("span", { className: "inline-note-chevron" }, "\u203A")
-      ) : /*#__PURE__*/
-
-      React.createElement("div", { key: `s${i}`, className: "inline-note-scripture inline-note-plain" }, /*#__PURE__*/
-      React.createElement("span", { className: "inline-note-tag" }, s.ref), /*#__PURE__*/
-      React.createElement("span", { className: "inline-note-cite" }, renderCommentaryCite(s.cite))
-      );
-
-    }),
-    votNotes.map((n, i) => {
-      const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
-      const hm = isHiddenManna(n);
-      const badge = hm ? /*#__PURE__*/
-      React.createElement("span", { className: "inline-vot-hm", title: "Hidden Manna \u2014 The Word of The Lord Spoken to Timothy" }, "HM") :
-      canTap ? /*#__PURE__*/
-      React.createElement("span", { className: "inline-vot-chevron" }, "\u203A") :
-      null;
-      const inner = /*#__PURE__*/
-      React.createElement(React.Fragment, null, /*#__PURE__*/
-      React.createElement("div", { className: "inline-vot-header" }, /*#__PURE__*/
-      React.createElement("span", { className: "inline-vot-ref" }, n.ref), /*#__PURE__*/
-      React.createElement("span", { className: "inline-vot-vol" }, n.vol),
-      badge
-      ), /*#__PURE__*/
-      React.createElement("div", { className: "inline-vot-letter" }, "\"", n.letter, "\""),
-      n.excerpt && /*#__PURE__*/React.createElement("div", { className: "inline-vot-excerpt" }, n.excerpt)
-      );
-
-      return canTap ? /*#__PURE__*/
-      React.createElement("button", {
-        key: `v${i}`,
-        className: "inline-vot-note inline-vot-note-tappable",
-        onClick: () => onVotLetterClick(n.vol, n.letter, n.excerpt) },
-      inner) : /*#__PURE__*/
-
-      React.createElement("div", { key: `v${i}`, className: "inline-vot-note" }, inner);
-
-    })
-    ));
-
-}
-
-function InlineEcho({ scriptures, votNotes }) {
-  if (!scriptures.length && !votNotes.length) return null;
-  const scrollToRef = (ref) => {
-    const ranges = parseRefRanges(ref);
-    if (ranges.length > 0) {
-      const target = document.getElementById(`v-${ranges[0].end}`);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  };
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "inline-echo" },
-    scriptures.map((s, i) => /*#__PURE__*/
-    React.createElement("button", { key: `es${i}`, className: "inline-echo-pill", onClick: () => scrollToRef(s.ref), title: `See note at ${s.ref}` }, /*#__PURE__*/
-    React.createElement("span", { className: "echo-arrow" }, "↑"), /*#__PURE__*/
-    React.createElement("span", null, s.ref)
-    )
-    ),
-    votNotes.map((n, i) => /*#__PURE__*/
-    React.createElement("button", { key: `ev${i}`, className: "inline-echo-pill", onClick: () => scrollToRef(n.ref), title: `See note at ${n.ref}` }, /*#__PURE__*/
-    React.createElement("span", { className: "echo-arrow" }, "↑"), /*#__PURE__*/
-    React.createElement("span", null, n.ref, " — ", n.vol)
-    )
-    )
-    ));
-
-}
+/* InlineEcho → extracted to src/ui/components/InlineEcho.js */
 
 /* ═══════════════════════════════════════════════════════════════
    STUDY PANELS COMPONENT (used by PDF mode)
 ═══════════════════════════════════════════════════════════════ */
-function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
-  const hasScriptures = scriptures && scriptures.length > 0;
-  const hasVot = votNotes && votNotes.length > 0;
-  if (!hasScriptures && !hasVot) return null;
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "study-panels" },
-    hasScriptures && /*#__PURE__*/
-    React.createElement("div", { className: "study-panel-group" }, /*#__PURE__*/
-    React.createElement("div", { className: "study-panel-group-title" }, "Scripture References"), /*#__PURE__*/
-    React.createElement("div", { className: "scripture-refs" },
-    scriptures.map((s, i) => {
-      const hasVerse = !!MATTHEW_NKJV[s.cite];
-      return hasVerse ? /*#__PURE__*/
-      React.createElement("button", { key: i, className: "scripture-ref", onClick: () => onScriptureClick && onScriptureClick(s) }, /*#__PURE__*/
-      React.createElement("span", { className: "scripture-ref-tag" }, s.ref), /*#__PURE__*/
-      React.createElement("span", { className: "scripture-ref-text" }, s.cite), /*#__PURE__*/
-      React.createElement("span", { className: "scripture-ref-chevron" }, "\u203A")
-      ) : /*#__PURE__*/
-
-      React.createElement("div", { key: i, className: "scripture-ref scripture-ref-note" }, /*#__PURE__*/
-      React.createElement("span", { className: "scripture-ref-tag" }, s.ref), /*#__PURE__*/
-      React.createElement("span", { className: "scripture-ref-text" }, renderCommentaryCite(s.cite))
-      );
-
-    })
-    )
-    ),
-
-    hasVot && /*#__PURE__*/
-    React.createElement("div", { className: "study-panel-group" }, /*#__PURE__*/
-    React.createElement("div", { className: "study-panel-group-title" }, "Volumes of Truth Notes"), /*#__PURE__*/
-    React.createElement("div", { className: "vot-notes" },
-    votNotes.map((n, i) => {
-      const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
-      const hm = isHiddenManna(n);
-      const badge = hm ? /*#__PURE__*/
-      React.createElement("span", { className: "vot-note-hm", title: "Hidden Manna \u2014 The Word of The Lord Spoken to Timothy" }, "HM") :
-      canTap ? /*#__PURE__*/
-      React.createElement("span", { className: "vot-note-chevron" }, "\u203A") :
-      null;
-      const inner = /*#__PURE__*/
-      React.createElement(React.Fragment, null, /*#__PURE__*/
-      React.createElement("div", { className: "vot-note-header" }, /*#__PURE__*/
-      React.createElement("span", { className: "vot-note-ref" }, n.ref), /*#__PURE__*/
-      React.createElement("span", { className: "vot-note-vol" }, n.vol),
-      badge
-      ), /*#__PURE__*/
-      React.createElement("div", { className: "vot-note-letter" }, "\"", n.letter, "\""),
-      n.excerpt && /*#__PURE__*/React.createElement("div", { className: "vot-note-excerpt" }, n.excerpt)
-      );
-
-      return canTap ? /*#__PURE__*/
-      React.createElement("button", { key: i, className: "vot-note vot-note-tappable", onClick: () => onVotLetterClick(n.vol, n.letter, n.excerpt) }, inner) : /*#__PURE__*/
-
-      React.createElement("div", { key: i, className: "vot-note" }, inner);
-
-    })
-    )
-    )
-
-    ));
-
-}
+/* StudyPanels → extracted to src/ui/components/StudyPanels.js */
 
 /* ═══════════════════════════════════════════════════════════════
    BOOK SELECTOR
@@ -4236,74 +3466,9 @@ const SCRIPTURE_GENRES = {
    The flag visually flips gold-bright when active, providing clear status
    feedback right in the nav so the user can tell at a glance whether
    they've already marked the page. */
-function ChapterBookmarkBtn({ chapterBookmark, hlTick }) {
-  if (!chapterBookmark || !chapterBookmark.hlKey || typeof BookmarkStore === 'undefined') return null;
-  // React.useMemo so we re-derive only when hlTick changes (after a create/delete).
-  const existing = React.useMemo(
-    () => BookmarkStore.getForKey(chapterBookmark.hlKey),
-    [chapterBookmark.hlKey, hlTick]
-  );
-  const isBookmarked = existing.length > 0;
+/* ChapterBookmarkBtn → extracted to src/ui/components/ChapterBookmarkBtn.js */
 
-  const onClick = (e) => {
-    e.stopPropagation();
-    if (isBookmarked) {
-      // Open the popover near the button so the user can edit thought / delete.
-      const rect = e.currentTarget.getBoundingClientRect();
-      const ids = existing.map(b => b.id);
-      if (window.__openBookmarkPopover) {
-        window.__openBookmarkPopover(ids, rect.left + rect.width / 2, rect.bottom + 4, chapterBookmark.hlKey);
-      }
-      return;
-    }
-    // Open the pre-commit create sheet so the user can refine label +
-    // attach a thought before persisting. Same flow as the
-    // SelectionToolbar bookmark action — consistent experience whether
-    // the user bookmarks a phrase or a whole chapter.
-    if (window.__bookmarkCreate) {
-      window.__bookmarkCreate({
-        hlKey: chapterBookmark.hlKey,
-        sourceLabel: chapterBookmark.label || '',
-        excerpt: '',
-        defaultLabel: chapterBookmark.label || 'Chapter bookmark'
-      });
-    } else {
-      // Fallback (bridge missing): silent-add so the action is never lost.
-      BookmarkStore.add({
-        id: (typeof bkmId === 'function') ? bkmId() : ('bkm_' + Date.now()),
-        hlKey: chapterBookmark.hlKey,
-        label: chapterBookmark.label || 'Chapter bookmark',
-        thought: '',
-        created: Date.now(),
-        updated: Date.now()
-      });
-      if (window.__bumpHlTick) window.__bumpHlTick();
-    }
-  };
-
-  return React.createElement("button", {
-    className: "nav-bookmark-btn" + (isBookmarked ? " nav-bookmark-btn-active" : ""),
-    onClick: onClick,
-    title: isBookmarked ? "Open bookmark options" : "Bookmark this chapter",
-    "aria-label": isBookmarked ? "Open bookmark options" : "Bookmark this chapter"
-  },
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-      React.createElement("path", { d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z", fill: isBookmarked ? "currentColor" : "none" })
-    )
-  );
-}
-
-function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey, journalRefLabel }) {
-  return React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("button", { className: "settings-gear-btn", onClick: onSettings, title: "Settings" }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /*#__PURE__*/React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))), /*#__PURE__*/
-    React.createElement("button", { className: reading ? "nav-search-btn nav-history-reading" : "nav-search-btn", onClick: onHistory, title: "History" }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /*#__PURE__*/React.createElement("polyline", { points: "1 4 1 10 7 10" }), /*#__PURE__*/React.createElement("path", { d: "M3.51 15a9 9 0 1 0 .49-5.01" }))), /*#__PURE__*/
-    React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))), /*#__PURE__*/
-    chapterBookmark && React.createElement(ChapterBookmarkBtn, { chapterBookmark: chapterBookmark, hlTick: hlTick }),
-    React.createElement(ThemeBtn, { theme: theme, onThemeChange: onThemeChange }));
-}
+/* NavButtons → extracted to src/ui/components/NavButtons.js */
 
 /* ── Library nav: single source of truth for every Library screen's
    top bar. Identical structure to _idxNav (back arrow + Home on the
@@ -4313,24 +3478,7 @@ function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, rea
    rightExtras render after the cluster (far right, e.g. the viewer's
    pin/delete). Keeps all Library sub-screens visually consistent with
    the rest of the app and prevents future drift. ── */
-function LibraryNav(opts) {
-  opts = opts || {};
-  return React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("button", {
-      className: "nav-home nav-back-icon",
-      onClick: opts.onBack,
-      title: opts.backTitle || "Back",
-      "aria-label": opts.backTitle || "Back" }, "‹"), /*#__PURE__*/
-    React.createElement(HomeBtn, null),
-    opts.leftExtras || null, /*#__PURE__*/
-    React.createElement(NavButtons, {
-      onSettings: opts.onSettings,
-      onHistory: opts.onHistory,
-      onSearch: opts.onSearch,
-      theme: opts.theme,
-      onThemeChange: opts.onThemeChange }),
-    opts.rightExtras || null);
-}
+/* LibraryNav → extracted to src/ui/components/LibraryNav.js */
 
 function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy, layout }) {
   const handleTile = (group) => {
@@ -9052,6 +8200,29 @@ multiNotePayload && React.createElement(MultiNotePopover, {
   <script src="src/ui/screens/SettingsScreen.js"></script>
   <script src="src/ui/screens/HomeScreen.js"></script>
   <script src="src/ui/screens/SearchScreen.js"></script>
+  <script src="src/ui/components/Segments.js"></script>
+  <script src="src/ui/components/ProphecyCard.js"></script>
+  <script src="src/ui/components/ProphecyGroup.js"></script>
+  <script src="src/ui/components/VerseWithNumbers.js"></script>
+  <script src="src/ui/components/InAppLinkButton.js"></script>
+  <script src="src/ui/components/FootnoteSheet.js"></script>
+  <script src="src/ui/components/ScriptureVerseText.js"></script>
+  <script src="src/ui/components/ScriptureSheet.js"></script>
+  <script src="src/ui/components/ExpandableVerse.js"></script>
+  <script src="src/ui/components/ThemeBtn.js"></script>
+  <script src="src/ui/components/ScreenLayout.js"></script>
+  <script src="src/ui/components/ModeToggle.js"></script>
+  <script src="src/ui/components/InlineNotes.js"></script>
+  <script src="src/ui/components/InlineEcho.js"></script>
+  <script src="src/ui/components/StudyPanels.js"></script>
+  <script src="src/ui/components/ChapterBookmarkBtn.js"></script>
+  <script src="src/ui/components/NavButtons.js"></script>
+  <script src="src/ui/components/ProphecyExpandToggle.js"></script>
+  <script src="src/ui/components/HomeBtn.js"></script>
+  <script src="src/ui/components/TabsNavBtn.js"></script>
+  <script src="src/ui/components/LibraryNav.js"></script>
+  <script src="src/ui/components/FootnoteListSection.js"></script>
+  <script src="src/ui/components/StickyChapterNav.js"></script>
   <script src="src/ui/screens/LinksScreen.js"></script>
   <!-- BookmarksScreen, BookmarkRow, BookmarkRowActionSheet, BookmarkPopover — extracted to src/ui/screens/BookmarksScreen.js -->
   <!-- Depends on: BookmarkStore (bookmark-store.js), ScreenLayout, ThemeBtn, relativeDate, -->

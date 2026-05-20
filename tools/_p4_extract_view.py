@@ -24,15 +24,17 @@ The script:
 import sys, os
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-if len(sys.argv) != 3:
-    print('usage: %s <VIEW_NAME> <NEXT_FUNC_NAME>' % sys.argv[0])
+if len(sys.argv) not in (3, 4):
+    print('usage: %s <VIEW_NAME> <NEXT_FUNC_NAME> [<subdir>]' % sys.argv[0])
+    print('  subdir defaults to "ui/screens"; pass e.g. "ui/components" for shared')
     sys.exit(2)
 
 VIEW = sys.argv[1]
 NEXT = sys.argv[2]
+SUBDIR = sys.argv[3] if len(sys.argv) == 4 else 'ui/screens'
 
 IDX = 'D:/VOTReader-studio/app/src/main/assets/index.html'
-SCREENS_DIR = 'D:/VOTReader-studio/app/src/main/assets/src/ui/screens'
+SCREENS_DIR = 'D:/VOTReader-studio/app/src/main/assets/src/' + SUBDIR
 OUT = os.path.join(SCREENS_DIR, VIEW + '.js')
 
 with open(IDX, 'r', encoding='utf-8', newline='') as f:
@@ -43,13 +45,23 @@ with open(IDX, 'r', encoding='utf-8', newline='') as f:
 NL = '\r\n' if '\r\n' in text[:4096] else '\n'
 print('detected line ending: %s' % ('CRLF' if NL == '\r\n' else 'LF'))
 
-# Locate the function — must be uniquely defined inline.
-start_anchor = 'function ' + VIEW + '({'
-i_start = text.find(start_anchor)
+# Locate the function — must be uniquely defined inline. Accept both
+# destructured `function NAME({` and bare `function NAME(` forms; some
+# small utilities like HomeBtn(), TabsNavBtn(), LibraryNav(opts) use
+# the bare paren.
+start_anchor_destructured = 'function ' + VIEW + '({'
+start_anchor_bare = 'function ' + VIEW + '('
+i_start = text.find(start_anchor_destructured)
 if i_start == -1:
-    print('FATAL: %s not found' % start_anchor); sys.exit(1)
-if text.find(start_anchor, i_start + 1) != -1:
-    print('FATAL: %s appears multiple times' % start_anchor); sys.exit(1)
+    i_start = text.find(start_anchor_bare)
+    if i_start == -1:
+        print('FATAL: function %s( not found' % VIEW); sys.exit(1)
+    # confirm uniqueness on the bare form too
+    if text.find(start_anchor_bare, i_start + 1) != -1:
+        print('FATAL: function %s( appears multiple times' % VIEW); sys.exit(1)
+else:
+    if text.find(start_anchor_destructured, i_start + 1) != -1:
+        print('FATAL: %s appears multiple times' % start_anchor_destructured); sys.exit(1)
 
 # Find the next top-level function (terminator), then walk back to find
 # this view's closing `}` line.
@@ -57,13 +69,18 @@ i_next = text.find('function ' + NEXT + '(', i_start)
 if i_next == -1:
     print('FATAL: terminator function %s not found after %s' % (NEXT, VIEW)); sys.exit(1)
 
-# The VIEW's closing brace is the LAST occurrence of '\r\n}\r\n' BEFORE
-# the next function. Find it.
-i_close_nl = text.rfind(NL + '}' + NL, i_start, i_next)
-if i_close_nl == -1:
-    print('FATAL: could not find closing }; for', VIEW); sys.exit(1)
-# Slice the body: includes the `}\r\n` (the function's closing brace + NL).
-body_end = i_close_nl + len(NL + '}' + NL)
+# The VIEW's closing brace is at the position of the last newline+`}`
+# pattern strictly BEFORE the next function. Try the strict pattern
+# first (function followed by a blank line), then relax to allow
+# adjacent functions with no blank line between (`\n}\n` → `\n}`).
+i_close = text.rfind(NL + '}' + NL, i_start, i_next)
+end_pattern_len = len(NL + '}' + NL)
+if i_close == -1:
+    i_close = text.rfind(NL + '}', i_start, i_next)
+    end_pattern_len = len(NL + '}')
+    if i_close == -1:
+        print('FATAL: could not find closing brace for', VIEW); sys.exit(1)
+body_end = i_close + end_pattern_len
 body = text[i_start:body_end]
 
 # ── Hook upgrade — bare → React.useX (self-containment) ──────────────
@@ -86,8 +103,8 @@ for h in hooks:
 
 # ── Sanity guards ────────────────────────────────────────────────────
 problems = []
-if len(body) < 1000:
-    problems.append('body suspiciously small: %d bytes' % len(body))
+if len(body) < 300:
+    problems.append('body suspiciously small (<300B — almost certainly truncated): %d bytes' % len(body))
 if len(body) > 50000:
     problems.append('body suspiciously large: %d bytes' % len(body))
 stripped = body.rstrip()
@@ -123,22 +140,23 @@ HEADER = (
 module_text = HEADER + body.rstrip() + NL
 
 # ── Build new index.html ─────────────────────────────────────────────
-breadcrumb = '/* ' + VIEW + ' → extracted to src/ui/screens/' + VIEW + '.js */' + NL
+SRC_PATH = 'src/' + SUBDIR + '/' + VIEW + '.js'
+breadcrumb = '/* ' + VIEW + ' → extracted to ' + SRC_PATH + ' */' + NL
 new_text = text[:i_start] + breadcrumb + text[body_end:]
 
 # Insert <script src> right BEFORE the LinksScreen.js block (canonical
-# screens insertion point).
+# screens/components insertion point — all module loads cluster here).
 INSERT_ANCHOR = NL + '  <script src="src/ui/screens/LinksScreen.js"></script>'
 if new_text.count(INSERT_ANCHOR) != 1:
     problems.append('insert anchor not unique/found (count=%d)' % new_text.count(INSERT_ANCHOR))
-new_tag = NL + '  <script src="src/ui/screens/' + VIEW + '.js"></script>'
+new_tag = NL + '  <script src="' + SRC_PATH + '"></script>'
 new_text = new_text.replace(INSERT_ANCHOR, new_tag + INSERT_ANCHOR, 1)
 
 # After-state: the inline function must be GONE from index.html
 if 'function ' + VIEW + '(' in new_text:
     problems.append('index.html still contains inline `function %s(`' % VIEW)
 # Tag exactly once
-n_tag = new_text.count('<script src="src/ui/screens/' + VIEW + '.js"></script>')
+n_tag = new_text.count('<script src="' + SRC_PATH + '"></script>')
 if n_tag != 1:
     problems.append('expected 1 <script src> for %s, got %d' % (VIEW, n_tag))
 
