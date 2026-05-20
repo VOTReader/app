@@ -1,0 +1,86 @@
+#!/bin/sh
+# pre-commit hook — two pre-flight checks gated on what's staged:
+#
+#   1. check_balance.py     when corpus data files change
+#      Catches black-screen failure modes that brace-balance alone
+#      misses: esprima parse errors, smart-quote delimiters, non-ASCII
+#      dashes in verse ranges.
+#
+#   2. python tools/build.py  when any bundle-source file changes
+#      Rebuilds dist/bundle-{a,b,c,d}.js and stages the regenerated
+#      output so the commit lands with bundles in sync with source.
+#      Replaces the "remember to run the build" trap — the hook does
+#      it for you. Runs ONLY on commits that touch bundle sources;
+#      docs/gradle/plan commits skip it entirely.
+#
+# This file is VERSIONED. To activate, run once per clone:
+#   git config core.hooksPath .githooks
+# (See CLAUDE.md for the one-line setup.)
+#
+# Both checks are skipped automatically when no relevant file is staged,
+# so commits to CLAUDE.md / PLAN.txt / gradle files / etc. run without
+# any delay.
+
+exec 1>&2  # all output to stderr so it appears during commit
+
+# Detect HEAD (first commit has no HEAD)
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+  against=HEAD
+else
+  against=$(git hash-object -t tree /dev/null)
+fi
+
+staged=$(git diff --cached --name-only "$against")
+
+# ─── Step 1: corpus data file validation ────────────────────────────
+data_changed=$(echo "$staged" | grep '^app/src/main/assets/src/data/' || true)
+
+if [ -n "$data_changed" ]; then
+  echo "[pre-commit] Data files changed — running check_balance.py..."
+  echo ""
+  python check_balance.py
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Data file validation FAILED — see output above."
+    echo "Fix the errors, re-stage the file(s), then retry the commit."
+    echo "  git add app/src/main/assets/src/data/<fixed-file>.js"
+    echo "  git commit ..."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] All data files OK."
+  echo ""
+fi
+
+# ─── Step 2: bundle rebuild ─────────────────────────────────────────
+# Any change to a bundled source file means dist/bundle-*.js is stale.
+# Rebuild + stage the regenerated bundles so the commit lands with
+# bundles in sync. Source files for the 4 clusters:
+#   - app/src/main/assets/src/**/*.js  (all extracted modules)
+#   - search.js, search-data.js, flexsearch.min.js
+#   - react.min.js, react-dom.min.js, html2canvas.min.js
+bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.js|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js)$' || true)
+
+if [ -n "$bundle_source_changed" ]; then
+  echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js..."
+  python tools/build.py
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Bundle rebuild FAILED — see output above."
+    echo "Fix the build error, re-stage, then retry the commit."
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  # Stage the regenerated bundles so this commit includes them.
+  git add app/src/main/assets/dist/bundle-a.js \
+          app/src/main/assets/dist/bundle-b.js \
+          app/src/main/assets/dist/bundle-c.js \
+          app/src/main/assets/dist/bundle-d.js
+  echo "[pre-commit] Bundles regenerated and staged."
+fi
+
+exit 0

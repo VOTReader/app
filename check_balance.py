@@ -15,7 +15,11 @@ Usage:
 """
 import sys, re, os
 
-DATA_DIR = "C:/Users/corbi/OneDrive/Desktop/VOTReader-studio/app/src/main/assets/data/"
+# Path is computed relative to this script so the check survives any
+# checkout location (the absolute path used here previously broke after
+# the working copy moved D: → src/data/ in P3.5b).
+_HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(_HERE, "app", "src", "main", "assets", "src", "data") + os.sep
 DEFAULT_FILES = [
     'volume-one','volume-two','volume-three','volume-four','volume-five',
     'volume-six','volume-seven','lords-rebuke','letters-flock','letters-timothy',
