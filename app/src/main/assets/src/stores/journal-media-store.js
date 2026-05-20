@@ -27,7 +27,7 @@
    on store delete.
 ═══════════════════════════════════════════════════════════════ */
 
-var JournalMediaStore = (function() {
+export var JournalMediaStore = (function() {
   var DB_NAME = 'vot-journal-media';
   var DB_VERSION = 1;
   var STORE = 'media';

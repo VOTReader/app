@@ -30,7 +30,9 @@
      streak-100 — 100-day streak
 ═══════════════════════════════════════════════════════════════ */
 
-function _jrnDateStr(ts) {
+import { CachedStore } from './cached-store.js';
+
+export function _jrnDateStr(ts) {
   var d = ts ? new Date(ts) : new Date();
   var y = d.getFullYear();
   var m = String(d.getMonth() + 1).padStart(2, '0');
@@ -38,14 +40,14 @@ function _jrnDateStr(ts) {
   return y + '-' + m + '-' + day;
 }
 
-function _jrnDaysBetween(d1, d2) {
+export function _jrnDaysBetween(d1, d2) {
   // d1, d2 are 'YYYY-MM-DD'. Returns whole-day delta (d2 - d1).
   var a = new Date(d1 + 'T00:00:00');
   var b = new Date(d2 + 'T00:00:00');
   return Math.round((b - a) / 86400000);
 }
 
-var MILESTONE_DEFS = [
+export var MILESTONE_DEFS = [
   { key: 'first',        type: 'entries', threshold: 1,    label: 'First entry' },
   { key: 'entries-10',   type: 'entries', threshold: 10,   label: '10 entries' },
   { key: 'entries-30',   type: 'entries', threshold: 30,   label: '30 entries' },
@@ -55,7 +57,7 @@ var MILESTONE_DEFS = [
   { key: 'streak-100',   type: 'streak',  threshold: 100,  label: '100-day streak' }
 ];
 
-var JournalStatsStore = Object.assign(CachedStore('vot-journal-stats', {
+export var JournalStatsStore = Object.assign(CachedStore('vot-journal-stats', {
   totalEntries: 0,
   currentStreak: 0,
   longestStreak: 0,
@@ -149,7 +151,7 @@ JournalStatsStore.recomputeFromLoad();
 
 /* Toast helper — pop a small in-app toast at the top of the screen when
    a milestone unlocks. The element is auto-created on first use. */
-function jrnShowMilestoneToast(milestone) {
+export function jrnShowMilestoneToast(milestone) {
   if (!milestone) return;
   var toast = document.getElementById('jrn-milestone-toast');
   if (!toast) {

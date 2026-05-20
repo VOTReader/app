@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "python tools/build.py && npm run build:c",
+    "build": "python tools/build.py && npm run build:b && npm run build:c",
+    "build:b": "esbuild app/src/main/assets/src/stores/_entry-b.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-b.js",
     "build:c": "esbuild app/src/main/assets/src/renderer/_entry.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-c.js"
   },
   "devDependencies": {

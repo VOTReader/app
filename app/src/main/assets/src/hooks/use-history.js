@@ -40,7 +40,9 @@
      other                    → 'ch:' + entry.bookId + ':' + entry.chapterNum
    ═══════════════════════════════════════════════════════════════════════ */
 
-function useHistory(historyEnabled) {
+import { useRefMirror } from './use-ref-mirror.js';
+
+export function useHistory(historyEnabled) {
   const [readHistory, setReadHistory] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('vot-history') || '[]'); }
     catch { return []; }

@@ -7,6 +7,8 @@
    vot-ann-migrated localStorage flag).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { CachedStore } from './cached-store.js';
+
 /* ── One-time migration: vot-highlights → vot-annotations + vot-notes ──
    Old shape (per-segment): { id, groupId?, color, style:'highlight'|'underline',
      text, note?, start, end, created }
@@ -15,7 +17,7 @@
    Notes split off into vot-notes keyed by groupId:
      { groupId, notebookIds:[], body, color, fullText, keys[], created, updated }
    The old key vot-highlights is left in place as a backup. */
-function migrateAnnotations() {
+export function migrateAnnotations() {
   try {
     if (localStorage.getItem('vot-ann-migrated') === '1') return;
     const oldRaw = localStorage.getItem('vot-highlights');
@@ -76,7 +78,7 @@ migrateAnnotations();
    back-compat with existing call sites. Every entry has a kind field
    ('highlight' | 'underline' | 'note') and a groupId (always present;
    single-segment annotations get a unique groupId == id at create time). */
-const AnnotationStore = Object.assign(CachedStore('vot-annotations', {}), {
+export const AnnotationStore = Object.assign(CachedStore('vot-annotations', {}), {
   get(key) { return this._load()[key] || []; },
   all() { return this._load(); },
   add(key, ann) {
@@ -150,4 +152,4 @@ const AnnotationStore = Object.assign(CachedStore('vot-annotations', {}), {
   }
 });
 // Back-compat alias — existing references throughout the file still work.
-const HighlightStore = AnnotationStore;
+export const HighlightStore = AnnotationStore;

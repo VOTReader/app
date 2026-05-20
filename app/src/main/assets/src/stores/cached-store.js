@@ -7,7 +7,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── CachedStore factory — shared localStorage cache/load/save ── */
-function CachedStore(storageKey, defaultVal) {
+export function CachedStore(storageKey, defaultVal) {
   return {
     _cache: null,
     _load() {

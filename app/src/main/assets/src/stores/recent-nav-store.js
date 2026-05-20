@@ -5,8 +5,10 @@
    Depends on: CachedStore (loaded before this).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { CachedStore } from './cached-store.js';
+
 /* ── Recent navigations (LinkPicker history) ── */
-const RecentNavStore = Object.assign(CachedStore('vot-recent-nav', []), {
+export const RecentNavStore = Object.assign(CachedStore('vot-recent-nav', []), {
   list() { return this._load().slice(0, 20); },
   add(item) {
     if (!item || !item.kind) return;

@@ -27,11 +27,13 @@
    {source, target} on first load (one-time per user).
 ═══════════════════════════════════════════════════════════════ */
 
-/* ID generators — also used by AnnotationStore (hlId) */
-function hlId() { return 'hl_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
-function lnkId() { return 'lnk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+import { CachedStore } from './cached-store.js';
 
-const LinkStore = Object.assign(CachedStore('vot-links', []), {
+/* ID generators — also used by AnnotationStore (hlId) */
+export function hlId() { return 'hl_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+export function lnkId() { return 'lnk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+
+export const LinkStore = Object.assign(CachedStore('vot-links', []), {
   /* Override _load to migrate legacy {a,b} records to {source,target} on
      first access. Migration is one-time per user: after it runs the
      persisted data is already in the new shape, so subsequent loads are
@@ -89,7 +91,7 @@ const LinkStore = Object.assign(CachedStore('vot-links', []), {
    Returns the link object on success OR when the link already exists
    (so callers can show the green ✓ either way). Returns null only when
    sourceEndpoint.key is missing. */
-function persistLink(sourceEndpoint, targetEndpoint) {
+export function persistLink(sourceEndpoint, targetEndpoint) {
   if (!sourceEndpoint || !sourceEndpoint.key) return null;
   const existing = LinkStore.getForKey(sourceEndpoint.key);
   // Dedup: a link exists if either endpoint on any existing record touches

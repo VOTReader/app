@@ -19,7 +19,7 @@
 
 /* Shared utility for rendering inline markup in p/h2/quote text.
    Returns an array of React nodes. Used by viewer + editor preview. */
-function jrnRenderInline(text, callbacks) {
+export function jrnRenderInline(text, callbacks) {
   if (!text) return null;
   callbacks = callbacks || {};
   // Tokenize: keep order of bold, italic, ref, links by scanning sequentially.
@@ -79,7 +79,7 @@ function jrnRenderInline(text, callbacks) {
    the rendered p/h2/quote so the app-wide annotation system (highlights,
    notes, links, bookmarks) picks up the paragraph automatically — same
    contract LetterView/WtlbEntryView use. */
-function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
+export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (!block) return null;
   callbacks = callbacks || {};
   var b = block;
@@ -264,7 +264,7 @@ function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
 }
 
 /* Async image block: fetches Blob URL from IDB on mount. */
-function JournalImageBlock({ mediaId, caption }) {
+export function JournalImageBlock({ mediaId, caption }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var _src = useState(null);
@@ -293,7 +293,7 @@ function JournalImageBlock({ mediaId, caption }) {
    confirming). When `samples` is provided (Float array from recording
    capture), the waveform renders the real shape rather than a decorative
    sine. */
-function JournalAudioBlock(props) {
+export function JournalAudioBlock(props) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;
@@ -446,7 +446,7 @@ function JournalAudioBlock(props) {
    bookmark-ribbon icon used elsewhere in the app. Diagonal
    pinned-tack silhouette so "pinned entry" never reads as
    "bookmark". Filled = pinned, outline = unpinned. */
-function jrnPinIcon(filled) {
+export function jrnPinIcon(filled) {
   return React.createElement('svg', { viewBox: '0 0 24 24', fill: filled ? 'currentColor' : 'none', stroke: 'currentColor', strokeWidth: '1.7', strokeLinecap: 'round', strokeLinejoin: 'round' },
     React.createElement('path', { d: 'M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z' }),
     React.createElement('path', { d: 'M8 12 L3 19', stroke: 'currentColor', fill: 'none' })
@@ -454,7 +454,7 @@ function jrnPinIcon(filled) {
 }
 
 /* ─── Main viewer screen ─────────────────────────────────── */
-function JournalViewerScreen(props) {
+export function JournalViewerScreen(props) {
   var useState = React.useState;
   var useMemo = React.useMemo;
 

@@ -26,7 +26,7 @@
 /* Per-card action sheet: Open · Edit · Pin/Unpin · Delete (triple
    confirm). Modeled on the bookmark/link action sheets (reuses the
    .link-action-* shell so it looks native to the app). */
-function JournalCardMenu(props) {
+export function JournalCardMenu(props) {
   var useState = React.useState;
   var entry = props.entry;
   var _step = useState(0); // 0 idle, 1/2/3 delete-confirm steps
@@ -103,7 +103,7 @@ function JournalCardMenu(props) {
   );
 }
 
-function JournalHubScreen(props) {
+export function JournalHubScreen(props) {
   var useState = React.useState;
   var useMemo = React.useMemo;
 

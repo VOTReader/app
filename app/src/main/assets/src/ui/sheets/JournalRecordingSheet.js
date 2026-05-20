@@ -22,7 +22,7 @@
      onClose()
 ═══════════════════════════════════════════════════════════════ */
 
-function JournalRecordingSheet({ onSave, onClose }) {
+export function JournalRecordingSheet({ onSave, onClose }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;

@@ -12,7 +12,7 @@
    BibleChapterView, ChapterView).
    ═══════════════════════════════════════════════════════════════════════ */
 
-function useMarkAsRead(enabled, onMarkRead) {
+export function useMarkAsRead(enabled, onMarkRead) {
   React.useEffect(() => {
     if (!enabled) return;
     window.__onReadingComplete = onMarkRead;

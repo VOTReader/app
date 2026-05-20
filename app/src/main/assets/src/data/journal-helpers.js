@@ -29,7 +29,7 @@
      [[journal:<id>]]                 — gold underlined journal-link
 ═══════════════════════════════════════════════════════════════ */
 
-var JournalHelpers = (function() {
+export var JournalHelpers = (function() {
 
   function blockId() {
     return 'b_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);

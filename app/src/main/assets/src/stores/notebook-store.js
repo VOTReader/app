@@ -6,11 +6,14 @@
    time only — remove() cascades via NoteStore.pruneNotebook).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { CachedStore } from './cached-store.js';
+import { NoteStore } from './note-store.js';
+
 /* NotebookStore — named buckets for grouping notes. Notebooks have
    no color (kept simple by user direction); the color belongs to the
    note. A note can live in 0, 1, or many notebooks (multi-membership
    via NoteStore.notebookIds[]). */
-const NotebookStore = Object.assign(CachedStore('vot-notebooks', { list: [] }), {
+export const NotebookStore = Object.assign(CachedStore('vot-notebooks', { list: [] }), {
   list() {
     const data = this._load();
     return (data.list || []).slice().sort((a, b) => (a.sortIndex || 0) - (b.sortIndex || 0) || (a.created || 0) - (b.created || 0));

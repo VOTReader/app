@@ -21,7 +21,7 @@
      'bookmark:bkm_abc'
 ═══════════════════════════════════════════════════════════════ */
 
-function JournalChip({ refKey, hlTick, onClick, label }) {
+export function JournalChip({ refKey, hlTick, onClick, label }) {
   var useMemo = React.useMemo;
   // Hooks must be called unconditionally on every render — no early return
   // before useMemo, or React detects the changed hook count and throws.
@@ -47,20 +47,20 @@ function JournalChip({ refKey, hlTick, onClick, label }) {
 
 /* Build the refKey for the current context — exposed for index.html
    wiring convenience. */
-function jrnRefKeyForLetter(volKey, letterId) {
+export function jrnRefKeyForLetter(volKey, letterId) {
   return (volKey && letterId) ? ('letter:' + volKey + '/' + letterId) : null;
 }
-function jrnRefKeyForChapter(bookId, chapter) {
+export function jrnRefKeyForChapter(bookId, chapter) {
   return (bookId && chapter != null) ? ('chapter:' + bookId + ':' + chapter) : null;
 }
-function jrnRefKeyForBookmark(bookmarkId) {
+export function jrnRefKeyForBookmark(bookmarkId) {
   return bookmarkId ? ('bookmark:' + bookmarkId) : null;
 }
 
 /* Resolve a letter refKey from the collection's display label (e.g.
    'Volume Two') and a letterId. Used by LetterView and WtlbEntryView
    nav, which receive `volumeLabel` rather than the raw volKey. */
-function jrnRefKeyForLetterByLabel(volumeLabel, letterId) {
+export function jrnRefKeyForLetterByLabel(volumeLabel, letterId) {
   if (!volumeLabel || !letterId || typeof COLLECTIONS === 'undefined') return null;
   for (var i = 0; i < COLLECTIONS.length; i++) {
     if (COLLECTIONS[i].label === volumeLabel) {

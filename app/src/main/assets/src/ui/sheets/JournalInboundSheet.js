@@ -14,7 +14,7 @@
      onOpenEntry(entry)    — caller navigates to JournalViewerScreen with this entry
 ═══════════════════════════════════════════════════════════════ */
 
-function JournalInboundSheet({ refKey, resourceLabel, onClose, onOpenEntry }) {
+export function JournalInboundSheet({ refKey, resourceLabel, onClose, onOpenEntry }) {
   var ids = (typeof JournalIndexStore !== 'undefined') ? JournalIndexStore.entriesReferencing(refKey) : [];
   var entries = ids
     .map(function(id) { return JournalStore.get(id); })

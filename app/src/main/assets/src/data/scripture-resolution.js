@@ -35,7 +35,7 @@
    once; all navigation, back-routing, search, last-read tracking,
    and data loading derive from this table.
 ═══════════════════════════════════════════════════════════════ */
-const COLLECTIONS = [
+export const COLLECTIONS = [
   { volKey: 'one',     cardId: 'volume-one',        readKey: 'volume-one',      globalName: 'LETTERS_V1',      prefaceGlobal: 'LETTERS_V1_PREFACE',      letterScreen: 'vot-one-letter',     indexScreen: 'vot-one-index',     label: 'Volume One',                                              registryLabel: 'Volume One',                                              searchVolId: 'v1',            kind: 'letter',     surpriseType: 'vot-one' },
   { volKey: 'two',     cardId: 'volume-two',        readKey: 'volume-two',      globalName: 'LETTERS',         prefaceGlobal: null,                       letterScreen: 'vot-letter',         indexScreen: 'vot-index',         label: 'Volume Two',                                              registryLabel: 'Volume Two',                                              searchVolId: 'v2',            kind: 'letter',     surpriseType: 'vot' },
   { volKey: 'three',   cardId: 'volume-three',      readKey: 'volume-three',    globalName: 'LETTERS_V3',      prefaceGlobal: 'LETTERS_V3_PREFACE',      letterScreen: 'vot-three-letter',   indexScreen: 'vot-three-index',   label: 'Volume Three',                                            registryLabel: 'Volume Three',                                            searchVolId: 'v3',            kind: 'letter',     surpriseType: 'vot-three' },
@@ -53,21 +53,21 @@ const COLLECTIONS = [
   { volKey: 'hm',      cardId: null,                readKey: 'hidden-manna',    globalName: 'HIDDEN_MANNA',    prefaceGlobal: null,                       letterScreen: 'hm-letter',          indexScreen: null,                label: 'Hidden Manna',                                            registryLabel: 'Hidden Manna',                                            searchVolId: 'hidden-manna',  kind: 'letter',     surpriseType: null }
 ];
 
-const COL_BY_KEY       = new Map(COLLECTIONS.map(c => [c.volKey, c]));
-const COL_BY_CARD      = new Map(COLLECTIONS.filter(c => c.cardId).map(c => [c.cardId, c]));
-const COL_BY_LETTER_SC = new Map(COLLECTIONS.map(c => [c.letterScreen, c]));
-const COL_BY_INDEX_SC  = new Map(COLLECTIONS.filter(c => c.indexScreen).map(c => [c.indexScreen, c]));
-const COL_BY_SEARCH_ID = new Map(COLLECTIONS.filter(c => c.searchVolId).map(c => [c.searchVolId, c]));
-const COL_BY_READ_KEY  = new Map(COLLECTIONS.filter(c => c.readKey).map(c => [c.readKey, c]));
-const _NAV_ICONS = {one:'V1',two:'V2',three:'V3',four:'V4',five:'V5',six:'V6',seven:'V7',timothy:'LT',flock:'LF',rebuke:'LR',wtlb1:'W1',wtlb2:'W2',blessed:'TB',holydays:'HD',hm:'HM'};
-const COL_NAV_ICON = new Map(COLLECTIONS.map(c => [c.label, _NAV_ICONS[c.volKey] || '?']));
+export const COL_BY_KEY       = new Map(COLLECTIONS.map(c => [c.volKey, c]));
+export const COL_BY_CARD      = new Map(COLLECTIONS.filter(c => c.cardId).map(c => [c.cardId, c]));
+export const COL_BY_LETTER_SC = new Map(COLLECTIONS.map(c => [c.letterScreen, c]));
+export const COL_BY_INDEX_SC  = new Map(COLLECTIONS.filter(c => c.indexScreen).map(c => [c.indexScreen, c]));
+export const COL_BY_SEARCH_ID = new Map(COLLECTIONS.filter(c => c.searchVolId).map(c => [c.searchVolId, c]));
+export const COL_BY_READ_KEY  = new Map(COLLECTIONS.filter(c => c.readKey).map(c => [c.readKey, c]));
+export const _NAV_ICONS = {one:'V1',two:'V2',three:'V3',four:'V4',five:'V5',six:'V6',seven:'V7',timothy:'LT',flock:'LF',rebuke:'LR',wtlb1:'W1',wtlb2:'W2',blessed:'TB',holydays:'HD',hm:'HM'};
+export const COL_NAV_ICON = new Map(COLLECTIONS.map(c => [c.label, _NAV_ICONS[c.volKey] || '?']));
 
 /* Boundary-card short labels (default to .label when same). Used by the
    boundaryConfig() helper inside App() to compute prev/next reading-chain
    transitions. shortFromOutside is the label shown when crossing in from a
    different "family" (Rebuke→WTLB1 shows "Words To Live By", not "Part One"). */
-const _BOUNDARY_SHORT = { flock: 'Little Flock', holydays: 'Holy Days', wtlb1: 'Part One', wtlb2: 'Part Two' };
-const _BOUNDARY_SHORT_OUTSIDE = { wtlb1: 'Words To Live By', wtlb2: 'Words To Live By' };
+export const _BOUNDARY_SHORT = { flock: 'Little Flock', holydays: 'Holy Days', wtlb1: 'Part One', wtlb2: 'Part Two' };
+export const _BOUNDARY_SHORT_OUTSIDE = { wtlb1: 'Words To Live By', wtlb2: 'Words To Live By' };
 COLLECTIONS.forEach(c => {
   c.short = _BOUNDARY_SHORT[c.volKey] || c.label;
   c.shortFromOutside = _BOUNDARY_SHORT_OUTSIDE[c.volKey] || null;
@@ -75,29 +75,29 @@ COLLECTIONS.forEach(c => {
 
 /* Reading chain — order in which collections appear in the prev/next nav.
    Optional members (blessed) are skipped when their global is empty. */
-const READING_CHAIN = ['one','two','three','four','five','six','seven','rebuke','wtlb1','wtlb2','blessed','flock','timothy','holydays'];
-function _isWtlbFamily(col) { return !!col && (col.kind === 'wtlb' || col.kind === 'blessed'); }
-function _boundaryShort(sourceCol, targetCol) {
+export const READING_CHAIN = ['one','two','three','four','five','six','seven','rebuke','wtlb1','wtlb2','blessed','flock','timothy','holydays'];
+export function _isWtlbFamily(col) { return !!col && (col.kind === 'wtlb' || col.kind === 'blessed'); }
+export function _boundaryShort(sourceCol, targetCol) {
   if (targetCol.shortFromOutside && _isWtlbFamily(sourceCol) !== _isWtlbFamily(targetCol)) return targetCol.shortFromOutside;
   return targetCol.short;
 }
 
-function colLetters(col)  { return col && typeof window[col.globalName] !== 'undefined' ? window[col.globalName] : null; }
-function colPreface(col)  { return col && col.prefaceGlobal && typeof window[col.prefaceGlobal] !== 'undefined' ? window[col.prefaceGlobal] : null; }
-function colLetterArr(col) { if (!col) return []; const arr = colLetters(col); return Array.isArray(arr) ? arr : []; }
+export function colLetters(col)  { return col && typeof window[col.globalName] !== 'undefined' ? window[col.globalName] : null; }
+export function colPreface(col)  { return col && col.prefaceGlobal && typeof window[col.prefaceGlobal] !== 'undefined' ? window[col.prefaceGlobal] : null; }
+export function colLetterArr(col) { if (!col) return []; const arr = colLetters(col); return Array.isArray(arr) ? arr : []; }
 
-const LETTER_SCREEN_SET = new Set(COLLECTIONS.map(c => c.letterScreen).concat(['bible-study-chapter']));
+export const LETTER_SCREEN_SET = new Set(COLLECTIONS.map(c => c.letterScreen).concat(['bible-study-chapter']));
 
 /* ═══════════════════════════════════════════════════════════════
    SCRIPTURE REFERENCE PRIMITIVES
    Shared by parseScriptureRef, lookupVersesFromBooks, searchNavIndex.
 ═══════════════════════════════════════════════════════════════ */
 
-function _allBooks() { return window.__ALL_BOOKS || (typeof BOOKS !== 'undefined' ? BOOKS : {}); }
-function _matthew() { return (typeof window !== 'undefined' && window.MATTHEW) || (typeof MATTHEW !== 'undefined' ? MATTHEW : null); }
-function _studies() { return typeof BIBLE_STUDIES !== 'undefined' ? BIBLE_STUDIES : []; }
+export function _allBooks() { return window.__ALL_BOOKS || (typeof BOOKS !== 'undefined' ? BOOKS : {}); }
+export function _matthew() { return (typeof window !== 'undefined' && window.MATTHEW) || (typeof MATTHEW !== 'undefined' ? MATTHEW : null); }
+export function _studies() { return typeof BIBLE_STUDIES !== 'undefined' ? BIBLE_STUDIES : []; }
 
-function parseRefStr(str) {
+export function parseRefStr(str) {
   if (!str) return null;
   const s = str.trim();
   const tagM = s.match(/\s*\(([A-Za-z]+)\)\s*$/);
@@ -113,7 +113,7 @@ function parseRefStr(str) {
   };
 }
 
-function findBook(rawName) {
+export function findBook(rawName) {
   if (rawName == null) return null;
   const books = _allBooks();
   const q = String(rawName).toLowerCase().replace(/\s+/g, '');
@@ -129,7 +129,7 @@ function findBook(rawName) {
   return null;
 }
 
-function parseScriptureRef(str) {
+export function parseScriptureRef(str) {
   const p = parseRefStr(str);
   if (!p || p.verse == null) return null;
   const bookKey = findBook(p.rawBook);
@@ -144,7 +144,7 @@ function parseScriptureRef(str) {
 }
 
 /* Resolve verse text for a link endpoint */
-function resolveVerseText(endpoint) {
+export function resolveVerseText(endpoint) {
   if (endpoint.type === 'bible') {
     const book = _allBooks()[endpoint.bookId];
     if (!book) return endpoint.preview || '';
@@ -181,7 +181,7 @@ function resolveVerseText(endpoint) {
    the source key prefix already tells us where to look (e.g. a `blessed:`
    hlKey should never match a WTLB One entry that happens to share an id).
    Returns null if no match found. */
-function findEntryContext(id, kindHint) {
+export function findEntryContext(id, kindHint) {
   if (!id) return null;
   const cols = kindHint ? COLLECTIONS.filter(c => c.kind === kindHint) : COLLECTIONS;
   for (const col of cols) {
@@ -220,7 +220,7 @@ function findEntryContext(id, kindHint) {
   return null;
 }
 
-function lookupVersesFromBooks(ref) {
+export function lookupVersesFromBooks(ref) {
   const p = parseRefStr(ref);
   if (!p || p.verse == null) return null;
   const bookKey = findBook(p.rawBook);

@@ -31,7 +31,7 @@
    (back-compat alias — every existing call site keeps working).
 ═══════════════════════════════════════════════════════════════ */
 
-function ExpandableText(props) {
+export function ExpandableText(props) {
   var useState = React.useState;
   var text = props.text || '';
   var threshold = props.threshold || 240;
@@ -70,7 +70,7 @@ function ExpandableText(props) {
 
 /* Back-compat alias — keep every existing `JrnExpandable` call site
    working without edits. */
-var JrnExpandable = ExpandableText;
+export var JrnExpandable = ExpandableText;
 if (typeof window !== 'undefined') {
   window.ExpandableText = ExpandableText;
   window.JrnExpandable = ExpandableText;

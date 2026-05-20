@@ -14,7 +14,7 @@
      onChanged(memberIds)  — called after each toggle/create with the new Set
 ═══════════════════════════════════════════════════════════════ */
 
-function JournalNotebookSheet({ entryId, memberIds, onClose, onChanged }) {
+export function JournalNotebookSheet({ entryId, memberIds, onClose, onChanged }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;

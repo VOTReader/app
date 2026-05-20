@@ -12,7 +12,7 @@
    needs no React.useX upgrade — just a destination move.
    ═══════════════════════════════════════════════════════════════════════ */
 
-class ErrorBoundary extends React.Component {
+export class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
   static getDerivedStateFromError(err) { return { error: err }; }
   render() {

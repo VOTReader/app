@@ -22,7 +22,7 @@
      excludeJournalId          — current entry id, to omit from journal pick
 ═══════════════════════════════════════════════════════════════ */
 
-function JournalInsertSheet(props) {
+export function JournalInsertSheet(props) {
   var useState = React.useState;
   var useMemo = React.useMemo;
 

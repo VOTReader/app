@@ -26,7 +26,7 @@
      - same single-pass evaluation (useMemo([]) → once per mount)
    ═══════════════════════════════════════════════════════════════════════ */
 
-function _validateTabState(s) {
+export function _validateTabState(s) {
   if ((s.screen === "matthew-ch" || s.screen === "bible-ch") && s.chapterNum == null) s.screen = "home";
   if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-letter$/.test(s.screen) && !s.letterId) s.screen = "home";
   if (s.screen === "vot-letter" && !s.letterId) s.screen = "home";
@@ -45,7 +45,7 @@ function _validateTabState(s) {
   return s;
 }
 
-function useSavedState() {
+export function useSavedState() {
   return React.useMemo(() => {
     try {
       const s = JSON.parse(localStorage.getItem("vot-state") || "{}");

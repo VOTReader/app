@@ -5,9 +5,11 @@
    Depends on: CachedStore (loaded first).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { CachedStore } from './cached-store.js';
+
 /* NoteStore — note bodies as first-class records keyed by groupId.
    A note exists iff its group's kind === 'note'. */
-const NoteStore = Object.assign(CachedStore('vot-notes', {}), {
+export const NoteStore = Object.assign(CachedStore('vot-notes', {}), {
   get(groupId) { return this._load()[groupId] || null; },
   all() { return this._load(); },
   list() {

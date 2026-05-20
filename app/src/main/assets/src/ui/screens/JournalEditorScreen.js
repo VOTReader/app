@@ -22,7 +22,7 @@
      theme, onThemeChange
 ═══════════════════════════════════════════════════════════════ */
 
-function JournalEditorScreen(props) {
+export function JournalEditorScreen(props) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;

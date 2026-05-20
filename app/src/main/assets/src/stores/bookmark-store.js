@@ -30,10 +30,12 @@
        text if the user doesn't provide one.
 ═══════════════════════════════════════════════════════════════ */
 
-/* ID generator for bookmarks — parallel to lnkId in link-store.js */
-function bkmId() { return 'bkm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
+import { CachedStore } from './cached-store.js';
 
-const BookmarkStore = Object.assign(CachedStore('vot-bookmarks', []), {
+/* ID generator for bookmarks — parallel to lnkId in link-store.js */
+export function bkmId() { return 'bkm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
+
+export const BookmarkStore = Object.assign(CachedStore('vot-bookmarks', []), {
   get(id) {
     return this._load().find(function(b) { return b.id === id; }) || null;
   },

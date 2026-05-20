@@ -49,38 +49,11 @@ A = [
     'flexsearch.min.js', 'search-data.js', 'search.js',
 ]
 
-# Cluster B — stores + components + hooks + journal subsystem
-B = [
-    'src/stores/cached-store.js',
-    'src/stores/annotation-store.js',
-    'src/stores/note-store.js',
-    'src/stores/notebook-store.js',
-    'src/stores/recent-nav-store.js',
-    'src/stores/link-store.js',
-    'src/stores/bookmark-store.js',
-    'src/components/ExpandableText.js',
-    'src/components/ErrorBoundary.js',
-    'src/hooks/useMarkAsRead.js',
-    'src/hooks/use-saved-state.js',
-    'src/hooks/use-ref-mirror.js',
-    'src/hooks/use-history.js',
-    'src/styles/journal-styles.js',
-    'src/stores/journal-media-store.js',
-    'src/stores/journal-stats-store.js',
-    'src/stores/journal-index-store.js',
-    'src/data/journal-helpers.js',
-    'src/stores/journal-store.js',
-    'src/ui/sheets/JournalRecordingSheet.js',
-    'src/ui/sheets/JournalInsertSheet.js',
-    'src/ui/sheets/JournalNotebookSheet.js',
-    'src/ui/sheets/JournalInboundSheet.js',
-    'src/ui/screens/JournalHubScreen.js',
-    'src/ui/screens/JournalViewerScreen.js',
-    'src/ui/screens/JournalEditorScreen.js',
-    'src/renderer/dom-journal-chip.js',
-    'src/data/scripture-resolution.js',
-    'src/data/letter-linking.js',
-]
+# Cluster B — stores + components + hooks + journal subsystem + scripture-resolution
+# (NOW BUNDLED VIA ESBUILD as of G.2.2).
+# This list is kept empty; the source files use ES `export` syntax now.
+# See package.json `build:b` for the esbuild invocation.
+B = []  # intentionally empty; esbuild owns bundle-b.js
 
 # Cluster C — renderer (NOW BUNDLED VIA ESBUILD as of G.2.1).
 # This list is kept for reference; tools/build.py no longer emits bundle-c.js.
@@ -205,12 +178,11 @@ def bundle(name, files):
 
 
 def main():
-    print('Building 3 classic-script bundles --> ' + DIST)
-    print('  (cluster C is bundled by esbuild; run `npm run build:c` separately)')
+    print('Building 2 classic-script bundles --> ' + DIST)
+    print('  (clusters B and C are bundled by esbuild; run `npm run build:b build:c` separately)')
     bundle('a', A)
-    bundle('b', B)
     bundle('d', D)
-    print('Done. (bundle-c.js belongs to esbuild now.)')
+    print('Done. (bundle-b.js and bundle-c.js belong to esbuild now.)')
 
 
 if __name__ == '__main__':

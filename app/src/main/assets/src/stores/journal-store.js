@@ -40,11 +40,13 @@
      JournalStore.collectAllMediaIds()  → for orphan cleanup
 ═══════════════════════════════════════════════════════════════ */
 
-function jrnId() {
+import { CachedStore } from './cached-store.js';
+
+export function jrnId() {
   return 'j_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 }
 
-var JournalStore = Object.assign(CachedStore('vot-journal', { list: [] }), {
+export var JournalStore = Object.assign(CachedStore('vot-journal', { list: [] }), {
   all() {
     var data = this._load();
     return (data.list || []).slice().sort(function(a, b) {
@@ -325,7 +327,7 @@ var JournalStore = Object.assign(CachedStore('vot-journal', { list: [] }), {
 });
 
 /* ── Notebook store: parallel to NotebookStore, separate localStorage key. ── */
-var JournalNotebookStore = Object.assign(CachedStore('vot-journal-notebooks', { list: [] }), {
+export var JournalNotebookStore = Object.assign(CachedStore('vot-journal-notebooks', { list: [] }), {
   list() {
     var data = this._load();
     return (data.list || []).slice().sort(function(a, b) {

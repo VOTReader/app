@@ -24,7 +24,7 @@
    makes the eventual P7 fix a one-place edit instead of 15.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function useRefMirror(value) {
+export function useRefMirror(value) {
   const r = React.useRef(value);
   r.current = value;
   return r;

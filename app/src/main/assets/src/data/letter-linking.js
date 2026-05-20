@@ -10,14 +10,14 @@
    =================================================================== */
 
 
-function linkWtlbEntries(arr) {
+export function linkWtlbEntries(arr) {
   for (let i = 0; i < arr.length; i++) {
     arr[i].prevEntry = i > 0 ? { id: arr[i - 1].id, title: arr[i - 1].title } : null;
     arr[i].nextEntry = i < arr.length - 1 ? { id: arr[i + 1].id, title: arr[i + 1].title } : null;
   }
 }
 
-function linkPreface(preface, letters) {
+export function linkPreface(preface, letters) {
   if (!preface || !letters || letters.length === 0) return;
   preface.num = 0;
   preface.isPreface = true;
@@ -25,7 +25,7 @@ function linkPreface(preface, letters) {
   letters[0].prevLetter = { id: preface.id, title: preface.title };
 }
 
-function resolveVotLetter(vol, letter) {
+export function resolveVotLetter(vol, letter) {
   if (!letter) return null;
   // Exact vol::letter match first; fall back to "null::letter" for entries
   // whose vol is intentionally null in matthew.js (e.g. standalone-album refs).
@@ -33,7 +33,7 @@ function resolveVotLetter(vol, letter) {
   return VOT_LETTER_REGISTRY.get(key) || null;
 }
 
-function isHiddenManna(n) {
+export function isHiddenManna(n) {
   return !!n && HIDDEN_MANNA_TITLES.has((n.letter || "").trim());
 }
 

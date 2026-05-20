@@ -32,7 +32,9 @@
        — reverse lookup: which refKeys does THIS entry contribute to?
 ═══════════════════════════════════════════════════════════════ */
 
-var JournalIndexStore = Object.assign(CachedStore('vot-journal-index', {}), {
+import { CachedStore } from './cached-store.js';
+
+export var JournalIndexStore = Object.assign(CachedStore('vot-journal-index', {}), {
   /* Returns the list of journal entry IDs referencing the given key. */
   entriesReferencing(refKey) {
     if (!refKey) return [];
