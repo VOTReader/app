@@ -115,124 +115,11 @@ const HL_COLORS = ['yellow','green','pink','red','orange','blue','purple','teal'
    segments live in). For display + navigation we need to convert
    that array into a human label like "Proverbs 2:1-3" and an
    endpoint object compatible with navigateToLink(). */
-function _bookTitle(bookId) {
-  if (typeof BIBLE_BOOK_LIST !== 'undefined') {
-    const b = BIBLE_BOOK_LIST.find(x => x.id === bookId);
-    if (b) return b.title;
-  }
-  // Fallback: title-case the id
-  return bookId.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-}
+/* _bookTitle --> extracted to src/utils/note-source.js */
 /* Compress a sorted list of integers into "1-3, 5, 7-9" form. */
-function _verseRangeLabel(nums) {
-  if (!nums.length) return '';
-  const sorted = [...new Set(nums)].sort((a, b) => a - b);
-  const parts = [];
-  let s = sorted[0], p = sorted[0];
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i] === p + 1) { p = sorted[i]; continue; }
-    parts.push(s === p ? String(s) : (s + '-' + p));
-    s = p = sorted[i];
-  }
-  parts.push(s === p ? String(s) : (s + '-' + p));
-  return parts.join(', ');
-}
-function noteSourceLabel(note) {
-  const keys = note.keys || [];
-  if (!keys.length) return 'Note';
-  // Group by (kind, primary id, chapter where applicable)
-  const first = keys[0];
-  const parts0 = first.split(':');
-  const kind = parts0[0];
-  if (kind === 'bible' || kind === 'study') {
-    // Key shapes differ:
-    //   bible:bookId:chapter:verse   (4 parts)
-    //   study:bookId-chapter:verse   (3 parts — chapter is fused into p[1])
-    const byChap = new Map();
-    keys.forEach(k => {
-      const p = k.split(':');
-      let book, chap, verse;
-      if (kind === 'study') {
-        // p[1] = "matthew-22" (book + chap fused); p[2] = verse
-        book = p[1];
-        chap = (p[1].match(/-(\d+)$/) || [])[1] || '';
-        verse = parseInt(p[2] || '0', 10);
-      } else {
-        book = p[1];
-        chap = p[2];
-        verse = parseInt(p[3] || '0', 10);
-      }
-      const ck = book + ':' + chap;
-      if (!byChap.has(ck)) byChap.set(ck, []);
-      byChap.get(ck).push(verse);
-    });
-    const segs = [];
-    byChap.forEach((verses, ck) => {
-      const [book, chap] = ck.split(':');
-      const title = kind === 'bible' ? _bookTitle(book) :
-        // study key shape e.g. "matthew-22"; strip off the chapter half
-        (function() {
-          const m = book.match(/^(.+)-(\d+)$/);
-          return m ? (m[1].charAt(0).toUpperCase() + m[1].slice(1)) : book;
-        })();
-      segs.push(title + ' ' + chap + ':' + _verseRangeLabel(verses.filter(Boolean)));
-    });
-    return segs.join(' · ');
-  }
-  if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
-    // The same letter spans multiple block indices — title is enough
-    const id = parts0[1];
-    if (typeof findEntryContext === 'function') {
-      const ctx = findEntryContext(id, kind);
-      if (ctx && ctx.title) return ctx.title;
-    }
-    return id;
-  }
-  if (kind === 'journal') {
-    // journal:<entryId>:<blockIdx>
-    const eid = parts0[1];
-    const je = (typeof JournalStore !== 'undefined') ? JournalStore.get(eid) : null;
-    if (je) {
-      const title = (typeof JournalHelpers !== 'undefined' && JournalHelpers.entryDisplayTitle)
-        ? (JournalHelpers.entryDisplayTitle(je) || 'Untitled')
-        : (je.title || 'Untitled');
-      return 'Journal · ' + title;
-    }
-    return 'Journal Entry';
-  }
-  return first;
-}
-function noteSourceNav(note) {
-  const keys = note.keys || [];
-  if (!keys.length) return null;
-  const k = keys[0];
-  const p = k.split(':');
-  const kind = p[0];
-  if (kind === 'bible') {
-    return { type: 'bible', key: k, bookId: p[1], chapter: parseInt(p[2], 10), verse: parseInt(p[3], 10) };
-  }
-  if (kind === 'study') {
-    const m = (p[1] || '').match(/^(.+)-(\d+)$/);
-    if (m) return { type: 'study', key: k, bookId: m[1], chapter: parseInt(m[2], 10), verse: parseInt(p[2] || '0', 10) };
-  }
-  if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
-    // findEntryContext locates the right collection/screen for the entry id.
-    const ctx = (typeof findEntryContext === 'function') ? findEntryContext(p[1], kind) : null;
-    return {
-      type: kind, key: k,
-      letterId: p[1], entryId: p[1],
-      screen: ctx ? ctx.screen : null
-    };
-  }
-  if (kind === 'journal') {
-    return {
-      type: 'journal', key: k,
-      entryId: p[1],
-      screen: 'journal-viewer'
-    };
-  }
-  return null;
-}
+/* _verseRangeLabel --> extracted to src/utils/note-source.js */
+/* noteSourceLabel --> extracted to src/utils/note-source.js */
+/* noteSourceNav --> extracted to src/utils/note-source.js */
   </script>
   <!-- Core in-memory stores extracted from the inline block above.
        CachedStore is the factory used by every other store — must
@@ -273,6 +160,10 @@ function noteSourceNav(note) {
        registry + scripture primitives. Loaded after the journal
        modules and BEFORE the inline <script> that consumes them. -->
   <script src="src/data/scripture-resolution.js"></script>
+  <!-- letter-linking.js: linkWtlbEntries + linkPreface are called from
+       boot-time top-level code in the big inline block below (around
+       lines ~900-915), so this MUST load before that block executes. -->
+  <script src="src/data/letter-linking.js"></script>
   <!-- ─── /JOURNAL ─── -->
   <script>
 /* hlId and lnkId are now defined in src/stores/link-store.js */
@@ -280,13 +171,13 @@ function noteSourceNav(note) {
 /* snapRangeToWords → extracted to src/renderer/annotation-engine.js */
 
 /* Build a highlight key for a Bible verse */
-function bibleHlKey(bookId, chapter, verse) { return 'bible:' + bookId + ':' + chapter + ':' + verse; }
+/* bibleHlKey --> extracted to src/utils/hl-keys.js */
 /* Build a highlight key for a letter block */
-function letterHlKey(letterId, blockIdx) { return 'letter:' + letterId + ':' + blockIdx; }
+/* letterHlKey --> extracted to src/utils/hl-keys.js */
 /* Build a highlight key for a WTLB paragraph */
-function wtlbHlKey(entryId, paraIdx) { return 'wtlb:' + entryId + ':' + paraIdx; }
+/* wtlbHlKey --> extracted to src/utils/hl-keys.js */
 /* Build a highlight key for a study chapter block */
-function studyHlKey(chapterId, blockIdx) { return 'study:' + chapterId + ':' + blockIdx; }
+/* studyHlKey --> extracted to src/utils/hl-keys.js */
 
 /* ═══════════════════════════════════════════════════════════════
    SCRIPTURE / COLLECTION RESOLUTION
@@ -302,10 +193,7 @@ var _OT_BOOKS_INLINE = new Set(['genesis','exodus','leviticus','numbers','deuter
   'job','psalms','proverbs','ecclesiastes','songofsolomon','isaiah','jeremiah','lamentations',
   'ezekiel','daniel','hosea','joel','amos','obadiah','jonah','micah','nahum','habakkuk',
   'zephaniah','haggai','zechariah','malachi']);
-function bookCategory(bookId) {
-  var ot = (typeof OT_BOOK_IDS !== 'undefined') ? OT_BOOK_IDS : _OT_BOOKS_INLINE;
-  return ot.has(bookId) ? 'Old Testament' : 'New Testament';
-}
+/* bookCategory --> extracted to src/utils/book-category.js */
 
 /* ═══════════════════════════════════════════════════════════════
    NAVIGATION INDEX
@@ -313,269 +201,14 @@ function bookCategory(bookId) {
    WTLB entry, study chapter, etc.) with aliases for shortcut
    matching. Built lazily, cached on window.__NAV_INDEX.
 ═══════════════════════════════════════════════════════════════ */
-function buildNavIndex() {
-  if (window.__NAV_INDEX) return window.__NAV_INDEX;
-  const items = [];
-
-  /* Bible books → chapters. Each book gets a chapter-level entry. */
-  const books = _allBooks();
-  Object.values(books).forEach(book => {
-    if (!book || !book.chapters) return;
-    const titleLc = book.title.toLowerCase();
-    const titleNoSpace = titleLc.replace(/\s+/g, '');
-    // Common abbreviations (a few hand-picked; full list isn't needed because
-    // matching tolerates leading-N + first-3-letters)
-    const abbrevs = {
-      'genesis': 'gen', 'exodus': 'exo', 'leviticus': 'lev', 'numbers': 'num',
-      'deuteronomy': 'deut', 'joshua': 'josh', 'judges': 'judg',
-      '1samuel': '1sam', '2samuel': '2sam', '1kings': '1kgs', '2kings': '2kgs',
-      '1chronicles': '1chr', '2chronicles': '2chr',
-      'nehemiah': 'neh', 'psalms': 'ps', 'proverbs': 'prov',
-      'ecclesiastes': 'ecc', 'songofsolomon': 'song',
-      'isaiah': 'isa', 'jeremiah': 'jer', 'lamentations': 'lam',
-      'ezekiel': 'eze', 'daniel': 'dan', 'hosea': 'hos',
-      'obadiah': 'oba', 'jonah': 'jon', 'micah': 'mic', 'nahum': 'nah',
-      'habakkuk': 'hab', 'zephaniah': 'zeph', 'haggai': 'hag',
-      'zechariah': 'zech', 'malachi': 'mal',
-      'matthew': 'mt', 'mark': 'mk', 'luke': 'lk', 'john': 'jn',
-      'romans': 'rom', '1corinthians': '1cor', '2corinthians': '2cor',
-      'galatians': 'gal', 'ephesians': 'eph', 'philippians': 'phil',
-      'colossians': 'col', '1thessalonians': '1thess', '2thessalonians': '2thess',
-      '1timothy': '1tim', '2timothy': '2tim', 'titus': 'titus',
-      'philemon': 'phlm', 'hebrews': 'heb', 'james': 'jas',
-      '1peter': '1pet', '2peter': '2pet', '1john': '1jn', '2john': '2jn', '3john': '3jn',
-      'jude': 'jude', 'revelation': 'rev'
-    };
-    const abbr = abbrevs[book.id] || titleLc.slice(0, 3);
-    book.chapters.forEach(ch => {
-      const aliases = [
-        titleLc + ' ' + ch.num,
-        titleNoSpace + ch.num,
-        abbr + ' ' + ch.num,
-        abbr + ch.num,
-        // First-3-letters fallback
-        titleLc.slice(0, 3) + ' ' + ch.num
-      ];
-      items.push({
-        kind: 'bible-chapter',
-        bookId: book.id,
-        chapter: ch.num,
-        label: book.title + ' ' + ch.num,
-        category: bookCategory(book.id),
-        title: book.title,
-        aliases: aliases.map(a => a.toLowerCase())
-      });
-    });
-  });
-
-  /* Letters / entries via COLLECTIONS registry. */
-  const NAV_KIND = { letter: 'letter', wtlb: 'wtlb-entry', blessed: 'blessed-entry', 'holy-days': 'holy-days-entry' };
-  const VOL_NUM = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7 };
-  const NAV_ALIAS_BASES = {
-    timothy: ['timothy', 'tim', 'letters from timothy', 'lft'],
-    flock:   ['flock', 'letters to the flock', 'lttf', 'ltf'],
-    rebuke:  ['rebuke', "the lord's rebuke", 'lr', "lord's rebuke"],
-    wtlb1:   ['wtlb1', 'wtlb 1', 'wtlb part one', 'words to live by 1', 'wtlb one'],
-    wtlb2:   ['wtlb2', 'wtlb 2', 'wtlb part two', 'words to live by 2', 'wtlb two'],
-    blessed: ['blessed', 'the blessed'],
-    holydays:['holy days', 'hd']
-  };
-
-  for (const col of COLLECTIONS) {
-    if (col.volKey === 'hm') continue;
-    const navKind = NAV_KIND[col.kind] || 'letter';
-    const isLetter = navKind === 'letter';
-    const vn = VOL_NUM[col.volKey];
-    const bases = NAV_ALIAS_BASES[col.volKey];
-    const category = col.volKey === 'holydays' ? 'Holy Days' : col.label;
-
-    const pref = colPreface(col);
-    if (pref && pref.id) {
-      const pAliases = [pref.title.toLowerCase()];
-      if (vn) pAliases.push(col.label.toLowerCase() + ' preface', 'v' + vn + ' preface');
-      if (bases) bases.forEach(b => pAliases.push(b + ' preface'));
-      items.push({
-        kind: navKind, collection: col.label, screen: col.letterScreen,
-        letterId: pref.id, letterNum: 0,
-        label: pref.title, category: category, title: pref.title, aliases: pAliases
-      });
-    }
-
-    colLetterArr(col).forEach(entry => {
-      const aliases = [entry.title.toLowerCase()];
-      if (vn && entry.num != null) {
-        aliases.push(
-          'v'+vn+'l'+entry.num, 'v'+vn+' l'+entry.num,
-          'vol '+vn+' letter '+entry.num, 'volume '+vn+' letter '+entry.num,
-          col.label.toLowerCase()+' letter '+entry.num, col.label.toLowerCase()+' '+entry.num,
-          'v'+vn+' '+entry.num, 'vol'+vn+' '+entry.num);
-      }
-      if (bases) {
-        bases.forEach(b => {
-          aliases.push(b + ' ' + (entry.num != null ? entry.num : ''));
-          if (entry.num != null) {
-            aliases.push(b + entry.num);
-            if (col.kind === 'wtlb') aliases.push(b + ' #' + entry.num);
-          }
-        });
-      }
-      const item = {
-        kind: navKind, collection: col.label, screen: col.letterScreen,
-        label: entry.title, category: category, title: entry.title, aliases
-      };
-      if (isLetter) { item.letterId = entry.id; item.letterNum = entry.num; }
-      else { item.entryId = entry.id; item.entryNum = entry.num; }
-      items.push(item);
-    });
-  }
-
-  /* Bible / Letter Studies (non-Matthew) — More Than a Man, Lamb of God, etc.
-     Each chapter is its own target since these can be linked to with verse-
-     like granularity (excerpt picker handles text-range selection). */
-  if (Array.isArray(window.BIBLE_STUDIES)) {
-    window.BIBLE_STUDIES.forEach(study => {
-      if (!study || !Array.isArray(study.chapters)) return;
-      const studyKey = (study.slug || study.id || '').toLowerCase();
-      const studyTitleLc = (study.title || '').toLowerCase();
-      study.chapters.forEach(ch => {
-        if (!ch || !ch.id) return;
-        const chTitle = ch.title || ('Chapter ' + (ch.num != null ? ch.num : ch.id));
-        items.push({
-          kind: 'study-letter-chapter',
-          collection: study.title || 'Bible Study',
-          screen: 'bible-study-chapter',
-          studyId: study.slug || study.id,
-          studyChapterId: ch.id,
-          letterId: ch.id, // for openLinkPicker compat
-          chapterNum: ch.num,
-          label: chTitle,
-          category: 'Bible Studies',
-          title: chTitle,
-          aliases: [
-            chTitle.toLowerCase(),
-            studyTitleLc,
-            studyKey + ' ' + (ch.num != null ? ch.num : ''),
-            studyKey + (ch.num != null ? ch.num : '')
-          ].filter(Boolean)
-        });
-      });
-    });
-  }
-
-  /* Matthew Study Bible chapters. */
-  var _m = _matthew();
-  if (_m && Array.isArray(_m.chapters)) {
-    _m.chapters.forEach(ch => {
-      items.push({
-        kind: 'study-chapter',
-        bookId: 'matthew', chapter: ch.num,
-        screen: 'matthew-ch',
-        label: 'Matthew Study Bible — Chapter ' + ch.num + (ch.title ? ': ' + ch.title : ''),
-        category: 'Bible Studies', title: ch.title || ('Chapter ' + ch.num),
-        aliases: [
-          'matthew study ' + ch.num, 'msb ' + ch.num, 'msb' + ch.num,
-          'matthew sb ' + ch.num, 'matthew study bible ' + ch.num
-        ]
-      });
-    });
-  }
-
-  window.__NAV_INDEX = items;
-  return items;
-}
+/* buildNavIndex --> extracted to src/utils/nav-index.js */
 
 /* Parse a query string into navigation candidates.
    Returns an array of { item, score } sorted by descending score. */
-function searchNavIndex(query, limit) {
-  limit = limit || 30;
-  if (!query) return [];
-  const q = query.toLowerCase().trim();
-  const items = buildNavIndex();
-  const scored = [];
-
-  /* Try Bible reference parser first (handles "Eph 6:5", "Genesis 1:1-3" etc). */
-  const refP = parseRefStr(q);
-  let bibleRefHit = null;
-  if (refP) {
-    const bookKey = findBook(refP.rawBook);
-    if (bookKey) {
-      const books = _allBooks();
-      const bookEntry = books[bookKey];
-      if (bookEntry && bookEntry.chapters) {
-        const chRec = bookEntry.chapters.find(c => c.num === refP.chapter);
-        if (chRec) {
-          const isStudy = bookEntry.id === 'matthew';
-          const lbl = bookEntry.title + ' ' + refP.chapter + (refP.verse != null ? ':' + refP.verse + (refP.verseEnd ? '-' + refP.verseEnd : '') : '');
-          bibleRefHit = isStudy ? {
-            kind: 'study-chapter', bookId: bookEntry.id,
-            chapter: refP.chapter, verse: refP.verse, verseEnd: refP.verseEnd,
-            screen: 'matthew-ch', label: lbl, category: 'Study Bible', title: bookEntry.title
-          } : {
-            kind: 'bible-chapter', bookId: bookEntry.id,
-            chapter: refP.chapter, verse: refP.verse, verseEnd: refP.verseEnd,
-            label: lbl, category: bookCategory(bookEntry.id), title: bookEntry.title
-          };
-          scored.push({ item: bibleRefHit, score: 1000 });
-        }
-      }
-    }
-  }
-
-  /* Match against all aliases. Score by alias quality:
-     - exact match: 900
-     - starts-with: 700 - len-diff
-     - contains: 400 - position
-     - title contains: 200 */
-  for (const item of items) {
-    if (bibleRefHit &&
-        (item.kind === 'bible-chapter' || item.kind === 'study-chapter') &&
-        item.bookId === bibleRefHit.bookId && item.chapter === bibleRefHit.chapter) {
-      continue; // Already added with verse info from the Bible-ref parser
-    }
-    let best = 0;
-    for (const a of item.aliases) {
-      if (a === q) { best = Math.max(best, 900); continue; }
-      if (a.startsWith(q)) { best = Math.max(best, 700 - (a.length - q.length)); continue; }
-      const idx = a.indexOf(q);
-      if (idx >= 0) { best = Math.max(best, 400 - idx); continue; }
-    }
-    // Title-only contains (lowercase) — even partial title words match
-    const titleLc = (item.title || '').toLowerCase();
-    if (titleLc.includes(q)) best = Math.max(best, 200);
-    if (best > 0) scored.push({ item: item, score: best });
-  }
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit);
-}
+/* searchNavIndex --> extracted to src/utils/nav-index.js */
 
 /* Get a verse-text preview for a nav item (Bible/study chapters only). */
-function navItemPreview(it) {
-  if (it.kind === 'bible-chapter') {
-    const b = _allBooks()[it.bookId];
-    if (!b) return '';
-    const ch = b.chapters && b.chapters.find(c => c.num === it.chapter);
-    if (!ch) return '';
-    if (it.verse) {
-      const v = ch.sections && ch.sections.flatMap(s => s.verses).find(v => v.n === it.verse);
-      return v ? v.text : '';
-    }
-    // Show chapter title or first verse
-    return (ch.sections && ch.sections[0] && ch.sections[0].heading) || '';
-  }
-  if (it.kind === 'study-chapter') {
-    const M = _matthew();
-    if (!M) return '';
-    const ch = M.chapters && M.chapters.find(c => c.num === it.chapter);
-    if (!ch) return '';
-    if (it.verse) {
-      const v = ch.verses && ch.verses.find(v => v.n === it.verse);
-      return v ? v.text : '';
-    }
-    return ch.title || '';
-  }
-  return '';
-}
+/* navItemPreview --> extracted to src/utils/nav-index.js */
 
 /* annMarkClass + HighlightableText + the DOM-overlay engine
    (findNoteIconInsertionPoint / _markCharEnd / applyNoteIcons /
@@ -651,119 +284,12 @@ function navItemPreview(it) {
 ═══════════════════════════════════════════════════════════════ */
 
 /* Convert a nav-index item into a link endpoint object usable by LinkStore. */
-function navItemToEndpoint(it) {
-  if (it.kind === 'bible-chapter') {
-    const hasVerse = it.verse != null;
-    const key = hasVerse ? bibleHlKey(it.bookId, it.chapter, it.verse) : ('bible:' + it.bookId + ':' + it.chapter);
-    return {
-      type: 'bible', key,
-      bookId: it.bookId, chapter: it.chapter, verse: hasVerse ? it.verse : null,
-      label: it.label, preview: navItemPreview(it)
-    };
-  }
-  if (it.kind === 'letter') {
-    return {
-      type: 'letter', key: 'letter:' + it.letterId + ':0',
-      letterId: it.letterId, screen: it.screen, collection: it.collection,
-      label: it.label, preview: ''
-    };
-  }
-  if (it.kind === 'wtlb-entry' || it.kind === 'blessed-entry' || it.kind === 'holy-days-entry') {
-    const _type = it.kind === 'holy-days-entry' ? 'holy-days' : it.kind === 'blessed-entry' ? 'blessed' : 'wtlb';
-    return {
-      type: _type, key: 'wtlb:' + it.entryId + ':0',
-      entryId: it.entryId, screen: it.screen, collection: it.collection,
-      label: it.label, preview: ''
-    };
-  }
-  if (it.kind === 'study-chapter') {
-    const v = it.verse || null;
-    const key = v ? ('study:' + it.bookId + '-' + it.chapter + ':' + v) : ('study:' + it.bookId + '-' + it.chapter + ':0');
-    return {
-      type: 'study', key: key,
-      bookId: it.bookId, chapter: it.chapter, verse: v,
-      screen: it.screen || 'matthew-ch',
-      label: it.label, preview: navItemPreview(it)
-    };
-  }
-  if (it.kind === 'study-letter-chapter') {
-    // Bible-study chapter (non-Matthew). The hlKey shape mirrors letters
-    // (`letter:{chapterId}:0`) so per-block link icons work in LetterView,
-    // which is what renders these chapters via the letterShim.
-    return {
-      type: 'study-letter', key: 'letter:' + it.studyChapterId + ':0',
-      letterId: it.studyChapterId,
-      studyId: it.studyId, studyChapterId: it.studyChapterId,
-      screen: it.screen || 'bible-study-chapter',
-      collection: it.collection,
-      label: it.label, preview: ''
-    };
-  }
-  return null;
-}
+/* navItemToEndpoint --> extracted to src/utils/nav-index.js */
 
 /* Build the source endpoint object from a sourceKey + optional excerpt offsets.
    Pulled out of LinkPicker so refinement screens (verse-picker, excerpt-picker)
    can reuse the same shape when finalizing a link. */
-function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText) {
-  const parts = sourceKey.split(':');
-  const excerpt = sourceStart != null ? { start: sourceStart, end: sourceEnd, text: sourceText } : {};
-  if (parts[0] === 'bible') {
-    return { type: 'bible', key: sourceKey, bookId: parts[1], chapter: parseInt(parts[2], 10), verse: parseInt(parts[3], 10), label: sourceLabel || sourceKey };
-  }
-  if (parts[0] === 'study') {
-    // Matthew Study Bible verse. parts[1] is "matthew-N", parts[2] is verse
-    const m = parts[1].match(/^(.+)-(\d+)$/);
-    const bookId = m ? m[1] : 'matthew';
-    const chapter = m ? parseInt(m[2], 10) : null;
-    const verse = parts[2] && parts[2] !== '0' ? parseInt(parts[2], 10) : null;
-    return { type: 'study', key: sourceKey, bookId, chapter, verse, screen: 'matthew-ch', label: sourceLabel || sourceKey };
-  }
-  // letter / wtlb / blessed / holy-days — look up so the source endpoint
-  // carries the right screen + studyId so it can be navigated back to.
-  // Pass parts[0] as a kind-hint so id collisions across collections (e.g.
-  // "introduction" exists in both WTLB One and The Blessed) resolve to the
-  // collection that matches the source key's prefix.
-  if (parts[0] === 'letter' || parts[0] === 'wtlb' || parts[0] === 'blessed' || parts[0] === 'holy-days') {
-    const id = parts[1];
-    const ctx = findEntryContext(id, parts[0]);
-    if (ctx && ctx.kind === 'study-letter') {
-      return {
-        type: 'study-letter', key: sourceKey,
-        letterId: id, studyId: ctx.studyId, studyChapterId: ctx.studyChapterId,
-        screen: ctx.screen, collection: ctx.collection,
-        label: sourceLabel || ctx.title, ...excerpt
-      };
-    }
-    if (ctx) {
-      const base = {
-        type: ctx.kind, key: sourceKey, screen: ctx.screen,
-        collection: ctx.collection, label: sourceLabel || ctx.title, ...excerpt
-      };
-      if (ctx.kind === 'letter') base.letterId = id;
-      else base.entryId = id;
-      return base;
-    }
-    // Fallback: keep prior shape so we degrade gracefully on unknown ids
-    if (parts[0] === 'letter') return { type: 'letter', key: sourceKey, letterId: id, label: sourceLabel || sourceKey, ...excerpt };
-    if (parts[0] === 'wtlb')   return { type: 'wtlb',   key: sourceKey, entryId: id,  label: sourceLabel || sourceKey, ...excerpt };
-    return { type: parts[0], key: sourceKey, label: sourceLabel || sourceKey, ...excerpt };
-  }
-  if (parts[0] === 'journal') {
-    // journal:<entryId>:<blockIdx>  — the user's own journal entry can be
-    // a link source. The endpoint navigates back to the entry viewer.
-    const eid = parts[1];
-    let label = sourceLabel;
-    if (!label && typeof JournalStore !== 'undefined') {
-      const je = JournalStore.get(eid);
-      if (je && typeof JournalHelpers !== 'undefined') {
-        label = 'Journal · ' + (JournalHelpers.entryDisplayTitle(je) || 'Untitled');
-      }
-    }
-    return { type: 'journal', key: sourceKey, entryId: eid, screen: 'journal-viewer', label: label || sourceKey, ...excerpt };
-  }
-  return { type: parts[0], key: sourceKey, label: sourceLabel || sourceKey, ...excerpt };
-}
+/* buildSourceEndpoint --> extracted to src/utils/nav-index.js */
 
 /* persistLink is defined in src/stores/link-store.js */
 
@@ -829,20 +355,7 @@ function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sou
    notebook filter, and sort. Tap a row to jump back to the source
    chapter and open the note for reading.
 ═══════════════════════════════════════════════════════════════ */
-function relativeDate(ts) {
-  if (!ts) return '';
-  const diff = Date.now() - ts;
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return 'Just now';
-  if (min < 60) return min + 'm ago';
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return hr + 'h ago';
-  const d = Math.floor(hr / 24);
-  if (d < 7) return d + 'd ago';
-  if (d < 30) return Math.floor(d / 7) + 'w ago';
-  const date = new Date(ts);
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
+/* relativeDate --> extracted to src/utils/dates.js */
 
 /* Note-row component — shared between drilled view and All Notes.
    Root is a div role=button so the body + anchor can host their own
@@ -869,40 +382,12 @@ function relativeDate(ts) {
 /* ═══════════════════════════════════════════════════════════════
    SHARED HELPERS
 ═══════════════════════════════════════════════════════════════ */
-function firstVerseOfRef(refStr) {
-  const stripped = refStr.replace(/^\d+:\s*/, '').trim();
-  const m = stripped.match(/\d+/);
-  return m ? parseInt(m[0], 10) : null;
-}
-function parseRefRanges(refStr) {
-  const stripped = refStr.replace(/^\d+:\s*/, '').trim();
-  const parts = stripped.split(/,\s*/);
-  const ranges = [];
-  for (const p of parts) {
-    const m = p.match(/(\d+)(?:\s*-\s*(\d+))?/);
-    if (m) ranges.push({ start: parseInt(m[1], 10), end: parseInt(m[2] || m[1], 10) });
-  }
-  return ranges;
-}
-function lastVerseOfFirstRange(refStr) {
-  const ranges = parseRefRanges(refStr);
-  return ranges.length > 0 ? ranges[0].end : firstVerseOfRef(refStr);
-}
-function echoVersesForRef(refStr) {
-  const ranges = parseRefRanges(refStr);
-  if (ranges.length <= 1) return [];
-  return ranges.slice(1).map((r) => r.end);
-}
-function getNotesForVerse(chapter, verseNum) {
-  const scriptures = (chapter.scriptures || []).filter((s) => lastVerseOfFirstRange(s.ref) === verseNum);
-  const votNotes = (chapter.votNotes || []).filter((n) => lastVerseOfFirstRange(n.ref) === verseNum);
-  return { scriptures, votNotes };
-}
-function getEchoesForVerse(chapter, verseNum) {
-  const scriptures = (chapter.scriptures || []).filter((s) => echoVersesForRef(s.ref).includes(verseNum));
-  const votNotes = (chapter.votNotes || []).filter((n) => echoVersesForRef(n.ref).includes(verseNum));
-  return { scriptures, votNotes };
-}
+/* firstVerseOfRef --> extracted to src/utils/scripture-parse.js */
+/* parseRefRanges --> extracted to src/utils/scripture-parse.js */
+/* lastVerseOfFirstRange --> extracted to src/utils/scripture-parse.js */
+/* echoVersesForRef --> extracted to src/utils/scripture-parse.js */
+/* getNotesForVerse --> extracted to src/utils/scripture-parse.js */
+/* getEchoesForVerse --> extracted to src/utils/scripture-parse.js */
 
 /* ═══════════════════════════════════════════════════════════════
    SUI HELPERS & FOOTNOTE COMPONENTS
@@ -917,35 +402,12 @@ function getEchoesForVerse(chapter, verseNum) {
 /* Length-preserving normalization: curly quotes → straight; en/em dash → hyphen.
    Keeps char offsets stable so indexOf on normalized strings maps 1:1 to the
    original text. Lowercases for case-insensitive search. */
-function normalizeForHighlight(s) {
-  return String(s || "").
-  replace(/[\u2018\u2019]/g, "'").
-  replace(/[\u201c\u201d]/g, '"').
-  replace(/[\u2013\u2014]/g, "-").
-  toLowerCase();
-}
+/* normalizeForHighlight --> extracted to src/utils/highlight.js */
 
 /* Wrap the first occurrence of `needle` inside `text` with a <mark.letter-highlight>.
    Offsets are computed against a normalized copy but applied to the raw original,
    so the displayed text preserves curly quotes/dashes. */
-function splitWithHighlight(text, needle, keyPrefix) {
-  if (!text || !needle) return null;
-  const hay = normalizeForHighlight(text);
-  const need = normalizeForHighlight(needle);
-  if (!need || need.length > hay.length) return null;
-  const idx = hay.indexOf(need);
-  if (idx === -1) return null;
-  const before = text.slice(0, idx);
-  const match = text.slice(idx, idx + need.length);
-  const after = text.slice(idx + need.length);
-  return (/*#__PURE__*/
-    React.createElement(React.Fragment, null,
-    before, /*#__PURE__*/
-    React.createElement("mark", { key: `${keyPrefix}-mark`, className: "letter-highlight" }, match),
-    after
-    ));
-
-}
+/* splitWithHighlight --> extracted to src/utils/highlight.js */
 
 /* Find and gold-flash every paragraph spanned by `excerpt` inside `mainEl`.
    Used by both LetterView (Volumes) and WtlbEntryView (WTLB / Blessed / Holy
@@ -966,173 +428,9 @@ function splitWithHighlight(text, needle, keyPrefix) {
    5. Highlight every paragraph whose token range overlaps [anchor, last
       matched position].
    Scrolls the first highlighted paragraph into view (instant). */
-function highlightExcerptInDom(mainEl, excerpt) {
-  if (!mainEl || !excerpt) return [];
-  const tokenize = (s) => normalizeForHighlight(s).match(/[a-z0-9']+/g) || [];
-  const stripFnRefs = (el) => {
-    const clone = el.cloneNode(true);
-    clone.querySelectorAll('.fn-ref').forEach((f) => f.replaceWith(document.createTextNode(' ')));
-    return clone.textContent;
-  };
-  const exTokens = tokenize(excerpt);
-  if (exTokens.length === 0) return [];
+/* highlightExcerptInDom --> extracted to src/utils/highlight.js */
 
-  const paraEls = Array.from(mainEl.querySelectorAll("p, div.letter-poetry, div.letter-closing, div.letter-closing-fn"));
-  const stream = [];
-  const ranges = []; // [{el, start, end}, ...] — end is exclusive
-  paraEls.forEach((el) => {
-    const tks = tokenize(stripFnRefs(el));
-    if (tks.length === 0) return;
-    const start = stream.length;
-    for (const t of tks) stream.push(t);
-    ranges.push({ el, start, end: stream.length });
-  });
-  if (stream.length === 0) return [];
-
-  // Find anchor by scanning for the longest consecutive prefix match.
-  // Try anchorLen 8 → 6 → 4 in turn.
-  const findAnchor = (anchorLen) => {
-    if (anchorLen > exTokens.length) anchorLen = exTokens.length;
-    if (anchorLen < 1) return -1;
-    const need = exTokens.slice(0, anchorLen);
-    const first = need[0];
-    outer: for (let i = 0; i <= stream.length - need.length; i++) {
-      if (stream[i] !== first) continue;
-      for (let j = 1; j < need.length; j++) if (stream[i+j] !== need[j]) continue outer;
-      return i;
-    }
-    return -1;
-  };
-  let anchor = findAnchor(8);
-  if (anchor === -1) anchor = findAnchor(6);
-  if (anchor === -1) anchor = findAnchor(4);
-  if (anchor === -1) return [];
-
-  // Walk forward from anchor through the stream, allowing small drift.
-  // For each excerpt token, look ahead up to 3 stream tokens for a match.
-  // If no match within window, skip the excerpt token (count as drift). Stop
-  // when drift exceeds 25% of excerpt length, or stream/excerpt exhausted.
-  let exIdx = 0; // cursor into exTokens
-  let stIdx = anchor; // cursor into stream
-  let lastMatchedStreamIdx = anchor; // furthest stream pos with a match
-  const maxDrift = Math.max(8, Math.floor(exTokens.length * 0.25));
-  let drift = 0;
-  while (exIdx < exTokens.length && stIdx < stream.length) {
-    const want = exTokens[exIdx];
-    if (stream[stIdx] === want) {
-      lastMatchedStreamIdx = stIdx;
-      exIdx++;
-      stIdx++;
-      continue;
-    }
-    // Look ahead in stream for `want` within a small window.
-    let foundAt = -1;
-    const lookahead = Math.min(3, stream.length - stIdx);
-    for (let k = 1; k < lookahead; k++) {
-      if (stream[stIdx + k] === want) { foundAt = stIdx + k; break; }
-    }
-    if (foundAt !== -1) {
-      lastMatchedStreamIdx = foundAt;
-      exIdx++;
-      stIdx = foundAt + 1;
-      continue;
-    }
-    // No match within stream window — try advancing excerpt cursor instead.
-    exIdx++;
-    drift++;
-    if (drift > maxDrift) break;
-  }
-
-  // Highlight every paragraph whose [start, end) overlaps [anchor, lastMatchedStreamIdx].
-  const hits = ranges.filter((r) => r.start <= lastMatchedStreamIdx && r.end > anchor);
-  if (hits.length === 0) return [];
-  // If the excerpt spans (essentially) the entire letter, the highlight adds
-  // no value — it's just the whole page lit up. Skip the flash; the reader
-  // is meant to read from the top.
-  if (hits.length >= ranges.length || hits.length / ranges.length >= 0.85) return [];
-
-  // Wrap each hit paragraph's text in <mark class="letter-highlight"> so the
-  // highlight follows the text shape (line-break-natural) instead of being a
-  // square block around the paragraph. Skip text inside footnote refs and
-  // inline scripture-ref anchors so those keep their original styling.
-  const wrapped = [];
-  const isSkippable = (n) => {
-    let p = n.parentNode;
-    while (p && p.nodeType === 1) {
-      if (p.classList) {
-        if (p.classList.contains('fn-ref')) return true;
-        if (p.classList.contains('inline-scrip-ref')) return true;
-        if (p.tagName === 'MARK' && p.classList.contains('letter-highlight')) return true;
-      }
-      p = p.parentNode;
-    }
-    return false;
-  };
-  hits.forEach((r) => {
-    const tw = document.createTreeWalker(r.el, NodeFilter.SHOW_TEXT);
-    const textNodes = [];
-    let n;
-    while ((n = tw.nextNode())) {
-      if (!n.nodeValue || !n.nodeValue.trim()) continue;
-      if (isSkippable(n)) continue;
-      textNodes.push(n);
-    }
-    textNodes.forEach((tn) => {
-      const m = document.createElement('mark');
-      m.className = 'letter-highlight';
-      tn.parentNode.insertBefore(m, tn);
-      m.appendChild(tn);
-      wrapped.push(m);
-    });
-  });
-  if (wrapped.length === 0) return [];
-  // Scroll the first paragraph in the span into view (instant).
-  hits[0].el.scrollIntoView({ block: "center" });
-  setTimeout(() => {
-    wrapped.forEach((m) => {
-      const parent = m.parentNode;
-      if (!parent) return;
-      while (m.firstChild) parent.insertBefore(m.firstChild, m);
-      parent.removeChild(m);
-      parent.normalize();
-    });
-  }, 8400);
-  return hits.map((r) => r.el);
-}
-
-function renderTextWithScripRefs(text, baseClassName, onScripClick, highlightText) {
-  if (!text) return baseClassName ? /*#__PURE__*/React.createElement("span", { className: baseClassName }, text) : text;
-  const hasRef = text.includes('{{ref:');
-  // No scripture refs: handle highlight inline, else return as-is.
-  if (!hasRef) {
-    if (highlightText) {
-      const hl = splitWithHighlight(text, highlightText, "hl");
-      if (hl) return baseClassName ? /*#__PURE__*/React.createElement("span", { className: baseClassName }, hl) : hl;
-    }
-    return baseClassName ? /*#__PURE__*/React.createElement("span", { className: baseClassName }, text) : text;
-  }
-  const parts = text.split(/(\{\{ref:[^}]+\}\})/g);
-  return parts.map((part, i) => {
-    const m = part.match(/^\{\{ref:(.+)\}\}$/);
-    if (m) {
-      const ref = m[1].trim();
-      return (/*#__PURE__*/
-        React.createElement("a", { key: i, className: "inline-scrip-ref", href: "#",
-          onClick: (e) => {e.preventDefault();onScripClick && onScripClick(ref);},
-          title: ref }, ref));
-
-    }
-    if (!part) return null;
-    let content = part;
-    if (highlightText) {
-      const hl = splitWithHighlight(part, highlightText, `hl-${i}`);
-      if (hl) content = hl;
-    }
-    return baseClassName ? /*#__PURE__*/
-    React.createElement("span", { key: i, className: baseClassName }, content) : /*#__PURE__*/
-    React.createElement(React.Fragment, { key: i }, content);
-  });
-}
+/* renderTextWithScripRefs --> extracted to src/utils/render-text.js */
 
 /* StaticSubtree → extracted to src/renderer/annotation-engine.js */
 
@@ -1148,20 +446,7 @@ function renderTextWithScripRefs(text, baseClassName, onScripClick, highlightTex
 // Parse a ref string like "John 3:16", "Romans 1:1-5", "Psalm 50:3-4",
 // or comma-separated "1 Cor 7:7, 9". Returns { start, end, verses? } or null.
 // For comma refs, `verses` is the explicit list (e.g. [7, 9]).
-function parseRefRange(ref) {
-  const clean = ref.replace(/\s*\(.*?\)\s*/g, "").trim();
-  // Comma-separated verses: "7:7, 9" or "7:7, 9, 11"
-  const cm = clean.match(/:(\d+(?:\s*,\s*\d+)+)$/);
-  if (cm) {
-    const nums = cm[1].split(/\s*,\s*/).map(Number);
-    if (nums.length >= 2) return { start: nums[0], end: nums[nums.length - 1], verses: nums };
-  }
-  const m = clean.match(/:(\d+)(?:-(\d+))?$/);
-  if (!m) return null;
-  const start = parseInt(m[1], 10);
-  const end = m[2] ? parseInt(m[2], 10) : start;
-  return end > start ? { start, end } : null;
-}
+/* parseRefRange --> extracted to src/utils/scripture-parse.js */
 
 /* lookupVersesFromBooks → src/data/scripture-resolution.js */
 
@@ -1176,111 +461,7 @@ function parseRefRange(ref) {
 //
 // STRATEGY 1 (fallback): sentence-boundary split, used when the text lacks
 // explicit N. markers (legacy data, hand-baked compound refs, etc.).
-function splitIntoVerses(text, ref) {
-  const range = parseRefRange(ref);
-  if (!range) return null;
-  // For comma refs like "7:7, 9", use explicit verse list; otherwise contiguous range
-  const verseNums = range.verses || Array.from({ length: range.end - range.start + 1 }, (_, i) => range.start + i);
-  const count = verseNums.length;
-  if (count < 2) return null;
-
-  // Strategy 0 — explicit "N. text" markers. Lookbehind accepts any
-  // whitespace (not just ". "), because verses often end with ";", ",",
-  // ":", "?" etc. and the fetcher joins them with a single space.
-  // Accept the LONGEST PREFIX of markers that matches verseNums in order.
-  // Partial prefix handles truncated text (e.g. ExpandableVerse's 130-char
-  // preview) correctly — we split on what markers we have instead of
-  // falling through to Strategy 1, which would treat the leading "13." as
-  // verse 13's text.
-  const numAlt = verseNums.map(String);
-  const markerRx = new RegExp(`(?:^|(?<=\\s))(${numAlt.join('|')})\\.\\s+`, 'g');
-  const markers = [];
-  let mm;
-  while ((mm = markerRx.exec(text)) !== null) {
-    markers.push({ vNum: parseInt(mm[1], 10), start: mm.index, markerEnd: mm.index + mm[0].length });
-  }
-  let prefixLen = 0;
-  const cap = Math.min(markers.length, count);
-  for (let i = 0; i < cap; i++) {
-    if (markers[i].vNum !== verseNums[i]) break;
-    prefixLen++;
-  }
-  if (prefixLen > 0) {
-    const segments = [];
-    for (let i = 0; i < prefixLen; i++) {
-      const textStart = markers[i].markerEnd;
-      const textEnd = i + 1 < prefixLen ? markers[i + 1].start : text.length;
-      const verseText = text.slice(textStart, textEnd).trim();
-      segments.push({ vNum: markers[i].vNum, text: verseText });
-    }
-    return segments;
-  }
-
-  // Strategy 0b — Unicode superscript verse numbers (e.g. "text ²when ³if ⁴then").
-  // MATTHEW_NKJV entries from bolls.life use these instead of "N. " markers.
-  const superMap = { '\u2070': 0, '\u00b9': 1, '\u00b2': 2, '\u00b3': 3, '\u2074': 4, '\u2075': 5, '\u2076': 6, '\u2077': 7, '\u2078': 8, '\u2079': 9 };
-  function parseSuperNum(s) {
-    let n = 0;
-    for (const ch of s) {if (!(ch in superMap)) return -1;n = n * 10 + superMap[ch];}
-    return n;
-  }
-  const superRx = /[\u2070\u00b9\u00b2\u00b3\u2074-\u2079]+/g;
-  const superMarkers = [];
-  let sm;
-  while ((sm = superRx.exec(text)) !== null) {
-    const vn = parseSuperNum(sm[0]);
-    if (verseNums.includes(vn)) {
-      superMarkers.push({ vNum: vn, start: sm.index, markerEnd: sm.index + sm[0].length });
-    }
-  }
-  // If first verse has no superscript prefix, add an implicit marker at position 0
-  if (superMarkers.length > 0 && superMarkers[0].vNum !== verseNums[0]) {
-    superMarkers.unshift({ vNum: verseNums[0], start: 0, markerEnd: 0 });
-  }
-  if (superMarkers.length === count) {
-    let superExact = true;
-    for (let i = 0; i < count; i++) {
-      if (superMarkers[i].vNum !== verseNums[i]) {superExact = false;break;}
-    }
-    if (superExact) {
-      const segs = [];
-      for (let i = 0; i < count; i++) {
-        const tStart = superMarkers[i].markerEnd;
-        const tEnd = i + 1 < count ? superMarkers[i + 1].start : text.length;
-        segs.push({ vNum: superMarkers[i].vNum, text: text.slice(tStart, tEnd).trim() });
-      }
-      return segs;
-    }
-  }
-
-  // Strategy 1 — sentence-boundary split (epistles, prophecy, narrative)
-  let chunks = text.split(/(?<=[.!?])\s+(?=[A-Z\u201c\u2018])/).filter(Boolean);
-
-  // Strategy 2 — comma-chain genealogy (e.g. Luke 3) — split on ", the "
-  if (chunks.length < count) {
-    const commaChunks = text.split(/, (?=the )/).filter(Boolean);
-    if (commaChunks.length >= count) {
-      chunks = commaChunks.map((c, i) => i === 0 ? c : "the " + c);
-    }
-  }
-
-  // Still not enough — label whole block with start verse only
-  if (chunks.length < count) {
-    return [{ vNum: range.start, text }];
-  }
-
-  const perVerse = Math.floor(chunks.length / count);
-  const remainder = chunks.length % count;
-  const segments = [];
-  let idx = 0;
-  for (let v = 0; v < count; v++) {
-    const take = perVerse + (v < remainder ? 1 : 0);
-    const joined = chunks.slice(idx, idx + take).join(", ");
-    segments.push({ vNum: range.start + v, text: joined });
-    idx += take;
-  }
-  return segments;
-}
+/* splitIntoVerses --> extracted to src/utils/scripture-parse.js */
 
 /* VerseWithNumbers → extracted to src/ui/components/VerseWithNumbers.js */
 
@@ -1501,29 +682,14 @@ const GARDEN_TIERS = [
 { id: "ultra", label: "Ultra", res: "4600px", size: "~680 MB", tag: "garden-ultra", desc: "Maximum quality — for pixel-peepers" }];
 
 const GARDEN_DEFAULT_TIER = "standard";
-function getGardenTier(id) {
-  return GARDEN_TIERS.find((t) => t.id === id) || GARDEN_TIERS.find((t) => t.id === GARDEN_DEFAULT_TIER);
-}
-function gardenUrl(n, tierId) {
-  const tier = getGardenTier(tierId);
-  return `https://github.com/corbinlythgoe/votreader-assets/releases/download/${tier.tag}/garden_${String(n).padStart(3, "0")}.jpg`;
-}
+/* getGardenTier --> extracted to src/utils/garden.js */
+/* gardenUrl --> extracted to src/utils/garden.js */
 
 // Image cache — per-tier, keyed as "tier:page"
 const gardenImageCache = {};
-function gardenCacheKey(n, tierId) {return `${tierId}:${n}`;}
-function gardenPreload(n, tierId) {
-  if (n < 1 || n > GARDEN_TOTAL) return;
-  const key = gardenCacheKey(n, tierId);
-  if (gardenImageCache[key]) return;
-  const img = new Image();
-  img.src = gardenUrl(n, tierId);
-  gardenImageCache[key] = img;
-}
-function gardenIsCached(n, tierId) {
-  const img = gardenImageCache[gardenCacheKey(n, tierId)];
-  return img && img.complete && img.naturalWidth > 0;
-}
+/* gardenCacheKey --> extracted to src/utils/garden.js */
+/* gardenPreload --> extracted to src/utils/garden.js */
+/* gardenIsCached --> extracted to src/utils/garden.js */
 
 /* GardenView → extracted to src/ui/screens/GardenView.js */
 
@@ -1576,19 +742,7 @@ const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'Ju
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function timeAgo(ts) {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks}w ago`;
-  return `${Math.floor(days / 30)}mo ago`;
-}
+/* timeAgo --> extracted to src/utils/dates.js */
 
 /* HistoryEntryCard → extracted to src/ui/components/HistoryEntryCard.js */
 
@@ -1646,68 +800,14 @@ const CLEAR_CLASSES = ["settings-clear-btn", "settings-clear-btn warning", "sett
 /* ═══════════════════════════════════════════════════════════════
    TABS OVERVIEW — describe each tab + render the grid
 ═══════════════════════════════════════════════════════════════ */
-function describeTab(tab) {
-  // Returns { title, subtitle } for the card. Falls back gracefully.
-  const s = tab.screen || 'home';
-  const resolveBook = (id) => id ? id === 'matthew' ? MATTHEW : id === 'matthew-plain' ? MATTHEW_PLAIN : BOOKS[id] : null;
-  const book = resolveBook(tab.bookId);
-
-  // Scripture flow
-  if (s === 'matthew-ch' || s === 'bible-ch') {
-    const title = book ? `${book.title} · Ch. ${tab.chapterNum ?? '?'}` : 'Reading';
-    const ot = book && OT_BOOK_IDS && OT_BOOK_IDS.has(book.id);
-    const subtitle = book ?
-    book.id === 'matthew' || book.id === 'matthew-plain' ? 'New Testament · Gospels' : ot ? 'Old Testament' : 'New Testament' :
-    'Scripture';
-    return { title, subtitle };
-  }
-  if (s === 'bible-idx' || s === 'matthew-idx') {
-    const title = book ? book.title : 'Book';
-    return { title, subtitle: book && OT_BOOK_IDS && OT_BOOK_IDS.has(book.id) ? 'Old Testament' : 'New Testament' };
-  }
-  if (s === 'scriptures-home') return { title: 'Scriptures', subtitle: 'The Scriptures of Truth' };
-  if (s === 'scripture-genre') return { title: tab.genreId || 'Scriptures', subtitle: 'Browse by genre' };
-
-  // Volumes & letter collections (via COLLECTIONS registry)
-  const _ltrCol = COL_BY_LETTER_SC.get(s);
-  if (_ltrCol) {
-    const l = colLetterArr(_ltrCol).find(e => e.id === tab.letterId);
-    return { title: l?.title || (_ltrCol.kind === 'letter' ? 'Letter' : 'Entry'), subtitle: _ltrCol.label };
-  }
-  const _idxCol = COL_BY_INDEX_SC.get(s);
-  if (_idxCol) return { title: _idxCol.label, subtitle: _idxCol.kind === 'letter' ? 'Letter index' : 'Entry index' };
-  if (s === 'volumes-home') return { title: 'Volumes', subtitle: 'The Volumes of Truth' };
-
-  // Studies
-  if (s === 'studies-home') return { title: 'Studies', subtitle: 'Letter Studies · Matthew Study Bible' };
-  if (s === 'bible-study-index') {
-    const _study = _studies().find(st => st.slug === tab.studyId);
-    return { title: _study?.title || 'Study', subtitle: 'Bible Letter Study' };
-  }
-  if (s === 'bible-study-chapter') {
-    const _study = _studies().find(st => st.slug === tab.studyId);
-    const _ch = _study && _study.chapters && _study.chapters.find(c => c.id === tab.studyChapterId);
-    return { title: _ch?.title || 'Study Chapter', subtitle: _study?.title || 'Bible Letter Study' };
-  }
-
-  // Meta
-  if (s === 'garden-view') return { title: `The Garden · Page ${tab.gardenPage ?? 1}`, subtitle: 'A Return to The Garden' };
-  if (s === 'search') return { title: tab.searchQuery ? `"${tab.searchQuery}"` : 'Search', subtitle: 'Full-text search' };
-  if (s === 'history') return { title: 'History', subtitle: 'Recently visited' };
-  if (s === 'settings') return { title: 'Settings', subtitle: 'App configuration' };
-
-  // Default → Home
-  return { title: 'Home', subtitle: 'VOT Study Bible' };
-}
+/* describeTab --> extracted to src/utils/tabs.js */
 
 /* TabActionSheet → extracted to src/ui/sheets/TabActionSheet.js */
 
 /* TabsOverview → extracted to src/ui/sheets/TabsOverview.js */
 
 // Content signature for thumbnail cache — stable across tab index shifts
-function tabContentKey(tab) {
-  return `${tab.screen || 'home'}|${tab.bookId || ''}|${tab.chapterNum ?? ''}|${tab.letterId || ''}|${tab.studyId || ''}|${tab.studyChapterId || ''}|${tab.genreId || ''}|${tab.gardenPage ?? ''}`;
-}
+/* tabContentKey --> extracted to src/utils/tabs.js */
 
 // Does this tab's screen actually have reading content with meaningful scroll
 // progress? Settings/history/index/search screens don't — the progress bar
@@ -1722,23 +822,10 @@ const READING_SCREENS = new Set([
 'bible-study-chapter',
 'garden-view']
 );
-function tabHasProgressBar(tab) {
-  return READING_SCREENS.has(tab.screen);
-}
+/* tabHasProgressBar --> extracted to src/utils/tabs.js */
 
 // Derive a scroll-memory key that matches the screen/content the tab is on.
-function scrollKeyForTab(tab) {
-  const s = tab.screen;
-  if (s === 'matthew-ch' || s === 'bible-ch') return `${tab.bookId}-${tab.chapterNum}`;
-  if (s === 'bible-study-chapter') return `study-${tab.studyId || ''}-${tab.studyChapterId || ''}`;
-  if (s === 'hm-letter') return `entry-${tab.letterId}`;
-  const _sc = COL_BY_LETTER_SC.get(s);
-  if (_sc) {
-    const pfx = _sc.kind === 'holy-days' ? 'holyday' : _sc.kind === 'letter' ? 'letter' : _sc.kind;
-    return `${pfx}-${tab.letterId}`;
-  }
-  return s || 'home';
-}
+/* scrollKeyForTab --> extracted to src/utils/tabs.js */
 
 /* AboutScreen → extracted to src/ui/screens/AboutScreen.js */
 
@@ -1759,106 +846,23 @@ function scrollKeyForTab(tab) {
 const THUMB_DB = 'vot-thumbs';
 const THUMB_STORE = 'thumbs';
 let _thumbDbPromise = null;
-function openThumbDB() {
-  if (_thumbDbPromise) return _thumbDbPromise;
-  _thumbDbPromise = new Promise((resolve) => {
-    try {
-      const req = indexedDB.open(THUMB_DB, 1);
-      req.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains(THUMB_STORE)) db.createObjectStore(THUMB_STORE);
-      };
-      req.onsuccess = (e) => resolve(e.target.result);
-      req.onerror = () => resolve(null);
-    } catch (e) {resolve(null);}
-  });
-  return _thumbDbPromise;
-}
-function idbPut(key, value) {
-  return openThumbDB().then((db) => {
-    if (!db) return;
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(THUMB_STORE, 'readwrite');
-        tx.objectStore(THUMB_STORE).put(value, key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
-        tx.onabort = () => resolve();
-      } catch (e) {resolve();}
-    });
-  });
-}
-function idbDelete(key) {
-  return openThumbDB().then((db) => {
-    if (!db) return;
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(THUMB_STORE, 'readwrite');
-        tx.objectStore(THUMB_STORE).delete(key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
-      } catch (e) {resolve();}
-    });
-  });
-}
-function idbReadAll() {
-  return openThumbDB().then((db) => {
-    if (!db) return {};
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(THUMB_STORE, 'readonly');
-        const store = tx.objectStore(THUMB_STORE);
-        const out = {};
-        const req = store.openCursor();
-        req.onsuccess = (e) => {
-          const c = e.target.result;
-          if (c) {out[c.key] = c.value;c.continue();} else
-          resolve(out);
-        };
-        req.onerror = () => resolve(out);
-      } catch (e) {resolve({});}
-    });
-  });
-}
+/* openThumbDB --> extracted to src/stores/thumb-store.js */
+/* idbPut --> extracted to src/stores/thumb-store.js */
+/* idbDelete --> extracted to src/stores/thumb-store.js */
+/* idbReadAll --> extracted to src/stores/thumb-store.js */
 
 // Alt-translation data is loaded lazily (see loadTranslation below). Until
 // the target translation's bible-<code>.js has loaded, translateVerse falls
 // back to the NKJV text baked into chapter.sections.verses[].text.
 const _translationPromises = {}; // code -> Promise that resolves when loaded
 const _translationLoaded = {}; // code -> true once global is available
-function loadTranslation(code) {
-  if (!code || code === 'nkjv') return Promise.resolve();
-  const globalName = 'BIBLE_' + code.toUpperCase();
-  if (window[globalName]) {_translationLoaded[code] = true;return Promise.resolve();}
-  if (_translationPromises[code]) return _translationPromises[code];
-  _translationPromises[code] = new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'src/data/bible-' + code + '.js';
-    script.async = true;
-    script.onload = () => {_translationLoaded[code] = true;resolve();};
-    script.onerror = () => {resolve();}; // silent fail — NKJV fallback
-    document.head.appendChild(script);
-  });
-  return _translationPromises[code];
-}
+/* loadTranslation --> extracted to src/data/translations.js */
 
 // bible-studies.js (~4.3 MB) is lazy-loaded the first time the user opens Studies.
 // Modeled on loadTranslation() — same caching / promise pattern.
 // Once loaded, window.BIBLE_STUDIES is defined and _studies() returns the array.
 let _bibleStudiesPromise = null;
-function loadBibleStudies() {
-  if (typeof BIBLE_STUDIES !== 'undefined') return Promise.resolve();
-  if (_bibleStudiesPromise) return _bibleStudiesPromise;
-  _bibleStudiesPromise = new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'src/data/bible-studies.js';
-    script.async = true;
-    script.onload = () => { resolve(); };
-    script.onerror = () => { resolve(); }; // silent fail — STUDIES stays []
-    document.head.appendChild(script);
-  });
-  return _bibleStudiesPromise;
-}
+/* loadBibleStudies --> extracted to src/data/translations.js */
 const TRANSLATION_OPTIONS = [
 { id: 'nkjv', label: 'NKJV', desc: 'New King James Version — default' },
 { id: 'web', label: 'WEB', desc: 'World English Bible — modern, public domain' },
@@ -1882,17 +886,7 @@ const ARROW_LAYOUT_OPTIONS = [
 { id: 'nav', label: 'In Top Nav', desc: 'Small bubble arrows inside the top nav bar.' },
 { id: 'off', label: 'Hidden', desc: 'Hide both arrows. Use the bottom prev/next cards.' }];
 
-function translateVerse(bookId, chNum, verse, translation) {
-  if (!translation || translation === 'nkjv') return verse.text;
-  const data = window['BIBLE_' + translation.toUpperCase()];
-  if (!data) return verse.text; // not yet loaded → NKJV fallback
-  const verses = data[bookId] && data[bookId][chNum];
-  if (!verses) return verse.text;
-  for (let i = 0; i < verses.length; i++) {
-    if (verses[i].n === verse.n) return verses[i].text;
-  }
-  return verse.text;
-}
+/* translateVerse --> extracted to src/data/translations.js */
 /* ═══════════════════════════════════════════════════════════════ */
 /* BibleChapterView → extracted to src/ui/screens/BibleChapterView.js */
 
@@ -1905,12 +899,7 @@ function translateVerse(bookId, chNum, verse, translation) {
 BOOKS["matthew-plain"] = MATTHEW_PLAIN;
 
 // Link WTLB entries with prev/next
-function linkWtlbEntries(arr) {
-  for (let i = 0; i < arr.length; i++) {
-    arr[i].prevEntry = i > 0 ? { id: arr[i - 1].id, title: arr[i - 1].title } : null;
-    arr[i].nextEntry = i < arr.length - 1 ? { id: arr[i + 1].id, title: arr[i + 1].title } : null;
-  }
-}
+/* linkWtlbEntries --> extracted to src/data/letter-linking.js */
 // Link WTLB-style entries with prevEntry/nextEntry nav chain
 // HOLY_DAYS already linked at fetch time (mixed wtlb/letter shapes)
 COLLECTIONS.forEach(function(col) {
@@ -1921,13 +910,7 @@ COLLECTIONS.forEach(function(col) {
 });
 
 // Link prefaces into nav chain: preface ↔ first letter
-function linkPreface(preface, letters) {
-  if (!preface || !letters || letters.length === 0) return;
-  preface.num = 0;
-  preface.isPreface = true;
-  preface.nextLetter = { id: letters[0].id, title: letters[0].title };
-  letters[0].prevLetter = { id: preface.id, title: preface.title };
-}
+/* linkPreface --> extracted to src/data/letter-linking.js */
 COLLECTIONS.forEach(function(col) {
   var pref = colPreface(col), arr = colLetterArr(col);
   if (pref) linkPreface(pref, arr);
@@ -2004,13 +987,7 @@ const VOT_LETTER_REGISTRY = (() => {
   return reg;
 })();
 
-function resolveVotLetter(vol, letter) {
-  if (!letter) return null;
-  // Exact vol::letter match first; fall back to "null::letter" for entries
-  // whose vol is intentionally null in matthew.js (e.g. standalone-album refs).
-  const key = (vol || "null") + "::" + letter;
-  return VOT_LETTER_REGISTRY.get(key) || null;
-}
+/* resolveVotLetter --> extracted to src/data/letter-linking.js */
 
 // Hidden Manna: true words given through Timothy that aren't publicly
 // published on thevolumesoftruth.com. They appear as excerpts in the
@@ -2020,9 +997,7 @@ const HIDDEN_MANNA_TITLES = new Set([
 "I Have Purged; Behold, I Shall Wipe Away and Restore",
 "Woe to Dallas"]
 );
-function isHiddenManna(n) {
-  return !!n && HIDDEN_MANNA_TITLES.has((n.letter || "").trim());
-}
+/* isHiddenManna --> extracted to src/data/letter-linking.js */
 
 /* ═══════════════════════════════════════════════════════════════
    SEARCH (Orama-backed)
@@ -2054,18 +1029,7 @@ const SRCH_KIND_LABEL = {
 };
 
 // ─── Result grouping ───
-function srchGroupKey(doc) {
-  if (!doc) return 'other';
-  const k = doc.kind;
-  if (k === 'verse' || k === 'chapter-title' || k === 'heading') return doc.bookId === 'matthew' ? 'matthew' : 'bible';
-  if (k === 'study-note' || k === 'cross-ref') return 'matthew-study';
-  if (k === 'letter' || k === 'letter-title' || k === 'footnote') return doc.volumeId || 'letters';
-  if (k === 'wtlb' || k === 'wtlb-title') return doc.volumeId || 'wtlb';
-  if (k === 'blessed' || k === 'blessed-title') return 'blessed';
-  if (k === 'holy-day' || k === 'holy-day-title') return 'holydays';
-  if (k === 'bible-study') return 'bible-studies';
-  return 'other';
-}
+/* srchGroupKey --> extracted to src/utils/search.js */
 const SRCH_GROUP_META = {
   'matthew': { label: 'Matthew Study Bible', order: 1 },
   'bible': { label: 'Scriptures', order: 2 },
@@ -2099,23 +1063,8 @@ const SRCH_GROUP_META = {
 
 
 // ─── Group with collapse ───
-function SrchGroup({ gkey, items, terms, onSelect, defaultOpen }) {
-  const [open, setOpen] = React.useState(defaultOpen !== false);
-  const meta = SRCH_GROUP_META[gkey] || { label: gkey };
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "srch-group" + (open ? '' : ' collapsed') }, /*#__PURE__*/
-    React.createElement("button", { className: "srch-group-header", onClick: () => setOpen((o) => !o) }, /*#__PURE__*/
-    React.createElement("span", null, meta.label, /*#__PURE__*/React.createElement("span", { className: "srch-group-count-inline" }, " · ", items.length, " ", items.length === 1 ? "match" : "matches")), /*#__PURE__*/
-    React.createElement("span", { className: "srch-group-count" }, open ? '▾' : '▸')
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "srch-group-items" },
-    items.map((entry, i) => /*#__PURE__*/
-    React.createElement(SrchCard, { key: i, entry: entry, terms: terms, onSelect: onSelect })
-    )
-    )
-    ));
+/* SrchGroup → extracted to src/ui/components/SrchGroup.js */
 
-}
 
 // ─── Quick-pick chips on empty state ───
 const SRCH_QUICK_PICKS = [
@@ -5233,6 +4182,22 @@ multiNotePayload && React.createElement(MultiNotePopover, {
   <script src="src/ui/sheets/NotebookManagerSheet.js"></script>
   <script src="src/ui/components/LinkCard.js"></script>
   <script src="src/ui/components/LinkIcon.js"></script>
+  <script src="src/utils/hl-keys.js"></script>
+  <script src="src/utils/dates.js"></script>
+  <script src="src/utils/garden.js"></script>
+  <script src="src/utils/tabs.js"></script>
+  <script src="src/stores/thumb-store.js"></script>
+  <script src="src/data/translations.js"></script>
+  <!-- letter-linking.js loaded much earlier (top of body) since it's
+       called by top-level boot code in the big inline block. -->
+  <script src="src/utils/nav-index.js"></script>
+  <script src="src/utils/note-source.js"></script>
+  <script src="src/utils/book-category.js"></script>
+  <script src="src/utils/scripture-parse.js"></script>
+  <script src="src/utils/highlight.js"></script>
+  <script src="src/utils/render-text.js"></script>
+  <script src="src/utils/search.js"></script>
+  <script src="src/ui/components/SrchGroup.js"></script>
   <script src="src/ui/screens/LinksScreen.js"></script>
   <!-- BookmarksScreen, BookmarkRow, BookmarkRowActionSheet, BookmarkPopover — extracted to src/ui/screens/BookmarksScreen.js -->
   <!-- Depends on: BookmarkStore (bookmark-store.js), ScreenLayout, ThemeBtn, relativeDate, -->
