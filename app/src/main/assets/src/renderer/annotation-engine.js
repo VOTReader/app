@@ -59,7 +59,7 @@ function snapRangeToWords(text, start, end) {
 ═══════════════════════════════════════════════════════════════ */
 /* Build the className for a mark based on annotation kind. */
 function annMarkClass(ann, isFirst, isLast) {
-  const kind = ann.kind || (ann.style === 'underline' ? 'underline' : 'highlight');
+  const kind = ann.kind || 'highlight';
   if (kind === 'note') {
     return 'hl-mark hl-note hl-' + ann.color +
       (isFirst ? ' first-segment' : '') +
@@ -148,7 +148,7 @@ function HighlightableText({ text, hlKey, hlTick }) {
       let node = segText;
       for (let i = seg.active.length - 1; i >= 0; i--) {
         const ann = seg.active[i];
-        const kind = ann.kind || (ann.style === 'underline' ? 'underline' : 'highlight');
+        const kind = ann.kind || 'highlight';
         const isFirst = firstSegByGroup.get(ann.groupId) === segIdx;
         const isLast = lastSegByGroup.get(ann.groupId) === segIdx;
         const isOutermost = i === 0;
@@ -382,7 +382,7 @@ function applyDOMHighlights() {
       var isFirst = seenIdx === 0;
       var isLast = seenIdx === groupCounts[ann.groupId] - 1;
       groupSeen[ann.groupId] = seenIdx + 1;
-      var kind = ann.kind || (ann.style === 'underline' ? 'underline' : 'highlight');
+      var kind = ann.kind || 'highlight';
 
       // Re-walk text nodes (cheap for typical paragraph sizes)
       var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);

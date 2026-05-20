@@ -630,7 +630,7 @@ function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onB
       React.createElement("div", { className: "sel-toolbar-colors" },
         HL_COLORS.map(c => React.createElement("button", {
           key: c,
-          className: "sel-color-btn sel-color-" + activeStyle + (selInfo.existingHl && selInfo.existingHl.color === c && (selInfo.existingHl.kind || (selInfo.existingHl.style === 'underline' ? 'underline' : 'highlight')) === activeStyle ? ' active' : ''),
+          className: "sel-color-btn sel-color-" + activeStyle + (selInfo.existingHl && selInfo.existingHl.color === c && (selInfo.existingHl.kind || 'highlight') === activeStyle ? ' active' : ''),
           "data-color": c,
           onClick: () => applyHighlight(c),
           title: c

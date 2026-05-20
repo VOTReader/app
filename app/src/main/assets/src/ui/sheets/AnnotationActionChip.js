@@ -23,7 +23,7 @@ function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }) {
   const { x, y, hlKey, groupId } = chip;
   const ann = (AnnotationStore.get(hlKey) || []).find(h => h.groupId === groupId);
   if (!ann) return null;
-  const kind = ann.kind || (ann.style === 'underline' ? 'underline' : 'highlight');
+  const kind = ann.kind || 'highlight';
   const kindLabel = kind === 'underline' ? 'underline' : 'highlight';
 
   // Width estimate by mode for viewport clamping
