@@ -69,18 +69,123 @@ i_next = text.find('function ' + NEXT + '(', i_start)
 if i_next == -1:
     print('FATAL: terminator function %s not found after %s' % (NEXT, VIEW)); sys.exit(1)
 
-# The VIEW's closing brace is at the position of the last newline+`}`
-# pattern strictly BEFORE the next function. Try the strict pattern
-# first (function followed by a blank line), then relax to allow
-# adjacent functions with no blank line between (`\n}\n` → `\n}`).
-i_close = text.rfind(NL + '}' + NL, i_start, i_next)
-end_pattern_len = len(NL + '}' + NL)
-if i_close == -1:
-    i_close = text.rfind(NL + '}', i_start, i_next)
-    end_pattern_len = len(NL + '}')
-    if i_close == -1:
-        print('FATAL: could not find closing brace for', VIEW); sys.exit(1)
-body_end = i_close + end_pattern_len
+# Find this function's OWN closing brace via brace-matching from its
+# body opener. The previous rfind('\n}\n') heuristic swept in adjacent
+# inline helpers when there were unextracted functions between this
+# function and the named terminator (caught when ClearProgressRow's
+# extraction grabbed ~30 inline helpers up to SrchGroup).
+#
+# Algorithm:
+#   1. Skip past parameter list (paren-matched, skipping strings/comments).
+#   2. Find the function-body `{`.
+#   3. Brace-count from that `{`, skipping content inside strings, line
+#      comments, block comments, and regex literals.
+def _find_func_close(s, fn_start):
+    n = len(s)
+    p = s.find('(', fn_start)
+    if p == -1: return -1
+    # Paren-match the parameter list
+    depth = 1
+    p += 1
+    while p < n and depth:
+        c = s[p]
+        if c == '"' or c == "'":
+            p += 1
+            while p < n and s[p] != c:
+                if s[p] == '\\': p += 2
+                else: p += 1
+            p += 1
+        elif c == '`':
+            p += 1
+            while p < n and s[p] != '`':
+                if s[p] == '\\': p += 2
+                elif s[p:p+2] == '${':
+                    p += 2
+                    bd = 1
+                    while p < n and bd:
+                        if s[p] == '{': bd += 1
+                        elif s[p] == '}': bd -= 1
+                        p += 1
+                else: p += 1
+            p += 1
+        elif s[p:p+2] == '//':
+            p = s.find('\n', p);
+            if p == -1: return -1
+        elif s[p:p+2] == '/*':
+            p = s.find('*/', p+2)
+            if p == -1: return -1
+            p += 2
+        elif c == '(': depth += 1; p += 1
+        elif c == ')': depth -= 1; p += 1
+        else: p += 1
+    if depth: return -1
+    # Find the function body opening `{`
+    while p < n and s[p] in ' \t\r\n': p += 1
+    if p >= n or s[p] != '{': return -1
+    # Brace-match the body
+    p += 1
+    depth = 1
+    prev_token = '{'  # for regex heuristic
+    while p < n and depth:
+        c = s[p]
+        if c == '"' or c == "'":
+            p += 1
+            while p < n and s[p] != c:
+                if s[p] == '\\': p += 2
+                else: p += 1
+            p += 1
+            prev_token = '"'
+        elif c == '`':
+            p += 1
+            while p < n and s[p] != '`':
+                if s[p] == '\\': p += 2
+                elif s[p:p+2] == '${':
+                    p += 2
+                    bd = 1
+                    while p < n and bd:
+                        if s[p] == '{': bd += 1
+                        elif s[p] == '}': bd -= 1
+                        p += 1
+                else: p += 1
+            p += 1
+            prev_token = '`'
+        elif s[p:p+2] == '//':
+            nl = s.find('\n', p)
+            p = nl if nl != -1 else n
+        elif s[p:p+2] == '/*':
+            e = s.find('*/', p+2)
+            if e == -1: return -1
+            p = e + 2
+        elif c == '/' and prev_token in '=(,!&|?:;{}[' and prev_token not in '*':
+            # Likely a regex literal — scan until unescaped /
+            p += 1
+            in_class = False
+            while p < n:
+                cc = s[p]
+                if cc == '\\': p += 2; continue
+                if cc == '[': in_class = True
+                elif cc == ']': in_class = False
+                elif cc == '/' and not in_class: p += 1; break
+                elif cc == '\n': break
+                p += 1
+            prev_token = '/'
+        elif c == '{':
+            depth += 1; p += 1; prev_token = '{'
+        elif c == '}':
+            depth -= 1; p += 1
+            if depth == 0: return p
+            prev_token = '}'
+        elif c in ' \t\r\n':
+            p += 1
+        else:
+            # Track last non-trivial token (single char OK for regex heuristic)
+            prev_token = c; p += 1
+    return -1
+
+body_end = _find_func_close(text, i_start)
+if body_end == -1 or body_end > i_next:
+    print('FATAL: brace-match failed (body_end=%d, i_next=%d)' % (body_end, i_next))
+    sys.exit(1)
 body = text[i_start:body_end]
 
 # ── Hook upgrade — bare → React.useX (self-containment) ──────────────

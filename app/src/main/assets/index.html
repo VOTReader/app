@@ -85,17 +85,7 @@
 function _extends() {return _extends = Object.assign ? Object.assign.bind() : function (n) {for (var e = 1; e < arguments.length; e++) {var t = arguments[e];for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);}return n;}, _extends.apply(null, arguments);}
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { error: null }; }
-  static getDerivedStateFromError(err) { return { error: err }; }
-  render() {
-    if (!this.state.error) return this.props.children;
-    return React.createElement("div", { style: { padding: "2rem", textAlign: "center", color: "#e0c97f", fontFamily: "Georgia, serif" } },
-      React.createElement("h2", { style: { marginBottom: "1rem" } }, "Something went wrong"),
-      React.createElement("p", { style: { color: "#b0a080", fontSize: "0.85rem", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" } }, String(this.state.error)),
-      React.createElement("button", { onClick: () => location.reload(), style: { padding: "0.6rem 1.6rem", background: "transparent", border: "1px solid #e0c97f", color: "#e0c97f", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit" } }, "Reload App"));
-  }
-}
+/* ErrorBoundary → extracted to src/components/ErrorBoundary.js */
 
 /* ═══════════════════════════════════════════════════════════════
    HIGHLIGHT & LINK STORAGE
@@ -108,14 +98,7 @@ class ErrorBoundary extends React.Component {
    color ROW shows them in this order. */
 const HL_COLORS = ['yellow','green','pink','red','orange','blue','purple','teal','brown','gray'];
 
-/* ── useMarkAsRead — shared hook for mark-as-read window bridge ── */
-function useMarkAsRead(enabled, onMarkRead) {
-  useEffect(() => {
-    if (!enabled) return;
-    window.__onReadingComplete = onMarkRead;
-    return () => {window.__onReadingComplete = null;};
-  }, [enabled, onMarkRead]);
-}
+/* useMarkAsRead → extracted to src/hooks/useMarkAsRead.js (P6 warmup) */
 
 /* CachedStore → extracted to src/stores/cached-store.js */
 
@@ -266,6 +249,9 @@ function noteSourceNav(note) {
   <!-- Shared ExpandableText (a.k.a. JrnExpandable) — used by Journal,
        Bookmarks AND Notes. MUST load before any of those consumers. -->
   <script src="src/components/ExpandableText.js"></script>
+  <!-- Root ErrorBoundary (wraps <App>) and the shared useMarkAsRead hook. -->
+  <script src="src/components/ErrorBoundary.js"></script>
+  <script src="src/hooks/useMarkAsRead.js"></script>
   <!-- ─── JOURNAL FEATURE — segregated module set ───
        All depend on CachedStore (defined above) + React (loaded earlier).
        Load order matters: styles → stores → helpers → sheets → screens → chip. -->
@@ -639,26 +625,8 @@ function navItemPreview(it) {
    Small chain icon rendered next to any verse/passage that has
    user-created links. Tapping opens the link sidebar.
 ═══════════════════════════════════════════════════════════════ */
-function LinkIcon({ hlKey, hlTick, onClick, prefix }) {
-  // When `prefix` is true, hlKey is treated as a prefix and any link whose
-  // endpoint key starts with that prefix counts. Used by letter/wtlb blocks
-  // because excerpts append ":start-end" to the block-level key.
-  const links = useMemo(
-    () => prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
-    [hlKey, hlTick, prefix]
-  );
-  if (!links || links.length === 0) return null;
-  return React.createElement("span", {
-    className: "verse-link-icon",
-    onClick: (e) => { e.stopPropagation(); onClick && onClick(hlKey); },
-    title: links.length + " link" + (links.length > 1 ? "s" : "")
-  },
-    React.createElement("svg", { viewBox: "0 0 24 24" },
-      React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
-      React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })
-    )
-  );
-}
+/* LinkIcon → extracted to src/ui/components/LinkIcon.js */
+
 
 /* ═══════════════════════════════════════════════════════════════
    LINK SIDEBAR
@@ -666,98 +634,8 @@ function LinkIcon({ hlKey, hlTick, onClick, prefix }) {
    hlKey. Each card shows the reference, category, text preview,
    and a remove button. Tapping a card navigates to that ref.
 ═══════════════════════════════════════════════════════════════ */
-function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
-  const [expanded, setExpanded] = useState(false);
-  // confirmRemove: false | true — governs the tap-confirm strip (§11.1: no instant delete).
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const matchesSide = (k) => isBlockScope ? (k === hlKey || k.startsWith(hlKey + ':')) : k === hlKey;
-  // Determine which side is "us" (this container) and which is "other" (the linked passage).
-  // source = where the user originated the link; target = the destination they picked.
-  const isSource = matchesSide(lnk.source.key);
-  const other = isSource ? lnk.target : lnk.source;
-  const thisSide = isSource ? lnk.source : lnk.target;
-  // isOutbound = true when THIS container is the source of the link.
-  // Shown as a subtle directional eyebrow in the card header.
-  const isOutbound = isSource;
-  const preview = resolveVerseText(other);
-  // Preview chain: prefer the OTHER side's text (what we linked TO),
-  // then resolveVerseText (Bible/study lookup), then fall back to
-  // THIS side's text (what we linked FROM) so the card never appears
-  // empty when one side has an excerpt and the other doesn't —
-  // e.g. user selects a sentence here, links to a whole letter
-  // without refining excerpt → other.text empty → fall back to
-  // showing what they linked FROM, prefixed with "From: ".
-  const otherText = other.text || preview || '';
-  const usingFromFallback = !otherText && !!thisSide.text;
-  const rawText = otherText || thisSide.text || '';
-  const isLong = rawText.length > 150;
-  const chainSvg = React.createElement("svg", { className: "link-card-chain", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" },
-    React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
-    React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })
-  );
-  const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); setHlTick(t => t + 1); };
-  return React.createElement("div", { className: "link-card", onClick: confirmRemove ? undefined : (() => onNavigate && onNavigate(other)) },
-    React.createElement("div", { className: "link-card-header" },
-      React.createElement("div", { className: "link-card-ref" },
-        React.createElement("span", { className: "link-card-direction" }, isOutbound ? "to " : "from "),
-        other.label
-      ),
-      chainSvg
-    ),
-    React.createElement("div", { className: "link-card-cat" },
-      other.type === 'bible' ? bookCategory(other.bookId) :
-      other.type === 'study' ? 'Matthew Study Bible' :
-      other.type === 'study-letter' ? (other.collection || 'Bible Study') :
-      other.type === 'letter' ? (other.collection || 'Letter') :
-      other.type === 'wtlb' ? (other.collection || 'Words To Live By') :
-      other.type === 'blessed' ? 'The Blessed' :
-      other.type === 'holy-days' ? 'Holy Days' :
-      ''
-    ),
-    // Created-date row — subtle Cinzel caps so the user can see when they
-    // anchored the link without having to open the full Links browser.
-    lnk.created && React.createElement("div", { className: "link-card-date" },
-      relativeDate(lnk.created)
-    ),
-    React.createElement("div", {
-      className: "link-card-preview",
-      style: expanded ? { display: 'block', WebkitLineClamp: 'unset', overflow: 'visible' } : undefined
-    },
-      ((other.type === 'bible' || other.type === 'study') && other.verse) && React.createElement("strong", null, other.verse + " "),
-      usingFromFallback && React.createElement("em", { className: "link-card-from-label" }, "From: "),
-      rawText
-    ),
-    // Actions row: show-more toggle + remove (with tap-confirm per §11.1)
-    !confirmRemove && React.createElement("div", { className: "link-card-actions" },
-      isLong && React.createElement("span", {
-        className: "link-card-show-more",
-        onClick: (e) => { e.stopPropagation(); setExpanded(x => !x); }
-      }, expanded ? "Show less" : "Show more"),
-      React.createElement("span", {
-        className: "link-card-remove",
-        onClick: (e) => { e.stopPropagation(); setConfirmRemove(true); }
-      }, "Remove link")
-    ),
-    // Tap-confirm strip — replaces the actions row when confirmRemove=true.
-    // First tap on "Remove link" → strip morphs into this. Second tap on
-    // "Yes, remove" → actually deletes. Cancel returns to the normal view.
-    confirmRemove && React.createElement("div", {
-      className: "ann-chip-confirm",
-      style: { padding: '10px 12px' },
-      onClick: (e) => e.stopPropagation()
-    },
-      React.createElement("span", { className: "ann-chip-confirm-q" }, "Remove this link?"),
-      React.createElement("button", {
-        className: "ann-chip-confirm-btn ann-chip-confirm-cancel",
-        onClick: (e) => { e.stopPropagation(); setConfirmRemove(false); }
-      }, "Cancel"),
-      React.createElement("button", {
-        className: "ann-chip-confirm-btn ann-chip-confirm-yes",
-        onClick: doRemove
-      }, "Yes, remove")
-    )
-  );
-}
+/* LinkCard → extracted to src/ui/components/LinkCard.js */
+
 
 /* LinkSidebar → extracted to src/ui/sheets/LinkSidebar.js */
 
@@ -934,108 +812,8 @@ function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sou
    Opened from the Notes index — lets the user create, rename, and
    delete notebooks without the picker's note-membership semantics.
 ═══════════════════════════════════════════════════════════════ */
-function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
-  const notebooks = useMemo(() => NotebookStore.list(), [hlTick]);
-  const [newName, setNewName] = useState('');
-  const [renameId, setRenameId] = useState(null);    // notebook id being renamed
-  const [renameValue, setRenameValue] = useState('');
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+/* NotebookManagerSheet → extracted to src/ui/sheets/NotebookManagerSheet.js */
 
-  const counts = useMemo(() => {
-    const map = {};
-    NoteStore.list().forEach(n => {
-      (n.notebookIds || []).forEach(id => { map[id] = (map[id] || 0) + 1; });
-    });
-    return map;
-  }, [hlTick]);
-
-  const createNotebook = () => {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-    NotebookStore.add(trimmed);
-    setHlTick(t => t + 1);
-    setNewName('');
-  };
-
-  const startRename = (nb) => { setRenameId(nb.id); setRenameValue(nb.name); };
-  const commitRename = () => {
-    const trimmed = renameValue.trim();
-    if (trimmed && renameId) {
-      NotebookStore.rename(renameId, trimmed);
-      setHlTick(t => t + 1);
-    }
-    setRenameId(null);
-    setRenameValue('');
-  };
-  const cancelRename = () => { setRenameId(null); setRenameValue(''); };
-
-  const deleteNb = (id) => {
-    NotebookStore.remove(id);
-    setHlTick(t => t + 1);
-    setConfirmDeleteId(null);
-  };
-
-  return React.createElement("div", { className: "nb-picker-overlay", onClick: onClose },
-    React.createElement("div", { className: "nb-picker", onClick: e => e.stopPropagation() },
-      React.createElement("div", { className: "nb-picker-header" },
-        React.createElement("span", { className: "nb-picker-title" }, "Manage Notebooks"),
-        React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "×")
-      ),
-      React.createElement("div", { className: "nb-picker-new" },
-        React.createElement("input", {
-          className: "nb-picker-new-input",
-          type: "text",
-          placeholder: "New notebook name…",
-          value: newName,
-          onChange: e => setNewName(e.target.value),
-          onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); createNotebook(); } },
-          maxLength: 60
-        }),
-        React.createElement("button", {
-          className: "nb-picker-new-btn" + (newName.trim() ? '' : ' disabled'),
-          onClick: createNotebook,
-          disabled: !newName.trim()
-        }, "Create")
-      ),
-      notebooks.length === 0
-        ? React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.")
-        : React.createElement("div", { className: "nb-picker-list" },
-            notebooks.map(nb => {
-              if (confirmDeleteId === nb.id) {
-                return React.createElement("div", { key: nb.id, className: "ann-chip-confirm", style: { padding: '10px 12px' } },
-                  React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete “", nb.name, "”? Notes will move to Uncategorized."),
-                  React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDeleteId(null) }, "Cancel"),
-                  React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: () => deleteNb(nb.id) }, "Yes, delete")
-                );
-              }
-              if (renameId === nb.id) {
-                return React.createElement("div", { key: nb.id, className: "nb-picker-row checked", style: { gap: '8px' } },
-                  React.createElement("input", {
-                    className: "nb-picker-new-input",
-                    type: "text",
-                    autoFocus: true,
-                    value: renameValue,
-                    onChange: e => setRenameValue(e.target.value),
-                    onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') cancelRename(); },
-                    maxLength: 60,
-                    style: { flex: 1 }
-                  }),
-                  React.createElement("button", { className: "nb-picker-row-delete", onClick: cancelRename, title: "Cancel" }, "✕"),
-                  React.createElement("button", { className: "nb-picker-new-btn", onClick: commitRename }, "Save")
-                );
-              }
-              const count = counts[nb.id] || 0;
-              return React.createElement("div", { key: nb.id, className: "nb-picker-row", style: { cursor: 'default' } },
-                React.createElement("span", { className: "nb-picker-name" }, nb.name),
-                React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: '0.52rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--cream-muted)', marginRight: '8px' } }, count, count === 1 ? ' note' : ' notes'),
-                React.createElement("button", { className: "nb-picker-row-delete", onClick: () => startRename(nb), title: "Rename", style: { color: 'var(--cream-muted)', padding: '4px 8px' } }, "✎"),
-                React.createElement("button", { className: "nb-picker-row-delete", onClick: () => setConfirmDeleteId(nb.id), title: "Delete notebook", "aria-label": "Delete notebook" }, "×")
-              );
-            })
-          )
-    )
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════
    LIBRARY SCREEN
@@ -1069,50 +847,8 @@ function relativeDate(ts) {
 /* Note-row component — shared between drilled view and All Notes.
    Root is a div role=button so the body + anchor can host their own
    "Show more" buttons (HTML disallows nested buttons inside a button). */
-function NoteRow({ note, onTap }) {
-  const sourceLabel = noteSourceLabel(note);
-  const date = relativeDate(note.updated || note.created);
-  const noteNbs = (note.notebookIds || []).map(id => NotebookStore.get(id)).filter(Boolean);
-  const swatchBg = ({
-    yellow: '#ffd700', green: '#76ff03', pink: '#ff4081', red: '#f44336',
-    orange: '#ff9100', blue: '#2196f3', purple: '#ba68c8', teal: '#00bcd4',
-    brown: '#8d6e63', gray: '#9e9e9e', cyan: '#00bcd4'
-  })[note.color] || '#ffd700';
-  const Exp = typeof JrnExpandable !== 'undefined' ? JrnExpandable : null;
-  const bodyText = note.body || '';
-  const anchorText = note.fullText || '';
-  return React.createElement("div", {
-    className: "note-row",
-    role: "button",
-    tabIndex: 0,
-    onClick: () => onTap(note),
-    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(note); } }
-  },
-    React.createElement("span", { className: "note-row-swatch", style: { background: swatchBg } }),
-    React.createElement("span", { className: "note-row-body" },
-      React.createElement("span", { className: "note-row-source-line" },
-        React.createElement("span", { className: "note-row-source" }, sourceLabel),
-        date && React.createElement("span", { className: "note-row-date" }, date)
-      ),
-      bodyText && (Exp && bodyText.length > 160
-        ? React.createElement(Exp, { text: bodyText, threshold: 160, className: "note-row-preview note-row-preview-expandable", tapToToggle: true })
-        : React.createElement("span", { className: "note-row-preview" }, bodyText)),
-      anchorText && (Exp && anchorText.length > 160
-        ? React.createElement(Exp, { text: "“" + anchorText + "”", threshold: 160, className: "note-row-anchor note-row-anchor-expandable", tapToToggle: true })
-        : React.createElement("span", { className: "note-row-anchor" }, "“", anchorText, "”")),
-      noteNbs.length > 0 && React.createElement("span", { className: "note-row-tags" },
-        noteNbs.slice(0, 2).map(nb => React.createElement("span", { key: nb.id, className: "note-row-nb" },
-          React.createElement("svg", { className: "note-row-nb-icon", viewBox: "0 0 24 24" },
-            React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }),
-            React.createElement("polyline", { points: "15 4 15 9 20 9" })
-          ),
-          nb.name
-        )),
-        noteNbs.length > 2 && React.createElement("span", { className: "note-row-nb" }, "+", noteNbs.length - 2)
-      )
-    )
-  );
-}
+/* NoteRow → extracted to src/ui/components/NoteRow.js */
+
 
 /* NotesIndexScreen — the Notes hub. Two tabs:
    • Notebooks: card grid (Uncategorized + each user notebook + + New). Tap a
@@ -1744,197 +1480,11 @@ const SCRIPTURE_GENRES = {
    the rest of the app and prevents future drift. ── */
 /* LibraryNav → extracted to src/ui/components/LibraryNav.js */
 
-function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy, layout }) {
-  const handleTile = (group) => {
-    if (group.single) {onSelect(group.books[0].id, true);} else
-    onGenre(group.id);
-  };
-  const handleBook = (id) => {onSelect(id);};
-  const allGenres = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt];
-  const allBooks = allGenres.flatMap((g) => g.books);
-
-  const navBar = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
-  React.createElement("button", { className: "nav-home", onClick: onBack }, "\u2190 Home"), /*#__PURE__*/
-  React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange })
-  );
-
-  const hero = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
-  React.createElement("div", { className: "home-eyebrow" }, "New King James Version"), /*#__PURE__*/
-  React.createElement("h1", { className: "home-title" }, "The Scriptures of Truth"), /*#__PURE__*/
-  React.createElement("div", { className: "home-ornament" }, /*#__PURE__*/
-  React.createElement("div", { className: "home-ornament-line" }), /*#__PURE__*/
-  React.createElement("div", { className: "home-ornament-diamond" }), /*#__PURE__*/
-  React.createElement("div", { className: "home-ornament-line r" })
-  )
-  );
-
-  /* ── GENRE GRID (default) ── */
-  if (layout === "genre" || !layout) return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { navChildren: navBar }, /*#__PURE__*/
-    React.createElement("div", { className: "home-screen scriptures-landing" },
-    hero, /*#__PURE__*/
-    React.createElement("div", { className: "genre-columns" }, /*#__PURE__*/
-    React.createElement("div", { className: "genre-col genre-col-stretch" }, /*#__PURE__*/
-    React.createElement("div", { className: "genre-col-label" }, "Old Testament"),
-    SCRIPTURE_GENRES.ot.map((g) => {
-      const totalCh = g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0);
-      const bookCount = g.books.length;
-      const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
-      return (/*#__PURE__*/
-        React.createElement("button", { key: g.id, className: "genre-tile", onClick: () => handleTile(g) }, /*#__PURE__*/
-        React.createElement("div", { className: "genre-tile-title" }, g.label), /*#__PURE__*/
-        React.createElement("div", { className: "genre-tile-sub" }, bookLabel, " \xB7 ", totalCh, " Chapters")
-        ));
-
-    })
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "genre-col genre-col-stretch" }, /*#__PURE__*/
-    React.createElement("div", { className: "genre-col-label" }, "New Testament"),
-    SCRIPTURE_GENRES.nt.map((g) => {
-      const totalCh = g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0);
-      const bookCount = g.books.length;
-      const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
-      return (/*#__PURE__*/
-        React.createElement("button", { key: g.id, className: "genre-tile", onClick: () => handleTile(g) }, /*#__PURE__*/
-        React.createElement("div", { className: "genre-tile-title" }, g.label), /*#__PURE__*/
-        React.createElement("div", { className: "genre-tile-sub" }, bookLabel, " \xB7 ", totalCh, " Chapters")
-        ));
-
-    })
-    )
-    )
-    )
-    ));
+/* ScripturesHome → extracted to src/ui/screens/ScripturesHome.js */
 
 
-  /* ── COMPACT LIST ── */
-  if (layout === "compact") return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { navChildren: navBar }, /*#__PURE__*/
-    React.createElement("div", { className: "home-screen" },
-    hero, /*#__PURE__*/
-    React.createElement("div", { className: "compact-list" },
-    [
-    { label: "Old Testament", genres: SCRIPTURE_GENRES.ot },
-    { label: "New Testament", genres: SCRIPTURE_GENRES.nt }].
-    map((section) => /*#__PURE__*/
-    React.createElement(React.Fragment, { key: section.label }, /*#__PURE__*/
-    React.createElement("div", { className: "compact-list-header", style: { fontSize: "0.65rem", color: "var(--gold)", marginTop: "0.8rem" } }, section.label),
-    section.genres.map((g) => /*#__PURE__*/
-    React.createElement("div", { key: g.id, className: "compact-list-group" }, /*#__PURE__*/
-    React.createElement("div", { className: "compact-list-header" }, g.label),
-    g.books.map((b) => /*#__PURE__*/
-    React.createElement("button", { key: b.id, className: "compact-list-item", onClick: () => handleBook(b.id) }, /*#__PURE__*/
-    React.createElement("span", { className: "compact-list-title" }, b.title), /*#__PURE__*/
-    React.createElement("span", { className: "compact-list-detail" }, b.detail)
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    )
-    ));
+/* ScriptureGenre → extracted to src/ui/screens/ScriptureGenre.js */
 
-
-  /* ── BOOK GRID ── */
-  if (layout === "grid") return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { navChildren: navBar }, /*#__PURE__*/
-    React.createElement("div", { className: "home-screen" },
-    hero, /*#__PURE__*/
-    React.createElement("div", { className: "flat-grid" },
-    allBooks.map((b) => /*#__PURE__*/
-    React.createElement("button", { key: b.id, className: "flat-grid-card", onClick: () => handleBook(b.id) }, /*#__PURE__*/
-    React.createElement("div", { className: "flat-grid-title" }, b.title), /*#__PURE__*/
-    React.createElement("div", { className: "flat-grid-detail" }, b.detail)
-    )
-    )
-    )
-    )
-    ));
-
-
-  /* ── CANONICAL SCROLL ── */
-  const otBooks = SCRIPTURE_GENRES.ot.flatMap((g) => g.books);
-  const ntBooks = SCRIPTURE_GENRES.nt.flatMap((g) => g.books);
-  let canonNum = 0;
-  return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { navChildren: navBar }, /*#__PURE__*/
-    React.createElement("div", { className: "home-screen" },
-    hero, /*#__PURE__*/
-    React.createElement("div", { className: "canon-scroll" }, /*#__PURE__*/
-    React.createElement("div", { className: "canon-scroll-divider" }, "Old Testament"),
-    otBooks.map((b) => {
-      canonNum++;
-      return (/*#__PURE__*/
-        React.createElement("button", { key: b.id, className: "canon-card", style: { animationDelay: `${canonNum * 0.3 % 5}s` }, onClick: () => handleBook(b.id) }, /*#__PURE__*/
-        React.createElement("span", { className: "canon-card-num" }, String(canonNum).padStart(2, "0")), /*#__PURE__*/
-        React.createElement("div", { className: "canon-card-body" }, /*#__PURE__*/
-        React.createElement("div", { className: "canon-card-title" }, b.title),
-        CANON_SUBTITLES[b.id] && /*#__PURE__*/React.createElement("div", { className: "canon-card-sub" }, CANON_SUBTITLES[b.id]), /*#__PURE__*/
-        React.createElement("div", { className: "canon-card-detail" }, b.detail)
-        )
-        ));
-
-    }), /*#__PURE__*/
-    React.createElement("div", { className: "canon-scroll-divider" }, "New Testament"),
-    ntBooks.map((b) => {
-      canonNum++;
-      return (/*#__PURE__*/
-        React.createElement("button", { key: b.id, className: "canon-card", style: { animationDelay: `${canonNum * 0.3 % 5}s` }, onClick: () => handleBook(b.id) }, /*#__PURE__*/
-        React.createElement("span", { className: "canon-card-num" }, String(canonNum).padStart(2, "0")), /*#__PURE__*/
-        React.createElement("div", { className: "canon-card-body" }, /*#__PURE__*/
-        React.createElement("div", { className: "canon-card-title" }, b.title),
-        CANON_SUBTITLES[b.id] && /*#__PURE__*/React.createElement("div", { className: "canon-card-sub" }, CANON_SUBTITLES[b.id]), /*#__PURE__*/
-        React.createElement("div", { className: "canon-card-detail" }, b.detail)
-        )
-        ));
-
-    })
-    )
-    )
-    ));
-
-}
-
-function ScriptureGenre({ genreId, onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
-  const genre = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt].find((g) => g.id === genreId);
-  if (!genre) return null;
-  const testament = SCRIPTURE_GENRES.nt.some((g) => g.id === genreId) ? "New Testament" : "Old Testament";
-  return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { navChildren: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
-      React.createElement("button", { className: "nav-home", onClick: onBack }, "\u2190 Scriptures"), /*#__PURE__*/
-      React.createElement(HomeBtn, null), /*#__PURE__*/
-
-      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange })) }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-header" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-eyebrow" }, testament), /*#__PURE__*/
-    React.createElement("h1", { className: "vol-index-title" }, genre.label), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-diamond" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line r" })
-    )
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-cards" },
-    genre.books.map((b, i) => /*#__PURE__*/
-    React.createElement("button", { key: b.id,
-      className: "chapter-card-btn",
-      onClick: () => onSelect(b.id) }, /*#__PURE__*/
-    React.createElement("span", { className: "chapter-card-num" }, i + 1), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-info" }, /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-label" }, b.detail), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-title" }, b.title)
-    )
-    )
-    )
-    )
-    )
-    ));
-
-}
 
 /* ═══════════════════════════════════════════════════════════════
    GARDEN VIEW — Progressive image viewer for "A Return to The Garden"
@@ -1975,218 +1525,16 @@ function gardenIsCached(n, tierId) {
   return img && img.complete && img.naturalWidth > 0;
 }
 
-function GardenView({ page, onPageChange, onBack, theme, onThemeChange, tier }) {
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState(false);
-  const [jumpMode, setJumpMode] = React.useState(false);
-  const [jumpInput, setJumpInput] = React.useState("");
-  const jumpRef = React.useRef(null);
-  const crawlRef = React.useRef(null);
-  const pageRef = React.useRef(page);
-  pageRef.current = page;
+/* GardenView → extracted to src/ui/screens/GardenView.js */
 
-  // Enter immersive mode on mount, exit on unmount
-  React.useEffect(() => {
-    if (window.AndroidBridge?.setImmersiveMode) window.AndroidBridge.setImmersiveMode(true);
-    return () => {if (window.AndroidBridge?.setImmersiveMode) window.AndroidBridge.setImmersiveMode(false);};
-  }, []);
-
-  // Reset error + native zoom on page change or tier change.
-  React.useEffect(() => {
-    setError(false);
-    setLoading(!gardenIsCached(page, tier));
-    if (window.AndroidBridge?.resetZoom) window.AndroidBridge.resetZoom();
-  }, [page, tier]);
-
-  // Priority preload: current page + 5 ahead (immediate, no throttle)
-  React.useEffect(() => {
-    gardenPreload(page, tier);
-    for (let i = page + 1; i <= Math.min(page + GARDEN_PRELOAD_AHEAD, GARDEN_TOTAL); i++) {
-      gardenPreload(i, tier);
-    }
-  }, [page, tier]);
-
-  // Background sequential crawl: fills in all pages from 1 forward, throttled.
-  // Restarts when tier changes (because all existing cached pages are for a
-  // different tier now).
-  React.useEffect(() => {
-    let cancelled = false;
-    let crawlPage = 1;
-
-    const crawlNext = () => {
-      if (cancelled) return;
-      // Skip already-cached pages (for the CURRENT tier)
-      while (crawlPage <= GARDEN_TOTAL && gardenImageCache[gardenCacheKey(crawlPage, tier)]) crawlPage++;
-      if (crawlPage > GARDEN_TOTAL) return;
-
-      const cur = pageRef.current;
-      if (crawlPage >= cur && crawlPage <= cur + GARDEN_PRELOAD_AHEAD) {
-        crawlPage++;
-      }
-
-      if (crawlPage <= GARDEN_TOTAL && !gardenImageCache[gardenCacheKey(crawlPage, tier)]) {
-        gardenPreload(crawlPage, tier);
-        crawlPage++;
-      }
-
-      crawlRef.current = setTimeout(crawlNext, GARDEN_CRAWL_DELAY);
-    };
-
-    crawlRef.current = setTimeout(crawlNext, 1500);
-
-    return () => {
-      cancelled = true;
-      if (crawlRef.current) clearTimeout(crawlRef.current);
-    };
-  }, [tier]);
-
-  // Focus jump input when it opens
-  React.useEffect(() => {
-    if (jumpMode && jumpRef.current) jumpRef.current.focus();
-  }, [jumpMode]);
-
-  const goNext = () => {if (page < GARDEN_TOTAL) onPageChange(page + 1);};
-  const goPrev = () => {if (page > 1) onPageChange(page - 1);};
-
-  const handleJump = () => {
-    const n = parseInt(jumpInput, 10);
-    if (n >= 1 && n <= GARDEN_TOTAL) onPageChange(n);
-    setJumpMode(false);
-    setJumpInput("");
-  };
-
-  // Enable native Android zoom while Garden is open
-  React.useEffect(() => {
-    if (window.AndroidBridge?.setZoomEnabled) window.AndroidBridge.setZoomEnabled(true);
-    return () => {if (window.AndroidBridge?.setZoomEnabled) window.AndroidBridge.setZoomEnabled(false);};
-  }, []);
-
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "garden-fullscreen" }, /*#__PURE__*/
-
-    React.createElement("div", { className: "garden-top-bar" }, /*#__PURE__*/
-    React.createElement("button", { className: "garden-back-btn", onClick: onBack }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("polyline", { points: "15 18 9 12 15 6" }))
-    ),
-    jumpMode ? /*#__PURE__*/
-    React.createElement("form", { className: "garden-jump-form", onSubmit: (e) => {e.preventDefault();handleJump();} }, /*#__PURE__*/
-    React.createElement("input", { ref: jumpRef, type: "number", min: "1", max: GARDEN_TOTAL,
-      className: "garden-jump-input",
-      value: jumpInput,
-      onChange: (e) => setJumpInput(e.target.value),
-      onBlur: () => {setJumpMode(false);setJumpInput("");},
-      placeholder: `1–${GARDEN_TOTAL}` }), /*#__PURE__*/
-    React.createElement("span", { className: "garden-jump-hint" }, "/ ", GARDEN_TOTAL)
-    ) : /*#__PURE__*/
-
-    React.createElement("button", { className: "garden-page-counter", onClick: () => setJumpMode(true) },
-    page, " / ", GARDEN_TOTAL
-    )
-
-    ), /*#__PURE__*/
-
-
-    React.createElement("div", { className: "garden-image-area" },
-    loading && /*#__PURE__*/
-    React.createElement("div", { className: "garden-loading" }, /*#__PURE__*/
-    React.createElement("div", { style: { color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" } }, error ? "Failed to load — check your connection" : `Loading page ${page}...`)
-    ), /*#__PURE__*/
-
-    React.createElement("img", {
-      key: `${tier}-${page}`,
-      src: gardenUrl(page, tier),
-      alt: `Garden page ${page}`,
-      className: "garden-page-img",
-      style: { opacity: loading ? 0 : 1, transition: "opacity 0.3s" },
-      onLoad: () => setLoading(false),
-      onError: () => {setLoading(true);setError(true);} }
-    )
-    ), /*#__PURE__*/
-
-
-    React.createElement("div", { className: "garden-bottom-bar" }, /*#__PURE__*/
-    React.createElement("button", { className: "garden-arrow-btn", onClick: goPrev, disabled: page <= 1 }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("polyline", { points: "15 18 9 12 15 6" }))
-    ), /*#__PURE__*/
-    React.createElement("button", { className: "garden-arrow-btn", onClick: goNext, disabled: page >= GARDEN_TOTAL }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("polyline", { points: "9 6 15 12 9 18" }))
-    )
-    )
-    ));
-
-}
 
 /* VolumesHome → extracted to src/ui/screens/VolumesHome.js */
 
 /* ═══════════════════════════════════════════════════════════════
    CHAPTER INDEX
 ═══════════════════════════════════════════════════════════════ */
-function ChapterIndex({ book, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, markAsReadEnabled, restoredNames, showChapterTitle }) {
-  const currentRef = React.useRef(null);
-  React.useEffect(() => {
-    if (currentRef.current) {
-      setTimeout(() => currentRef.current.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
-    }
-  }, []);
-  // Restored-Name chrome lookup for the chapter cards. When restoredNames
-  // is on, show the restored chapter title; otherwise fall back to the
-  // standard. If showChapterTitle is off, titles are hidden entirely.
-  const getChapterTitle = (ch) => {
-    if (showChapterTitle === false) return null;
-    if (restoredNames && typeof BOOKS_RESTORED !== "undefined" && BOOKS_RESTORED[book.id]) {
-      const r = BOOKS_RESTORED[book.id].chapters.find((c) => c.num === ch.num);
-      if (r && r.title) return r.title;
-    }
-    return ch.title;
-  };
-  return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { navChildren: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
-      React.createElement("button", { className: "nav-home", onClick: onBack }, "\u2190 Books"), /*#__PURE__*/
-      React.createElement(HomeBtn, null), /*#__PURE__*/
+/* ChapterIndex → extracted to src/ui/screens/ChapterIndex.js */
 
-      React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange })) }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-header" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-eyebrow" }, "Scriptures of Truth"), /*#__PURE__*/
-    React.createElement("h1", { className: "vol-index-title" }, book.title), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-subtitle" }, book.subtitle), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-diamond" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line r" })
-    )
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-cards" },
-    book.chapters.map((ch, i) => {
-      const isCurrent = ch.num === currentChapter;
-      return (/*#__PURE__*/
-        React.createElement("button", {
-          key: ch.num,
-          ref: isCurrent ? currentRef : null,
-          className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
-          onClick: () => onSelect(ch.num) }, /*#__PURE__*/
-
-        React.createElement("span", { className: "chapter-card-num" }, ch.num), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-info" },
-        (() => {
-          const t = getChapterTitle(ch);
-          return t ? /*#__PURE__*/
-          React.createElement("div", { className: "chapter-card-title" }, t) : /*#__PURE__*/
-
-          React.createElement("div", { className: "chapter-card-title untitled" }, "Chapter ", ch.num);
-
-        })()
-        ),
-        markAsReadEnabled && isRead(ch.num) && /*#__PURE__*/React.createElement("span", { className: "read-check" }, "\u2713")
-        ));
-
-    })
-    )
-    )
-    ));
-
-}
 
 /* ═══════════════════════════════════════════════════════════════
    BIBLE LETTER STUDIES — home screen
@@ -2196,134 +1544,8 @@ function ChapterIndex({ book, onSelect, onBack, onSearch, onHistory, onSettings,
 /* ═══════════════════════════════════════════════════════════════
    BIBLE LETTER STUDIES — per-study chapter index
 ═══════════════════════════════════════════════════════════════ */
-function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, markAsReadEnabled }) {
-  const currentRef = React.useRef(null);
-  const [expandedPart, setExpandedPart] = React.useState(null);
+/* BibleStudyIndex → extracted to src/ui/screens/BibleStudyIndex.js */
 
-  // Auto-expand the part containing the current reading position
-  React.useEffect(() => {
-    if (currentChapter && study.parts) {
-      const ownerPart = study.parts.find((p) => p.chapterIds.includes(currentChapter));
-      if (ownerPart) setExpandedPart(ownerPart.num);
-    }
-  }, []);
-
-  // Scroll current chapter into view after expand
-  React.useEffect(() => {
-    if (currentRef.current) {
-      setTimeout(() => currentRef.current.scrollIntoView({ behavior: "smooth", block: "center" }), 180);
-    }
-  }, [expandedPart]);
-
-  const resolveChapter = (cid) => (study.chapters || []).find((c) => c.id === cid);
-
-  const renderChapterCard = (ch) => {
-    if (!ch) return null;
-    const isCurrent = ch.id === currentChapter;
-    return (/*#__PURE__*/
-      React.createElement("button", {
-        key: ch.id,
-        ref: isCurrent ? currentRef : null,
-        className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
-        onClick: () => onSelect(ch.id) }, /*#__PURE__*/
-
-      React.createElement("span", { className: "chapter-card-num" }, ch.num), /*#__PURE__*/
-      React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-      React.createElement("div", { className: "chapter-card-info" },
-      ch.title ? /*#__PURE__*/
-      React.createElement("div", { className: "chapter-card-title" }, ch.title) : /*#__PURE__*/
-
-      React.createElement("div", { className: "chapter-card-title untitled" }, "Part ", ch.num)
-
-      ),
-      markAsReadEnabled && isRead(ch.id) && /*#__PURE__*/React.createElement("span", { className: "read-check" }, "\u2713")
-      ));
-
-  };
-
-  const navBar = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
-  React.createElement("button", { className: "nav-home", onClick: onBack }, "\u2190 Studies"), /*#__PURE__*/
-  React.createElement(HomeBtn, null), /*#__PURE__*/
-  React.createElement(NavButtons, { onSettings: onSettings, onHistory: onHistory, onSearch: onSearch, theme: theme, onThemeChange: onThemeChange })
-  );
-
-  return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { navChildren: navBar }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-header" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-eyebrow" }, "Bible/Letter Study"), /*#__PURE__*/
-    React.createElement("h1", { className: "vol-index-title" }, study.title),
-    study.subtitle && /*#__PURE__*/React.createElement("div", { className: "vol-index-subtitle" }, study.subtitle), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-diamond" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line r" })
-    )
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-cards" },
-    study.parts ? /*#__PURE__*/React.createElement(React.Fragment, null,
-
-    study.prefaceId && renderChapterCard(resolveChapter(study.prefaceId)),
-
-
-    study.parts.map((part) => {
-      const partChapters = part.chapterIds.map(resolveChapter).filter(Boolean);
-      const sectionCount = partChapters.length;
-      const isSingleSection = sectionCount === 1;
-      const isOpen = expandedPart === part.num;
-
-      if (isSingleSection) {
-        /* Single-section part: direct tap goes straight to chapter */
-        const ch = partChapters[0];
-        const isCurrent = ch && ch.id === currentChapter;
-        return (/*#__PURE__*/
-          React.createElement("button", {
-            key: part.num,
-            ref: isCurrent ? currentRef : null,
-            className: `part-group-card${isCurrent ? " is-expanded" : ""}`,
-            onClick: () => ch && onSelect(ch.id) }, /*#__PURE__*/
-
-          React.createElement("div", { className: "part-group-info" }, /*#__PURE__*/
-          React.createElement("div", { className: "part-group-num" }, "Part ", part.num), /*#__PURE__*/
-          React.createElement("div", { className: "part-group-title" }, part.title),
-          part.subtitle && /*#__PURE__*/React.createElement("div", { className: "part-group-subtitle" }, part.subtitle)
-          ),
-          markAsReadEnabled && ch && isRead(ch.id) && /*#__PURE__*/React.createElement("span", { className: "read-check" }, "\u2713")
-          ));
-
-      }
-
-      /* Multi-section part: accordion expand */
-      return (/*#__PURE__*/
-        React.createElement(React.Fragment, { key: part.num }, /*#__PURE__*/
-        React.createElement("button", {
-          className: `part-group-card${isOpen ? " is-expanded" : ""}`,
-          onClick: () => setExpandedPart(isOpen ? null : part.num) }, /*#__PURE__*/
-
-        React.createElement("div", { className: "part-group-info" }, /*#__PURE__*/
-        React.createElement("div", { className: "part-group-num" }, "Part ", part.num), /*#__PURE__*/
-        React.createElement("div", { className: "part-group-title" }, part.title),
-        part.subtitle && /*#__PURE__*/React.createElement("div", { className: "part-group-subtitle" }, part.subtitle)
-        ), /*#__PURE__*/
-        React.createElement("span", { className: `part-chevron${isOpen ? " is-open" : ""}` }, "\u203A")
-        ),
-        isOpen && /*#__PURE__*/
-        React.createElement("div", { className: "part-chapters" },
-        partChapters.map((ch) => renderChapterCard(ch))
-        )
-
-        ));
-
-    })
-    ) : (
-    /* Flat chapter list fallback for studies without parts */
-    (study.chapters || []).map((ch) => renderChapterCard(ch)))
-
-    )
-    )
-    ));
-
-}
 
 /* ═══════════════════════════════════════════════════════════════
    CHAPTER VIEW
@@ -2368,28 +1590,8 @@ function timeAgo(ts) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-function HistoryEntryCard({ entry, onSelect }) {
-  const isLetter = entry.type === 'letter';
-  const isStudy = entry.type === 'study-chapter';
-  const num = isLetter ? entry.letterNum : entry.chapterNum;
-  const title = isLetter ? entry.letterTitle : entry.chapterTitle || null;
-  const _volCol = entry.volumeScreen ? COL_BY_INDEX_SC.get(entry.volumeScreen) : null;
-  const cardLabel = isStudy ?
-  studyAbbrev(entry.studySlug, entry.studyTitle) :
-  isLetter ? entry.volume === 1 ? 'Volume One' : _volCol ? _volCol.label : 'Volume Two' : entry.bookTitle;
-  const fallback = isLetter ? `Letter ${num}` : isStudy ? `Part ${num}` : `Chapter ${num}`;
-  return (/*#__PURE__*/
-    React.createElement("button", { className: "chapter-card-btn", onClick: () => onSelect(entry) }, /*#__PURE__*/
-    React.createElement("span", { className: "chapter-card-num" }, num), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-info" }, /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-label" }, cardLabel), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-title" }, title || fallback)
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "history-entry-time" }, timeAgo(entry.ts))
-    ));
+/* HistoryEntryCard → extracted to src/ui/components/HistoryEntryCard.js */
 
-}
 
 /* HistoryScreen → extracted to src/ui/screens/HistoryScreen.js */
 
@@ -2399,179 +1601,10 @@ function HistoryEntryCard({ entry, onSelect }) {
 ═══════════════════════════════════════════════════════════════ */
 
 
-function VolumeIndex({ onSelect, currentLetter, isRead, markAsReadEnabled }) {
-  const currentRef = React.useRef(null);
-  React.useEffect(() => {
-    if (currentRef.current) {
-      currentRef.current.scrollIntoView({ block: "center", behavior: "instant" });
-    }
-  }, []);
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "vol-index" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-header" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-eyebrow" }, "The Volumes of Truth"), /*#__PURE__*/
-    React.createElement("h1", { className: "vol-index-title" }, "Volume Two"), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-diamond" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line r" })
-    )
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-cards" },
-    LETTERS.map((letter) => {
-      const isCurrent = letter.id === currentLetter;
-      return (/*#__PURE__*/
-        React.createElement("button", { key: letter.id,
-          className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
-          ref: isCurrent ? currentRef : null,
-          onClick: () => onSelect(letter.id) }, /*#__PURE__*/
+/* -- Generic Volume/Collection Letter Index (consolidated 2026-05-19, P5d) -- */
 
-        React.createElement("span", { className: "chapter-card-num" }, letter.num), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-info" }, /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-label" }, letter.date), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-title" }, letter.title)
-        ),
-        markAsReadEnabled && isRead(letter.id) && /*#__PURE__*/React.createElement("span", { className: "read-check", style: { marginLeft: '0.4rem' } }, "\u2713")
-        ));
+/* VolumeLetterIndex → extracted to src/ui/components/VolumeLetterIndex.js */
 
-    })
-    )
-    ));
-
-}
-
-/* ── Volume One Index ── */
-function VolumeOneIndex({ onSelect, onSelectPreface, currentLetter, isRead, markAsReadEnabled }) {
-  const currentRef = React.useRef(null);
-  React.useEffect(() => {
-    if (currentRef.current) {
-      currentRef.current.scrollIntoView({ block: "center", behavior: "instant" });
-    }
-  }, []);
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "vol-index" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-header" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-eyebrow" }, "The Volumes of Truth"), /*#__PURE__*/
-    React.createElement("h1", { className: "vol-index-title" }, "Volume One"), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-diamond" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line r" })
-    )
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-cards" },
-    LETTERS_V1_PREFACE && /*#__PURE__*/
-    React.createElement("button", {
-      className: "chapter-card-btn",
-      onClick: () => onSelectPreface && onSelectPreface(LETTERS_V1_PREFACE.id) }, /*#__PURE__*/
-
-    React.createElement("span", { className: "chapter-card-num" }, "0"), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-info" }, /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-label" }, "Preface"), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-title" }, LETTERS_V1_PREFACE.title)
-    ),
-    markAsReadEnabled && isRead(LETTERS_V1_PREFACE.id) && /*#__PURE__*/React.createElement("span", { className: "read-check", style: { marginLeft: '0.4rem' } }, "\u2713")
-    ),
-
-    LETTERS_V1.map((letter) => {
-      const isCurrent = letter.id === currentLetter;
-      return (/*#__PURE__*/
-        React.createElement("button", { key: letter.id,
-          className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
-          ref: isCurrent ? currentRef : null,
-          onClick: () => onSelect(letter.id) }, /*#__PURE__*/
-
-        React.createElement("span", { className: "chapter-card-num" }, letter.num), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-info" }, /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-label" }, letter.date), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-title" }, letter.title)
-        ),
-        markAsReadEnabled && isRead(letter.id) && /*#__PURE__*/React.createElement("span", { className: "read-check", style: { marginLeft: '0.4rem' } }, "\u2713")
-        ));
-
-    })
-    )
-    ));
-
-}
-
-/* ── Generic Volume/Collection Letter Index ── */
-function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, markAsReadEnabled, columns }) {
-  const currentRef = React.useRef(null);
-  React.useEffect(() => {
-    if (currentRef.current) {
-      currentRef.current.scrollIntoView({ block: "center", behavior: "instant" });
-    }
-  }, []);
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "vol-index" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-header" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-eyebrow" }, eyebrow || "The Volumes of Truth"), /*#__PURE__*/
-    React.createElement("h1", { className: "vol-index-title" }, volumeTitle), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-diamond" }), /*#__PURE__*/
-    React.createElement("div", { className: "vol-index-ornament-line r" })
-    )
-    ), /*#__PURE__*/
-    React.createElement("div", { className: `chapter-cards${columns === 2 ? " two-col" : ""}` },
-    preface && (columns === 2 ? /*#__PURE__*/
-    React.createElement("button", { className: "chapter-card-btn", onClick: () => onSelectPreface && onSelectPreface(preface.id) }, /*#__PURE__*/
-    React.createElement("div", { className: "two-col-inner" }, /*#__PURE__*/
-    React.createElement("div", { className: "two-col-num" }, "0"), /*#__PURE__*/
-    React.createElement("div", { className: "two-col-title" }, preface.title)
-    )
-    ) : /*#__PURE__*/
-
-    React.createElement("button", { className: "chapter-card-btn", onClick: () => onSelectPreface && onSelectPreface(preface.id) }, /*#__PURE__*/
-    React.createElement("span", { className: "chapter-card-num" }, "0"), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-info" }, /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-label" }, "Preface"), /*#__PURE__*/
-    React.createElement("div", { className: "chapter-card-title" }, preface.title)
-    ),
-    markAsReadEnabled && isRead(preface.id) && /*#__PURE__*/React.createElement("span", { className: "read-check", style: { marginLeft: '0.4rem' } }, "\u2713")
-    )),
-
-    letters.map((letter) => {
-      const isCurrent = letter.id === currentLetter;
-      if (columns === 2) {
-        return (/*#__PURE__*/
-          React.createElement("button", { key: letter.id,
-            className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
-            ref: isCurrent ? currentRef : null,
-            onClick: () => onSelect(letter.id) }, /*#__PURE__*/
-
-          React.createElement("div", { className: "two-col-inner" }, /*#__PURE__*/
-          React.createElement("div", { className: "two-col-num" }, letter.num), /*#__PURE__*/
-          React.createElement("div", { className: "two-col-title" }, letter.title)
-          )
-          ));
-
-      }
-      return (/*#__PURE__*/
-        React.createElement("button", { key: letter.id,
-          className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
-          ref: isCurrent ? currentRef : null,
-          onClick: () => onSelect(letter.id) }, /*#__PURE__*/
-
-        React.createElement("span", { className: "chapter-card-num" }, letter.num), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-divider" }), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-info" }, /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-label" }, letter.date), /*#__PURE__*/
-        React.createElement("div", { className: "chapter-card-title" }, letter.title)
-        ),
-        markAsReadEnabled && isRead(letter.id) && /*#__PURE__*/React.createElement("span", { className: "read-check", style: { marginLeft: '0.4rem' } }, "\u2713")
-        ));
-
-    })
-    )
-    ));
-
-}
 
 /* ── Scripture ref lookup for WTLB — hardcoded in data/wtlb-scriptures.js ── */
 
@@ -2596,112 +1629,19 @@ function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, o
 /* ═══════════════════════════════════════════════════════════════
    HOME SCREEN
 ═══════════════════════════════════════════════════════════════ */
-function SelectField({ eyebrow, title, label, desc, value, options, onChange }) {
-  const [open, setOpen] = React.useState(false);
-  const selected = options.find((o) => o.id === value) || options[0];
+/* SelectField → extracted to src/ui/components/SelectField.js */
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = window.__closeSheet;
-    window.__closeSheet = () => setOpen(false);
-    return () => {window.__closeSheet = prev || null;};
-  }, [open]);
 
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "settings-row", style: { flexDirection: "column", alignItems: "stretch" } }, /*#__PURE__*/
-    React.createElement("div", { className: "settings-row-text", style: { marginBottom: "0.7rem" } }, /*#__PURE__*/
-    React.createElement("div", { className: "settings-row-label" }, label), /*#__PURE__*/
-    React.createElement("div", { className: "settings-row-desc" }, desc)
-    ), /*#__PURE__*/
-    React.createElement("button", { className: "select-field", onClick: (e) => {e.stopPropagation();setOpen(true);} }, /*#__PURE__*/
-    React.createElement("div", { className: "select-field-body" }, /*#__PURE__*/
-    React.createElement("span", { className: "select-field-label" }, selected.label),
-    selected.desc ? /*#__PURE__*/React.createElement("span", { className: "select-field-caption" }, selected.desc) : null
-    ), /*#__PURE__*/
-    React.createElement("span", { className: "select-field-chevron" }, "\u203A")
-    ),
-    open && /*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet-backdrop open", onClick: () => setOpen(false) }), /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet", onClick: (e) => e.stopPropagation() }, /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet-handle" }),
-    eyebrow ? /*#__PURE__*/React.createElement("div", { className: "select-sheet-eyebrow" }, eyebrow) : null, /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet-title" }, title || label), /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet-ornament-diamond" }, "\u2726"), /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet-ornament-line r" })
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "select-sheet-options" },
-    options.map((opt) => {
-      const isSelected = opt.id === value;
-      return (/*#__PURE__*/
-        React.createElement("button", {
-          key: opt.id,
-          className: `select-sheet-option${isSelected ? " selected" : ""}`,
-          onClick: () => {onChange(opt.id);setOpen(false);} }, /*#__PURE__*/
+/* SettingsRow → extracted to src/ui/components/SettingsRow.js */
 
-        React.createElement("div", { className: "select-sheet-option-main" }, /*#__PURE__*/
-        React.createElement("span", { className: "select-sheet-option-label" }, opt.label),
-        isSelected ? /*#__PURE__*/React.createElement("span", { className: "select-sheet-option-check" }, "\u2713") : null
-        ),
-        opt.desc ? /*#__PURE__*/React.createElement("div", { className: "select-sheet-option-desc" }, opt.desc) : null
-        ));
-
-    })
-    )
-    )
-    )
-
-    ));
-
-}
-
-function SettingsRow({ label, desc, checked, onToggle, disabled, disabledReason }) {
-  return (/*#__PURE__*/
-    React.createElement("div", { className: `settings-row${disabled ? " settings-row-disabled" : ""}` }, /*#__PURE__*/
-    React.createElement("div", { className: "settings-row-text" }, /*#__PURE__*/
-    React.createElement("div", { className: "settings-row-label" }, label),
-    desc && /*#__PURE__*/React.createElement("div", { className: "settings-row-desc" }, desc),
-    disabled && disabledReason && /*#__PURE__*/
-    React.createElement("div", { className: "settings-row-disabled-hint" }, disabledReason)
-
-    ), /*#__PURE__*/
-    React.createElement("label", { className: "settings-toggle" }, /*#__PURE__*/
-    React.createElement("input", {
-      type: "checkbox",
-      checked: checked,
-      disabled: !!disabled,
-      onChange: disabled ? undefined : onToggle }
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "settings-toggle-track" }), /*#__PURE__*/
-    React.createElement("div", { className: "settings-toggle-thumb" })
-    )
-    ));
-
-}
 
 /* Three-stage clear flow: Clear → Are You Sure? → Confirm.
    Stage is owned by the SettingsScreen parent via `clearPending`, so that
    tapping anywhere else on the screen resets it. */
 const CLEAR_LABELS = ["Clear", "Are You Sure?", "Confirm"];
 const CLEAR_CLASSES = ["settings-clear-btn", "settings-clear-btn warning", "settings-clear-btn danger"];
-function ClearProgressRow({ label, total, count, stage, onTap }) {
-  if (count === 0) return (/*#__PURE__*/
-    React.createElement("div", { className: "progress-row" }, /*#__PURE__*/
-    React.createElement("span", { className: "progress-row-label" }, label), /*#__PURE__*/
-    React.createElement("span", { className: "progress-row-tally" }, "0 / ", total), /*#__PURE__*/
-    React.createElement("button", { className: "settings-clear-btn", disabled: true }, "Clear")
-    ));
+/* ClearProgressRow → extracted to src/ui/components/ClearProgressRow.js */
 
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "progress-row" }, /*#__PURE__*/
-    React.createElement("span", { className: "progress-row-label" }, label), /*#__PURE__*/
-    React.createElement("span", { className: "progress-row-tally" }, count, " / ", total), /*#__PURE__*/
-    React.createElement("button", { className: CLEAR_CLASSES[stage], onClick: onTap }, CLEAR_LABELS[stage])
-    ));
-
-}
 
 /* ═══════════════════════════════════════════════════════════════
    TABS OVERVIEW — describe each tab + render the grid
@@ -3151,54 +2091,12 @@ const SRCH_GROUP_META = {
 };
 
 // ─── Highlighted snippet renderer ───
-function SrchSnippet({ text, terms, maxLen = 180 }) {
-  if (!text) return null;
-  const snippet = window.VotSearch.snippet(text, terms || [], maxLen);
-  const spans = window.VotSearch.highlightSpans(snippet, terms || []);
-  return (/*#__PURE__*/
-    React.createElement("span", null,
-    spans.map((s, i) =>
-    s.hit ? /*#__PURE__*/
-    React.createElement("mark", { key: i, className: "search-highlight" }, s.text) : /*#__PURE__*/
-    React.createElement(React.Fragment, { key: i }, s.text)
-    )
-    ));
+/* SrchSnippet → extracted to src/ui/components/SrchSnippet.js */
 
-}
 
 // ─── Result card ───
-function SrchCard({ entry, terms, onSelect, isDirect }) {
-  if (isDirect) {
-    return (/*#__PURE__*/
-      React.createElement("button", { className: "srch-card card-direct", onClick: () => onSelect(entry) }, /*#__PURE__*/
-      React.createElement("div", { className: "srch-card-top" }, /*#__PURE__*/
-      React.createElement("span", { className: "srch-card-ref" }, entry.__label)
-      ), /*#__PURE__*/
-      React.createElement("div", { className: "srch-card-snippet" }, entry.__sub || 'Go')
-      ));
+/* SrchCard → extracted to src/ui/components/SrchCard.js */
 
-  }
-  const doc = entry.doc;
-  const meta = SRCH_KIND_LABEL[doc.kind] || { label: doc.kind, cls: '' };
-  const refLine = doc.ref || (doc.title || '') + (doc.chapterNum ? ' ' + doc.chapterNum : '');
-  const body = doc.kind === 'heading' ? (doc.heading || doc.text) :
-  (doc.kind === 'chapter-title' || doc.kind === 'letter-title' || doc.kind === 'wtlb-title' || doc.kind === 'blessed-title' || doc.kind === 'holy-day-title') ?
-  (doc.title || doc.text) :
-  doc.text;
-  return (/*#__PURE__*/
-    React.createElement("button", { className: "srch-card", onClick: () => onSelect(entry) }, /*#__PURE__*/
-    React.createElement("div", { className: "srch-card-top" }, /*#__PURE__*/
-    React.createElement("span", { className: "srch-card-ref" }, refLine), /*#__PURE__*/
-    React.createElement("span", { className: "srch-card-badge " + (meta.cls || '') }, meta.label),
-    doc.translation && doc.translation !== 'nkjv' && /*#__PURE__*/React.createElement("span", { className: "srch-card-badge" }, doc.translation.toUpperCase()),
-    doc.heading && doc.kind === 'verse' && /*#__PURE__*/React.createElement("span", { className: "srch-card-badge badge-heading" }, doc.heading.length > 28 ? doc.heading.slice(0, 28) + '…' : doc.heading)
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "srch-card-snippet" }, /*#__PURE__*/
-    React.createElement(SrchSnippet, { text: body || '', terms: terms })
-    )
-    ));
-
-}
 
 // ─── Group with collapse ───
 function SrchGroup({ gkey, items, terms, onSelect, defaultOpen }) {
@@ -5743,13 +4641,13 @@ function App() {
 
     screen === "vot-index" && /*#__PURE__*/
     React.createElement(ScreenLayout, { navChildren: _idxNav() }, /*#__PURE__*/
-    React.createElement(VolumeIndex, colIdxProps('two'))
+    React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume Two", letters: LETTERS }, colIdxProps('two')))
     ),
 
 
     screen === "vot-one-index" && /*#__PURE__*/
     React.createElement(ScreenLayout, { navChildren: _idxNav() }, /*#__PURE__*/
-    React.createElement(VolumeOneIndex, colIdxProps('one'))
+    React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume One", letters: LETTERS_V1, preface: LETTERS_V1_PREFACE }, colIdxProps('one')))
     ),
 
 
@@ -6319,6 +5217,22 @@ multiNotePayload && React.createElement(MultiNotePopover, {
   <script src="src/ui/sheets/LinkSidebar.js"></script>
   <script src="src/ui/sheets/SelectionToolbar.js"></script>
   <script src="src/ui/sheets/AnnotationActionChip.js"></script>
+  <script src="src/ui/components/ClearProgressRow.js"></script>
+  <script src="src/ui/components/SrchCard.js"></script>
+  <script src="src/ui/components/SrchSnippet.js"></script>
+  <script src="src/ui/components/SettingsRow.js"></script>
+  <script src="src/ui/components/SelectField.js"></script>
+  <script src="src/ui/components/VolumeLetterIndex.js"></script>
+  <script src="src/ui/components/HistoryEntryCard.js"></script>
+  <script src="src/ui/screens/BibleStudyIndex.js"></script>
+  <script src="src/ui/screens/ChapterIndex.js"></script>
+  <script src="src/ui/screens/GardenView.js"></script>
+  <script src="src/ui/screens/ScriptureGenre.js"></script>
+  <script src="src/ui/screens/ScripturesHome.js"></script>
+  <script src="src/ui/components/NoteRow.js"></script>
+  <script src="src/ui/sheets/NotebookManagerSheet.js"></script>
+  <script src="src/ui/components/LinkCard.js"></script>
+  <script src="src/ui/components/LinkIcon.js"></script>
   <script src="src/ui/screens/LinksScreen.js"></script>
   <!-- BookmarksScreen, BookmarkRow, BookmarkRowActionSheet, BookmarkPopover — extracted to src/ui/screens/BookmarksScreen.js -->
   <!-- Depends on: BookmarkStore (bookmark-store.js), ScreenLayout, ThemeBtn, relativeDate, -->
