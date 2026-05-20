@@ -2262,6 +2262,298 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   Branch refactor/modularize-incremental is now 11 commits ahead of
   main, all pushed to origin (full backup).
 
+  ═══════════════════════════════════════════════════════════════════════
+  P6 RECONNAISSANCE REPORT (2026-05-20)
+  ═══════════════════════════════════════════════════════════════════════
+
+  Read-only mapping of App()'s hooks, refs, and dependencies before any
+  extraction. App() spans lines 1099-4117 of index.html (~3,018 lines of
+  body content). 121 hook call-sites total (counted via grep). 30 useRef,
+  ~40 useState, ~40 useEffect, ~14 useCallback, 2 useMemo.
+
+  CLUSTER MAP (12 candidate hooks, in order of extraction safety):
+
+  ── Cluster 1: useSavedState ── (LOW RISK, ~30 lines, src/hooks/use-saved-state.js)
+    Symbols: _validateTabState (closure), saved (useMemo)
+    Reads:  localStorage 'vot-state' once at mount
+    Writes: never (read-only)
+    Deps:   none — pure mount-time read
+    Caller: every other hook reads `saved.X` for initial state seeding
+    Why first: zero closure coupling; just returns the validated saved
+              object. Establishes the src/hooks/ extraction pattern.
+
+  ── Cluster 2: useTabs ── (HIGH RISK — load-bearing, ~280 lines, src/hooks/use-tabs.js)
+    Symbols: DEFAULT_TAB, tabs/setTabs, activeTabIdx/setActiveTabIdx,
+             activeTab, updateActiveTab (useCallback), _uatRef, _tabSetters
+             (useRef), tabField helper, openNewTab/switchToTab/closeTab/
+             closeOtherTabs/closeTabsToTheRight/closeAllTabs/deduplicate
+             Tabs, MAX_TABS, tabsOverviewOpen/tabActionIdx/disableTabsPrompt
+             Open/clearAllStage/lastTabCloseStrikes
+    Reads:  saved (Cluster 1), settings.tabsEnabled (Cluster 11)
+    Writes: tabs, activeTabIdx → vot-state.tabs[]/activeTabIdx
+    Critical: `_tabSetters.current[key]` returns the SAME setter across
+             renders so child components see stable identity (any change
+             here re-mounts every tab-state-consuming child). The
+             updater closes over `activeTabIdx` via `_uatRef.current`
+             which is updated BEFORE each render via the ref's
+             assignment — keep this exact pattern.
+    Returns: { tabs, setTabs, activeTabIdx, setActiveTabIdx, activeTab,
+              updateActiveTab, tabField, openNewTab, switchToTab, ... }
+    The tab-field state spread (lines 1198-1208: const [screen, setScreen]
+    = tabField('screen'), ...) STAYS in App() — that's the bridge from
+    the hook back to local consts. Don't pull those into the hook.
+    Why HIGH risk: tabField identity stability is invisible to tests
+                   but breaks render correctness everywhere. Verify
+                   smoke after extraction shows the SAME tab-thumbnail
+                   counts and the SAME hl-mark counts as before (no
+                   stale child re-mounts).
+
+  ── Cluster 3: useScrollMemory ── (MEDIUM, ~80 lines, src/hooks/use-scroll-memory.js)
+    Symbols: getScrollKey (function), scrollKeyRef, flushScrollToActiveTab
+             (useCallback), 3 effects (scroll listener attach, pagehide
+             flush, screen-change restore)
+    Reads:  screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+            activeTabIdx, activeTab.scrollPositions, surpriseAnchor,
+            __scrollEl (global), tabsOverviewOpenRef
+    Writes: tab.scrollPositions[key] via updateActiveTab
+    Deps:   updateActiveTab (from Cluster 2)
+    Why medium: 300ms polling for __scrollEl is fragile but already
+                proven. The "save scroll on visibilityState=hidden"
+                effect is critical for Android-kill survival.
+    Returns: { flushScrollToActiveTab, scrollKeyRef }
+    Open question: getScrollKey reads COL_BY_LETTER_SC — should this be
+    a pure helper in src/utils/ instead of staying inside the hook?
+
+  ── Cluster 4: useThumbnails ── (MEDIUM, ~150 lines, src/hooks/use-thumbnails.js)
+    Symbols: tabThumbnails state, thumbGcTimerRef, captureActiveTabThumbnail
+             (useCallback with html2canvas fallback), 4 effects: idb-load
+             on mount, GC stale thumbs, scroll-stop capture, screen-change
+             capture, aspect-ratio CSS var
+    Reads:  settings.tabsEnabled, tabs, activeTabIdx, tabsOverviewOpenRef,
+            AndroidBridge, __scrollEl
+    Writes: tabThumbnails state, IndexedDB via idbPut/idbDelete/idbReadAll
+    Deps:   thumb-store (already extracted to src/stores/thumb-store.js),
+            tabContentKey (extracted to src/utils/tabs.js)
+    Returns: { tabThumbnails, captureActiveTabThumbnail }
+    Why medium: lots of refs to coordinate (activeTabIdxRef/tabsRef/
+                captureInFlightRef/thumbnailsRef); refs must mirror the
+                state passed in as props.
+
+  ── Cluster 5: useReadingDwell ── (MEDIUM, ~60 lines, src/hooks/use-reading-dwell.js)
+    Symbols: activeReadKey/setActiveReadKeyRaw, 5 dwell refs (timer/acc/
+             start/key/pendingCommit), DWELL_MS, commitDwellNow,
+             cancelDwell, scheduleDwell, pauseDwell, setActiveReadKey,
+             visibilitychange effect, __onDwellCommit bridge effect
+    Reads:  settings.dwellMs (with default 20000), document.visibilityState
+    Writes: activeReadKey state; commitFn callbacks (saved to localStorage)
+    Returns: { activeReadKey, setActiveReadKey, cancelDwell, commitDwellNow }
+    Why medium: visibilityState handling is correctness-critical (mark-as-
+                read fires only after dwell on a visible page). Cross-tab
+                switch MUST cancel dwell before flipping — see the
+                cancelDwell() call in switchToTab.
+    Open question: this hook's commitDwellNow is exposed via window.
+                  __onDwellCommit — keep that bridge or thread as prop?
+
+  ── Cluster 6: useFromLetterStack ── (LOW, ~50 lines, src/hooks/use-from-letter-stack.js)
+    Symbols: fromLetterStack (from tabField), pushFromLetter, popFromLetter,
+             tapThroughBack, fromLetterRef (sync), prune effect, backHint
+             computation
+    Reads:  screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+            destSnapshot
+    Writes: fromLetterStack via setFromLetterStack
+    Returns: { fromLetterStack, pushFromLetter, popFromLetter, tapThroughBack,
+              fromLetterRef, backHint }
+    Open: fromLetterRef.current = fromLetterStack pattern (sync ref); the
+          pattern is shared with ~7 other refs in App() — see Cluster 10.
+
+  ── Cluster 7: useNavigateToLink ── (HIGH RISK, ~85 lines, src/hooks/use-navigate-to-link.js)
+    Symbols: _navToLinkRef + navigateToLink (useCallback), the deferred
+             ref body assignment (line 1836)
+    Reads:  screen, letterId, bookId, chapterNum, studyId, studyChapterId
+    Writes: bookId, chapterNum, letterId, studyId, studyChapterId, screen,
+            journalEntryId, surpriseAnchor, fromLetterStack; window.
+            __pendingHighlight, __pendingScrollHlKey, __pendingLinkExcerpt
+    Why HIGH: This is the cross-app deep-linking hub. Every Library row
+              tap, footnote tap-through, and excerpt navigation routes
+              through it. Must preserve the "ref assigned later" pattern
+              that lets useCallback have [] deps while still seeing the
+              current pushFromLetter (closure-over-mutable-ref).
+
+  ── Cluster 8: useAndroidBack ── (HIGH RISK, ~70 lines, src/hooks/use-android-back.js)
+    Symbols: screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/
+             fromMatthewChRef/fromLetterRef/studyIdRef/fromWtlbRef/
+             searchOriginRef (10 sync refs); handleAndroidBack effect (the
+             ~60-line switch statement); window.__goHome bridge effect
+    Reads:  EVERY state setter, EVERY ref, LETTER_SCREEN_SET,
+            COL_BY_LETTER_SC, COL_BY_INDEX_SC, getStudyById, journalEntryId
+    Writes: setBookId/setChapterNum/setLetterId/setStudyId/setStudy
+            ChapterId/setScreen/setFromLetterStack/setFromSearch/
+            setFromStudies/setFromWtlb/setFromMatthewCh/setTabsOverviewOpen
+    Why HIGH: this is the most-coupled handler in the whole codebase.
+              Has direct dependencies on Clusters 2/5/6/7 AND many local
+              nav helpers (goNavOrigin, goSearchOrigin, goStudiesHome,
+              goJournalViewer, goHome). Likely will NOT be extractable
+              cleanly without refactoring nav helpers first.
+
+  ── Cluster 9: useHistory ── (LOW, ~60 lines, src/hooks/use-history.js)
+    Symbols: readHistory/setReadHistory state, addToHistory, clearHistory,
+             pruneHistoryDay, history-track effect
+    Reads:  screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+            BOOKS, MATTHEW, COL_BY_LETTER_SC, _findLetter, getStudyById,
+            getStudyChapter, settings.historyEnabled
+    Writes: readHistory state → localStorage 'vot-history'
+    Returns: { readHistory, addToHistory, clearHistory, pruneHistoryDay }
+    Why low: clean append-only with explicit deps. Easy first real test
+             of the hook-extraction pattern after the warmup.
+
+  ── Cluster 10: useRefMirror ── (LOW, ~30 lines, src/hooks/use-ref-mirror.js)
+    Pattern only, not a single hook:
+      const xRef = useRef(initial); xRef.current = x;
+    Used 13× across App() to give event-handlers / window bridges
+    synchronous read access to state without re-binding. Could become:
+      function useRefMirror(value) { var r = useRef(value); r.current = value; return r; }
+    Tiny abstraction — but it deduplicates the 13 mirror sites and
+    documents the pattern. Optional, mechanical refactor.
+
+  ── Cluster 11: useSettings ── (MEDIUM, ~80 lines, src/hooks/use-settings.js)
+    Symbols: settings/setSettings state, toggleSetting, updateSetting,
+             showWelcome/setShowWelcome state, isOnline/setIsOnline,
+             dismissWelcome, online-check effect, body-class effects
+             (split into useEffects on settings + theme), save vot-state
+             effect (the big one that depends on EVERYTHING)
+    Reads:  tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap,
+            activeReadKey, settings, readItems
+    Writes: settings state, vot-state localStorage, body className list,
+            AndroidBridge.setLightStatusBar, AndroidBridge.setKeepScreenOn
+    Why medium: the save-state effect's dep array is the biggest in
+                App() — ANY of those reads being out-of-sync triggers
+                a stale write. Audit thoroughly.
+
+  ── Cluster 12: useSheetOrchestration ── (LOW, ~150 lines, src/hooks/use-sheet-orchestration.js)
+    Symbols: 11 sheet/overlay state slots (annChip, linkSidebarKey,
+             linkPickerSource, linkRefineRequest, lastLinkCreated,
+             linkPickerMode, linkPickerOnPickRef, noteSheetTarget,
+             notebookPickerTarget, multiNotePayload, bookmark
+             PopoverPayload, bookmarkCreatePending, inboundJournal
+             Payload); 10+ window.__open* bridge effects; auto-dismiss
+             on screen change effect
+    Reads:  screen, letterId, bookId, chapterNum, studyId, studyChapterId
+    Writes: 11 setX(null) calls in the dismiss-on-nav effect
+    Why low: each setter is a leaf — no dependencies between them. The
+             "auto-dismiss on screen change" effect is the single
+             behavioral guarantee to preserve.
+
+  ── Other small clusters (not split out yet) ──
+    apply-DOM-effects (4 effects calling applyDOMHighlights/Links/
+      Bookmarks/NoteIcons/ActiveNoteState — runs every hlTick) — could
+      become useApplyDom().
+    visualViewport keyboard-height effect — could become useKeyboard
+      Inset(). Self-contained.
+    journal-media-orphan-sweep effect — already self-contained, one-
+      time on mount. Could be a one-liner useEffect inline.
+
+  ═════════════════════════════════════════════════════════════════════
+  CRITICAL INVARIANTS that any P6 extraction MUST preserve:
+  ═════════════════════════════════════════════════════════════════════
+
+  1. tabField setter identity stability
+     `_tabSetters.current[key]` caches per-key. The SAME function is
+     returned across renders so child components don't see prop identity
+     changes that would trigger unnecessary work. If the hook returns
+     a fresh setter each render → re-mount cascade. SMOKE: tab-overview
+     thumbnail count + Letter screen annotation count must be identical
+     before/after.
+
+  2. Ref-mirror sync timing
+     Every `xRef.current = x` line runs DURING render. If you move the
+     state into a hook but leave the mirror assignment in App(), the
+     mirror sees the OLD value (one render late). Either move the
+     mirror into the hook, or expose `xRef` from the hook.
+
+  3. Hook ordering
+     React requires hooks to be called in the SAME ORDER every render.
+     Replacing 10 individual useState calls with one useFoo() that
+     returns multi-value is fine — but mixing extracted hooks with
+     local useState calls means the EXTRACTED hooks must come either
+     all-before or all-after the local ones, consistently across all
+     renders. Plan: ALL extracted hooks called at the top of App(),
+     then local useState/useEffect after.
+
+  4. _navToLinkRef closure-over-mutable-ref pattern
+     useCallback(() => _navToLinkRef.current(...), []) lets the
+     callback have [] deps while still calling the LATEST navigation
+     body. The body is assigned LATER in App() (line 1836). If P6
+     extracts navigateToLink into a hook, the hook must expose the
+     ref so App() can still do `_navToLinkRef.current = ...`.
+
+  5. Boot-time top-level code in the inline script block
+     The inline `<script>` at lines 240-2200 has top-level code that
+     runs BEFORE App() mounts (COLLECTIONS.forEach wiring prev/next
+     links, BIBLE_BOOK_LIST construction, etc.). DO NOT move boot
+     code into App() or hooks — the order matters.
+
+  6. window.__* bridges
+     Every extracted hook that wires `window.__openX = ...` MUST
+     return the cleanup function. The smoke harness's wtlbAnnotation
+     round-trip will silently fail if these aren't cleaned up between
+     renders (specifically: __openNote, __showAnnChip, __showMultiNote,
+     __openBookmarkPopover, __bumpHlTick, __openLinkPicker, __open
+     LinkPickerForTarget, __bookmarkCreate, __openJournalInbound,
+     __bookmarkEdit, __openLinkSidebar, __goSearch, __goHome,
+     handleAndroidBack, __onDwellCommit).
+
+  ═════════════════════════════════════════════════════════════════════
+  EXTRACTION ORDER (proposed):
+  ═════════════════════════════════════════════════════════════════════
+
+  P6a: useSavedState     (warmup — establishes src/hooks/ pattern)
+  P6b: useRefMirror      (mechanical refactor — replaces 13 sites)
+  P6c: useHistory        (smallest real hook with state + effect)
+  P6d: useScrollMemory   (verify smoke scroll-restore works)
+  P6e: useReadingDwell   (verify mark-as-read still fires)
+  P6f: useSettings       (the save-state effect — careful audit)
+  P6g: useThumbnails     (heavy refs but isolated)
+  P6h: useSheetOrchestration (11 sheets but each is leaf)
+  P6i: useFromLetterStack (back-pill behavior)
+  P6j: useNavigateToLink  (cross-app router — test every endpoint type)
+  P6k: useTabs           (THE LOAD-BEARING ONE — last, fullest smoke run)
+  P6l: useAndroidBack    (depends on most others — saved for last)
+
+  After P6l: App() should drop from ~2,500 lines → ~400 lines (just
+  the hook composition + render tree). Local helpers (_findLetter,
+  colReadNavProps, colIdxProps, boundary configs) stay inline since
+  they close over hook-returned values.
+
+  Cluster sizes summing to ~1,100 lines extracted → ~1,400 left in
+  App() (mostly the render tree which is ~1,000 lines + handler glue).
+
+  ═════════════════════════════════════════════════════════════════════
+  RISKS / OPEN QUESTIONS:
+  ═════════════════════════════════════════════════════════════════════
+
+  - tabField identity stability under hook refactor — needs a smoke
+    that explicitly tests "tab thumbnail count stable across re-renders"
+  - handleAndroidBack has cyclic dependencies on every other hook's
+    setters → may need a "router" hook layer that orchestrates them,
+    OR pass the entire return-value of all earlier hooks down. Defer
+    P6l decision until P6a-k are landed and the dependency graph is
+    visible.
+  - Several refs (xRef.current = x DURING render) violate React's
+    "no side effects during render" rule. They work because xRef is
+    a useRef (not state) and the assignment is idempotent. But future
+    React Strict Mode + Concurrent Mode could expose this. Don't fix
+    in P6 — flag for a separate audit.
+  - The `tabField()` helper is NOT a hook — it's a plain function called
+    inside App() that returns a [state, setter] tuple. If P6 extracts
+    useTabs(), tabField needs to stay callable from App() OR each
+    `[screen, setScreen] = tabField('screen')` becomes `const screen =
+    tabs.activeTab.screen; const setScreen = useTabSetter('screen');`.
+    Pick a direction up-front.
+
+  ═════════════════════════════════════════════════════════════════════
+  END P6 RECONNAISSANCE
+  ═════════════════════════════════════════════════════════════════════
+
   CURRENT NEXT: P6 (App() hook extraction). App() is now the only
   big inline component left in index.html (~2,500 of its ~4,237 lines).
   Extract its custom hooks (useTabField, settings persistence, scroll
