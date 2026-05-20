@@ -2155,11 +2155,42 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   marks/13 icons no crash on open or next/prev, 0 console.error). This
   is also Objective E's natural home — the data registry + scripture
   primitives now live in their own module, ready for any future
-  data-unification work. NEXT: P4 (LetterView / WtlbEntryView /
-  BibleChapterView / ChapterView big screen components — the largest
-  remaining single chunk in index.html — then hook extraction to slim
-  App()).
+  data-unification work.
 
+  P3.5a — DONE (2026-05-19). Extracted the 5 remaining inline stores
+  to src/stores/: CachedStore (factory, loads first), AnnotationStore +
+  HighlightStore alias + migrateAnnotations, NoteStore, NotebookStore,
+  RecentNavStore. Every store now lives in its own module under
+  src/stores/ — none left inline. Verbatim transfer, no logic changes.
+  First extraction run silently truncated RecentNavStore + NoteStore
+  because end anchor `});\n` also matched inline `JSON.stringify({...});`
+  in their bodies — the smoke harness caught it loud (every store global
+  undefined, app fully broken). Reverted, hardened the anchor to
+  `\n});\n` (only matches `});` at column 0 — the actual Object.assign
+  close), added a truncation guard asserting each module body ENDS with
+  the proper closing. Second run clean. Verified: annotation round-trip
+  ok (133 marks/13 icons no crash on open or next/prev), 0 console
+  errors, NotebookStore.remove → NoteStore.pruneNotebook cascade works
+  (add → list[1] → remove → list[0]).
+
+  P3.5b — DONE (2026-05-19). Relocated all 29 raw corpus data files from
+  app/src/main/assets/data/ → app/src/main/assets/src/data/ via git mv
+  (preserves history). Updated 25 references: 21 static <script src>
+  tags in index.html + 2 dynamic (loadTranslation, lazy bible-studies
+  loader) + 2 in search.js. Removed the now-empty data/ directory.
+  ONE HOME for all data + code under src/data/ — no more "is this in
+  data/ or src/data/?" cognitive load. Verified: data globals load
+  correctly (BOOKS, LETTERS_V1, LETTERS [V2's global], MATTHEW, HOLY
+  _DAYS, THE_BLESSED, WTLB_ONE all populated; BIBLE_STUDIES correctly
+  undefined until lazy-loaded). lookupVersesFromBooks('Genesis 1:1')
+  returns real Bible text via the relocated books.js. Annotation
+  round-trip identical to baseline.
+
+  NEXT: P4 (LetterView / WtlbEntryView / BibleChapterView / ChapterView
+  big screen components — the largest remaining single chunk in
+  index.html — then hook extraction to slim App()).
+
+  NEXT (superseded): P3.5 (stores extraction + data relocation).
   NEXT (superseded): P3 (scripture/data resolution).
 
   NEXT (superseded): P2 (CSS-in-JS → src/styles/).

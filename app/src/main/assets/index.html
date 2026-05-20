@@ -45,32 +45,32 @@
 <body>
   <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");}catch(e){}</script>
   <div id="root"></div>
-  <script src="data/books.js"></script>
-  <script src="data/books-restored.js"></script>
-  <script src="data/matthew.js"></script>
-  <script src="data/matthew-plain.js"></script>
-  <script src="data/matthew-nkjv.js"></script>
+  <script src="src/data/books.js"></script>
+  <script src="src/data/books-restored.js"></script>
+  <script src="src/data/matthew.js"></script>
+  <script src="src/data/matthew-plain.js"></script>
+  <script src="src/data/matthew-nkjv.js"></script>
   <!-- Alt-translation Bible files (~4.5 MB each, 7 files = ~32 MB of JS parse time).
        Loaded on demand via loadTranslation() below — not upfront — so app startup is fast.
        Users stay on NKJV unless they change translations, so typically zero extra load. -->
   <!-- bible-studies.js (~4.3 MB) is loaded on demand via loadBibleStudies() below.
        Most sessions never open a Bible Study, so this keeps cold-boot fast. -->
-  <script src="data/volume-one.js"></script>
-  <script src="data/volume-two.js"></script>
-  <script src="data/volume-three.js"></script>
-  <script src="data/volume-four.js"></script>
-  <script src="data/volume-five.js"></script>
-  <script src="data/volume-six.js"></script>
-  <script src="data/volume-seven.js"></script>
-  <script src="data/letters-timothy.js"></script>
-  <script src="data/letters-flock.js"></script>
-  <script src="data/lords-rebuke.js"></script>
-  <script src="data/wtlb-one.js"></script>
-  <script src="data/wtlb-two.js"></script>
-  <script src="data/wtlb-scriptures.js"></script>
-  <script src="data/the-blessed.js"></script>
-  <script src="data/holy-days.js"></script>
-  <script src="data/hidden-manna.js"></script>
+  <script src="src/data/volume-one.js"></script>
+  <script src="src/data/volume-two.js"></script>
+  <script src="src/data/volume-three.js"></script>
+  <script src="src/data/volume-four.js"></script>
+  <script src="src/data/volume-five.js"></script>
+  <script src="src/data/volume-six.js"></script>
+  <script src="src/data/volume-seven.js"></script>
+  <script src="src/data/letters-timothy.js"></script>
+  <script src="src/data/letters-flock.js"></script>
+  <script src="src/data/lords-rebuke.js"></script>
+  <script src="src/data/wtlb-one.js"></script>
+  <script src="src/data/wtlb-two.js"></script>
+  <script src="src/data/wtlb-scriptures.js"></script>
+  <script src="src/data/the-blessed.js"></script>
+  <script src="src/data/holy-days.js"></script>
+  <script src="src/data/hidden-manna.js"></script>
 
   <!-- Search: FlexSearch engine + data dictionaries + runtime module -->
   <script src="flexsearch.min.js"></script>
@@ -8413,7 +8413,7 @@ function loadTranslation(code) {
   if (_translationPromises[code]) return _translationPromises[code];
   _translationPromises[code] = new Promise((resolve) => {
     const script = document.createElement('script');
-    script.src = 'data/bible-' + code + '.js';
+    script.src = 'src/data/bible-' + code + '.js';
     script.async = true;
     script.onload = () => {_translationLoaded[code] = true;resolve();};
     script.onerror = () => {resolve();}; // silent fail — NKJV fallback
@@ -8431,7 +8431,7 @@ function loadBibleStudies() {
   if (_bibleStudiesPromise) return _bibleStudiesPromise;
   _bibleStudiesPromise = new Promise((resolve) => {
     const script = document.createElement('script');
-    script.src = 'data/bible-studies.js';
+    script.src = 'src/data/bible-studies.js';
     script.async = true;
     script.onload = () => { resolve(); };
     script.onerror = () => { resolve(); }; // silent fail — STUDIES stays []

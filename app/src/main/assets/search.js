@@ -1,7 +1,7 @@
 /* ═════════════════════════════════════════════════════════════════════════
    VotReader Search — powered by FlexSearch (window.FlexSearch).
    Depends on: window.VotSearchData (from search-data.js), window.FlexSearch,
-   and all data globals loaded via <script src="data/*.js">.
+   and all data globals loaded via <script src="src/data/*.js">.
 
    Exposes: window.VotSearch = { init, ensureTranslations, parse,
                                  search, suggest, commands, highlight,
@@ -930,7 +930,7 @@ function loadOneTranslation(code) {
   return new Promise(function (resolve) {
     if (window['BIBLE_' + code.toUpperCase()]) return resolve();
     var script = document.createElement('script');
-    script.src = 'data/bible-' + code + '.js';
+    script.src = 'src/data/bible-' + code + '.js';
     script.async = true;
     script.onload = function () { resolve(); };
     script.onerror = function () { resolve(); };
