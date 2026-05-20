@@ -2291,12 +2291,18 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   React root mounts, LetterView renders ("VOLUME ONE · PREFACE · A Word
   of Warning"), zero NEW console errors introduced. Commit 8cf2081.
 
-  Surfaced (NOT caused by P5c): WtlbEntryView.js:33 throws 7 times on
-  initial mount with "Cannot read properties of undefined (reading
-  'useMemo')". Reproduces on pristine pre-P5c state. App still renders
-  correctly (ErrorBoundary swallows it). Root cause unclear — React is
-  defined globally, no local shadowing. Flagged for a dedicated
-  investigation when P6 begins.
+  Cleanup note: I initially flagged a "7 WtlbEntryView useMemo errors
+  per mount" defect as part of P5c verification. Follow-up root-cause
+  investigation closed it as a PHANTOM — the errors came from a one-off
+  detached `ReactDOM.createRoot(div).render(WtlbEntryView)` test run
+  while debugging (a detached root can't establish a React hook
+  context, so the hooks legitimately throw there). Chrome devtools'
+  persistent console log buffer retained those errors across page
+  reloads, making them look like they fired on every mount. Installing
+  a fresh-mount `console.error` interceptor showed ZERO real errors
+  across LetterView, theme toggle, WTLB-entry navigation, and home.
+  There is no real bug to fix. CLAUDE.md was edited to remove the
+  bogus "KNOWN LATENT BUG" callout.
 
   Cumulative P1-P5c: index.html ~944 KB / ~17.2k lines →
   ~320 KB / 6,340 lines. **106 modules** under src/.
