@@ -4212,6 +4212,24 @@ multiNotePayload && React.createElement(MultiNotePopover, {
        screens. Lets the user refine label + add an optional thought
        BEFORE the bookmark is persisted (replaces the silent add). -->
   <script src="src/ui/sheets/BookmarkCreateSheet.js"></script>
+  <!-- Mirror lexical-only globals onto window so the smoke harness
+       (tools/smoke.js) can probe them without `eval()` (CSP forbids
+       'unsafe-eval'). `function NAME(){}` and extracted modules using
+       `var X =` are already window-globals; only inline `const X = ...`
+       and `class X` declarations live in lexical-only scope. -->
+  <script>
+    if (typeof AnnotationStore !== 'undefined') window.AnnotationStore = AnnotationStore;
+    if (typeof NoteStore !== 'undefined') window.NoteStore = NoteStore;
+    if (typeof LinkStore !== 'undefined') window.LinkStore = LinkStore;
+    if (typeof BookmarkStore !== 'undefined') window.BookmarkStore = BookmarkStore;
+    if (typeof NotebookStore !== 'undefined') window.NotebookStore = NotebookStore;
+    if (typeof RecentNavStore !== 'undefined') window.RecentNavStore = RecentNavStore;
+    if (typeof COLLECTIONS !== 'undefined') window.COLLECTIONS = COLLECTIONS;
+    if (typeof COL_BY_KEY !== 'undefined') window.COL_BY_KEY = COL_BY_KEY;
+    if (typeof HL_COLORS !== 'undefined') window.HL_COLORS = HL_COLORS;
+    if (typeof ErrorBoundary !== 'undefined') window.ErrorBoundary = ErrorBoundary;
+    if (typeof StaticSubtree !== 'undefined') window.StaticSubtree = StaticSubtree;
+  </script>
   <script>
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(App, null)));

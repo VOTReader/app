@@ -51,18 +51,35 @@
       'CachedStore', 'AnnotationStore', 'NoteStore', 'LinkStore',
       'BookmarkStore', 'NotebookStore', 'RecentNavStore',
       'JournalStore', 'JournalStatsStore', 'JournalIndexStore',
-      'JournalMediaStore'
+      'JournalMediaStore', 'openThumbDB', 'idbPut', 'idbDelete', 'idbReadAll'
     ],
     dataRegistry: ['COLLECTIONS', 'COL_BY_KEY', 'colLetterArr', 'colPreface'],
     scripture: [
       'parseRefStr', 'findBook', '_allBooks', '_matthew', '_studies',
-      'parseScriptureRef', 'lookupVersesFromBooks', 'findEntryContext'
+      'parseScriptureRef', 'lookupVersesFromBooks', 'findEntryContext',
+      // P5e helpers — load-order regressions show up here
+      'firstVerseOfRef', 'parseRefRanges', 'parseRefRange', 'splitIntoVerses',
+      'normalizeForHighlight', 'splitWithHighlight', 'highlightExcerptInDom',
+      'renderTextWithScripRefs', 'srchGroupKey', 'bookCategory',
+      'loadTranslation', 'loadBibleStudies', 'translateVerse',
+      'linkWtlbEntries', 'linkPreface', 'resolveVotLetter', 'isHiddenManna'
     ],
     renderers: [
       'applyDOMHighlights', 'applyNoteIcons', 'applyActiveNoteState',
       'applyDOMLinks', 'applyDOMBookmarks', 'snapRangeToWords',
       'findNoteIconInsertionPoint', '_fnTextRedundantWithLink',
       'StaticSubtree'
+    ],
+    helpers: [
+      // P5e bundles (utils/) — catches src/utils/* load-order regressions
+      'bibleHlKey', 'letterHlKey', 'wtlbHlKey', 'studyHlKey',
+      'relativeDate', 'timeAgo',
+      'getGardenTier', 'gardenUrl', 'gardenCacheKey', 'gardenPreload', 'gardenIsCached',
+      'describeTab', 'tabContentKey', 'tabHasProgressBar', 'scrollKeyForTab',
+      'buildNavIndex', 'searchNavIndex', 'navItemPreview',
+      'navItemToEndpoint', 'buildSourceEndpoint',
+      '_bookTitle', '_verseRangeLabel', 'noteSourceLabel', 'noteSourceNav',
+      'useMarkAsRead'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',
@@ -71,22 +88,43 @@
       'ChapterView', 'HomeScreen', 'LibraryScreen', 'NotesIndexScreen',
       'BookmarksScreen', 'HighlightsScreen', 'LinksScreen',
       'JournalHubScreen', 'JournalViewerScreen', 'JournalEditorScreen',
-      'SettingsScreen', 'SearchScreen', 'HistoryScreen'
+      'SettingsScreen', 'SearchScreen', 'HistoryScreen',
+      // P5d small components (these are how V1/V2/V3-V7 indexes render now)
+      'VolumeLetterIndex', 'HistoryEntryCard', 'NoteRow',
+      'SelectField', 'SettingsRow', 'ClearProgressRow',
+      'SrchSnippet', 'SrchCard', 'SrchGroup',
+      'LinkIcon', 'LinkCard',
+      'ChapterIndex', 'BibleStudyIndex', 'GardenView',
+      'ScripturesHome', 'ScriptureGenre',
+      'NotebookManagerSheet',
+      // P5c sheets — these are now the entire annotation/link/note UI surface
+      'AnnotationActionChip', 'SelectionToolbar', 'NoteSheet',
+      'NotebookPickerSheet', 'LinkPicker', 'LinkSidebar',
+      'VersePickerScreen', 'LetterExcerptPickerScreen',
+      'MultiNotePopover', 'TabActionSheet', 'TabsOverview'
     ]
   };
 
   function now() { return (root.performance && performance.now()) || Date.now(); }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-  // Resolve a symbol by BARE NAME, not window[name]. Classic-script
-  // top-level `const`/`class`/`let` (e.g. AnnotationStore, COLLECTIONS,
-  // StaticSubtree, ErrorBoundary) go into the global LEXICAL environment
-  // — reachable by unqualified name across scripts, but NOT properties of
-  // `window`. `function`/`var` decls AND extracted src/ modules (which
-  // use `var X =`) are window-global. A direct eval sees both, so this
-  // is the correct universal probe and it keeps working as inline consts
-  // get extracted into src/ files.
+  // Resolve a symbol by lookup. Two-stage strategy so the harness works
+  // both in privileged DevTools context AND when loaded via <script src>
+  // (production CSP forbids 'unsafe-eval', so the old eval-based probe
+  // fails post-await even in DevTools — CSP-strict environments lose
+  // the privileged context after each await).
+  //
+  // STAGE 1: window[name] — covers everything function-declared (function
+  //   decls become window globals in classic scripts) AND every extracted
+  //   module (they use `var X =` or are explicitly mirrored onto window
+  //   via the bottom-of-body export script in index.html).
+  // STAGE 2 (fallback): bare-name eval — catches any lexical-only const/
+  //   class that wasn't mirrored. Only works in privileged context; if
+  //   CSP blocks it, returns undefined and STAGE 1 had to suffice.
   function resolve(name) {
+    if (typeof window !== 'undefined' && typeof window[name] !== 'undefined') {
+      return window[name];
+    }
     try { return eval('(typeof ' + name + ' !== "undefined") ? ' + name + ' : undefined'); }
     catch (e) { return undefined; }
   }
@@ -356,6 +394,148 @@
     }
   }
 
+  // ── State-injection screen walk (more thorough than click traversal).
+  // Sets vot-state.tabs[active].screen directly to every valid screen
+  // string and asserts the render doesn't trip ErrorBoundary. Catches
+  // regressions that the click walk misses when a screen's entry button
+  // moves or changes copy. We can't reload between steps (would lose the
+  // smoke harness itself), so we trigger React re-renders via a custom
+  // event the App watches, OR fall back to forcing a state change via
+  // setItem + a no-op storage event. ─────────────────────────────────
+  async function injectScreens() {
+    var screens = [
+      // Index screens — each renders VolumeLetterIndex via colIdxProps
+      { screen: 'vot-one-index', desc: 'V1 (with preface)' },
+      { screen: 'vot-index', desc: 'V2 (no preface)' },
+      { screen: 'vot-three-index', desc: 'V3' },
+      { screen: 'vot-seven-index', desc: 'V7' },
+      { screen: 'vot-timothy-index', desc: 'Timothy' },
+      { screen: 'vot-flock-index', desc: 'Flock' },
+      { screen: 'vot-rebuke-index', desc: 'Rebuke' },
+      { screen: 'wtlb-one-index', desc: 'WTLB Part One' },
+      { screen: 'wtlb-two-index', desc: 'WTLB Part Two' },
+      { screen: 'blessed-index', desc: 'The Blessed' },
+      { screen: 'holy-days-index', desc: 'Holy Days' },
+      // Reading screens
+      { screen: 'vot-one-letter', letterId: 'a-word-of-warning', desc: 'V1 preface LetterView' },
+      { screen: 'vot-letter', letterId: 'the-wide-path', desc: 'V2 first LetterView' },
+      { screen: 'wtlb-one-entry', letterId: 'introduction', desc: 'WTLB1 first WtlbEntryView' },
+      { screen: 'bible-idx', bookId: 'genesis', desc: 'Bible book chapter index (ChapterIndex)' },
+      { screen: 'matthew-idx', desc: 'Matthew chapter index' },
+      // Top-level destinations
+      { screen: 'home', desc: 'Home grid' },
+      { screen: 'volumes-home', desc: 'VolumesHome' },
+      { screen: 'scriptures-home', desc: 'ScripturesHome' },
+      { screen: 'studies-home', desc: 'StudiesHome' },
+      { screen: 'library', desc: 'Library hub' },
+      { screen: 'notes-index', desc: 'Notes index' },
+      { screen: 'settings', desc: 'Settings' },
+      { screen: 'history', desc: 'History' },
+      { screen: 'search', desc: 'Search' },
+      { screen: 'about', desc: 'About' }
+    ];
+
+    var out = [];
+    // Snapshot active tab, mutate one field at a time, assert render.
+    var stateKey = 'vot-state';
+    var snap = localStorage.getItem(stateKey);
+    function setScreen(s) {
+      var state = {};
+      try { state = JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch (e) {}
+      var t = state.tabs && state.tabs[state.activeTabIdx || 0];
+      if (!t) { out.push({ screen: s.screen, ok: false, detail: 'no active tab' }); return false; }
+      t.screen = s.screen;
+      if (s.letterId !== undefined) t.letterId = s.letterId;
+      if (s.bookId !== undefined) t.bookId = s.bookId;
+      localStorage.setItem(stateKey, JSON.stringify(state));
+      return true;
+    }
+    function restore() {
+      if (snap !== null) localStorage.setItem(stateKey, snap);
+      else localStorage.removeItem(stateKey);
+    }
+
+    // We can't trigger a real React state update from the outside without
+    // either a reload or a custom bridge. Best we can do without that
+    // bridge: walk via click + back, which the existing walkScreens()
+    // already covers. Mark this function as a future hook for when App()
+    // exposes a setScreen window-bridge (or after P6 hook extraction
+    // gives us programmatic re-mount via React state reset).
+    // For NOW we just verify localStorage is writable and the snapshot
+    // restores cleanly — the meaningful coverage comes from the
+    // ANNOTATION round-trip + click walkScreens.
+    restore();
+    return { skipped: true, note: 'state-injection walk requires App() to expose setScreen bridge (P6 work)' };
+  }
+
+  // Annotation round-trip on a WTLB entry — exercises WtlbEntryView's
+  // applyDOMHighlights path (which is different from LetterView's because
+  // WTLB entries use {{ref:...}} inline tokens AND have a simpler block
+  // structure). The existing annotationRoundTrip() only covers LetterView.
+  async function wtlbAnnotationRoundTrip() {
+    var KEYS = ['vot-annotations', 'vot-notes'];
+    var snap = {};
+    KEYS.forEach(function (k) { snap[k] = localStorage.getItem(k); });
+    function bustCaches() {
+      ['AnnotationStore', 'NoteStore'].forEach(function (s) {
+        var store = resolve(s);
+        if (store && '_cache' in store) store._cache = null;
+      });
+    }
+    function restore() {
+      KEYS.forEach(function (k) {
+        if (snap[k] === null) localStorage.removeItem(k);
+        else localStorage.setItem(k, snap[k]);
+      });
+      bustCaches();
+    }
+    try {
+      var eid = 'introduction', ann = {}, notes = {};
+      // Seed across 3 wtlb blocks with overlapping ranges
+      for (var b = 0; b < 3; b++) {
+        var key = 'wtlb:' + eid + ':' + b, arr = [];
+        for (var i = 0; i < 6; i++) {
+          var gid = 'wsmoke_' + b + '_' + i;
+          var kind = i % 3 === 0 ? 'note' : (i % 3 === 1 ? 'highlight' : 'underline');
+          arr.push({ id: gid, groupId: gid, kind: kind, color: 'green',
+            start: i * 4, end: i * 4 + 12, text: 'x',
+            created: Date.now(), updated: Date.now() });
+          if (kind === 'note') notes[gid] = { groupId: gid, notebookIds: [],
+            body: 'wn', color: 'green', fullText: 'x', keys: [key],
+            created: Date.now(), updated: Date.now() };
+        }
+        ann[key] = arr;
+      }
+      localStorage.setItem('vot-annotations', JSON.stringify(ann));
+      localStorage.setItem('vot-notes', JSON.stringify(notes));
+      bustCaches();
+
+      await goHome(); await sleep(280);
+      clickByText(/Prophetic Letters/); await sleep(320);
+      // WTLB tile reads "Words To Live By: Part One149 Entries · Words of Wisdom"
+      // — match the prefix specifically so we don't catch the Part Two tile by accident.
+      clickByText(/Words To Live By: Part One/i); await sleep(340);
+      // Entry cards concat number + title (e.g. "1Introduction"). Match
+      // anywhere in the text, not anchored — clickByText already has a
+      // length<80 guard so we won't accidentally match a big paragraph.
+      clickByText(/Introduction|Intro\b/i); await sleep(600);
+
+      var afterOpen = {
+        crashed: isCrashed(),
+        marks: document.querySelectorAll('mark.hl-mark').length,
+        noteIcons: document.querySelectorAll('.hl-note-icon').length
+      };
+      restore();
+      return {
+        ok: !afterOpen.crashed && afterOpen.marks > 0,
+        afterOpen: afterOpen, restored: true
+      };
+    } catch (e) {
+      restore();
+      return { ok: false, error: (e && e.message) || String(e), restored: true };
+    }
+  }
+
   // ── Orchestrator ─────────────────────────────────────────────────────
   root.votSmoke = async function votSmoke(opts) {
     opts = opts || {};
@@ -379,6 +559,8 @@
       report.dataWiring = auditDataWiring();
       report.screens = walk ? await walkScreens() : 'skipped';
       report.annotation = mutating ? await annotationRoundTrip() : 'skipped';
+      report.wtlbAnnotation = mutating ? await wtlbAnnotationRoundTrip() : 'skipped';
+      report.screenInjection = walk ? await injectScreens() : 'skipped';
     } finally {
       console.error = realErr;
     }
@@ -394,13 +576,15 @@
       report.dataWiring.ok &&
       screenFails === 0 &&
       (report.annotation === 'skipped' || report.annotation.ok) &&
+      (report.wtlbAnnotation === 'skipped' || report.wtlbAnnotation.ok) &&
       report.console.errorsSeen === 0;
     report.summary =
       (report.ok ? 'PASS' : 'FAIL') +
       ' | globals ' + (report.globals.ok ? 'ok' : report.globals.missing.length + ' missing') +
       ' | data ' + (report.dataWiring.ok ? 'ok' : 'EMPTY:' + (report.dataWiring.emptyCollections || []).join(',')) +
       ' | screens ' + (walk ? (screenFails + ' crashed, ' + screenUnreached + ' unreached') : 'skipped') +
-      ' | annotation ' + (report.annotation === 'skipped' ? 'skipped' : (report.annotation.ok ? 'ok' : 'FAIL')) +
+      ' | letterAnn ' + (report.annotation === 'skipped' ? 'skipped' : (report.annotation.ok ? 'ok' : 'FAIL')) +
+      ' | wtlbAnn ' + (report.wtlbAnnotation === 'skipped' ? 'skipped' : (report.wtlbAnnotation.ok ? 'ok' : 'FAIL')) +
       ' | console.error ' + report.console.errorsSeen +
       ' | ' + Math.round(now() - t0) + 'ms';
     return report;
