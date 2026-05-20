@@ -81,7 +81,9 @@
       '_bookTitle', '_verseRangeLabel', 'noteSourceLabel', 'noteSourceNav',
       'useMarkAsRead',
       // P6a: useSavedState hook + its colocated _validateTabState helper
-      'useSavedState', '_validateTabState'
+      'useSavedState', '_validateTabState',
+      // P6b: useRefMirror — 15 sites in App() now route through it
+      'useRefMirror'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',

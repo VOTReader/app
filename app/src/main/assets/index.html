@@ -159,6 +159,7 @@ const HL_COLORS = ['yellow','green','pink','red','orange','blue','purple','teal'
   <script src="src/components/ErrorBoundary.js"></script>
   <script src="src/hooks/useMarkAsRead.js"></script>
   <script src="src/hooks/use-saved-state.js"></script>
+  <script src="src/hooks/use-ref-mirror.js"></script>
   <!-- ─── JOURNAL FEATURE — segregated module set ───
        All depend on CachedStore (defined above) + React (loaded earlier).
        Load order matters: styles → stores → helpers → sheets → screens → chip. -->
@@ -1158,8 +1159,7 @@ function App() {
       return { ...t, ...patch };
     }));
   }, [activeTabIdx]);
-  const _uatRef = React.useRef(updateActiveTab);
-  _uatRef.current = updateActiveTab;
+  const _uatRef = useRefMirror(updateActiveTab);
   const _tabSetters = React.useRef({});
   const tabField = (key) => {
     if (!_tabSetters.current[key]) {
@@ -2015,10 +2015,8 @@ function App() {
   const [readHistory, setReadHistory] = useState(() => {
     try {return JSON.parse(localStorage.getItem('vot-history') || '[]');} catch {return [];}
   });
-  const navOriginRef = React.useRef(null);
-  navOriginRef.current = navOrigin;
-  const tabsOverviewOpenRef = React.useRef(false);
-  tabsOverviewOpenRef.current = tabsOverviewOpen;
+  const navOriginRef = useRefMirror(navOrigin);
+  const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
 
   /* ── Scroll position memory ──────────────────────────────────────
      Two layers:
@@ -2204,10 +2202,8 @@ function App() {
   // Fallback: html2canvas (~500-1500ms, used when not in the Android app).
   // Always crops the top nav bar so the thumb is pure body content.
   // Triggered on scroll-stop, screen change, and when opening the overview.
-  const activeTabIdxRef = React.useRef(activeTabIdx);
-  activeTabIdxRef.current = activeTabIdx;
-  const tabsRef = React.useRef(tabs);
-  tabsRef.current = tabs;
+  const activeTabIdxRef = useRefMirror(activeTabIdx);
+  const tabsRef = useRefMirror(tabs);
   const captureInFlightRef = React.useRef(false);
   const thumbnailsRef = React.useRef({});
 
@@ -2620,12 +2616,9 @@ function App() {
   };
 
   /* ── Android back gesture handler (called from Kotlin) ── */
-  const screenRef = React.useRef(screen);
-  screenRef.current = screen;
-  const bookIdRef = React.useRef(bookId);
-  bookIdRef.current = bookId;
-  const genreIdRef = React.useRef(genreId);
-  genreIdRef.current = genreId;
+  const screenRef = useRefMirror(screen);
+  const bookIdRef = useRefMirror(bookId);
+  const genreIdRef = useRefMirror(genreId);
 
   // Track history whenever a reading screen is entered
   useEffect(() => {
@@ -2646,20 +2639,13 @@ function App() {
     }
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
 
-  const fromSearchRef = React.useRef(false);
-  fromSearchRef.current = fromSearch;
-  const fromStudiesRef = React.useRef(false);
-  fromStudiesRef.current = fromStudies;
-  const fromMatthewChRef = React.useRef(null);
-  fromMatthewChRef.current = fromMatthewCh;
-  const fromLetterRef = React.useRef(null);
-  fromLetterRef.current = fromLetterStack;
-  const studyIdRef = React.useRef(null);
-  studyIdRef.current = studyId;
-  const fromWtlbRef = React.useRef(null);
-  fromWtlbRef.current = fromWtlb;
-  const searchOriginRef = React.useRef(null);
-  searchOriginRef.current = searchOrigin;
+  const fromSearchRef = useRefMirror(fromSearch);
+  const fromStudiesRef = useRefMirror(fromStudies);
+  const fromMatthewChRef = useRefMirror(fromMatthewCh);
+  const fromLetterRef = useRefMirror(fromLetterStack);
+  const studyIdRef = useRefMirror(studyId);
+  const fromWtlbRef = useRefMirror(fromWtlb);
+  const searchOriginRef = useRefMirror(searchOrigin);
 
   useEffect(() => {
     const onVis = () => {if (document.visibilityState === 'hidden') pauseDwell();else scheduleDwell();};
