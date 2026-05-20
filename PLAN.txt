@@ -2564,16 +2564,91 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
     audit" pass (call it P7?) that converts each xRef = x assignment
     into the appropriate effect.
 
+    P7 TRIGGER (calendar by event, not date):
+      The fix lands the SAME SESSION any of these arrive — the issue
+      transitions from theoretical to active at that moment:
+        - React 19 upgrade considered (concurrent features stricter)
+        - First <Suspense> boundary added anywhere in the tree
+        - First startTransition() call (e.g., for slow renders)
+        - Any third-party React lib added that uses Suspense
+          internally (lazy loading, data fetching, etc.)
+      Until one of those fires, the sync mutations stay. Code search
+      command for future-Claude: `grep -n "Suspense\|startTransition"
+      app/src/main/assets/index.html app/src/main/assets/src/`. If
+      that returns anything non-comment, do P7 first before whatever
+      change introduced it.
+
   REMAINING TRUE RISK (no decision needed yet — just monitor):
   - tabField identity stability under hook refactor needs a smoke
-    assertion: "the same setter function instance is returned for the
-    same key across renders." The current harness doesn't probe this.
-    Adding such a probe to wtlbAnnotationRoundTrip (or a new
-    tabFieldStabilityProbe) is the safety net for the P6k useTabs
-    extraction. Plan to add the probe BEFORE starting P6k.
+    assertion. RESOLVED 2026-05-20 — the stability probe inside App()
+    now console.error's if `_tabSetters.current[key]` ever changes
+    identity across renders, and the smoke harness already monitors
+    console.error count. Lands BEFORE P6k useTabs as required.
 
   ═════════════════════════════════════════════════════════════════════
   END P6 RECONNAISSANCE
+  ═════════════════════════════════════════════════════════════════════
+
+  ═══════════════════════════════════════════════════════════════════════
+  POST-P6c REASSESSMENT (2026-05-20, user-confirmed)
+  ═══════════════════════════════════════════════════════════════════════
+
+  The modularization push (P1 through P6c) landed on origin/main at
+  commit 0759671 via fast-forward merge — no drift, no conflicts.
+  index.html went from 17,200 lines / 944 KB to 4,237 lines / 224 KB
+  with 130+ cohesive modules under src/. App() is now ~2,500 lines.
+
+  P6c was the natural stopping point for one extraction session. P6d
+  onward (useScrollMemory, useReadingDwell, useSettings, useThumbnails,
+  useSheetOrchestration, useFromLetterStack, useNavigateToLink,
+  useTabs, useAndroidBack) are MEDIUM-to-HIGH risk and benefit from
+  a fresh branch + fresh session with full attention.
+
+  STRATEGIC RECOMMENDATION (user-confirmed during P6c session):
+
+    Before continuing P6 medium/high-risk work, consider tackling
+    Objective G (esbuild bundler) FIRST. Rationale:
+
+      - The current manual <script src> sequencing in index.html
+        (135+ tags, with hand-managed load order) is exactly what a
+        bundler solves at zero ongoing cost.
+      - The window-mirror script for 11 lexical-only consts is a
+        symptom of having no module system. ES modules with explicit
+        imports/exports make this disappear.
+      - The Python extraction scripts (_p4_extract_view.py,
+        _p5e_bundle_helpers.py) are surgical tools for pre-compiled
+        Babel output. Standard JS refactoring tools work directly on
+        ES modules. P6 high-risk work in a real module system is
+        significantly less risky.
+      - One-time cost: bundler config + initial conversion. Ongoing
+        win: every future change is easier.
+
+    Cheapest viable bundler path: esbuild as a concatenator first
+    (preserves classic-script semantics, just emits one app.js with
+    files in the right order). Then incrementally convert each src/
+    module from classic-script-mutates-globals to ES-module-with-
+    imports. Then P6 high-risk work in the new world.
+
+    Sequence going forward (proposed, NOT final):
+      1. [DONE] Land P1-P6c on main (modularization foundation)
+      2. [NEXT] Objective G: esbuild bundler (one-time setup +
+         classic-script concatenation as v1; ES module conversion
+         as v2 if/when worth the work)
+      3. P6 medium/high-risk hooks on top of the new bundler
+      4. P7 sync-ref audit (when triggered per Direction 3 above)
+      5. Whichever Objective I user-facing feature comes next
+         (TTS / font controls / sepia / better search relevance)
+
+  ALTERNATIVE if Objective G feels premature:
+    Continue P6 mechanical extraction on a fresh branch. The
+    toolchain is proven; each step is small. Just understand that
+    every hook extracted before the bundler arrives is a hook that
+    needs revisiting once the bundler arrives (window globals → ES
+    imports). That's not wasted work — the hooks themselves don't
+    move — but it's two-pass work.
+
+  ═════════════════════════════════════════════════════════════════════
+  END POST-P6c REASSESSMENT
   ═════════════════════════════════════════════════════════════════════
 
   CURRENT NEXT: P6 (App() hook extraction). App() is now the only
