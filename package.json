@@ -1,0 +1,17 @@
+{
+  "name": "votreader-build",
+  "version": "0.0.0",
+  "description": "Build pipeline for VOTReader's WebView assets (Objective G — bundler + ES modules).",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "python tools/build.py",
+    "build:esbuild": "echo 'reserved for G.2.1+ — esbuild bundling of ES modules'"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

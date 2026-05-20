@@ -69,6 +69,11 @@ __pycache__/
 .venv/
 venv/
 
+# ─── Node (build pipeline only — added 2026-05-20 for Objective G) ──
+# node_modules can be re-fetched with `npm install`; lockfile IS committed
+# so versions are pinned. esbuild lands in here as part of G.2.
+node_modules/
+
 # ─── Claude Code config (workspace-local, may contain MCP secrets) ──
 .claude/settings.local.json
 
