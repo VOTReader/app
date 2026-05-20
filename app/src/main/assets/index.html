@@ -1193,6 +1193,28 @@ function App() {
     }
     return [activeTab[key], _tabSetters.current[key]];
   };
+  // tabField identity stability probe — foundational instrumentation that
+  // surfaces a contract violation immediately via console.error (which the
+  // smoke harness already monitors). The CONTRACT: tabField('X')[1] returns
+  // the SAME function instance for the same key across every render.
+  // Violating it causes cascading re-mounts in every tab-state-consuming
+  // child component (the props change identity each render → React tears
+  // down and rebuilds the subtree). The cache lives in _tabSetters.current.
+  // If a future refactor (P6's useTabs is the prime candidate) accidentally
+  // returns a fresh setter each render, this probe catches it within a
+  // single render cycle instead of letting it land silently.
+  const _tabSettersPrevRef = React.useRef({});
+  React.useEffect(() => {
+    var cur = _tabSetters.current;
+    var prev = _tabSettersPrevRef.current;
+    for (var key in cur) {
+      if (prev[key] && prev[key] !== cur[key]) {
+        console.error('[tabField stability] setter identity changed for key=' + key +
+          ' across renders — this breaks child component stability and triggers cascading re-mounts.');
+      }
+      prev[key] = cur[key];
+    }
+  });
 
 
   const [screen, setScreen] = tabField('screen');
