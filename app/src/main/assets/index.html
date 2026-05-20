@@ -4008,7 +4008,7 @@ function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, statesRef, 
   const cardFnProps = fnProps;
   return (/*#__PURE__*/
     React.createElement("div", { className: cls }, /*#__PURE__*/
-    React.createElement("div", { className: "prophecy-card-header", onClick: () => setExpanded((e) => !e) }, /*#__PURE__*/
+    React.createElement("div", { className: "prophecy-card-header", onClick: () => setExpanded(e => !e) }, /*#__PURE__*/
     React.createElement("span", { className: "prophecy-card-tag" }, tag), /*#__PURE__*/
     React.createElement("span", { className: `prophecy-card-chevron${expanded ? "" : " collapsed"}` }, "\u25BC")
     ), /*#__PURE__*/
@@ -4261,9 +4261,10 @@ function splitIntoVerses(text, ref) {
 function VerseWithNumbers({ text, refStr }) {
   const segments = splitIntoVerses(text, refStr);
   if (!segments) {
-    // Single-verse ref (count < 2) — strip any leading Unicode superscript
-    // so a data regression doesn't render a literal "⁴" as plain white text.
-    const cleaned = (text || "").replace(/^[⁰¹²³⁴⁵⁶⁷⁸⁹]+\s*/, "");
+    // Single-verse ref — strip ALL Unicode superscript digits so a data
+    // regression (stray ¹ ² ³ in the middle of verse text) never renders
+    // as a plain white character.
+    const cleaned = (text || "").replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, "");
     return /*#__PURE__*/React.createElement("span", null, cleaned);
   }
   return (/*#__PURE__*/
@@ -4271,7 +4272,7 @@ function VerseWithNumbers({ text, refStr }) {
     segments.map((seg, i) => /*#__PURE__*/
     React.createElement("span", { key: i }, /*#__PURE__*/
     React.createElement("sup", { className: "verse-sup" }, seg.vNum),
-    seg.text.replace(/^[⁰¹²³⁴⁵⁶⁷⁸⁹]+/, ''), i < segments.length - 1 ? " " : ""
+    seg.text.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, ''), i < segments.length - 1 ? " " : ""
     )
     )
     ));
@@ -4393,7 +4394,7 @@ function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavig
     /*#__PURE__*/React.createElement(React.Fragment, null,
       fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && /*#__PURE__*/React.createElement("div", { className: "fn-sheet-note" }, fn.text),
       fn.link && /*#__PURE__*/React.createElement(InAppLinkButton, { link: fn.link, onActivate: onInAppLink }),
-      fn.url && /*#__PURE__*/React.createElement("div", { className: fn.link ? "fn-sheet-url-extra" : "fn-sheet-note" }, /*#__PURE__*/React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link" }, fn.link ? "Open external link" : (fn.text || fn.url))),
+      fn.url && /*#__PURE__*/React.createElement("div", { className: (fn.link || fn.text) ? "fn-sheet-url-extra" : "fn-sheet-note" }, /*#__PURE__*/React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link" }, (fn.link || fn.text) ? "Open external link" : fn.url)),
       !fn.text && !fn.link && !fn.url && /*#__PURE__*/React.createElement("div", { className: "fn-sheet-verse-missing" }, "This footnote has no content attached.")
     )
 
@@ -4468,19 +4469,41 @@ const MIN_HIDDEN_WORDS = 20; // only collapse if hiding at least this many whole
 
 function ExpandableVerse({ text, refStr }) {
   const [expanded, setExpanded] = useState(false);
-  const hiddenPortion = text.slice(EXPAND_THRESHOLD).trim();
+
+  // Compound refs store text as "partLabel \u2014 verse text | partLabel \u2014 verse text".
+  // VerseWithNumbers doesn't split on " | ", so the raw string would make the
+  // "18:20-33 \u2014 " chapter-label render as plain white text in the truncated preview.
+  // Extract just the first part's verse content and its label (e.g. "18:20-33")
+  // as the preview ref, so Strategy 0 verse-number detection works correctly.
+  let previewText = text;
+  let previewRef = refStr;
+  if (text.includes(" | ")) {
+    const firstPart = text.split(" | ")[0];
+    const dashIdx = firstPart.indexOf(" \u2014 ");
+    if (dashIdx !== -1) {
+      previewRef = firstPart.slice(0, dashIdx).trim();
+      previewText = firstPart.slice(dashIdx + 3);
+    } else {
+      previewText = firstPart;
+    }
+  }
+
+  const hiddenPortion = previewText.slice(EXPAND_THRESHOLD).trim();
   const hiddenWords = hiddenPortion.split(/\s+/).filter(Boolean).length;
   const isLong = text.length > EXPAND_THRESHOLD && hiddenWords >= MIN_HIDDEN_WORDS;
 
   const fullContent = /*#__PURE__*/React.createElement(ScriptureVerseText, { text: text, cite: refStr });
-  const truncatedContent = /*#__PURE__*/React.createElement(VerseWithNumbers, { text: text.slice(0, EXPAND_THRESHOLD).trimEnd() + "\u2026", refStr: refStr });
+  const truncatedContent = /*#__PURE__*/React.createElement(VerseWithNumbers, { text: previewText.slice(0, EXPAND_THRESHOLD).trimEnd() + "\u2026", refStr: previewRef });
 
   return (/*#__PURE__*/
     React.createElement("span", { className: "footnote-list-verse" },
     isLong && !expanded ? truncatedContent : fullContent,
     isLong && /*#__PURE__*/
     React.createElement("button", {
-      onClick: () => setExpanded((e) => !e),
+      // stopPropagation: the parent .footnote-list-item card has an onClick
+      // that calls scrollToBubble(num) — without this, tapping Read more
+      // ALSO scrolls the page up to the in-body footnote bubble.
+      onClick: (e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v); },
       style: {
         display: "inline-block", marginLeft: "0.5em",
         background: "none", border: "none", cursor: "pointer",
@@ -4540,7 +4563,7 @@ function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLink }) {
     /*#__PURE__*/React.createElement(React.Fragment, null,
       fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && /*#__PURE__*/React.createElement("span", { className: "footnote-list-note-text" }, fn.text, fn.link && " "),
       fn.link && /*#__PURE__*/React.createElement(InAppLinkButton, { compact: true, link: fn.link, onActivate: onInAppLink }),
-      fn.url && /*#__PURE__*/React.createElement("span", { className: fn.link ? "footnote-list-url-extra" : "footnote-list-note-text" }, /*#__PURE__*/React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link" }, fn.link ? "Open external link" : (fn.text || fn.url))),
+      fn.url && /*#__PURE__*/React.createElement("span", { className: (fn.link || fn.text) ? "footnote-list-url-extra" : "footnote-list-note-text" }, /*#__PURE__*/React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link", onClick: (e) => e.stopPropagation() }, (fn.link || fn.text) ? "Open external link" : fn.url)),
       !fn.text && !fn.link && !fn.url && /*#__PURE__*/React.createElement("span", { className: "footnote-list-missing" }, "(no content attached)")
     )
 
