@@ -2129,8 +2129,38 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   Verified: app.css = 1470 parsed rules; --gold/--cream-dim/--gold-border
   + body font resolve on deep screens; no crash on home/Volumes/Library/
   Bookmarks; smoke core identical to baseline (globals ok, data ok,
-  annotation 133 marks/13 icons no crash, 0 console.error). NEXT: P3
-  (scripture/data resolution — also Objective E's home).
+  annotation 133 marks/13 icons no crash, 0 console.error).
+
+  P3 — DONE (2026-05-19). Scripture / collection resolution layer
+  extracted to src/data/scripture-resolution.js (~19.5 KB, 27 symbols).
+  Verbatim move; no logic changes. Symbols: COLLECTIONS + COL_BY_*
+  derived maps (KEY/CARD/LETTER_SC/INDEX_SC/SEARCH_ID/READ_KEY/NAV_ICON),
+  _NAV_ICONS, _BOUNDARY_SHORT/_BOUNDARY_SHORT_OUTSIDE + the
+  COLLECTIONS.forEach mutation that attaches .short/.shortFromOutside,
+  READING_CHAIN, _isWtlbFamily, _boundaryShort, colLetters, colPreface,
+  colLetterArr, LETTER_SCREEN_SET, _allBooks, _matthew, _studies,
+  parseRefStr, findBook, parseScriptureRef, resolveVerseText,
+  findEntryContext, lookupVersesFromBooks. Two source regions
+  consolidated (the main 562-752 cluster + lookupVersesFromBooks at
+  ~4101). Branched-merged main into refactor first to bring 4 in-flight
+  renderer paper-cut fixes (superscript-anywhere, fn url+text coexist,
+  compound-ref preview, ProphecyCard arrow) so P3 builds on a current
+  baseline; clean merge, no conflicts. index.html: 12783→12585 lines /
+  662KB→645KB. Verified live: all 27 P3 symbols resolve via bare-name
+  probe; functional checks return real data — parseRefStr('John 3:16')
+  ='John|3:16', findBook('John')='john', lookupVersesFromBooks('Genesis
+  1:1') returns real verse text, findEntryContext('the-wide-path',
+  'letter') resolves to 'The Wide Path|Volume Two'. Smoke core PASS,
+  identical to baseline (globals 60/60, data ok, annotation 133
+  marks/13 icons no crash on open or next/prev, 0 console.error). This
+  is also Objective E's natural home — the data registry + scripture
+  primitives now live in their own module, ready for any future
+  data-unification work. NEXT: P4 (LetterView / WtlbEntryView /
+  BibleChapterView / ChapterView big screen components — the largest
+  remaining single chunk in index.html — then hook extraction to slim
+  App()).
+
+  NEXT (superseded): P3 (scripture/data resolution).
 
   NEXT (superseded): P2 (CSS-in-JS → src/styles/).
 
