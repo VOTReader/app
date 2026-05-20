@@ -6,7 +6,7 @@
 > **index.html: 17,200 lines / 944 KB → 4,237 lines / 224 KB.** ~13,000 lines / ~720 KB extracted into **130+ cohesive modules** under `src/`. The whole modularization push (P1 through P6c + recon + P7 calendar) landed on `origin/main` at commit `c9e6ae4` via fast-forward merge — clean baseline for whatever comes next.
 >
 > **THE "ORIGINAL SIN" IS TWO PROBLEMS, NOT ONE** (clarified during P6c reassessment, see PLAN.txt §Post-P6c):
-> 1. **No build system** — 135+ `<script src>` tags, hand-managed load order, `window.*` global proliferation. Symptom: P5g window-mirror, P5e load-order bug, the manual ordering of dozens of script tags. **Fix: Objective G (esbuild). LOW cost, BEFORE P6 high-risk.**
+> 1. **No build system** — 135+ `<script src>` tags, hand-managed load order, `window.*` global proliferation. Symptom: P5g window-mirror, P5e load-order bug, the manual ordering of dozens of script tags. **Fix: Objective G (esbuild). LOW cost, BEFORE P6 high-risk. Internal sequence: G.1 esbuild-as-concatenator FIRST (no module changes, just bundle the existing `<script src>` order; smoke must PASS identically), THEN G.2 ES imports cluster-by-cluster — debug one thing at a time.**
 > 2. **No JSX** — Babel-compiled `React.createElement` chains as canonical source. Symptom: the Python extraction scripts had to exist because ast-grep / jscodeshift / react-codemod don't recognize the source as React. **Fix: incremental module-by-module JSX conversion, SIGNIFICANT cost, AFTER P6 lands.** Do NOT big-bang rewrite — annotation engine + boundary nav + scripture resolution have been debugged carefully over months; incremental preserves that correctness.
 >
 > **Honest sequencing going forward**:

@@ -2621,22 +2621,44 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
         - The P5e load-order bug (letter-linking.js had to precede
           the big inline block) would have been impossible to make
           with an import graph
-      Fix cost: LOW — esbuild is on the roadmap (Objective G). One-
-        time setup + a mostly-mechanical conversion sweep:
-          - package.json + esbuild config (~30 lines)
-          - Each <script src="src/X.js"> becomes `import './X.js'`
-            in an entry file (or, better, replace with explicit
-            named imports where consumers live)
-          - Each `window.XYZ = XYZ` export becomes `export const XYZ`
-          - Each `window.XYZ` call site becomes `import { XYZ }`
-        Output: ONE bundled app.js. Works offline in WebView exactly
-        like today; the WebView doesn't care about tag count.
+      Fix cost: LOW — esbuild is on the roadmap (Objective G).
       Risk: real but bounded — modules are already isolated, so this
         is rewiring not redesign. Smoke harness catches regressions.
       Sequencing: BEFORE P6 medium/high-risk work. Once esbuild is
         in, the manual load-order problem and window-mirror script
         both disappear. Hook ordering during P6 becomes a standard
         ES-module problem instead of a load-graph puzzle.
+
+      INTERNAL SEQUENCE (one variable at a time — DO NOT collapse):
+
+        G.1 — esbuild as concatenator FIRST
+          Get the bundler producing correct output from the EXISTING
+          <script src> structure. No code changes to modules. Output
+          is byte-equivalent classic-script concatenation in the same
+          load order as today; index.html drops from 135+ tags to one
+          <script src="app.js">. Smoke harness must pass identically
+          (every global still on window, every closure still works).
+          Deliverables: package.json + esbuild config + the single
+          bundle replacing all the loose tags.
+          Verification: smoke harness PASS with the SAME global names
+            present, SAME render walk, SAME annotation round-trips.
+            If anything diverges, the bundler config is wrong — fix
+            it before touching any module code.
+
+        G.2 — ES imports SECOND
+          With G.1 shipped and proven, NOW convert modules. Cluster
+          by cluster (data files → stores → renderer → utils →
+          hooks → components → screens → sheets → App). Each cluster:
+            - Each `window.XYZ = XYZ` (or implicit-via-function-decl)
+              becomes `export const XYZ`
+            - Each call site `window.XYZ` or bare `XYZ` becomes
+              `import { XYZ } from '...'`
+          Smoke harness gates every cluster.
+
+        Why this sequence: if anything breaks during G.2, you debug
+        ONE thing (the import wiring of the cluster you just touched),
+        not two (bundler config + import wiring simultaneously). The
+        bundler is already proven correct by G.1's PASS.
 
     Problem 2: NO JSX
       Symptoms:
