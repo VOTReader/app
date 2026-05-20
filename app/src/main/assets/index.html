@@ -155,9 +155,10 @@ const HL_COLORS = ['yellow','green','pink','red','orange','blue','purple','teal'
   <!-- Shared ExpandableText (a.k.a. JrnExpandable) — used by Journal,
        Bookmarks AND Notes. MUST load before any of those consumers. -->
   <script src="src/components/ExpandableText.js"></script>
-  <!-- Root ErrorBoundary (wraps <App>) and the shared useMarkAsRead hook. -->
+  <!-- Root ErrorBoundary (wraps <App>) and the shared hooks. -->
   <script src="src/components/ErrorBoundary.js"></script>
   <script src="src/hooks/useMarkAsRead.js"></script>
+  <script src="src/hooks/use-saved-state.js"></script>
   <!-- ─── JOURNAL FEATURE — segregated module set ───
        All depend on CachedStore (defined above) + React (loaded earlier).
        Load order matters: styles → stores → helpers → sheets → screens → chip. -->
@@ -1099,33 +1100,8 @@ const SRCH_QUICK_PICKS = [
 function App() {
   // screens: "home" | "scriptures-home" | "volumes-home" | "matthew-idx" | "matthew-ch" | "bible-idx" | "bible-ch" | "vot-index" | "vot-letter" | "search"
   var sharedViewProps, _navToChapter, _idxNav;
-  /* ── Load saved state ── */
-  function _validateTabState(s) {
-    if ((s.screen === "matthew-ch" || s.screen === "bible-ch") && s.chapterNum == null) s.screen = "home";
-    if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-letter$/.test(s.screen) && !s.letterId) s.screen = "home";
-    if (s.screen === "vot-letter" && !s.letterId) s.screen = "home";
-    if (s.screen === "hm-letter" && !s.letterId) s.screen = "home";
-    if (/^(wtlb-one-entry|wtlb-two-entry|blessed-entry|holy-days-entry)$/.test(s.screen) && !s.letterId) s.screen = "home";
-    if (s.screen === "garden-view" && s.gardenPage == null) s.screen = "home";
-    if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-index$/.test(s.screen)) s.screen = "volumes-home";
-    if ((s.screen === "matthew-idx" || s.screen === "bible-idx") && !s.bookId) s.screen = "home";
-    if (s.screen === "search") s.screen = "home";
-    if (s.screen === "scripture-genre" && !s.genreId) s.screen = "scriptures-home";
-    if (s.screen === "bible-study-chapter" && (!s.studyId || !s.studyChapterId)) s.screen = "studies-home";
-    if (s.screen === "bible-study-index" && !s.studyId) s.screen = "studies-home";
-    // Journal screens require entryId which lives in local state (not tab
-    // state), so they can't be reliably restored on reload. Bounce to hub.
-    if (s.screen === "journal-viewer" || s.screen === "journal-editor") s.screen = "journal-home";
-    return s;
-  }
-  const saved = React.useMemo(() => {
-    try {
-      const s = JSON.parse(localStorage.getItem("vot-state") || "{}");
-      _validateTabState(s);
-      if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
-      return s;
-    } catch (e) {return {};}
-  }, []);
+  /* useSavedState + _validateTabState → extracted to src/hooks/use-saved-state.js (P6a) */
+  const saved = useSavedState();
 
   /* ═══════════════════════════════════════════════════════════════
      TAB-BACKED READING STATE

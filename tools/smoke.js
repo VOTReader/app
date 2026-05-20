@@ -79,7 +79,9 @@
       'buildNavIndex', 'searchNavIndex', 'navItemPreview',
       'navItemToEndpoint', 'buildSourceEndpoint',
       '_bookTitle', '_verseRangeLabel', 'noteSourceLabel', 'noteSourceNav',
-      'useMarkAsRead'
+      'useMarkAsRead',
+      // P6a: useSavedState hook + its colocated _validateTabState helper
+      'useSavedState', '_validateTabState'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',
