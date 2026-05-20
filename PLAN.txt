@@ -2263,14 +2263,79 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   main, all pushed to origin (full backup).
 
   CURRENT NEXT: P6 (App() hook extraction). App() is now the only
-  big inline component left in index.html (~2,500 of its ~8.2k lines).
+  big inline component left in index.html (~2,500 of its ~4,237 lines).
   Extract its custom hooks (useTabField, settings persistence, scroll
   handlers, history tracking, thumbnail capture, visualViewport
   keyboard tracking, etc.) into src/hooks/ so App() drops to ~400
-  lines. This is the riskiest single refactor in the whole plan —
-  real semantic surgery (closure dependencies, React hook ordering,
-  state passing between newly-separated hooks). DEFER to a dedicated
-  focused session with full attention, NOT the tail-end of a marathon.
+  lines. First hook (useMarkAsRead) already extracted in P5d as a
+  warmup — proves the toolchain. P5g smoke harness now passes end-
+  to-end across globals/data/render-walk/letter+wtlb annotation, so
+  regressions during P6 will surface cleanly. This is still the
+  riskiest single refactor in the whole plan — real semantic surgery
+  (closure dependencies, React hook ordering, state passing between
+  newly-separated hooks). DEFER to a dedicated focused session with
+  full attention, NOT the tail-end of a marathon.
+
+  P5d-g — DONE (2026-05-20, full cleanup sweep before P6):
+
+    P5d (commit 5ea3e66): VolumeIndex consolidation + 18 small
+      components extracted. Deleted legacy VolumeIndex (V2-hardcoded)
+      and VolumeOneIndex (V1-hardcoded); both call sites now use the
+      generic VolumeLetterIndex. All 14 collections share ONE index
+      component (the user's "thoroughly standardize for conformity"
+      ask). Hardened the extractor with proper JS brace-matching
+      (string + comment + regex aware) so it finds the function's
+      OWN closing brace, not the last `\n}\n` before the terminator
+      — caught when ClearProgressRow's extraction grabbed ~30
+      adjacent inline helpers up to SrchGroup. Extracted: SrchCard/
+      SrchSnippet/SrchGroup, ClearProgressRow/SettingsRow/SelectField,
+      VolumeLetterIndex, HistoryEntryCard, NoteRow, LinkCard/LinkIcon,
+      NotebookManagerSheet, BibleStudyIndex/ChapterIndex/GardenView/
+      ScriptureGenre/ScripturesHome, ErrorBoundary (class, written
+      manually), and useMarkAsRead (FIRST hook extracted — the P6
+      warmup proving the toolchain on the smallest isolated hook).
+      ~56 KB / ~1,086 lines moved into 18 modules.
+
+    P5e (commit 449dd46): 46 pure-function helpers → 13 domain
+      bundles via new tools/_p5e_bundle_helpers.py (multi-function
+      extractor with the same brace-match + hook-upgrade + refuse-
+      to-write guards). Buckets: utils/hl-keys, utils/dates,
+      utils/garden, utils/tabs, utils/nav-index (16 KB — LinkPicker's
+      brain), utils/note-source, utils/book-category, utils/scripture-
+      parse, utils/highlight, utils/render-text, utils/search,
+      stores/thumb-store, data/translations, data/letter-linking.
+      Load-order fix landed: letter-linking.js must load BEFORE the
+      big inline <script> block (top-level boot code calls
+      linkPreface/linkWtlbEntries at module scope) — original
+      extraction loaded it at the default end-of-body anchor which
+      caused boot-time "linkWtlbEntries is not defined" cascading
+      into "BIBLE_BOOK_LIST TDZ". ~40 KB / ~1,035 lines into 14
+      bundle files.
+
+    P5f (commit 72c6b7d): dead-code audit. Removed ann.style
+      defensive fallback guards (5 sites — one-shot annotation
+      migration makes them unreachable post-migration). Discipline
+      directive kept: the `|| 'highlight'` default stays for kind-
+      less entries (safe initializer), only the dead style→kind
+      translation is gone. If a `style:` entry ever sneaks in again,
+      it'll surface as a wrong-kind render instead of being silently
+      papered over.
+
+    P5g (commit 1693715): smoke harness hardened. (1) CSP-safe
+      resolve() — window-first lookup with eval fallback only when
+      privileged; works under production CSP (no 'unsafe-eval').
+      (2) Window mirror for 11 lexical-only consts (AnnotationStore,
+      NoteStore, etc.) via a tiny inline <script> at end of body —
+      lets the harness probe them without eval. (3) Expanded
+      EXPECTED_GLOBALS with all P5d/P5e symbols (~50 new probes).
+      (4) New wtlbAnnotationRoundTrip() exercises the WtlbEntryView
+      path (the existing annotationRoundTrip only covered LetterView).
+      Live-verified end-to-end: PASS | globals ok | data ok |
+      12 screens 0 crashed | letterAnn ok (2 marks) | wtlbAnn ok
+      (51 marks + 6 note icons) | 0 console.error | 18s total.
+
+  Cumulative P1-P5g: index.html ~944 KB / ~17.2k lines →
+  ~224 KB / 4,237 lines. **130+ modules** under src/.
 
   P5c — DONE (2026-05-19, later). Extracted 11 remaining sheet/picker
   components to src/ui/sheets/: SelectionToolbar (~34 KB — by far
