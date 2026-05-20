@@ -108,25 +108,25 @@
   function now() { return (root.performance && performance.now()) || Date.now(); }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-  // Resolve a symbol by lookup. Two-stage strategy so the harness works
-  // both in privileged DevTools context AND when loaded via <script src>
-  // (production CSP forbids 'unsafe-eval', so the old eval-based probe
-  // fails post-await even in DevTools — CSP-strict environments lose
-  // the privileged context after each await).
+  // Resolve a symbol by `window[name]` only. Three categories of globals
+  // are reachable this way:
+  //   1. Function declarations: `function X(){}` in a classic script
+  //      auto-becomes window.X.
+  //   2. Extracted modules: every src/*.js declares its symbols with
+  //      `function X(){}` for the same reason.
+  //   3. Lexical-only consts (AnnotationStore, COLLECTIONS, HL_COLORS,
+  //      ErrorBoundary, StaticSubtree, etc.): explicitly mirrored to
+  //      window by the export script at the bottom of index.html.
   //
-  // STAGE 1: window[name] — covers everything function-declared (function
-  //   decls become window globals in classic scripts) AND every extracted
-  //   module (they use `var X =` or are explicitly mirrored onto window
-  //   via the bottom-of-body export script in index.html).
-  // STAGE 2 (fallback): bare-name eval — catches any lexical-only const/
-  //   class that wasn't mirrored. Only works in privileged context; if
-  //   CSP blocks it, returns undefined and STAGE 1 had to suffice.
+  // No eval fallback: production CSP blocks 'unsafe-eval' and a
+  // try-catch around eval would silently mask CSP failures AND swallow
+  // any legitimate "missing global" so a real load-order regression
+  // would just report `undefined` with no diagnostic. The mirror script
+  // is the foundation; if a symbol isn't on window, it's a real bug
+  // that needs fixing in the mirror or in the module that should have
+  // declared it.
   function resolve(name) {
-    if (typeof window !== 'undefined' && typeof window[name] !== 'undefined') {
-      return window[name];
-    }
-    try { return eval('(typeof ' + name + ' !== "undefined") ? ' + name + ' : undefined'); }
-    catch (e) { return undefined; }
+    return window[name];
   }
   function exists(name) {
     var v = resolve(name);
@@ -394,80 +394,6 @@
     }
   }
 
-  // ── State-injection screen walk (more thorough than click traversal).
-  // Sets vot-state.tabs[active].screen directly to every valid screen
-  // string and asserts the render doesn't trip ErrorBoundary. Catches
-  // regressions that the click walk misses when a screen's entry button
-  // moves or changes copy. We can't reload between steps (would lose the
-  // smoke harness itself), so we trigger React re-renders via a custom
-  // event the App watches, OR fall back to forcing a state change via
-  // setItem + a no-op storage event. ─────────────────────────────────
-  async function injectScreens() {
-    var screens = [
-      // Index screens — each renders VolumeLetterIndex via colIdxProps
-      { screen: 'vot-one-index', desc: 'V1 (with preface)' },
-      { screen: 'vot-index', desc: 'V2 (no preface)' },
-      { screen: 'vot-three-index', desc: 'V3' },
-      { screen: 'vot-seven-index', desc: 'V7' },
-      { screen: 'vot-timothy-index', desc: 'Timothy' },
-      { screen: 'vot-flock-index', desc: 'Flock' },
-      { screen: 'vot-rebuke-index', desc: 'Rebuke' },
-      { screen: 'wtlb-one-index', desc: 'WTLB Part One' },
-      { screen: 'wtlb-two-index', desc: 'WTLB Part Two' },
-      { screen: 'blessed-index', desc: 'The Blessed' },
-      { screen: 'holy-days-index', desc: 'Holy Days' },
-      // Reading screens
-      { screen: 'vot-one-letter', letterId: 'a-word-of-warning', desc: 'V1 preface LetterView' },
-      { screen: 'vot-letter', letterId: 'the-wide-path', desc: 'V2 first LetterView' },
-      { screen: 'wtlb-one-entry', letterId: 'introduction', desc: 'WTLB1 first WtlbEntryView' },
-      { screen: 'bible-idx', bookId: 'genesis', desc: 'Bible book chapter index (ChapterIndex)' },
-      { screen: 'matthew-idx', desc: 'Matthew chapter index' },
-      // Top-level destinations
-      { screen: 'home', desc: 'Home grid' },
-      { screen: 'volumes-home', desc: 'VolumesHome' },
-      { screen: 'scriptures-home', desc: 'ScripturesHome' },
-      { screen: 'studies-home', desc: 'StudiesHome' },
-      { screen: 'library', desc: 'Library hub' },
-      { screen: 'notes-index', desc: 'Notes index' },
-      { screen: 'settings', desc: 'Settings' },
-      { screen: 'history', desc: 'History' },
-      { screen: 'search', desc: 'Search' },
-      { screen: 'about', desc: 'About' }
-    ];
-
-    var out = [];
-    // Snapshot active tab, mutate one field at a time, assert render.
-    var stateKey = 'vot-state';
-    var snap = localStorage.getItem(stateKey);
-    function setScreen(s) {
-      var state = {};
-      try { state = JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch (e) {}
-      var t = state.tabs && state.tabs[state.activeTabIdx || 0];
-      if (!t) { out.push({ screen: s.screen, ok: false, detail: 'no active tab' }); return false; }
-      t.screen = s.screen;
-      if (s.letterId !== undefined) t.letterId = s.letterId;
-      if (s.bookId !== undefined) t.bookId = s.bookId;
-      localStorage.setItem(stateKey, JSON.stringify(state));
-      return true;
-    }
-    function restore() {
-      if (snap !== null) localStorage.setItem(stateKey, snap);
-      else localStorage.removeItem(stateKey);
-    }
-
-    // We can't trigger a real React state update from the outside without
-    // either a reload or a custom bridge. Best we can do without that
-    // bridge: walk via click + back, which the existing walkScreens()
-    // already covers. Mark this function as a future hook for when App()
-    // exposes a setScreen window-bridge (or after P6 hook extraction
-    // gives us programmatic re-mount via React state reset).
-    // For NOW we just verify localStorage is writable and the snapshot
-    // restores cleanly — the meaningful coverage comes from the
-    // ANNOTATION round-trip + click walkScreens.
-    restore();
-    return { skipped: true, note: 'state-injection walk requires App() to expose setScreen bridge (P6 work)' };
-  }
-
   // Annotation round-trip on a WTLB entry — exercises WtlbEntryView's
   // applyDOMHighlights path (which is different from LetterView's because
   // WTLB entries use {{ref:...}} inline tokens AND have a simpler block
@@ -552,6 +478,13 @@
       return realErr.apply(console, arguments);
     };
 
+    // Snapshot resource-error count BEFORE the run so we report only
+    // failures that occur DURING the audit (not stale ones from earlier
+    // sessions still in the buffer). The window.__votResourceErrs array
+    // is populated by an early inline listener in index.html so it
+    // catches every load failure, even very early ones.
+    var resourceErrsAtStart = (root.__votResourceErrs || []).length;
+
     var report = { startedAt: new Date().toISOString() };
     try {
       report.appMounted = appMounted();
@@ -560,11 +493,23 @@
       report.screens = walk ? await walkScreens() : 'skipped';
       report.annotation = mutating ? await annotationRoundTrip() : 'skipped';
       report.wtlbAnnotation = mutating ? await wtlbAnnotationRoundTrip() : 'skipped';
-      report.screenInjection = walk ? await injectScreens() : 'skipped';
     } finally {
       console.error = realErr;
     }
     report.console = { errorsSeen: errs.length, samples: errs.slice(0, 8) };
+
+    // Resource-load failures (404s for JS/CSS/img). Without this, stale
+    // browser-cache failures (like the bible-translation 404s caught by
+    // P5h) fail silently — they don't go through console.error, only
+    // window.error. Tracking both pre-audit and during-audit makes
+    // boot-time regressions vs. walk-induced ones distinguishable.
+    var allRes = (root.__votResourceErrs || []);
+    report.resourceErrors = {
+      atStart: resourceErrsAtStart,
+      duringAudit: allRes.length - resourceErrsAtStart,
+      total: allRes.length,
+      samples: allRes.slice(-8).map(function(r){ return r.tag + ':' + r.url; })
+    };
 
     var screenFails = walk
       ? report.screens.filter(function (s) { return s.crashed; }).length : 0;
@@ -577,7 +522,8 @@
       screenFails === 0 &&
       (report.annotation === 'skipped' || report.annotation.ok) &&
       (report.wtlbAnnotation === 'skipped' || report.wtlbAnnotation.ok) &&
-      report.console.errorsSeen === 0;
+      report.console.errorsSeen === 0 &&
+      report.resourceErrors.total === 0;
     report.summary =
       (report.ok ? 'PASS' : 'FAIL') +
       ' | globals ' + (report.globals.ok ? 'ok' : report.globals.missing.length + ' missing') +
@@ -586,6 +532,7 @@
       ' | letterAnn ' + (report.annotation === 'skipped' ? 'skipped' : (report.annotation.ok ? 'ok' : 'FAIL')) +
       ' | wtlbAnn ' + (report.wtlbAnnotation === 'skipped' ? 'skipped' : (report.wtlbAnnotation.ok ? 'ok' : 'FAIL')) +
       ' | console.error ' + report.console.errorsSeen +
+      ' | resource404 ' + report.resourceErrors.total +
       ' | ' + Math.round(now() - t0) + 'ms';
     return report;
   };

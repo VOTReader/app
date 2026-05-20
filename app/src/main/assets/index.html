@@ -35,6 +35,25 @@
     @font-face { font-family: 'EB Garamond'; font-weight: 400 500; font-style: italic; src: url('fonts/EBGaramond-Italic-VariableFont_wght.ttf') format('truetype'); font-display: swap; }
   </style>
   <link rel="stylesheet" href="app.css" />
+  <script>
+    /* Resource-load error capture — feeds tools/smoke.js so the harness
+       can surface stale-path / 404 regressions that the regular console
+       .error capture misses (resource failures don't go through
+       console.error). Runs BEFORE any other script so it catches very
+       early load failures too. Zero overhead in production: just one
+       event listener that pushes onto an array. */
+    window.__votResourceErrs = [];
+    window.addEventListener('error', function(e){
+      try {
+        if (e.target && e.target !== window && (e.target.src || e.target.href)) {
+          window.__votResourceErrs.push({
+            tag: e.target.tagName,
+            url: e.target.src || e.target.href
+          });
+        }
+      } catch(x){}
+    }, true);
+  </script>
   <script src="react.min.js"></script>
   <script src="react-dom.min.js"></script>
   <script src="html2canvas.min.js"></script>
@@ -4216,19 +4235,27 @@ multiNotePayload && React.createElement(MultiNotePopover, {
        (tools/smoke.js) can probe them without `eval()` (CSP forbids
        'unsafe-eval'). `function NAME(){}` and extracted modules using
        `var X =` are already window-globals; only inline `const X = ...`
-       and `class X` declarations live in lexical-only scope. -->
+       and `class X` declarations live in lexical-only scope.
+
+       NO `typeof X !== 'undefined'` guards here. If any of these is
+       missing, the app is broken anyway — let the assignment throw
+       loud at boot rather than silently leak the failure into a
+       downstream "X is not a function" once someone tries to use it.
+       The createRoot script BELOW already depends on ErrorBoundary
+       being a class, so an unguarded mirror reaches no worse failure
+       mode than what render would hit anyway. -->
   <script>
-    if (typeof AnnotationStore !== 'undefined') window.AnnotationStore = AnnotationStore;
-    if (typeof NoteStore !== 'undefined') window.NoteStore = NoteStore;
-    if (typeof LinkStore !== 'undefined') window.LinkStore = LinkStore;
-    if (typeof BookmarkStore !== 'undefined') window.BookmarkStore = BookmarkStore;
-    if (typeof NotebookStore !== 'undefined') window.NotebookStore = NotebookStore;
-    if (typeof RecentNavStore !== 'undefined') window.RecentNavStore = RecentNavStore;
-    if (typeof COLLECTIONS !== 'undefined') window.COLLECTIONS = COLLECTIONS;
-    if (typeof COL_BY_KEY !== 'undefined') window.COL_BY_KEY = COL_BY_KEY;
-    if (typeof HL_COLORS !== 'undefined') window.HL_COLORS = HL_COLORS;
-    if (typeof ErrorBoundary !== 'undefined') window.ErrorBoundary = ErrorBoundary;
-    if (typeof StaticSubtree !== 'undefined') window.StaticSubtree = StaticSubtree;
+    window.AnnotationStore = AnnotationStore;
+    window.NoteStore = NoteStore;
+    window.LinkStore = LinkStore;
+    window.BookmarkStore = BookmarkStore;
+    window.NotebookStore = NotebookStore;
+    window.RecentNavStore = RecentNavStore;
+    window.COLLECTIONS = COLLECTIONS;
+    window.COL_BY_KEY = COL_BY_KEY;
+    window.HL_COLORS = HL_COLORS;
+    window.ErrorBoundary = ErrorBoundary;
+    window.StaticSubtree = StaticSubtree;
   </script>
   <script>
 const root = ReactDOM.createRoot(document.getElementById("root"));
