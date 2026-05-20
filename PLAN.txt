@@ -2186,10 +2186,42 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   returns real Bible text via the relocated books.js. Annotation
   round-trip identical to baseline.
 
-  NEXT: P4 (LetterView / WtlbEntryView / BibleChapterView / ChapterView
-  big screen components — the largest remaining single chunk in
-  index.html — then hook extraction to slim App()).
+  P4 — DONE (2026-05-19). All four big reading-screen components
+  extracted to src/ui/screens/. Verbatim transfers; each module
+  upgraded bare React-hook calls to `React.useX` form via a
+  regex-based parameterized extractor (negative-lookbehind
+  `(?<![.\w])useX\(` so already-prefixed calls aren't touched).
 
+    src/ui/screens/LetterView.js        ~27 KB (13 hook upgrades)
+    src/ui/screens/WtlbEntryView.js     ~18 KB ( 8 hook upgrades)
+    src/ui/screens/BibleChapterView.js  ~13 KB ( 1 hook upgrade)
+    src/ui/screens/ChapterView.js       ~12 KB ( 2 hook upgrades)
+
+  WtlbEntryView first attempt crashed: a naive str.replace turned the
+  existing `React.useMemo(` into `React.React.useMemo(` → undefined.X
+  TypeError. Smoke harness caught it immediately (ErrorBoundary tripped
+  on first navigation to a WTLB entry). Reverted clean, hardened the
+  upgrade to a regex with negative-lookbehind + added a refuse-to-write
+  guard on `React.React.` substring presence. Second run clean. Same
+  loud-fail / no-bandaid principle as P3.5a's truncation incident.
+
+  Verified live across all four views: LetterView (Volume One preface,
+  4 blocks rendered), WtlbEntryView (WTLB Part One Introduction, 3
+  paragraphs), Studies hub + Scriptures hub render cleanly (module-load
+  errors would have broken the parent screens). Annotation round-trip
+  identical to baseline: 133 marks / 13 icons / no crash on open or
+  next/prev / 0 console.error / localStorage restored.
+
+  index.html now ~566 KB / ~9.5k lines (was ~17.2k pre-modularization).
+  Cumulative reduction across P1-P4: ~600 KB / ~7,700 lines extracted
+  into 40+ cohesive modules.
+
+  NEXT: P5 (hook extraction to slim App() — extract useTabField / use
+  Settings / etc. from the App component, per PLAN §3.6). Optional
+  also: consolidate shared inline components (Segments, ProphecyGroup,
+  FootnoteSheet, etc.) that all the now-extracted screens depend on.
+
+  NEXT (superseded): P4 (big screen components).
   NEXT (superseded): P3.5 (stores extraction + data relocation).
   NEXT (superseded): P3 (scripture/data resolution).
 
