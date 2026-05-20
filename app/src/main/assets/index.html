@@ -54,9 +54,7 @@
       } catch(x){}
     }, true);
   </script>
-  <script src="react.min.js"></script>
-  <script src="react-dom.min.js"></script>
-  <script src="html2canvas.min.js"></script>
+  <!-- vendor scripts moved into dist/bundle-a.js (G.1) -->
   
   <style>body { margin: 0; background: #000000; }
   body.light { background: #f7f2e8; }</style>
@@ -64,37 +62,9 @@
 <body>
   <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");}catch(e){}</script>
   <div id="root"></div>
-  <script src="src/data/books.js"></script>
-  <script src="src/data/books-restored.js"></script>
-  <script src="src/data/matthew.js"></script>
-  <script src="src/data/matthew-plain.js"></script>
-  <script src="src/data/matthew-nkjv.js"></script>
-  <!-- Alt-translation Bible files (~4.5 MB each, 7 files = ~32 MB of JS parse time).
-       Loaded on demand via loadTranslation() below — not upfront — so app startup is fast.
-       Users stay on NKJV unless they change translations, so typically zero extra load. -->
-  <!-- bible-studies.js (~4.3 MB) is loaded on demand via loadBibleStudies() below.
-       Most sessions never open a Bible Study, so this keeps cold-boot fast. -->
-  <script src="src/data/volume-one.js"></script>
-  <script src="src/data/volume-two.js"></script>
-  <script src="src/data/volume-three.js"></script>
-  <script src="src/data/volume-four.js"></script>
-  <script src="src/data/volume-five.js"></script>
-  <script src="src/data/volume-six.js"></script>
-  <script src="src/data/volume-seven.js"></script>
-  <script src="src/data/letters-timothy.js"></script>
-  <script src="src/data/letters-flock.js"></script>
-  <script src="src/data/lords-rebuke.js"></script>
-  <script src="src/data/wtlb-one.js"></script>
-  <script src="src/data/wtlb-two.js"></script>
-  <script src="src/data/wtlb-scriptures.js"></script>
-  <script src="src/data/the-blessed.js"></script>
-  <script src="src/data/holy-days.js"></script>
-  <script src="src/data/hidden-manna.js"></script>
-
-  <!-- Search: FlexSearch engine + data dictionaries + runtime module -->
-  <script src="flexsearch.min.js"></script>
-  <script src="search-data.js"></script>
-  <script src="search.js"></script>
+  <!-- Cluster A: vendor + raw corpus + search engine (27 files, ~11.7 MB).
+       Concatenated by tools/build.py — DO NOT edit dist/bundle-a.js by hand. -->
+  <script src="dist/bundle-a.js"></script>
 
   <!-- The ~4.4k-line CSS now lives in app.css, loaded via <link rel="stylesheet"> in <head>. This eliminates the
        const CSS template-literal black-screen footgun (a stray backtick in a CSS comment used to
@@ -143,49 +113,9 @@ const HL_COLORS = ['yellow','green','pink','red','orange','blue','purple','teal'
   <!-- Core in-memory stores extracted from the inline block above.
        CachedStore is the factory used by every other store — must
        load first. Then the 4 stores that depend on it. -->
-  <script src="src/stores/cached-store.js"></script>
-  <script src="src/stores/annotation-store.js"></script>
-  <script src="src/stores/note-store.js"></script>
-  <script src="src/stores/notebook-store.js"></script>
-  <script src="src/stores/recent-nav-store.js"></script>
-  <!-- LinkStore, persistLink, lnkId, hlId — extracted to src/stores/link-store.js -->
-  <script src="src/stores/link-store.js"></script>
-  <!-- BookmarkStore, bkmId — extracted to src/stores/bookmark-store.js -->
-  <script src="src/stores/bookmark-store.js"></script>
-  <!-- Shared ExpandableText (a.k.a. JrnExpandable) — used by Journal,
-       Bookmarks AND Notes. MUST load before any of those consumers. -->
-  <script src="src/components/ExpandableText.js"></script>
-  <!-- Root ErrorBoundary (wraps <App>) and the shared hooks. -->
-  <script src="src/components/ErrorBoundary.js"></script>
-  <script src="src/hooks/useMarkAsRead.js"></script>
-  <script src="src/hooks/use-saved-state.js"></script>
-  <script src="src/hooks/use-ref-mirror.js"></script>
-  <script src="src/hooks/use-history.js"></script>
-  <!-- ─── JOURNAL FEATURE — segregated module set ───
-       All depend on CachedStore (defined above) + React (loaded earlier).
-       Load order matters: styles → stores → helpers → sheets → screens → chip. -->
-  <script src="src/styles/journal-styles.js"></script>
-  <script src="src/stores/journal-media-store.js"></script>
-  <script src="src/stores/journal-stats-store.js"></script>
-  <script src="src/stores/journal-index-store.js"></script>
-  <script src="src/data/journal-helpers.js"></script>
-  <script src="src/stores/journal-store.js"></script>
-  <script src="src/ui/sheets/JournalRecordingSheet.js"></script>
-  <script src="src/ui/sheets/JournalInsertSheet.js"></script>
-  <script src="src/ui/sheets/JournalNotebookSheet.js"></script>
-  <script src="src/ui/sheets/JournalInboundSheet.js"></script>
-  <script src="src/ui/screens/JournalHubScreen.js"></script>
-  <script src="src/ui/screens/JournalViewerScreen.js"></script>
-  <script src="src/ui/screens/JournalEditorScreen.js"></script>
-  <script src="src/renderer/dom-journal-chip.js"></script>
-  <!-- Scripture / collection resolution module — COLLECTIONS
-       registry + scripture primitives. Loaded after the journal
-       modules and BEFORE the inline <script> that consumes them. -->
-  <script src="src/data/scripture-resolution.js"></script>
-  <!-- letter-linking.js: linkWtlbEntries + linkPreface are called from
-       boot-time top-level code in the big inline block below (around
-       lines ~900-915), so this MUST load before that block executes. -->
-  <script src="src/data/letter-linking.js"></script>
+  <!-- Cluster B: stores + components + hooks + journal + scripture-resolution +
+       letter-linking (29 files). -->
+  <script src="dist/bundle-b.js"></script>
   <!-- ─── /JOURNAL ─── -->
   <script>
 /* hlId and lnkId are now defined in src/stores/link-store.js */
@@ -241,15 +171,8 @@ var _OT_BOOKS_INLINE = new Set(['genesis','exodus','leviticus','numbers','deuter
 /* applyDOMLinks, _buildLinkIcon, _insertLinkIconAt extracted to
    src/renderer/dom-links.js — see <script src> below. */
   </script>
-  <script src="src/renderer/dom-links.js"></script>
-  <!-- applyDOMBookmarks, _buildBookmarkIcon, _insertBookmarkIconAt — extracted to dom-bookmarks.js -->
-  <script src="src/renderer/dom-bookmarks.js"></script>
-  <!-- Annotation rendering engine (snapRangeToWords, annMarkClass,
-       HighlightableText, findNoteIconInsertionPoint, _markCharEnd,
-       applyNoteIcons, applyActiveNoteState, applyDOMHighlights,
-       StaticSubtree). Loads here, after the stores' inline block, so
-       every dependency resolves at call time. -->
-  <script src="src/renderer/annotation-engine.js"></script>
+  <!-- Cluster C: DOM renderer engines (3 files). -->
+  <script src="dist/bundle-c.js"></script>
   <script>
 /* findNoteIconInsertionPoint · _markCharEnd · applyNoteIcons ·
    applyActiveNoteState · applyDOMHighlights → extracted to
@@ -4085,99 +4008,8 @@ multiNotePayload && React.createElement(MultiNotePopover, {
   <!--             bookCategory, findEntryContext, _allBooks, _matthew (all defined above). -->
   <!-- All references are resolved at React render time, not at parse time, so -->
   <!-- loading here (before root.render) is safe even though callee is defined above. -->
-  <script src="src/ui/screens/LetterView.js"></script>
-  <script src="src/ui/screens/WtlbEntryView.js"></script>
-  <script src="src/ui/screens/BibleChapterView.js"></script>
-  <script src="src/ui/screens/ChapterView.js"></script>
-  <script src="src/ui/screens/LibraryScreen.js"></script>
-  <script src="src/ui/screens/NotesIndexScreen.js"></script>
-  <script src="src/ui/screens/VolumesHome.js"></script>
-  <script src="src/ui/screens/StudiesHome.js"></script>
-  <script src="src/ui/screens/HistoryScreen.js"></script>
-  <script src="src/ui/screens/AboutScreen.js"></script>
-  <script src="src/ui/screens/SettingsScreen.js"></script>
-  <script src="src/ui/screens/HomeScreen.js"></script>
-  <script src="src/ui/screens/SearchScreen.js"></script>
-  <script src="src/ui/components/Segments.js"></script>
-  <script src="src/ui/components/ProphecyCard.js"></script>
-  <script src="src/ui/components/ProphecyGroup.js"></script>
-  <script src="src/ui/components/VerseWithNumbers.js"></script>
-  <script src="src/ui/components/InAppLinkButton.js"></script>
-  <script src="src/ui/components/FootnoteSheet.js"></script>
-  <script src="src/ui/components/ScriptureVerseText.js"></script>
-  <script src="src/ui/components/ScriptureSheet.js"></script>
-  <script src="src/ui/components/ExpandableVerse.js"></script>
-  <script src="src/ui/components/ThemeBtn.js"></script>
-  <script src="src/ui/components/ScreenLayout.js"></script>
-  <script src="src/ui/components/ModeToggle.js"></script>
-  <script src="src/ui/components/InlineNotes.js"></script>
-  <script src="src/ui/components/InlineEcho.js"></script>
-  <script src="src/ui/components/StudyPanels.js"></script>
-  <script src="src/ui/components/ChapterBookmarkBtn.js"></script>
-  <script src="src/ui/components/NavButtons.js"></script>
-  <script src="src/ui/components/ProphecyExpandToggle.js"></script>
-  <script src="src/ui/components/HomeBtn.js"></script>
-  <script src="src/ui/components/TabsNavBtn.js"></script>
-  <script src="src/ui/components/LibraryNav.js"></script>
-  <script src="src/ui/components/FootnoteListSection.js"></script>
-  <script src="src/ui/components/StickyChapterNav.js"></script>
-  <script src="src/ui/sheets/TabsOverview.js"></script>
-  <script src="src/ui/sheets/TabActionSheet.js"></script>
-  <script src="src/ui/sheets/MultiNotePopover.js"></script>
-  <script src="src/ui/sheets/NotebookPickerSheet.js"></script>
-  <script src="src/ui/sheets/NoteSheet.js"></script>
-  <script src="src/ui/sheets/LetterExcerptPickerScreen.js"></script>
-  <script src="src/ui/sheets/VersePickerScreen.js"></script>
-  <script src="src/ui/sheets/LinkPicker.js"></script>
-  <script src="src/ui/sheets/LinkSidebar.js"></script>
-  <script src="src/ui/sheets/SelectionToolbar.js"></script>
-  <script src="src/ui/sheets/AnnotationActionChip.js"></script>
-  <script src="src/ui/components/ClearProgressRow.js"></script>
-  <script src="src/ui/components/SrchCard.js"></script>
-  <script src="src/ui/components/SrchSnippet.js"></script>
-  <script src="src/ui/components/SettingsRow.js"></script>
-  <script src="src/ui/components/SelectField.js"></script>
-  <script src="src/ui/components/VolumeLetterIndex.js"></script>
-  <script src="src/ui/components/HistoryEntryCard.js"></script>
-  <script src="src/ui/screens/BibleStudyIndex.js"></script>
-  <script src="src/ui/screens/ChapterIndex.js"></script>
-  <script src="src/ui/screens/GardenView.js"></script>
-  <script src="src/ui/screens/ScriptureGenre.js"></script>
-  <script src="src/ui/screens/ScripturesHome.js"></script>
-  <script src="src/ui/components/NoteRow.js"></script>
-  <script src="src/ui/sheets/NotebookManagerSheet.js"></script>
-  <script src="src/ui/components/LinkCard.js"></script>
-  <script src="src/ui/components/LinkIcon.js"></script>
-  <script src="src/utils/hl-keys.js"></script>
-  <script src="src/utils/dates.js"></script>
-  <script src="src/utils/garden.js"></script>
-  <script src="src/utils/tabs.js"></script>
-  <script src="src/stores/thumb-store.js"></script>
-  <script src="src/data/translations.js"></script>
-  <!-- letter-linking.js loaded much earlier (top of body) since it's
-       called by top-level boot code in the big inline block. -->
-  <script src="src/utils/nav-index.js"></script>
-  <script src="src/utils/note-source.js"></script>
-  <script src="src/utils/book-category.js"></script>
-  <script src="src/utils/scripture-parse.js"></script>
-  <script src="src/utils/highlight.js"></script>
-  <script src="src/utils/render-text.js"></script>
-  <script src="src/utils/search.js"></script>
-  <script src="src/ui/components/SrchGroup.js"></script>
-  <script src="src/ui/screens/LinksScreen.js"></script>
-  <!-- BookmarksScreen, BookmarkRow, BookmarkRowActionSheet, BookmarkPopover — extracted to src/ui/screens/BookmarksScreen.js -->
-  <!-- Depends on: BookmarkStore (bookmark-store.js), ScreenLayout, ThemeBtn, relativeDate, -->
-  <!--             bookCategory, findEntryContext, _allBooks, _matthew (all defined above). -->
-  <script src="src/ui/screens/BookmarksScreen.js"></script>
-  <!-- HighlightsScreen — Highlights & Underlines browser. Loads AFTER
-       BookmarksScreen so it can reuse _bookmarkSourceLabel /
-       _bookmarkSourceEndpoint (identical hlKey format). -->
-  <script src="src/ui/screens/HighlightsScreen.js"></script>
-  <!-- BookmarkCreateSheet — pre-commit form opened by SelectionToolbar's
-       Bookmark action and the chapter-bookmark NavButton on reading
-       screens. Lets the user refine label + add an optional thought
-       BEFORE the bookmark is persisted (replaces the silent add). -->
-  <script src="src/ui/sheets/BookmarkCreateSheet.js"></script>
+  <!-- Cluster D: all extracted screens/sheets/components/utils (81 files). -->
+  <script src="dist/bundle-d.js"></script>
   <!-- Mirror lexical-only globals onto window so the smoke harness
        (tools/smoke.js) can probe them without `eval()` (CSP forbids
        'unsafe-eval'). `function NAME(){}` and extracted modules using
