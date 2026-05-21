@@ -3446,14 +3446,23 @@ multiNotePayload && React.createElement(MultiNotePopover, {
       onPick: (gid) => { setMultiNotePayload(null); setNoteSheetTarget({ groupId: gid, startInEditMode: false }); }
     }),
     bookmarkPopoverPayload && React.createElement(BookmarkPopover, {
-      payload: bookmarkPopoverPayload,
-      hlTick: hlTick, setHlTick: setHlTick,
-      onNavigateToSource: (endpoint, meta) => {
-        if (endpoint) {
-          setBookmarkPopoverPayload(null);
-          navigateToLink(endpoint, meta || { sourceLetterTitle: 'Bookmark' });
-        }
+      // BookmarkPopover's signature is ({ bkmIds, x, y, onClose,
+      // onNavigate, onDeleteDone }) — pass the unpacked payload, not a
+      // `payload` prop. (Pre-2026-05-20 this render passed `payload` +
+      // `onNavigateToSource`, which the component never read, so the
+      // popover silently returned null. Fixed: real props now.)
+      bkmIds: bookmarkPopoverPayload.bkmIds,
+      x: bookmarkPopoverPayload.x,
+      y: bookmarkPopoverPayload.y,
+      onNavigate: (bkm) => {
+        // Resolve the bookmark's source hlKey to an endpoint, then route
+        // through navigateToLink so the back-pill is wired. Mirrors the
+        // BookmarkCreateSheet "Open Source" path below.
+        const endpoint = (typeof _bookmarkSourceEndpoint === 'function') ? _bookmarkSourceEndpoint(bkm.hlKey) : null;
+        setBookmarkPopoverPayload(null);
+        if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: 'Bookmark' });
       },
+      onDeleteDone: () => setHlTick(t => t + 1),
       onClose: () => setBookmarkPopoverPayload(null)
     }),
     // BookmarkCreateSheet — pre-commit form for new bookmarks. Opens
