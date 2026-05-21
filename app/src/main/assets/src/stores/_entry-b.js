@@ -66,6 +66,7 @@ import { useScrollMemory } from '../hooks/use-scroll-memory.js';
 import { useReadingDwell } from '../hooks/use-reading-dwell.js';
 import { useSettings } from '../hooks/use-settings.js';
 import { useSheetOrchestration } from '../hooks/use-sheet-orchestration.js';
+import { useFromLetterStack } from '../hooks/use-from-letter-stack.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -127,6 +128,7 @@ Object.assign(window, {
   useReadingDwell,
   useSettings,
   useSheetOrchestration,
+  useFromLetterStack,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,

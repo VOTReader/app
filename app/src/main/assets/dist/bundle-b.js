@@ -2376,6 +2376,77 @@
     };
   }
 
+  // app/src/main/assets/src/hooks/use-from-letter-stack.js
+  function useFromLetterStack({
+    tabField,
+    screen,
+    bookId,
+    chapterNum,
+    letterId,
+    studyId,
+    studyChapterId,
+    setScreen,
+    setBookId,
+    setChapterNum,
+    setLetterId,
+    setStudyId,
+    setStudyChapterId
+  }) {
+    const [fromLetterStack, setFromLetterStack] = tabField("fromLetterStack");
+    const fromLetterRef = useRefMirror(fromLetterStack);
+    const pushFromLetter = (entry) => setFromLetterStack((prev) => {
+      var next = [...prev, entry];
+      return next.length > 50 ? next.slice(-50) : next;
+    });
+    const tapThroughBack = () => {
+      const stack = fromLetterRef.current;
+      if (!stack || stack.length === 0) return;
+      const popped = stack[stack.length - 1];
+      setFromLetterStack(stack.slice(0, -1));
+      window.__pendingHighlight = null;
+      if (popped.sourceBookId !== void 0) setBookId(popped.sourceBookId);
+      if (popped.sourceChapterNum !== void 0) setChapterNum(popped.sourceChapterNum);
+      if (popped.sourceLetterId !== void 0) setLetterId(popped.sourceLetterId);
+      if (popped.sourceStudyId !== void 0) setStudyId(popped.sourceStudyId);
+      if (popped.sourceStudyChapterId !== void 0) setStudyChapterId(popped.sourceStudyChapterId);
+      if (popped.sourceScreen) setScreen(popped.sourceScreen);
+    };
+    const _destMatches = (dest) => {
+      if (!dest) return true;
+      if (dest.screen !== screen) return false;
+      if (dest.bookId != null && dest.bookId !== bookId) return false;
+      if (dest.chapterNum != null && dest.chapterNum !== chapterNum) return false;
+      if (dest.letterId != null && dest.letterId !== letterId) return false;
+      if (dest.studyId != null && dest.studyId !== studyId) return false;
+      if (dest.studyChapterId != null && dest.studyChapterId !== studyChapterId) return false;
+      return true;
+    };
+    React.useEffect(() => {
+      if (fromLetterStack.length === 0) return;
+      const top = fromLetterStack[fromLetterStack.length - 1];
+      if (!top.destSnapshot) return;
+      if (!_destMatches(top.destSnapshot)) {
+        setFromLetterStack((prev) => prev.slice(0, -1));
+      }
+    }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, fromLetterStack]);
+    const backHint = fromLetterStack.length > 0 ? (() => {
+      const top = fromLetterStack[fromLetterStack.length - 1];
+      if (top.destSnapshot && !_destMatches(top.destSnapshot)) return null;
+      return {
+        title: top.sourceLetterTitle || "previous",
+        volumeLabel: top.sourceVolumeLabel || null
+      };
+    })() : null;
+    return {
+      fromLetterStack,
+      setFromLetterStack,
+      pushFromLetter,
+      tapThroughBack,
+      fromLetterRef,
+      backHint
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -6588,6 +6659,7 @@
     useReadingDwell,
     useSettings,
     useSheetOrchestration,
+    useFromLetterStack,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,

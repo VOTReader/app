@@ -1400,75 +1400,20 @@ function App() {
      Records the source letter + screen so Android back returns here.
      Sets window.__pendingHighlight so the destination LetterView, on its
      next mount/letter-change, wraps the excerpt with <mark.letter-highlight>. */
-  // Multi-level tap-through back-stack (declared here so both backHint
-  // below and openInAppLetter further down can use it without TDZ).
-  const [fromLetterStack, setFromLetterStack] = tabField('fromLetterStack');
-  const pushFromLetter = (entry) => setFromLetterStack((prev) => { var next = [...prev, entry]; return next.length > 50 ? next.slice(-50) : next; });
-  // Tap-through "Back to …" pill handler: pops the top of the from-letter
-  // stack and restores the captured screen + IDs. tabField setters run
-  // their updater fns ASYNC, so we read the current stack from its ref
-  // (kept in sync below) and call setFromLetterStack with a plain value.
-  const tapThroughBack = () => {
-    const stack = fromLetterRef.current;
-    if (!stack || stack.length === 0) return;
-    const popped = stack[stack.length - 1];
-    setFromLetterStack(stack.slice(0, -1));
-    window.__pendingHighlight = null;
-    if (popped.sourceBookId !== undefined) setBookId(popped.sourceBookId);
-    if (popped.sourceChapterNum !== undefined) setChapterNum(popped.sourceChapterNum);
-    if (popped.sourceLetterId !== undefined) setLetterId(popped.sourceLetterId);
-    if (popped.sourceStudyId !== undefined) setStudyId(popped.sourceStudyId);
-    if (popped.sourceStudyChapterId !== undefined) setStudyChapterId(popped.sourceStudyChapterId);
-    if (popped.sourceScreen) setScreen(popped.sourceScreen);
-  };
-
-  // Prune stale tap-through entries. When the user navigates away from a
-  // recorded destination (next chapter, different book, etc.), pop the entry
-  // so the pill doesn't reappear if they happen to land back on the dest
-  // later, and so Android-back doesn't trigger a confusing jump.
-  // destSnapshot uses BOTH null (push paths explicitly null out unused
-  // fields) and undefined (legacy entries without a recorded field), and
-  // both should mean "don't care about this field". Loose-equal nullish
-  // check (`!= null`) catches both — strict `=== undefined` missed the
-  // null case and matched against stale state, so the single-shot back
-  // pill was being silently pruned in the primary cross-screen flow
-  // (Notes index → Bible/Study → expected "Back to My Notes" pill).
-  const _destMatches = (dest) => {
-    if (!dest) return true;
-    if (dest.screen !== screen) return false;
-    if (dest.bookId != null && dest.bookId !== bookId) return false;
-    if (dest.chapterNum != null && dest.chapterNum !== chapterNum) return false;
-    if (dest.letterId != null && dest.letterId !== letterId) return false;
-    if (dest.studyId != null && dest.studyId !== studyId) return false;
-    if (dest.studyChapterId != null && dest.studyChapterId !== studyChapterId) return false;
-    return true;
-  };
-  useEffect(() => {
-    if (fromLetterStack.length === 0) return;
-    const top = fromLetterStack[fromLetterStack.length - 1];
-    if (!top.destSnapshot) return;
-    if (!_destMatches(top.destSnapshot)) {
-      setFromLetterStack((prev) => prev.slice(0, -1));
-    }
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, fromLetterStack]);
-
-  // Top-of-stack back-hint — shows above the hero on tap-through destinations
-  // so the user knows where Android back will return.
-  // If the entry has a destSnapshot (recorded at push time), the pill is
-  // suppressed when the current state has diverged from that destination —
-  // the pill is single-shot, not persistent. Legacy entries without a
-  // destSnapshot show the pill unconditionally (preserves the existing
-  // letter→letter tap-through multi-level back behavior).
-  const backHint = fromLetterStack.length > 0 ?
-  (() => {
-    const top = fromLetterStack[fromLetterStack.length - 1];
-    if (top.destSnapshot && !_destMatches(top.destSnapshot)) return null;
-    return {
-      title: top.sourceLetterTitle || "previous",
-      volumeLabel: top.sourceVolumeLabel || null
-    };
-  })() :
-  null;
+  /* useFromLetterStack — the multi-level tap-through back-stack:
+     fromLetterStack (tabField) + pushFromLetter + tapThroughBack + the
+     destSnapshot prune effect + the backHint computation + the
+     fromLetterRef mirror. Extracted to src/hooks/use-from-letter-stack.js
+     (P6i). setFromLetterStack is returned because __goHome and
+     handleAndroidBack (both still in App()) mutate the stack directly. */
+  const {
+    setFromLetterStack, pushFromLetter,
+    tapThroughBack, fromLetterRef, backHint,
+  } = useFromLetterStack({
+    tabField,
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
+  });
 
   const openInAppLetter = (target, meta) => {
     if (!target || !target.letterTitle) return;
@@ -2035,7 +1980,7 @@ function App() {
   const fromSearchRef = useRefMirror(fromSearch);
   const fromStudiesRef = useRefMirror(fromStudies);
   const fromMatthewChRef = useRefMirror(fromMatthewCh);
-  const fromLetterRef = useRefMirror(fromLetterStack);
+  /* fromLetterRef → returned by useFromLetterStack (src/hooks/use-from-letter-stack.js, P6i) */
   const studyIdRef = useRefMirror(studyId);
   const fromWtlbRef = useRefMirror(fromWtlb);
   const searchOriginRef = useRefMirror(searchOrigin);
