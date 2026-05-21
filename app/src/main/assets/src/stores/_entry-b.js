@@ -63,6 +63,7 @@ import { useRefMirror } from '../hooks/use-ref-mirror.js';
 import { useHistory } from '../hooks/use-history.js';
 import { useThumbnails } from '../hooks/use-thumbnails.js';
 import { useScrollMemory } from '../hooks/use-scroll-memory.js';
+import { useReadingDwell } from '../hooks/use-reading-dwell.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -121,6 +122,7 @@ Object.assign(window, {
   useHistory,
   useThumbnails,
   useScrollMemory,
+  useReadingDwell,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,

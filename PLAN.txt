@@ -2355,13 +2355,29 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
              visibilitychange effect, __onDwellCommit bridge effect
     Reads:  settings.dwellMs (with default 20000), document.visibilityState
     Writes: activeReadKey state; commitFn callbacks (saved to localStorage)
-    Returns: { activeReadKey, setActiveReadKey, cancelDwell, commitDwellNow }
+    Returns: { activeReadKey, setActiveReadKey, cancelDwell }
+      CORRECTED 2026-05-20 by P6f recon: was "{ …, commitDwellNow }" —
+      but commitDwellNow has ZERO direct external callsites. Its only
+      consumer is the __onDwellCommit window bridge (which moves into
+      the hook with it). scheduleDwell + pauseDwell are likewise NOT
+      returned — their only callers are setActiveReadKey and the
+      visibilitychange effect, both in-hook.
+    Open question RESOLVED (P6f recon): keep the window bridge.
+      ScreenLayout.js (a separate Cluster D module) reads
+      window.__onDwellCommit for its scroll/fit checks — the bridge IS
+      the cross-module interface. The __onDwellCommit bridge effect
+      moves into the hook; commitDwellNow stays hook-internal, exposed
+      only through window.__onDwellCommit. Do NOT thread it as a prop.
     Why medium: visibilityState handling is correctness-critical (mark-as-
                 read fires only after dwell on a visible page). Cross-tab
                 switch MUST cancel dwell before flipping — see the
                 cancelDwell() call in switchToTab.
-    Open question: this hook's commitDwellNow is exposed via window.
-                  __onDwellCommit — keep that bridge or thread as prop?
+    GOTCHA (P6f recon): the dwell code is INTERLEAVED with unrelated
+      prophecy-card code. Region 1 = index.html:1479-1493, then
+      :1494-1503 is prophecy-card state (prophecyCardStatesRef +
+      saveProphecyCardStates useCallback — must NOT move), then
+      region 2 = :1504-1536. Extract as two separate cuts with the
+      prophecy block fenced off untouched between them.
 
   ── Cluster 6: useFromLetterStack ── (LOW, ~50 lines, src/hooks/use-from-letter-stack.js)
     Symbols: fromLetterStack (from tabField), pushFromLetter, popFromLetter,

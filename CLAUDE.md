@@ -21,8 +21,8 @@
 > 2. **No JSX** — Babel-compiled `React.createElement` chains as canonical source. Standard React tooling (ast-grep, jscodeshift, react-codemod) doesn't recognize it. Fix: incremental module-by-module JSX conversion, AFTER P6 lands. Do NOT big-bang rewrite — the annotation engine + boundary nav + scripture resolution have been debugged carefully over months.
 >
 > **CURRENT SEQUENCING (user-confirmed, refined through G.2.3 + P6d)**:
-> - **NOW**: **P6 — `App()` hook extraction** IN PROGRESS. Landed so far: `useMarkAsRead` (P5d warmup), `useSavedState`+`_validateTabState` (P6a), `useRefMirror` (P6b), `useHistory` (P6c), `useThumbnails` (P6d), `useScrollMemory` (P6e). Remaining per PLAN.txt §P6 revised order: P6f `useReadingDwell` → P6g `useSettings` → P6h `useSheetOrchestration` → P6i `useFromLetterStack` → P6j `useNavigateToLink` → P6k `useTabs` (load-bearing, last) → P6l `useAndroidBack`. The riskiest single refactor in the plan — real semantic surgery (closure deps, React hook ordering, state passing between newly-separated hooks). Go ONE hook at a time; smoke after each; one hook = one commit.
-> - **`App()` LINE COUNT (tracked per extraction — record the real `wc` number in every P6 commit message)**: post-P6e = **2,735 lines** (`function App()` at index.html:1000 → closing `}` at :3734). Progression: ~2,815 post-P6d → 2,735 post-P6e (−80). The "~2,500" figure in pre-P6d docs was a drifted estimate — measure, don't guess. Target when P6 completes: ~400 lines (hook composition + render tree). Each extraction should visibly move this number down; if a commit doesn't, something didn't actually leave App().
+> - **NOW**: **P6 — `App()` hook extraction** IN PROGRESS. Landed so far: `useMarkAsRead` (P5d warmup), `useSavedState`+`_validateTabState` (P6a), `useRefMirror` (P6b), `useHistory` (P6c), `useThumbnails` (P6d), `useScrollMemory` (P6e), `useReadingDwell` (P6f). Remaining per PLAN.txt §P6 revised order: P6g `useSettings` → P6h `useSheetOrchestration` → P6i `useFromLetterStack` → P6j `useNavigateToLink` → P6k `useTabs` (load-bearing, last) → P6l `useAndroidBack`. The riskiest single refactor in the plan — real semantic surgery (closure deps, React hook ordering, state passing between newly-separated hooks). Go ONE hook at a time; smoke after each; one hook = one commit.
+> - **`App()` LINE COUNT (tracked per extraction — record the real `wc` number in every P6 commit message)**: post-P6f = **2,693 lines** (`function App()` at index.html:1000 → closing `}` at :3692). Progression: ~2,815 post-P6d → 2,735 post-P6e (−80) → 2,693 post-P6f (−42). The "~2,500" figure in pre-P6d docs was a drifted estimate — measure, don't guess. Target when P6 completes: ~400 lines (hook composition + render tree). Each extraction should visibly move this number down; if a commit doesn't, something didn't actually leave App().
 > - **THEN**: JSX conversion, outside-in, module-by-module (now possible because every consumer is a module with explicit imports, so a converted `.jsx` file can co-exist with un-converted `.js` callers).
 > - **LATER**: Vite for HMR (optional; esbuild IIFE output ships fine on Android WebView).
 > - **AS-TRIGGERED**: P7 sync-ref audit per the calendar in PLAN.txt §P6 Direction 3.
@@ -95,15 +95,15 @@
 > - `components/` — `ExpandableText` (used by journal/bookmarks/notes)
 > - `styles/` — `journal-styles`
 >
-> **WHAT'S LEFT IN `index.html` (3,774 lines / ~206 KB as of post-P6e):**
-> - `App()` — **2,735 lines** (`function App()` at :1000 → closing `}` at :3734), **the only big inline component left, P6 target for hook extraction** (P6a-e extracted 6 hooks; 7 to go)
+> **WHAT'S LEFT IN `index.html` (3,732 lines / ~204 KB as of post-P6f):**
+> - `App()` — **2,693 lines** (`function App()` at :1000 → closing `}` at :3692), **the only big inline component left, P6 target for hook extraction** (P6a-f extracted 7 hooks; 6 to go)
 > - The Babel runtime `_extends` helper at the very top
 > - Boot-time top-level code in the big inline `<script>` block (before :1000): COLLECTIONS forEach that wires preface/nextEntry links, `BIBLE_BOOK_LIST` + `OT_BOOK_IDS` declarations, `LETTER_TITLE_MAP`/`VOT_LETTER_REGISTRY`/`MATTHEW_CHAIN_ENTRY`/`HIDDEN_MANNA_TITLES`, navigation glue used inside App's render tree
 > - The bottom lexical-mirror script (`<script>` at :3826 — mirrors lexical-only consts onto window for the smoke harness)
 > - The final `ReactDOM.createRoot()` + render (:3851-3852)
 > - ~50 one-line breadcrumb comments pointing to extracted modules (debug aids)
 >
-> **NEXT: P6f — `useReadingDwell`.** See the CURRENT SEQUENCING block above for the full P6f-l order and the proven 6-step extraction workflow. P6 is the riskiest single refactor in the plan — real semantic surgery (closure deps, React hook ordering, state passing between separated hooks) — but the workflow is now proven through P6d+P6e and the smoke harness + mandatory per-extraction targeted test catch regressions cleanly.
+> **NEXT: P6g — `useSettings`.** See the CURRENT SEQUENCING block above for the full P6g-l order and the proven 6-step extraction workflow. P6 is the riskiest single refactor in the plan — real semantic surgery (closure deps, React hook ordering, state passing between separated hooks) — but the workflow is now proven through P6d+P6e+P6f and the smoke harness + mandatory per-extraction targeted test catch regressions cleanly. NOTE for P6g: useSettings's save-state effect has the widest dep array in App() (writes the entire vot-state) — audit it thoroughly; the P6f extraction relies on it to persist activeReadKey.
 >
 > **`tools/_p5e_bundle_helpers.py`** — new bundling extractor that pulls multiple pure-function helpers into one domain-grouped module. Same brace-match + hook-upgrade + refuse-to-write logic as `_p4_extract_view.py`. Used for P5e helper bundles.
 >

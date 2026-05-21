@@ -89,7 +89,9 @@
       // P6d: useThumbnails — tab-card thumbnail capture + IDB persistence + GC
       'useThumbnails',
       // P6e: useScrollMemory — per-tab/per-screen scroll position capture + restore
-      'useScrollMemory'
+      'useScrollMemory',
+      // P6f: useReadingDwell — dwell-timer mark-as-read tracking
+      'useReadingDwell'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',
