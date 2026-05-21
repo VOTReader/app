@@ -1414,19 +1414,14 @@ function App() {
     clearAllStage, setClearAllStage, lastTabCloseStrikes, MAX_TABS,
   } = useTabActions({ tabState, cancelDwell, setTabThumbnails });
 
-  /* ── Persist vot-state on every change ──
-     Persistence sink — moves to usePersistedState after P6k when all
-     deps are hook returns (then App() just composes hook returns).
-     Body-class + AndroidBridge mirror was split into useSettings (P6g). */
-  useEffect(() => {
-    try {
-      localStorage.setItem("vot-state", JSON.stringify({
-        tabs, activeTabIdx,
-        theme, lastReadChapters, lastReadLetterMap,
-        activeReadKey, settings, readItems
-      }));
-    } catch (e) { console.warn('localStorage write failed for vot-state', e); }
-  }, [tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap, activeReadKey, settings, readItems]);
+  /* vot-state persistence sink → src/hooks/use-persisted-state.js (P6k+1).
+     8 params: tabs/activeTabIdx (useTabs), activeReadKey (useReadingDwell),
+     settings (useSettings) are hook returns; theme/lastReadChapters/
+     lastReadLetterMap/readItems are still App-local useState. */
+  usePersistedState({
+    tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap,
+    activeReadKey, settings, readItems,
+  });
 
   const ALL_BOOKS = { matthew: MATTHEW, ...BOOKS };
   window.__ALL_BOOKS = ALL_BOOKS; // expose for parseScriptureRef()

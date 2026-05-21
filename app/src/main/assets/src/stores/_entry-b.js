@@ -70,6 +70,7 @@ import { useFromLetterStack } from '../hooks/use-from-letter-stack.js';
 import { useNavigateToLink } from '../hooks/use-navigate-to-link.js';
 import { useTabs } from '../hooks/use-tabs.js';
 import { useTabActions } from '../hooks/use-tab-actions.js';
+import { usePersistedState } from '../hooks/use-persisted-state.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -135,6 +136,7 @@ Object.assign(window, {
   useNavigateToLink,
   useTabs,
   useTabActions,
+  usePersistedState,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,

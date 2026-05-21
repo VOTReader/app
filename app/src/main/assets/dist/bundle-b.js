@@ -2739,6 +2739,35 @@
     };
   }
 
+  // app/src/main/assets/src/hooks/use-persisted-state.js
+  function usePersistedState({
+    tabs,
+    activeTabIdx,
+    theme,
+    lastReadChapters,
+    lastReadLetterMap,
+    activeReadKey,
+    settings,
+    readItems
+  }) {
+    React.useEffect(() => {
+      try {
+        localStorage.setItem("vot-state", JSON.stringify({
+          tabs,
+          activeTabIdx,
+          theme,
+          lastReadChapters,
+          lastReadLetterMap,
+          activeReadKey,
+          settings,
+          readItems
+        }));
+      } catch (e) {
+        console.warn("localStorage write failed for vot-state", e);
+      }
+    }, [tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap, activeReadKey, settings, readItems]);
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -6955,6 +6984,7 @@
     useNavigateToLink,
     useTabs,
     useTabActions,
+    usePersistedState,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
