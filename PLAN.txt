@@ -2046,6 +2046,68 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-21 — Bookmark inline-icon fix + P6i (useFromLetterStack)
+             + no-cache preview server
+
+  Branch: main. Commits c828982 → 18f2171 (6 commits).
+
+  Bookmark inline icon on Bible/study verse views (c828982). A bookmark
+  made on a Bible verse saved to BookmarkStore and showed in the Library
+  but rendered no inline icon. Root cause was NOT the suspected hlTick /
+  applyDOMBookmarks wiring — those are correct, and LetterView /
+  WtlbEntryView (the [data-hl-dom] views) inject bookmark icons fine.
+  The gap: BibleChapterView + ChapterView render each verse via the React
+  <HighlightableText> component, which has no [data-hl-dom] container, so
+  applyDOMBookmarks() can never reach them. Links already had a per-verse
+  React <LinkIcon> for exactly this case; the bookmark equivalent was
+  never built. Fix: new BookmarkIcon component (src/ui/components/
+  BookmarkIcon.js) mirroring LinkIcon — reads BookmarkStore.
+  getForKeyPrefix, renders the flag icon, taps route to __bookmarkEdit
+  (single) / __openBookmarkPopover (multi). Rendered after LinkIcon at
+  all 3 HighlightableText callsites. Two rendering strategies → two
+  bookmark renderers. Verified live: icon renders (single + multi-badge);
+  popover Open / Delete (+ icon refresh) / close all work, 0 console
+  errors.
+
+  P6i — useFromLetterStack (80eed25). The multi-level tap-through
+  back-stack extracted from App() into src/hooks/use-from-letter-stack.js:
+  fromLetterStack (tabField) + pushFromLetter + tapThroughBack + the
+  destSnapshot prune effect + fromLetterRef + the backHint computation.
+  Pure verbatim move (only bare useEffect → React.useEffect). One
+  cohesion unit, one commit — every symbol revolves around the single
+  fromLetterStack state, no clean split seam. The prune effect moved INTO
+  the hook: it is a consistency-enforcement effect (sole side effect:
+  setFromLetterStack) guarding an invariant intrinsic to what
+  fromLetterStack means — NOT a composition-level sink. Invariant 4
+  preserved: _navToLinkRef / navigateToLink / the deferred ref-body
+  assignment all stay in App() untouched; the dependency runs the other
+  way (that body calls the hook's pushFromLetter). App() line count,
+  measured: 2,461 (post-P6i; closing brace at index.html:3460). Smoke
+  PASS x2 (0 crashed, 0 unreached, annotations bit-exact to baseline);
+  two-branch back-pill targeted test PASS (tap-through → "Back to
+  Bookmark" pill appears → onward nav → prune evicts it; direct arrival
+  → no pill). 10 of 13 hooks done; P6j useNavigateToLink → P6k useTabs
+  → P6l useAndroidBack remain.
+
+  Extraction discovery (309194e) — recon found popFromLetter was dead
+  code (defined, never called). Removed as a separate behavior-neutral
+  commit BEFORE the extraction so the P6i commit stayed a pure move.
+  Continues the established pattern: every extraction surfaces exactly
+  one pre-existing bug the surgical reading exposes.
+
+  No-cache preview server (2db90a6) — tools/preview-server.py, a
+  SimpleHTTPRequestHandler that sends Cache-Control: no-store on every
+  response. `python -m http.server` sends only Last-Modified, so
+  browsers heuristically cache dist/bundle-*.js and location.reload()
+  serves the STALE bundle after a rebuild — that cost real verification
+  time twice this session. launch.json now points the preview at it.
+  Dev-only; never shipped to the APK.
+
+  Docs: 8dd1f3a (CLAUDE.md — bookmark retro + two named extraction
+  principles: "diff review is the primary regression catch, not a
+  formality" and "expect one pre-existing-bug discovery per extraction"),
+  18f2171 (CLAUDE.md — P6i landed + measured line count).
+
 2026-05-20 — G.2.3 (Cluster D → ES modules) + P6d–P6h hook extraction
              + BookmarkPopover fix
 
@@ -2504,6 +2566,23 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
               goJournalViewer, goHome). Likely will NOT be extractable
               cleanly without refactoring nav helpers first.
 
+  ── Companion Kotlin commit (same session as P6l) ── PREDICTIVE BACK
+    After P6l lands, modernize the Kotlin back-handling layer in
+    MainActivity.kt as a standalone commit (no JS changes):
+      - Register OnBackInvokedCallback (API 33+) that calls
+        evaluateJavascript("window.handleAndroidBack()") and
+        conditionally unregisters when the JS stack returns "false"
+        (nothing left to handle).
+      - Keep OnBackPressedDispatcher as the fallback for API < 33.
+      - Remove / replace the deprecated onBackPressed() override.
+    Why here: P6l extracts the JS-side hook; this commit modernizes the
+    Kotlin-side of the same concern. Two layers of one feature, done
+    together. Without it, back-handling degrades silently on Android 13+
+    devices where predictive back gestures are enabled by default — the
+    system won't know in advance whether the app will consume the event,
+    so the swipe-preview animation is suppressed and edge-case timing
+    issues can surface. ~25-30 lines of Kotlin, zero JS changes.
+
   ── Cluster 9: useHistory ── (LOW, ~60 lines, src/hooks/use-history.js)
     Symbols: readHistory/setReadHistory state, addToHistory, clearHistory,
              pruneHistoryDay, history-track effect
@@ -2685,7 +2764,9 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
   After P6l: App() should drop from ~2,500 lines → ~400 lines (just
   the hook composition + render tree). Local helpers (_findLetter,
   colReadNavProps, colIdxProps, boundary configs) stay inline since
-  they close over hook-returned values.
+  they close over hook-returned values. Immediately after P6l, same
+  session: the companion Predictive Back Kotlin commit (see Cluster 8
+  note above) — back-handling fully modernized at both layers.
 
   Cluster sizes summing to ~1,100 lines extracted → ~1,400 left in
   App() (mostly the render tree which is ~1,000 lines + handler glue).

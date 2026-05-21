@@ -60,14 +60,17 @@
 > npx esbuild --version    # expect 0.28+
 > # 4. rebuild bundles from source (proves the build pipeline works)
 > npm run build
-> # 5. open app/src/main/assets/index.html via preview tool;
-> #    paste tools/smoke.js into preview_eval and call votSmoke()
+> # 5. preview: serve via tools/preview-server.py — NOT `python -m http.server`
+> #    (that one heuristically caches dist/bundle-*.js, so a rebuilt bundle
+> #    won't load on reload; preview-server.py sends Cache-Control: no-store).
+> #    .claude/launch.json already points the preview tool at it.
+> #    Open index.html, paste tools/smoke.js into preview_eval, call votSmoke()
 > #    expect PASS line with globals ok, data ok, screens 0 crashed,
 > #    letterAnn ok, wtlbAnn ok, console.error 0, resource404 0
 > ```
 > If Node is missing on Windows: `winget install OpenJS.NodeJS.LTS`. Use bash/git-bash for npm commands (PowerShell execution policy blocks `npm.ps1`).
 >
-> **PREVIEW CACHE GOTCHA (cost real verification time — read this before debugging a "my rebuild didn't take" symptom):** after `npm run build`, `location.reload()` in the preview does **not** pick up the rebuilt `dist/bundle-*.js`. The python `http.server` sends only `Last-Modified` (no `Cache-Control`/`ETag`), so the browser applies heuristic freshness and serves the stale bundle from cache without revalidating. Bust it with `?cb=<anything>` on the bundle URL (inject a fresh `<script src="dist/bundle-d.js?cb=N">` — CSP-safe, it's still `'self'`) or do a true hard reload. `index.html` itself is served unbundled, so it always reloads fresh — only the `dist/` bundles cache.
+> **PREVIEW CACHE GOTCHA (SOLVED 2026-05-21 — but know why):** with the plain `python -m http.server`, after `npm run build` a `location.reload()` does **not** pick up the rebuilt `dist/bundle-*.js` — it sends only `Last-Modified` (no `Cache-Control`/`ETag`), so the browser applies heuristic freshness and serves the stale bundle without revalidating. **Fix in place:** `tools/preview-server.py` sends `Cache-Control: no-store` on every response, and `.claude/launch.json` points the preview tool at it — so reloads now always fetch fresh bundles. If you ever bypass it and run the plain server, the cache returns: bust it with `?cb=<anything>` on the bundle URL (inject `<script src="dist/bundle-d.js?cb=N">` — CSP-safe, still `'self'`) or a true hard reload. `index.html` itself is served unbundled, so it always reloads fresh — only the `dist/` bundles cached.
 >
 > **PHASES LANDED (this session):**
 > - **Phase-0 (`cedd7ed`)** — smoke harness (`tools/smoke.js` + `tools/SMOKE.md`). Globals audit + COLLECTIONS data-wiring + 12-screen render walk + annotation round-trip. Lives outside the shipped asset path; runs IN the app page via `preview_eval` or `chrome://inspect`. Green baseline captured here; every subsequent phase verified against it.
