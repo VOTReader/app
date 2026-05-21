@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useHistory — app-global reading-history state + mutators
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Bundled into dist/bundle-b.js via tools/build.py.
+   Global-scope module. Bundled into dist/bundle-b.js.
 
    OWNS:
      - readHistory state (persisted to localStorage['vot-history'])
@@ -18,8 +18,8 @@
        call site.
 
    PARAMS:
-     historyEnabled — current value of settings.historyEnabled. Read
-                      through a ref so the addToHistory closure always
+     historyEnabled — current value of settings.historyEnabled (useSettings).
+                      Read through a ref so the addToHistory closure always
                       sees the latest setting without needing a fresh
                       closure each render.
 
@@ -27,6 +27,8 @@
 
    STORAGE: localStorage 'vot-history' (JSON array of entries, newest
             first, cap 2000). The 2000 cap is enforced on every add.
+
+   WINDOW: none — wires no window.__* handler bridges.
 
    ENTRY SHAPE (newest-first, per existing schema):
      { type: 'chapter' | 'letter' | 'study-chapter',

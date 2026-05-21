@@ -4,29 +4,41 @@
    Global-scope module. Bundled into dist/bundle-b.js.
 
    One effect: serialize the 8-value app-persistence union to
-   localStorage['vot-state'] whenever any of them changes. This is a
-   COMPOSITION-LEVEL SINK — it does not own any state; it writes the union
-   of values that originate in several different places. It is the last
+   localStorage['vot-state'] whenever any of them changes. It is the last
    thing App() composes.
 
-   THE 8 PARAMS — 4 are hook returns, 4 are still App-local useState:
-     tabs, activeTabIdx   ← useTabs (P6k)
-     activeReadKey        ← useReadingDwell (P6f)
-     settings             ← useSettings (P6g)
-     theme, lastReadChapters, lastReadLetterMap, readItems
-                          ← still plain App() useState (no cluster owns
-                            them; a future useAppGlobals hook could, but
-                            that is not P6). They are passed in as params
-                            exactly like the hook-return four — the sink
-                            does not care about provenance.
+   OWNS:
+     - the single persist useEffect (deps = all 8 params) that writes the
+       vot-state JSON. Owns NO state of its own — it is a pure SINK.
 
-   Body-class + AndroidBridge mirroring was split out into useSettings
-   (P6g); this hook is ONLY the localStorage write.
+   DOES NOT OWN:
+     - any of the 8 values it writes — they originate in useTabs /
+       useReadingDwell / useSettings / App()-local useState (see PARAMS).
+       This is a COMPOSITION-LEVEL SINK: it writes the union and is
+       deliberately provenance-agnostic.
+     - the READ side — useSavedState (P6a) loads vot-state on mount.
+     - body-class + AndroidBridge mirroring — split out into useSettings
+       (P6g); this hook is ONLY the localStorage write.
 
    PARAMS: { tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap,
-             activeReadKey, settings, readItems }
-   RETURNS: nothing.
-   STORAGE: localStorage 'vot-state' (JSON).
+             activeReadKey, settings, readItems } — 4 are hook returns,
+     4 are still App-local useState:
+       tabs, activeTabIdx   ← useTabs (P6k)
+       activeReadKey        ← useReadingDwell (P6f)
+       settings             ← useSettings (P6g)
+       theme, lastReadChapters, lastReadLetterMap, readItems
+                            ← still plain App() useState (no cluster owns
+                              them; a future useAppGlobals hook could, but
+                              that is not P6). Passed in exactly like the
+                              hook-return four — the sink does not care
+                              about provenance.
+
+   RETURNS: nothing — pure side-effect hook.
+
+   STORAGE: localStorage 'vot-state' (JSON) — the WRITE side.
+            useSavedState owns the READ side.
+
+   WINDOW: none.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function usePersistedState({

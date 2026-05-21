@@ -1,27 +1,36 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useRefMirror — give event handlers a synchronous read window on state
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
+   Global-scope module. Bundled into dist/bundle-b.js.
    Trivial wrapper over the `const xRef = useRef(initial); xRef.current = x`
-   pattern used ~15× across App() to bridge React state into imperative
-   handlers (window bridges, Android-back router, scroll listeners,
-   navigation refs).
+   pattern used ~15× across App() (and now inside other hooks) to bridge
+   React state into imperative handlers — window bridges, the Android-back
+   router, scroll listeners, navigation refs.
+
+   This hook is small enough that the full 6-section template would be
+   noise; per the Q0 consolidation spec it carries OWNS / RETURNS only.
+
+   OWNS:
+     - a single React.useRef whose `.current` is re-synced to `value` on
+       every render (the sync mutation runs DURING render).
+
+   RETURNS: the ref object. Stable identity across renders; `.current`
+            always equals the latest `value` once render completes.
 
    PATTERN:
      Before:   const screenRef = React.useRef(screen);
                screenRef.current = screen;
      After:    const screenRef = useRefMirror(screen);
 
-   SEMANTICS: identical. Both end with screenRef.current === screen
-   after every render. The sync mutation runs DURING render (formally
-   a side effect during render, see PLAN.txt §P6 Direction 3 — flagged
-   for a separate useLayoutEffect pass after P6 stabilizes). This hook
-   PRESERVES that timing exactly so behavior doesn't change here; the
-   correctness refactor lives in P7.
+   SEMANTICS: identical to the inline pattern. The sync mutation during
+   render is formally a side effect during render (see PLAN.txt §P6
+   Direction 3 — flagged for a separate useLayoutEffect pass after P6
+   stabilizes). This hook PRESERVES that timing exactly so behavior
+   doesn't change here; the correctness refactor lives in P7.
 
-   WHY A HOOK: deduplicates 15 two-line sites into 15 one-line sites
-   and gives the pattern a name future readers can recognize. Also
-   makes the eventual P7 fix a one-place edit instead of 15.
+   WHY A HOOK: deduplicates 15 two-line sites into 15 one-line sites,
+   gives the pattern a name future readers can recognize, and makes the
+   eventual P7 fix a one-place edit instead of 15.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function useRefMirror(value) {

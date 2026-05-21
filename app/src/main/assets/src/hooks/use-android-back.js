@@ -66,10 +66,35 @@
      via useRefMirror like the other 9 nav reads, and the handler reads
      journalEntryIdRef.current — fresh at every back-press.
 
-   PARAMS: a wide bag — 9 mirrored values, journalEntryId, fromLetterRef,
-     12 setters, cancelDwell + 7 nav helpers. See the destructure below.
+   PARAMS — a deliberately WIDE bag (see DOES NOT OWN). Every key, by source:
+     screen, bookId, genreId, studyId, fromSearch, fromStudies,
+       fromMatthewCh, fromWtlb        — useTabs via tabField; mirrored here
+                                        through useRefMirror for call-time
+                                        reads (the []-deps effect closure
+                                        would otherwise freeze them).
+     tabsOverviewOpen                 — App()-local state; also mirrored.
+     journalEntryId                   — App()-local useState; mirrored (the
+                                        journalEntryIdRef fix — see above).
+     fromLetterRef                    — useFromLetterStack (already a ref).
+     setScreen, setBookId, setChapterNum, setLetterId, setStudyId,
+       setStudyChapterId, setFromSearch, setFromStudies, setFromWtlb,
+       setFromMatthewCh               — useTabs via tabField setters.
+     setFromLetterStack               — useFromLetterStack.
+     setTabsOverviewOpen              — App()-local state setter.
+     cancelDwell                      — useReadingDwell.
+     goNavOrigin, goHome, goSearchOrigin, goScripturesHome, goStudiesHome,
+       goVolumesHome, goJournalViewer — App()-local nav-helper glue.
+
    RETURNS: nothing — pure side-effect hook.
+
    STORAGE: writes localStorage 'vot-about-seen' on back-from-about.
+
+   WINDOW:
+     handleAndroidBack — the Kotlin-callable back router; wired in a
+       []-deps effect, cleanup `delete window.handleAndroidBack`.
+     Reads but does NOT own: window.__closeSheet (calls it, then nulls it —
+       owned by whichever sheet set it) and window.__pendingHighlight
+       (writes `= null` — a one-shot data slot, not a handler bridge).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';

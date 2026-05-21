@@ -1,24 +1,44 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useSavedState — load + validate vot-state on mount
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
+   Global-scope module. Bundled into dist/bundle-b.js.
    First mechanical hook extraction of P6 (App() decomposition).
 
-   READS  : localStorage['vot-state']
-   WRITES : never
-   RETURNS: the validated saved-state object (or {} on parse failure)
+   Reads localStorage['vot-state'] exactly once on mount (useMemo []),
+   coerces stale screen values back to safe defaults, and hands the
+   validated object to App() — which then distributes its fields
+   (saved.theme, saved.tabs, saved.settings, saved.activeReadKey …) to
+   useTabs / useSettings / useReadingDwell / App-local useState.
 
-   The validator coerces stale screen values back to safe defaults — a
-   screen string that no longer makes sense (e.g. reading a letter that
-   has no letterId saved alongside it) gets rewritten to 'home' or its
-   parent index. Runs on the legacy top-level state AND on each entry in
-   the multi-tab `s.tabs[]` array so the same rules apply uniformly.
+   OWNS:
+     - the single-evaluation read + JSON.parse of localStorage['vot-state']
+     - the parse-error fallback ({} on JSON.parse throw)
 
-   Why a hook and not a function call?
-     useMemo with [] deps gives a single-evaluation guarantee tied to the
-     component lifecycle. A plain function called during render would
-     re-evaluate every render — same logical outcome but extra work.
-     React's useMemo also documents intent: "read once on mount".
+   DOES NOT OWN:
+     - _validateTabState — the screen-coercion POLICY (13 rules that
+       rewrite a no-longer-valid screen string to 'home' or its parent
+       index). It is a pure EXPORTED helper colocated in this file, not a
+       hook: useSavedState merely CALLS it — over the legacy top-level
+       state AND each entry in s.tabs[] — so the same rules apply
+       uniformly. Kept standalone so it can be unit-tested and reused
+       independently of the hook.
+     - the consumption / distribution of the returned object — App() owns
+       which subsystem each field is routed to.
+
+   PARAMS: none.
+
+   RETURNS: the validated saved-state object (or {} on JSON.parse failure).
+
+   STORAGE: reads localStorage['vot-state']; never writes — usePersistedState
+            (P6k+1) owns the write side.
+
+   WINDOW: none.
+
+   Why a hook and not a plain function call?
+     useMemo([]) gives a single-evaluation guarantee tied to the component
+     lifecycle and documents intent ("read once on mount"). A plain
+     function called during render would re-evaluate every render — same
+     logical outcome, extra work.
 
    Test contract preserved exactly:
      - same screen-validation rules (no behavior change)

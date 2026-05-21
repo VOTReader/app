@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useSettings — app settings state + mutators + body-class/AndroidBridge effect
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Bundled into dist/bundle-b.js via tools/build.py.
+   Global-scope module. Bundled into dist/bundle-b.js.
 
    OWNS:
      - settings state  (React.useState with migration initializer; initial
@@ -17,11 +17,11 @@
                         document.body.classList and window.AndroidBridge.
 
    DOES NOT OWN:
-     - The vot-state PERSIST effect — it stays in App(). That effect is a
-       composition-level persistence sink touching 8 values from 4 different
-       subsystems (tabs, activeTabIdx, theme, lastReadChapters,
-       lastReadLetterMap, activeReadKey, settings, readItems). It has no
-       business inside a "settings" hook.
+     - The vot-state PERSIST effect — it is usePersistedState (P6k+1). That
+       effect is a composition-level persistence sink touching 8 values
+       from 4 different subsystems (tabs, activeTabIdx, theme,
+       lastReadChapters, lastReadLetterMap, activeReadKey, settings,
+       readItems). It has no business inside a "settings" hook.
      - showWelcome / isOnline / dismissWelcome / the online-check effect —
        they stay in App() entirely and are not related to settings.
      - GARDEN_DEFAULT_TIER — a bare-name window global from bundle-d.js.
@@ -33,15 +33,20 @@
                        null / undefined on first launch). Passed explicitly
                        so the hook initialises React.useState with the
                        persisted value rather than re-reading localStorage.
-     theme           — current theme string ("dark" | "light") from App().
-                       Required as a dep of the body-class effect so the
-                       "light" body class toggles on theme changes.
+     theme           — current theme string ("dark" | "light"); App()-local
+                       useState. Required as a dep of the body-class effect
+                       so the "light" body class toggles on theme changes.
 
    RETURNS: { settings, setSettings, toggleSetting, updateSetting }
 
    STORAGE:
-     None directly. settings is mirrored back into the vot-state JSON by
-     the persist effect in App() via the returned settings value.
+     None directly. settings rides along in the vot-state JSON written by
+     usePersistedState (P6k+1) via the returned settings value.
+
+   WINDOW: none — wires no window.__* handler bridges. The body-class
+     effect CALLS window.AndroidBridge.setLightStatusBar / setKeepScreenOn
+     (native methods, absent + no-op on desktop) — those are calls, not
+     bridges this hook owns or must clean up.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function useSettings({ savedSettings, theme }) {

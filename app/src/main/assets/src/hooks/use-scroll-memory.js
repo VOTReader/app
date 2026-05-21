@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useScrollMemory — per-tab, per-screen scroll-position capture + restore
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Bundled into dist/bundle-b.js via tools/build.py.
+   Global-scope module. Bundled into dist/bundle-b.js.
 
    OWNS:
      - scrollKeyRef             (hook-internal; NOT returned)
@@ -25,31 +25,36 @@
 
    PARAMS:
      screen, bookId, chapterNum, letterId, studyId, studyChapterId
-                     — current navigation state; used as effect deps and
-                       passed to getScrollKey.
-     activeTab       — current active-tab object; scrollPositions are read
-                       from here to restore scroll on screen change.
-     activeTabIdx    — current tab index; included in the restore-effect
+                     — current navigation state (useTabs via tabField);
+                       used as effect deps and passed to getScrollKey.
+     activeTab       — active-tab object (useTabs); scrollPositions are
+                       read from here to restore scroll on screen change.
+     activeTabIdx    — active tab index (useTabs); in the restore-effect
                        dep array so a tab switch also triggers restore.
-     updateActiveTab — stable updater from useTabs; passed as the sole dep
-                       of flushScrollToActiveTab's useCallback.
-     surpriseAnchor  — if truthy, the screen-change effect skips restore
-                       (the anchor will position the view instead).
-     tabsOverviewOpen — if truthy, flushScrollToActiveTab is a no-op
-                       (don't overwrite with the overview's scroll position).
+     updateActiveTab — stable updater (useTabs); the sole dep of
+                       flushScrollToActiveTab's useCallback.
+     surpriseAnchor  — useTabs via tabField; if truthy the screen-change
+                       effect skips restore (the anchor positions instead).
+     tabsOverviewOpen — App()-local state; if truthy flushScrollToActiveTab
+                       is a no-op (don't overwrite with the overview scroll).
 
    RETURNS: { flushScrollToActiveTab }
 
    STORAGE:
      None directly. Writes into activeTab.scrollPositions via
-     updateActiveTab — those values are persisted by useSavedState as part
-     of the tabs array in localStorage['vot-state'].
+     updateActiveTab — those values ride along in the tabs array persisted
+     to localStorage['vot-state'] by usePersistedState (P6k+1).
 
-   HARD INVARIANT:
-     flushScrollToActiveTab MUST be the direct return value of
-     React.useCallback with dependency array [updateActiveTab]. Effects 1
-     and 2 list it in their dep arrays and re-attach their listeners when
-     its identity changes — identity stability is load-bearing.
+   WINDOW: none — wires no window.__* handler bridges. Reads the bare-name
+     global __scrollEl and attaches scroll / visibilitychange / pagehide
+     listeners (all balanced with removeEventListener in effect cleanup).
+
+   ┌─ HARD INVARIANT — flushScrollToActiveTab identity stability ──────────┐
+   │ flushScrollToActiveTab MUST be the direct return value of             │
+   │ React.useCallback with dependency array [updateActiveTab]. Effects 1  │
+   │ and 2 list it in their dep arrays and re-attach their listeners when  │
+   │ its identity changes — identity stability is load-bearing.            │
+   └───────────────────────────────────────────────────────────────────────┘
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';

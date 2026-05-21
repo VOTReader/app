@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useThumbnails — tab-card thumbnail capture, IDB persistence, and GC
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Bundled into dist/bundle-b.js via tools/build.py.
+   Global-scope module. Bundled into dist/bundle-b.js.
 
    OWNS:
      - tabThumbnails state (content-keyed JPEG data-URL map)
@@ -24,12 +24,15 @@
        capture callback.
 
    PARAMS:
-     tabs              — full tabs array (for GC live-key set + tabsRef)
-     activeTabIdx      — current active tab index (for activeTabIdxRef)
-     activeTab         — current active tab object (screen, bookId, etc.)
-                         used as effect deps for the after-nav trigger
-     tabsEnabled       — settings.tabsEnabled; gates capture everywhere
-     tabsOverviewOpen  — boolean; suppresses capture while overview is up
+     tabs              — full tabs array (useTabs). For the GC live-key
+                         set + tabsRef.
+     activeTabIdx      — active tab index (useTabs). For activeTabIdxRef.
+     activeTab         — active tab object (useTabs); screen/bookId/etc.
+                         used as effect deps for the after-nav trigger.
+     tabsEnabled       — settings.tabsEnabled (useSettings); gates capture
+                         everywhere.
+     tabsOverviewOpen  — boolean (App()-local state); suppresses capture
+                         while the Tabs Overview overlay is up.
 
    RETURNS: { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail }
 
@@ -38,10 +41,17 @@
      on mount. Keys are content-signature strings produced by
      tabContentKey(tab) — survive tab-index shifts (close/reorder).
 
-   HARD INVARIANT:
-     captureActiveTabThumbnail MUST be the direct return value of
-     React.useCallback with dependency array [tabsEnabled]. The
-     scroll-stop and after-nav effects depend on its identity stability.
+   WINDOW: none — no window.__* handler bridges wired. The native capture
+     fast-path CALLS window.AndroidBridge.takeScreenshot() (a native
+     method, absent on desktop → html2canvas fallback); that is a call,
+     not a bridge this hook owns or must clean up.
+
+   ┌─ HARD INVARIANT — captureActiveTabThumbnail identity stability ───────┐
+   │ captureActiveTabThumbnail MUST be the direct return value of          │
+   │ React.useCallback with dependency array [tabsEnabled]. The scroll-    │
+   │ stop and after-nav effects list it in their dep arrays and re-attach  │
+   │ their listeners when its identity changes — stability is load-bearing.│
+   └───────────────────────────────────────────────────────────────────────┘
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';

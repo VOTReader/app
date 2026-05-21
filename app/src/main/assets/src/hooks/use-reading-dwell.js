@@ -1,12 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════
    useReadingDwell — dwell-timer mark-as-read tracking
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Bundled into dist/bundle-b.js via tools/build.py.
+   Global-scope module. Bundled into dist/bundle-b.js.
 
    OWNS:
      - activeReadKey state (init from initialActiveReadKey for cold-start
                             restore; persisted back to vot-state by
-                            useSavedState in App())
+                            usePersistedState in App())
      - setActiveReadKeyRaw    (hook-internal; NOT returned)
      - dwellTimerRef          (hook-internal ref)
      - dwellAccRef            (hook-internal ref — accumulated dwell ms)
@@ -38,8 +38,8 @@
        collection knowledge; this hook only owns the timing gate.
 
    PARAMS:
-     dwellMs             — current value of settings.dwellMs (number or
-                           falsy). If falsy, defaults to 20000 ms (20 s).
+     dwellMs             — settings.dwellMs (useSettings) — number or
+                           falsy. If falsy, defaults to 20000 ms (20 s).
      initialActiveReadKey — saved.activeReadKey from useSavedState (the
                            cold-start restore value). MUST be passed
                            explicitly so the hook initialises useState
@@ -50,8 +50,25 @@
    RETURNS: { activeReadKey, setActiveReadKey, cancelDwell }
 
    STORAGE:
-     None directly. activeReadKey is mirrored back into the vot-state
-     JSON by useSavedState in App() via the returned activeReadKey value.
+     None directly. activeReadKey rides along in the vot-state JSON
+     written by usePersistedState (P6k+1) via the returned value.
+
+   WINDOW:
+     __onDwellCommit — set to commitDwellNow so ScreenLayout (a Cluster D
+       module) can call it directly. The binding effect's dep
+       [commitDwellNow] re-binds it every render (see box below). Cleanup
+       nulls it, GUARDED — only clears window.__onDwellCommit if it still
+       points at this hook's function, so a re-bind from the next render
+       is not clobbered.
+
+   ┌─ STRUCTURAL — commitDwellNow MUST stay a plain function ──────────────┐
+   │ commitDwellNow (and the other dwell arrows) MUST NOT be wrapped in    │
+   │ React.useCallback. The __onDwellCommit bridge effect has dep          │
+   │ [commitDwellNow] and relies on commitDwellNow's identity CHURNING     │
+   │ every render to re-bind the window hook — so ScreenLayout always      │
+   │ holds a fresh reference. A useCallback would freeze that and          │
+   │ permanently stale-bind the bridge.                                    │
+   └───────────────────────────────────────────────────────────────────────┘
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function useReadingDwell({ dwellMs, initialActiveReadKey }) {

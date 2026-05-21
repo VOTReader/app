@@ -2,7 +2,7 @@
    useSheetOrchestration — modal/sheet/overlay open-state + window bridges
    + auto-dismiss-on-navigation
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Bundled into dist/bundle-b.js via tools/build.py.
+   Global-scope module. Bundled into dist/bundle-b.js.
 
    OWNS:
      - annChip state             { x, y, hlKey, groupId } | null
@@ -40,10 +40,12 @@
 
    PARAMS:
      screen, letterId, bookId, chapterNum, studyId, studyChapterId —
-       navigation position — used as deps for the auto-dismiss effect so
-       floating overlays clear whenever the active reading position changes
-     setHlTick — from App(); closeLinkPicker calls setHlTick(t => t + 1)
-       to force the apply-DOM effects to re-run after the picker closes
+       navigation position (useTabs via tabField) — deps of the
+       auto-dismiss effect so floating overlays clear whenever the active
+       reading position changes.
+     setHlTick — App()-local useState setter; closeLinkPicker calls
+       setHlTick(t => t + 1) to force the apply-DOM effects to re-run
+       after the picker closes.
 
    RETURNS: {
      annChip, setAnnChip,
@@ -63,6 +65,21 @@
    STORAGE:
      None. All state is in-memory React state; nothing persisted to
      localStorage directly. The render tree consumes the returned values.
+
+   WINDOW: 10 handler bridges, each wired in its own effect and torn down
+     with `delete` in that effect's cleanup —
+       __openLinkPicker          → openLinkPicker
+       __openLinkPickerForTarget → openLinkPickerForTarget
+       __openNote                → openNoteSheet
+       __openLinkSidebar         → openLinkSidebar
+       __showAnnChip             → inline setAnnChip(x,y,hlKey,groupId)
+       __showMultiNote           → inline setMultiNotePayload(groupIds,x,y)
+       __openBookmarkPopover     → inline setBookmarkPopoverPayload(...)
+       __bookmarkCreate          → inline setBookmarkCreatePending(info)
+       __openJournalInbound      → inline setInboundJournalPayload(...)
+       __bookmarkEdit            → inline BookmarkStore lookup + setter
+     Reads but does NOT own: window.__hideSelectionToolbar (called in the
+     auto-dismiss effect — owned by SelectionToolbar).
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function useSheetOrchestration({

@@ -46,11 +46,6 @@
        App() (tabs block P6k + App-local useState); received as params
        (values for the back-stack source capture, setters for the jump).
 
-   WINDOW: no handler bridges wired (nothing to clean up). The body only
-     WRITES two data slots — window.__pendingScrollHlKey and
-     window.__pendingLinkExcerpt — which the destination view's post-render
-     effect consumes. Plain assignments, not `window.__openX` handlers.
-
    PARAMS:
      closeLinkSidebar — useSheetOrchestration; closes the sidebar before nav.
      pushFromLetter   — useFromLetterStack; records the back-stack entry.
@@ -66,6 +61,11 @@
             fully internal; App() consumes navigateToLink, nothing else.)
 
    STORAGE: none.
+
+   WINDOW: no handler bridges wired (nothing to clean up). The body only
+     WRITES two data slots — window.__pendingScrollHlKey and
+     window.__pendingLinkExcerpt — which the destination view's post-render
+     effect consumes. Plain assignments, not `window.__openX` handlers.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function useNavigateToLink({

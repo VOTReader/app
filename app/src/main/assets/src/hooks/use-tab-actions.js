@@ -50,6 +50,8 @@
               clearAllStage, setClearAllStage, lastTabCloseStrikes }
 
    STORAGE: none.
+
+   WINDOW: none.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { DEFAULT_TAB } from './use-tabs.js';

@@ -65,7 +65,9 @@
      setTabs (the Commit-B diff review must confirm that drop).
 
    STORAGE: none directly — tabs/activeTabIdx ride along in the vot-state
-            persistence owned by App() (→ usePersistedState, P6k+1).
+            persistence owned by usePersistedState (P6k+1).
+
+   WINDOW: none.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';

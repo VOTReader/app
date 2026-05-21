@@ -48,10 +48,6 @@
        here as params (values for reads, setters for tapThroughBack's
        source-restore).
 
-   WINDOW BRIDGES: none. The only window touch is `window.__pendingHighlight
-     = null` inside tapThroughBack — a one-shot data-slot write consumed by
-     LetterView, not a handler bridge. No cleanup needed.
-
    PARAMS:
      tabField — the per-tab field accessor from App()'s tabs block; called
        as tabField('fromLetterStack') to get [state, setter] (the setter is
@@ -67,7 +63,11 @@
               tapThroughBack, fromLetterRef, backHint }
 
    STORAGE: none directly. fromLetterStack is a tabField, so it rides along
-            in the vot-state tab persistence owned by App().
+            in the vot-state tab persistence (usePersistedState, P6k+1).
+
+   WINDOW: none. The only window touch is `window.__pendingHighlight = null`
+     inside tapThroughBack — a one-shot data-slot write consumed by
+     LetterView, not a handler bridge. No cleanup needed.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
