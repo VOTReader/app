@@ -1006,16 +1006,15 @@ function App() {
   /* ═══════════════════════════════════════════════════════════════
      TAB-BACKED READING STATE — the per-tab state machine + tabField
      accessor + CRITICAL INVARIANT 1 (cached stable per-key setters) +
-     the stability probe → extracted to src/hooks/use-tabs.js (P6k
-     Commit A). DEFAULT_TAB / setTabs are returned for the Commit-A→B
-     window: the still-inline tab-management functions below consume
-     them; both drop from this destructure once P6k Commit B moves
-     management into useTabActions.
+     the stability probe → src/hooks/use-tabs.js (P6k Commit A). The
+     tab open/close/switch OPERATIONS → src/hooks/use-tab-actions.js
+     (P6k Commit B), called further down once its cross-hook deps
+     (cancelDwell, setTabThumbnails) exist. `tabState` is the whole
+     useTabs return — useTabActions consumes setTabs/setActiveTabIdx
+     from it, so App() does not destructure those loose.
   ═══════════════════════════════════════════════════════════════ */
-  const {
-    DEFAULT_TAB, tabField, activeTab, tabs, activeTabIdx,
-    setTabs, setActiveTabIdx, updateActiveTab,
-  } = useTabs({ saved });
+  const tabState = useTabs({ saved });
+  const { tabField, activeTab, tabs, activeTabIdx, updateActiveTab } = tabState;
 
   const [screen, setScreen] = tabField('screen');
   const [bookId, setBookId] = tabField('bookId');
@@ -1161,107 +1160,19 @@ function App() {
     applyActiveNoteState();
   }, [noteSheetTarget, hlTick]);
 
-  /* ═══════════════════════════════════════════════════════════════
-     TAB MANAGEMENT
-  ═══════════════════════════════════════════════════════════════ */
-  const MAX_TABS = 999;
-  const openNewTab = React.useCallback(() => {
-    setTabs((prev) => {
-      if (prev.length >= MAX_TABS) return prev;
-      const next = [...prev, { ...DEFAULT_TAB }];
-      setActiveTabIdx(next.length - 1);
-      return next;
-    });
-  }, []);
-  const switchToTab = React.useCallback((idx) => {
-    // Cancel any in-flight dwell timer BEFORE flipping tabs — otherwise
-    // the previous tab's "read 90%, fire commit" timer would land on the
-    // newly-active tab and mark the wrong letter as read.
-    cancelDwell();
-    setActiveTabIdx((prev) => {
-      if (idx < 0) return 0;
-      return Math.min(idx, tabs.length - 1);
-    });
-  }, [tabs.length]);
-  const closeTab = React.useCallback((idx) => {
-    setTabs((prev) => {
-      if (prev.length <= 1) {
-        // 3-strike: user keeps trying to close their last tab → offer to disable tabs entirely
-        lastTabCloseStrikes.current += 1;
-        if (lastTabCloseStrikes.current >= 3) {
-          setDisableTabsPromptOpen(true);
-          lastTabCloseStrikes.current = 0;
-        }
-        // Reset the last tab to home rather than actually closing it
-        const reset = { ...DEFAULT_TAB };
-        setActiveTabIdx(0);
-        return [reset];
-      }
-      // Closing a non-last tab — reset the strike counter (user is using tabs normally)
-      lastTabCloseStrikes.current = 0;
-      const next = prev.filter((_, i) => i !== idx);
-      // Keep activeTabIdx pointing at a valid tab
-      setActiveTabIdx((prevIdx) => {
-        if (idx < prevIdx) return prevIdx - 1; // shifted left
-        if (idx === prevIdx) return Math.max(0, Math.min(prevIdx, next.length - 1));
-        return prevIdx; // closed tab was to the right; idx unchanged
-      });
-      return next;
-    });
-  }, []);
-  const closeOtherTabs = React.useCallback((keepIdx) => {
-    setTabs((prev) => {
-      if (prev.length <= 1) return prev;
-      const kept = prev[keepIdx];
-      if (!kept) return prev;
-      setActiveTabIdx(0);
-      return [kept];
-    });
-  }, []);
-  const closeTabsToTheRight = React.useCallback((keepIdx) => {
-    setTabs((prev) => {
-      if (keepIdx >= prev.length - 1) return prev;
-      setActiveTabIdx((cur) => Math.min(cur, keepIdx));
-      return prev.slice(0, keepIdx + 1);
-    });
-  }, []);
-  const closeAllTabs = React.useCallback(() => {
-    setTabs([{ ...DEFAULT_TAB }]);
-    setActiveTabIdx(0);
-    setTabThumbnails({});
-  }, []);
-  // Merge duplicates: if two tabs have the same content signature, drop later duplicates
-  const deduplicateTabs = React.useCallback(() => {
-    setTabs((prev) => {
-      if (prev.length <= 1) return prev;
-      const seen = new Set();
-      const keep = [];
-      let activeStillInKept = false;
-      let newActiveIdx = 0;
-      prev.forEach((t, i) => {
-        const k = tabContentKey(t);
-        if (!seen.has(k)) {
-          seen.add(k);
-          if (i === activeTabIdx) {activeStillInKept = true;newActiveIdx = keep.length;}
-          keep.push(t);
-        } else if (i === activeTabIdx && !activeStillInKept) {
-          // Active tab is a duplicate — point at the first kept instance
-          let idx = keep.findIndex((x) => tabContentKey(x) === k);
-          if (idx >= 0) newActiveIdx = idx;
-        }
-      });
-      setActiveTabIdx(newActiveIdx);
-      return keep;
-    });
-  }, [activeTabIdx]);
+  /* TAB MANAGEMENT — openNewTab / switchToTab / closeTab / closeOtherTabs
+     / closeTabsToTheRight / closeAllTabs / deduplicateTabs + the 4 tab-UI
+     state slots (tabActionIdx, disableTabsPromptOpen, clearAllStage,
+     lastTabCloseStrikes) → src/hooks/use-tab-actions.js (P6k Commit B).
+     The useTabActions() call is further down, after useReadingDwell —
+     it needs cancelDwell + setTabThumbnails. tabsOverviewOpen stays here
+     (useThumbnails consumes it as a param, before useTabActions runs). */
   // Tabs Overview is an app-level overlay, not a per-tab screen.
   // That way, switching tabs unmounts the overview cleanly and the
   // individual tabs never carry a stale "tabs" screen.
   const [tabsOverviewOpen, setTabsOverviewOpen] = useState(false);
-  const [tabActionIdx, setTabActionIdx] = useState(null); // long-press target
-  const [disableTabsPromptOpen, setDisableTabsPromptOpen] = useState(false);
-  const [clearAllStage, setClearAllStage] = useState(0); // 0 = idle, 1 = "Are You Sure?", 2 = confirmed
-  const lastTabCloseStrikes = React.useRef(0); // 3-strike counter for last-tab close
+  /* tabActionIdx / disableTabsPromptOpen / clearAllStage / lastTabCloseStrikes
+     → src/hooks/use-tab-actions.js (P6k Commit B) */
   /* Thumbnail state + IDB load + GC → extracted to src/hooks/use-thumbnails.js (P6d) */
   // (Effect closing overview when tabs are disabled lives further down —
   // it needs `settings`, which is declared after this block.)
@@ -1490,6 +1401,18 @@ function App() {
     dwellMs: settings.dwellMs,
     initialActiveReadKey: saved.activeReadKey || null,
   });
+
+  /* useTabActions — tab open/close/switch operations (P6k Commit B).
+     Called here, after useReadingDwell + useThumbnails, so cancelDwell
+     and setTabThumbnails are in scope as plain params. See
+     src/hooks/use-tab-actions.js. */
+  const {
+    openNewTab, switchToTab, closeTab, closeOtherTabs,
+    closeTabsToTheRight, closeAllTabs, deduplicateTabs,
+    tabActionIdx, setTabActionIdx,
+    disableTabsPromptOpen, setDisableTabsPromptOpen,
+    clearAllStage, setClearAllStage, lastTabCloseStrikes, MAX_TABS,
+  } = useTabActions({ tabState, cancelDwell, setTabThumbnails });
 
   /* ── Persist vot-state on every change ──
      Persistence sink — moves to usePersistedState after P6k when all

@@ -2628,6 +2628,117 @@
     };
   }
 
+  // app/src/main/assets/src/hooks/use-tab-actions.js
+  var MAX_TABS = 999;
+  function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
+    const { tabs, activeTabIdx, setTabs, setActiveTabIdx } = tabState;
+    const [tabActionIdx, setTabActionIdx] = React.useState(null);
+    const [disableTabsPromptOpen, setDisableTabsPromptOpen] = React.useState(false);
+    const [clearAllStage, setClearAllStage] = React.useState(0);
+    const lastTabCloseStrikes = React.useRef(0);
+    const openNewTab = React.useCallback(() => {
+      setTabs((prev) => {
+        if (prev.length >= MAX_TABS) return prev;
+        const next = [...prev, { ...DEFAULT_TAB }];
+        setActiveTabIdx(next.length - 1);
+        return next;
+      });
+    }, []);
+    const switchToTab = React.useCallback((idx) => {
+      cancelDwell();
+      setActiveTabIdx((prev) => {
+        if (idx < 0) return 0;
+        return Math.min(idx, tabs.length - 1);
+      });
+    }, [tabs.length]);
+    const closeTab = React.useCallback((idx) => {
+      setTabs((prev) => {
+        if (prev.length <= 1) {
+          lastTabCloseStrikes.current += 1;
+          if (lastTabCloseStrikes.current >= 3) {
+            setDisableTabsPromptOpen(true);
+            lastTabCloseStrikes.current = 0;
+          }
+          const reset = { ...DEFAULT_TAB };
+          setActiveTabIdx(0);
+          return [reset];
+        }
+        lastTabCloseStrikes.current = 0;
+        const next = prev.filter((_, i) => i !== idx);
+        setActiveTabIdx((prevIdx) => {
+          if (idx < prevIdx) return prevIdx - 1;
+          if (idx === prevIdx) return Math.max(0, Math.min(prevIdx, next.length - 1));
+          return prevIdx;
+        });
+        return next;
+      });
+    }, []);
+    const closeOtherTabs = React.useCallback((keepIdx) => {
+      setTabs((prev) => {
+        if (prev.length <= 1) return prev;
+        const kept = prev[keepIdx];
+        if (!kept) return prev;
+        setActiveTabIdx(0);
+        return [kept];
+      });
+    }, []);
+    const closeTabsToTheRight = React.useCallback((keepIdx) => {
+      setTabs((prev) => {
+        if (keepIdx >= prev.length - 1) return prev;
+        setActiveTabIdx((cur) => Math.min(cur, keepIdx));
+        return prev.slice(0, keepIdx + 1);
+      });
+    }, []);
+    const closeAllTabs = React.useCallback(() => {
+      setTabs([{ ...DEFAULT_TAB }]);
+      setActiveTabIdx(0);
+      setTabThumbnails({});
+    }, []);
+    const deduplicateTabs = React.useCallback(() => {
+      setTabs((prev) => {
+        if (prev.length <= 1) return prev;
+        const seen = /* @__PURE__ */ new Set();
+        const keep = [];
+        let activeStillInKept = false;
+        let newActiveIdx = 0;
+        prev.forEach((t, i) => {
+          const k = tabContentKey(t);
+          if (!seen.has(k)) {
+            seen.add(k);
+            if (i === activeTabIdx) {
+              activeStillInKept = true;
+              newActiveIdx = keep.length;
+            }
+            keep.push(t);
+          } else if (i === activeTabIdx && !activeStillInKept) {
+            let idx = keep.findIndex((x) => tabContentKey(x) === k);
+            if (idx >= 0) newActiveIdx = idx;
+          }
+        });
+        setActiveTabIdx(newActiveIdx);
+        return keep;
+      });
+    }, [activeTabIdx]);
+    return {
+      openNewTab,
+      switchToTab,
+      closeTab,
+      closeOtherTabs,
+      closeTabsToTheRight,
+      closeAllTabs,
+      deduplicateTabs,
+      tabActionIdx,
+      setTabActionIdx,
+      disableTabsPromptOpen,
+      setDisableTabsPromptOpen,
+      clearAllStage,
+      setClearAllStage,
+      lastTabCloseStrikes,
+      MAX_TABS
+      // re-exported for the TabsOverview render (the cap badge)
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -6843,6 +6954,7 @@
     useFromLetterStack,
     useNavigateToLink,
     useTabs,
+    useTabActions,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
