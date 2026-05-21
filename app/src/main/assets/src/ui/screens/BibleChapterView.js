@@ -128,6 +128,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           React.createElement("span", { className: "verse-num" }, v.n),
           React.createElement(HighlightableText, { text: vText, hlKey: vHlKey, hlTick: hlTick }),
           React.createElement(LinkIcon, { hlKey: vHlKey, hlTick: hlTick, onClick: onLinkOpen }),
+          React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick: hlTick }),
           " "
         );
       };

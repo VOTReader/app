@@ -114,6 +114,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         React.createElement("span", { className: "verse-num" }, v.n),
         React.createElement(HighlightableText, { text: v.text, hlKey: vHlKey, hlTick: typeof hlTick !== 'undefined' ? hlTick : 0 }),
         React.createElement(LinkIcon, { hlKey: vHlKey, hlTick: hlTick, onClick: onLinkOpen }),
+        React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick: hlTick }),
         " "
       );
     })
@@ -140,7 +141,8 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         React.createElement("div", { className: "verse-line" }, /*#__PURE__*/
         React.createElement("span", { className: "verse-num" }, v.n), /*#__PURE__*/
         React.createElement(HighlightableText, { text: v.text, hlKey: vHlKey, hlTick: typeof hlTick !== 'undefined' ? hlTick : 0 }),
-        React.createElement(LinkIcon, { hlKey: vHlKey, hlTick: hlTick, onClick: onLinkOpen })
+        React.createElement(LinkIcon, { hlKey: vHlKey, hlTick: hlTick, onClick: onLinkOpen }),
+        React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick: hlTick })
         ),
         showStudy && (scriptures.length > 0 || votNotes.length > 0) && /*#__PURE__*/
         React.createElement(InlineNotes, { scriptures: scriptures, votNotes: votNotes, onScriptureClick: setActiveScripRef, onVotLetterClick: onVotLetterClick }),

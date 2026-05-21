@@ -2615,6 +2615,47 @@
     );
   }
 
+  // app/src/main/assets/src/ui/components/BookmarkIcon.js
+  function BookmarkIcon2({ hlKey, hlTick }) {
+    const bookmarks = React.useMemo(
+      () => BookmarkStore.getForKeyPrefix(hlKey),
+      [hlKey, hlTick]
+    );
+    if (!bookmarks || bookmarks.length === 0) return null;
+    const ids = bookmarks.map((b) => b.id);
+    const open = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (ids.length === 1 && window.__bookmarkEdit) {
+        window.__bookmarkEdit(ids[0], { atSource: true });
+        return;
+      }
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (window.__openBookmarkPopover) {
+        window.__openBookmarkPopover(ids, rect.left + rect.width / 2, rect.bottom + 4, hlKey);
+      }
+    };
+    return React.createElement(
+      "span",
+      {
+        className: "inline-bookmark-icon" + (ids.length > 1 ? " inline-bookmark-icon-multi" : ""),
+        onClick: open,
+        title: ids.length === 1 ? "Bookmark" : ids.length + " bookmarks"
+      },
+      React.createElement(
+        "svg",
+        { viewBox: "0 0 24 24", fill: "currentColor", stroke: "currentColor" },
+        React.createElement("path", {
+          fill: "currentColor",
+          stroke: "currentColor",
+          strokeWidth: "1.5",
+          strokeLinejoin: "round",
+          d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"
+        })
+      )
+    );
+  }
+
   // app/src/main/assets/src/ui/screens/LetterView.js
   function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark, isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, hlTick, onLinkOpen }) {
     const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
@@ -3598,6 +3639,7 @@
                 /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n),
                 React.createElement(HighlightableText, { text: vText, hlKey: vHlKey, hlTick }),
                 React.createElement(LinkIcon, { hlKey: vHlKey, hlTick, onClick: onLinkOpen }),
+                React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick }),
                 " "
               );
             };
@@ -3844,6 +3886,7 @@
                     /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n),
                     React.createElement(HighlightableText, { text: v.text, hlKey: vHlKey, hlTick: typeof hlTick !== "undefined" ? hlTick : 0 }),
                     React.createElement(LinkIcon, { hlKey: vHlKey, hlTick, onClick: onLinkOpen }),
+                    React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick }),
                     " "
                   );
                 })
@@ -3876,7 +3919,8 @@
                     { className: "verse-line" },
                     /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n),
                     /* @__PURE__ */ React.createElement(HighlightableText, { text: v.text, hlKey: vHlKey, hlTick: typeof hlTick !== "undefined" ? hlTick : 0 }),
-                    React.createElement(LinkIcon, { hlKey: vHlKey, hlTick, onClick: onLinkOpen })
+                    React.createElement(LinkIcon, { hlKey: vHlKey, hlTick, onClick: onLinkOpen }),
+                    React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick })
                   ),
                   showStudy && (scriptures.length > 0 || votNotes.length > 0) && /* @__PURE__ */ React.createElement(InlineNotes, { scriptures, votNotes, onScriptureClick: setActiveScripRef, onVotLetterClick }),
                   showStudy && hasEchoes && /* @__PURE__ */ React.createElement(InlineEcho, { scriptures: echoes.scriptures, votNotes: echoes.votNotes })
@@ -10961,6 +11005,7 @@
     NoteRow: NoteRow2,
     LinkCard: LinkCard2,
     LinkIcon: LinkIcon2,
+    BookmarkIcon: BookmarkIcon2,
     // Screens
     LetterView,
     WtlbEntryView,
