@@ -2811,6 +2811,7 @@
     const studyIdRef = useRefMirror(studyId);
     const fromWtlbRef = useRefMirror(fromWtlb);
     const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
+    const journalEntryIdRef = useRefMirror(journalEntryId);
     React.useEffect(() => {
       window.handleAndroidBack = () => {
         if (window.__closeSheet) {
@@ -2869,7 +2870,7 @@
           setScreen("journal-home");
           return "true";
         } else if (s === "journal-editor") {
-          goJournalViewer(journalEntryId);
+          goJournalViewer(journalEntryIdRef.current);
           return "true";
         } else if (s === "library") {
           goHome();

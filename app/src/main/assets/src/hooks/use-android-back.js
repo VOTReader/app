@@ -55,15 +55,16 @@
      - LETTER_SCREEN_SET / COL_BY_LETTER_SC / COL_BY_INDEX_SC / BOOKS /
        getStudyById — module globals, used by bare name.
 
-   KNOWN PRE-EXISTING BUG, preserved verbatim (do NOT fix here — fix in a
-   follow-up so this extraction stays a pure move):
-     `journalEntryId` is read by the handler but is a PLAIN value param,
+   FIXED HERE — a pre-existing stale-closure bug, surfaced by the P6l
+   recon and fixed in the immediate follow-up:
+     `journalEntryId` was read by the handler directly from the param,
      captured by this hook's []-deps effect closure at mount — when
-     journalEntryId is null. So back from `journal-editor` runs
-     goJournalViewer(null), which the `if (eid)` guard turns into a
-     no-op. The bug predates P6l (the original App() effect had the same
-     []-deps stale capture). The fix is to mirror journalEntryId via
-     useRefMirror like the other 9 reads — a one-line follow-up commit.
+     journalEntryId is null. Back from `journal-editor` therefore ran
+     goJournalViewer(null), which the `if (eid)` guard turned into a
+     no-op. The bug predated P6l (the original App() effect had the
+     same []-deps stale capture). Fix: journalEntryId is now mirrored
+     via useRefMirror like the other 9 nav reads, and the handler reads
+     journalEntryIdRef.current — fresh at every back-press.
 
    PARAMS: a wide bag — 9 mirrored values, journalEntryId, fromLetterRef,
      12 setters, cancelDwell + 7 nav helpers. See the destructure below.
@@ -93,6 +94,7 @@ export function useAndroidBack({
   const studyIdRef = useRefMirror(studyId);
   const fromWtlbRef = useRefMirror(fromWtlb);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
+  const journalEntryIdRef = useRefMirror(journalEntryId);
 
   // All letter-style screens that can be a tap-through destination. When
   // the user entered via an in-app footnote link, Android back pops the
@@ -129,7 +131,7 @@ export function useAndroidBack({
       if (s === "highlights-index") {setScreen("library");return "true";} else
       if (s === "journal-home") {setScreen("library");return "true";} else
       if (s === "journal-viewer") {setScreen("journal-home");return "true";} else
-      if (s === "journal-editor") {goJournalViewer(journalEntryId);return "true";} else
+      if (s === "journal-editor") {goJournalViewer(journalEntryIdRef.current);return "true";} else
       if (s === "library") {goHome();return "true";} else
       if (s === "search") {goSearchOrigin();return "true";} else
       if (s === "scripture-genre") {goScripturesHome();return "true";} else
