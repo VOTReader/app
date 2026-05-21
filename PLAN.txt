@@ -2046,6 +2046,69 @@ SECTION 7 — OPEN QUESTIONS (resolve before relevant phase)
 SECTION 8 — PROGRESS LOG (append-only; newest at top)
 ───────────────────────────────────────────────────────────────────────────────
 
+2026-05-20 — G.2.3 (Cluster D → ES modules) + P6d–P6h hook extraction
+             + BookmarkPopover fix
+
+  Branch: main. Commits a4a4506 → c331ad7 (11 commits this arc).
+
+  G.2.3 — Cluster D (81 files: screens / sheets / components / utils +
+  the late stores thumb-store + translations) converted to ES modules
+  with an esbuild IIFE bundle. With G.2.1 (Cluster C) and G.2.2
+  (Cluster B) already landed, ALL FOUR cluster bundles are now in their
+  final build form: A stays classic-script forever (vendor + corpus +
+  search), B/C/D are esbuild ES-module IIFEs. 131 `export`s added by a
+  mechanical, idempotency-guarded script (tools/_g23_add_exports.py).
+  New esbuild entry point src/ui/_entry-d.js. STRICT-MODE DISCOVERY:
+  ES modules are implicitly strict, so module-private mutable state
+  reassigned inside a function (_thumbDbPromise, _bibleStudiesPromise,
+  the GARDEN_* constants, etc.) needs an explicit module-scope binding
+  or the assignment throws ReferenceError — those were moved out of
+  index.html into their owning modules. Commits: a4a4506 (G.2.3),
+  61571ca (follow-up — removed the now-dead index.html dupes).
+
+  P6 — App() hook extraction, IN PROGRESS. The ~2,500-line-class App()
+  is being decomposed hook-by-hook into src/hooks/*.js ES modules.
+  Landed this arc: P6d useThumbnails (eaac0b4), P6e useScrollMemory
+  (5a6a361), P6f useReadingDwell (e377e23), P6g useSettings (87e0d56),
+  P6h useSheetOrchestration (f29517b). App() line count, measured by
+  `wc` per commit and recorded in each commit message: ~2,815 (post-
+  P6d) → 2,735 → 2,693 → 2,641 → 2,516 (post-P6h). 9 of 13 hooks done
+  (incl. the useMarkAsRead/P5d warmup + P6a-c); 4 remain — P6i
+  useFromLetterStack → P6j useNavigateToLink → P6k useTabs (load-
+  bearing, last) → P6l useAndroidBack. Every extraction followed the
+  same loop: recon → precise brief (hard hook signature + DO NOT MOVE
+  list + pre-written targeted test) → coding agent → 2-min diff review
+  → npm run build + smoke + a mandatory targeted test for what smoke
+  can't reach → one hook = one commit. ZERO regressions: smoke PASS
+  after each (12/12 screens reached + 0 crashed, both annotation round-
+  trips bit-exact to baseline — 133+13 / 51+6 marks/icons, 0
+  console.error, 0 resource404). The workflow was formalized + hardened
+  in a retrospective (3c8fcb5, d948b74) — see §P6 DIRECTION 4 (the
+  named "composition-level sink pattern": split a fused effect whose
+  two concerns have different dep surfaces; the cross-cutting sink
+  stays in App() until all its deps are hook returns) and the 6-step
+  workflow in CLAUDE.md. P6g applied that pattern — the body-class
+  effect split into useSettings, the vot-state PERSIST effect stays in
+  App() and becomes usePersistedState at the end of P6k.
+
+  BookmarkPopover fix (c331ad7) — a pre-existing bug surfaced during
+  the P6h diff review. The BookmarkPopover render in index.html passed
+  a `payload` prop, but the component (BookmarksScreen.js:371)
+  destructures `{ bkmIds, x, y, onClose, onNavigate, onDeleteDone }` —
+  so `bkmIds` was undefined, the component hit its line-381 null guard,
+  and the inline-bookmark-icon tap popover never displayed. git-blame
+  proved it was mismatched from birth: the component (52ac90b2) and its
+  render call (03c9fd32) were committed 9 SECONDS apart on 2026-05-14 —
+  the render was a copy-paste of the sibling MultiNotePopover render
+  (which legitimately uses `payload`). Fixed the render (the malformed
+  side): pass bkmIds/x/y unpacked, onNavigate (resolve bkm.hlKey via
+  _bookmarkSourceEndpoint → navigateToLink), onDeleteDone (hlTick
+  bump). Verified live — popover renders with label/thought/3 actions;
+  Delete and Open (with "Back to Bookmark" pill) both work. Pure
+  index.html change, no bundle source touched. NOT P6h-caused — both
+  lines predate it; P6h's disciplined diff review is simply what
+  caught a year-old latent bug.
+
 2026-05-19 (later) — Objective E/F kickoff: scope agreed + Phase-0 net
 
   Branch: refactor/modularize-incremental (off main @ 492b696, pushed
