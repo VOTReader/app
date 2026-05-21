@@ -2503,21 +2503,54 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
      handleAndroidBack, __onDwellCommit).
 
   ═════════════════════════════════════════════════════════════════════
-  EXTRACTION ORDER (proposed):
+  EXTRACTION ORDER (revised 2026-05-20 after G.2.3 + recon agent):
   ═════════════════════════════════════════════════════════════════════
 
-  P6a: useSavedState     (warmup — establishes src/hooks/ pattern)
-  P6b: useRefMirror      (mechanical refactor — replaces 13 sites)
-  P6c: useHistory        (smallest real hook with state + effect)
-  P6d: useScrollMemory   (verify smoke scroll-restore works)
-  P6e: useReadingDwell   (verify mark-as-read still fires)
-  P6f: useSettings       (the save-state effect — careful audit)
-  P6g: useThumbnails     (heavy refs but isolated)
-  P6h: useSheetOrchestration (11 sheets but each is leaf)
-  P6i: useFromLetterStack (back-pill behavior)
-  P6j: useNavigateToLink  (cross-app router — test every endpoint type)
-  P6k: useTabs           (THE LOAD-BEARING ONE — last, fullest smoke run)
-  P6l: useAndroidBack    (depends on most others — saved for last)
+  P6a: useSavedState     LANDED — warmup, established src/hooks/ pattern
+  P6b: useRefMirror      LANDED — mechanical refactor across 13 sites
+  P6c: useHistory        LANDED — smallest real hook with state + effect
+
+  ── G.2.3 landed: A/B/C/D bundles all in final ES-module form ──
+
+  P6d: useThumbnails        NEXT (revised from useScrollMemory).
+                            ~140 lines, LOW risk. Nearly self-contained:
+                            reads only useRefMirror'd refs, writes only
+                            tabThumbnails via setter, idbPut/idbReadAll/
+                            idbDelete are module-scope free fns. Recon
+                            agent + PLAN.txt §P6 Cluster 4 both rate it
+                            the smallest blast radius of the remaining 9.
+                            Smoke probe: open tabs overview → tab cards
+                            show captured previews.
+  P6e: useScrollMemory   (was P6d) — verify smoke scroll-restore works
+  P6f: useReadingDwell   (was P6e) — verify mark-as-read still fires
+  P6g: useSettings       (was P6f) — the save-state effect, careful audit
+  P6h: useSheetOrchestration (was P6h) — 11 sheets, each leaf
+  P6i: useFromLetterStack (was P6i) — back-pill behavior
+  P6j: useNavigateToLink  (was P6j) — cross-app router, every endpoint
+  P6k: useTabs           (was P6k) — THE LOAD-BEARING ONE, last
+  P6l: useAndroidBack    (was P6l) — depends on most others, saved for last
+
+  Why useThumbnails moved first (was P6g, now P6d):
+    - Recon agent (Sonnet 4.6, 2026-05-20) rated thumbnails LOW because
+      every dep is either useRefMirror'd (already extracted as P6b) or
+      a module-scope helper. Setter writes only to tabThumbnails.
+    - useScrollMemory is MEDIUM because it depends on `updateActiveTab`
+      (a useCallback that lives in the still-inline tabs block), so
+      extracting it BEFORE useTabs requires threading the callback as
+      a parameter — workable but more coupling than thumbnails.
+    - Smaller blast radius wins. We're optimizing for "one hook = one
+      commit = one smoke run that PASSES" — not coverage breadth.
+
+  Future P6+ hardening principle (added 2026-05-20 by user, applies
+  to all hook extractions from here on):
+    For TRULY module-private mutable state (vars that App() never reads),
+    prefer bare `let` over `export let`. Strict-mode is satisfied by the
+    binding alone — `export` inflates the module's public surface for
+    no callable gain. Example: a hook's internal `tickRef` or per-mount
+    `dwellTimerRef` lives in the hook body and never crosses the
+    module boundary. (The G.2.3 modules used `export let` for these
+    bindings out of mechanical convenience — fine but loose; do better
+    in hooks where the public surface matters.)
 
   After P6l: App() should drop from ~2,500 lines → ~400 lines (just
   the hook composition + render tree). Local helpers (_findLetter,
