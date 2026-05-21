@@ -2447,6 +2447,94 @@
     };
   }
 
+  // app/src/main/assets/src/hooks/use-navigate-to-link.js
+  function useNavigateToLink({
+    closeLinkSidebar,
+    pushFromLetter,
+    screen,
+    bookId,
+    chapterNum,
+    letterId,
+    studyId,
+    studyChapterId,
+    setScreen,
+    setBookId,
+    setChapterNum,
+    setLetterId,
+    setStudyId,
+    setStudyChapterId,
+    setSurpriseAnchor,
+    setJournalEntryId
+  }) {
+    const _navToLinkRef = React.useRef(null);
+    const navigateToLink = React.useCallback((endpoint, meta) => {
+      if (_navToLinkRef.current) _navToLinkRef.current(endpoint, meta);
+    }, []);
+    _navToLinkRef.current = (endpoint, meta) => {
+      closeLinkSidebar();
+      window.__pendingScrollHlKey = endpoint && endpoint.key ? String(endpoint.key).replace(/:\d+-\d+$/, "") : null;
+      let destSnapshot = null;
+      if (endpoint.type === "bible" && endpoint.bookId && BOOKS[endpoint.bookId]) {
+        destSnapshot = { screen: "bible-ch", bookId: endpoint.bookId, chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
+      } else if (endpoint.type === "study" || endpoint.type === "bible" && endpoint.bookId === "matthew") {
+        destSnapshot = { screen: "matthew-ch", bookId: "matthew", chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
+      } else if (endpoint.type === "study-letter" && endpoint.studyId && endpoint.studyChapterId) {
+        destSnapshot = { screen: "bible-study-chapter", bookId: null, chapterNum: null, letterId: null, studyId: endpoint.studyId, studyChapterId: endpoint.studyChapterId };
+      } else if (endpoint.screen) {
+        destSnapshot = { screen: endpoint.screen, bookId: null, chapterNum: null, letterId: endpoint.letterId || endpoint.entryId || null, studyId: null, studyChapterId: null };
+      }
+      pushFromLetter({
+        sourceScreen: screen,
+        sourceLetterId: letterId,
+        sourceBookId: bookId,
+        sourceChapterNum: chapterNum,
+        sourceStudyId: studyId,
+        sourceStudyChapterId: studyChapterId,
+        sourceLetterTitle: meta && meta.sourceLetterTitle || null,
+        sourceVolumeLabel: meta && meta.sourceVolumeLabel || null,
+        destSnapshot
+      });
+      if (endpoint.type === "bible" && endpoint.bookId && BOOKS[endpoint.bookId]) {
+        setBookId(endpoint.bookId);
+        setChapterNum(endpoint.chapter);
+        setScreen("bible-ch");
+        setSurpriseAnchor(endpoint.verse ? { type: "verse", verses: [endpoint.verse] } : null);
+      } else if (endpoint.type === "study" || endpoint.type === "bible" && endpoint.bookId === "matthew") {
+        setBookId("matthew");
+        setChapterNum(endpoint.chapter);
+        setScreen("matthew-ch");
+        setSurpriseAnchor(endpoint.verse ? { type: "verse", verses: [endpoint.verse] } : null);
+      } else if (endpoint.type === "study-letter" && endpoint.studyId && endpoint.studyChapterId) {
+        setBookId(null);
+        setChapterNum(null);
+        setLetterId(null);
+        setStudyId(endpoint.studyId);
+        setStudyChapterId(endpoint.studyChapterId);
+        setScreen("bible-study-chapter");
+        window.__pendingLinkExcerpt = endpoint.start != null ? { start: endpoint.start, end: endpoint.end, text: endpoint.text, key: endpoint.key } : null;
+      } else if (endpoint.type === "journal" && endpoint.entryId) {
+        setBookId(null);
+        setChapterNum(null);
+        setStudyId(null);
+        setStudyChapterId(null);
+        setLetterId(null);
+        setJournalEntryId(endpoint.entryId);
+        setScreen("journal-viewer");
+        window.__pendingLinkExcerpt = endpoint.start != null ? { start: endpoint.start, end: endpoint.end, text: endpoint.text, key: endpoint.key } : null;
+      } else if (endpoint.screen) {
+        setBookId(null);
+        setChapterNum(null);
+        setStudyId(null);
+        setStudyChapterId(null);
+        if (endpoint.letterId) setLetterId(endpoint.letterId);
+        else if (endpoint.entryId) setLetterId(endpoint.entryId);
+        setScreen(endpoint.screen);
+        window.__pendingLinkExcerpt = endpoint.start != null ? { start: endpoint.start, end: endpoint.end, text: endpoint.text, key: endpoint.key } : null;
+      }
+    };
+    return { navigateToLink };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -6660,6 +6748,7 @@
     useSettings,
     useSheetOrchestration,
     useFromLetterStack,
+    useNavigateToLink,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
