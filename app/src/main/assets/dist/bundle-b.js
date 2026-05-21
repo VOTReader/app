@@ -2768,6 +2768,224 @@
     }, [tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap, activeReadKey, settings, readItems]);
   }
 
+  // app/src/main/assets/src/hooks/use-android-back.js
+  function useAndroidBack({
+    screen,
+    bookId,
+    genreId,
+    fromSearch,
+    fromStudies,
+    fromMatthewCh,
+    studyId,
+    fromWtlb,
+    tabsOverviewOpen,
+    journalEntryId,
+    fromLetterRef,
+    setScreen,
+    setBookId,
+    setChapterNum,
+    setLetterId,
+    setStudyId,
+    setStudyChapterId,
+    setFromLetterStack,
+    setFromSearch,
+    setFromStudies,
+    setFromWtlb,
+    setFromMatthewCh,
+    setTabsOverviewOpen,
+    cancelDwell,
+    goNavOrigin,
+    goHome,
+    goSearchOrigin,
+    goScripturesHome,
+    goStudiesHome,
+    goVolumesHome,
+    goJournalViewer
+  }) {
+    const screenRef = useRefMirror(screen);
+    const bookIdRef = useRefMirror(bookId);
+    const genreIdRef = useRefMirror(genreId);
+    const fromSearchRef = useRefMirror(fromSearch);
+    const fromStudiesRef = useRefMirror(fromStudies);
+    const fromMatthewChRef = useRefMirror(fromMatthewCh);
+    const studyIdRef = useRefMirror(studyId);
+    const fromWtlbRef = useRefMirror(fromWtlb);
+    const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
+    React.useEffect(() => {
+      window.handleAndroidBack = () => {
+        if (window.__closeSheet) {
+          window.__closeSheet();
+          window.__closeSheet = null;
+          return "true";
+        }
+        if (tabsOverviewOpenRef.current) {
+          setTabsOverviewOpen(false);
+          return "true";
+        }
+        cancelDwell();
+        const s = screenRef.current;
+        const stack = fromLetterRef.current;
+        if (LETTER_SCREEN_SET.has(s) && stack && stack.length > 0) {
+          const fl = stack[stack.length - 1];
+          setFromLetterStack((prev) => prev.slice(0, -1));
+          window.__pendingHighlight = null;
+          if (fl.sourceBookId !== void 0) setBookId(fl.sourceBookId);
+          if (fl.sourceChapterNum !== void 0) setChapterNum(fl.sourceChapterNum);
+          if (fl.sourceLetterId !== void 0) setLetterId(fl.sourceLetterId);
+          if (fl.sourceStudyId !== void 0) setStudyId(fl.sourceStudyId);
+          if (fl.sourceStudyChapterId !== void 0) setStudyChapterId(fl.sourceStudyChapterId);
+          setScreen(fl.sourceScreen);
+          return "true";
+        }
+        if (s === "settings") {
+          goNavOrigin();
+          return "true";
+        } else if (s === "history") {
+          goNavOrigin();
+          return "true";
+        } else if (s === "about") {
+          try {
+            localStorage.setItem("vot-about-seen", "1");
+          } catch (e) {
+          }
+          goNavOrigin();
+          return "true";
+        } else if (s === "notes-index") {
+          setScreen("library");
+          return "true";
+        } else if (s === "links-index") {
+          setScreen("library");
+          return "true";
+        } else if (s === "bookmarks-index") {
+          setScreen("library");
+          return "true";
+        } else if (s === "highlights-index") {
+          setScreen("library");
+          return "true";
+        } else if (s === "journal-home") {
+          setScreen("library");
+          return "true";
+        } else if (s === "journal-viewer") {
+          setScreen("journal-home");
+          return "true";
+        } else if (s === "journal-editor") {
+          goJournalViewer(journalEntryId);
+          return "true";
+        } else if (s === "library") {
+          goHome();
+          return "true";
+        } else if (s === "search") {
+          goSearchOrigin();
+          return "true";
+        } else if (s === "scripture-genre") {
+          goScripturesHome();
+          return "true";
+        } else if (s === "scriptures-home") {
+          goHome();
+          return "true";
+        } else if (s === "volumes-home") {
+          goHome();
+          return "true";
+        } else if (s === "matthew-ch") {
+          if (fromSearchRef.current) {
+            setFromSearch(false);
+            setScreen("search");
+          } else {
+            setChapterNum(null);
+            setScreen("matthew-idx");
+          }
+          return "true";
+        } else if (s === "matthew-idx") {
+          if (fromStudiesRef.current) {
+            setFromStudies(false);
+            goStudiesHome();
+          } else {
+            goHome();
+          }
+          return "true";
+        } else if (s === "studies-home") {
+          goHome();
+          return "true";
+        } else if (s === "bible-study-index") {
+          goStudiesHome();
+          return "true";
+        } else if (s === "bible-study-chapter") {
+          if (fromSearchRef.current) {
+            setFromSearch(false);
+            setScreen("search");
+            return "true";
+          }
+          const cur = getStudyById(studyIdRef.current);
+          if (cur && cur.chapters && cur.chapters.length > 1) {
+            setStudyChapterId(null);
+            setScreen("bible-study-index");
+          } else {
+            goStudiesHome();
+          }
+          return "true";
+        } else if (s === "bible-ch") {
+          if (fromWtlbRef.current) {
+            const ret = fromWtlbRef.current;
+            setFromWtlb(null);
+            setScreen(ret);
+            return "true";
+          }
+          if (fromSearchRef.current) {
+            setFromSearch(false);
+            setScreen("search");
+          } else {
+            const bid = bookIdRef.current;
+            if (bid && BOOKS[bid]?.chapters.length === 1) {
+              if (genreIdRef.current) {
+                setScreen("scripture-genre");
+              } else {
+                goScripturesHome();
+              }
+            } else {
+              setChapterNum(null);
+              setScreen("bible-idx");
+            }
+          }
+          return "true";
+        } else if (s === "bible-idx") {
+          if (genreIdRef.current) {
+            setScreen("scripture-genre");
+          } else {
+            goScripturesHome();
+          }
+          return "true";
+        } else {
+          const col = COL_BY_LETTER_SC.get(s);
+          if (col) {
+            if (fromMatthewChRef.current) {
+              setFromMatthewCh(null);
+              setScreen("matthew-ch");
+            } else if (fromSearchRef.current) {
+              setFromSearch(false);
+              setScreen("search");
+            } else if (fromStudiesRef.current) {
+              setFromStudies(false);
+              setScreen("bible-study-chapter");
+            } else if (col.indexScreen) {
+              setScreen(col.indexScreen);
+            } else {
+              goHome();
+            }
+            return "true";
+          }
+        }
+        if (COL_BY_INDEX_SC.has(s) || s === "garden-view") {
+          goVolumesHome();
+          return "true";
+        }
+        return "false";
+      };
+      return () => {
+        delete window.handleAndroidBack;
+      };
+    }, []);
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -3193,7 +3411,7 @@
   var COL_BY_KEY2 = new Map(COLLECTIONS2.map((c) => [c.volKey, c]));
   var COL_BY_CARD = new Map(COLLECTIONS2.filter((c) => c.cardId).map((c) => [c.cardId, c]));
   var COL_BY_LETTER_SC2 = new Map(COLLECTIONS2.map((c) => [c.letterScreen, c]));
-  var COL_BY_INDEX_SC = new Map(COLLECTIONS2.filter((c) => c.indexScreen).map((c) => [c.indexScreen, c]));
+  var COL_BY_INDEX_SC2 = new Map(COLLECTIONS2.filter((c) => c.indexScreen).map((c) => [c.indexScreen, c]));
   var COL_BY_SEARCH_ID = new Map(COLLECTIONS2.filter((c) => c.searchVolId).map((c) => [c.searchVolId, c]));
   var COL_BY_READ_KEY = new Map(COLLECTIONS2.filter((c) => c.readKey).map((c) => [c.readKey, c]));
   var _NAV_ICONS = { one: "V1", two: "V2", three: "V3", four: "V4", five: "V5", six: "V6", seven: "V7", timothy: "LT", flock: "LF", rebuke: "LR", wtlb1: "W1", wtlb2: "W2", blessed: "TB", holydays: "HD", hm: "HM" };
@@ -3223,7 +3441,7 @@
     const arr = colLetters(col);
     return Array.isArray(arr) ? arr : [];
   }
-  var LETTER_SCREEN_SET = new Set(COLLECTIONS2.map((c) => c.letterScreen).concat(["bible-study-chapter"]));
+  var LETTER_SCREEN_SET2 = new Set(COLLECTIONS2.map((c) => c.letterScreen).concat(["bible-study-chapter"]));
   function _allBooks2() {
     return window.__ALL_BOOKS || (typeof BOOKS !== "undefined" ? BOOKS : {});
   }
@@ -6985,13 +7203,14 @@
     useTabs,
     useTabActions,
     usePersistedState,
+    useAndroidBack,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
     COL_BY_KEY: COL_BY_KEY2,
     COL_BY_CARD,
     COL_BY_LETTER_SC: COL_BY_LETTER_SC2,
-    COL_BY_INDEX_SC,
+    COL_BY_INDEX_SC: COL_BY_INDEX_SC2,
     COL_BY_SEARCH_ID,
     COL_BY_READ_KEY,
     _NAV_ICONS,
@@ -7004,7 +7223,7 @@
     colLetters,
     colPreface,
     colLetterArr,
-    LETTER_SCREEN_SET,
+    LETTER_SCREEN_SET: LETTER_SCREEN_SET2,
     _allBooks: _allBooks2,
     _matthew,
     _studies,

@@ -1382,7 +1382,7 @@ function App() {
     tabsOverviewOpen,
   });
   const navOriginRef = useRefMirror(navOrigin);
-  const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
+  /* tabsOverviewOpenRef → created inside useAndroidBack (P6l) */
 
   /* useScrollMemory — per-tab/per-screen scroll position capture +
      restore. Extracted to src/hooks/use-scroll-memory.js (P6e). */
@@ -1733,10 +1733,7 @@ function App() {
     }
   };
 
-  /* ── Android back gesture handler (called from Kotlin) ── */
-  const screenRef = useRefMirror(screen);
-  const bookIdRef = useRefMirror(bookId);
-  const genreIdRef = useRefMirror(genreId);
+  /* screenRef / bookIdRef / genreIdRef → created inside useAndroidBack (P6l) */
 
   // Track history whenever a reading screen is entered
   useEffect(() => {
@@ -1757,12 +1754,9 @@ function App() {
     }
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
 
-  const fromSearchRef = useRefMirror(fromSearch);
-  const fromStudiesRef = useRefMirror(fromStudies);
-  const fromMatthewChRef = useRefMirror(fromMatthewCh);
-  /* fromLetterRef → returned by useFromLetterStack (src/hooks/use-from-letter-stack.js, P6i) */
-  const studyIdRef = useRefMirror(studyId);
-  const fromWtlbRef = useRefMirror(fromWtlb);
+  const fromMatthewChRef = useRefMirror(fromMatthewCh);  // also used in the render (~line 3001)
+  /* fromLetterRef → returned by useFromLetterStack (P6i);
+     fromSearchRef / fromStudiesRef / studyIdRef / fromWtlbRef → created inside useAndroidBack (P6l) */
   const searchOriginRef = useRefMirror(searchOrigin);
 
   /* visibilitychange dwell-pause/resume effect → src/hooks/use-reading-dwell.js (P6f) */
@@ -1799,70 +1793,9 @@ function App() {
     return () => {if (window.__goHome) delete window.__goHome;};
   }, []);
 
-  // All letter-style screens that can be a tap-through destination. When
-  // the user entered via an in-app footnote link, Android back pops the
-  // top of the fromLetter stack and returns to the source. Includes
-  // bible-study-chapter so tap-throughs INTO a study unwind correctly.
-  useEffect(() => {
-    window.handleAndroidBack = () => {
-      if (window.__closeSheet) {window.__closeSheet();window.__closeSheet = null;return "true";}
-      if (tabsOverviewOpenRef.current) {
-        setTabsOverviewOpen(false);
-        return "true";
-      }
-      cancelDwell();
-      const s = screenRef.current;
-      const stack = fromLetterRef.current;
-      if (LETTER_SCREEN_SET.has(s) && stack && stack.length > 0) {
-        const fl = stack[stack.length - 1];
-        setFromLetterStack((prev) => prev.slice(0, -1));
-        window.__pendingHighlight = null;
-        if (fl.sourceBookId !== undefined) setBookId(fl.sourceBookId);
-        if (fl.sourceChapterNum !== undefined) setChapterNum(fl.sourceChapterNum);
-        if (fl.sourceLetterId !== undefined) setLetterId(fl.sourceLetterId);
-        if (fl.sourceStudyId !== undefined) setStudyId(fl.sourceStudyId);
-        if (fl.sourceStudyChapterId !== undefined) setStudyChapterId(fl.sourceStudyChapterId);
-        setScreen(fl.sourceScreen);
-        return "true";
-      }
-      if (s === "settings") {goNavOrigin();return "true";} else
-      if (s === "history") {goNavOrigin();return "true";} else
-      if (s === "about") {try{localStorage.setItem('vot-about-seen','1');}catch(e){}goNavOrigin();return "true";} else
-      if (s === "notes-index") {setScreen("library");return "true";} else
-      if (s === "links-index") {setScreen("library");return "true";} else
-      if (s === "bookmarks-index") {setScreen("library");return "true";} else
-      if (s === "highlights-index") {setScreen("library");return "true";} else
-      if (s === "journal-home") {setScreen("library");return "true";} else
-      if (s === "journal-viewer") {setScreen("journal-home");return "true";} else
-      if (s === "journal-editor") {goJournalViewer(journalEntryId);return "true";} else
-      if (s === "library") {goHome();return "true";} else
-      if (s === "search") {goSearchOrigin();return "true";} else
-      if (s === "scripture-genre") {goScripturesHome();return "true";} else
-      if (s === "scriptures-home") {goHome();return "true";} else
-      if (s === "volumes-home") {goHome();return "true";} else
-      if (s === "matthew-ch") {if (fromSearchRef.current) {setFromSearch(false);setScreen("search");} else {setChapterNum(null);setScreen("matthew-idx");}return "true";} else
-      if (s === "matthew-idx") {if (fromStudiesRef.current) {setFromStudies(false);goStudiesHome();} else {goHome();}return "true";} else
-      if (s === "studies-home") {goHome();return "true";} else
-      if (s === "bible-study-index") {goStudiesHome();return "true";} else
-      if (s === "bible-study-chapter") {if (fromSearchRef.current) {setFromSearch(false);setScreen("search");return "true";}const cur = getStudyById(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
-      if (s === "bible-ch") {if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current) {setFromSearch(false);setScreen("search");} else {const bid = bookIdRef.current;if (bid && BOOKS[bid]?.chapters.length === 1) {if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}} else {setChapterNum(null);setScreen("bible-idx");}}return "true";} else
-      if (s === "bible-idx") {if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}return "true";} else
-      // Letter screens: unified back via COLLECTIONS registry
-      { const col = COL_BY_LETTER_SC.get(s);
-      if (col) {
-        if (fromMatthewChRef.current) {setFromMatthewCh(null);setScreen("matthew-ch");}
-        else if (fromSearchRef.current) {setFromSearch(false);setScreen("search");}
-        else if (fromStudiesRef.current) {setFromStudies(false);setScreen("bible-study-chapter");}
-        else if (col.indexScreen) {setScreen(col.indexScreen);}
-        else {goHome();}
-        return "true";
-      }}
-      // Index screens + garden: all go back to volumes-home
-      if (COL_BY_INDEX_SC.has(s) || s === "garden-view") {goVolumesHome();return "true";}
-      return "false";
-    };
-    return () => {delete window.handleAndroidBack;};
-  }, []);
+  /* useAndroidBack(...) call → moved below, after goStudiesHome — that
+     nav helper is one of the hook's params and is defined further down,
+     so the call must follow it to avoid a TDZ ReferenceError. P6l. */
 
   /* ── Home category selector ── */
   const handleSelect = (id) => {
@@ -1912,6 +1845,23 @@ function App() {
   const studyReadKey = (slug) => `bible-study-${slug}`;
 
   const goStudiesHome = () => {setScreen("studies-home");};
+
+  /* useAndroidBack — the window.handleAndroidBack routing handler + its 9
+     call-time ref mirrors. Extracted to src/hooks/use-android-back.js
+     (P6l — the last P6 hook). The widest param surface in the app: it is
+     the most-coupled handler, depending on nav state + the App-local
+     nav-helper glue + cancelDwell + the fromLetter stack. Called here,
+     after every nav helper it threads (goStudiesHome is the last one). */
+  useAndroidBack({
+    screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb,
+    tabsOverviewOpen, journalEntryId, fromLetterRef,
+    setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
+    setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh,
+    setTabsOverviewOpen,
+    cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
+    goStudiesHome, goVolumesHome, goJournalViewer,
+  });
+
   const selectStudy = (id) => {
     const study = getStudyById(id);
     if (!study || study.locked || !study.chapters?.length) return;
