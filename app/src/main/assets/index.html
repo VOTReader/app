@@ -1404,15 +1404,6 @@ function App() {
   // below and openInAppLetter further down can use it without TDZ).
   const [fromLetterStack, setFromLetterStack] = tabField('fromLetterStack');
   const pushFromLetter = (entry) => setFromLetterStack((prev) => { var next = [...prev, entry]; return next.length > 50 ? next.slice(-50) : next; });
-  const popFromLetter = () => {
-    let popped = null;
-    setFromLetterStack((prev) => {
-      if (prev.length === 0) return prev;
-      popped = prev[prev.length - 1];
-      return prev.slice(0, -1);
-    });
-    return popped;
-  };
   // Tap-through "Back to …" pill handler: pops the top of the from-letter
   // stack and restores the captured screen + IDs. tabField setters run
   // their updater fns ASYNC, so we read the current stack from its ref
