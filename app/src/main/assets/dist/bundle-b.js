@@ -2535,6 +2535,99 @@
     return { navigateToLink };
   }
 
+  // app/src/main/assets/src/hooks/use-tabs.js
+  var DEFAULT_TAB = {
+    screen: "home",
+    bookId: null,
+    chapterNum: null,
+    letterId: null,
+    studyId: null,
+    studyChapterId: null,
+    fromStudies: false,
+    genreId: null,
+    mode: "pdf",
+    showStudy: true,
+    surpriseAnchor: null,
+    fromLetterStack: [],
+    titleFocusHidden: false,
+    headingsFocusHidden: false,
+    fromMatthewCh: null,
+    fromWtlb: null,
+    fromSearch: false,
+    searchQuery: "",
+    searchOrigin: null,
+    searchScope: null,
+    searchContext: null,
+    navOrigin: null,
+    gardenPage: 1,
+    scrollPositions: {}
+    // per-screen scroll memory: { [screenName]: px }
+  };
+  function useTabs({ saved }) {
+    const [tabs, setTabs] = React.useState(() => {
+      if (Array.isArray(saved.tabs) && saved.tabs.length > 0) {
+        return saved.tabs.map((t) => ({ ...DEFAULT_TAB, ...t }));
+      }
+      return [{
+        ...DEFAULT_TAB,
+        screen: saved.screen || "home",
+        bookId: saved.bookId || null,
+        chapterNum: saved.chapterNum != null ? saved.chapterNum : null,
+        letterId: saved.letterId || null,
+        studyId: saved.studyId || null,
+        studyChapterId: saved.studyChapterId || null,
+        fromStudies: saved.fromStudies || false,
+        genreId: saved.genreId || null,
+        mode: saved.mode || "pdf",
+        showStudy: saved.showStudy !== false,
+        gardenPage: saved.gardenPage || 1
+      }];
+    });
+    const [activeTabIdx, setActiveTabIdx] = React.useState(() => {
+      const idx = typeof saved.activeTabIdx === "number" ? saved.activeTabIdx : 0;
+      return Math.max(0, Math.min(idx, 998));
+    });
+    const activeTab = tabs[activeTabIdx] || tabs[0];
+    const updateActiveTab = React.useCallback((patchOrFn) => {
+      setTabs((prev) => prev.map((t, i) => {
+        if (i !== activeTabIdx) return t;
+        const patch = typeof patchOrFn === "function" ? patchOrFn(t) : patchOrFn;
+        return { ...t, ...patch };
+      }));
+    }, [activeTabIdx]);
+    const _uatRef = useRefMirror(updateActiveTab);
+    const _tabSetters = React.useRef({});
+    const tabField = (key) => {
+      if (!_tabSetters.current[key]) {
+        _tabSetters.current[key] = (val) => _uatRef.current((cur) => ({
+          [key]: typeof val === "function" ? val(cur[key]) : val
+        }));
+      }
+      return [activeTab[key], _tabSetters.current[key]];
+    };
+    const _tabSettersPrevRef = React.useRef({});
+    React.useEffect(() => {
+      var cur = _tabSetters.current;
+      var prev = _tabSettersPrevRef.current;
+      for (var key in cur) {
+        if (prev[key] && prev[key] !== cur[key]) {
+          console.error("[tabField stability] setter identity changed for key=" + key + " across renders \u2014 this breaks child component stability and triggers cascading re-mounts.");
+        }
+        prev[key] = cur[key];
+      }
+    });
+    return {
+      DEFAULT_TAB,
+      tabField,
+      activeTab,
+      tabs,
+      activeTabIdx,
+      setTabs,
+      setActiveTabIdx,
+      updateActiveTab
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -6749,6 +6842,7 @@
     useSheetOrchestration,
     useFromLetterStack,
     useNavigateToLink,
+    useTabs,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,

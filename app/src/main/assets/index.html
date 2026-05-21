@@ -1004,93 +1004,18 @@ function App() {
   const saved = useSavedState();
 
   /* ═══════════════════════════════════════════════════════════════
-     TAB-BACKED READING STATE
-     Each tab owns its reading state (screen, book/chapter, mode, focus
-     mode, etc.). The active tab's fields are surfaced via `tabField()`
-     so every existing `screen`/`bookId`/`setScreen`/... call site keeps
-     working. Non-reading state (theme, settings, read progress) is
-     app-global. See `settings.tabsEnabled` for the tabs UI.
+     TAB-BACKED READING STATE — the per-tab state machine + tabField
+     accessor + CRITICAL INVARIANT 1 (cached stable per-key setters) +
+     the stability probe → extracted to src/hooks/use-tabs.js (P6k
+     Commit A). DEFAULT_TAB / setTabs are returned for the Commit-A→B
+     window: the still-inline tab-management functions below consume
+     them; both drop from this destructure once P6k Commit B moves
+     management into useTabActions.
   ═══════════════════════════════════════════════════════════════ */
-  const DEFAULT_TAB = {
-    screen: 'home',
-    bookId: null, chapterNum: null, letterId: null,
-    studyId: null, studyChapterId: null,
-    fromStudies: false, genreId: null,
-    mode: 'pdf', showStudy: true,
-    surpriseAnchor: null,
-    fromLetterStack: [],
-    titleFocusHidden: false, headingsFocusHidden: false,
-    fromMatthewCh: null, fromWtlb: null, fromSearch: false,
-    searchQuery: '', searchOrigin: null, searchScope: null, searchContext: null,
-    navOrigin: null,
-    gardenPage: 1,
-    scrollPositions: {} // per-screen scroll memory: { [screenName]: px }
-  };
-  const [tabs, setTabs] = useState(() => {
-    if (Array.isArray(saved.tabs) && saved.tabs.length > 0) {
-      return saved.tabs.map((t) => ({ ...DEFAULT_TAB, ...t }));
-    }
-    // Migration: seed tab 0 from legacy single-screen state
-    return [{
-      ...DEFAULT_TAB,
-      screen: saved.screen || 'home',
-      bookId: saved.bookId || null,
-      chapterNum: saved.chapterNum != null ? saved.chapterNum : null,
-      letterId: saved.letterId || null,
-      studyId: saved.studyId || null,
-      studyChapterId: saved.studyChapterId || null,
-      fromStudies: saved.fromStudies || false,
-      genreId: saved.genreId || null,
-      mode: saved.mode || 'pdf',
-      showStudy: saved.showStudy !== false,
-      gardenPage: saved.gardenPage || 1
-    }];
-  });
-  const [activeTabIdx, setActiveTabIdx] = useState(() => {
-    const idx = typeof saved.activeTabIdx === 'number' ? saved.activeTabIdx : 0;
-    return Math.max(0, Math.min(idx, 998));
-  });
-  const activeTab = tabs[activeTabIdx] || tabs[0];
-  const updateActiveTab = React.useCallback((patchOrFn) => {
-    setTabs((prev) => prev.map((t, i) => {
-      if (i !== activeTabIdx) return t;
-      const patch = typeof patchOrFn === 'function' ? patchOrFn(t) : patchOrFn;
-      return { ...t, ...patch };
-    }));
-  }, [activeTabIdx]);
-  const _uatRef = useRefMirror(updateActiveTab);
-  const _tabSetters = React.useRef({});
-  const tabField = (key) => {
-    if (!_tabSetters.current[key]) {
-      _tabSetters.current[key] = (val) => _uatRef.current((cur) => ({
-        [key]: typeof val === 'function' ? val(cur[key]) : val
-      }));
-    }
-    return [activeTab[key], _tabSetters.current[key]];
-  };
-  // tabField identity stability probe — foundational instrumentation that
-  // surfaces a contract violation immediately via console.error (which the
-  // smoke harness already monitors). The CONTRACT: tabField('X')[1] returns
-  // the SAME function instance for the same key across every render.
-  // Violating it causes cascading re-mounts in every tab-state-consuming
-  // child component (the props change identity each render → React tears
-  // down and rebuilds the subtree). The cache lives in _tabSetters.current.
-  // If a future refactor (P6's useTabs is the prime candidate) accidentally
-  // returns a fresh setter each render, this probe catches it within a
-  // single render cycle instead of letting it land silently.
-  const _tabSettersPrevRef = React.useRef({});
-  React.useEffect(() => {
-    var cur = _tabSetters.current;
-    var prev = _tabSettersPrevRef.current;
-    for (var key in cur) {
-      if (prev[key] && prev[key] !== cur[key]) {
-        console.error('[tabField stability] setter identity changed for key=' + key +
-          ' across renders — this breaks child component stability and triggers cascading re-mounts.');
-      }
-      prev[key] = cur[key];
-    }
-  });
-
+  const {
+    DEFAULT_TAB, tabField, activeTab, tabs, activeTabIdx,
+    setTabs, setActiveTabIdx, updateActiveTab,
+  } = useTabs({ saved });
 
   const [screen, setScreen] = tabField('screen');
   const [bookId, setBookId] = tabField('bookId');

@@ -68,6 +68,7 @@ import { useSettings } from '../hooks/use-settings.js';
 import { useSheetOrchestration } from '../hooks/use-sheet-orchestration.js';
 import { useFromLetterStack } from '../hooks/use-from-letter-stack.js';
 import { useNavigateToLink } from '../hooks/use-navigate-to-link.js';
+import { useTabs } from '../hooks/use-tabs.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -131,6 +132,7 @@ Object.assign(window, {
   useSheetOrchestration,
   useFromLetterStack,
   useNavigateToLink,
+  useTabs,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,
