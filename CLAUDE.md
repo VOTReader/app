@@ -21,12 +21,21 @@
 > 2. **No JSX** — Babel-compiled `React.createElement` chains as canonical source. Standard React tooling (ast-grep, jscodeshift, react-codemod) doesn't recognize it. Fix: incremental module-by-module JSX conversion, AFTER P6 lands. Do NOT big-bang rewrite — the annotation engine + boundary nav + scripture resolution have been debugged carefully over months.
 >
 > **CURRENT SEQUENCING (user-confirmed, refined through G.2.3 + P6d)**:
-> - **NOW**: **P6 — `App()` hook extraction** IN PROGRESS. Landed so far: `useMarkAsRead` (P5d warmup), `useSavedState`+`_validateTabState` (P6a), `useRefMirror` (P6b), `useHistory` (P6c), `useThumbnails` (P6d). Remaining per PLAN.txt §P6 revised order: P6e `useScrollMemory` → P6f `useReadingDwell` → P6g `useSettings` → P6h `useSheetOrchestration` → P6i `useFromLetterStack` → P6j `useNavigateToLink` → P6k `useTabs` (load-bearing, last) → P6l `useAndroidBack`. `App()` drops ~2,500 → ~400 lines when complete. The riskiest single refactor in the plan — real semantic surgery (closure deps, React hook ordering, state passing between newly-separated hooks). Go ONE hook at a time; smoke after each; one hook = one commit.
+> - **NOW**: **P6 — `App()` hook extraction** IN PROGRESS. Landed so far: `useMarkAsRead` (P5d warmup), `useSavedState`+`_validateTabState` (P6a), `useRefMirror` (P6b), `useHistory` (P6c), `useThumbnails` (P6d). Remaining per PLAN.txt §P6 revised order: P6e `useScrollMemory` → P6f `useReadingDwell` → P6g `useSettings` → P6h `useSheetOrchestration` → P6i `useFromLetterStack` → P6j `useNavigateToLink` → P6k `useTabs` (load-bearing, last) → P6l `useAndroidBack`. The riskiest single refactor in the plan — real semantic surgery (closure deps, React hook ordering, state passing between newly-separated hooks). Go ONE hook at a time; smoke after each; one hook = one commit.
+> - **`App()` LINE COUNT (tracked per extraction — record the real `wc` number in every P6 commit message)**: post-P6d = **2,815 lines** (`function App()` at index.html:1000 → closing `}` at :3814). The "~2,500" figure in older docs was a drifted estimate — 2,815 is the measured truth. Target when P6 completes: ~400 lines (hook composition + render tree). Each extraction should visibly move this number down; if a commit doesn't, something didn't actually leave App().
 > - **THEN**: JSX conversion, outside-in, module-by-module (now possible because every consumer is a module with explicit imports, so a converted `.jsx` file can co-exist with un-converted `.js` callers).
 > - **LATER**: Vite for HMR (optional; esbuild IIFE output ships fine on Android WebView).
 > - **AS-TRIGGERED**: P7 sync-ref audit per the calendar in PLAN.txt §P6 Direction 3.
 > - **INTERLEAVED**: Objective I user-facing features (TTS, font controls, sepia, search relevance).
-> - **P6 EXTRACTION WORKFLOW (proven through P6d)**: (1) recon — map the target's lines + classify every effect single-vs-mixed concern; (2) write a precise brief with the HARD hook signature (input/output type sigs, not just line ranges) + DO NOT MOVE callsite list + invariants; (3) coding agent (or direct) writes the hook + edits App(); (4) 2-min diff review BEFORE smoke — agents drop lines / mis-thread params in ways smoke won't catch; (5) `npm run build` + smoke + targeted feature test for anything smoke doesn't exercise; (6) one hook = one commit. **P6+ hardening principle**: prefer bare `let`/`const` over `export let`/`export const` for truly module-private mutable state — strict-mode is satisfied by the binding alone.
+> - **P6 EXTRACTION WORKFLOW (proven through P6d — follow this exactly)**:
+>   1. **Recon** — map the target's lines; classify every `useEffect` single-vs-mixed concern; **for any function/callback threaded as a hook param, verify it is a `useCallback` (stable identity), not a plain function recreated each render** — a plain function as a param re-fires the consuming hook's effects every render. Check stability, not just presence.
+>   2. **Brief** — write the HARD hook signature (input/output type sigs, not just line ranges) + DO NOT MOVE callsite list + invariants. Tell the coding agent: *"Follow the structure of `src/hooks/use-thumbnails.js` — named `export function`, destructured params object, no default export, `React.*`-prefixed hooks, header comment with OWNS/DOES NOT OWN/PARAMS/RETURNS/STORAGE."*
+>   3. **Code** — coding agent (or direct) writes the hook + edits App().
+>   4. **Diff review** — 2-min read of `git diff` BEFORE smoke. Agents drop lines / mis-thread params in ways smoke won't catch.
+>   5. **Verify** — `npm run build` + smoke harness. Then **identify the ONE manual test smoke structurally cannot cover and run it** — this is mandatory, not optional. P6d's was "enable tabs → navigate → confirm thumbnail captured to IndexedDB" (caught that `tabsEnabled` threading would be invisible to smoke since the walk runs with tabs off). P6e's is: "navigate to a screen → scroll down → navigate away → navigate back → confirm scroll position restored." Snapshot/restore any localStorage or IndexedDB the test touches.
+>   6. **Commit** — one hook = one commit. Record the new `App()` line count in the message.
+>   - **P6+ hardening principle**: prefer bare `let`/`const` over `export let`/`export const` for truly module-private mutable state — strict-mode is satisfied by the binding alone.
+>   - **Agent-cutoff recovery**: if a coding agent is interrupted, Edit/Write are atomic so no file is half-written — `git diff` each target file, confirm each is syntactically whole (`node --check` for hook files; build + smoke for the whole), and the only loss is the agent's text report, which you reconstruct from the diff.
 >
 > **OBJECTIVE G LANDED COMMITS**:
 > - **G.1 (`f919017`)** — `tools/build.py` concatenates 139 `<script src>` tags into 4 cluster bundles (`dist/bundle-{a,b,c,d}.js`). Pure Python. byte-equivalent output to pre-G.1 load order. Smoke PASS identically.
@@ -86,15 +95,15 @@
 > - `components/` — `ExpandableText` (used by journal/bookmarks/notes)
 > - `styles/` — `journal-styles`
 >
-> **WHAT'S LEFT IN `index.html` (~4,237 lines / 224 KB):**
-> - `App()` (~2,500 lines, lines ~2100-4100) — the only big inline component left, **P6 target for hook extraction**
+> **WHAT'S LEFT IN `index.html` (3,854 lines / ~210 KB as of post-P6d):**
+> - `App()` — **2,815 lines** (`function App()` at :1000 → closing `}` at :3814), **the only big inline component left, P6 target for hook extraction** (P6a-d already extracted 5 hooks; 8 to go)
 > - The Babel runtime `_extends` helper at the very top
-> - Boot-time top-level code in the big inline `<script>` block (lines ~250-2100): COLLECTIONS forEach that wires preface/nextEntry links, `BIBLE_BOOK_LIST` + `OT_BOOK_IDS` declarations, `LETTER_TITLE_MAP`/`VOT_LETTER_REGISTRY`/`MATTHEW_CHAIN_ENTRY`/`HIDDEN_MANNA_TITLES`, navigation glue used inside App's render tree
-> - The bottom export script (lexical const → window mirror — P5g)
-> - The final `ReactDOM.createRoot()` + render
+> - Boot-time top-level code in the big inline `<script>` block (before :1000): COLLECTIONS forEach that wires preface/nextEntry links, `BIBLE_BOOK_LIST` + `OT_BOOK_IDS` declarations, `LETTER_TITLE_MAP`/`VOT_LETTER_REGISTRY`/`MATTHEW_CHAIN_ENTRY`/`HIDDEN_MANNA_TITLES`, navigation glue used inside App's render tree
+> - The bottom lexical-mirror script (`<script>` at :3826 — mirrors lexical-only consts onto window for the smoke harness)
+> - The final `ReactDOM.createRoot()` + render (:3851-3852)
 > - ~50 one-line breadcrumb comments pointing to extracted modules (debug aids)
 >
-> **NEXT: P6 — `App()` hook extraction.** Extract `useTabField` / settings persistence / scroll handlers / history tracking / thumbnail capture / visualViewport keyboard tracking / etc. into `src/hooks/` so `App()` drops from ~2,500 lines to ~400. The first hook (`useMarkAsRead`) already landed in P5d as a warmup, proving the toolchain. **The riskiest single refactor in the whole plan** — real semantic surgery (closure dependencies, React hook ordering rules, state passing between newly-separated hooks). DEFER to a dedicated focused session with full attention. The P5g smoke harness will catch regressions cleanly: globals, render walk, AND both annotation paths now have coverage.
+> **NEXT: P6e — `useScrollMemory`.** See the CURRENT SEQUENCING block above for the full P6e-l order and the proven 6-step extraction workflow. P6 is the riskiest single refactor in the plan — real semantic surgery (closure deps, React hook ordering, state passing between separated hooks) — but the workflow is now proven through P6d and the smoke harness + mandatory per-extraction targeted test catch regressions cleanly.
 >
 > **`tools/_p5e_bundle_helpers.py`** — new bundling extractor that pulls multiple pure-function helpers into one domain-grouped module. Same brace-match + hook-upgrade + refuse-to-write logic as `_p4_extract_view.py`. Used for P5e helper bundles.
 >
