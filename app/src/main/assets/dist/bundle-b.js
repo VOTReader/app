@@ -2196,6 +2196,186 @@
     return { settings, setSettings, toggleSetting, updateSetting };
   }
 
+  // app/src/main/assets/src/hooks/use-sheet-orchestration.js
+  function useSheetOrchestration({
+    screen,
+    letterId,
+    bookId,
+    chapterNum,
+    studyId,
+    studyChapterId,
+    setHlTick
+  }) {
+    const [annChip, setAnnChip] = React.useState(null);
+    const [linkSidebarKey, setLinkSidebarKey] = React.useState(null);
+    const [linkPickerSource, setLinkPickerSource] = React.useState(null);
+    const [linkRefineRequest, setLinkRefineRequest] = React.useState(null);
+    const [lastLinkCreated, setLastLinkCreated] = React.useState(null);
+    const [linkPickerMode, setLinkPickerMode] = React.useState(null);
+    const linkPickerOnPickRef = React.useRef(null);
+    const [noteSheetTarget, setNoteSheetTarget] = React.useState(null);
+    const [notebookPickerTarget, setNotebookPickerTarget] = React.useState(null);
+    const [multiNotePayload, setMultiNotePayload] = React.useState(null);
+    const [bookmarkPopoverPayload, setBookmarkPopoverPayload] = React.useState(null);
+    const [bookmarkCreatePending, setBookmarkCreatePending] = React.useState(null);
+    const [inboundJournalPayload, setInboundJournalPayload] = React.useState(null);
+    const openLinkSidebar = React.useCallback((hlKey) => setLinkSidebarKey(hlKey), []);
+    const closeLinkSidebar = React.useCallback(() => setLinkSidebarKey(null), []);
+    const openLinkPicker = React.useCallback((selInfo) => {
+      const hlKey = typeof selInfo === "string" ? selInfo : selInfo.hlKey;
+      if (!hlKey) return;
+      const parts = hlKey.split(":");
+      let label = hlKey;
+      if (parts[0] === "bible") {
+        const b = _allBooks()[parts[1]];
+        label = (b ? b.title : parts[1]) + " " + parts[2] + ":" + parts[3];
+      } else if (parts[0] === "study") {
+        const m = parts[1].match(/^(.+)-(\d+)$/);
+        if (m) label = m[1].charAt(0).toUpperCase() + m[1].slice(1) + " " + m[2] + (parts[2] && parts[2] !== "0" ? ":" + parts[2] : "");
+      } else if (parts[0] === "letter" || parts[0] === "wtlb" || parts[0] === "blessed" || parts[0] === "holy-days") {
+        const ctx = findEntryContext(parts[1], parts[0]);
+        if (ctx && ctx.title) label = ctx.title;
+      } else if (parts[0] === "journal") {
+        const eid = parts[1];
+        const je = typeof JournalStore !== "undefined" ? JournalStore.get(eid) : null;
+        if (je && typeof JournalHelpers !== "undefined") {
+          label = "Journal \xB7 " + (JournalHelpers.entryDisplayTitle(je) || "Untitled");
+        }
+      }
+      const src = typeof selInfo === "string" ? { key: hlKey, label } : { key: hlKey, label, start: selInfo.start, end: selInfo.end, text: selInfo.text };
+      setLinkPickerSource(src);
+    }, []);
+    const closeLinkPicker = React.useCallback(() => {
+      setLinkPickerSource(null);
+      setLinkRefineRequest(null);
+      setLastLinkCreated(null);
+      setLinkPickerMode(null);
+      linkPickerOnPickRef.current = null;
+      setHlTick((t) => t + 1);
+    }, []);
+    const openLinkPickerForTarget = React.useCallback((mode, onPick) => {
+      linkPickerOnPickRef.current = typeof onPick === "function" ? onPick : null;
+      setLinkPickerSource({ key: null, label: null, picker: true });
+      setLinkPickerMode(mode || "card");
+      setLinkRefineRequest(null);
+      setLastLinkCreated(null);
+    }, []);
+    const openNoteSheet = React.useCallback((groupId, startInEditMode) => {
+      setNoteSheetTarget({ groupId, startInEditMode: !!startInEditMode });
+      setAnnChip(null);
+    }, []);
+    const closeNoteSheet = React.useCallback(() => setNoteSheetTarget(null), []);
+    React.useEffect(() => {
+      window.__openLinkPicker = openLinkPicker;
+      window.__openLinkPickerForTarget = openLinkPickerForTarget;
+      return () => {
+        delete window.__openLinkPicker;
+        delete window.__openLinkPickerForTarget;
+      };
+    }, [openLinkPicker, openLinkPickerForTarget]);
+    React.useEffect(() => {
+      window.__openNote = openNoteSheet;
+      return () => {
+        delete window.__openNote;
+      };
+    }, [openNoteSheet]);
+    React.useEffect(() => {
+      window.__openLinkSidebar = openLinkSidebar;
+      return () => {
+        delete window.__openLinkSidebar;
+      };
+    }, [openLinkSidebar]);
+    React.useEffect(() => {
+      window.__showAnnChip = (x, y, hlKey, groupId) => setAnnChip({ x, y, hlKey, groupId });
+      return () => {
+        delete window.__showAnnChip;
+      };
+    }, []);
+    React.useEffect(() => {
+      window.__showMultiNote = (groupIds, x, y) => setMultiNotePayload({ groupIds, x, y });
+      return () => {
+        delete window.__showMultiNote;
+      };
+    }, []);
+    React.useEffect(() => {
+      window.__openBookmarkPopover = (bkmIds, x, y, hlKey) => setBookmarkPopoverPayload({ bkmIds, x, y, hlKey });
+      return () => {
+        delete window.__openBookmarkPopover;
+      };
+    }, []);
+    React.useEffect(() => {
+      window.__bookmarkCreate = (info) => setBookmarkCreatePending(info || null);
+      return () => {
+        delete window.__bookmarkCreate;
+      };
+    }, []);
+    React.useEffect(() => {
+      window.__openJournalInbound = (refKey, label) => setInboundJournalPayload(refKey ? { refKey, label } : null);
+      return () => {
+        delete window.__openJournalInbound;
+      };
+    }, []);
+    React.useEffect(() => {
+      window.__bookmarkEdit = (bkmId2, opts) => {
+        if (!bkmId2 || typeof BookmarkStore === "undefined") return;
+        const bkm = BookmarkStore.get(bkmId2);
+        if (!bkm) return;
+        const sourceLabel = typeof _bookmarkSourceLabel === "function" ? _bookmarkSourceLabel(bkm.hlKey) : "";
+        setBookmarkCreatePending({
+          editId: bkm.id,
+          hlKey: bkm.hlKey,
+          sourceLabel,
+          excerpt: "",
+          defaultLabel: bkm.label || "",
+          currentLabel: bkm.label || "",
+          currentThought: bkm.thought || "",
+          atSource: !!(opts && opts.atSource)
+        });
+      };
+      return () => {
+        delete window.__bookmarkEdit;
+      };
+    }, []);
+    React.useEffect(() => {
+      if (typeof window.__hideSelectionToolbar === "function") window.__hideSelectionToolbar();
+      setNoteSheetTarget(null);
+      setAnnChip(null);
+      setMultiNotePayload(null);
+      setBookmarkPopoverPayload(null);
+    }, [screen, letterId, bookId, chapterNum, studyId, studyChapterId]);
+    return {
+      annChip,
+      setAnnChip,
+      linkSidebarKey,
+      openLinkSidebar,
+      closeLinkSidebar,
+      linkPickerSource,
+      openLinkPicker,
+      openLinkPickerForTarget,
+      closeLinkPicker,
+      linkRefineRequest,
+      setLinkRefineRequest,
+      lastLinkCreated,
+      setLastLinkCreated,
+      linkPickerMode,
+      linkPickerOnPickRef,
+      noteSheetTarget,
+      setNoteSheetTarget,
+      openNoteSheet,
+      closeNoteSheet,
+      notebookPickerTarget,
+      setNotebookPickerTarget,
+      multiNotePayload,
+      setMultiNotePayload,
+      bookmarkPopoverPayload,
+      setBookmarkPopoverPayload,
+      bookmarkCreatePending,
+      setBookmarkCreatePending,
+      inboundJournalPayload,
+      setInboundJournalPayload
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -2652,7 +2832,7 @@
     return Array.isArray(arr) ? arr : [];
   }
   var LETTER_SCREEN_SET = new Set(COLLECTIONS2.map((c) => c.letterScreen).concat(["bible-study-chapter"]));
-  function _allBooks() {
+  function _allBooks2() {
     return window.__ALL_BOOKS || (typeof BOOKS !== "undefined" ? BOOKS : {});
   }
   function _matthew() {
@@ -2678,7 +2858,7 @@
   }
   function findBook(rawName) {
     if (rawName == null) return null;
-    const books = _allBooks();
+    const books = _allBooks2();
     const q = String(rawName).toLowerCase().replace(/\s+/g, "");
     if (!q) return null;
     for (const k of Object.keys(books)) {
@@ -2695,7 +2875,7 @@
     if (!p || p.verse == null) return null;
     const bookKey = findBook(p.rawBook);
     if (!bookKey) return null;
-    const books = _allBooks();
+    const books = _allBooks2();
     const book = books[bookKey];
     const ch = book.chapters && book.chapters.find((c) => c.num === p.chapter);
     if (!ch) return null;
@@ -2705,7 +2885,7 @@
   }
   function resolveVerseText(endpoint) {
     if (endpoint.type === "bible") {
-      const book = _allBooks()[endpoint.bookId];
+      const book = _allBooks2()[endpoint.bookId];
       if (!book) return endpoint.preview || "";
       const ch = book.chapters && book.chapters.find((c) => c.num === endpoint.chapter);
       if (!ch) return endpoint.preview || "";
@@ -2780,7 +2960,7 @@
         }
       }
     }
-    const books = _allBooks();
+    const books = _allBooks2();
     const book = books[bookKey];
     const chapter = (book && book.chapters || []).find((c) => c.num === p.chapter);
     if (!chapter) return null;
@@ -6407,6 +6587,7 @@
     useScrollMemory,
     useReadingDwell,
     useSettings,
+    useSheetOrchestration,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
@@ -6427,7 +6608,7 @@
     colPreface,
     colLetterArr,
     LETTER_SCREEN_SET,
-    _allBooks,
+    _allBooks: _allBooks2,
     _matthew,
     _studies,
     parseRefStr,

@@ -1121,90 +1121,27 @@ function App() {
      Overlay state tracks which sheets/sidebars are open.
   ═══════════════════════════════════════════════════════════════ */
   const [hlTick, setHlTick] = useState(0);
-  const [annChip, setAnnChip] = useState(null);                  // { x, y, hlKey, groupId } or null
-  const [linkSidebarKey, setLinkSidebarKey] = useState(null);   // hlKey or null
-  const [linkPickerSource, setLinkPickerSource] = useState(null); // { key, label } or null
-  const [linkRefineRequest, setLinkRefineRequest] = useState(null); // { kind, target, item } or null
-  const [lastLinkCreated, setLastLinkCreated] = useState(null); // most recently created link, for undo
-  // Picker mode — when set, LinkPicker behaves as a target picker (no source,
-  // no link persistence); the selected/refined target is handed back via
-  // linkPickerOnPickRef.current. Used by Journal to drive the LinkPicker for
-  // "Insert Card" (mode='card', no excerpt prompt) and "Insert Excerpt"
-  // (mode='excerpt', always refine through verse/letter picker).
-  const [linkPickerMode, setLinkPickerMode] = useState(null); // null | 'card' | 'excerpt'
-  const linkPickerOnPickRef = useRef(null);
-  const [noteSheetTarget, setNoteSheetTarget] = useState(null);  // { groupId, startInEditMode } or null
-  const [notebookPickerTarget, setNotebookPickerTarget] = useState(null); // groupId or null
-  const [multiNotePayload, setMultiNotePayload] = useState(null); // { groupIds, x, y } or null
-  const [bookmarkPopoverPayload, setBookmarkPopoverPayload] = useState(null); // { bkmIds, x, y, hlKey } or null
-  const [bookmarkCreatePending, setBookmarkCreatePending] = useState(null);   // { hlKey, sourceLabel, excerpt, defaultLabel } or null
-
-  const openLinkSidebar = useCallback((hlKey) => setLinkSidebarKey(hlKey), []);
-  const closeLinkSidebar = useCallback(() => setLinkSidebarKey(null), []);
-  const openLinkPicker = useCallback((selInfo) => {
-    const hlKey = typeof selInfo === 'string' ? selInfo : selInfo.hlKey;
-    if (!hlKey) return;
-    const parts = hlKey.split(':');
-    let label = hlKey;
-    if (parts[0] === 'bible') {
-      const b = _allBooks()[parts[1]];
-      label = (b ? b.title : parts[1]) + ' ' + parts[2] + ':' + parts[3];
-    } else if (parts[0] === 'study') {
-      // study:bookId-chapter:verse  e.g. "study:matthew-4:7"
-      const m = parts[1].match(/^(.+)-(\d+)$/);
-      if (m) label = (m[1].charAt(0).toUpperCase() + m[1].slice(1)) + ' ' + m[2] + (parts[2] && parts[2] !== '0' ? ':' + parts[2] : '');
-    } else if (parts[0] === 'letter' || parts[0] === 'wtlb' || parts[0] === 'blessed' || parts[0] === 'holy-days') {
-      // Centralized lookup also covers Bible-Study chapters (whose source
-      // hlKey shape is "letter:{chapterId}:N" because LetterView renders them).
-      const ctx = findEntryContext(parts[1], parts[0]);
-      if (ctx && ctx.title) label = ctx.title;
-    } else if (parts[0] === 'journal') {
-      // journal:<entryId>:<blockIdx>
-      const eid = parts[1];
-      const je = (typeof JournalStore !== 'undefined') ? JournalStore.get(eid) : null;
-      if (je && typeof JournalHelpers !== 'undefined') {
-        label = 'Journal · ' + (JournalHelpers.entryDisplayTitle(je) || 'Untitled');
-      }
-    }
-    const src = typeof selInfo === 'string'
-      ? { key: hlKey, label }
-      : { key: hlKey, label, start: selInfo.start, end: selInfo.end, text: selInfo.text };
-    setLinkPickerSource(src);
-  }, []);
-  const closeLinkPicker = useCallback(() => { setLinkPickerSource(null); setLinkRefineRequest(null); setLastLinkCreated(null); setLinkPickerMode(null); linkPickerOnPickRef.current = null; setHlTick(t => t + 1); }, []);
-  // Picker mode — Journal calls this to open LinkPicker as a target picker.
-  //   mode: 'card'    → return target after the first item is chosen (no
-  //                     verse/excerpt prompt). Used for "Insert Card".
-  //   mode: 'excerpt' → always run the verse/letter excerpt picker so the
-  //                     user can pick a character-precise span. Used for
-  //                     "Insert Excerpt".
-  // onPick receives the chosen target endpoint (+ optional refinement data).
-  const openLinkPickerForTarget = useCallback((mode, onPick) => {
-    linkPickerOnPickRef.current = typeof onPick === 'function' ? onPick : null;
-    // Use a sentinel source object so the render conditions ("source &&
-    // !refine") still fire — but no real source key/label exists.
-    setLinkPickerSource({ key: null, label: null, picker: true });
-    setLinkPickerMode(mode || 'card');
-    setLinkRefineRequest(null);
-    setLastLinkCreated(null);
-  }, []);
-  // Expose openLinkPicker globally so the SelectionToolbar can invoke it
-  // from anywhere (Bible/Letter/WTLB views), and so tests / hardware-back
-  // handling can interact with it without prop-drilling.
-  useEffect(() => {
-    window.__openLinkPicker = openLinkPicker;
-    window.__openLinkPickerForTarget = openLinkPickerForTarget;
-    return () => {
-      delete window.__openLinkPicker;
-      delete window.__openLinkPickerForTarget;
-    };
-  }, [openLinkPicker, openLinkPickerForTarget]);
-  const openNoteSheet = useCallback((groupId, startInEditMode) => {
-    setNoteSheetTarget({ groupId, startInEditMode: !!startInEditMode });
-    setAnnChip(null);
-  }, []);
-  const closeNoteSheet = useCallback(() => setNoteSheetTarget(null), []);
-  useEffect(() => { window.__openNote = openNoteSheet; return () => { delete window.__openNote; }; }, [openNoteSheet]);
+  /* useSheetOrchestration — modal/sheet/overlay open-state + the
+     window.__open* bridges + auto-dismiss-on-navigation.
+     Extracted to src/hooks/use-sheet-orchestration.js (P6h). */
+  const {
+    annChip, setAnnChip,
+    linkSidebarKey, openLinkSidebar, closeLinkSidebar,
+    linkPickerSource, openLinkPicker, openLinkPickerForTarget, closeLinkPicker,
+    linkRefineRequest, setLinkRefineRequest,
+    lastLinkCreated, setLastLinkCreated,
+    linkPickerMode, linkPickerOnPickRef,
+    noteSheetTarget, setNoteSheetTarget, openNoteSheet, closeNoteSheet,
+    notebookPickerTarget, setNotebookPickerTarget,
+    multiNotePayload, setMultiNotePayload,
+    bookmarkPopoverPayload, setBookmarkPopoverPayload,
+    bookmarkCreatePending, setBookmarkCreatePending,
+    inboundJournalPayload, setInboundJournalPayload,
+  } = useSheetOrchestration({
+    screen, letterId, bookId, chapterNum, studyId, studyChapterId,
+    setHlTick,
+  });
+  /* sheet slots → src/hooks/use-sheet-orchestration.js (P6h) */
 
   // Navigate to a link target (from LinkSidebar card tap).
   // Uses _navToLinkRef so it can push onto fromLetterStack (defined later)
@@ -1215,13 +1152,8 @@ function App() {
     if (_navToLinkRef.current) _navToLinkRef.current(endpoint, meta);
   }, []);
 
-  // Apply DOM-based highlights + inline link icons to LetterView/WtlbEntryView
-  // containers after React renders. HighlightableText handles BibleChapterView/
-  // ChapterView. window.__openLinkSidebar is read by inline link icon clicks.
-  useEffect(() => { window.__openLinkSidebar = openLinkSidebar; }, [openLinkSidebar]);
-  useEffect(() => { window.__showAnnChip = (x, y, hlKey, groupId) => setAnnChip({ x, y, hlKey, groupId }); }, []);
-  useEffect(() => { window.__showMultiNote = (groupIds, x, y) => setMultiNotePayload({ groupIds, x, y }); }, []);
-  useEffect(() => { window.__openBookmarkPopover = (bkmIds, x, y, hlKey) => setBookmarkPopoverPayload({ bkmIds, x, y, hlKey }); return () => { delete window.__openBookmarkPopover; }; }, []);
+  /* bridge effects (__openLinkSidebar, __showAnnChip, __showMultiNote,
+     __openBookmarkPopover) → src/hooks/use-sheet-orchestration.js (P6h) */
   // Lightweight escape hatch for inline components (e.g. the chapter
   // bookmark button in NavButtons) to trigger a hlTick bump without prop-
   // drilling. Used after store writes that aren't otherwise tied to React
@@ -1257,65 +1189,8 @@ function App() {
       root.style.setProperty('--keyboard-height', '0px');
     };
   }, []);
-  // Bridge for SelectionToolbar + ChapterBookmarkBtn to open the
-  // pre-commit BookmarkCreateSheet instead of silently adding to the
-  // store. `info` shape: { hlKey, sourceLabel, excerpt, defaultLabel }.
-  useEffect(() => { window.__bookmarkCreate = (info) => setBookmarkCreatePending(info || null); return () => { delete window.__bookmarkCreate; }; }, []);
-  // Journal inbound sheet bridge — opened from JournalChip in NavButtons.
-  // payload: { refKey: 'letter:two/the-wide-path', label: 'The Wide Path' }
-  const [inboundJournalPayload, setInboundJournalPayload] = useState(null);
-  useEffect(() => {
-    window.__openJournalInbound = (refKey, label) => setInboundJournalPayload(refKey ? { refKey, label } : null);
-    return () => { delete window.__openJournalInbound; };
-  }, []);
-  // Bridge for the inline bookmark icon (single-bookmark tap) and the
-  // BookmarksScreen row's edit-from-action-sheet path to open the same
-  // BookmarkCreateSheet in EDIT mode. Looks up the existing record and
-  // builds the `pending` shape with editId + currentLabel/currentThought
-  // populated so the sheet renders preloaded.
-  useEffect(() => {
-    window.__bookmarkEdit = (bkmId, opts) => {
-      if (!bkmId || typeof BookmarkStore === 'undefined') return;
-      const bkm = BookmarkStore.get(bkmId);
-      if (!bkm) return;
-      // Source label reuses the BookmarksScreen helper for consistency.
-      const sourceLabel = (typeof _bookmarkSourceLabel === 'function')
-        ? _bookmarkSourceLabel(bkm.hlKey)
-        : '';
-      // `atSource` lets callers signal that the user is already on the
-      // bookmarked passage (set by the inline-icon tap in
-      // dom-bookmarks.js). The sheet uses it to hide the "Open Source"
-      // button, which would otherwise be a redundant no-op. Future
-      // callers from a list surface (e.g. BookmarksScreen row's action
-      // sheet) can omit it and the Open button is shown by default.
-      setBookmarkCreatePending({
-        editId: bkm.id,
-        hlKey: bkm.hlKey,
-        sourceLabel: sourceLabel,
-        excerpt: '',
-        defaultLabel: bkm.label || '',
-        currentLabel: bkm.label || '',
-        currentThought: bkm.thought || '',
-        atSource: !!(opts && opts.atSource)
-      });
-    };
-    return () => { delete window.__bookmarkEdit; };
-  }, []);
-  // Auto-dismiss floating overlays whenever the active screen, letter,
-  // book, or study chapter changes. Without this the always-mounted
-  // SelectionToolbar persists with a stale selInfo, and the
-  // noteSheetTarget keeps the NoteSheet visible over an unrelated
-  // page after the user navigates via letter arrows or hardware back.
-  // Also clears the AnnotationActionChip and MultiNote popover for the
-  // same reason. annChip + multiNote already had partial cleanup in
-  // hlTick reset paths; this consolidates the policy in one place.
-  useEffect(() => {
-    if (typeof window.__hideSelectionToolbar === 'function') window.__hideSelectionToolbar();
-    setNoteSheetTarget(null);
-    setAnnChip(null);
-    setMultiNotePayload(null);
-    setBookmarkPopoverPayload(null);
-  }, [screen, letterId, bookId, chapterNum, studyId, studyChapterId]);
+  /* __bookmarkCreate, inboundJournalPayload, __openJournalInbound,
+     __bookmarkEdit, auto-dismiss effect → src/hooks/use-sheet-orchestration.js (P6h) */
   useEffect(() => {
     const t = setTimeout(() => {
       // Each annotation layer is isolated: this pipeline mutates the DOM

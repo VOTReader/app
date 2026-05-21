@@ -93,7 +93,9 @@
       // P6f: useReadingDwell — dwell-timer mark-as-read tracking
       'useReadingDwell',
       // P6g: useSettings — settings state + mutators + body-class/AndroidBridge effect
-      'useSettings'
+      'useSettings',
+      // P6h: useSheetOrchestration — sheet/overlay state + window bridges + auto-dismiss
+      'useSheetOrchestration'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',
