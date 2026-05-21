@@ -420,9 +420,7 @@ var _OT_BOOKS_INLINE = new Set(['genesis','exodus','leviticus','numbers','deuter
 /* ── Scripture Sheet (Matthew) ── */
 /* ScriptureSheet → extracted to src/ui/components/ScriptureSheet.js */
 
-const EXPAND_THRESHOLD = 130;
-const MIN_HIDDEN_WORDS = 20; // only collapse if hiding at least this many whole words
-
+/* EXPAND_THRESHOLD + MIN_HIDDEN_WORDS → extracted to src/ui/components/ExpandableVerse.js (G.2.3) */
 /* ExpandableVerse → extracted to src/ui/components/ExpandableVerse.js */
 
 /* FootnoteListSection → extracted to src/ui/components/FootnoteListSection.js */
@@ -614,29 +612,16 @@ const SCRIPTURE_GENRES = {
 
 /* ═══════════════════════════════════════════════════════════════
    GARDEN VIEW — Progressive image viewer for "A Return to The Garden"
+   Constants + helpers extracted (G.2.3):
+   - GARDEN_TOTAL / GARDEN_TIERS / GARDEN_DEFAULT_TIER / gardenImageCache
+     → src/utils/garden.js (cross-module-shared; exposed on window via _entry-d.js
+       so inline App() in this file reads them through window globals)
+   - GARDEN_PRELOAD_AHEAD / GARDEN_CRAWL_DELAY → src/ui/screens/GardenView.js
+     (module-private; only GardenView consumes them)
+   - getGardenTier / gardenUrl / gardenCacheKey / gardenPreload / gardenIsCached
+     → src/utils/garden.js
+   - GardenView → src/ui/screens/GardenView.js
 ═══════════════════════════════════════════════════════════════ */
-const GARDEN_TOTAL = 209;
-const GARDEN_PRELOAD_AHEAD = 5;
-const GARDEN_CRAWL_DELAY = 500; // ms between background crawl downloads
-
-// Quality tiers — each hosted on its own GitHub release
-const GARDEN_TIERS = [
-{ id: "mobile", label: "Mobile", res: "2160px", size: "~110 MB", tag: "garden-mobile", desc: "Screen-native; light on cell data" },
-{ id: "standard", label: "Standard", res: "2880px", size: "~180 MB", tag: "garden-standard", desc: "Balanced default — great at 1× and 1.5× zoom" },
-{ id: "native", label: "Native", res: "3600px", size: "~320 MB", tag: "garden-native", desc: "Full source detail; no upscaling" },
-{ id: "ultra", label: "Ultra", res: "4600px", size: "~680 MB", tag: "garden-ultra", desc: "Maximum quality — for pixel-peepers" }];
-
-const GARDEN_DEFAULT_TIER = "standard";
-/* getGardenTier --> extracted to src/utils/garden.js */
-/* gardenUrl --> extracted to src/utils/garden.js */
-
-// Image cache — per-tier, keyed as "tier:page"
-const gardenImageCache = {};
-/* gardenCacheKey --> extracted to src/utils/garden.js */
-/* gardenPreload --> extracted to src/utils/garden.js */
-/* gardenIsCached --> extracted to src/utils/garden.js */
-
-/* GardenView → extracted to src/ui/screens/GardenView.js */
 
 
 /* VolumesHome → extracted to src/ui/screens/VolumesHome.js */
@@ -785,29 +770,19 @@ const READING_SCREENS = new Set([
    Matthew is deliberately excluded — Study Bible owns it.
 ═══════════════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════════════
-   Thumbnail storage — IndexedDB (localStorage's ~5MB quota fills up
-   fast with JPEG data URLs; each thumb is 50-120KB).
+   Thumbnail storage — IndexedDB-backed thumb cache.
+   Constants + state + helpers extracted (G.2.3) to
+   src/stores/thumb-store.js (module-private; never read from App()).
 ═══════════════════════════════════════════════════════════════ */
-const THUMB_DB = 'vot-thumbs';
-const THUMB_STORE = 'thumbs';
-let _thumbDbPromise = null;
-/* openThumbDB --> extracted to src/stores/thumb-store.js */
-/* idbPut --> extracted to src/stores/thumb-store.js */
-/* idbDelete --> extracted to src/stores/thumb-store.js */
-/* idbReadAll --> extracted to src/stores/thumb-store.js */
+/* THUMB_DB / THUMB_STORE / _thumbDbPromise → src/stores/thumb-store.js */
+/* openThumbDB / idbPut / idbDelete / idbReadAll → src/stores/thumb-store.js */
 
-// Alt-translation data is loaded lazily (see loadTranslation below). Until
-// the target translation's bible-<code>.js has loaded, translateVerse falls
-// back to the NKJV text baked into chapter.sections.verses[].text.
-const _translationPromises = {}; // code -> Promise that resolves when loaded
-const _translationLoaded = {}; // code -> true once global is available
-/* loadTranslation --> extracted to src/data/translations.js */
-
-// bible-studies.js (~4.3 MB) is lazy-loaded the first time the user opens Studies.
-// Modeled on loadTranslation() — same caching / promise pattern.
-// Once loaded, window.BIBLE_STUDIES is defined and _studies() returns the array.
-let _bibleStudiesPromise = null;
-/* loadBibleStudies --> extracted to src/data/translations.js */
+/* Alt-translation lazy loaders — state + helpers extracted (G.2.3) to
+   src/data/translations.js (module-private; never read from App()).
+   bible-studies.js (~4.3 MB) is also lazy-loaded there via the same
+   caching/promise pattern. */
+/* _translationPromises / _translationLoaded / _bibleStudiesPromise → src/data/translations.js */
+/* loadTranslation / loadBibleStudies / translateVerse → src/data/translations.js */
 const TRANSLATION_OPTIONS = [
 { id: 'nkjv', label: 'NKJV', desc: 'New King James Version — default' },
 { id: 'web', label: 'WEB', desc: 'World English Bible — modern, public domain' },
