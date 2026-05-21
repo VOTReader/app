@@ -14,7 +14,6 @@ Usage (see .claude/launch.json):
 """
 
 import http.server
-import socketserver
 import sys
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8090
@@ -35,8 +34,13 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
-class Server(socketserver.TCPServer):
+# THREADED — must mirror `python -m http.server`, which uses ThreadingHTTPServer.
+# A single-threaded TCPServer stalls under the smoke harness's rapid concurrent
+# request bursts (a held-open connection blocks the whole server), the preview
+# tool then sees the port as dead and the browser falls back to chrome-error.
+class Server(http.server.ThreadingHTTPServer):
     allow_reuse_address = True  # avoid "address already in use" on quick restarts
+    daemon_threads = True       # don't let lingering request threads block exit
 
 
 if __name__ == "__main__":
