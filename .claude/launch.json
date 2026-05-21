@@ -4,7 +4,7 @@
     {
       "name": "app",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8090", "--directory", "D:\\VOTReader-studio\\app\\src\\main\\assets"],
+      "runtimeArgs": ["tools/preview-server.py", "8090", "D:\\VOTReader-studio\\app\\src\\main\\assets"],
       "port": 8090
     }
   ]
