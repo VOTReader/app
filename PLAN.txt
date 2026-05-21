@@ -2320,9 +2320,18 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
     Why medium: 300ms polling for __scrollEl is fragile but already
                 proven. The "save scroll on visibilityState=hidden"
                 effect is critical for Android-kill survival.
-    Returns: { flushScrollToActiveTab, scrollKeyRef }
-    Open question: getScrollKey reads COL_BY_LETTER_SC — should this be
-    a pure helper in src/utils/ instead of staying inside the hook?
+    Returns: { flushScrollToActiveTab }
+      CORRECTED 2026-05-20 by P6e recon: was "{ flushScrollToActiveTab,
+      scrollKeyRef }" — but scrollKeyRef has ZERO callsites outside the
+      scroll block (3 uses: init at :1918, read in flush at :1928, write
+      in the restore effect at :1971 — all in-block). It stays
+      hook-internal and is NOT returned. flushScrollToActiveTab IS
+      returned — goTabs (:2078) calls it.
+    getScrollKey disposition (the old open question): RESOLVED — it has
+      no callsites outside the scroll block either, so it moves INTO
+      src/hooks/use-scroll-memory.js as a module-private helper (not a
+      src/utils/ file). It reads COL_BY_LETTER_SC, a bundle-B window
+      global, by bare name — no import needed, same as __scrollEl.
 
   ── Cluster 4: useThumbnails ── (MEDIUM, ~150 lines, src/hooks/use-thumbnails.js)
     Symbols: tabThumbnails state, thumbGcTimerRef, captureActiveTabThumbnail

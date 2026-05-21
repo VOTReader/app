@@ -87,7 +87,9 @@
       // P6c: useHistory — App-global reading-history state + mutators
       'useHistory',
       // P6d: useThumbnails — tab-card thumbnail capture + IDB persistence + GC
-      'useThumbnails'
+      'useThumbnails',
+      // P6e: useScrollMemory — per-tab/per-screen scroll position capture + restore
+      'useScrollMemory'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',

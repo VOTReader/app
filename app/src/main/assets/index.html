@@ -1893,95 +1893,15 @@ function App() {
   const navOriginRef = useRefMirror(navOrigin);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
 
-  /* ── Scroll position memory ──────────────────────────────────────
-     Two layers:
-     1. SESSION map (useRef, plain object) — remembers every chapter
-        you've visited this session so back/forward feels natural.
-        Cleared when the app closes. Never touches localStorage.
-     2. PERSISTENT (localStorage, single entry) — only the chapter
-        you were on when the app was last open, so restarts land you
-        back in the right place. Navigating to a fresh chapter that
-        isn't in the session map → goes to top, not a stale position.
-  ────────────────────────────────────────────────────────────────── */
-  const getScrollKey = (scr, bid, cnum, lid, sid, scid) => {
-    if (scr === "matthew-ch" || scr === "bible-ch") return bid + '-' + cnum;
-    if (scr === "bible-study-chapter") return 'study-' + (sid || '') + '-' + (scid || '');
-    if (scr === "hm-letter") return 'entry-' + lid;
-    var _sc = COL_BY_LETTER_SC.get(scr);
-    if (_sc) {
-      var pfx = _sc.kind === 'holy-days' ? 'holyday' : _sc.kind === 'letter' ? 'letter' : _sc.kind;
-      return pfx + '-' + lid;
-    }
-    return scr;
-  };
-
-  const scrollKeyRef = React.useRef(getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId));
-  // Active tab's current position is kept in tab.scrollPositions (persisted
-  // via tabs state). Each tab has its own per-screen map. Overview-screen
-  // progress bars also read from these values.
-
-  // Debounced scroll listener — writes { y, pct } per-screen per-tab
-  // Synchronous scroll flush — reads __scrollEl, writes to active tab.
-  // Callable from goTabs / visibilitychange so pending scroll work isn't lost.
-  const flushScrollToActiveTab = React.useCallback(() => {
-    if (tabsOverviewOpenRef.current) return; // don't overwrite with overview scroll
-    const key = scrollKeyRef.current;
-    if (!key || !__scrollEl) return;
-    const { scrollTop, scrollHeight, clientHeight } = __scrollEl;
-    const max = Math.max(scrollHeight - clientHeight, 1);
-    const pct = Math.max(0, Math.min(1, scrollTop / max));
-    updateActiveTab((t) => ({
-      scrollPositions: { ...(t.scrollPositions || {}), [key]: { y: scrollTop, pct } }
-    }));
-  }, [updateActiveTab]);
-
-  useEffect(() => {
-    let timeout;
-    let currentEl = null;
-    const onScroll = () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(flushScrollToActiveTab, 120);
-    };
-    const attach = () => {
-      if (__scrollEl !== currentEl) {
-        if (currentEl) currentEl.removeEventListener("scroll", onScroll);
-        currentEl = __scrollEl;
-        if (currentEl) currentEl.addEventListener("scroll", onScroll, { passive: true });
-      }
-    };
-    attach();
-    const poll = setInterval(attach, 300);
-    return () => {clearInterval(poll);if (currentEl) currentEl.removeEventListener("scroll", onScroll);clearTimeout(timeout);};
-  }, [flushScrollToActiveTab]);
-
-  // Flush scroll on page hide / app background — ensures preservation across OS kills
-  useEffect(() => {
-    const onVis = () => {if (document.visibilityState === 'hidden') flushScrollToActiveTab();};
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('pagehide', flushScrollToActiveTab);
-    return () => {
-      document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('pagehide', flushScrollToActiveTab);
-    };
-  }, [flushScrollToActiveTab]);
-
-  // On screen change or tab switch: restore active tab's scroll for the screen
-  useEffect(() => {
-    const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId);
-    scrollKeyRef.current = key;
-    if (surpriseAnchor) return;
-
-    const saved = activeTab && activeTab.scrollPositions && activeTab.scrollPositions[key];
-    // Support both new { y, pct } shape and legacy plain number for backcompat
-    const savedY = saved == null ? null :
-    typeof saved === 'number' ? saved : typeof saved.y === 'number' ? saved.y : null;
-    if (typeof savedY === 'number' && savedY > 0) {
-      const timer = setTimeout(() => {if (__scrollEl) __scrollEl.scrollTop = savedY;}, 0);
-      return () => clearTimeout(timer);
-    }
-    // Fresh screen / no saved position → top
-    setTimeout(() => {if (__scrollEl) __scrollEl.scrollTop = 0;}, 0);
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
+  /* useScrollMemory — per-tab/per-screen scroll position capture +
+     restore. Extracted to src/hooks/use-scroll-memory.js (P6e). */
+  const { flushScrollToActiveTab } = useScrollMemory({
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    activeTab, activeTabIdx,
+    updateActiveTab,
+    surpriseAnchor,
+    tabsOverviewOpen,
+  });
 
   /* ── Save state on every change ── */
   useEffect(() => {

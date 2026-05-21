@@ -1953,6 +1953,96 @@
     return { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail };
   }
 
+  // app/src/main/assets/src/hooks/use-scroll-memory.js
+  function getScrollKey(scr, bid, cnum, lid, sid, scid) {
+    if (scr === "matthew-ch" || scr === "bible-ch") return bid + "-" + cnum;
+    if (scr === "bible-study-chapter") return "study-" + (sid || "") + "-" + (scid || "");
+    if (scr === "hm-letter") return "entry-" + lid;
+    var _sc = COL_BY_LETTER_SC.get(scr);
+    if (_sc) {
+      var pfx = _sc.kind === "holy-days" ? "holyday" : _sc.kind === "letter" ? "letter" : _sc.kind;
+      return pfx + "-" + lid;
+    }
+    return scr;
+  }
+  function useScrollMemory({
+    screen,
+    bookId,
+    chapterNum,
+    letterId,
+    studyId,
+    studyChapterId,
+    activeTab,
+    activeTabIdx,
+    updateActiveTab,
+    surpriseAnchor,
+    tabsOverviewOpen
+  }) {
+    const scrollKeyRef = React.useRef(getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId));
+    const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
+    const flushScrollToActiveTab = React.useCallback(() => {
+      if (tabsOverviewOpenRef.current) return;
+      const key = scrollKeyRef.current;
+      if (!key || !__scrollEl) return;
+      const { scrollTop, scrollHeight, clientHeight } = __scrollEl;
+      const max = Math.max(scrollHeight - clientHeight, 1);
+      const pct = Math.max(0, Math.min(1, scrollTop / max));
+      updateActiveTab((t) => ({
+        scrollPositions: { ...t.scrollPositions || {}, [key]: { y: scrollTop, pct } }
+      }));
+    }, [updateActiveTab]);
+    React.useEffect(() => {
+      let timeout;
+      let currentEl = null;
+      const onScroll = () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(flushScrollToActiveTab, 120);
+      };
+      const attach = () => {
+        if (__scrollEl !== currentEl) {
+          if (currentEl) currentEl.removeEventListener("scroll", onScroll);
+          currentEl = __scrollEl;
+          if (currentEl) currentEl.addEventListener("scroll", onScroll, { passive: true });
+        }
+      };
+      attach();
+      const poll = setInterval(attach, 300);
+      return () => {
+        clearInterval(poll);
+        if (currentEl) currentEl.removeEventListener("scroll", onScroll);
+        clearTimeout(timeout);
+      };
+    }, [flushScrollToActiveTab]);
+    React.useEffect(() => {
+      const onVis = () => {
+        if (document.visibilityState === "hidden") flushScrollToActiveTab();
+      };
+      document.addEventListener("visibilitychange", onVis);
+      window.addEventListener("pagehide", flushScrollToActiveTab);
+      return () => {
+        document.removeEventListener("visibilitychange", onVis);
+        window.removeEventListener("pagehide", flushScrollToActiveTab);
+      };
+    }, [flushScrollToActiveTab]);
+    React.useEffect(() => {
+      const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId);
+      scrollKeyRef.current = key;
+      if (surpriseAnchor) return;
+      const saved = activeTab && activeTab.scrollPositions && activeTab.scrollPositions[key];
+      const savedY = saved == null ? null : typeof saved === "number" ? saved : typeof saved.y === "number" ? saved.y : null;
+      if (typeof savedY === "number" && savedY > 0) {
+        const timer = setTimeout(() => {
+          if (__scrollEl) __scrollEl.scrollTop = savedY;
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+      setTimeout(() => {
+        if (__scrollEl) __scrollEl.scrollTop = 0;
+      }, 0);
+    }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
+    return { flushScrollToActiveTab };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -2377,7 +2467,7 @@
   ];
   var COL_BY_KEY2 = new Map(COLLECTIONS2.map((c) => [c.volKey, c]));
   var COL_BY_CARD = new Map(COLLECTIONS2.filter((c) => c.cardId).map((c) => [c.cardId, c]));
-  var COL_BY_LETTER_SC = new Map(COLLECTIONS2.map((c) => [c.letterScreen, c]));
+  var COL_BY_LETTER_SC2 = new Map(COLLECTIONS2.map((c) => [c.letterScreen, c]));
   var COL_BY_INDEX_SC = new Map(COLLECTIONS2.filter((c) => c.indexScreen).map((c) => [c.indexScreen, c]));
   var COL_BY_SEARCH_ID = new Map(COLLECTIONS2.filter((c) => c.searchVolId).map((c) => [c.searchVolId, c]));
   var COL_BY_READ_KEY = new Map(COLLECTIONS2.filter((c) => c.readKey).map((c) => [c.readKey, c]));
@@ -6161,12 +6251,13 @@
     useRefMirror,
     useHistory,
     useThumbnails,
+    useScrollMemory,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
     COL_BY_KEY: COL_BY_KEY2,
     COL_BY_CARD,
-    COL_BY_LETTER_SC,
+    COL_BY_LETTER_SC: COL_BY_LETTER_SC2,
     COL_BY_INDEX_SC,
     COL_BY_SEARCH_ID,
     COL_BY_READ_KEY,
