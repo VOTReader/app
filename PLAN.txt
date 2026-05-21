@@ -2440,19 +2440,40 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
     Tiny abstraction — but it deduplicates the 13 mirror sites and
     documents the pattern. Optional, mechanical refactor.
 
-  ── Cluster 11: useSettings ── (MEDIUM, ~80 lines, src/hooks/use-settings.js)
-    Symbols: settings/setSettings state, toggleSetting, updateSetting,
-             showWelcome/setShowWelcome state, isOnline/setIsOnline,
-             dismissWelcome, online-check effect, body-class effects
-             (split into useEffects on settings + theme), save vot-state
-             effect (the big one that depends on EVERYTHING)
-    Reads:  tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap,
-            activeReadKey, settings, readItems
-    Writes: settings state, vot-state localStorage, body className list,
-            AndroidBridge.setLightStatusBar, AndroidBridge.setKeepScreenOn
-    Why medium: the save-state effect's dep array is the biggest in
-                App() — ANY of those reads being out-of-sync triggers
-                a stale write. Audit thoroughly.
+  ── Cluster 11: useSettings ── (LOW-MEDIUM, ~70 lines, src/hooks/use-settings.js)
+    SCOPE NARROWED 2026-05-20 by P6g recon + user decision (Option C):
+      useSettings owns ONLY the settings domain — settings/setSettings
+      state (with the migration in the init), toggleSetting,
+      updateSetting, and the body-class/AndroidBridge effect (SPLIT out
+      of the old save-state effect — see below).
+    NOT in useSettings:
+      - The vot-state PERSIST effect stays in App() as a composition-
+        level persistence sink. It writes the union of 8 values from 4
+        different (future) hooks — tabs/activeTabIdx (useTabs/P6k),
+        theme + lastReadChapters + lastReadLetterMap + readItems (App
+        state), activeReadKey (useReadingDwell/P6f), settings
+        (useSettings). It has no natural home until P6k lands and all
+        deps are hook returns; then it becomes usePersistedState. A
+        breadcrumb comment marks it in App().
+      - showWelcome/isOnline/dismissWelcome/online-check stay in App()
+        — dismissWelcome touches navigation (setNavOrigin/setScreen);
+        first-run + connectivity is a distinct concern, optionally a
+        future useWelcome hook.
+    THE SPLIT: the old save-state effect did TWO jobs in one useEffect —
+      (A) body-class toggles + AndroidBridge calls, (B) the persist
+      setItem. P6g splits them: (A) becomes a new effect inside
+      useSettings with deps [theme, settings]; (B) stays in App() with
+      its 8-value dep array UNCHANGED. The split is behavior-safe:
+      classList.toggle(name, bool) is idempotent, so the body-class
+      runs lost on tabs/readItems/etc. dep changes were redundant
+      re-applications of identical classes — invisible to drop.
+    Signature: useSettings({ savedSettings, theme })
+               -> { settings, setSettings, toggleSetting, updateSetting }
+    Reads:  saved.settings (init), theme (param, for body-class effect)
+    Writes: settings state, body className list,
+            AndroidBridge.setLightStatusBar/setKeepScreenOn
+    Interleaved non-settings code fenced off (stays in App): studies
+      lazy-load effect, clear-all-stage reset, focus-mode tabFields.
 
   ── Cluster 12: useSheetOrchestration ── (LOW, ~150 lines, src/hooks/use-sheet-orchestration.js)
     Symbols: 11 sheet/overlay state slots (annChip, linkSidebarKey,

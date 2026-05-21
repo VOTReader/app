@@ -91,7 +91,9 @@
       // P6e: useScrollMemory — per-tab/per-screen scroll position capture + restore
       'useScrollMemory',
       // P6f: useReadingDwell — dwell-timer mark-as-read tracking
-      'useReadingDwell'
+      'useReadingDwell',
+      // P6g: useSettings — settings state + mutators + body-class/AndroidBridge effect
+      'useSettings'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',

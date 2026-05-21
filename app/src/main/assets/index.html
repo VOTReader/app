@@ -1722,47 +1722,11 @@ function App() {
   const [readItems, setReadItems] = useState(saved.readItems || {});
   const [gardenPage, setGardenPage] = tabField('gardenPage');
   const [gardenWarningOpen, setGardenWarningOpen] = useState(false);
-  const [settings, setSettings] = useState(() => {
-    const savedS = saved.settings || {};
-    // Migration: old `showChrome` → both new masters. Old `showChapterSummary`
-    // → showChapterTitle (Matthew hero is unified into the universal setting).
-    const migrated = {};
-    if ('showChrome' in savedS) {
-      if (savedS.showChrome === false) {
-        migrated.showChapterTitle = false;
-        migrated.showSectionHeadings = false;
-      }
-    }
-    if ('showChapterSummary' in savedS && savedS.showChapterSummary === false) {
-      migrated.showChapterTitle = false;
-    }
-    return {
-      showReadingDot: false, showSurpriseButton: false, markAsRead: false,
-      showProgressBar: true,
-      // Search defaults — only the values that are actually wired to
-      // VotSearch.search() at the call site. Previously this block also
-      // declared 12 searchInclude* flags (Notes, Verses, Headings,
-      // StudyNotes, CrossRefs, Footnotes, Letters, LetterBody, Wtlb,
-      // Blessed, HolyDays, BibleStudies) plus searchFuzzy and
-      // searchAllTranslations — all dead defaults (declared, never read,
-      // never exposed in UI). Removed 2026-05-11 so future devs aren't
-      // misled into wiring against them. If granular include/exclude
-      // ever ships, declare AT THAT TIME with both a Settings UI toggle
-      // AND a consumer in the search call.
-      searchUseStopWords: true,
-      searchCorpus: 'all', // 'all' | 'scriptures' | 'volumes'
-      haptic: true,
-      keepScreenOn: true,
-      scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
-      showSettingsGear: false, translation: "nkjv", restoredNames: false,
-      showChapterTitle: true, showSectionHeadings: true, showInlineEchoes: true,
-      tabsEnabled: false,
-      searchEnabled: true, historyEnabled: true,
-      historyInNav: false,
-      arrowLayout: "split", // "split" | "right" | "left" | "nav" | "off"
-      ...savedS,
-      ...migrated // migration wins over stale saved values
-    };
+  /* useSettings — settings object + mutators + body-class/AndroidBridge
+     effect. Extracted to src/hooks/use-settings.js (P6g). */
+  const { settings, setSettings, toggleSetting, updateSetting } = useSettings({
+    savedSettings: saved.settings,
+    theme,
   });
   // Close tabs overview when tabs get disabled (relies on `settings`)
   useEffect(() => {
@@ -1865,29 +1829,14 @@ function App() {
     initialActiveReadKey: saved.activeReadKey || null,
   });
 
-  /* ── Save state on every change ── */
+  /* ── Persist vot-state on every change ──
+     Persistence sink — moves to usePersistedState after P6k when all
+     deps are hook returns (then App() just composes hook returns).
+     Body-class + AndroidBridge mirror was split into useSettings (P6g). */
   useEffect(() => {
-    document.body.classList.toggle("light", theme === "light");
-    document.body.classList.toggle("no-gear", !settings.showSettingsGear);
-    document.body.classList.toggle("no-search", settings.searchEnabled === false);
-    document.body.classList.toggle("no-history", settings.historyEnabled === false);
-    document.body.classList.toggle("history-in-nav", !!settings.historyInNav);
-    document.body.classList.toggle("arrows-right", settings.arrowLayout === 'right');
-    document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
-    document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');
-    document.body.classList.toggle("arrows-off", settings.arrowLayout === 'off');
-    if (window.AndroidBridge) window.AndroidBridge.setLightStatusBar(theme === "light");
-    // Mirror the keep-screen-on setting to the Android window flag. On PC the
-    // bridge method is absent and this no-ops. Defaults to true (matches the
-    // pre-toggle behavior — the Kotlin side also defaults to keep-on).
-    if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === 'function') {
-      window.AndroidBridge.setKeepScreenOn(settings.keepScreenOn !== false);
-    }
     try {
       localStorage.setItem("vot-state", JSON.stringify({
-        // Tab-backed reading state
         tabs, activeTabIdx,
-        // App-global
         theme, lastReadChapters, lastReadLetterMap,
         activeReadKey, settings, readItems
       }));
@@ -2006,8 +1955,7 @@ function App() {
     if (o) {setSearchOrigin(null);setScreen(o.screen);if (o.bookId !== undefined) setBookId(o.bookId);if (o.chapterNum !== undefined) setChapterNum(o.chapterNum);if (o.letterId !== undefined) setLetterId(o.letterId);} else
     goHome();
   };
-  const toggleSetting = (key) => setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
-  const updateSetting = (key, val) => setSettings((prev) => ({ ...prev, [key]: val }));
+  /* toggleSetting + updateSetting → src/hooks/use-settings.js (P6g) */
 
   /* ── Mark as Read helpers ──
      Key format: "versionId:bookOrVolumeId:chapterOrLetterId"

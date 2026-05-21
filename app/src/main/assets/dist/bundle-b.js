@@ -2123,6 +2123,79 @@
     return { activeReadKey, setActiveReadKey, cancelDwell };
   }
 
+  // app/src/main/assets/src/hooks/use-settings.js
+  function useSettings({ savedSettings, theme }) {
+    const [settings, setSettings] = React.useState(() => {
+      const savedS = savedSettings || {};
+      const migrated = {};
+      if ("showChrome" in savedS) {
+        if (savedS.showChrome === false) {
+          migrated.showChapterTitle = false;
+          migrated.showSectionHeadings = false;
+        }
+      }
+      if ("showChapterSummary" in savedS && savedS.showChapterSummary === false) {
+        migrated.showChapterTitle = false;
+      }
+      return {
+        showReadingDot: false,
+        showSurpriseButton: false,
+        markAsRead: false,
+        showProgressBar: true,
+        // Search defaults — only the values that are actually wired to
+        // VotSearch.search() at the call site. Previously this block also
+        // declared 12 searchInclude* flags (Notes, Verses, Headings,
+        // StudyNotes, CrossRefs, Footnotes, Letters, LetterBody, Wtlb,
+        // Blessed, HolyDays, BibleStudies) plus searchFuzzy and
+        // searchAllTranslations — all dead defaults (declared, never read,
+        // never exposed in UI). Removed 2026-05-11 so future devs aren't
+        // misled into wiring against them. If granular include/exclude
+        // ever ships, declare AT THAT TIME with both a Settings UI toggle
+        // AND a consumer in the search call.
+        searchUseStopWords: true,
+        searchCorpus: "all",
+        // 'all' | 'scriptures' | 'volumes'
+        haptic: true,
+        keepScreenOn: true,
+        scriptureLayout: "genre",
+        gardenTier: GARDEN_DEFAULT_TIER,
+        showSettingsGear: false,
+        translation: "nkjv",
+        restoredNames: false,
+        showChapterTitle: true,
+        showSectionHeadings: true,
+        showInlineEchoes: true,
+        tabsEnabled: false,
+        searchEnabled: true,
+        historyEnabled: true,
+        historyInNav: false,
+        arrowLayout: "split",
+        // "split" | "right" | "left" | "nav" | "off"
+        ...savedS,
+        ...migrated
+        // migration wins over stale saved values
+      };
+    });
+    const toggleSetting = (key) => setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+    const updateSetting = (key, val) => setSettings((prev) => ({ ...prev, [key]: val }));
+    React.useEffect(() => {
+      document.body.classList.toggle("light", theme === "light");
+      document.body.classList.toggle("no-gear", !settings.showSettingsGear);
+      document.body.classList.toggle("no-search", settings.searchEnabled === false);
+      document.body.classList.toggle("no-history", settings.historyEnabled === false);
+      document.body.classList.toggle("history-in-nav", !!settings.historyInNav);
+      document.body.classList.toggle("arrows-right", settings.arrowLayout === "right");
+      document.body.classList.toggle("arrows-left", settings.arrowLayout === "left");
+      document.body.classList.toggle("arrows-nav", settings.arrowLayout === "nav");
+      document.body.classList.toggle("arrows-off", settings.arrowLayout === "off");
+      if (window.AndroidBridge) window.AndroidBridge.setLightStatusBar(theme === "light");
+      if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === "function") {
+        window.AndroidBridge.setKeepScreenOn(settings.keepScreenOn !== false);
+      }
+    }, [theme, settings]);
+    return { settings, setSettings, toggleSetting, updateSetting };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -6333,6 +6406,7 @@
     useThumbnails,
     useScrollMemory,
     useReadingDwell,
+    useSettings,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
