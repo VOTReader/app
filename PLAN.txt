@@ -2308,6 +2308,27 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
                    counts and the SAME hl-mark counts as before (no
                    stale child re-mounts).
 
+    P6k ALSO CONSOLIDATES THE PERSIST SINK (deferred obligation from
+    P6g Option C — see DIRECTION 4, composition-level sink pattern):
+      The vot-state persist effect —
+        useEffect(() => { localStorage.setItem("vot-state",
+          JSON.stringify({ tabs, activeTabIdx, theme, lastReadChapters,
+          lastReadLetterMap, activeReadKey, settings, readItems })); },
+          [ ...those same 8 values ]);
+      — was deliberately left inline in App() through P6d-P6g because
+      its 8 deps came from subsystems not yet extracted. As of P6g it
+      lives at index.html ~line 1833; the durable anchor is the
+      breadcrumb comment — grep "Persistence sink — moves to
+      usePersistedState". `tabs` and `activeTabIdx` are the LAST TWO of
+      its 8 deps to become hook returns, and useTabs (this cluster)
+      provides them. STEP, at the end of P6k: extract that effect into
+      src/hooks/use-persisted-state.js as
+        usePersistedState({ tabs, activeTabIdx, theme, lastReadChapters,
+          lastReadLetterMap, activeReadKey, settings, readItems })
+      — a pure sink (one setItem, no return value). App() then just
+      composes the other hooks' returns into that one call. This is the
+      moment the composition-level sink pattern completes.
+
   ── Cluster 3: useScrollMemory ── (MEDIUM, ~80 lines, src/hooks/use-scroll-memory.js)
     Symbols: getScrollKey (function), scrollKeyRef, flushScrollToActiveTab
              (useCallback), 3 effects (scroll listener attach, pagehide
@@ -2656,6 +2677,33 @@ SECTION 8 — PROGRESS LOG (append-only; newest at top)
       app/src/main/assets/index.html app/src/main/assets/src/`. If
       that returns anything non-comment, do P7 first before whatever
       change introduced it.
+
+  DIRECTION 4 — Composition-level sink pattern (named P6g, 2026-05-20)
+    When a fused `useEffect` carries TWO concerns with DIFFERENT
+    dependency surfaces — one causally OWNED by the hook being
+    extracted, the other a cross-cutting SINK that touches state from
+    several subsystems — SPLIT the effect. The owned concern moves into
+    the hook with its narrow dep array; the cross-cutting sink STAYS in
+    App() until every one of its deps is itself a hook return, at which
+    point it consolidates into its own dedicated hook.
+    Rationale: forcing the sink into a domain hook gives that hook
+    custody of state it doesn't own and an inflated param surface for
+    zero cohesion gain. The sink belongs at the composition level
+    (App), where all its inputs are naturally in scope, until the
+    composition itself is all hooks.
+    Behavior-safety condition: splitting is invisible ONLY when the
+    moved concern is idempotent under the deps being dropped. P6g's
+    body-class effect qualified — `classList.toggle(name, bool)` to an
+    unchanged value is a no-op, so narrowing its deps from 8 to
+    [theme, settings] just removed redundant re-applications. ALWAYS
+    state the idempotence argument explicitly before narrowing a dep
+    array; if the moved concern is NOT idempotent, the split is a
+    behavior change and is out of scope for a verbatim extraction.
+    Precedent: P6g split the old save-state effect — body-class +
+    AndroidBridge → useSettings; the vot-state persist (8 cross-
+    subsystem deps) stayed in App(), scheduled to become
+    usePersistedState at the end of P6k (see Cluster 2 above).
+    The P6h+ briefs reference this entry by name.
 
   REMAINING TRUE RISK (no decision needed yet — just monitor):
   - tabField identity stability under hook refactor needs a smoke
