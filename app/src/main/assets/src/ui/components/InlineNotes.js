@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
+export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
   if (!scriptures.length && !votNotes.length) return null;
   return (/*#__PURE__*/
     React.createElement("div", { className: "inline-notes" },

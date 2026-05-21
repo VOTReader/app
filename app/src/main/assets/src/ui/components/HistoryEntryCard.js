@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function HistoryEntryCard({ entry, onSelect }) {
+export function HistoryEntryCard({ entry, onSelect }) {
   const isLetter = entry.type === 'letter';
   const isStudy = entry.type === 'study-chapter';
   const num = isLetter ? entry.letterNum : entry.chapterNum;

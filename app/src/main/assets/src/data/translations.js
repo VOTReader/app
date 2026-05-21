@@ -1,15 +1,21 @@
 /* ===================================================================
    Translation loaders — lazy script tag injection for Bible alt translations + bible-studies
    ===================================================================
-   Global-scope module. Concatenates with index.html via <script src>.
+   ES module (G.2.3). Module-private state — moved out of index.html as
+   part of the strict-mode conversion. `_bibleStudiesPromise` is reassigned
+   from inside loadBibleStudies(), so it needs a module-scope `let` binding
+   or strict mode throws.
    Bundled helpers (P5e):
    - loadTranslation
    - loadBibleStudies
    - translateVerse
    =================================================================== */
 
+export const _translationPromises = {}; // code -> Promise that resolves when loaded
+export const _translationLoaded = {};   // code -> true once global is available
+export let _bibleStudiesPromise = null;
 
-function loadTranslation(code) {
+export function loadTranslation(code) {
   if (!code || code === 'nkjv') return Promise.resolve();
   const globalName = 'BIBLE_' + code.toUpperCase();
   if (window[globalName]) {_translationLoaded[code] = true;return Promise.resolve();}
@@ -25,7 +31,7 @@ function loadTranslation(code) {
   return _translationPromises[code];
 }
 
-function loadBibleStudies() {
+export function loadBibleStudies() {
   if (typeof BIBLE_STUDIES !== 'undefined') return Promise.resolve();
   if (_bibleStudiesPromise) return _bibleStudiesPromise;
   _bibleStudiesPromise = new Promise((resolve) => {
@@ -39,7 +45,7 @@ function loadBibleStudies() {
   return _bibleStudiesPromise;
 }
 
-function translateVerse(bookId, chNum, verse, translation) {
+export function translateVerse(bookId, chNum, verse, translation) {
   if (!translation || translation === 'nkjv') return verse.text;
   const data = window['BIBLE_' + translation.toUpperCase()];
   if (!data) return verse.text; // not yet loaded → NKJV fallback

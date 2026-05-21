@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function LinkIcon({ hlKey, hlTick, onClick, prefix }) {
+export function LinkIcon({ hlKey, hlTick, onClick, prefix }) {
   // When `prefix` is true, hlKey is treated as a prefix and any link whose
   // endpoint key starts with that prefix counts. Used by letter/wtlb blocks
   // because excerpts append ":start-end" to the block-level key.

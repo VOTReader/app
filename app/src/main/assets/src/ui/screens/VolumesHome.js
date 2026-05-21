@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const collections = [
   { id: "lords-rebuke", title: "The Lord's Rebuke", sub: "Correction & Warning", locked: LETTERS_REBUKE.length === 0 },
   { id: "words-to-live-by-1", title: "Words To Live By: Part One", sub: `${WTLB_ONE.length} Entries · Words of Wisdom`, locked: false },

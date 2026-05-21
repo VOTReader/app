@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
+export function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
   // Letter/WTLB/Blessed/Holy-Days blocks anchor links by block-index, but
   // excerpts append ":start-end" to the stored endpoint key. Use prefix
   // matching for those scopes so the sidebar finds excerpt-scoped links from

@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function StudiesHome({ studies, studiesLoading, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function StudiesHome({ studies, studiesLoading, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // `studies` is the pre-ordered UNIFIED_CHAIN from App — heavy → light,
   // Matthew Study Bible already inserted at its weighted position.
   // studiesLoading is true while bible-studies.js is fetched the first time.

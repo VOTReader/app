@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function SrchCard({ entry, terms, onSelect, isDirect }) {
+export function SrchCard({ entry, terms, onSelect, isDirect }) {
   if (isDirect) {
     return (/*#__PURE__*/
       React.createElement("button", { className: "srch-card card-direct", onClick: () => onSelect(entry) }, /*#__PURE__*/

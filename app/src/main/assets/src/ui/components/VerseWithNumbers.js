@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function VerseWithNumbers({ text, refStr }) {
+export function VerseWithNumbers({ text, refStr }) {
   const segments = splitIntoVerses(text, refStr);
   if (!segments) {
     // Single-verse ref — strip ALL Unicode superscript digits so a data
@@ -43,7 +43,7 @@ function VerseWithNumbers({ text, refStr }) {
    Detect the PURE-pointer case — text is only a lead-in phrase plus the
    linked title, nothing else — and suppress the redundant text. Notes
    that add real commentary beyond the title are left untouched. */
-function _fnTextRedundantWithLink(text, link) {
+export function _fnTextRedundantWithLink(text, link) {
   if (!text || !link || !link.letterTitle) return false;
   const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '');
   const payload = String(text)

@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ScriptureGenre({ genreId, onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function ScriptureGenre({ genreId, onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const genre = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt].find((g) => g.id === genreId);
   if (!genre) return null;
   const testament = SCRIPTURE_GENRES.nt.some((g) => g.id === genreId) ? "New Testament" : "Old Testament";

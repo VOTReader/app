@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function TabsNavBtn() {
+export function TabsNavBtn() {
   const ctx = React.useContext(TabsContext);
   if (!ctx || !ctx.enabled) return null;
   const { count, onOpen, isOnTabsScreen } = ctx;

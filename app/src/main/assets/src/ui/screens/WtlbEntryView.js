@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark, isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel, footnotesMode, backHint, onBack, hlTick, onLinkOpen, onInAppLink }) {
+export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark, isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel, footnotesMode, backHint, onBack, hlTick, onLinkOpen, onInAppLink }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   const [highlightedFn, setHighlightedFn] = React.useState(null);

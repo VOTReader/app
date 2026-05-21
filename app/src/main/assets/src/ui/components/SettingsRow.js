@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function SettingsRow({ label, desc, checked, onToggle, disabled, disabledReason }) {
+export function SettingsRow({ label, desc, checked, onToggle, disabled, disabledReason }) {
   return (/*#__PURE__*/
     React.createElement("div", { className: `settings-row${disabled ? " settings-row-disabled" : ""}` }, /*#__PURE__*/
     React.createElement("div", { className: "settings-row-text" }, /*#__PURE__*/

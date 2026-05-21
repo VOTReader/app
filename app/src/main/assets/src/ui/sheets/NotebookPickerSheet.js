@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function NotebookPickerSheet({ groupId, hlTick, setHlTick, onClose }) {
+export function NotebookPickerSheet({ groupId, hlTick, setHlTick, onClose }) {
   const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
   const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
   const [newName, setNewName] = React.useState('');

@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function TabActionSheet({ idx, total, onCloseOthers, onCloseToRight, onDismiss }) {
+export function TabActionSheet({ idx, total, onCloseOthers, onCloseToRight, onDismiss }) {
   if (idx == null) return null;
   const tabNum = idx + 1;
   const hasOthers = total > 1;

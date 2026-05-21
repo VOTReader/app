@@ -7,7 +7,7 @@
    =================================================================== */
 
 
-function bookCategory(bookId) {
+export function bookCategory(bookId) {
   var ot = (typeof OT_BOOK_IDS !== 'undefined') ? OT_BOOK_IDS : _OT_BOOKS_INLINE;
   return ot.has(bookId) ? 'Old Testament' : 'New Testament';
 }

@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpenNotebookPicker }) {
+export function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpenNotebookPicker }) {
   const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
   const segs = React.useMemo(() => AnnotationStore.getByGroup(groupId), [groupId, hlTick]);
   const [mode, setMode] = React.useState(startInEditMode ? 'edit' : 'read');

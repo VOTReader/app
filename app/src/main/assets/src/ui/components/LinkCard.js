@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
+export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
   const [expanded, setExpanded] = React.useState(false);
   // confirmRemove: false | true — governs the tap-confirm strip (§11.1: no instant delete).
   const [confirmRemove, setConfirmRemove] = React.useState(false);

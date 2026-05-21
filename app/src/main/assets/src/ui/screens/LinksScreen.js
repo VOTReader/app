@@ -34,7 +34,7 @@
 /* Human-readable category label for a link endpoint.
    Mirrors the logic in LinkCard inside index.html so the two surfaces
    stay in sync. */
-function _linkEndpointCategory(ep) {
+export function _linkEndpointCategory(ep) {
   if (!ep) return '';
   if (ep.type === 'bible') return (typeof bookCategory === 'function') ? bookCategory(ep.bookId) : 'Bible';
   if (ep.type === 'study') return 'Matthew Study Bible';
@@ -49,7 +49,7 @@ function _linkEndpointCategory(ep) {
 /* Cheap "is this endpoint still navigable?" check. We only use
    already-loaded globals — no extra fetches. Returns true if
    the endpoint resolves to a known destination. */
-function _endpointResolves(ep) {
+export function _endpointResolves(ep) {
   if (!ep || !ep.type || !ep.key) return false;
   if (ep.type === 'bible') {
     var books = (typeof _allBooks === 'function') ? _allBooks() : {};
@@ -78,7 +78,7 @@ function _endpointResolves(ep) {
 }
 
 /* Build a text string for the search index from an endpoint. */
-function _epSearchText(ep) {
+export function _epSearchText(ep) {
   if (!ep) return '';
   return [ep.label || '', _linkEndpointCategory(ep), ep.text || '', ep.preview || ''].join(' ').toLowerCase();
 }
@@ -87,7 +87,7 @@ function _epSearchText(ep) {
 /* One row in the links browser. Shows SOURCE above, chain, TARGET below.
    Each side is its own tappable button. Long-press surfaces the action
    sheet (passed down as onLongPress). */
-function LinkRow({ lnk, onNavigateSource, onNavigateTarget, onLongPress }) {
+export function LinkRow({ lnk, onNavigateSource, onNavigateTarget, onLongPress }) {
   var src = lnk.source;
   var tgt = lnk.target;
   var date = (typeof relativeDate === 'function') ? relativeDate(lnk.created) : '';
@@ -144,7 +144,7 @@ function LinkRow({ lnk, onNavigateSource, onNavigateTarget, onLongPress }) {
 /* ── LinkRowActionSheet ──────────────────────────────────────────── */
 /* Bottom sheet with: Open Source / Open Target / Delete.
    Delete follows the tap-confirm-strip pattern (PLAN.txt §11.1). */
-function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateTarget, onDelete }) {
+export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateTarget, onDelete }) {
   var useState = React.useState;
   var _state = useState(false);
   var confirming = _state[0];
@@ -225,7 +225,7 @@ function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateTarget, 
      hlTick / setHlTick  — refresh signal from App
      theme / onThemeChange / onSearch / onHistory / historyEnabled
 */
-function LinksScreen(props) {
+export function LinksScreen(props) {
   var onBack = props.onBack;
   var onHome = props.onHome;
   var onNavigateToSource = props.onNavigateToSource;

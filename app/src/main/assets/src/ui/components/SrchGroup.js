@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function SrchGroup({ gkey, items, terms, onSelect, defaultOpen }) {
+export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen }) {
   const [open, setOpen] = React.useState(defaultOpen !== false);
   const meta = SRCH_GROUP_META[gkey] || { label: gkey };
   return (/*#__PURE__*/

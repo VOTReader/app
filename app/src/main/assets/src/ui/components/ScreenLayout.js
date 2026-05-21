@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn }) {
+export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn }) {
   const ref = React.useCallback((el) => {__scrollEl = el;}, []);
 
   React.useEffect(() => {

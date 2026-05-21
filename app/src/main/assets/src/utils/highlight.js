@@ -9,7 +9,7 @@
    =================================================================== */
 
 
-function normalizeForHighlight(s) {
+export function normalizeForHighlight(s) {
   return String(s || "").
   replace(/[\u2018\u2019]/g, "'").
   replace(/[\u201c\u201d]/g, '"').
@@ -17,7 +17,7 @@ function normalizeForHighlight(s) {
   toLowerCase();
 }
 
-function splitWithHighlight(text, needle, keyPrefix) {
+export function splitWithHighlight(text, needle, keyPrefix) {
   if (!text || !needle) return null;
   const hay = normalizeForHighlight(text);
   const need = normalizeForHighlight(needle);
@@ -36,7 +36,7 @@ function splitWithHighlight(text, needle, keyPrefix) {
 
 }
 
-function highlightExcerptInDom(mainEl, excerpt) {
+export function highlightExcerptInDom(mainEl, excerpt) {
   if (!mainEl || !excerpt) return [];
   const tokenize = (s) => normalizeForHighlight(s).match(/[a-z0-9']+/g) || [];
   const stripFnRefs = (el) => {

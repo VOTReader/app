@@ -1,15 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════
    ExpandableVerse — extracted React screen component
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Self-contained — uses React.useX hooks directly (no dependency on the
-   inline script's `const { useState, ... } = React` destructuring).
-   All other call-time dependencies (Segments, FootnoteSheet, ScreenLayout,
-   findEntryContext, applyDOMHighlights, etc.) are global-lexical and
-   resolve at render time from the surrounding scripts.
+   ES module (G.2.3). EXPAND_THRESHOLD + MIN_HIDDEN_WORDS are owned here
+   (only consumer); moved out of index.html as part of the strict-mode
+   conversion.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ExpandableVerse({ text, refStr }) {
+export const EXPAND_THRESHOLD = 130;
+export const MIN_HIDDEN_WORDS = 20; // only collapse if hiding at least this many whole words
+
+export function ExpandableVerse({ text, refStr }) {
   const [expanded, setExpanded] = React.useState(false);
 
   // Compound refs store text as "partLabel \u2014 verse text | partLabel \u2014 verse text".

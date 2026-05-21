@@ -8,7 +8,7 @@
    =================================================================== */
 
 
-function relativeDate(ts) {
+export function relativeDate(ts) {
   if (!ts) return '';
   const diff = Date.now() - ts;
   const min = Math.floor(diff / 60000);
@@ -23,7 +23,7 @@ function relativeDate(ts) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function timeAgo(ts) {
+export function timeAgo(ts) {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';

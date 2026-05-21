@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function StickyChapterNav({ onPrev, onNext, prevDisabled, nextDisabled, prevLabel, nextLabel }) {
+export function StickyChapterNav({ onPrev, onNext, prevDisabled, nextDisabled, prevLabel, nextLabel }) {
   return (/*#__PURE__*/
     React.createElement("div", { className: "chapter-nav-sticky" }, /*#__PURE__*/
     React.createElement("button", {

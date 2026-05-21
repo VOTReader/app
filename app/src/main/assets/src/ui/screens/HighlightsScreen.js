@@ -81,20 +81,20 @@
 
 /* Canonical palette order + display hex (mirrors HL_COLORS). 'cyan'
    is a legacy alias for teal kept so old marks still resolve. */
-var _HL_COLOR_ORDER = ['yellow', 'green', 'pink', 'red', 'orange', 'blue', 'purple', 'teal', 'brown', 'gray'];
-var _HL_COLOR_HEX = {
+export var _HL_COLOR_ORDER = ['yellow', 'green', 'pink', 'red', 'orange', 'blue', 'purple', 'teal', 'brown', 'gray'];
+export var _HL_COLOR_HEX = {
   yellow: '#ffd700', green: '#76ff03', pink: '#ff4081', red: '#f44336',
   orange: '#ff9100', blue: '#2196f3', purple: '#ba68c8', teal: '#00bcd4',
   brown: '#8d6e63', gray: '#9e9e9e', cyan: '#00bcd4'
 };
-function _hlColorHex(c) { return _HL_COLOR_HEX[c] || '#ffd700'; }
-function _hlColorIndex(c) {
+export function _hlColorHex(c) { return _HL_COLOR_HEX[c] || '#ffd700'; }
+export function _hlColorIndex(c) {
   var i = _HL_COLOR_ORDER.indexOf(c === 'cyan' ? 'teal' : c);
   return i < 0 ? 99 : i;
 }
 
 /* Flatten AnnotationStore into one row per groupId. */
-function _collectMarks() {
+export function _collectMarks() {
   if (typeof AnnotationStore === 'undefined') return [];
   var data = AnnotationStore.all() || {};
   var groups = {}; // groupId -> aggregate
@@ -127,7 +127,7 @@ function _collectMarks() {
 
 /* One row. The whole row navigates to the source (no expand state —
    highlight text is short by nature; the source IS the full context). */
-function HighlightRow(props) {
+export function HighlightRow(props) {
   var m = props.mark;
   var sourceLabel = (typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(m.hlKey) : m.hlKey;
   var date = (typeof relativeDate === 'function') ? relativeDate(m.updated || m.created) : '';
@@ -154,7 +154,7 @@ function HighlightRow(props) {
   );
 }
 
-function HighlightsScreen(props) {
+export function HighlightsScreen(props) {
   var useState = React.useState;
   var useMemo = React.useMemo;
 

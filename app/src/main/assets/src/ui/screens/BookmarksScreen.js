@@ -27,7 +27,7 @@
 
 /* ── Source label for a bookmark ─────────────────────────────── */
 /* Returns a human-readable source label for displaying in the row. */
-function _bookmarkSourceLabel(hlKey) {
+export function _bookmarkSourceLabel(hlKey) {
   if (!hlKey) return 'Bookmark';
   var parts = hlKey.split(':');
   var kind = parts[0];
@@ -76,7 +76,7 @@ function _bookmarkSourceLabel(hlKey) {
 }
 
 /* Returns an endpoint suitable for navigateToLink(), mirroring noteSourceNav(). */
-function _bookmarkSourceEndpoint(hlKey) {
+export function _bookmarkSourceEndpoint(hlKey) {
   if (!hlKey) return null;
   var parts = hlKey.split(':');
   var kind = parts[0];
@@ -104,7 +104,7 @@ function _bookmarkSourceEndpoint(hlKey) {
    Tapping the thought (if any) toggles expand/collapse without
    navigating — single-line truncated by default, full wrapping when
    expanded. Long-press surfaces the action sheet. */
-function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onEditSave, onEditCancel }) {
+export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onEditSave, onEditCancel }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;
@@ -227,7 +227,7 @@ function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onE
 /* Bottom sheet with: Open / Edit Label / Edit Thought / Delete.
    Delete follows the tap-confirm-strip pattern (PLAN.txt §11.1).
    Edit Thought toggles into an inline textarea (no separate screen). */
-function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onEditThought, onDelete }) {
+export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onEditThought, onDelete }) {
   var useState = React.useState;
 
   var _state = useState(false);
@@ -368,7 +368,7 @@ function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onEditT
    called a note), and three actions: Open / Add-or-Edit Thought /
    Delete. Delete uses the tap-confirm-strip pattern.
    Thought editing is inline within the popover via a textarea. */
-function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
+export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
   var useState = React.useState;
   var _ci = useState(null); var confirmingId = _ci[0]; var setConfirmingId = _ci[1];
   var _ei = useState(null); var editingId = _ei[0]; var setEditingId = _ei[1];
@@ -485,7 +485,7 @@ function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
      hlTick / setHlTick    — refresh signal from App
      theme / onThemeChange / onSearch / onHistory / historyEnabled
 */
-function BookmarksScreen(props) {
+export function BookmarksScreen(props) {
   var onBack = props.onBack;
   var onHome = props.onHome;
   var onNavigateToSource = props.onNavigateToSource;

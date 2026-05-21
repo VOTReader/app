@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function SrchSnippet({ text, terms, maxLen = 180 }) {
+export function SrchSnippet({ text, terms, maxLen = 180 }) {
   if (!text) return null;
   const snippet = window.VotSearch.snippet(text, terms || [], maxLen);
   const spans = window.VotSearch.highlightSpans(snippet, terms || []);

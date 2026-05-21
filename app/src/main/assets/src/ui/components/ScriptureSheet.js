@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ScriptureSheet({ activeRef, onClose }) {
+export function ScriptureSheet({ activeRef, onClose }) {
   const isOpen = activeRef !== null;
   const verseText = activeRef ? MATTHEW_NKJV[activeRef.cite] : null;
   return (/*#__PURE__*/

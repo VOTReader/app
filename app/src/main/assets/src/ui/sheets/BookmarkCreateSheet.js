@@ -49,7 +49,7 @@
      onOpen:    function(editId) → void   // navigates to bookmark source
 ═══════════════════════════════════════════════════════════════ */
 
-function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen }) {
+export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;

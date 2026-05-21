@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }) {
+export function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }) {
   const [mode, setMode] = React.useState('main'); // 'main' | 'confirm' | 'colors'
   // Reset mode whenever a fresh chip opens (different group)
   const lastGroupRef = React.useRef(null);

@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, markAsReadEnabled, columns }) {
+export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, markAsReadEnabled, columns }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
     if (currentRef.current) {

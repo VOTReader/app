@@ -7,7 +7,7 @@
    =================================================================== */
 
 
-function renderTextWithScripRefs(text, baseClassName, onScripClick, highlightText) {
+export function renderTextWithScripRefs(text, baseClassName, onScripClick, highlightText) {
   if (!text) return baseClassName ? /*#__PURE__*/React.createElement("span", { className: baseClassName }, text) : text;
   const hasRef = text.includes('{{ref:');
   // No scripture refs: handle highlight inline, else return as-is.

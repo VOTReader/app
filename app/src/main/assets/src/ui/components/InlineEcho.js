@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function InlineEcho({ scriptures, votNotes }) {
+export function InlineEcho({ scriptures, votNotes }) {
   if (!scriptures.length && !votNotes.length) return null;
   const scrollToRef = (ref) => {
     const ranges = parseRefRanges(ref);

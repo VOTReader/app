@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLink }) {
+export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLink }) {
   const entries = Object.entries(footnotes);
   if (entries.length === 0) return null;
   const scrollToBubble = (num) => {

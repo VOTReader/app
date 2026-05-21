@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
+export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
   const hasScriptures = scriptures && scriptures.length > 0;
   const hasVot = votNotes && votNotes.length > 0;
   if (!hasScriptures && !hasVot) return null;

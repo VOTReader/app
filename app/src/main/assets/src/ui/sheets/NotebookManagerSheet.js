@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
+export function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
   const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
   const [newName, setNewName] = React.useState('');
   const [renameId, setRenameId] = React.useState(null);    // notebook id being renamed

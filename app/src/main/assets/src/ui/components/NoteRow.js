@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function NoteRow({ note, onTap }) {
+export function NoteRow({ note, onTap }) {
   const sourceLabel = noteSourceLabel(note);
   const date = relativeDate(note.updated || note.created);
   const noteNbs = (note.notebookIds || []).map(id => NotebookStore.get(id)).filter(Boolean);

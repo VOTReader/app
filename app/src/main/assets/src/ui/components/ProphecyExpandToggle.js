@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ProphecyExpandToggle({ allExpanded, onToggle }) {
+export function ProphecyExpandToggle({ allExpanded, onToggle }) {
   return (/*#__PURE__*/
     React.createElement("div", { className: "mode-toggle-wrap" }, /*#__PURE__*/
     React.createElement("div", { className: "mode-toggle" }, /*#__PURE__*/

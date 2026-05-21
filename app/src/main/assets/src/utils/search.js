@@ -7,7 +7,7 @@
    =================================================================== */
 
 
-function srchGroupKey(doc) {
+export function srchGroupKey(doc) {
   if (!doc) return 'other';
   const k = doc.kind;
   if (k === 'verse' || k === 'chapter-title' || k === 'heading') return doc.bookId === 'matthew' ? 'matthew' : 'bible';

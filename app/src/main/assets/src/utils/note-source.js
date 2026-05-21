@@ -10,7 +10,7 @@
    =================================================================== */
 
 
-function _bookTitle(bookId) {
+export function _bookTitle(bookId) {
   if (typeof BIBLE_BOOK_LIST !== 'undefined') {
     const b = BIBLE_BOOK_LIST.find(x => x.id === bookId);
     if (b) return b.title;
@@ -19,7 +19,7 @@ function _bookTitle(bookId) {
   return bookId.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
 }
 
-function _verseRangeLabel(nums) {
+export function _verseRangeLabel(nums) {
   if (!nums.length) return '';
   const sorted = [...new Set(nums)].sort((a, b) => a - b);
   const parts = [];
@@ -33,7 +33,7 @@ function _verseRangeLabel(nums) {
   return parts.join(', ');
 }
 
-function noteSourceLabel(note) {
+export function noteSourceLabel(note) {
   const keys = note.keys || [];
   if (!keys.length) return 'Note';
   // Group by (kind, primary id, chapter where applicable)
@@ -99,7 +99,7 @@ function noteSourceLabel(note) {
   return first;
 }
 
-function noteSourceNav(note) {
+export function noteSourceNav(note) {
   const keys = note.keys || [];
   if (!keys.length) return null;
   const k = keys[0];

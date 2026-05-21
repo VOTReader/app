@@ -1,15 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════════════
    GardenView — extracted React screen component
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Self-contained — uses React.useX hooks directly (no dependency on the
-   inline script's `const { useState, ... } = React` destructuring).
-   All other call-time dependencies (Segments, FootnoteSheet, ScreenLayout,
-   findEntryContext, applyDOMHighlights, etc.) are global-lexical and
-   resolve at render time from the surrounding scripts.
+   ES module (G.2.3). GARDEN_PRELOAD_AHEAD + GARDEN_CRAWL_DELAY are owned
+   here (only consumer); the cross-D shared garden constants live in
+   src/utils/garden.js and are accessed via window globals exposed by
+   _entry-d.js.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function GardenView({ page, onPageChange, onBack, theme, onThemeChange, tier }) {
+export const GARDEN_PRELOAD_AHEAD = 5;
+export const GARDEN_CRAWL_DELAY = 500; // ms between background crawl downloads
+
+export function GardenView({ page, onPageChange, onBack, theme, onThemeChange, tier }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(false);
   const [jumpMode, setJumpMode] = React.useState(false);

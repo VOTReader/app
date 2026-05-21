@@ -1,7 +1,10 @@
 /* ===================================================================
    Tab thumbnail store — IndexedDB-backed dataURL cache
    ===================================================================
-   Global-scope module. Concatenates with index.html via <script src>.
+   ES module (G.2.3). Module-private state — moved out of index.html as
+   part of the strict-mode conversion (esbuild ES modules are strict, so
+   the in-function `_thumbDbPromise = ...` assignment would throw if the
+   binding wasn't declared at module scope).
    Bundled helpers (P5e):
    - openThumbDB
    - idbPut
@@ -9,8 +12,11 @@
    - idbReadAll
    =================================================================== */
 
+export const THUMB_DB = 'vot-thumbs';
+export const THUMB_STORE = 'thumbs';
+export let _thumbDbPromise = null;
 
-function openThumbDB() {
+export function openThumbDB() {
   if (_thumbDbPromise) return _thumbDbPromise;
   _thumbDbPromise = new Promise((resolve) => {
     try {
@@ -26,7 +32,7 @@ function openThumbDB() {
   return _thumbDbPromise;
 }
 
-function idbPut(key, value) {
+export function idbPut(key, value) {
   return openThumbDB().then((db) => {
     if (!db) return;
     return new Promise((resolve) => {
@@ -41,7 +47,7 @@ function idbPut(key, value) {
   });
 }
 
-function idbDelete(key) {
+export function idbDelete(key) {
   return openThumbDB().then((db) => {
     if (!db) return;
     return new Promise((resolve) => {
@@ -55,7 +61,7 @@ function idbDelete(key) {
   });
 }
 
-function idbReadAll() {
+export function idbReadAll() {
   return openThumbDB().then((db) => {
     if (!db) return {};
     return new Promise((resolve) => {

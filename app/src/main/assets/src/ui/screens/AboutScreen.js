@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {
+export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {
   return (/*#__PURE__*/
     React.createElement(ScreenLayout, { navChildren: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
       React.createElement("button", { className: "nav-home nav-back-icon", onClick: onBack, title: "Back", "aria-label": "Back" }, "‹"), /*#__PURE__*/

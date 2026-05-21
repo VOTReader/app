@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function InAppLinkButton({ link, onActivate, compact, label }) {
+export function InAppLinkButton({ link, onActivate, compact, label }) {
   if (!link || !onActivate) return null;
   const title = link.letterTitle || label || "Open in App";
   if (compact) {

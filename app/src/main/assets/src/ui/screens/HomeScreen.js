@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onInfo, onAbout, history, theme, onThemeChange }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onInfo, onAbout, history, theme, onThemeChange }) {
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all

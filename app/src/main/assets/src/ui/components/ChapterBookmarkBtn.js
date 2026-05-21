@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ChapterBookmarkBtn({ chapterBookmark, hlTick }) {
+export function ChapterBookmarkBtn({ chapterBookmark, hlTick }) {
   if (!chapterBookmark || !chapterBookmark.hlKey || typeof BookmarkStore === 'undefined') return null;
   // React.useMemo so we re-derive only when hlTick changes (after a create/delete).
   const existing = React.useMemo(

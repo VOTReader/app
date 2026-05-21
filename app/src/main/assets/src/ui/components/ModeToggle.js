@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
+export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
   if (!showStudy) {
     return (/*#__PURE__*/
       React.createElement("div", { className: "mode-toggle-wrap" }, /*#__PURE__*/
@@ -65,7 +65,7 @@ function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
 ═══════════════════════════════════════════════════════════════ */
 // Commentary cites (non-lookup scripture notes) may embed inline refs like
 // "(Matthew 11:14)". Detect Book-Ch:Vs patterns and style them gold.
-function renderCommentaryCite(text) {
+export function renderCommentaryCite(text) {
   if (!text) return text;
   // Matches "Matthew 11:14", "1 John 2:15-17", "Psalm 22:1", etc.
   const rx = /\b((?:[123]\s)?[A-Z][a-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:[-,\s\d]+)?)\b/g;

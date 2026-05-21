@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ScriptureVerseText({ text, cite }) {
+export function ScriptureVerseText({ text, cite }) {
   // Compound citations are stored as "Book X:Y — verse text | Book X:Y — verse text".
   // CONVENTION: single-ref scripture text must never contain literal " | " (space-pipe-space).
   // The data audit (PLAN.txt §12 Phase 1 data state) confirms this is uniformly upheld;

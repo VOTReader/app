@@ -11,7 +11,7 @@
    =================================================================== */
 
 
-function buildNavIndex() {
+export function buildNavIndex() {
   if (window.__NAV_INDEX) return window.__NAV_INDEX;
   const items = [];
 
@@ -182,7 +182,7 @@ function buildNavIndex() {
   return items;
 }
 
-function searchNavIndex(query, limit) {
+export function searchNavIndex(query, limit) {
   limit = limit || 30;
   if (!query) return [];
   const q = query.toLowerCase().trim();
@@ -245,7 +245,7 @@ function searchNavIndex(query, limit) {
   return scored.slice(0, limit);
 }
 
-function navItemPreview(it) {
+export function navItemPreview(it) {
   if (it.kind === 'bible-chapter') {
     const b = _allBooks()[it.bookId];
     if (!b) return '';
@@ -272,7 +272,7 @@ function navItemPreview(it) {
   return '';
 }
 
-function navItemToEndpoint(it) {
+export function navItemToEndpoint(it) {
   if (it.kind === 'bible-chapter') {
     const hasVerse = it.verse != null;
     const key = hasVerse ? bibleHlKey(it.bookId, it.chapter, it.verse) : ('bible:' + it.bookId + ':' + it.chapter);
@@ -323,7 +323,7 @@ function navItemToEndpoint(it) {
   return null;
 }
 
-function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText) {
+export function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText) {
   const parts = sourceKey.split(':');
   const excerpt = sourceStart != null ? { start: sourceStart, end: sourceEnd, text: sourceText } : {};
   if (parts[0] === 'bible') {

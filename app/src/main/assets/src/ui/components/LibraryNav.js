@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function LibraryNav(opts) {
+export function LibraryNav(opts) {
   opts = opts || {};
   return React.createElement(React.Fragment, null, /*#__PURE__*/
     React.createElement("button", {

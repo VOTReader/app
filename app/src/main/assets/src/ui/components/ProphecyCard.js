@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, statesRef, onSaveStates, expandSignal }) {
+export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, statesRef, onSaveStates, expandSignal }) {
   // Read initial state from persistent ref, default to expanded (true)
   const stored = statesRef && statesRef.current[stateKey];
   const [expanded, setExpandedRaw] = React.useState(stored !== undefined ? stored : true);

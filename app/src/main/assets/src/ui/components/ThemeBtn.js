@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ThemeBtn({ theme, onThemeChange }) {
+export function ThemeBtn({ theme, onThemeChange }) {
   const next = theme === "dark" ? "light" : "dark";
   const title = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
   return (/*#__PURE__*/

@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onBookmarkRequest }) {
+export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
   const [pos, setPos] = React.useState({ x: 0, y: 0 });
   const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, existingHl, multiVerse }

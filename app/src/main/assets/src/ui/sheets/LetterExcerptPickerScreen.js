@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
+export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
   const target = refineRequest.target;
   const item = refineRequest.item;
   const bodyRef = React.useRef(null);

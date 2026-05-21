@@ -14,13 +14,13 @@
    =================================================================== */
 
 
-function firstVerseOfRef(refStr) {
+export function firstVerseOfRef(refStr) {
   const stripped = refStr.replace(/^\d+:\s*/, '').trim();
   const m = stripped.match(/\d+/);
   return m ? parseInt(m[0], 10) : null;
 }
 
-function parseRefRanges(refStr) {
+export function parseRefRanges(refStr) {
   const stripped = refStr.replace(/^\d+:\s*/, '').trim();
   const parts = stripped.split(/,\s*/);
   const ranges = [];
@@ -31,30 +31,30 @@ function parseRefRanges(refStr) {
   return ranges;
 }
 
-function lastVerseOfFirstRange(refStr) {
+export function lastVerseOfFirstRange(refStr) {
   const ranges = parseRefRanges(refStr);
   return ranges.length > 0 ? ranges[0].end : firstVerseOfRef(refStr);
 }
 
-function echoVersesForRef(refStr) {
+export function echoVersesForRef(refStr) {
   const ranges = parseRefRanges(refStr);
   if (ranges.length <= 1) return [];
   return ranges.slice(1).map((r) => r.end);
 }
 
-function getNotesForVerse(chapter, verseNum) {
+export function getNotesForVerse(chapter, verseNum) {
   const scriptures = (chapter.scriptures || []).filter((s) => lastVerseOfFirstRange(s.ref) === verseNum);
   const votNotes = (chapter.votNotes || []).filter((n) => lastVerseOfFirstRange(n.ref) === verseNum);
   return { scriptures, votNotes };
 }
 
-function getEchoesForVerse(chapter, verseNum) {
+export function getEchoesForVerse(chapter, verseNum) {
   const scriptures = (chapter.scriptures || []).filter((s) => echoVersesForRef(s.ref).includes(verseNum));
   const votNotes = (chapter.votNotes || []).filter((n) => echoVersesForRef(n.ref).includes(verseNum));
   return { scriptures, votNotes };
 }
 
-function parseRefRange(ref) {
+export function parseRefRange(ref) {
   const clean = ref.replace(/\s*\(.*?\)\s*/g, "").trim();
   // Comma-separated verses: "7:7, 9" or "7:7, 9, 11"
   const cm = clean.match(/:(\d+(?:\s*,\s*\d+)+)$/);
@@ -69,7 +69,7 @@ function parseRefRange(ref) {
   return end > start ? { start, end } : null;
 }
 
-function splitIntoVerses(text, ref) {
+export function splitIntoVerses(text, ref) {
   const range = parseRefRange(ref);
   if (!range) return null;
   // For comma refs like "7:7, 9", use explicit verse list; otherwise contiguous range

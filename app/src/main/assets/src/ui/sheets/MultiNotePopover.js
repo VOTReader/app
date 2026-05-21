@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function MultiNotePopover({ payload, onClose, onPick }) {
+export function MultiNotePopover({ payload, onClose, onPick }) {
   if (!payload) return null;
   const { groupIds, x, y } = payload;
   const notes = groupIds.map(gid => NoteStore.get(gid)).filter(Boolean);

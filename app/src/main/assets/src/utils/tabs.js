@@ -10,7 +10,7 @@
    =================================================================== */
 
 
-function describeTab(tab) {
+export function describeTab(tab) {
   // Returns { title, subtitle } for the card. Falls back gracefully.
   const s = tab.screen || 'home';
   const resolveBook = (id) => id ? id === 'matthew' ? MATTHEW : id === 'matthew-plain' ? MATTHEW_PLAIN : BOOKS[id] : null;
@@ -64,15 +64,15 @@ function describeTab(tab) {
   return { title: 'Home', subtitle: 'VOT Study Bible' };
 }
 
-function tabContentKey(tab) {
+export function tabContentKey(tab) {
   return `${tab.screen || 'home'}|${tab.bookId || ''}|${tab.chapterNum ?? ''}|${tab.letterId || ''}|${tab.studyId || ''}|${tab.studyChapterId || ''}|${tab.genreId || ''}|${tab.gardenPage ?? ''}`;
 }
 
-function tabHasProgressBar(tab) {
+export function tabHasProgressBar(tab) {
   return READING_SCREENS.has(tab.screen);
 }
 
-function scrollKeyForTab(tab) {
+export function scrollKeyForTab(tab) {
   const s = tab.screen;
   if (s === 'matthew-ch' || s === 'bible-ch') return `${tab.bookId}-${tab.chapterNum}`;
   if (s === 'bible-study-chapter') return `study-${tab.studyId || ''}-${tab.studyChapterId || ''}`;

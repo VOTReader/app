@@ -10,11 +10,11 @@
    =================================================================== */
 
 
-function bibleHlKey(bookId, chapter, verse) { return 'bible:' + bookId + ':' + chapter + ':' + verse; }
+export function bibleHlKey(bookId, chapter, verse) { return 'bible:' + bookId + ':' + chapter + ':' + verse; }
 
-function letterHlKey(letterId, blockIdx) { return 'letter:' + letterId + ':' + blockIdx; }
+export function letterHlKey(letterId, blockIdx) { return 'letter:' + letterId + ':' + blockIdx; }
 
-function wtlbHlKey(entryId, paraIdx) { return 'wtlb:' + entryId + ':' + paraIdx; }
+export function wtlbHlKey(entryId, paraIdx) { return 'wtlb:' + entryId + ':' + paraIdx; }
 
-function studyHlKey(chapterId, blockIdx) { return 'study:' + chapterId + ':' + blockIdx; }
+export function studyHlKey(chapterId, blockIdx) { return 'study:' + chapterId + ':' + blockIdx; }
 

@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate }) {
+export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate }) {
   const isOpen = num !== null;
   const verse = fn?.type === "scripture" ? nkjv?.[fn.ref] || null : null;
   // Build ordered key list once we know the footnotes dict; keys are

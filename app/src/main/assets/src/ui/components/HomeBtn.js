@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function HomeBtn() {
+export function HomeBtn() {
   return (/*#__PURE__*/
     React.createElement("button", { className: "nav-search-btn", onClick: () => window.__goHome && window.__goHome(), title: "Home", "aria-label": "Home" }, /*#__PURE__*/
     React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /*#__PURE__*/

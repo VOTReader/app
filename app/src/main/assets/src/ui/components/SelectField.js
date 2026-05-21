@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function SelectField({ eyebrow, title, label, desc, value, options, onChange }) {
+export function SelectField({ eyebrow, title, label, desc, value, options, onChange }) {
   const [open, setOpen] = React.useState(false);
   const selected = options.find((o) => o.id === value) || options[0];
 

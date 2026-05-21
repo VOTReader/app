@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ClearProgressRow({ label, total, count, stage, onTap }) {
+export function ClearProgressRow({ label, total, count, stage, onTap }) {
   if (count === 0) return (/*#__PURE__*/
     React.createElement("div", { className: "progress-row" }, /*#__PURE__*/
     React.createElement("span", { className: "progress-row-label" }, label), /*#__PURE__*/

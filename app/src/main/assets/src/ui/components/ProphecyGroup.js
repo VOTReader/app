@@ -9,7 +9,7 @@
    resolve at render time from the surrounding scripts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-function ProphecyGroup({ block, fnProps, expandSignal, groupKey, statesRef, onSaveStates }) {
+export function ProphecyGroup({ block, fnProps, expandSignal, groupKey, statesRef, onSaveStates }) {
   return (/*#__PURE__*/
     React.createElement("div", { className: "prophecy-group" },
     block.label && /*#__PURE__*/React.createElement("div", { className: "prophecy-group-label" }, block.label),
