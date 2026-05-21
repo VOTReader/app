@@ -85,7 +85,9 @@
       // P6b: useRefMirror — 15 sites in App() now route through it
       'useRefMirror',
       // P6c: useHistory — App-global reading-history state + mutators
-      'useHistory'
+      'useHistory',
+      // P6d: useThumbnails — tab-card thumbnail capture + IDB persistence + GC
+      'useThumbnails'
     ],
     components: [
       'App', 'ErrorBoundary', 'ScreenLayout', 'NavButtons', 'LibraryNav',

@@ -1465,38 +1465,7 @@ function App() {
   const [disableTabsPromptOpen, setDisableTabsPromptOpen] = useState(false);
   const [clearAllStage, setClearAllStage] = useState(0); // 0 = idle, 1 = "Are You Sure?", 2 = confirmed
   const lastTabCloseStrikes = React.useRef(0); // 3-strike counter for last-tab close
-  // Thumbnails for tab cards. Persisted in IndexedDB (localStorage's 5MB
-  // quota fills up after ~50 JPEG thumbnails; IndexedDB handles 50MB+ easily).
-  // Keyed by content signature so they survive tab-index shifts (close/
-  // reorder) — tabs on the same content share the same preview.
-  const [tabThumbnails, setTabThumbnails] = useState({});
-  // Load previously-saved thumbnails on mount
-  useEffect(() => {
-    let cancelled = false;
-    idbReadAll().then((thumbs) => {
-      if (cancelled) return;
-      setTabThumbnails(thumbs || {});
-    });
-    return () => {cancelled = true;};
-  }, []);
-  // Garbage-collect stale thumbnails (those whose content key no longer
-  // matches any open tab). Debounced so we don't thrash during rapid tab edits.
-  const thumbGcTimerRef = React.useRef(null);
-  useEffect(() => {
-    clearTimeout(thumbGcTimerRef.current);
-    thumbGcTimerRef.current = setTimeout(() => {
-      const liveKeys = new Set(tabs.map((t) => tabContentKey(t)));
-      const deadKeys = Object.keys(tabThumbnails).filter((k) => !liveKeys.has(k));
-      if (deadKeys.length === 0) return;
-      deadKeys.forEach((k) => idbDelete(k));
-      setTabThumbnails((prev) => {
-        const out = {};
-        for (const k of Object.keys(prev)) if (liveKeys.has(k)) out[k] = prev[k];
-        return out;
-      });
-    }, 2000);
-    return () => clearTimeout(thumbGcTimerRef.current);
-  }, [tabs, tabThumbnails]);
+  /* Thumbnail state + IDB load + GC → extracted to src/hooks/use-thumbnails.js (P6d) */
   // (Effect closing overview when tabs are disabled lives further down —
   // it needs `settings`, which is declared after this block.)
   const [lastReadChapters, setLastReadChapters] = useState(saved.lastReadChapters || {});
@@ -1914,6 +1883,13 @@ function App() {
   // State + mutators extracted to useHistory(); auto-track effect stays
   // below (depends on tab-local nav state).
   const { readHistory, addToHistory, clearHistory, pruneHistoryDay } = useHistory(settings.historyEnabled);
+  /* useThumbnails — tab card thumbnail capture + IDB persistence + GC.
+     Extracted to src/hooks/use-thumbnails.js (P6d). */
+  const { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail } = useThumbnails({
+    tabs, activeTabIdx, activeTab,
+    tabsEnabled: settings.tabsEnabled,
+    tabsOverviewOpen,
+  });
   const navOriginRef = useRefMirror(navOrigin);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
 
@@ -1988,9 +1964,6 @@ function App() {
       window.removeEventListener('pagehide', flushScrollToActiveTab);
     };
   }, [flushScrollToActiveTab]);
-
-  // (Thumbnail-capture effects relocated below `captureActiveTabThumbnail`
-  //  declaration to avoid a TDZ ReferenceError when React reads their deps.)
 
   // On screen change or tab switch: restore active tab's scroll for the screen
   useEffect(() => {
@@ -2096,145 +2069,8 @@ function App() {
   const goLinksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("links-index");};
   const goBookmarksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("bookmarks-index");};
   const goHighlightsIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("highlights-index");};
-  // Capture a thumbnail of the ACTIVE tab's current visible screen.
-  // Fast path: native AndroidBridge.takeScreenshot (~30-80ms on UI thread).
-  // Fallback: html2canvas (~500-1500ms, used when not in the Android app).
-  // Always crops the top nav bar so the thumb is pure body content.
-  // Triggered on scroll-stop, screen change, and when opening the overview.
-  const activeTabIdxRef = useRefMirror(activeTabIdx);
-  const tabsRef = useRefMirror(tabs);
-  const captureInFlightRef = React.useRef(false);
-  const thumbnailsRef = React.useRef({});
-
-  const captureActiveTabThumbnail = React.useCallback(() => {
-    if (!settings.tabsEnabled) return;
-    if (tabsOverviewOpenRef.current) return; // overview open → no point capturing
-    if (captureInFlightRef.current) return;
-    const tab = tabsRef.current[activeTabIdxRef.current];
-    if (!tab) return;
-    const key = tabContentKey(tab);
-
-    // Measure nav height (in CSS px) so the native side can crop it
-    const navEl = document.querySelector('.top-nav');
-    const navHeightDp = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0;
-
-    const applyThumb = (dataUrl) => {
-      if (!dataUrl) return;
-      thumbnailsRef.current[key] = dataUrl;
-      setTabThumbnails((prev) => ({ ...prev, [key]: dataUrl }));
-      idbPut(key, dataUrl); // write-through to IndexedDB — survives app restart
-    };
-
-    // Hide floating UI chrome (sticky arrows, reading dot) for the duration
-    // of the capture so the thumbnail shows pure content only.
-    document.body.classList.add('capturing-thumb');
-    // Force a synchronous layout so the visibility:hidden takes effect
-    // before we hand control to the native bridge.
-    void document.body.offsetHeight;
-
-    // Native fast path — synchronous because WebView JS interfaces run on
-    // a worker thread; blocking here on the UI thread for ~50ms does not
-    // deadlock. Synchronous is important: callers (like goTabs) need the
-    // thumbnail captured BEFORE the overlay mounts and covers the screen.
-    if (window.AndroidBridge && typeof window.AndroidBridge.takeScreenshot === 'function') {
-      captureInFlightRef.current = true;
-      try {
-        const dataUrl = window.AndroidBridge.takeScreenshot(navHeightDp, 1440, 90);
-        applyThumb(dataUrl);
-      } catch (e) {}
-      captureInFlightRef.current = false;
-      document.body.classList.remove('capturing-thumb');
-      return;
-    }
-
-    // html2canvas fallback (dev browser / no bridge)
-    if (typeof html2canvas !== 'function') return;
-    captureInFlightRef.current = true;
-    const bg = document.body.classList.contains('light') ? '#f7f2e8' : '#07070e';
-    try {
-      html2canvas(document.body, {
-        backgroundColor: bg,
-        scale: Math.min(window.devicePixelRatio || 1, 2),
-        useCORS: true, logging: false, allowTaint: false, imageTimeout: 2000,
-        ignoreElements: (el) => el.classList && (
-          el.classList.contains('tabs-overview-layer') ||
-          el.classList.contains('top-nav') ||
-          el.classList.contains('back-hint-row') ||
-          el.classList.contains('chapter-nav-sticky') ||
-          el.classList.contains('reading-dot-global') ||
-          el.classList.contains('surprise-fab') ||
-          el.classList.contains('mode-toggle-wrap'))
-      }).then((canvas) => {
-        const MAX_DIM = 1440;
-        const w = canvas.width, h = canvas.height;
-        const scale = Math.min(MAX_DIM / w, MAX_DIM / h, 1);
-        let out = canvas;
-        if (scale < 1) {
-          const c2 = document.createElement('canvas');
-          c2.width = Math.round(w * scale);c2.height = Math.round(h * scale);
-          const ctx = c2.getContext('2d');
-          ctx.imageSmoothingEnabled = true;ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(canvas, 0, 0, c2.width, c2.height);
-          out = c2;
-        }
-        applyThumb(out.toDataURL('image/jpeg', 0.90));
-      }).catch(() => {}).finally(() => {
-        captureInFlightRef.current = false;
-        document.body.classList.remove('capturing-thumb');
-      });
-    } catch (e) {
-      captureInFlightRef.current = false;
-      document.body.classList.remove('capturing-thumb');
-    }
-  }, [settings.tabsEnabled]);
-
-  // Keep tab thumbnails fresh: capture on scroll-stop (300ms idle) and
-  // shortly after any screen/tab change. Must live after the callback above
-  // since its deps reference captureActiveTabThumbnail.
-  useEffect(() => {
-    let scrollTimer = null;
-    let currentEl = null;
-    const onScroll = () => {
-      clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(captureActiveTabThumbnail, 300);
-    };
-    const attach = () => {
-      if (__scrollEl !== currentEl) {
-        if (currentEl) currentEl.removeEventListener("scroll", onScroll);
-        currentEl = __scrollEl;
-        if (currentEl) currentEl.addEventListener("scroll", onScroll, { passive: true });
-      }
-    };
-    attach();
-    const poll = setInterval(attach, 400);
-    return () => {
-      clearInterval(poll);clearTimeout(scrollTimer);
-      if (currentEl) currentEl.removeEventListener("scroll", onScroll);
-    };
-  }, [captureActiveTabThumbnail]);
-
-  // Keep tab-card aspect ratio in sync with the viewport so
-  // thumbnails fill their cards without crop or distortion.
-  useEffect(() => {
-    const update = () => {
-      const w = window.innerWidth || 1, h = window.innerHeight || 1;
-      document.documentElement.style.setProperty('--card-ar', w + ' / ' + h);
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-
-  // Capture after any navigation change (new screen or switched tab).
-  useEffect(() => {
-    if (!settings.tabsEnabled) return;
-    if (tabsOverviewOpen) return;
-    const timer = setTimeout(captureActiveTabThumbnail, 350);
-    return () => clearTimeout(timer);
-  }, [activeTab.screen, activeTab.bookId, activeTab.chapterNum, activeTab.letterId,
-  activeTab.studyId, activeTab.studyChapterId, activeTab.genreId,
-  activeTab.gardenPage, activeTabIdx, settings.tabsEnabled, tabsOverviewOpen,
-  captureActiveTabThumbnail]);
+  /* captureActiveTabThumbnail + scroll-stop + aspect-ratio + after-nav effects
+     → extracted to src/hooks/use-thumbnails.js (P6d) */
 
   // Tabs overview — overlay; back closes it without touching per-tab screen.
   const goTabs = () => {

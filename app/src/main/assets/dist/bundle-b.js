@@ -1794,6 +1794,165 @@
     return { readHistory, addToHistory, clearHistory, pruneHistoryDay };
   }
 
+  // app/src/main/assets/src/hooks/use-thumbnails.js
+  function useThumbnails({
+    tabs,
+    activeTabIdx,
+    activeTab,
+    tabsEnabled,
+    tabsOverviewOpen
+  }) {
+    const [tabThumbnails, setTabThumbnails] = React.useState({});
+    React.useEffect(() => {
+      let cancelled = false;
+      idbReadAll().then((thumbs) => {
+        if (cancelled) return;
+        setTabThumbnails(thumbs || {});
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, []);
+    const thumbGcTimerRef = React.useRef(null);
+    React.useEffect(() => {
+      clearTimeout(thumbGcTimerRef.current);
+      thumbGcTimerRef.current = setTimeout(() => {
+        const liveKeys = new Set(tabs.map((t) => tabContentKey(t)));
+        const deadKeys = Object.keys(tabThumbnails).filter((k) => !liveKeys.has(k));
+        if (deadKeys.length === 0) return;
+        deadKeys.forEach((k) => idbDelete(k));
+        setTabThumbnails((prev) => {
+          const out = {};
+          for (const k of Object.keys(prev)) if (liveKeys.has(k)) out[k] = prev[k];
+          return out;
+        });
+      }, 2e3);
+      return () => clearTimeout(thumbGcTimerRef.current);
+    }, [tabs, tabThumbnails]);
+    const activeTabIdxRef = useRefMirror(activeTabIdx);
+    const tabsRef = useRefMirror(tabs);
+    const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
+    const captureInFlightRef = React.useRef(false);
+    const thumbnailsRef = React.useRef({});
+    const captureActiveTabThumbnail = React.useCallback(() => {
+      if (!tabsEnabled) return;
+      if (tabsOverviewOpenRef.current) return;
+      if (captureInFlightRef.current) return;
+      const tab = tabsRef.current[activeTabIdxRef.current];
+      if (!tab) return;
+      const key = tabContentKey(tab);
+      const navEl = document.querySelector(".top-nav");
+      const navHeightDp = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0;
+      const applyThumb = (dataUrl) => {
+        if (!dataUrl) return;
+        thumbnailsRef.current[key] = dataUrl;
+        setTabThumbnails((prev) => ({ ...prev, [key]: dataUrl }));
+        idbPut(key, dataUrl);
+      };
+      document.body.classList.add("capturing-thumb");
+      void document.body.offsetHeight;
+      if (window.AndroidBridge && typeof window.AndroidBridge.takeScreenshot === "function") {
+        captureInFlightRef.current = true;
+        try {
+          const dataUrl = window.AndroidBridge.takeScreenshot(navHeightDp, 1440, 90);
+          applyThumb(dataUrl);
+        } catch (e) {
+        }
+        captureInFlightRef.current = false;
+        document.body.classList.remove("capturing-thumb");
+        return;
+      }
+      if (typeof html2canvas !== "function") return;
+      captureInFlightRef.current = true;
+      const bg = document.body.classList.contains("light") ? "#f7f2e8" : "#07070e";
+      try {
+        html2canvas(document.body, {
+          backgroundColor: bg,
+          scale: Math.min(window.devicePixelRatio || 1, 2),
+          useCORS: true,
+          logging: false,
+          allowTaint: false,
+          imageTimeout: 2e3,
+          ignoreElements: (el) => el.classList && (el.classList.contains("tabs-overview-layer") || el.classList.contains("top-nav") || el.classList.contains("back-hint-row") || el.classList.contains("chapter-nav-sticky") || el.classList.contains("reading-dot-global") || el.classList.contains("surprise-fab") || el.classList.contains("mode-toggle-wrap"))
+        }).then((canvas) => {
+          const MAX_DIM = 1440;
+          const w = canvas.width, h = canvas.height;
+          const scale = Math.min(MAX_DIM / w, MAX_DIM / h, 1);
+          let out = canvas;
+          if (scale < 1) {
+            const c2 = document.createElement("canvas");
+            c2.width = Math.round(w * scale);
+            c2.height = Math.round(h * scale);
+            const ctx = c2.getContext("2d");
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.drawImage(canvas, 0, 0, c2.width, c2.height);
+            out = c2;
+          }
+          applyThumb(out.toDataURL("image/jpeg", 0.9));
+        }).catch(() => {
+        }).finally(() => {
+          captureInFlightRef.current = false;
+          document.body.classList.remove("capturing-thumb");
+        });
+      } catch (e) {
+        captureInFlightRef.current = false;
+        document.body.classList.remove("capturing-thumb");
+      }
+    }, [tabsEnabled]);
+    React.useEffect(() => {
+      let scrollTimer = null;
+      let currentEl = null;
+      const onScroll = () => {
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(captureActiveTabThumbnail, 300);
+      };
+      const attach = () => {
+        if (__scrollEl !== currentEl) {
+          if (currentEl) currentEl.removeEventListener("scroll", onScroll);
+          currentEl = __scrollEl;
+          if (currentEl) currentEl.addEventListener("scroll", onScroll, { passive: true });
+        }
+      };
+      attach();
+      const poll = setInterval(attach, 400);
+      return () => {
+        clearInterval(poll);
+        clearTimeout(scrollTimer);
+        if (currentEl) currentEl.removeEventListener("scroll", onScroll);
+      };
+    }, [captureActiveTabThumbnail]);
+    React.useEffect(() => {
+      const update = () => {
+        const w = window.innerWidth || 1, h = window.innerHeight || 1;
+        document.documentElement.style.setProperty("--card-ar", w + " / " + h);
+      };
+      update();
+      window.addEventListener("resize", update);
+      return () => window.removeEventListener("resize", update);
+    }, []);
+    React.useEffect(() => {
+      if (!tabsEnabled) return;
+      if (tabsOverviewOpen) return;
+      const timer = setTimeout(captureActiveTabThumbnail, 350);
+      return () => clearTimeout(timer);
+    }, [
+      activeTab.screen,
+      activeTab.bookId,
+      activeTab.chapterNum,
+      activeTab.letterId,
+      activeTab.studyId,
+      activeTab.studyChapterId,
+      activeTab.genreId,
+      activeTab.gardenPage,
+      activeTabIdx,
+      tabsEnabled,
+      tabsOverviewOpen,
+      captureActiveTabThumbnail
+    ]);
+    return { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -6001,6 +6160,7 @@
     useSavedState,
     useRefMirror,
     useHistory,
+    useThumbnails,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
