@@ -35,6 +35,14 @@ jobs:
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build
 
+      - name: Verify committed bundles match source
+        # After `npm run build` regenerates dist/, the working tree's
+        # dist/ should be byte-identical to the committed copy. Any
+        # diff = the committed bundles are stale relative to source
+        # (someone bypassed the pre-commit hook, or built with a
+        # different esbuild). Catches every scenario the hook misses.
+        run: git diff --exit-code app/src/main/assets/dist/
+
       - name: Syntax-check every src/ module
         run: |
           # .js — Node's own parser. node --check cannot parse JSX, so
