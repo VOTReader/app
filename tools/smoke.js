@@ -483,24 +483,29 @@
     }
   }
 
-  // ── Tabs round-trip — the votSmoke({ tabsOn:true }) variant. The
-  // 12-screen walk + both annotation round-trips run with tabs OFF, so the
-  // tab state machine itself (open / switch / per-tab isolation) has zero
-  // automated coverage — only the in-App tabField stability probe catches
-  // setter-identity churn. This exercises the machine end to end:
+  // ── Tabs round-trip — the votSmoke({ tabsOn:true }) variant.
+  //
+  // DESTRUCTIVE — READ BEFORE RUNNING. This MUTATES the live app: it
+  // enables the Tabs setting, opens two extra tabs, and walks the active
+  // tab through all 12 screens. localStorage['vot-state'] is snapshotted
+  // and restored automatically, so a page RELOAD returns to the pre-test
+  // state — but the un-reloaded live session stays visibly mutated (Tabs
+  // on, two extra tabs). ALWAYS reload after running. Never inject
+  // votSmoke({ tabsOn:true }) into a real user's session for a casual
+  // debugging check — it will rearrange their tab layout until they reload.
+  //
+  // Why it exists: the 12-screen walk + both annotation round-trips run
+  // with tabs OFF, so the tab state machine itself (open / switch /
+  // per-tab isolation) has zero automated coverage — only the in-App
+  // tabField stability probe catches setter-identity churn. End to end:
   //   1. enable Tabs via the Settings UI toggle
   //   2. open a fresh tab (X), navigate it to a KNOWN screen (Volumes idx)
   //   3. open a second fresh tab (Y)
   //   4. run the full 12-screen walk inside tab Y
   //   5. switch back to tab X and assert it STILL holds the Volumes index
   //      — proving navigating one tab never corrupts another tab's state.
-  //
-  // Snapshots + restores localStorage['vot-state'] (enabling tabs and
-  // opening tabs both persist there), so a reload returns to the original
-  // state. The LIVE React session stays mutated after the run — tabs
-  // visibly enabled, two extra tabs present — exactly as the annotation
-  // round-trip leaves the app navigated to a letter. This is a test tool,
-  // run deliberately; a reload restores everything. Do NOT add a reload.
+  // Do NOT add a page reload inside this function — the snapshot lives in
+  // a closure var; a reload would lose it.
   async function tabsRoundTrip() {
     var snap = localStorage.getItem('vot-state');
     function restore() {

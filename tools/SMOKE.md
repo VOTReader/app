@@ -33,6 +33,15 @@ nearly all of that in seconds, deterministically.
   Fast inner-loop check while editing.
 - `votSmoke({ mutating:false })` — skips the annotation round-trip
   (pure read-only; no localStorage touched at all).
+- `votSmoke({ tabsOn:true })` — adds the multi-tab round-trip: enables
+  Tabs, opens two tabs, runs the 12-screen walk in one, switches back,
+  asserts per-tab isolation. ~35–40 s total.
+  **DESTRUCTIVE — mutates the live app.** It enables the Tabs setting,
+  opens two extra tabs, and walks the active tab through all 12 screens.
+  `vot-state` is snapshotted + restored, so a page **reload** returns to
+  the pre-test state — but the un-reloaded session stays visibly mutated.
+  Always reload after running. Never run the `tabsOn` variant against a
+  real user's live session for a casual check without warning them first.
 
 ## Reading the result
 
@@ -51,6 +60,11 @@ nearly all of that in seconds, deterministically.
   the class of bug fixed in `2db70f5`). It snapshots and **always
   restores** `vot-annotations`/`vot-notes` in-session, so it never
   corrupts real data — never add a page reload to that section.
+- `tabs.ok` — the multi-tab round-trip (only when `tabsOn:true`). Sub-
+  fields: `tabXLanded` / `tabYFreshHome` / `tabXHeldAfterWalk` (the
+  per-tab isolation assertion) and `walkInTabY.crashed` (screens that
+  tripped ErrorBoundary during the in-tab walk). Snapshots + restores
+  `vot-state`; see the **DESTRUCTIVE** note under Options.
 - `console.errorsSeen` — uncaught `console.error` during the run.
 
 ## Discipline
