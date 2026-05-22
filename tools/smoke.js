@@ -9,14 +9,22 @@
      • Android:  chrome://inspect → the WebView's console → same.
 
    WHY THIS EXISTS
-   The codebase has no automated tests and no build step; modules are
-   plain <script src> files sharing one global scope. The dominant
-   regression when extracting code is therefore NOT logic bugs — it's:
-     1. a module that fails to load / loads in the wrong order, so a
-        global is `undefined` and the app white-screens, and
-     2. a screen that silently stops rendering because a symbol moved.
-   A globals audit + a screen-render walk catches ~all of that in
-   seconds, deterministically, before it ships.
+   The codebase has a build pipeline (esbuild for clusters B/C/D,
+   python tools/build.py for cluster A) and CI that runs node --check
+   on every .js + esbuild on every .jsx + the full `npm run build`.
+   That catches syntax errors, missing imports, and build breakage —
+   but NOT runtime regressions in the assembled app. The dominant
+   class of regression the build can't see is:
+     1. A symbol that builds clean but isn't on `window` when the
+        inline App() block (still classic-script) reaches for it.
+     2. A screen that renders blank because a refactor moved a helper
+        out from under it -- React swallows the error inside the
+        ErrorBoundary's gold panel; smoke catches the empty screen.
+     3. An annotation round-trip that crashes or corrupts on the
+        next/prev nav (the original regression that motivated this).
+   A globals audit + a 12-screen render walk + an annotation round-
+   trip catches all of that in ~20 seconds, deterministically, before
+   it ships.
 
    CONTRACT
    votSmoke({ mutating=true, walk=true, tabsOn=false }) → Promise<report>
