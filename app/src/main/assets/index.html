@@ -1003,9 +1003,14 @@ function App() {
 
   /* ═══════════════════════════════════════════════════════════════════
      HOOK CALL-ORDER DAG (P6 decomposition) — 13 hooks, in call order.
-     Each hook may consume only the RETURNS of hooks ABOVE it; the "←"
-     notes name those deps. Do NOT reorder without re-checking this graph.
-     This code is authoritative — keep CLAUDE.md §POST-P6 HOOK DAG in sync.
+     THIS COMMENT IS THE SINGLE SOURCE OF TRUTH for hook call order. If it
+     ever disagrees with CLAUDE.md or any other doc, TRUST THIS COMMENT and
+     fix the doc — never "correct" this block to match a stale doc.
+     The number is call ORDER; the "←" list is the dependency. A hook need
+     only follow the hooks named in its "←" list — two hooks with no "←"
+     relationship are order-independent (e.g. 3 and 4 both depend only on
+     useTabs, so they may be swapped). A few hooks ALSO carry an App-local
+     constraint not expressible as a hook dep — flagged inline below.
         1. useSavedState          (no hook deps — reads vot-state once)
         2. useTabs                ← saved
         3. useSheetOrchestration  ← nav state via tabField (2)
@@ -1018,9 +1023,11 @@ function App() {
        10. useTabActions          ← tabState (2), cancelDwell (9), setTabThumbnails (7)
        11. usePersistedState      ← tabs (2), activeReadKey (9), settings (5)
        12. useNavigateToLink      ← closeLinkSidebar (3), pushFromLetter (4)
+                                    + App-local: must follow setJournalEntryId.
        13. useAndroidBack         ← cancelDwell (9), fromLetterRef (4), + every
-                                    go* nav helper — so it is called LAST, far
-                                    below, after goStudiesHome is defined.
+                                    go* nav helper + App-local: HARD-LAST —
+                                    must follow goStudiesHome, defined deep
+                                    in App().
      The other 2 of the 15 P6 hooks are not in this sequence: useMarkAsRead
      is called by the 4 reading views; useRefMirror is called inline ~15×.
      ═══════════════════════════════════════════════════════════════════ */
