@@ -58,10 +58,10 @@ fi
 # Any change to a bundled source file means dist/bundle-*.js is stale.
 # Rebuild + stage the regenerated bundles so the commit lands with
 # bundles in sync. Source files for the 4 clusters:
-#   - app/src/main/assets/src/**/*.js  (all extracted modules)
+#   - app/src/main/assets/src/**/*.{js,jsx}  (all extracted modules)
 #   - search.js, search-data.js, flexsearch.min.js
 #   - react.min.js, react-dom.min.js, html2canvas.min.js
-bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.js|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js)$' || true)
+bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js)$' || true)
 
 if [ -n "$bundle_source_changed" ]; then
   echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js..."
