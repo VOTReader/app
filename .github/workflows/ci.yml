@@ -1,0 +1,39 @@
+name: CI
+
+# Day-one pipeline (Q1): prove all 4 bundles compile and every src/ module
+# parses. Typecheck / lint / test steps land later — Q4 / Q6 / Q5 — as those
+# tools are introduced. See quality-uplift-plan.txt.
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: build + syntax-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node (LTS — matches local Node 24)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      # `npm run build` invokes `python tools/build.py` (which generates
+      # bundle-a.js) — setup-python guarantees a `python` on PATH.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies (npm ci — exact lockfile)
+        run: npm ci
+
+      - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
+        run: npm run build
+
+      - name: Syntax-check every src/ module (node --check)
+        run: find app/src/main/assets/src -name '*.js' -print0 | xargs -0 -n1 node --check
