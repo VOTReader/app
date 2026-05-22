@@ -70,6 +70,10 @@ if [ -n "$bundle_source_changed" ]; then
   #   2. esbuild                → bundle-b.js (G.2.2), bundle-c.js (G.2.1), bundle-d.js (G.2.3)
   # All four must succeed before we stage.
   #
+  # All four bundles rebuild + re-stage every time, so a commit can include
+  # changes to bundles whose source you did not edit — the hook normalizes
+  # any previously-stale bundle here. That extra diff is intentional.
+  #
   # Node is required on PATH for the esbuild half. The original assumption
   # was that git-bash on Windows inherits the system PATH containing
   # C:\Program Files\nodejs (the winget install location). In practice
