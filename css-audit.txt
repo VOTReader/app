@@ -1,0 +1,753 @@
+================================================================================
+CSS AUDIT CATALOG — VOTReader-studio
+File audited: app/src/main/assets/app.css  (4,410 lines)
+Generated: 2026-05-21
+Purpose: work list for the future "CSS hardening" phase (Q3). CATALOG ONLY — no
+         edits were made to any CSS or code file.
+Method:  app.css read in full; every class name cross-checked for references
+         against app/src/main/assets/index.html AND every *.js under
+         app/src/main/assets/src/ (157 files). The dist/ bundles were treated
+         as build output, not source, and excluded from reference checks.
+Note:    A separate CSS-in-JS file exists at
+         app/src/main/assets/src/styles/journal-styles.js — it injects all
+         `jrn-`-prefixed journal styles into a dedicated <style> element at
+         runtime. It is NOT audited here (primary scope is app.css). Flag it
+         for a separate pass if a journal-CSS audit is wanted.
+================================================================================
+
+
+================================================================================
+SECTION 1 — !important DECLARATIONS
+================================================================================
+TOTAL: 36 !important declarations.
+(The string "!important" also appears once at app.css:2332 inside a CODE COMMENT
+ — "/* Per-color rules — longhand-only, !important to win ... */" — that
+ occurrence is NOT a declaration and is excluded from the count of 36.)
+
+Grouped by reason category below.
+
+--------------------------------------------------------------------------------
+CATEGORY A — annotation-system shorthand-expansion override
+             (text-decoration-color must beat the `text-decoration` shorthand's
+              currentColor expansion)                                  [11 decls]
+--------------------------------------------------------------------------------
+app.css:2334  .hl-note.is-active.hl-yellow   text-decoration-color
+app.css:2335  .hl-note.is-active.hl-green    text-decoration-color
+app.css:2336  .hl-note.is-active.hl-pink     text-decoration-color
+app.css:2337  .hl-note.is-active.hl-red      text-decoration-color
+app.css:2338  .hl-note.is-active.hl-orange   text-decoration-color
+app.css:2339  .hl-note.is-active.hl-blue     text-decoration-color
+app.css:2340  .hl-note.is-active.hl-purple   text-decoration-color
+app.css:2341  .hl-note.is-active.hl-teal     text-decoration-color
+app.css:2342  .hl-note.is-active.hl-brown    text-decoration-color
+app.css:2343  .hl-note.is-active.hl-gray     text-decoration-color
+app.css:2344  .hl-note.is-active.hl-cyan     text-decoration-color
+  Reason: the base `.hl-note.is-active` rule sets the `text-decoration` shorthand,
+  which expands `text-decoration-color` to `currentColor`. These per-color
+  longhand rules are more specific but the shorthand expansion would still win
+  the cascade without !important. (The file's own comment at line 2332 documents
+  this exact rationale.)
+
+--------------------------------------------------------------------------------
+CATEGORY B — annotation-system: note kind must strip inherited highlight styling
+             (a `.hl-note` mark also carries an `.hl-{color}` class from the
+              highlight palette; the note-kind rules must suppress that fill /
+              the active-state shorthand)                               [9 decls]
+--------------------------------------------------------------------------------
+app.css:2312  .hl-note:not(.is-active)   background
+app.css:2313  .hl-note:not(.is-active)   border-left
+app.css:2314  .hl-note:not(.is-active)   padding-left
+app.css:2315  .hl-note:not(.is-active)   text-decoration
+app.css:2323  .hl-note.is-active         background
+app.css:2324  .hl-note.is-active         border-left
+app.css:2325  .hl-note.is-active         padding-left
+app.css:2326  .hl-note.is-active         text-decoration-line
+app.css:2327  .hl-note.is-active         text-decoration-style
+  Reason: specificity battle — `.hl-yellow` etc. (highlight palette) would
+  otherwise paint a background/decoration through a note mark. CLAUDE.md §33
+  flags the four `.hl-note:not(.is-active)` stripping rules as the best
+  candidates for future cleanup via `:where()` or `@layer`.
+  NOTE: line 2328 (.hl-note.is-active text-decoration-thickness) ALSO carries
+  !important — counted under Category A grouping span; see line 2328 below.
+
+app.css:2328  .hl-note.is-active   text-decoration-thickness
+  Reason: same as Category B — part of the active-state block that must beat
+  the highlight-palette / shorthand cascade.
+
+--------------------------------------------------------------------------------
+CATEGORY C — annotation-system: icon/clear-button backgrounds must beat the
+             dynamically-applied `.hl-{color}` palette background           [4 decls]
+--------------------------------------------------------------------------------
+app.css:2274  .hl-underline               background
+  Reason: `.hl-underline` shares its element with an `.hl-{color}` class; the
+  underline kind must have NO background fill, so it overrides the palette.
+app.css:2368  .hl-note-icon               background
+  Reason: the icon span carries an `.hl-{color}` class (for per-color SVG
+  stroke); without this the palette's `.hl-{color}` background would paint a
+  colored square behind the icon. (File comment at 2364-2367 documents this.)
+app.css:2562  .sel-color-btn.sel-color-underline   background
+  Reason: underline-style color swatches render as a ring, not a fill; this
+  forces transparent over the `[data-color]` solid-fill rule.
+app.css:2624  .inline-link-icon           background
+  Reason: same pattern as .hl-note-icon — the inline link icon must not inherit
+  a palette background.
+
+--------------------------------------------------------------------------------
+CATEGORY D — active-state override (a hover/active rule must beat a base rule)
+                                                                         [4 decls]
+--------------------------------------------------------------------------------
+app.css:1082  .scripture-ref-note:hover, :focus-visible   background      (in @media hover)
+app.css:1082  .scripture-ref-note:hover, :focus-visible   border-color    (in @media hover)
+  Reason: `.scripture-ref-note` is a non-interactive variant of `.scripture-ref`;
+  the hover rule forcibly re-asserts the resting look so the note variant does
+  NOT appear to react to hover. Overrides `.scripture-ref:hover`.
+app.css:1085  .inline-note-plain:hover    opacity
+  Reason: `.inline-note-plain` is a non-interactive variant of
+  `.inline-note-scripture`; this cancels the parent's `:hover { opacity:0.75 }`.
+app.css:2582  .sel-color-clear:active     border-color
+  Reason: active-state override — the X/clear swatch turns pink on press,
+  beating its own base `border` rule (line 2578, which is itself !important).
+
+--------------------------------------------------------------------------------
+CATEGORY E — responsive / layout-variant override
+             (a state/variant class must beat a base layout rule)        [4 decls]
+--------------------------------------------------------------------------------
+app.css:198   body.capturing-thumb .chapter-nav-sticky / .reading-dot-global /
+              .surprise-fab / .mode-toggle-wrap / .back-hint-row   visibility
+  Reason: thumbnail-capture mode must force-hide floating chrome regardless of
+  each element's own display/visibility rules, so screenshots are pure content.
+app.css:501   .headings-restore           margin-bottom
+  Reason: `.headings-restore` is a pill that can attach to elements with their
+  own margin rules; it forces a consistent bottom gap.
+app.css:1144  .volumes-landing .genre-full-width   padding
+  Reason: layout-variant override — the compact "volumes-landing" screen must
+  shrink `.genre-full-width`'s padding, beating the base `.genre-full-width`
+  and `.genre-tile` padding rules.
+app.css:1330  .home-nav-item.dragging     opacity
+  Reason: drag-state override — the original card must become fully invisible
+  (a flying clone follows the finger), beating any hover/base opacity.
+
+--------------------------------------------------------------------------------
+CATEGORY F — specificity battle (overriding a more-specific rule)         [4 decls]
+--------------------------------------------------------------------------------
+app.css:1504  .settings-row-disabled .settings-toggle-track   background
+app.css:1504  .settings-row-disabled .settings-toggle-track   opacity
+  Reason: the disabled-row styling must beat
+  `.settings-toggle input:checked ~ .settings-toggle-track` (which has equal-ish
+  specificity but appears later / is state-driven). Forces the muted look even
+  when the underlying checkbox is checked.
+app.css:2578  .sel-color-clear            border
+  Reason: `.sel-color-clear` shares the `.sel-color-btn` element; the
+  `[data-color]` attribute rules set `border-color`, so the clear button forces
+  its own gold border. (Paired with the active override at line 2582.)
+
+================================================================================
+END SECTION 1  —  36 !important declarations total
+  Category A (decoration-color shorthand) ........ 11
+  Category B (note-kind strips highlight styling) . 9
+  Category C (icon/underline bg vs palette) ....... 4
+  Category D (active-state override) .............. 4
+  Category E (responsive/variant override) ........ 4
+  Category F (specificity battle) ................. 4
+================================================================================
+
+
+================================================================================
+SECTION 2 — RAW HEX COLORS NOT BEHIND A CSS VARIABLE
+================================================================================
+TOTAL raw-hex USAGES: 130
+DISTINCT multi-use hex values (appearing 2+ times as a raw usage): 18
+
+Excluded (correctly — these are the variable DEFINITIONS, not raw usages):
+  - all hex inside :root { ... }      (app.css lines 5-29)
+  - all hex inside body.light { ... } (app.css lines 33-51)
+Also excluded: hex-like tokens in code COMMENTS at lines 835 ("#211700") and
+839 ("#09122e") — those are not property values.
+
+--------------------------------------------------------------------------------
+2A — MULTI-USE HEX VALUES (2+ raw usages) — PRIORITY for variable extraction
+--------------------------------------------------------------------------------
+
+### #ef9a9a — 10 usages — the "danger / destructive action" red
+  Used as `color` on every danger button/icon across the app. STRONG candidate
+  for a single `--danger` (or `--accent-red`) variable.
+  app.css:2425   .ann-chip-btn.danger                 color
+  app.css:2449   .ann-chip-confirm-yes                color
+  app.css:2786   .hl-remove-menu-btn.danger           color   (NOTE: dead rule — see Section 3)
+  app.css:3254   .note-sheet-menu-item.danger         color
+  app.css:3520   .nb-drilled-action.danger            color
+  app.css:4006   .links-broken-icon                   color
+  app.css:4054   .link-action-btn-danger              color
+  app.css:4055   .link-action-btn-danger svg          color
+  app.css:4147   .bkm-create-edit-btn-danger          color
+  app.css:4330   .bkm-popover-btn-danger              color
+
+### #00bcd4 — 9 usages — annotation "teal" highlight color
+  app.css:2287   .hl-underline.hl-teal                text-decoration-color
+  app.css:2290   .hl-underline.hl-cyan                text-decoration-color
+  app.css:2341   .hl-note.is-active.hl-teal           text-decoration-color
+  app.css:2344   .hl-note.is-active.hl-cyan           text-decoration-color
+  app.css:2385   .hl-note-icon.hl-teal svg            stroke
+  app.css:2388   .hl-note-icon.hl-cyan svg            stroke
+  app.css:2476   .ann-chip-color-btn[data-color="teal"]   background
+  app.css:2557   .sel-color-btn[data-color="teal"]        background
+  app.css:2572   .sel-color-btn.sel-color-underline[data-color="teal"]   border-color
+  (teal == cyan back-compat alias; the SAME hex is repeated for both names.
+   Whole annotation palette below is a strong candidate for a `--hl-*` token set.)
+
+### #2a2520 — 8 usages — light-theme dark text color (inside ::selection / inputs)
+  app.css:2886   body.light .navpick-search-input     color
+  app.css:3050   body.light .picker-verses ::selection / .picker-body-letter ::selection   color
+  app.css:3107   body.light .picker-body-letter ::selection   color
+  app.css:3201   body.light .note-sheet-textarea      color
+  app.css:3484   body.light .nb-card-create-input     color
+  app.css:3532   body.light .nb-drilled-rename        color
+  app.css:3558   body.light .notes-index-search       color
+  app.css:3781   body.light .nb-picker-new-input      color
+  Candidate for a `--input-text-light` variable (or reuse an existing
+  light-mode `--cream-*` token — currently bypasses the theme system entirely).
+
+### #8d6e63 — 7 usages — annotation "brown" highlight color
+  app.css:2288   .hl-underline.hl-brown               text-decoration-color
+  app.css:2342   .hl-note.is-active.hl-brown          text-decoration-color
+  app.css:2386   .hl-note-icon.hl-brown svg           stroke
+  app.css:2477   .ann-chip-color-btn[data-color="brown"]  background
+  app.css:2558   .sel-color-btn[data-color="brown"]       background
+  app.css:2573   .sel-color-btn.sel-color-underline[data-color="brown"]   border-color
+  app.css:2921   .navpick-row-icon-bible-chapter      color   (reuses the brown hex)
+
+### #ff9100 — 6 usages — annotation "orange" highlight color
+  app.css:2284   .hl-underline.hl-orange              text-decoration-color
+  app.css:2338   .hl-note.is-active.hl-orange         text-decoration-color
+  app.css:2382   .hl-note-icon.hl-orange svg          stroke
+  app.css:2473   .ann-chip-color-btn[data-color="orange"]  background
+  app.css:2554   .sel-color-btn[data-color="orange"]       background
+  app.css:2569   .sel-color-btn.sel-color-underline[data-color="orange"]   border-color
+
+### #ff4081 — 6 usages — annotation "pink" highlight color
+  app.css:2282   .hl-underline.hl-pink                text-decoration-color
+  app.css:2336   .hl-note.is-active.hl-pink           text-decoration-color
+  app.css:2380   .hl-note-icon.hl-pink svg            stroke
+  app.css:2471   .ann-chip-color-btn[data-color="pink"]    background
+  app.css:2552   .sel-color-btn[data-color="pink"]         background
+  app.css:2567   .sel-color-btn.sel-color-underline[data-color="pink"]    border-color
+
+### #f7f2e8 — 6 usages — light-theme input/background cream
+  (identical to the `--bg` value in body.light, but hardcoded instead of var)
+  app.css:2886   body.light .navpick-search-input     background
+  app.css:3201   body.light .note-sheet-textarea      background
+  app.css:3484   body.light .nb-card-create-input     background
+  app.css:3532   body.light .nb-drilled-rename        background
+  app.css:3558   body.light .notes-index-search       background
+  app.css:3781   body.light .nb-picker-new-input      background
+  PRIORITY: this is literally `var(--bg)` in light mode — should just use the
+  variable.
+
+### #f44336 — 6 usages — annotation "red" highlight color
+  app.css:2283   .hl-underline.hl-red                 text-decoration-color
+  app.css:2337   .hl-note.is-active.hl-red            text-decoration-color
+  app.css:2381   .hl-note-icon.hl-red svg             stroke
+  app.css:2472   .ann-chip-color-btn[data-color="red"]     background
+  app.css:2553   .sel-color-btn[data-color="red"]          background
+  app.css:2568   .sel-color-btn.sel-color-underline[data-color="red"]     border-color
+
+### #ba68c8 — 6 usages — annotation "purple" highlight color
+  app.css:2286   .hl-underline.hl-purple              text-decoration-color
+  app.css:2340   .hl-note.is-active.hl-purple         text-decoration-color
+  app.css:2384   .hl-note-icon.hl-purple svg          stroke
+  app.css:2475   .ann-chip-color-btn[data-color="purple"]  background
+  app.css:2556   .sel-color-btn[data-color="purple"]       background
+  app.css:2571   .sel-color-btn.sel-color-underline[data-color="purple"]  border-color
+
+### #9e9e9e — 6 usages — annotation "gray" highlight color
+  app.css:2289   .hl-underline.hl-gray                text-decoration-color
+  app.css:2343   .hl-note.is-active.hl-gray           text-decoration-color
+  app.css:2387   .hl-note-icon.hl-gray svg            stroke
+  app.css:2478   .ann-chip-color-btn[data-color="gray"]    background
+  app.css:2559   .sel-color-btn[data-color="gray"]         background
+  app.css:2574   .sel-color-btn.sel-color-underline[data-color="gray"]    border-color
+
+### #76ff03 — 6 usages — annotation "green" highlight color
+  app.css:2281   .hl-underline.hl-green               text-decoration-color
+  app.css:2335   .hl-note.is-active.hl-green          text-decoration-color
+  app.css:2379   .hl-note-icon.hl-green svg           stroke
+  app.css:2470   .ann-chip-color-btn[data-color="green"]   background
+  app.css:2551   .sel-color-btn[data-color="green"]        background
+  app.css:2566   .sel-color-btn.sel-color-underline[data-color="green"]   border-color
+
+### #2196f3 — 6 usages — annotation "blue" highlight color
+  app.css:2285   .hl-underline.hl-blue                text-decoration-color
+  app.css:2339   .hl-note.is-active.hl-blue           text-decoration-color
+  app.css:2383   .hl-note-icon.hl-blue svg            stroke
+  app.css:2474   .ann-chip-color-btn[data-color="blue"]    background
+  app.css:2555   .sel-color-btn[data-color="blue"]         background
+  app.css:2570   .sel-color-btn.sel-color-underline[data-color="blue"]    border-color
+
+### #ffd700 — 5 usages — annotation "yellow" highlight color
+  app.css:2280   .hl-underline.hl-yellow              text-decoration-color
+  app.css:2334   .hl-note.is-active.hl-yellow         text-decoration-color
+  app.css:2469   .ann-chip-color-btn[data-color="yellow"]  background
+  app.css:2550   .sel-color-btn[data-color="yellow"]       background
+  app.css:2565   .sel-color-btn.sel-color-underline[data-color="yellow"]  border-color
+  (Note: yellow has NO .hl-note-icon stroke override — it intentionally falls
+   back to var(--gold). See file comment at line 2376.)
+
+### #fff — 5 usages — pure white (toggle thumbs, garden input, tab title)
+  app.css:1418   .garden-jump-input                   color
+  app.css:1515   .settings-toggle-thumb               background
+  app.css:1695   .search-toggle::after                background   (NOTE: dead rule — see Section 3)
+  app.css:2129   .tab-card-title                      color
+  app.css:3561   body.light .notes-index-search:focus background
+  Candidate for `--white` or reuse `--cream` (dark mode --cream is #ffffff).
+
+### #d18f2e — 2 usages — "warning" amber (settings clear-progress button)
+  app.css:1638   .settings-clear-btn.warning          color  AND  border-color
+  (both occurrences on the SAME line/rule; the value is used for two properties)
+
+### #c0392b — 2 usages — "danger" deep red (settings clear-all button)
+  app.css:1640   .settings-clear-btn.danger           color  AND  border-color
+  (both occurrences on the SAME line/rule)
+
+### #2079a8 — 2 usages — light-theme link blue (cyan ref labels)
+  app.css:2712   body.light .link-card-ref            color
+  app.css:2899   body.light .navpick-section-label    color
+  Candidate: this is the light-mode counterpart of --link-blue; consider folding
+  into the --link-blue variable's body.light definition and using var().
+
+### #1a0f00 — 2 usages — dark amber gradient stop (hero backgrounds)
+  app.css:419    .hero-bg.study                       background (gradient stop)
+  app.css:426    .hero-bg.ot                          background (gradient stop)
+
+--------------------------------------------------------------------------------
+2B — SINGLE-USE HEX VALUES (1 raw usage each) — lower priority
+--------------------------------------------------------------------------------
+app.css:395    #1f1500   .hero-bg                       background (gradient stop)
+app.css:396    #2a1d00   .hero-bg                       background (gradient stop)
+app.css:397    #1a1200   .hero-bg                       background (gradient stop)
+app.css:405    #03060f   .hero-bg.vol                   background (gradient stop)
+app.css:406    #070e24   .hero-bg.vol                   background (gradient stop)
+app.css:407    #09122e   .hero-bg.vol                   background (gradient stop)
+app.css:408    #060c1e   .hero-bg.vol                   background (gradient stop)
+app.css:416    #120802   .hero-bg.study                 background (gradient stop)
+app.css:417    #1e0f00   .hero-bg.study                 background (gradient stop)
+app.css:418    #2b1a02   .hero-bg.study                 background (gradient stop)
+app.css:427    #211400   .hero-bg.ot                    background (gradient stop)
+app.css:428    #1a0e00   .hero-bg.ot                    background (gradient stop)
+app.css:1079   #b85c58   .sc-sheet-error                color   (NOTE: dead rule — see Section 3)
+app.css:1208   #f5d86a   .home-main-amp                 color
+app.css:1216   #8c6820   body.light .home-main-amp      color
+app.css:1409   #000     .garden-fullscreen             background
+app.css:1535   #3a3527   body.light .about-body p       color
+app.css:1536   #1f1c14   body.light .about-body p em / a em   color
+app.css:1803   #d98888   .srch-error                    color
+app.css:2135   #1a1a24   body.light .tab-card-title     color
+app.css:2375   #8a6914   body.light .hl-note-icon svg   stroke
+app.css:2860   #e85555   .navpick-close-undo            color
+app.css:2864   #4caf50   .navpick-confirm-green         color
+app.css:2922   #d4a960   .navpick-row-icon-letter       color
+app.css:2923   #b39ddb   .navpick-row-icon-wtlb-entry   color
+app.css:2925   #4dd0e1   .navpick-row-icon-holy-days-entry   color
+app.css:2926   #81c784   .navpick-row-icon-study-chapter     color
+app.css:2927   #aed581   .navpick-row-icon-study-letter-chapter   color
+app.css:2957   #b9d8e9   .navpick-flash                 color   (NOTE: dead rule — see Section 3)
+app.css:2962   #1f5876   body.light .navpick-flash      color   (NOTE: dead rule — see Section 3)
+
+NOTE on #f5d86a / #8c6820: #f5d86a is identical to the dark-mode --gold-bright
+value; #8c6820 is close to (but not exactly) a light-mode gold. Both on
+.home-main-amp — candidates for var(--gold-bright) / a gold token.
+
+--------------------------------------------------------------------------------
+2 — SECTION 2 TOTALS
+--------------------------------------------------------------------------------
+  Total raw-hex usages ......................... 130
+  Distinct multi-use hex values (>=2 usages) ... 18
+  Distinct single-use hex values ............... 30
+  Largest cluster .............................. the 10-color annotation
+       palette (#ffd700/#76ff03/#ff4081/#f44336/#ff9100/#2196f3/#ba68c8/
+       #00bcd4/#8d6e63/#9e9e9e) is repeated ~5-9x each across 5 sub-systems
+       (.hl-underline, .hl-note.is-active, .hl-note-icon svg,
+       .ann-chip-color-btn[data-color], .sel-color-btn[data-color] +
+       .sel-color-underline). A single `--hl-yellow` … `--hl-gray` token set
+       would collapse ~62 raw hex usages to 10 definitions.
+================================================================================
+
+
+================================================================================
+SECTION 3 — DEAD / DUPLICATE RULES
+================================================================================
+
+--------------------------------------------------------------------------------
+3A — EMPTY RULE BODIES
+--------------------------------------------------------------------------------
+app.css:1878   .history-screen { /* inherits .vol-index width (680px) */ }
+  Only a comment inside the braces — no declarations. The `.history-screen`
+  class IS used (HistoryScreen.js:182, as "vol-index history-screen"), so the
+  selector is live but the rule is empty and can be deleted (or keep the comment
+  elsewhere).
+
+(Non-rule comment lines that merely DOCUMENT an absent rule — not empty rules,
+ just stray comments — for completeness:
+   app.css:366   /* .letter-list-item — no styles needed */   (bare comment)
+   app.css:533   /* .section-block and .section-heading defined ... below */
+   app.css:1690  /* .search-screen — no styles needed */       (bare comment)
+   app.css:1262  /* homeHeroIn — removed (unused) */
+   app.css:1266  /* homeOrnIn — removed (unused) */
+ These are comments, not rules — listed only so a cleanup pass can sweep them.)
+
+--------------------------------------------------------------------------------
+3B — DUPLICATE SELECTORS (same selector, same context / non-media)
+--------------------------------------------------------------------------------
+The following selectors are each defined in 2+ separate top-level rule blocks
+(NOT media-query variants — those are legitimate and excluded). Most are
+INTENTIONAL split-rule layering rather than accidental duplication; flagged so a
+hardening pass can decide whether to merge.
+
+.verse-text
+  app.css:776   .verse-text { color: var(--cream); }
+  app.css:2291  .verse-text { position: relative; }
+  -> Two unrelated declarations on the same selector in two different sections.
+     Genuine candidate to merge into one rule.
+
+.home-screen-app
+  app.css:1124  .home-screen-app { justify-content:flex-start; padding-top:1.6rem; }
+  app.css:1179  .home-screen-app { padding-top:2.6rem; background-image:...; ... }
+  -> Two separate blocks; line 1179's padding-top:2.6rem OVERRIDES line 1124's
+     1.6rem (later rule wins). Likely a leftover from the "ambient minimal" home
+     redesign — the 1124 block's padding-top is dead-on-arrival. Merge / clean.
+
+.nav-arrows
+  app.css:162   .nav-arrows { display: flex; gap:0.3rem; margin-left:auto; flex-shrink:0; }
+  app.css:218   .nav-arrows { display: none; }
+  -> Line 218 overrides display to none (bubbles only show in `arrows-nav`
+     mode, re-enabled at line 219 `body.arrows-nav .nav-arrows`). Intentional
+     but reads as a duplicate; could be consolidated.
+
+.hl-note-icon
+  app.css:2348  .hl-note-icon { display:inline-block; width:14px; ... }
+  app.css:2368  .hl-note-icon { background: transparent !important; }
+  -> Intentional split (the 2368 one-liner isolates the !important override).
+     Could fold the background into the main rule.
+
+.bkm-create-thought-input
+  app.css:4110  .bkm-create-label-input, .bkm-create-thought-input { ...shared... }
+  app.css:4119  .bkm-create-thought-input { font-size:0.95rem; min-height:96px; ... }
+  -> NOT a true duplicate: 4110 is a shared rule for two inputs, 4119 adds
+     thought-input-specific overrides. Intentional layering. (Listed for
+     completeness; no action needed.)
+
+(The duplicate-selector scan also surfaced .hero-title, .book-selector-title,
+ .vol-index-title, .mode-btn, .mode-toggle-wrap — every one of those is a
+ base rule + an `@media (max-width:500px)` variant (block at lines 675-681).
+ Those are legitimate responsive variants and are NOT duplicates.)
+
+--------------------------------------------------------------------------------
+3C — CONFIRMED-DEAD RULES (selector class referenced NOWHERE in index.html
+     or any src/*.js — verified by exhaustive grep)
+--------------------------------------------------------------------------------
+Method: each candidate class was grepped across index.html + all 157 src/*.js
+files. Classes that could be DYNAMICALLY constructed (string concatenation /
+template literals) were verified and EXCLUDED — see the "dynamic — skipped"
+note at the end. Only classes with CONFIRMED zero references are listed here.
+
+--- DEAD BLOCK: "BOOK SELECTOR" (entire section, lines 252-312) ---
+  This whole component was removed from the app (the volume/book index now uses
+  the `.chapter-card-*` layout). Every class below is dead:
+app.css:253    .book-selector
+app.css:258    .book-selector-eyebrow
+app.css:262    .book-selector-title           (also has a dead @media variant at :677)
+app.css:266    .book-selector-sub
+app.css:270    .book-selector-ornament
+app.css:273    .book-selector-ornament-line
+app.css:276    .book-selector-ornament-line.r
+app.css:279    .book-selector-ornament-diamond
+app.css:283    .book-cards
+app.css:284    .book-card
+app.css:289    .book-card:hover               (in @media hover)
+app.css:290    .book-card-eyebrow
+app.css:294    .book-card-title
+app.css:298    .book-card-sub
+app.css:299    .book-card-chapters
+app.css:303    .book-card.vot-edition
+app.css:307    .book-card-badge
+  -> NOTE: the @media variant `.book-selector-title { font-size:1.6rem }` at
+     app.css:677 is also dead (its base selector is dead).
+
+--- DEAD BLOCK: old "HOME SCREEN" card layout (lines ~1167-1176) ---
+  Superseded by the "AMBIENT MINIMAL" home redesign (`.home-nav-item` /
+  `.home-nav-list` / `.home-main-title`, which ARE used). The old card classes:
+app.css:1128   .home-app-name
+app.css:1167   .home-card
+app.css:1168   .home-card:hover               (in @media hover)
+app.css:1169   .home-card.featured
+app.css:1170   .home-card-eyebrow
+app.css:1171   .home-card-title
+app.css:1172   .home-card-sub
+app.css:1173   .home-card-detail
+app.css:1174   .home-card-badge
+app.css:1175   .home-card.locked
+app.css:1176   .home-coming-soon
+app.css:1163   .home-section
+app.css:1164   .home-section-label
+app.css:1165   .home-section-label::after
+app.css:1166   .home-cards
+  -> NOTE: `.home-card.genre-book-lg` and its descendants at lines 1458-1460
+     (.home-card.genre-book-lg / .home-card.genre-book-lg .home-card-title /
+     .home-card.genre-book-lg .home-card-detail) are also dead — `.home-card`
+     and `.genre-book-lg` are both unused.
+
+--- DEAD BLOCK: old "LETTER LIST" index layout (lines 365-383 + 112-122 + 1632) ---
+  Superseded by `.chapter-card-*`. The letter-list classes:
+app.css:365    .letter-list
+app.css:367    .letter-list-btn
+app.css:373    .letter-list-btn:hover         (in @media hover)
+app.css:374    .letter-list-num
+app.css:378    .letter-list-title
+app.css:379    .letter-list-btn:hover .letter-list-title   (in @media hover)
+app.css:380    .letter-list-date
+app.css:112    .letter-list-btn.is-current
+app.css:117    .letter-list-btn.is-current .letter-list-num
+app.css:120    .letter-list-btn.is-current .letter-list-title
+app.css:123    .letter-list-current-dot
+app.css:1632   .letter-list-btn.is-current .read-check
+  -> `.read-check` itself IS used; only the `.letter-list-btn.is-current`
+     compound prefix at line 1632 is dead.
+
+--- DEAD BLOCK: old "SEARCH" (v1) screen (lines ~1686-1727) ---
+  The search screen was rewritten ("SEARCH v2 (Orama)" — the `.srch-*` family).
+  The old `.search-*` classes below are dead (still-used ones —
+  .search-input, .search-no-results, .search-screen, .search-highlight — are
+  NOT listed):
+app.css:1700   .search-count
+app.css:1698   .search-hint
+app.css:1691   .search-toggle-row
+app.css:1692   .search-toggle-label
+app.css:1693   .search-toggle-text
+app.css:1694   .search-toggle
+app.css:1695   .search-toggle::after
+app.css:1696   .search-toggle.on
+app.css:1697   .search-toggle.on::after
+app.css:1701   .search-result-item
+app.css:1702   .search-result-item:active
+app.css:1703   .search-result-ref
+app.css:1704   .search-result-tag
+app.css:1705   .search-result-text
+app.css:1708   .search-result-direct
+app.css:1709   .search-result-direct:active
+app.css:1710   .search-result-direct .search-result-ref
+app.css:1711   .search-result-direct-sub
+app.css:1712   .search-result-overflow
+app.css:1713   .search-result-overflow .search-result-ref
+app.css:1714   .search-tips-btn
+app.css:1715   .search-tips-btn:hover         (in @media hover)
+app.css:1716   .search-tips-panel
+app.css:1717   .search-tips-heading
+app.css:1718   .search-tips-heading:first-child
+app.css:1719   .search-tips-row
+app.css:1720   .search-tips-code
+app.css:1721   .search-tips-desc
+app.css:1722   .search-tips-table
+app.css:1723   .search-tips-table td
+app.css:1724   .search-tips-table td:first-child
+app.css:1725   .search-scope-chip
+app.css:1726   .search-scope-clear
+app.css:1727   .search-scope-clear:hover      (in @media hover)
+
+--- DEAD: leftover "SEARCH v2" facet/chip/status sub-features ---
+  Parts of the Orama search UI that were built then removed:
+app.css:1736   .srch-status-bar
+app.css:1737   .srch-status-bar .srch-status-dot
+app.css:1738   .srch-status-bar.ready .srch-status-dot
+app.css:1739   .srch-status-bar.building .srch-status-dot
+app.css:1748   .srch-chip-row
+app.css:1749   .srch-chip-row::-webkit-scrollbar
+app.css:1750   .srch-chip
+app.css:1751   .srch-chip:active
+app.css:1752   .srch-chip.on
+app.css:1753   .srch-chip.on-dim
+app.css:1755   .srch-facet-bar
+app.css:1756   .srch-facet
+app.css:1757   .srch-facet-label
+
+--- DEAD: misc individual rules ---
+app.css:1079   .sc-sheet-error
+  -> `.sc-sheet-loading`, `.sc-sheet-tag`, `.sc-sheet-cite`, etc. ARE used;
+     only the `-error` variant is dead.
+app.css:1983   .history-date-header
+  -> the history screen was rewritten into a year/month/week/day tree
+     (`.history-year-*` … `.history-day-*`, which ARE used).
+app.css:873    .study-fn-link                  (block lines 873-885)
+app.css:884    .study-fn-link:active
+app.css:885    .study-fn-link:hover            (in @media hover)
+  -> the Study external-ref dagger; markup uses the plain `.fn-link` class
+     instead.
+app.css:1056   .letter-highlight-block         (lines 1056-1064)
+app.css:1065   body.light .letter-highlight-block   (lines 1065-1069)
+  -> `.letter-highlight` (inline tap-through pulse) IS used; the `-block`
+     variant is not.
+app.css:1875   .chapter-card-dot               (and @keyframes dot-pulse is still
+                                                used by .reading-dot-global, so
+                                                the keyframe stays — only the
+                                                .chapter-card-dot rule is dead)
+app.css:1852   .chapter-card-sub
+  -> the chapter card uses `.chapter-card-title` / `.chapter-card-label` /
+     `.chapter-card-info`; the `-sub` line is unused.
+app.css:1871   .preface-card
+  -> a `.preface-card` border-style override; the preface chapter card is
+     rendered with plain `.chapter-card-btn` (no `.preface-card` class applied).
+app.css:174    .nav-btn-text
+  -> `.nav-btn` is used but the inner `.nav-btn-text` span class is not.
+app.css:3018   .picker-chapter-title
+  -> verse picker uses `.picker-letter-title` / `.picker-title`; the
+     `-chapter-` variant is unused.
+
+--- DEAD BLOCK: notes sort-menu popover (lines 3700-3723) ---
+  CLAUDE.md §17.17 confirms the 3-mode sort dropdown was removed in favor of a
+  simple Newest/Oldest toggle button (`.notes-index-sort-btn`, which IS used):
+app.css:3701   .notes-sort-menu
+app.css:3711   body.light .notes-sort-menu
+app.css:3712   .notes-sort-menu-item
+app.css:3721   .notes-sort-menu-item + .notes-sort-menu-item
+app.css:3722   .notes-sort-menu-item.active
+app.css:3723   .notes-sort-menu-item:active
+app.css:3567   .notes-index-chip
+app.css:3577   .notes-index-chip:active        (filter chip — also removed per §17.17)
+app.css:3578   .notes-index-chip.active
+
+--- DEAD BLOCK: "HIGHLIGHT REMOVE CONTEXT MENU" (lines 2769-2786) ---
+  CLAUDE.md §17.x: replaced entirely by the annotation action chip
+  (`.ann-chip*`). The whole `.hl-remove-menu` family is dead:
+app.css:2770   .hl-remove-menu
+app.css:2776   .hl-remove-menu-btn
+app.css:2784   .hl-remove-menu-btn + .hl-remove-menu-btn
+app.css:2785   .hl-remove-menu-btn:active
+app.css:2786   .hl-remove-menu-btn.danger
+
+--- DEAD: Studies-home "stacked tile" + genre variants ---
+app.css:1399   .studies-stack
+app.css:1400   .study-stack-tile
+app.css:1401   .study-stack-tile .genre-tile-title
+app.css:1402   .study-stack-tile .genre-tile-sub
+app.css:1403   .study-stack-capstone
+app.css:1404   .study-stack-external
+  -> StudiesHome.js renders study tiles with a different structure; the
+     `.study-stack-*` / `.studies-stack` classes are not applied.
+app.css:1391   .genre-tile-detail
+app.css:1395   .genre-tile-external
+app.css:1396   .genre-tile-external .ext-arrow
+app.css:1393   .genre-tile-preview
+  -> the genre tiles use `.genre-tile-title` / `.genre-tile-sub` /
+     `.genre-tile-badge` only; `-detail`, `-external`, `-preview` (+ the
+     `.ext-arrow` inside `-external`) are unused.
+app.css:1455   .genre-screen
+app.css:1456   .genre-screen .home-ornament
+  -> `.genre-screen` is not applied to any element.
+
+--- DEAD: bookmark thought "more/less" inline toggle ---
+app.css:4264   .bkm-row-thought-toggle
+  -> the bookmark thought read-more is now handled by the `JrnExpandable`
+     component (`.bkm-row-thought-body`, which IS used). The standalone
+     `.bkm-row-thought-toggle` affordance class is not applied.
+
+--- DEAD (one settings widget): custom <select> styling ---
+app.css:1517   .settings-select
+app.css:1518   body.light .settings-select
+  -> Settings uses the custom `.select-field` / `.select-sheet` bottom-sheet
+     widget; the styled native `.settings-select` is not used. (Heads-up: the
+     2 lines also embed inline SVG data-URIs with a hardcoded stroke color —
+     `%23c8a456` / `%237a5c10` — those go away with the dead rule.)
+
+--- DEAD (settings clear-progress row container) ---
+app.css:1633   .settings-clear-row
+app.css:1634   .settings-clear-count
+  -> `.settings-clear-btn` (+ `.warning` / `.danger`) IS used; the row
+     container `.settings-clear-row` and the count label `.settings-clear-count`
+     are not.
+
+--- LIKELY DEAD (superseded, noted conservatively) ---
+app.css:4239   .bkm-row-thought.is-collapsible
+app.css:4244   .bkm-row-thought.is-collapsible:hover, :active
+app.css:4249   .bkm-row-thought.is-expanded
+  -> `.bkm-row-thought` IS used, but the `.is-collapsible` / `.is-expanded`
+     modifiers are NOT applied to bookmark thought rows (BookmarksScreen.js
+     uses the `JrnExpandable` component — `.bkm-row-thought-body` path — per
+     the file's own comment at lines 4252-4255). Listed as LIKELY dead rather
+     than confirmed because `is-collapsible` / `is-expanded` are generic
+     modifier names; a hardening pass should confirm before removal.
+
+--------------------------------------------------------------------------------
+3 — DYNAMIC CLASSES — CHECKED AND DELIBERATELY *NOT* FLAGGED AS DEAD
+--------------------------------------------------------------------------------
+These appeared to have zero literal references but are CONSTRUCTED AT RUNTIME
+via string concatenation / template literals — they are LIVE. Do NOT remove.
+  - .hl-yellow/.hl-green/.hl-pink/.hl-red/.hl-orange/.hl-blue/.hl-purple/
+    .hl-teal/.hl-brown/.hl-gray/.hl-cyan
+       built via `'hl-' + ann.color` (annotation-engine.js:64,68,69,408)
+  - .navpick-row-icon-bible-chapter / -letter / -wtlb-entry / -blessed-entry /
+    -holy-days-entry / -study-chapter / -study-letter-chapter
+       built via `"navpick-row-icon-" + item.kind` (LinkPicker.js:98)
+  - .pc-intro / .pc-nt / .pc-ot / .pc-vot
+       built via `` `prophecy-card pc-${type}` `` (ProphecyCard.js:37)
+  - .badge-verse / .badge-note / .badge-footnote / .badge-letter
+       built via `"srch-card-badge " + (meta.cls || '')` (SrchCard.js:34)
+  - .sel-color-underline
+       built via `"sel-color-btn sel-color-" + activeStyle` (SelectionToolbar.js:633)
+  - .study-heading-l3
+       built via `` `study-heading study-heading-l${block.level || 3}` ``
+       (LetterView.js:234 default 2, ProphecyCard.js:63 default 3)
+Also note: `w3` and `hl-color` surfaced in the raw class scan but are FALSE
+POSITIVES — `w3` is from the SVG namespace URI `http://www.w3.org/2000/svg`
+inside data-URIs; `hl-color` appears only in app.css code comments describing
+the dynamic `hl-{color}` concept. Neither is a real class/rule.
+
+================================================================================
+END SECTION 3
+  Empty rules ................................. 1   (.history-screen, app.css:1878)
+  Duplicate selectors (same-context) .......... 5   (.verse-text, .home-screen-app,
+        .nav-arrows, .hl-note-icon, .bkm-create-thought-input — last two/three
+        are intentional split-rule layering)
+  Confirmed-dead rules ........................ ~110 rules across ~95 distinct
+        dead classes/selectors (6 dead blocks: BOOK SELECTOR, old HOME cards,
+        LETTER LIST, old SEARCH v1, srch facet/chip/status, notes sort-menu,
+        hl-remove-menu — plus ~20 scattered single dead rules)
+  Likely-dead (noted, needs confirm) .......... 3   (.bkm-row-thought.is-collapsible
+        family)
+================================================================================
+
+
+================================================================================
+SECTION 4 — SUMMARY
+================================================================================
+  !important declarations ................................. 36
+       (annotation-system overrides dominate: 24 of 36 are in the
+        .hl-note / .hl-underline / .hl-note-icon / color-swatch subsystem)
+
+  Raw-hex color usages (outside :root / body.light defs) ... 130
+  Distinct multi-use hex values (>=2 raw usages) ........... 18
+       (the 10-color annotation palette alone accounts for ~62 of the 130 —
+        a `--hl-*` token set is the single highest-leverage cleanup)
+
+  Empty rule bodies ....................................... 1
+       (.history-screen — comment-only, app.css:1878)
+
+  Duplicate selectors (same non-media context) ............ 5
+       (.verse-text + .home-screen-app are genuine merge candidates;
+        .nav-arrows + .hl-note-icon + .bkm-create-thought-input are
+        intentional split-rule layering)
+
+  Confirmed-dead rules .................................... ~110 rules
+       (6 whole dead component blocks — BOOK SELECTOR, old HOME-card layout,
+        LETTER LIST index, old SEARCH v1, srch facet/chip/status,
+        notes sort-menu + hl-remove-menu — plus ~20 scattered single dead
+        rules; ~95 distinct dead classes/selectors total. Conservatively, all
+        dynamically-constructed classes were verified and EXCLUDED.)
+
+  Likely-dead (needs one confirmation pass) ............... 3
+       (.bkm-row-thought.is-collapsible / :hover / .is-expanded)
+
+  Separate CSS-in-JS file (NOT audited here):
+       app/src/main/assets/src/styles/journal-styles.js — injects all
+       `jrn-`-prefixed journal CSS into a runtime <style> element. A future
+       hardening pass should audit it separately with the same four checks.
+================================================================================
+END OF CSS AUDIT CATALOG
+================================================================================
