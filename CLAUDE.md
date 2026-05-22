@@ -1,5 +1,7 @@
 # CLAUDE.md — VOTReader-studio Project Knowledge Base
 
+![CI](https://github.com/corbinlythgoe/VOTReader-studio/actions/workflows/ci.yml/badge.svg)
+
 > Living document. Update after every major examination or change.
 > Last major update: 2026-05-20 (G.2.3 LANDED IN WORKING TREE — Cluster D now ES modules via esbuild; **all four clusters are now in their final build form**. Next: P6 App() hook extraction.).
 >
