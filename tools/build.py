@@ -29,9 +29,12 @@ import os, sys
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-REPO  = 'D:/VOTReader-studio'
-ROOT  = REPO + '/app/src/main/assets'
-DIST  = ROOT + '/dist'
+# Repo paths resolved relative to THIS script (tools/build.py) so the
+# build runs identically on any machine and on CI — no hardcoded path.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+REPO  = os.path.dirname(_HERE)
+ROOT  = os.path.join(REPO, 'app', 'src', 'main', 'assets')
+DIST  = os.path.join(ROOT, 'dist')
 
 # Cluster A — vendor + raw corpus + search engine
 A = [
@@ -69,7 +72,7 @@ D = []  # intentionally empty; esbuild owns bundle-d.js
 
 
 def bundle(name, files):
-    out_path = DIST + '/bundle-' + name + '.js'
+    out_path = os.path.join(DIST, 'bundle-' + name + '.js')
     parts = []
     parts.append('/* ' + '=' * 67 + '\n')
     parts.append('   G.1 BUNDLE ' + name.upper() + ' — ' + str(len(files)) + ' files concatenated\n')
