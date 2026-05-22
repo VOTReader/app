@@ -1160,31 +1160,27 @@
     return verse.text;
   }
 
-  // app/src/main/assets/src/ui/components/Segments.js
+  // app/src/main/assets/src/ui/components/Segments.jsx
   function Segments2({ segments, activeFn, onFnClick, onScripClick, onLetterClick, onInAppLink, studyMode, footnotes, highlightText }) {
     return segments.map((seg, i) => {
       if (seg.t === "fn") {
-        return /* @__PURE__ */ React.createElement("span", {
-          key: i,
-          className: `fn-ref${activeFn === seg.v ? " active" : ""}`,
-          "data-fn-num": seg.v,
-          onClick: () => onFnClick(seg.v),
-          title: `Footnote ${seg.v}`
-        }, seg.v);
+        return /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            key: i,
+            className: `fn-ref${activeFn === seg.v ? " active" : ""}`,
+            "data-fn-num": seg.v,
+            onClick: () => onFnClick(seg.v),
+            title: `Footnote ${seg.v}`
+          },
+          seg.v
+        );
       }
       if (seg.t === "letter-link") {
         if (seg.link && onInAppLink) {
-          return /* @__PURE__ */ React.createElement("span", {
-            key: i,
-            className: "letter-link-ref",
-            onClick: () => onInAppLink(seg.link)
-          }, seg.label);
+          return /* @__PURE__ */ React.createElement("span", { key: i, className: "letter-link-ref", onClick: () => onInAppLink(seg.link) }, seg.label);
         }
-        return /* @__PURE__ */ React.createElement("span", {
-          key: i,
-          className: "letter-link-ref",
-          onClick: () => onLetterClick && onLetterClick(seg.letterId, seg.screen)
-        }, seg.label);
+        return /* @__PURE__ */ React.createElement("span", { key: i, className: "letter-link-ref", onClick: () => onLetterClick && onLetterClick(seg.letterId, seg.screen) }, seg.label);
       }
       if (seg.t === "stanza-break") return /* @__PURE__ */ React.createElement("div", { key: i, className: "stanza-break" });
       const prevV = i > 0 ? segments[i - 1].v || "" : "";
@@ -1196,7 +1192,7 @@
     });
   }
 
-  // app/src/main/assets/src/ui/components/ProphecyCard.js
+  // app/src/main/assets/src/ui/components/ProphecyCard.jsx
   function ProphecyCard2({ type, tag, label, blocks, fnProps, stateKey, statesRef, onSaveStates, expandSignal }) {
     const stored = statesRef && statesRef.current[stateKey];
     const [expanded, setExpandedRaw] = React.useState(stored !== void 0 ? stored : true);
@@ -1219,76 +1215,27 @@
     }, [expandSignal]);
     const cls = `prophecy-card pc-${type}`;
     const cardFnProps = fnProps;
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: cls },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "prophecy-card-header", onClick: () => setExpanded((e) => !e) },
-        /* @__PURE__ */ React.createElement("span", { className: "prophecy-card-tag" }, tag),
-        /* @__PURE__ */ React.createElement("span", { className: `prophecy-card-chevron${expanded ? "" : " collapsed"}` }, "\u25BC")
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: `prophecy-card-body${expanded ? "" : " collapsed"}` },
-        label && /* @__PURE__ */ React.createElement("div", { className: "prophecy-card-sublabel" }, label),
-        blocks.map((block, bi) => {
-          if (block.type === "para") return /* @__PURE__ */ React.createElement(
-            "p",
-            { key: bi, className: "letter-para" },
-            /* @__PURE__ */ React.createElement(Segments, _extends({ segments: block.segments }, cardFnProps))
-          );
-          if (block.type === "poetry") return /* @__PURE__ */ React.createElement(
-            "div",
-            { key: bi, className: "letter-poetry" },
-            block.lines.map(
-              (line, li) => /* @__PURE__ */ React.createElement(
-                "div",
-                { key: li, className: "poetry-line" },
-                /* @__PURE__ */ React.createElement(Segments, _extends({ segments: line }, fnProps))
-              )
-            )
-          );
-          if (block.type === "heading") return /* @__PURE__ */ React.createElement("h2", { key: bi, className: `study-heading study-heading-l${block.level || 3}` }, block.text);
-          return null;
-        })
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: cls }, /* @__PURE__ */ React.createElement("div", { className: "prophecy-card-header", onClick: () => setExpanded((e) => !e) }, /* @__PURE__ */ React.createElement("span", { className: "prophecy-card-tag" }, tag), /* @__PURE__ */ React.createElement("span", { className: `prophecy-card-chevron${expanded ? "" : " collapsed"}` }, "\u25BC")), /* @__PURE__ */ React.createElement("div", { className: `prophecy-card-body${expanded ? "" : " collapsed"}` }, label && /* @__PURE__ */ React.createElement("div", { className: "prophecy-card-sublabel" }, label), blocks.map((block, bi) => {
+      if (block.type === "para") return /* @__PURE__ */ React.createElement("p", { key: bi, className: "letter-para" }, /* @__PURE__ */ React.createElement(Segments, { ..._extends({ segments: block.segments }, cardFnProps) }));
+      if (block.type === "poetry") return /* @__PURE__ */ React.createElement("div", { key: bi, className: "letter-poetry" }, block.lines.map((line, li) => /* @__PURE__ */ React.createElement("div", { key: li, className: "poetry-line" }, /* @__PURE__ */ React.createElement(Segments, { ..._extends({ segments: line }, fnProps) }))));
+      if (block.type === "heading") return /* @__PURE__ */ React.createElement("h2", { key: bi, className: `study-heading study-heading-l${block.level || 3}` }, block.text);
+      return null;
+    })));
   }
 
-  // app/src/main/assets/src/ui/components/ProphecyGroup.js
+  // app/src/main/assets/src/ui/components/ProphecyGroup.jsx
   function ProphecyGroup2({ block, fnProps, expandSignal, groupKey, statesRef, onSaveStates }) {
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "prophecy-group" },
-      block.label && /* @__PURE__ */ React.createElement("div", { className: "prophecy-group-label" }, block.label),
-      block.intro && block.intro.length > 0 && /* @__PURE__ */ React.createElement(ProphecyCard, { type: "intro", tag: "Introduction", blocks: block.intro, fnProps, expandSignal, stateKey: groupKey + ":intro", statesRef, onSaveStates }),
-      block.ot && block.ot.blocks && block.ot.blocks.length > 0 && /* @__PURE__ */ React.createElement(ProphecyCard, { type: "ot", tag: "Old Testament Prophecy", label: block.ot.label, blocks: block.ot.blocks, fnProps, expandSignal, stateKey: groupKey + ":ot", statesRef, onSaveStates }),
-      block.nt && block.nt.blocks && block.nt.blocks.length > 0 && /* @__PURE__ */ React.createElement(ProphecyCard, { type: "nt", tag: "Fulfilled in the New Testament", label: block.nt.label, blocks: block.nt.blocks, fnProps, expandSignal, stateKey: groupKey + ":nt", statesRef, onSaveStates }),
-      block.vot && block.vot.blocks && block.vot.blocks.length > 0 && /* @__PURE__ */ React.createElement(ProphecyCard, { type: "vot", tag: "Fulfillment in the Volumes of Truth", label: block.vot.label, blocks: block.vot.blocks, fnProps, expandSignal, stateKey: groupKey + ":vot", statesRef, onSaveStates })
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "prophecy-group" }, block.label && /* @__PURE__ */ React.createElement("div", { className: "prophecy-group-label" }, block.label), block.intro && block.intro.length > 0 && /* @__PURE__ */ React.createElement(ProphecyCard, { type: "intro", tag: "Introduction", blocks: block.intro, fnProps, expandSignal, stateKey: groupKey + ":intro", statesRef, onSaveStates }), block.ot && block.ot.blocks && block.ot.blocks.length > 0 && /* @__PURE__ */ React.createElement(ProphecyCard, { type: "ot", tag: "Old Testament Prophecy", label: block.ot.label, blocks: block.ot.blocks, fnProps, expandSignal, stateKey: groupKey + ":ot", statesRef, onSaveStates }), block.nt && block.nt.blocks && block.nt.blocks.length > 0 && /* @__PURE__ */ React.createElement(ProphecyCard, { type: "nt", tag: "Fulfilled in the New Testament", label: block.nt.label, blocks: block.nt.blocks, fnProps, expandSignal, stateKey: groupKey + ":nt", statesRef, onSaveStates }), block.vot && block.vot.blocks && block.vot.blocks.length > 0 && /* @__PURE__ */ React.createElement(ProphecyCard, { type: "vot", tag: "Fulfillment in the Volumes of Truth", label: block.vot.label, blocks: block.vot.blocks, fnProps, expandSignal, stateKey: groupKey + ":vot", statesRef, onSaveStates }));
   }
 
-  // app/src/main/assets/src/ui/components/VerseWithNumbers.js
+  // app/src/main/assets/src/ui/components/VerseWithNumbers.jsx
   function VerseWithNumbers2({ text, refStr }) {
     const segments = splitIntoVerses(text, refStr);
     if (!segments) {
       const cleaned = (text || "").replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, "");
       return /* @__PURE__ */ React.createElement("span", null, cleaned);
     }
-    return /* @__PURE__ */ React.createElement(
-      "span",
-      null,
-      segments.map(
-        (seg, i) => /* @__PURE__ */ React.createElement(
-          "span",
-          { key: i },
-          /* @__PURE__ */ React.createElement("sup", { className: "verse-sup" }, seg.vNum),
-          seg.text.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, ""),
-          i < segments.length - 1 ? " " : ""
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement("span", null, segments.map((seg, i) => /* @__PURE__ */ React.createElement("span", { key: i }, /* @__PURE__ */ React.createElement("sup", { className: "verse-sup" }, seg.vNum), seg.text.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, ""), i < segments.length - 1 ? " " : "")));
   }
   function _fnTextRedundantWithLink2(text, link) {
     if (!text || !link || !link.letterTitle) return false;
@@ -1297,7 +1244,7 @@
     return norm(payload) === norm(link.letterTitle);
   }
 
-  // app/src/main/assets/src/ui/components/InAppLinkButton.js
+  // app/src/main/assets/src/ui/components/InAppLinkButton.jsx
   function InAppLinkButton2({ link, onActivate, compact, label }) {
     if (!link || !onActivate) return null;
     const title = link.letterTitle || label || "Open in App";
@@ -1313,12 +1260,7 @@
             onActivate(link);
           }
         },
-        /* @__PURE__ */ React.createElement(
-          "span",
-          { className: "fn-list-rich-body" },
-          /* @__PURE__ */ React.createElement("span", { className: "fn-list-rich-eyebrow" }, "Open in App"),
-          /* @__PURE__ */ React.createElement("span", { className: "fn-list-rich-title" }, title)
-        ),
+        /* @__PURE__ */ React.createElement("span", { className: "fn-list-rich-body" }, /* @__PURE__ */ React.createElement("span", { className: "fn-list-rich-eyebrow" }, "Open in App"), /* @__PURE__ */ React.createElement("span", { className: "fn-list-rich-title" }, title)),
         /* @__PURE__ */ React.createElement("span", { className: "chev" }, "\u203A")
       );
     }
@@ -1333,17 +1275,12 @@
           onActivate(link);
         }
       },
-      /* @__PURE__ */ React.createElement(
-        "span",
-        { className: "fn-sheet-link-body" },
-        /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-link-eyebrow" }, "Open in App"),
-        /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-link-title" }, title)
-      ),
+      /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-link-body" }, /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-link-eyebrow" }, "Open in App"), /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-link-title" }, title)),
       /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-link-chevron" }, "\u203A")
     );
   }
 
-  // app/src/main/assets/src/ui/components/FootnoteSheet.js
+  // app/src/main/assets/src/ui/components/FootnoteSheet.jsx
   function FootnoteSheet2({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate }) {
     const isOpen = num !== null;
     const verse = fn?.type === "scripture" ? nkjv?.[fn.ref] || null : null;
@@ -1357,127 +1294,63 @@
     const nextKey = curIdx >= 0 && curIdx < orderedKeys.length - 1 ? orderedKeys[curIdx + 1] : null;
     const total = orderedKeys.length;
     const showNav = total > 1 && onNavigate && curIdx !== -1;
-    return /* @__PURE__ */ React.createElement(
-      React.Fragment,
-      null,
-      /* @__PURE__ */ React.createElement("div", { className: `fn-sheet-backdrop${isOpen ? " open" : ""}`, onClick: onClose }),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: `fn-sheet${isOpen ? " open" : ""}` },
-        /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-handle" }),
-        fn && /* @__PURE__ */ React.createElement(
-          React.Fragment,
-          null,
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "fn-sheet-num-row" },
-            /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-num" }, "Footnote ", num, showNav && /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-num-of" }, " of ", total)),
-            showNav && /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "fn-sheet-nav" },
-              /* @__PURE__ */ React.createElement("button", {
-                className: "fn-sheet-nav-btn",
-                onClick: () => prevKey != null && onNavigate(prevKey),
-                disabled: prevKey == null,
-                "aria-label": "Previous footnote",
-                title: "Previous footnote"
-              }, "\u2039"),
-              /* @__PURE__ */ React.createElement("button", {
-                className: "fn-sheet-nav-btn",
-                onClick: () => nextKey != null && onNavigate(nextKey),
-                disabled: nextKey == null,
-                "aria-label": "Next footnote",
-                title: "Next footnote"
-              }, "\u203A")
-            )
-          ),
-          fn.type === "scripture" ? /* @__PURE__ */ React.createElement(
-            React.Fragment,
-            null,
-            /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-ref" }, fn.ref),
-            verse ? /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-verse" }, /* @__PURE__ */ React.createElement(ScriptureVerseText, { text: verse, cite: fn.ref })) : /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-verse-missing" }, "Verse text isn't available for this reference. The footnote points to ", /* @__PURE__ */ React.createElement("strong", null, fn.ref), ", but no matching entry was found in this letter's scripture dictionary."),
-            fn.seeAlso && /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "fn-sheet-see-also" },
-              /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-see-also-label" }, "Also see"),
-              /* @__PURE__ */ React.createElement(
-                InAppLinkButton,
-                {
-                  link: { collection: fn.seeAlso.collection, letterTitle: fn.seeAlso.letterTitle, excerpt: fn.seeAlso.excerpt },
-                  onActivate: onInAppLink,
-                  label: fn.seeAlso.label || fn.seeAlso.letterTitle
-                }
-              )
-            )
-          ) : /* @__PURE__ */ React.createElement(
-            React.Fragment,
-            null,
-            fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-note" }, fn.text),
-            fn.link && /* @__PURE__ */ React.createElement(InAppLinkButton, { link: fn.link, onActivate: onInAppLink }),
-            fn.url && /* @__PURE__ */ React.createElement("div", { className: fn.link || fn.text ? "fn-sheet-url-extra" : "fn-sheet-note" }, /* @__PURE__ */ React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link" }, fn.link || fn.text ? "Open external link" : fn.url)),
-            !fn.text && !fn.link && !fn.url && /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-verse-missing" }, "This footnote has no content attached.")
-          )
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: `fn-sheet-backdrop${isOpen ? " open" : ""}`, onClick: onClose }), /* @__PURE__ */ React.createElement("div", { className: `fn-sheet${isOpen ? " open" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-handle" }), fn && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-num-row" }, /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-num" }, "Footnote ", num, showNav && /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-num-of" }, " of ", total)), showNav && /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-nav" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "fn-sheet-nav-btn",
+        onClick: () => prevKey != null && onNavigate(prevKey),
+        disabled: prevKey == null,
+        "aria-label": "Previous footnote",
+        title: "Previous footnote"
+      },
+      "\u2039"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "fn-sheet-nav-btn",
+        onClick: () => nextKey != null && onNavigate(nextKey),
+        disabled: nextKey == null,
+        "aria-label": "Next footnote",
+        title: "Next footnote"
+      },
+      "\u203A"
+    ))), fn.type === "scripture" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-ref" }, fn.ref), verse ? /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-verse" }, /* @__PURE__ */ React.createElement(ScriptureVerseText, { text: verse, cite: fn.ref })) : /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-verse-missing" }, "Verse text isn't available for this reference. The footnote points to ", /* @__PURE__ */ React.createElement("strong", null, fn.ref), ", but no matching entry was found in this letter's scripture dictionary."), fn.seeAlso && /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-see-also" }, /* @__PURE__ */ React.createElement("span", { className: "fn-sheet-see-also-label" }, "Also see"), /* @__PURE__ */ React.createElement(
+      InAppLinkButton,
+      {
+        link: { collection: fn.seeAlso.collection, letterTitle: fn.seeAlso.letterTitle, excerpt: fn.seeAlso.excerpt },
+        onActivate: onInAppLink,
+        label: fn.seeAlso.label || fn.seeAlso.letterTitle
+      }
+    ))) : /* @__PURE__ */ React.createElement(React.Fragment, null, fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-note" }, fn.text), fn.link && /* @__PURE__ */ React.createElement(InAppLinkButton, { link: fn.link, onActivate: onInAppLink }), fn.url && /* @__PURE__ */ React.createElement("div", { className: fn.link || fn.text ? "fn-sheet-url-extra" : "fn-sheet-note" }, /* @__PURE__ */ React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link" }, fn.link || fn.text ? "Open external link" : fn.url)), !fn.text && !fn.link && !fn.url && /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-verse-missing" }, "This footnote has no content attached.")))));
   }
 
-  // app/src/main/assets/src/ui/components/ScriptureVerseText.js
+  // app/src/main/assets/src/ui/components/ScriptureVerseText.jsx
   function ScriptureVerseText2({ text, cite }) {
     const parts = text.split(" | ");
     if (parts.length > 1) {
       const normalizedCite = (cite || "").trim();
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "sc-sheet-compound" },
-        parts.map((part, i) => {
-          const dashIdx = part.indexOf(" \u2014 ");
-          if (dashIdx !== -1) {
-            const label = part.slice(0, dashIdx).trim();
-            const verse = part.slice(dashIdx + 3);
-            const showLabel = label && label !== normalizedCite;
-            return /* @__PURE__ */ React.createElement(
-              "div",
-              { key: i, className: "sc-sheet-compound-part" },
-              showLabel && /* @__PURE__ */ React.createElement("span", { className: "sc-sheet-compound-label" }, label),
-              /* @__PURE__ */ React.createElement(VerseWithNumbers, { text: verse, refStr: label || cite })
-            );
-          }
-          return /* @__PURE__ */ React.createElement("div", { key: i, className: "sc-sheet-compound-part" }, /* @__PURE__ */ React.createElement(VerseWithNumbers, { text: part, refStr: cite }));
-        })
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-compound" }, parts.map((part, i) => {
+        const dashIdx = part.indexOf(" \u2014 ");
+        if (dashIdx !== -1) {
+          const label = part.slice(0, dashIdx).trim();
+          const verse = part.slice(dashIdx + 3);
+          const showLabel = label && label !== normalizedCite;
+          return /* @__PURE__ */ React.createElement("div", { key: i, className: "sc-sheet-compound-part" }, showLabel && /* @__PURE__ */ React.createElement("span", { className: "sc-sheet-compound-label" }, label), /* @__PURE__ */ React.createElement(VerseWithNumbers, { text: verse, refStr: label || cite }));
+        }
+        return /* @__PURE__ */ React.createElement("div", { key: i, className: "sc-sheet-compound-part" }, /* @__PURE__ */ React.createElement(VerseWithNumbers, { text: part, refStr: cite }));
+      }));
     }
     return /* @__PURE__ */ React.createElement(VerseWithNumbers, { text, refStr: cite });
   }
 
-  // app/src/main/assets/src/ui/components/ScriptureSheet.js
+  // app/src/main/assets/src/ui/components/ScriptureSheet.jsx
   function ScriptureSheet2({ activeRef, onClose }) {
     const isOpen = activeRef !== null;
     const verseText = activeRef ? MATTHEW_NKJV[activeRef.cite] : null;
-    return /* @__PURE__ */ React.createElement(
-      React.Fragment,
-      null,
-      /* @__PURE__ */ React.createElement("div", { className: `fn-sheet-backdrop${isOpen ? " open" : ""}`, onClick: onClose }),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: `fn-sheet${isOpen ? " open" : ""}` },
-        /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-handle" }),
-        activeRef && verseText && /* @__PURE__ */ React.createElement(
-          React.Fragment,
-          null,
-          /* @__PURE__ */ React.createElement("span", { className: "sc-sheet-tag" }, "Scripture Reference \xB7 ", activeRef.ref),
-          /* @__PURE__ */ React.createElement("span", { className: "sc-sheet-cite" }, activeRef.cite),
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "sc-sheet-verse" },
-            /* @__PURE__ */ React.createElement(ScriptureVerseText, { text: verseText, cite: activeRef.cite })
-          )
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: `fn-sheet-backdrop${isOpen ? " open" : ""}`, onClick: onClose }), /* @__PURE__ */ React.createElement("div", { className: `fn-sheet${isOpen ? " open" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "fn-sheet-handle" }), activeRef && verseText && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { className: "sc-sheet-tag" }, "Scripture Reference \xB7 ", activeRef.ref), /* @__PURE__ */ React.createElement("span", { className: "sc-sheet-cite" }, activeRef.cite), /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-verse" }, /* @__PURE__ */ React.createElement(ScriptureVerseText, { text: verseText, cite: activeRef.cite })))));
   }
 
-  // app/src/main/assets/src/ui/components/ExpandableVerse.js
+  // app/src/main/assets/src/ui/components/ExpandableVerse.jsx
   var EXPAND_THRESHOLD = 130;
   var MIN_HIDDEN_WORDS = 20;
   function ExpandableVerse2({ text, refStr }) {
@@ -1499,70 +1372,42 @@
     const isLong = text.length > EXPAND_THRESHOLD && hiddenWords >= MIN_HIDDEN_WORDS;
     const fullContent = /* @__PURE__ */ React.createElement(ScriptureVerseText, { text, cite: refStr });
     const truncatedContent = /* @__PURE__ */ React.createElement(VerseWithNumbers, { text: previewText.slice(0, EXPAND_THRESHOLD).trimEnd() + "\u2026", refStr: previewRef });
-    return /* @__PURE__ */ React.createElement(
-      "span",
-      { className: "footnote-list-verse" },
-      isLong && !expanded ? truncatedContent : fullContent,
-      isLong && /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          // stopPropagation: the parent .footnote-list-item card has an onClick
-          // that calls scrollToBubble(num) — without this, tapping Read more
-          // ALSO scrolls the page up to the in-body footnote bubble.
-          onClick: (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setExpanded((v) => !v);
-          },
-          style: {
-            display: "inline-block",
-            marginLeft: "0.5em",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "var(--gold)",
-            fontFamily: "'Cinzel', serif",
-            fontSize: "0.72rem",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            padding: "0",
-            verticalAlign: "middle",
-            lineHeight: 1
-          }
+    return /* @__PURE__ */ React.createElement("span", { className: "footnote-list-verse" }, isLong && !expanded ? truncatedContent : fullContent, isLong && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setExpanded((v) => !v);
         },
-        expanded ? "Show less \u25B2" : "Read more \u25BC"
-      )
-    );
+        style: {
+          display: "inline-block",
+          marginLeft: "0.5em",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "var(--gold)",
+          fontFamily: "'Cinzel', serif",
+          fontSize: "0.72rem",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          padding: "0",
+          verticalAlign: "middle",
+          lineHeight: 1
+        }
+      },
+      expanded ? "Show less \u25B2" : "Read more \u25BC"
+    ));
   }
 
-  // app/src/main/assets/src/ui/components/ThemeBtn.js
+  // app/src/main/assets/src/ui/components/ThemeBtn.jsx
   function ThemeBtn2({ theme, onThemeChange }) {
     const next = theme === "dark" ? "light" : "dark";
     const title = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
-    return /* @__PURE__ */ React.createElement(
-      "button",
-      { className: "nav-theme-btn", onClick: () => onThemeChange(next), title },
-      theme === "dark" ? /* @__PURE__ */ React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" },
-        /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "5" }),
-        /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "1", x2: "12", y2: "3" }),
-        /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "21", x2: "12", y2: "23" }),
-        /* @__PURE__ */ React.createElement("line", { x1: "4.22", y1: "4.22", x2: "5.64", y2: "5.64" }),
-        /* @__PURE__ */ React.createElement("line", { x1: "18.36", y1: "18.36", x2: "19.78", y2: "19.78" }),
-        /* @__PURE__ */ React.createElement("line", { x1: "1", y1: "12", x2: "3", y2: "12" }),
-        /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "12", x2: "23", y2: "12" }),
-        /* @__PURE__ */ React.createElement("line", { x1: "4.22", y1: "19.78", x2: "5.64", y2: "18.36" }),
-        /* @__PURE__ */ React.createElement("line", { x1: "18.36", y1: "5.64", x2: "19.78", y2: "4.22" })
-      ) : /* @__PURE__ */ React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" },
-        /* @__PURE__ */ React.createElement("path", { d: "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" })
-      )
-    );
+    return /* @__PURE__ */ React.createElement("button", { className: "nav-theme-btn", onClick: () => onThemeChange(next), title }, theme === "dark" ? /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "5" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "1", x2: "12", y2: "3" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "21", x2: "12", y2: "23" }), /* @__PURE__ */ React.createElement("line", { x1: "4.22", y1: "4.22", x2: "5.64", y2: "5.64" }), /* @__PURE__ */ React.createElement("line", { x1: "18.36", y1: "18.36", x2: "19.78", y2: "19.78" }), /* @__PURE__ */ React.createElement("line", { x1: "1", y1: "12", x2: "3", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "12", x2: "23", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "4.22", y1: "19.78", x2: "5.64", y2: "18.36" }), /* @__PURE__ */ React.createElement("line", { x1: "18.36", y1: "5.64", x2: "19.78", y2: "4.22" })) : /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /* @__PURE__ */ React.createElement("path", { d: "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" })));
   }
 
-  // app/src/main/assets/src/ui/components/ScreenLayout.js
+  // app/src/main/assets/src/ui/components/ScreenLayout.jsx
   function ScreenLayout2({ navChildren, children, showProgress, hideTabsBtn }) {
     const ref = React.useCallback((el) => {
       __scrollEl = el;
@@ -1600,84 +1445,43 @@
         if (el) el.removeEventListener("scroll", onScroll);
       };
     }, [showProgress]);
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "screen-layout" },
-      /* @__PURE__ */ React.createElement("nav", { className: "top-nav" }, navChildren, hideTabsBtn ? null : /* @__PURE__ */ React.createElement(TabsNavBtn, null)),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "screen-scroll", ref },
-        children
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "screen-layout" }, /* @__PURE__ */ React.createElement("nav", { className: "top-nav" }, navChildren, hideTabsBtn ? null : /* @__PURE__ */ React.createElement(TabsNavBtn, null)), /* @__PURE__ */ React.createElement("div", { className: "screen-scroll", ref }, children));
   }
 
-  // app/src/main/assets/src/ui/components/ModeToggle.js
+  // app/src/main/assets/src/ui/components/ModeToggle.jsx
   function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
     if (!showStudy) {
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "mode-toggle-wrap" },
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "mode-toggle" },
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              className: "mode-btn active",
-              onClick: () => onShowStudyChange(true),
-              title: "Show study notes, references, and further reading"
-            },
-            /* @__PURE__ */ React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" },
-              /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
-              /* @__PURE__ */ React.createElement("path", { d: "M9 12l2 2 4-4" })
-            ),
-            "On"
-          )
-        )
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "mode-toggle-wrap" }, /* @__PURE__ */ React.createElement("div", { className: "mode-toggle" }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "mode-btn active",
+          onClick: () => onShowStudyChange(true),
+          title: "Show study notes, references, and further reading"
+        },
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("path", { d: "M9 12l2 2 4-4" })),
+        "On"
+      )));
     }
     const isPdf = mode === "pdf";
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "mode-toggle-wrap" },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "mode-toggle" },
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: "mode-btn active",
-            onClick: () => onChange(isPdf ? "inline" : "pdf"),
-            title: isPdf ? "PDF Mode \u2014 tap to switch to Inline" : "Inline Mode \u2014 tap to switch to PDF"
-          },
-          /* @__PURE__ */ React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" },
-            isPdf ? /* @__PURE__ */ React.createElement("path", { d: "M2 6h20M2 12h20M2 18h12" }) : /* @__PURE__ */ React.createElement("path", { d: "M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" })
-          ),
-          isPdf ? "PDF" : "Inline"
-        ),
-        /* @__PURE__ */ React.createElement("div", { className: "mode-divider" }),
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: "mode-btn",
-            onClick: () => onShowStudyChange(false),
-            title: "Hide study notes, references, and further reading"
-          },
-          /* @__PURE__ */ React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" },
-            /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
-            /* @__PURE__ */ React.createElement("line", { x1: "4.5", y1: "4.5", x2: "19.5", y2: "19.5" })
-          ),
-          "Off"
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "mode-toggle-wrap" }, /* @__PURE__ */ React.createElement("div", { className: "mode-toggle" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "mode-btn active",
+        onClick: () => onChange(isPdf ? "inline" : "pdf"),
+        title: isPdf ? "PDF Mode \u2014 tap to switch to Inline" : "Inline Mode \u2014 tap to switch to PDF"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, isPdf ? /* @__PURE__ */ React.createElement("path", { d: "M2 6h20M2 12h20M2 18h12" }) : /* @__PURE__ */ React.createElement("path", { d: "M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" })),
+      isPdf ? "PDF" : "Inline"
+    ), /* @__PURE__ */ React.createElement("div", { className: "mode-divider" }), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "mode-btn",
+        onClick: () => onShowStudyChange(false),
+        title: "Hide study notes, references, and further reading"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("line", { x1: "4.5", y1: "4.5", x2: "19.5", y2: "19.5" })),
+      "Off"
+    )));
   }
   function renderCommentaryCite2(text) {
     if (!text) return text;
@@ -1693,58 +1497,30 @@
     return parts.length ? parts : text;
   }
 
-  // app/src/main/assets/src/ui/components/InlineNotes.js
+  // app/src/main/assets/src/ui/components/InlineNotes.jsx
   function InlineNotes2({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
     if (!scriptures.length && !votNotes.length) return null;
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "inline-notes" },
-      scriptures.map((s, i) => {
-        const hasVerse = !!MATTHEW_NKJV[s.cite];
-        return hasVerse ? /* @__PURE__ */ React.createElement(
-          "button",
-          { key: `s${i}`, className: "inline-note-scripture", onClick: () => onScriptureClick && onScriptureClick(s) },
-          /* @__PURE__ */ React.createElement("span", { className: "inline-note-tag" }, s.ref),
-          /* @__PURE__ */ React.createElement("span", { className: "inline-note-cite" }, s.cite),
-          /* @__PURE__ */ React.createElement("span", { className: "inline-note-chevron" }, "\u203A")
-        ) : /* @__PURE__ */ React.createElement(
-          "div",
-          { key: `s${i}`, className: "inline-note-scripture inline-note-plain" },
-          /* @__PURE__ */ React.createElement("span", { className: "inline-note-tag" }, s.ref),
-          /* @__PURE__ */ React.createElement("span", { className: "inline-note-cite" }, renderCommentaryCite(s.cite))
-        );
-      }),
-      votNotes.map((n, i) => {
-        const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
-        const hm = isHiddenManna(n);
-        const badge = hm ? /* @__PURE__ */ React.createElement("span", { className: "inline-vot-hm", title: "Hidden Manna \u2014 The Word of The Lord Spoken to Timothy" }, "HM") : canTap ? /* @__PURE__ */ React.createElement("span", { className: "inline-vot-chevron" }, "\u203A") : null;
-        const inner = /* @__PURE__ */ React.createElement(
-          React.Fragment,
-          null,
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "inline-vot-header" },
-            /* @__PURE__ */ React.createElement("span", { className: "inline-vot-ref" }, n.ref),
-            /* @__PURE__ */ React.createElement("span", { className: "inline-vot-vol" }, n.vol),
-            badge
-          ),
-          /* @__PURE__ */ React.createElement("div", { className: "inline-vot-letter" }, '"', n.letter, '"'),
-          n.excerpt && /* @__PURE__ */ React.createElement("div", { className: "inline-vot-excerpt" }, n.excerpt)
-        );
-        return canTap ? /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            key: `v${i}`,
-            className: "inline-vot-note inline-vot-note-tappable",
-            onClick: () => onVotLetterClick(n.vol, n.letter, n.excerpt)
-          },
-          inner
-        ) : /* @__PURE__ */ React.createElement("div", { key: `v${i}`, className: "inline-vot-note" }, inner);
-      })
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "inline-notes" }, scriptures.map((s, i) => {
+      const hasVerse = !!MATTHEW_NKJV[s.cite];
+      return hasVerse ? /* @__PURE__ */ React.createElement("button", { key: `s${i}`, className: "inline-note-scripture", onClick: () => onScriptureClick && onScriptureClick(s) }, /* @__PURE__ */ React.createElement("span", { className: "inline-note-tag" }, s.ref), /* @__PURE__ */ React.createElement("span", { className: "inline-note-cite" }, s.cite), /* @__PURE__ */ React.createElement("span", { className: "inline-note-chevron" }, "\u203A")) : /* @__PURE__ */ React.createElement("div", { key: `s${i}`, className: "inline-note-scripture inline-note-plain" }, /* @__PURE__ */ React.createElement("span", { className: "inline-note-tag" }, s.ref), /* @__PURE__ */ React.createElement("span", { className: "inline-note-cite" }, renderCommentaryCite(s.cite)));
+    }), votNotes.map((n, i) => {
+      const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
+      const hm = isHiddenManna(n);
+      const badge = hm ? /* @__PURE__ */ React.createElement("span", { className: "inline-vot-hm", title: "Hidden Manna \u2014 The Word of The Lord Spoken to Timothy" }, "HM") : canTap ? /* @__PURE__ */ React.createElement("span", { className: "inline-vot-chevron" }, "\u203A") : null;
+      const inner = /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "inline-vot-header" }, /* @__PURE__ */ React.createElement("span", { className: "inline-vot-ref" }, n.ref), /* @__PURE__ */ React.createElement("span", { className: "inline-vot-vol" }, n.vol), badge), /* @__PURE__ */ React.createElement("div", { className: "inline-vot-letter" }, '"', n.letter, '"'), n.excerpt && /* @__PURE__ */ React.createElement("div", { className: "inline-vot-excerpt" }, n.excerpt));
+      return canTap ? /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: `v${i}`,
+          className: "inline-vot-note inline-vot-note-tappable",
+          onClick: () => onVotLetterClick(n.vol, n.letter, n.excerpt)
+        },
+        inner
+      ) : /* @__PURE__ */ React.createElement("div", { key: `v${i}`, className: "inline-vot-note" }, inner);
+    }));
   }
 
-  // app/src/main/assets/src/ui/components/InlineEcho.js
+  // app/src/main/assets/src/ui/components/InlineEcho.jsx
   function InlineEcho2({ scriptures, votNotes }) {
     if (!scriptures.length && !votNotes.length) return null;
     const scrollToRef = (ref) => {
@@ -1754,92 +1530,27 @@
         if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     };
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "inline-echo" },
-      scriptures.map(
-        (s, i) => /* @__PURE__ */ React.createElement(
-          "button",
-          { key: `es${i}`, className: "inline-echo-pill", onClick: () => scrollToRef(s.ref), title: `See note at ${s.ref}` },
-          /* @__PURE__ */ React.createElement("span", { className: "echo-arrow" }, "\u2191"),
-          /* @__PURE__ */ React.createElement("span", null, s.ref)
-        )
-      ),
-      votNotes.map(
-        (n, i) => /* @__PURE__ */ React.createElement(
-          "button",
-          { key: `ev${i}`, className: "inline-echo-pill", onClick: () => scrollToRef(n.ref), title: `See note at ${n.ref}` },
-          /* @__PURE__ */ React.createElement("span", { className: "echo-arrow" }, "\u2191"),
-          /* @__PURE__ */ React.createElement("span", null, n.ref, " \u2014 ", n.vol)
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "inline-echo" }, scriptures.map((s, i) => /* @__PURE__ */ React.createElement("button", { key: `es${i}`, className: "inline-echo-pill", onClick: () => scrollToRef(s.ref), title: `See note at ${s.ref}` }, /* @__PURE__ */ React.createElement("span", { className: "echo-arrow" }, "\u2191"), /* @__PURE__ */ React.createElement("span", null, s.ref))), votNotes.map((n, i) => /* @__PURE__ */ React.createElement("button", { key: `ev${i}`, className: "inline-echo-pill", onClick: () => scrollToRef(n.ref), title: `See note at ${n.ref}` }, /* @__PURE__ */ React.createElement("span", { className: "echo-arrow" }, "\u2191"), /* @__PURE__ */ React.createElement("span", null, n.ref, " \u2014 ", n.vol))));
   }
 
-  // app/src/main/assets/src/ui/components/StudyPanels.js
+  // app/src/main/assets/src/ui/components/StudyPanels.jsx
   function StudyPanels2({ scriptures, votNotes, onScriptureClick, onVotLetterClick }) {
     const hasScriptures = scriptures && scriptures.length > 0;
     const hasVot = votNotes && votNotes.length > 0;
     if (!hasScriptures && !hasVot) return null;
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "study-panels" },
-      hasScriptures && /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "study-panel-group" },
-        /* @__PURE__ */ React.createElement("div", { className: "study-panel-group-title" }, "Scripture References"),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "scripture-refs" },
-          scriptures.map((s, i) => {
-            const hasVerse = !!MATTHEW_NKJV[s.cite];
-            return hasVerse ? /* @__PURE__ */ React.createElement(
-              "button",
-              { key: i, className: "scripture-ref", onClick: () => onScriptureClick && onScriptureClick(s) },
-              /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-tag" }, s.ref),
-              /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-text" }, s.cite),
-              /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-chevron" }, "\u203A")
-            ) : /* @__PURE__ */ React.createElement(
-              "div",
-              { key: i, className: "scripture-ref scripture-ref-note" },
-              /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-tag" }, s.ref),
-              /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-text" }, renderCommentaryCite(s.cite))
-            );
-          })
-        )
-      ),
-      hasVot && /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "study-panel-group" },
-        /* @__PURE__ */ React.createElement("div", { className: "study-panel-group-title" }, "Volumes of Truth Notes"),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "vot-notes" },
-          votNotes.map((n, i) => {
-            const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
-            const hm = isHiddenManna(n);
-            const badge = hm ? /* @__PURE__ */ React.createElement("span", { className: "vot-note-hm", title: "Hidden Manna \u2014 The Word of The Lord Spoken to Timothy" }, "HM") : canTap ? /* @__PURE__ */ React.createElement("span", { className: "vot-note-chevron" }, "\u203A") : null;
-            const inner = /* @__PURE__ */ React.createElement(
-              React.Fragment,
-              null,
-              /* @__PURE__ */ React.createElement(
-                "div",
-                { className: "vot-note-header" },
-                /* @__PURE__ */ React.createElement("span", { className: "vot-note-ref" }, n.ref),
-                /* @__PURE__ */ React.createElement("span", { className: "vot-note-vol" }, n.vol),
-                badge
-              ),
-              /* @__PURE__ */ React.createElement("div", { className: "vot-note-letter" }, '"', n.letter, '"'),
-              n.excerpt && /* @__PURE__ */ React.createElement("div", { className: "vot-note-excerpt" }, n.excerpt)
-            );
-            return canTap ? /* @__PURE__ */ React.createElement("button", { key: i, className: "vot-note vot-note-tappable", onClick: () => onVotLetterClick(n.vol, n.letter, n.excerpt) }, inner) : /* @__PURE__ */ React.createElement("div", { key: i, className: "vot-note" }, inner);
-          })
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "study-panels" }, hasScriptures && /* @__PURE__ */ React.createElement("div", { className: "study-panel-group" }, /* @__PURE__ */ React.createElement("div", { className: "study-panel-group-title" }, "Scripture References"), /* @__PURE__ */ React.createElement("div", { className: "scripture-refs" }, scriptures.map((s, i) => {
+      const hasVerse = !!MATTHEW_NKJV[s.cite];
+      return hasVerse ? /* @__PURE__ */ React.createElement("button", { key: i, className: "scripture-ref", onClick: () => onScriptureClick && onScriptureClick(s) }, /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-tag" }, s.ref), /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-text" }, s.cite), /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-chevron" }, "\u203A")) : /* @__PURE__ */ React.createElement("div", { key: i, className: "scripture-ref scripture-ref-note" }, /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-tag" }, s.ref), /* @__PURE__ */ React.createElement("span", { className: "scripture-ref-text" }, renderCommentaryCite(s.cite)));
+    }))), hasVot && /* @__PURE__ */ React.createElement("div", { className: "study-panel-group" }, /* @__PURE__ */ React.createElement("div", { className: "study-panel-group-title" }, "Volumes of Truth Notes"), /* @__PURE__ */ React.createElement("div", { className: "vot-notes" }, votNotes.map((n, i) => {
+      const canTap = onVotLetterClick && !!resolveVotLetter(n.vol, n.letter);
+      const hm = isHiddenManna(n);
+      const badge = hm ? /* @__PURE__ */ React.createElement("span", { className: "vot-note-hm", title: "Hidden Manna \u2014 The Word of The Lord Spoken to Timothy" }, "HM") : canTap ? /* @__PURE__ */ React.createElement("span", { className: "vot-note-chevron" }, "\u203A") : null;
+      const inner = /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "vot-note-header" }, /* @__PURE__ */ React.createElement("span", { className: "vot-note-ref" }, n.ref), /* @__PURE__ */ React.createElement("span", { className: "vot-note-vol" }, n.vol), badge), /* @__PURE__ */ React.createElement("div", { className: "vot-note-letter" }, '"', n.letter, '"'), n.excerpt && /* @__PURE__ */ React.createElement("div", { className: "vot-note-excerpt" }, n.excerpt));
+      return canTap ? /* @__PURE__ */ React.createElement("button", { key: i, className: "vot-note vot-note-tappable", onClick: () => onVotLetterClick(n.vol, n.letter, n.excerpt) }, inner) : /* @__PURE__ */ React.createElement("div", { key: i, className: "vot-note" }, inner);
+    }))));
   }
 
-  // app/src/main/assets/src/ui/components/ChapterBookmarkBtn.js
+  // app/src/main/assets/src/ui/components/ChapterBookmarkBtn.jsx
   function ChapterBookmarkBtn2({ chapterBookmark, hlTick }) {
     if (!chapterBookmark || !chapterBookmark.hlKey || typeof BookmarkStore === "undefined") return null;
     const existing = React.useMemo(
@@ -1876,7 +1587,7 @@
         if (window.__bumpHlTick) window.__bumpHlTick();
       }
     };
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement(
       "button",
       {
         className: "nav-bookmark-btn" + (isBookmarked ? " nav-bookmark-btn-active" : ""),
@@ -1884,80 +1595,44 @@
         title: isBookmarked ? "Open bookmark options" : "Bookmark this chapter",
         "aria-label": isBookmarked ? "Open bookmark options" : "Bookmark this chapter"
       },
-      React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("path", { d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z", fill: isBookmarked ? "currentColor" : "none" })
-      )
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z", fill: isBookmarked ? "currentColor" : "none" }))
     );
   }
 
-  // app/src/main/assets/src/ui/components/NavButtons.js
+  // app/src/main/assets/src/ui/components/NavButtons.jsx
   function NavButtons2({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey, journalRefLabel }) {
-    return React.createElement(
-      React.Fragment,
-      null,
-      /* @__PURE__ */ React.createElement(
-        "button",
-        { className: "settings-gear-btn", onClick: onSettings, title: "Settings" },
-        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        { className: reading ? "nav-search-btn nav-history-reading" : "nav-search-btn", onClick: onHistory, title: "History" },
-        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polyline", { points: "1 4 1 10 7 10" }), /* @__PURE__ */ React.createElement("path", { d: "M3.51 15a9 9 0 1 0 .49-5.01" }))
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        { className: "nav-search-btn", onClick: onSearch, title: "Search" },
-        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))
-      ),
-      chapterBookmark && React.createElement(ChapterBookmarkBtn, { chapterBookmark, hlTick }),
-      React.createElement(ThemeBtn, { theme, onThemeChange })
-    );
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "settings-gear-btn", onClick: onSettings, title: "Settings" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))), /* @__PURE__ */ React.createElement("button", { className: reading ? "nav-search-btn nav-history-reading" : "nav-search-btn", onClick: onHistory, title: "History" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polyline", { points: "1 4 1 10 7 10" }), /* @__PURE__ */ React.createElement("path", { d: "M3.51 15a9 9 0 1 0 .49-5.01" }))), /* @__PURE__ */ React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))), chapterBookmark && /* @__PURE__ */ React.createElement(ChapterBookmarkBtn, { chapterBookmark, hlTick }), /* @__PURE__ */ React.createElement(ThemeBtn, { theme, onThemeChange }));
   }
 
-  // app/src/main/assets/src/ui/components/ProphecyExpandToggle.js
+  // app/src/main/assets/src/ui/components/ProphecyExpandToggle.jsx
   function ProphecyExpandToggle2({ allExpanded, onToggle }) {
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "mode-toggle-wrap" },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "mode-toggle" },
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: "mode-btn active",
-            onClick: () => onToggle(!allExpanded),
-            title: allExpanded ? "Collapse all cards" : "Expand all cards"
-          },
-          /* @__PURE__ */ React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" },
-            allExpanded ? React.createElement("polyline", { points: "6 15 12 9 18 15" }) : React.createElement("polyline", { points: "6 9 12 15 18 9" })
-          ),
-          allExpanded ? "Collapse" : "Expand"
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "mode-toggle-wrap" }, /* @__PURE__ */ React.createElement("div", { className: "mode-toggle" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "mode-btn active",
+        onClick: () => onToggle(!allExpanded),
+        title: allExpanded ? "Collapse all cards" : "Expand all cards"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, allExpanded ? /* @__PURE__ */ React.createElement("polyline", { points: "6 15 12 9 18 15" }) : /* @__PURE__ */ React.createElement("polyline", { points: "6 9 12 15 18 9" })),
+      allExpanded ? "Collapse" : "Expand"
+    )));
   }
 
-  // app/src/main/assets/src/ui/components/HomeBtn.js
+  // app/src/main/assets/src/ui/components/HomeBtn.jsx
   function HomeBtn2() {
     return /* @__PURE__ */ React.createElement(
       "button",
-      { className: "nav-search-btn", onClick: () => window.__goHome && window.__goHome(), title: "Home", "aria-label": "Home" },
-      /* @__PURE__ */ React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-        /* @__PURE__ */ React.createElement("path", { d: "M3 10.5L12 3l9 7.5" }),
-        /* @__PURE__ */ React.createElement("path", { d: "M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" })
-      )
+      {
+        className: "nav-search-btn",
+        onClick: () => window.__goHome && window.__goHome(),
+        title: "Home",
+        "aria-label": "Home"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M3 10.5L12 3l9 7.5" }), /* @__PURE__ */ React.createElement("path", { d: "M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" }))
     );
   }
 
-  // app/src/main/assets/src/ui/components/TabsNavBtn.js
+  // app/src/main/assets/src/ui/components/TabsNavBtn.jsx
   function TabsNavBtn2() {
     const ctx = React.useContext(TabsContext);
     if (!ctx || !ctx.enabled) return null;
@@ -1976,32 +1651,31 @@
     );
   }
 
-  // app/src/main/assets/src/ui/components/LibraryNav.js
+  // app/src/main/assets/src/ui/components/LibraryNav.jsx
   function LibraryNav2(opts) {
     opts = opts || {};
-    return React.createElement(
-      React.Fragment,
-      null,
-      /* @__PURE__ */ React.createElement("button", {
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      "button",
+      {
         className: "nav-home nav-back-icon",
         onClick: opts.onBack,
         title: opts.backTitle || "Back",
         "aria-label": opts.backTitle || "Back"
-      }, "\u2039"),
-      /* @__PURE__ */ React.createElement(HomeBtn, null),
-      opts.leftExtras || null,
-      /* @__PURE__ */ React.createElement(NavButtons, {
+      },
+      "\u2039"
+    ), /* @__PURE__ */ React.createElement(HomeBtn, null), opts.leftExtras || null, /* @__PURE__ */ React.createElement(
+      NavButtons,
+      {
         onSettings: opts.onSettings,
         onHistory: opts.onHistory,
         onSearch: opts.onSearch,
         theme: opts.theme,
         onThemeChange: opts.onThemeChange
-      }),
-      opts.rightExtras || null
-    );
+      }
+    ), opts.rightExtras || null);
   }
 
-  // app/src/main/assets/src/ui/components/FootnoteListSection.js
+  // app/src/main/assets/src/ui/components/FootnoteListSection.jsx
   function FootnoteListSection2({ footnotes, nkjv, highlightedFn, onInAppLink }) {
     const entries = Object.entries(footnotes);
     if (entries.length === 0) return null;
@@ -2012,215 +1686,106 @@
       } catch (e) {
       }
     };
-    return /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "footnote-list" }, /* @__PURE__ */ React.createElement("div", { className: "footnote-list-header" }, "Footnotes"), entries.map(([num, fn]) => /* @__PURE__ */ React.createElement(
       "div",
-      { className: "footnote-list" },
-      /* @__PURE__ */ React.createElement("div", { className: "footnote-list-header" }, "Footnotes"),
-      entries.map(
-        ([num, fn]) => /* @__PURE__ */ React.createElement(
-          "div",
-          {
-            key: num,
-            id: `fn-item-${num}`,
-            className: `footnote-list-item${highlightedFn === num ? " pulse" : ""}`,
-            role: "button",
-            tabIndex: 0,
-            onClick: () => scrollToBubble(num),
-            onKeyDown: (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                scrollToBubble(num);
-              }
-            },
-            title: `Jump back to footnote ${num} in the body`
-          },
-          /* @__PURE__ */ React.createElement("div", { className: "footnote-list-num" }, num, "."),
-          /* @__PURE__ */ React.createElement(
-            "div",
-            null,
-            fn.type === "scripture" ? /* @__PURE__ */ React.createElement(
-              React.Fragment,
-              null,
-              /* @__PURE__ */ React.createElement("span", { className: "footnote-list-ref" }, fn.ref),
-              nkjv[fn.ref] ? /* @__PURE__ */ React.createElement(ExpandableVerse, { text: nkjv[fn.ref], refStr: fn.ref }) : /* @__PURE__ */ React.createElement("span", { className: "footnote-list-missing" }, " \u2014 verse text not available"),
-              fn.seeAlso && /* @__PURE__ */ React.createElement(
-                "div",
-                { style: { marginTop: "0.5rem" } },
-                /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" } }, "Also see:"),
-                /* @__PURE__ */ React.createElement("span", { style: { fontStyle: "italic" } }, fn.seeAlso.label || fn.seeAlso.letterTitle),
-                /* @__PURE__ */ React.createElement(InAppLinkButton, { compact: true, link: { collection: fn.seeAlso.collection, letterTitle: fn.seeAlso.letterTitle, excerpt: fn.seeAlso.excerpt }, onActivate: onInAppLink })
-              )
-            ) : /* @__PURE__ */ React.createElement(
-              React.Fragment,
-              null,
-              fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && /* @__PURE__ */ React.createElement("span", { className: "footnote-list-note-text" }, fn.text, fn.link && " "),
-              fn.link && /* @__PURE__ */ React.createElement(InAppLinkButton, { compact: true, link: fn.link, onActivate: onInAppLink }),
-              fn.url && /* @__PURE__ */ React.createElement("span", { className: fn.link || fn.text ? "footnote-list-url-extra" : "footnote-list-note-text" }, /* @__PURE__ */ React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link", onClick: (e) => e.stopPropagation() }, fn.link || fn.text ? "Open external link" : fn.url)),
-              !fn.text && !fn.link && !fn.url && /* @__PURE__ */ React.createElement("span", { className: "footnote-list-missing" }, "(no content attached)")
-            )
-          )
-        )
-      )
-    );
+      {
+        key: num,
+        id: `fn-item-${num}`,
+        className: `footnote-list-item${highlightedFn === num ? " pulse" : ""}`,
+        role: "button",
+        tabIndex: 0,
+        onClick: () => scrollToBubble(num),
+        onKeyDown: (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            scrollToBubble(num);
+          }
+        },
+        title: `Jump back to footnote ${num} in the body`
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "footnote-list-num" }, num, "."),
+      /* @__PURE__ */ React.createElement("div", null, fn.type === "scripture" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { className: "footnote-list-ref" }, fn.ref), nkjv[fn.ref] ? /* @__PURE__ */ React.createElement(ExpandableVerse, { text: nkjv[fn.ref], refStr: fn.ref }) : /* @__PURE__ */ React.createElement("span", { className: "footnote-list-missing" }, " \u2014 verse text not available"), fn.seeAlso && /* @__PURE__ */ React.createElement("div", { style: { marginTop: "0.5rem" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" } }, "Also see:"), /* @__PURE__ */ React.createElement("span", { style: { fontStyle: "italic" } }, fn.seeAlso.label || fn.seeAlso.letterTitle), /* @__PURE__ */ React.createElement(InAppLinkButton, { compact: true, link: { collection: fn.seeAlso.collection, letterTitle: fn.seeAlso.letterTitle, excerpt: fn.seeAlso.excerpt }, onActivate: onInAppLink }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && /* @__PURE__ */ React.createElement("span", { className: "footnote-list-note-text" }, fn.text, fn.link && " "), fn.link && /* @__PURE__ */ React.createElement(InAppLinkButton, { compact: true, link: fn.link, onActivate: onInAppLink }), fn.url && /* @__PURE__ */ React.createElement("span", { className: fn.link || fn.text ? "footnote-list-url-extra" : "footnote-list-note-text" }, /* @__PURE__ */ React.createElement("a", { href: fn.url, target: "_blank", rel: "noopener noreferrer", className: "fn-link", onClick: (e) => e.stopPropagation() }, fn.link || fn.text ? "Open external link" : fn.url)), !fn.text && !fn.link && !fn.url && /* @__PURE__ */ React.createElement("span", { className: "footnote-list-missing" }, "(no content attached)")))
+    )));
   }
   window.__setInsets = function(top, bottom) {
     document.documentElement.style.setProperty("--inset-top", top + "px");
     document.documentElement.style.setProperty("--inset-bottom", bottom + "px");
   };
 
-  // app/src/main/assets/src/ui/components/StickyChapterNav.js
+  // app/src/main/assets/src/ui/components/StickyChapterNav.jsx
   function StickyChapterNav2({ onPrev, onNext, prevDisabled, nextDisabled, prevLabel, nextLabel }) {
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "chapter-nav-sticky" },
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "chapter-nav-sticky-arrow",
-          disabled: !!prevDisabled,
-          onClick: onPrev,
-          title: prevLabel || "Previous",
-          "aria-label": prevLabel || "Previous"
-        },
-        "\u2039"
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "chapter-nav-sticky-arrow",
-          disabled: !!nextDisabled,
-          onClick: onNext,
-          title: nextLabel || "Next",
-          "aria-label": nextLabel || "Next"
-        },
-        "\u203A"
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "chapter-nav-sticky" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "chapter-nav-sticky-arrow",
+        disabled: !!prevDisabled,
+        onClick: onPrev,
+        title: prevLabel || "Previous",
+        "aria-label": prevLabel || "Previous"
+      },
+      "\u2039"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "chapter-nav-sticky-arrow",
+        disabled: !!nextDisabled,
+        onClick: onNext,
+        title: nextLabel || "Next",
+        "aria-label": nextLabel || "Next"
+      },
+      "\u203A"
+    ));
   }
 
-  // app/src/main/assets/src/ui/components/ClearProgressRow.js
+  // app/src/main/assets/src/ui/components/ClearProgressRow.jsx
   function ClearProgressRow2({ label, total, count, stage, onTap }) {
-    if (count === 0) return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "progress-row" },
-      /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, label),
-      /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, "0 / ", total),
-      /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", disabled: true }, "Clear")
-    );
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "progress-row" },
-      /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, label),
-      /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, count, " / ", total),
-      /* @__PURE__ */ React.createElement("button", { className: CLEAR_CLASSES[stage], onClick: onTap }, CLEAR_LABELS[stage])
-    );
+    if (count === 0) return /* @__PURE__ */ React.createElement("div", { className: "progress-row" }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, label), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, "0 / ", total), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", disabled: true }, "Clear"));
+    return /* @__PURE__ */ React.createElement("div", { className: "progress-row" }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, label), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, count, " / ", total), /* @__PURE__ */ React.createElement("button", { className: CLEAR_CLASSES[stage], onClick: onTap }, CLEAR_LABELS[stage]));
   }
 
-  // app/src/main/assets/src/ui/components/SrchCard.js
+  // app/src/main/assets/src/ui/components/SrchCard.jsx
   function SrchCard2({ entry, terms, onSelect, isDirect }) {
     if (isDirect) {
-      return /* @__PURE__ */ React.createElement(
-        "button",
-        { className: "srch-card card-direct", onClick: () => onSelect(entry) },
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "srch-card-top" },
-          /* @__PURE__ */ React.createElement("span", { className: "srch-card-ref" }, entry.__label)
-        ),
-        /* @__PURE__ */ React.createElement("div", { className: "srch-card-snippet" }, entry.__sub || "Go")
-      );
+      return /* @__PURE__ */ React.createElement("button", { className: "srch-card card-direct", onClick: () => onSelect(entry) }, /* @__PURE__ */ React.createElement("div", { className: "srch-card-top" }, /* @__PURE__ */ React.createElement("span", { className: "srch-card-ref" }, entry.__label)), /* @__PURE__ */ React.createElement("div", { className: "srch-card-snippet" }, entry.__sub || "Go"));
     }
     const doc = entry.doc;
     const meta = SRCH_KIND_LABEL[doc.kind] || { label: doc.kind, cls: "" };
     const refLine = doc.ref || (doc.title || "") + (doc.chapterNum ? " " + doc.chapterNum : "");
     const body = doc.kind === "heading" ? doc.heading || doc.text : doc.kind === "chapter-title" || doc.kind === "letter-title" || doc.kind === "wtlb-title" || doc.kind === "blessed-title" || doc.kind === "holy-day-title" ? doc.title || doc.text : doc.text;
-    return /* @__PURE__ */ React.createElement(
-      "button",
-      { className: "srch-card", onClick: () => onSelect(entry) },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "srch-card-top" },
-        /* @__PURE__ */ React.createElement("span", { className: "srch-card-ref" }, refLine),
-        /* @__PURE__ */ React.createElement("span", { className: "srch-card-badge " + (meta.cls || "") }, meta.label),
-        doc.translation && doc.translation !== "nkjv" && /* @__PURE__ */ React.createElement("span", { className: "srch-card-badge" }, doc.translation.toUpperCase()),
-        doc.heading && doc.kind === "verse" && /* @__PURE__ */ React.createElement("span", { className: "srch-card-badge badge-heading" }, doc.heading.length > 28 ? doc.heading.slice(0, 28) + "\u2026" : doc.heading)
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "srch-card-snippet" },
-        /* @__PURE__ */ React.createElement(SrchSnippet, { text: body || "", terms })
-      )
-    );
+    return /* @__PURE__ */ React.createElement("button", { className: "srch-card", onClick: () => onSelect(entry) }, /* @__PURE__ */ React.createElement("div", { className: "srch-card-top" }, /* @__PURE__ */ React.createElement("span", { className: "srch-card-ref" }, refLine), /* @__PURE__ */ React.createElement("span", { className: "srch-card-badge " + (meta.cls || "") }, meta.label), doc.translation && doc.translation !== "nkjv" && /* @__PURE__ */ React.createElement("span", { className: "srch-card-badge" }, doc.translation.toUpperCase()), doc.heading && doc.kind === "verse" && /* @__PURE__ */ React.createElement("span", { className: "srch-card-badge badge-heading" }, doc.heading.length > 28 ? doc.heading.slice(0, 28) + "\u2026" : doc.heading)), /* @__PURE__ */ React.createElement("div", { className: "srch-card-snippet" }, /* @__PURE__ */ React.createElement(SrchSnippet, { text: body || "", terms })));
   }
 
-  // app/src/main/assets/src/ui/components/SrchSnippet.js
+  // app/src/main/assets/src/ui/components/SrchSnippet.jsx
   function SrchSnippet2({ text, terms, maxLen = 180 }) {
     if (!text) return null;
     const snippet = window.VotSearch.snippet(text, terms || [], maxLen);
     const spans = window.VotSearch.highlightSpans(snippet, terms || []);
-    return /* @__PURE__ */ React.createElement(
-      "span",
-      null,
-      spans.map(
-        (s, i) => s.hit ? /* @__PURE__ */ React.createElement("mark", { key: i, className: "search-highlight" }, s.text) : /* @__PURE__ */ React.createElement(React.Fragment, { key: i }, s.text)
-      )
-    );
+    return /* @__PURE__ */ React.createElement("span", null, spans.map(
+      (s, i) => s.hit ? /* @__PURE__ */ React.createElement("mark", { key: i, className: "search-highlight" }, s.text) : /* @__PURE__ */ React.createElement(React.Fragment, { key: i }, s.text)
+    ));
   }
 
-  // app/src/main/assets/src/ui/components/SrchGroup.js
+  // app/src/main/assets/src/ui/components/SrchGroup.jsx
   function SrchGroup2({ gkey, items, terms, onSelect, defaultOpen }) {
     const [open, setOpen] = React.useState(defaultOpen !== false);
     const meta = SRCH_GROUP_META[gkey] || { label: gkey };
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "srch-group" + (open ? "" : " collapsed") },
-      /* @__PURE__ */ React.createElement(
-        "button",
-        { className: "srch-group-header", onClick: () => setOpen((o) => !o) },
-        /* @__PURE__ */ React.createElement("span", null, meta.label, /* @__PURE__ */ React.createElement("span", { className: "srch-group-count-inline" }, " \xB7 ", items.length, " ", items.length === 1 ? "match" : "matches")),
-        /* @__PURE__ */ React.createElement("span", { className: "srch-group-count" }, open ? "\u25BE" : "\u25B8")
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "srch-group-items" },
-        items.map(
-          (entry, i) => /* @__PURE__ */ React.createElement(SrchCard, { key: i, entry, terms, onSelect })
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "srch-group" + (open ? "" : " collapsed") }, /* @__PURE__ */ React.createElement("button", { className: "srch-group-header", onClick: () => setOpen((o) => !o) }, /* @__PURE__ */ React.createElement("span", null, meta.label, /* @__PURE__ */ React.createElement("span", { className: "srch-group-count-inline" }, " \xB7 ", items.length, " ", items.length === 1 ? "match" : "matches")), /* @__PURE__ */ React.createElement("span", { className: "srch-group-count" }, open ? "\u25BE" : "\u25B8")), /* @__PURE__ */ React.createElement("div", { className: "srch-group-items" }, items.map((entry, i) => /* @__PURE__ */ React.createElement(SrchCard, { key: i, entry, terms, onSelect }))));
   }
 
-  // app/src/main/assets/src/ui/components/SettingsRow.js
+  // app/src/main/assets/src/ui/components/SettingsRow.jsx
   function SettingsRow2({ label, desc, checked, onToggle, disabled, disabledReason }) {
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: `settings-row${disabled ? " settings-row-disabled" : ""}` },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "settings-row-text" },
-        /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, label),
-        desc && /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, desc),
-        disabled && disabledReason && /* @__PURE__ */ React.createElement("div", { className: "settings-row-disabled-hint" }, disabledReason)
-      ),
-      /* @__PURE__ */ React.createElement(
-        "label",
-        { className: "settings-toggle" },
-        /* @__PURE__ */ React.createElement(
-          "input",
-          {
-            type: "checkbox",
-            checked,
-            disabled: !!disabled,
-            onChange: disabled ? void 0 : onToggle
-          }
-        ),
-        /* @__PURE__ */ React.createElement("div", { className: "settings-toggle-track" }),
-        /* @__PURE__ */ React.createElement("div", { className: "settings-toggle-thumb" })
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: `settings-row${disabled ? " settings-row-disabled" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, label), desc && /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, desc), disabled && disabledReason && /* @__PURE__ */ React.createElement("div", { className: "settings-row-disabled-hint" }, disabledReason)), /* @__PURE__ */ React.createElement("label", { className: "settings-toggle" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked,
+        disabled: !!disabled,
+        onChange: disabled ? void 0 : onToggle
+      }
+    ), /* @__PURE__ */ React.createElement("div", { className: "settings-toggle-track" }), /* @__PURE__ */ React.createElement("div", { className: "settings-toggle-thumb" })));
   }
 
-  // app/src/main/assets/src/ui/components/SelectField.js
+  // app/src/main/assets/src/ui/components/SelectField.jsx
   function SelectField2({ eyebrow, title, label, desc, value, options, onChange }) {
     const [open, setOpen] = React.useState(false);
     const selected = options.find((o) => o.id === value) || options[0];
@@ -2232,77 +1797,28 @@
         window.__closeSheet = prev || null;
       };
     }, [open]);
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "settings-row", style: { flexDirection: "column", alignItems: "stretch" } },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "settings-row-text", style: { marginBottom: "0.7rem" } },
-        /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, label),
-        /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, desc)
-      ),
-      /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "settings-row", style: { flexDirection: "column", alignItems: "stretch" } }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text", style: { marginBottom: "0.7rem" } }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, label), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, desc)), /* @__PURE__ */ React.createElement("button", { className: "select-field", onClick: (e) => {
+      e.stopPropagation();
+      setOpen(true);
+    } }, /* @__PURE__ */ React.createElement("div", { className: "select-field-body" }, /* @__PURE__ */ React.createElement("span", { className: "select-field-label" }, selected.label), selected.desc ? /* @__PURE__ */ React.createElement("span", { className: "select-field-caption" }, selected.desc) : null), /* @__PURE__ */ React.createElement("span", { className: "select-field-chevron" }, "\u203A")), open && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-backdrop open", onClick: () => setOpen(false) }), /* @__PURE__ */ React.createElement("div", { className: "select-sheet", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-handle" }), eyebrow ? /* @__PURE__ */ React.createElement("div", { className: "select-sheet-eyebrow" }, eyebrow) : null, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-title" }, title || label), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-diamond" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-options" }, options.map((opt) => {
+      const isSelected = opt.id === value;
+      return /* @__PURE__ */ React.createElement(
         "button",
-        { className: "select-field", onClick: (e) => {
-          e.stopPropagation();
-          setOpen(true);
-        } },
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "select-field-body" },
-          /* @__PURE__ */ React.createElement("span", { className: "select-field-label" }, selected.label),
-          selected.desc ? /* @__PURE__ */ React.createElement("span", { className: "select-field-caption" }, selected.desc) : null
-        ),
-        /* @__PURE__ */ React.createElement("span", { className: "select-field-chevron" }, "\u203A")
-      ),
-      open && /* @__PURE__ */ React.createElement(
-        React.Fragment,
-        null,
-        /* @__PURE__ */ React.createElement("div", { className: "select-sheet-backdrop open", onClick: () => setOpen(false) }),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "select-sheet", onClick: (e) => e.stopPropagation() },
-          /* @__PURE__ */ React.createElement("div", { className: "select-sheet-handle" }),
-          eyebrow ? /* @__PURE__ */ React.createElement("div", { className: "select-sheet-eyebrow" }, eyebrow) : null,
-          /* @__PURE__ */ React.createElement("div", { className: "select-sheet-title" }, title || label),
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "select-sheet-ornament" },
-            /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line" }),
-            /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-diamond" }, "\u2726"),
-            /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line r" })
-          ),
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "select-sheet-options" },
-            options.map((opt) => {
-              const isSelected = opt.id === value;
-              return /* @__PURE__ */ React.createElement(
-                "button",
-                {
-                  key: opt.id,
-                  className: `select-sheet-option${isSelected ? " selected" : ""}`,
-                  onClick: () => {
-                    onChange(opt.id);
-                    setOpen(false);
-                  }
-                },
-                /* @__PURE__ */ React.createElement(
-                  "div",
-                  { className: "select-sheet-option-main" },
-                  /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-label" }, opt.label),
-                  isSelected ? /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-check" }, "\u2713") : null
-                ),
-                opt.desc ? /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-desc" }, opt.desc) : null
-              );
-            })
-          )
-        )
-      )
-    );
+        {
+          key: opt.id,
+          className: `select-sheet-option${isSelected ? " selected" : ""}`,
+          onClick: () => {
+            onChange(opt.id);
+            setOpen(false);
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-main" }, /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-label" }, opt.label), isSelected ? /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-check" }, "\u2713") : null),
+        opt.desc ? /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-desc" }, opt.desc) : null
+      );
+    })))));
   }
 
-  // app/src/main/assets/src/ui/components/VolumeLetterIndex.js
+  // app/src/main/assets/src/ui/components/VolumeLetterIndex.jsx
   function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, markAsReadEnabled, columns }) {
     const currentRef = React.useRef(null);
     React.useEffect(() => {
@@ -2310,90 +1826,37 @@
         currentRef.current.scrollIntoView({ block: "center", behavior: "instant" });
       }
     }, []);
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "vol-index" },
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "vol-index-header" },
-        /* @__PURE__ */ React.createElement("div", { className: "vol-index-eyebrow" }, eyebrow || "The Volumes of Truth"),
-        /* @__PURE__ */ React.createElement("h1", { className: "vol-index-title" }, volumeTitle),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "vol-index-ornament" },
-          /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line" }),
-          /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-diamond" }),
-          /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line r" })
-        )
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: `chapter-cards${columns === 2 ? " two-col" : ""}` },
-        preface && (columns === 2 ? /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "vol-index" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-header" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-eyebrow" }, eyebrow || "The Volumes of Truth"), /* @__PURE__ */ React.createElement("h1", { className: "vol-index-title" }, volumeTitle), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line r" }))), /* @__PURE__ */ React.createElement("div", { className: `chapter-cards${columns === 2 ? " two-col" : ""}` }, preface && (columns === 2 ? /* @__PURE__ */ React.createElement("button", { className: "chapter-card-btn", onClick: () => onSelectPreface && onSelectPreface(preface.id) }, /* @__PURE__ */ React.createElement("div", { className: "two-col-inner" }, /* @__PURE__ */ React.createElement("div", { className: "two-col-num" }, "0"), /* @__PURE__ */ React.createElement("div", { className: "two-col-title" }, preface.title))) : /* @__PURE__ */ React.createElement("button", { className: "chapter-card-btn", onClick: () => onSelectPreface && onSelectPreface(preface.id) }, /* @__PURE__ */ React.createElement("span", { className: "chapter-card-num" }, "0"), /* @__PURE__ */ React.createElement("div", { className: "chapter-card-divider" }), /* @__PURE__ */ React.createElement("div", { className: "chapter-card-info" }, /* @__PURE__ */ React.createElement("div", { className: "chapter-card-label" }, "Preface"), /* @__PURE__ */ React.createElement("div", { className: "chapter-card-title" }, preface.title)), markAsReadEnabled && isRead(preface.id) && /* @__PURE__ */ React.createElement("span", { className: "read-check", style: { marginLeft: "0.4rem" } }, "\u2713"))), letters.map((letter) => {
+      const isCurrent = letter.id === currentLetter;
+      if (columns === 2) {
+        return /* @__PURE__ */ React.createElement(
           "button",
-          { className: "chapter-card-btn", onClick: () => onSelectPreface && onSelectPreface(preface.id) },
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "two-col-inner" },
-            /* @__PURE__ */ React.createElement("div", { className: "two-col-num" }, "0"),
-            /* @__PURE__ */ React.createElement("div", { className: "two-col-title" }, preface.title)
-          )
-        ) : /* @__PURE__ */ React.createElement(
-          "button",
-          { className: "chapter-card-btn", onClick: () => onSelectPreface && onSelectPreface(preface.id) },
-          /* @__PURE__ */ React.createElement("span", { className: "chapter-card-num" }, "0"),
-          /* @__PURE__ */ React.createElement("div", { className: "chapter-card-divider" }),
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "chapter-card-info" },
-            /* @__PURE__ */ React.createElement("div", { className: "chapter-card-label" }, "Preface"),
-            /* @__PURE__ */ React.createElement("div", { className: "chapter-card-title" }, preface.title)
-          ),
-          markAsReadEnabled && isRead(preface.id) && /* @__PURE__ */ React.createElement("span", { className: "read-check", style: { marginLeft: "0.4rem" } }, "\u2713")
-        )),
-        letters.map((letter) => {
-          const isCurrent = letter.id === currentLetter;
-          if (columns === 2) {
-            return /* @__PURE__ */ React.createElement(
-              "button",
-              {
-                key: letter.id,
-                className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
-                ref: isCurrent ? currentRef : null,
-                onClick: () => onSelect(letter.id)
-              },
-              /* @__PURE__ */ React.createElement(
-                "div",
-                { className: "two-col-inner" },
-                /* @__PURE__ */ React.createElement("div", { className: "two-col-num" }, letter.num),
-                /* @__PURE__ */ React.createElement("div", { className: "two-col-title" }, letter.title)
-              )
-            );
-          }
-          return /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              key: letter.id,
-              className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
-              ref: isCurrent ? currentRef : null,
-              onClick: () => onSelect(letter.id)
-            },
-            /* @__PURE__ */ React.createElement("span", { className: "chapter-card-num" }, letter.num),
-            /* @__PURE__ */ React.createElement("div", { className: "chapter-card-divider" }),
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "chapter-card-info" },
-              /* @__PURE__ */ React.createElement("div", { className: "chapter-card-label" }, letter.date),
-              /* @__PURE__ */ React.createElement("div", { className: "chapter-card-title" }, letter.title)
-            ),
-            markAsReadEnabled && isRead(letter.id) && /* @__PURE__ */ React.createElement("span", { className: "read-check", style: { marginLeft: "0.4rem" } }, "\u2713")
-          );
-        })
-      )
-    );
+          {
+            key: letter.id,
+            className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
+            ref: isCurrent ? currentRef : null,
+            onClick: () => onSelect(letter.id)
+          },
+          /* @__PURE__ */ React.createElement("div", { className: "two-col-inner" }, /* @__PURE__ */ React.createElement("div", { className: "two-col-num" }, letter.num), /* @__PURE__ */ React.createElement("div", { className: "two-col-title" }, letter.title))
+        );
+      }
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: letter.id,
+          className: `chapter-card-btn${isCurrent ? " is-current" : ""}`,
+          ref: isCurrent ? currentRef : null,
+          onClick: () => onSelect(letter.id)
+        },
+        /* @__PURE__ */ React.createElement("span", { className: "chapter-card-num" }, letter.num),
+        /* @__PURE__ */ React.createElement("div", { className: "chapter-card-divider" }),
+        /* @__PURE__ */ React.createElement("div", { className: "chapter-card-info" }, /* @__PURE__ */ React.createElement("div", { className: "chapter-card-label" }, letter.date), /* @__PURE__ */ React.createElement("div", { className: "chapter-card-title" }, letter.title)),
+        markAsReadEnabled && isRead(letter.id) && /* @__PURE__ */ React.createElement("span", { className: "read-check", style: { marginLeft: "0.4rem" } }, "\u2713")
+      );
+    })));
   }
 
-  // app/src/main/assets/src/ui/components/HistoryEntryCard.js
+  // app/src/main/assets/src/ui/components/HistoryEntryCard.jsx
   function HistoryEntryCard2({ entry, onSelect }) {
     const isLetter = entry.type === "letter";
     const isStudy = entry.type === "study-chapter";
@@ -2402,22 +1865,10 @@
     const _volCol = entry.volumeScreen ? COL_BY_INDEX_SC.get(entry.volumeScreen) : null;
     const cardLabel = isStudy ? studyAbbrev(entry.studySlug, entry.studyTitle) : isLetter ? entry.volume === 1 ? "Volume One" : _volCol ? _volCol.label : "Volume Two" : entry.bookTitle;
     const fallback = isLetter ? `Letter ${num}` : isStudy ? `Part ${num}` : `Chapter ${num}`;
-    return /* @__PURE__ */ React.createElement(
-      "button",
-      { className: "chapter-card-btn", onClick: () => onSelect(entry) },
-      /* @__PURE__ */ React.createElement("span", { className: "chapter-card-num" }, num),
-      /* @__PURE__ */ React.createElement("div", { className: "chapter-card-divider" }),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "chapter-card-info" },
-        /* @__PURE__ */ React.createElement("div", { className: "chapter-card-label" }, cardLabel),
-        /* @__PURE__ */ React.createElement("div", { className: "chapter-card-title" }, title || fallback)
-      ),
-      /* @__PURE__ */ React.createElement("div", { className: "history-entry-time" }, timeAgo(entry.ts))
-    );
+    return /* @__PURE__ */ React.createElement("button", { className: "chapter-card-btn", onClick: () => onSelect(entry) }, /* @__PURE__ */ React.createElement("span", { className: "chapter-card-num" }, num), /* @__PURE__ */ React.createElement("div", { className: "chapter-card-divider" }), /* @__PURE__ */ React.createElement("div", { className: "chapter-card-info" }, /* @__PURE__ */ React.createElement("div", { className: "chapter-card-label" }, cardLabel), /* @__PURE__ */ React.createElement("div", { className: "chapter-card-title" }, title || fallback)), /* @__PURE__ */ React.createElement("div", { className: "history-entry-time" }, timeAgo(entry.ts)));
   }
 
-  // app/src/main/assets/src/ui/components/NoteRow.js
+  // app/src/main/assets/src/ui/components/NoteRow.jsx
   function NoteRow2({ note, onTap }) {
     const sourceLabel = noteSourceLabel(note);
     const date = relativeDate(note.updated || note.created);
@@ -2438,7 +1889,7 @@
     const Exp = typeof JrnExpandable !== "undefined" ? JrnExpandable : null;
     const bodyText = note.body || "";
     const anchorText = note.fullText || "";
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement(
       "div",
       {
         className: "note-row",
@@ -2452,39 +1903,12 @@
           }
         }
       },
-      React.createElement("span", { className: "note-row-swatch", style: { background: swatchBg } }),
-      React.createElement(
-        "span",
-        { className: "note-row-body" },
-        React.createElement(
-          "span",
-          { className: "note-row-source-line" },
-          React.createElement("span", { className: "note-row-source" }, sourceLabel),
-          date && React.createElement("span", { className: "note-row-date" }, date)
-        ),
-        bodyText && (Exp && bodyText.length > 160 ? React.createElement(Exp, { text: bodyText, threshold: 160, className: "note-row-preview note-row-preview-expandable", tapToToggle: true }) : React.createElement("span", { className: "note-row-preview" }, bodyText)),
-        anchorText && (Exp && anchorText.length > 160 ? React.createElement(Exp, { text: "\u201C" + anchorText + "\u201D", threshold: 160, className: "note-row-anchor note-row-anchor-expandable", tapToToggle: true }) : React.createElement("span", { className: "note-row-anchor" }, "\u201C", anchorText, "\u201D")),
-        noteNbs.length > 0 && React.createElement(
-          "span",
-          { className: "note-row-tags" },
-          noteNbs.slice(0, 2).map((nb) => React.createElement(
-            "span",
-            { key: nb.id, className: "note-row-nb" },
-            React.createElement(
-              "svg",
-              { className: "note-row-nb-icon", viewBox: "0 0 24 24" },
-              React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }),
-              React.createElement("polyline", { points: "15 4 15 9 20 9" })
-            ),
-            nb.name
-          )),
-          noteNbs.length > 2 && React.createElement("span", { className: "note-row-nb" }, "+", noteNbs.length - 2)
-        )
-      )
+      /* @__PURE__ */ React.createElement("span", { className: "note-row-swatch", style: { background: swatchBg } }),
+      /* @__PURE__ */ React.createElement("span", { className: "note-row-body" }, /* @__PURE__ */ React.createElement("span", { className: "note-row-source-line" }, /* @__PURE__ */ React.createElement("span", { className: "note-row-source" }, sourceLabel), date && /* @__PURE__ */ React.createElement("span", { className: "note-row-date" }, date)), bodyText && (Exp && bodyText.length > 160 ? /* @__PURE__ */ React.createElement(Exp, { text: bodyText, threshold: 160, className: "note-row-preview note-row-preview-expandable", tapToToggle: true }) : /* @__PURE__ */ React.createElement("span", { className: "note-row-preview" }, bodyText)), anchorText && (Exp && anchorText.length > 160 ? /* @__PURE__ */ React.createElement(Exp, { text: "\u201C" + anchorText + "\u201D", threshold: 160, className: "note-row-anchor note-row-anchor-expandable", tapToToggle: true }) : /* @__PURE__ */ React.createElement("span", { className: "note-row-anchor" }, "\u201C", anchorText, "\u201D")), noteNbs.length > 0 && /* @__PURE__ */ React.createElement("span", { className: "note-row-tags" }, noteNbs.slice(0, 2).map((nb) => /* @__PURE__ */ React.createElement("span", { key: nb.id, className: "note-row-nb" }, /* @__PURE__ */ React.createElement("svg", { className: "note-row-nb-icon", viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 4 15 9 20 9" })), nb.name)), noteNbs.length > 2 && /* @__PURE__ */ React.createElement("span", { className: "note-row-nb" }, "+", noteNbs.length - 2)))
     );
   }
 
-  // app/src/main/assets/src/ui/components/LinkCard.js
+  // app/src/main/assets/src/ui/components/LinkCard.jsx
   function LinkCard2({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
     const [expanded, setExpanded] = React.useState(false);
     const [confirmRemove, setConfirmRemove] = React.useState(false);
@@ -2498,106 +1922,79 @@
     const usingFromFallback = !otherText && !!thisSide.text;
     const rawText = otherText || thisSide.text || "";
     const isLong = rawText.length > 150;
-    const chainSvg = React.createElement(
-      "svg",
-      { className: "link-card-chain", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" },
-      React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
-      React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })
-    );
+    const chainSvg = /* @__PURE__ */ React.createElement("svg", { className: "link-card-chain", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" }));
     const doRemove = (e) => {
       e.stopPropagation();
       LinkStore.remove(lnk.id);
       setHlTick((t) => t + 1);
     };
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "link-card", onClick: confirmRemove ? void 0 : (() => onNavigate && onNavigate(other)) }, /* @__PURE__ */ React.createElement("div", { className: "link-card-header" }, /* @__PURE__ */ React.createElement("div", { className: "link-card-ref" }, /* @__PURE__ */ React.createElement("span", { className: "link-card-direction" }, isOutbound ? "to " : "from "), other.label), chainSvg), /* @__PURE__ */ React.createElement("div", { className: "link-card-cat" }, other.type === "bible" ? bookCategory(other.bookId) : other.type === "study" ? "Matthew Study Bible" : other.type === "study-letter" ? other.collection || "Bible Study" : other.type === "letter" ? other.collection || "Letter" : other.type === "wtlb" ? other.collection || "Words To Live By" : other.type === "blessed" ? "The Blessed" : other.type === "holy-days" ? "Holy Days" : ""), lnk.created && /* @__PURE__ */ React.createElement("div", { className: "link-card-date" }, relativeDate(lnk.created)), /* @__PURE__ */ React.createElement(
       "div",
-      { className: "link-card", onClick: confirmRemove ? void 0 : (() => onNavigate && onNavigate(other)) },
-      React.createElement(
-        "div",
-        { className: "link-card-header" },
-        React.createElement(
-          "div",
-          { className: "link-card-ref" },
-          React.createElement("span", { className: "link-card-direction" }, isOutbound ? "to " : "from "),
-          other.label
-        ),
-        chainSvg
-      ),
-      React.createElement(
-        "div",
-        { className: "link-card-cat" },
-        other.type === "bible" ? bookCategory(other.bookId) : other.type === "study" ? "Matthew Study Bible" : other.type === "study-letter" ? other.collection || "Bible Study" : other.type === "letter" ? other.collection || "Letter" : other.type === "wtlb" ? other.collection || "Words To Live By" : other.type === "blessed" ? "The Blessed" : other.type === "holy-days" ? "Holy Days" : ""
-      ),
-      // Created-date row — subtle Cinzel caps so the user can see when they
-      // anchored the link without having to open the full Links browser.
-      lnk.created && React.createElement(
-        "div",
-        { className: "link-card-date" },
-        relativeDate(lnk.created)
-      ),
-      React.createElement(
-        "div",
+      {
+        className: "link-card-preview",
+        style: expanded ? { display: "block", WebkitLineClamp: "unset", overflow: "visible" } : void 0
+      },
+      (other.type === "bible" || other.type === "study") && other.verse && /* @__PURE__ */ React.createElement("strong", null, other.verse + " "),
+      usingFromFallback && /* @__PURE__ */ React.createElement("em", { className: "link-card-from-label" }, "From: "),
+      rawText
+    ), !confirmRemove && /* @__PURE__ */ React.createElement("div", { className: "link-card-actions" }, isLong && /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        className: "link-card-show-more",
+        onClick: (e) => {
+          e.stopPropagation();
+          setExpanded((x) => !x);
+        }
+      },
+      expanded ? "Show less" : "Show more"
+    ), /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        className: "link-card-remove",
+        onClick: (e) => {
+          e.stopPropagation();
+          setConfirmRemove(true);
+        }
+      },
+      "Remove link"
+    )), confirmRemove && /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "ann-chip-confirm",
+        style: { padding: "10px 12px" },
+        onClick: (e) => e.stopPropagation()
+      },
+      /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Remove this link?"),
+      /* @__PURE__ */ React.createElement(
+        "button",
         {
-          className: "link-card-preview",
-          style: expanded ? { display: "block", WebkitLineClamp: "unset", overflow: "visible" } : void 0
-        },
-        (other.type === "bible" || other.type === "study") && other.verse && React.createElement("strong", null, other.verse + " "),
-        usingFromFallback && React.createElement("em", { className: "link-card-from-label" }, "From: "),
-        rawText
-      ),
-      // Actions row: show-more toggle + remove (with tap-confirm per §11.1)
-      !confirmRemove && React.createElement(
-        "div",
-        { className: "link-card-actions" },
-        isLong && React.createElement("span", {
-          className: "link-card-show-more",
-          onClick: (e) => {
-            e.stopPropagation();
-            setExpanded((x) => !x);
-          }
-        }, expanded ? "Show less" : "Show more"),
-        React.createElement("span", {
-          className: "link-card-remove",
-          onClick: (e) => {
-            e.stopPropagation();
-            setConfirmRemove(true);
-          }
-        }, "Remove link")
-      ),
-      // Tap-confirm strip — replaces the actions row when confirmRemove=true.
-      // First tap on "Remove link" → strip morphs into this. Second tap on
-      // "Yes, remove" → actually deletes. Cancel returns to the normal view.
-      confirmRemove && React.createElement(
-        "div",
-        {
-          className: "ann-chip-confirm",
-          style: { padding: "10px 12px" },
-          onClick: (e) => e.stopPropagation()
-        },
-        React.createElement("span", { className: "ann-chip-confirm-q" }, "Remove this link?"),
-        React.createElement("button", {
           className: "ann-chip-confirm-btn ann-chip-confirm-cancel",
           onClick: (e) => {
             e.stopPropagation();
             setConfirmRemove(false);
           }
-        }, "Cancel"),
-        React.createElement("button", {
+        },
+        "Cancel"
+      ),
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
           className: "ann-chip-confirm-btn ann-chip-confirm-yes",
           onClick: doRemove
-        }, "Yes, remove")
+        },
+        "Yes, remove"
       )
-    );
+    ));
   }
 
-  // app/src/main/assets/src/ui/components/LinkIcon.js
+  // app/src/main/assets/src/ui/components/LinkIcon.jsx
   function LinkIcon2({ hlKey, hlTick, onClick, prefix }) {
     const links = React.useMemo(
       () => prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
       [hlKey, hlTick, prefix]
     );
     if (!links || links.length === 0) return null;
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement(
       "span",
       {
         className: "verse-link-icon",
@@ -2607,16 +2004,11 @@
         },
         title: links.length + " link" + (links.length > 1 ? "s" : "")
       },
-      React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24" },
-        React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
-        React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })
-      )
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" }))
     );
   }
 
-  // app/src/main/assets/src/ui/components/BookmarkIcon.js
+  // app/src/main/assets/src/ui/components/BookmarkIcon.jsx
   function BookmarkIcon2({ hlKey, hlTick }) {
     const bookmarks = React.useMemo(
       () => BookmarkStore.getForKeyPrefix(hlKey),
@@ -2636,24 +2028,23 @@
         window.__openBookmarkPopover(ids, rect.left + rect.width / 2, rect.bottom + 4, hlKey);
       }
     };
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement(
       "span",
       {
         className: "inline-bookmark-icon" + (ids.length > 1 ? " inline-bookmark-icon-multi" : ""),
         onClick: open,
         title: ids.length === 1 ? "Bookmark" : ids.length + " bookmarks"
       },
-      React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "currentColor", stroke: "currentColor" },
-        React.createElement("path", {
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor", stroke: "currentColor" }, /* @__PURE__ */ React.createElement(
+        "path",
+        {
           fill: "currentColor",
           stroke: "currentColor",
           strokeWidth: "1.5",
           strokeLinejoin: "round",
           d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"
-        })
-      )
+        }
+      ))
     );
   }
 
