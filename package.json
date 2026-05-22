@@ -9,7 +9,8 @@
     "build:b": "esbuild app/src/main/assets/src/stores/_entry-b.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-b.js",
     "build:c": "esbuild app/src/main/assets/src/renderer/_entry.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-c.js",
     "build:d": "esbuild app/src/main/assets/src/ui/_entry-d.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-d.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "jsx-progress": "python tools/jsx-progress.py"
   },
   "devDependencies": {
     "esbuild": "^0.28.0",
