@@ -19,7 +19,7 @@
    seconds, deterministically, before it ships.
 
    CONTRACT
-   votSmoke({ mutating=true, walk=true }) → Promise<report>
+   votSmoke({ mutating=true, walk=true, tabsOn=false }) → Promise<report>
      report.ok           overall boolean (true = safe)
      report.summary      one-line pass/fail counts
      report.console      uncaught console.error strings seen during run
@@ -29,8 +29,13 @@
      report.annotation   round-trip result (marks render, no crash on
                           next/prev) — ALWAYS restores localStorage it
                           touched, even on failure.
-   `mutating:false` skips the annotation round-trip (pure read-only).
+     report.tabs         multi-tab round-trip (tabsOn only) — enable tabs,
+                          open two tabs, walk 12 screens in one, switch
+                          back, assert the other held its state. ALWAYS
+                          restores vot-state, even on failure.
+   `mutating:false` skips the annotation round-trips (pure read-only).
    `walk:false` skips the UI screen walk (globals/console only — fast).
+   `tabsOn:true` adds the multi-tab round-trip — votSmoke({ tabsOn:true }).
 
    IMPORTANT: the annotation check snapshots and restores vot-annotations
    / vot-notes within a single page session (no reload between seed and
@@ -478,11 +483,112 @@
     }
   }
 
+  // ── Tabs round-trip — the votSmoke({ tabsOn:true }) variant. The
+  // 12-screen walk + both annotation round-trips run with tabs OFF, so the
+  // tab state machine itself (open / switch / per-tab isolation) has zero
+  // automated coverage — only the in-App tabField stability probe catches
+  // setter-identity churn. This exercises the machine end to end:
+  //   1. enable Tabs via the Settings UI toggle
+  //   2. open a fresh tab (X), navigate it to a KNOWN screen (Volumes idx)
+  //   3. open a second fresh tab (Y)
+  //   4. run the full 12-screen walk inside tab Y
+  //   5. switch back to tab X and assert it STILL holds the Volumes index
+  //      — proving navigating one tab never corrupts another tab's state.
+  //
+  // Snapshots + restores localStorage['vot-state'] (enabling tabs and
+  // opening tabs both persist there), so a reload returns to the original
+  // state. The LIVE React session stays mutated after the run — tabs
+  // visibly enabled, two extra tabs present — exactly as the annotation
+  // round-trip leaves the app navigated to a letter. This is a test tool,
+  // run deliberately; a reload restores everything. Do NOT add a reload.
+  async function tabsRoundTrip() {
+    var snap = localStorage.getItem('vot-state');
+    function restore() {
+      if (snap === null) localStorage.removeItem('vot-state');
+      else localStorage.setItem('vot-state', snap);
+    }
+    function fail(msg) { restore(); return { ok: false, error: msg, restored: true }; }
+    // Open the Tabs Overview via the nav button (present on every screen,
+    // including home, once tabs are enabled). Resolves true once the
+    // .tabs-overview overlay is on screen.
+    async function openOverview() {
+      if (document.querySelector('.tabs-overview')) return true;
+      var nb = document.querySelector('button.tabs-nav-btn');
+      if (!nb) return false;
+      nb.click();
+      await sleep(450);
+      return !!document.querySelector('.tabs-overview');
+    }
+    try {
+      // 1. Enable Tabs via the Settings UI (idempotent — skip if already on).
+      await goHome(); await sleep(200);
+      clickByText(/App Configuration|^Settings/); await sleep(420);
+      var tabsRow = [].slice.call(document.querySelectorAll('.settings-row'))
+        .find(function (r) {
+          var l = r.querySelector('.settings-row-label');
+          return l && (l.textContent || '').trim() === 'Tabs';
+        });
+      if (!tabsRow) return fail('Tabs settings row not found');
+      var cb = tabsRow.querySelector('input[type="checkbox"]');
+      if (!cb) return fail('Tabs toggle checkbox not found');
+      if (!cb.checked) { cb.click(); await sleep(450); }
+      await goHome(); await sleep(350);
+      if (!document.querySelector('button.tabs-nav-btn'))
+        return fail('tabs-nav-btn did not appear after enabling Tabs');
+
+      // 2. Open tab X, then navigate it to the Volumes index (a known screen).
+      if (!(await openOverview())) return fail('Tabs Overview did not open (tab X)');
+      var realCardsBefore = document.querySelectorAll('.tab-card:not(.tab-card-new)').length;
+      var newBtnX = document.querySelector('button.tab-card-new');
+      if (!newBtnX) return fail('New Tab button not found (tab X)');
+      newBtnX.click();             // openNewTab appends + activates → tab X
+      await sleep(600);
+      var xIdx = realCardsBefore;  // the appended tab is the new last index
+      clickByText(/Prophetic Letters/); await sleep(500);
+      var xLanded = /Volume One/.test(document.body.textContent || '') && !isCrashed();
+
+      // 3. Open tab Y (a second fresh tab — starts on home).
+      if (!(await openOverview())) return fail('Tabs Overview did not open (tab Y)');
+      var newBtnY = document.querySelector('button.tab-card-new');
+      if (!newBtnY) return fail('New Tab button not found (tab Y)');
+      newBtnY.click();
+      await sleep(600);
+      var yOnHome = onHome();
+
+      // 4. Run the full 12-screen walk inside tab Y.
+      var walk = await walkScreens();
+      var walkCrashed = walk.filter(function (s) { return s.crashed; }).length;
+      var walkUnreached = walk.filter(function (s) { return !s.reached && !s.crashed; }).length;
+
+      // 5. Switch back to tab X; it must still hold the Volumes index.
+      if (!(await openOverview())) return fail('Tabs Overview did not open (switch back)');
+      var cards = [].slice.call(document.querySelectorAll('.tab-card:not(.tab-card-new)'));
+      if (!cards[xIdx]) return fail('tab X card (idx ' + xIdx + ') missing — ' + cards.length + ' cards present');
+      cards[xIdx].click();
+      await sleep(550);
+      var xHeld = /Volume One/.test(document.body.textContent || '') && !onHome() && !isCrashed();
+
+      restore();
+      return {
+        ok: xLanded && yOnHome && walkCrashed === 0 && xHeld,
+        tabXLanded: xLanded,              // tab X reached the Volumes index
+        tabYFreshHome: yOnHome,           // tab Y opened on home
+        walkInTabY: { screens: walk.length, crashed: walkCrashed, unreached: walkUnreached },
+        tabXHeldAfterWalk: xHeld,         // tab X still on Volumes index after the tab-Y walk
+        restored: true
+      };
+    } catch (e) {
+      restore();
+      return { ok: false, error: (e && e.message) || String(e), restored: true };
+    }
+  }
+
   // ── Orchestrator ─────────────────────────────────────────────────────
   root.votSmoke = async function votSmoke(opts) {
     opts = opts || {};
     var mutating = opts.mutating !== false;
     var walk = opts.walk !== false;
+    var tabsOn = !!opts.tabsOn;
     var t0 = now();
 
     // Capture uncaught console.error for the duration of the run.
@@ -509,6 +615,7 @@
       report.screens = walk ? await walkScreens() : 'skipped';
       report.annotation = mutating ? await annotationRoundTrip() : 'skipped';
       report.wtlbAnnotation = mutating ? await wtlbAnnotationRoundTrip() : 'skipped';
+      report.tabs = tabsOn ? await tabsRoundTrip() : 'skipped';
     } finally {
       console.error = realErr;
     }
@@ -538,6 +645,7 @@
       screenFails === 0 &&
       (report.annotation === 'skipped' || report.annotation.ok) &&
       (report.wtlbAnnotation === 'skipped' || report.wtlbAnnotation.ok) &&
+      (report.tabs === 'skipped' || report.tabs.ok) &&
       report.console.errorsSeen === 0 &&
       report.resourceErrors.total === 0;
     report.summary =
@@ -547,6 +655,7 @@
       ' | screens ' + (walk ? (screenFails + ' crashed, ' + screenUnreached + ' unreached') : 'skipped') +
       ' | letterAnn ' + (report.annotation === 'skipped' ? 'skipped' : (report.annotation.ok ? 'ok' : 'FAIL')) +
       ' | wtlbAnn ' + (report.wtlbAnnotation === 'skipped' ? 'skipped' : (report.wtlbAnnotation.ok ? 'ok' : 'FAIL')) +
+      ' | tabs ' + (report.tabs === 'skipped' ? 'skipped' : (report.tabs.ok ? 'ok' : 'FAIL')) +
       ' | console.error ' + report.console.errorsSeen +
       ' | resource404 ' + report.resourceErrors.total +
       ' | ' + Math.round(now() - t0) + 'ms';
