@@ -164,6 +164,16 @@ Excluded (correctly — these are the variable DEFINITIONS, not raw usages):
 Also excluded: hex-like tokens in code COMMENTS at lines 835 ("#211700") and
 839 ("#09122e") — those are not property values.
 
+DEFINITIONS vs USAGES — read before Q3. Every entry in this section is a raw
+USAGE (a hex literal in a rule's property value). The variable DEFINITIONS in
+:root / body.light are excluded above and are correct as-is. A "raw usage" is
+NOT a wrong color: the 10-color annotation palette especially (#ffd700 … the
+~62 usages noted in 2A) — those hex values ARE the canonical colors. The Q3
+task for them is to PROMOTE the values into a `--hl-*` token set (10 new
+definitions) and swap the usages to var() — NOT to change any color. Q3.1's
+acceptance ("grep returns only single-use values or values inside variable
+definitions") is satisfied by that promotion.
+
 --------------------------------------------------------------------------------
 2A — MULTI-USE HEX VALUES (2+ raw usages) — PRIORITY for variable extraction
 --------------------------------------------------------------------------------
@@ -448,6 +458,15 @@ Method: each candidate class was grepped across index.html + all 157 src/*.js
 files. Classes that could be DYNAMICALLY constructed (string concatenation /
 template literals) were verified and EXCLUDED — see the "dynamic — skipped"
 note at the end. Only classes with CONFIRMED zero references are listed here.
+
+CONFIDENCE — read before bulk-deleting. "Dead" here means a literal grep for
+the class name found ZERO hits in index.html or any src/**/*.js. That is
+strong evidence but NOT proof: a class assembled at runtime by string
+concatenation (e.g. `'hl-' + color`) will never match a literal grep. The
+known dynamic classes were checked and excluded (see "DYNAMIC CLASSES" at the
+end of Section 3), but the Q3 cleanup agent should still re-grep each class —
+both as a literal AND as a likely concatenation fragment — before removing
+its rule. Treat this list as high-confidence candidates, not a delete script.
 
 --- DEAD BLOCK: "BOOK SELECTOR" (entire section, lines 252-312) ---
   This whole component was removed from the app (the volume/book index now uses
