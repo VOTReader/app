@@ -35,5 +35,12 @@ jobs:
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build
 
-      - name: Syntax-check every src/ module (node --check)
-        run: find app/src/main/assets/src -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Syntax-check every src/ module
+        run: |
+          # .js — Node's own parser. node --check cannot parse JSX, so
+          # this pass is .js only (corpus data + un-converted modules).
+          find app/src/main/assets/src -name '*.js' -print0 | xargs -0 -n1 node --check
+          # .jsx — esbuild. JSX-aware, emits clean file:line errors;
+          # node --check would reject the syntax outright. -r skips the
+          # esbuild run on a tree that has no .jsx files yet.
+          find app/src/main/assets/src -name '*.jsx' -print0 | xargs -0 -r -n1 npx esbuild --outfile=/dev/null --log-level=warning
