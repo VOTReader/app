@@ -1000,6 +1000,30 @@ const SRCH_QUICK_PICKS = [
 function App() {
   // screens: "home" | "scriptures-home" | "volumes-home" | "matthew-idx" | "matthew-ch" | "bible-idx" | "bible-ch" | "vot-index" | "vot-letter" | "search"
   var sharedViewProps, _navToChapter, _idxNav;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     HOOK CALL-ORDER DAG (P6 decomposition) — 13 hooks, in call order.
+     Each hook may consume only the RETURNS of hooks ABOVE it; the "←"
+     notes name those deps. Do NOT reorder without re-checking this graph.
+     This code is authoritative — keep CLAUDE.md §POST-P6 HOOK DAG in sync.
+        1. useSavedState          (no hook deps — reads vot-state once)
+        2. useTabs                ← saved
+        3. useSheetOrchestration  ← nav state via tabField (2)
+        4. useFromLetterStack     ← tabField (2)
+        5. useSettings            ← saved
+        6. useHistory             ← settings.historyEnabled (5)
+        7. useThumbnails          ← tabs/activeTab (2), settings (5)
+        8. useScrollMemory        ← activeTab + updateActiveTab (2)
+        9. useReadingDwell        ← settings.dwellMs (5), saved.activeReadKey
+       10. useTabActions          ← tabState (2), cancelDwell (9), setTabThumbnails (7)
+       11. usePersistedState      ← tabs (2), activeReadKey (9), settings (5)
+       12. useNavigateToLink      ← closeLinkSidebar (3), pushFromLetter (4)
+       13. useAndroidBack         ← cancelDwell (9), fromLetterRef (4), + every
+                                    go* nav helper — so it is called LAST, far
+                                    below, after goStudiesHome is defined.
+     The other 2 of the 15 P6 hooks are not in this sequence: useMarkAsRead
+     is called by the 4 reading views; useRefMirror is called inline ~15×.
+     ═══════════════════════════════════════════════════════════════════ */
   /* useSavedState + _validateTabState → extracted to src/hooks/use-saved-state.js (P6a) */
   const saved = useSavedState();
 
