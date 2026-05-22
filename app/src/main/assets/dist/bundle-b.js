@@ -1,3 +1,4 @@
+"use strict";
 (() => {
   var __defProp = Object.defineProperty;
   var __export = (target, all) => {
@@ -1681,7 +1682,7 @@
     window.JrnExpandable = ExpandableText;
   }
 
-  // app/src/main/assets/src/components/ErrorBoundary.js
+  // app/src/main/assets/src/components/ErrorBoundary.jsx
   var ErrorBoundary = class extends React.Component {
     constructor(props) {
       super(props);
@@ -1692,13 +1693,14 @@
     }
     render() {
       if (!this.state.error) return this.props.children;
-      return React.createElement(
-        "div",
-        { style: { padding: "2rem", textAlign: "center", color: "#e0c97f", fontFamily: "Georgia, serif" } },
-        React.createElement("h2", { style: { marginBottom: "1rem" } }, "Something went wrong"),
-        React.createElement("p", { style: { color: "#b0a080", fontSize: "0.85rem", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" } }, String(this.state.error)),
-        React.createElement("button", { onClick: () => location.reload(), style: { padding: "0.6rem 1.6rem", background: "transparent", border: "1px solid #e0c97f", color: "#e0c97f", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit" } }, "Reload App")
-      );
+      return /* @__PURE__ */ React.createElement("div", { style: { padding: "2rem", textAlign: "center", color: "#e0c97f", fontFamily: "Georgia, serif" } }, /* @__PURE__ */ React.createElement("h2", { style: { marginBottom: "1rem" } }, "Something went wrong"), /* @__PURE__ */ React.createElement("p", { style: { color: "#b0a080", fontSize: "0.85rem", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" } }, String(this.state.error)), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: () => location.reload(),
+          style: { padding: "0.6rem 1.6rem", background: "transparent", border: "1px solid #e0c97f", color: "#e0c97f", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit" }
+        },
+        "Reload App"
+      ));
     }
   };
 

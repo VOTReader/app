@@ -54,7 +54,7 @@ import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
 
 // ── Components ──────────────────────────────────────────────────────────
 import { ExpandableText, JrnExpandable } from '../components/ExpandableText.js';
-import { ErrorBoundary } from '../components/ErrorBoundary.js';
+import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 
 // ── Hooks ───────────────────────────────────────────────────────────────
 import { useMarkAsRead } from '../hooks/useMarkAsRead.js';

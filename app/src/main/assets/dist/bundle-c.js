@@ -1,3 +1,4 @@
+"use strict";
 (() => {
   // app/src/main/assets/src/renderer/dom-links.js
   function applyDOMLinks() {
