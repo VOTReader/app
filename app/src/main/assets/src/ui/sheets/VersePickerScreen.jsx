@@ -1,12 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   VersePickerScreen — extracted React screen component
-   ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Self-contained — uses React.useX hooks directly (no dependency on the
-   inline script's `const { useState, ... } = React` destructuring).
-   All other call-time dependencies (Segments, FootnoteSheet, ScreenLayout,
-   findEntryContext, applyDOMHighlights, etc.) are global-lexical and
-   resolve at render time from the surrounding scripts.
+   VersePickerScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
@@ -182,12 +175,14 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
   }, [selInfo, captureSelectionSync, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink]);
 
   if (!chapter) {
-    return React.createElement("div", { className: "picker-screen" },
-      React.createElement("div", { className: "picker-header" },
-        React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "←"),
-        React.createElement("span", { className: "picker-title" }, "Select Verse")
-      ),
-      React.createElement("div", { className: "picker-empty" }, "Chapter not found.")
+    return (
+      <div className="picker-screen">
+        <div className="picker-header">
+          <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
+          <span className="picker-title">Select Verse</span>
+        </div>
+        <div className="picker-empty">Chapter not found.</div>
+      </div>
     );
   }
 
@@ -195,44 +190,51 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
   const hasSelection = !!selInfo;
   const previewText = selInfo ? (selInfo.text || '') : '';
 
-  return React.createElement("div", { className: "picker-screen" },
-    React.createElement("div", { className: "picker-header" },
-      React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "←"),
-      React.createElement("span", { className: "picker-title" }, "Select Text"),
-      React.createElement("button", {
-        className: "picker-confirm",
-        onClick: confirmLink, "aria-label": "Confirm",
-        title: hasSelection ? "Use this excerpt" : "Use the whole chapter"
-      },
-        React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" },
-          React.createElement("polyline", { points: "20 6 9 17 4 12" })
-        )
-      )
-    ),
-    React.createElement("div", { className: "picker-body picker-body-letter",
-      onTouchEnd: captureSelection, onMouseUp: captureSelection
-    },
-      React.createElement("div", { className: "picker-letter-title" }, titleText),
-      React.createElement("div", { className: "picker-letter-subtitle" }, isStudy ? "Matthew Study Bible" : "Bible Chapter"),
-      React.createElement("div", {
-        className: "picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")
-      }, hasSelection
-        ? previewText
-        : "Highlight any portion to link. Or tap a verse number to grab the whole verse."
-      ),
-      React.createElement("div", { ref: bodyRef, className: "picker-verses" },
-        verses.map(v => React.createElement("p", {
-          key: v.n,
-          className: "picker-verse-selectable",
-          'data-verse': v.n
-        },
-          React.createElement("span", {
-            className: "picker-verse-num",
-            onClick: function(e) { e.stopPropagation(); handleVerseTap(v.n); }
-          }, v.n + " "),
-          React.createElement("span", { className: "picker-verse-text" }, v.text)
-        ))
-      )
-    )
+  return (
+    <div className="picker-screen">
+      <div className="picker-header">
+        <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
+        <span className="picker-title">Select Text</span>
+        <button
+          className="picker-confirm"
+          onClick={confirmLink}
+          aria-label="Confirm"
+          title={hasSelection ? "Use this excerpt" : "Use the whole chapter"}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+      </div>
+      <div
+        className="picker-body picker-body-letter"
+        onTouchEnd={captureSelection}
+        onMouseUp={captureSelection}
+      >
+        <div className="picker-letter-title">{titleText}</div>
+        <div className="picker-letter-subtitle">{isStudy ? "Matthew Study Bible" : "Bible Chapter"}</div>
+        <div
+          className={"picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")}
+        >{hasSelection
+          ? previewText
+          : "Highlight any portion to link. Or tap a verse number to grab the whole verse."
+        }</div>
+        <div ref={bodyRef} className="picker-verses">
+          {verses.map(v => (
+            <p
+              key={v.n}
+              className="picker-verse-selectable"
+              data-verse={v.n}
+            >
+              <span
+                className="picker-verse-num"
+                onClick={function(e) { e.stopPropagation(); handleVerseTap(v.n); }}
+              >{v.n + " "}</span>
+              <span className="picker-verse-text">{v.text}</span>
+            </p>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

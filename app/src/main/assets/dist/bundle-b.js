@@ -3606,7 +3606,7 @@
     return !!n && HIDDEN_MANNA_TITLES.has((n.letter || "").trim());
   }
 
-  // app/src/main/assets/src/ui/sheets/JournalRecordingSheet.js
+  // app/src/main/assets/src/ui/sheets/JournalRecordingSheet.jsx
   function JournalRecordingSheet2({ onSave, onClose }) {
     var useState = React.useState;
     var useEffect = React.useEffect;
@@ -4264,9 +4264,9 @@
       for (var i = 0; i < count; i++) {
         var v = src.length ? src[Math.min(src.length - 1, Math.floor(i * src.length / count))] : 0.05;
         var h = Math.max(4, Math.min(56, Math.round(v * 56)));
-        bars.push(React.createElement("div", { key: i, className: "bar", style: { height: h + "px" } }));
+        bars.push(/* @__PURE__ */ React.createElement("div", { key: i, className: "bar", style: { height: h + "px" } }));
       }
-      return React.createElement("div", { className: "jrn-rec-waveform" }, bars);
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-waveform" }, bars);
     }
     function renderScrubWave(samples, prog) {
       var bars = [];
@@ -4275,124 +4275,42 @@
       for (var i = 0; i < count; i++) {
         var v = src.length ? src[Math.min(src.length - 1, Math.floor(i * src.length / count))] : 0.3;
         var h = Math.max(4, Math.min(56, Math.round(v * 56)));
-        bars.push(React.createElement("div", {
-          key: i,
-          className: "bar" + (i / count <= prog ? " is-played" : ""),
-          style: { height: h + "px" }
-        }));
+        bars.push(
+          /* @__PURE__ */ React.createElement(
+            "div",
+            {
+              key: i,
+              className: "bar" + (i / count <= prog ? " is-played" : ""),
+              style: { height: h + "px" }
+            }
+          )
+        );
       }
-      return React.createElement("div", {
-        className: "jrn-rec-waveform is-scrubbable",
-        onClick: seekPreviewFromEvent,
-        role: "slider",
-        "aria-label": "Scrub recording"
-      }, bars);
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          className: "jrn-rec-waveform is-scrubbable",
+          onClick: seekPreviewFromEvent,
+          role: "slider",
+          "aria-label": "Scrub recording"
+        },
+        bars
+      );
     }
     function renderContent() {
       if (stage === "error") {
-        return React.createElement(
-          "div",
-          null,
-          React.createElement("div", { className: "jrn-rec-error" }, error || "Recording failed."),
-          React.createElement(
-            "div",
-            { className: "jrn-rec-actions" },
-            React.createElement("button", { className: "jrn-rec-cancel", onClick: discard }, "Close")
-          )
-        );
+        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-error" }, error || "Recording failed."), /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-actions" }, /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-cancel", onClick: discard }, "Close")));
       }
       if (stage === "requesting") {
-        return React.createElement(
-          "div",
-          { className: "jrn-rec-content" },
-          React.createElement("div", { className: "jrn-rec-requesting" }, "Requesting microphone access\u2026"),
-          React.createElement(
-            "div",
-            { className: "jrn-rec-actions" },
-            React.createElement("button", { className: "jrn-rec-cancel", onClick: discard }, "Cancel")
-          )
-        );
+        return /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-content" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-requesting" }, "Requesting microphone access\u2026"), /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-actions" }, /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-cancel", onClick: discard }, "Cancel")));
       }
       if (stage === "recording" || stage === "paused") {
         var isPaused = stage === "paused";
-        return React.createElement(
-          "div",
-          { className: "jrn-rec-content" },
-          React.createElement("div", { className: "jrn-rec-status" + (isPaused ? " is-paused" : "") }, isPaused ? "Paused" : "Recording"),
-          React.createElement("div", { className: "jrn-rec-time" }, fmtTime(seconds)),
-          renderRecordingWave(waveLive),
-          React.createElement(
-            "div",
-            { className: "jrn-rec-actions" },
-            React.createElement("button", { className: "jrn-rec-cancel", onClick: discard, "aria-label": "Cancel" }, "Cancel"),
-            isPaused ? React.createElement(
-              "button",
-              { className: "jrn-rec-pause-btn", onClick: resumeRecording, "aria-label": "Resume", title: "Resume" },
-              React.createElement(
-                "svg",
-                { viewBox: "0 0 24 24", fill: "currentColor" },
-                React.createElement("path", { d: "M6 3v18l16-9z" })
-              )
-            ) : React.createElement(
-              "button",
-              { className: "jrn-rec-pause-btn", onClick: pauseRecording, "aria-label": "Pause", title: "Pause" },
-              React.createElement(
-                "svg",
-                { viewBox: "0 0 24 24", fill: "currentColor" },
-                React.createElement("path", { d: "M6 4h4v16H6zM14 4h4v16h-4z" })
-              )
-            ),
-            React.createElement(
-              "button",
-              { className: "jrn-rec-stop-btn", onClick: stopRecording, "aria-label": "Finish", title: "Finish" },
-              React.createElement(
-                "svg",
-                { viewBox: "0 0 24 24", fill: "currentColor" },
-                React.createElement("rect", { x: 6, y: 6, width: 12, height: 12, rx: 2 })
-              )
-            )
-          )
-        );
+        return /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-content" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-status" + (isPaused ? " is-paused" : "") }, isPaused ? "Paused" : "Recording"), /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-time" }, fmtTime(seconds)), renderRecordingWave(waveLive), /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-actions" }, /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-cancel", onClick: discard, "aria-label": "Cancel" }, "Cancel"), isPaused ? /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-pause-btn", onClick: resumeRecording, "aria-label": "Resume", title: "Resume" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ React.createElement("path", { d: "M6 3v18l16-9z" }))) : /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-pause-btn", onClick: pauseRecording, "aria-label": "Pause", title: "Pause" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ React.createElement("path", { d: "M6 4h4v16H6zM14 4h4v16h-4z" }))), /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-stop-btn", onClick: stopRecording, "aria-label": "Finish", title: "Finish" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ React.createElement("rect", { x: 6, y: 6, width: 12, height: 12, rx: 2 })))));
       }
-      return React.createElement(
-        "div",
-        { className: "jrn-rec-content jrn-rec-preview" },
-        React.createElement("div", { className: "jrn-rec-status" }, "Review"),
-        React.createElement(
-          "div",
-          { className: "jrn-rec-time" },
-          fmtTime(Math.floor((progress || 0) * (previewDurationRef.current || seconds))),
-          React.createElement("span", { className: "jrn-rec-time-total" }, " / " + fmtTime(previewDurationRef.current || seconds))
-        ),
-        renderScrubWave(waveFinal, progress),
-        React.createElement(
-          "div",
-          { className: "jrn-rec-preview-actions" },
-          React.createElement(
-            "button",
-            { className: "jrn-rec-pp", onClick: togglePreviewPlay, "aria-label": previewPlaying ? "Pause" : "Play", title: previewPlaying ? "Pause" : "Play" },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "currentColor" },
-              previewPlaying ? React.createElement("path", { d: "M6 4h4v16H6zM14 4h4v16h-4z" }) : React.createElement("path", { d: "M6 3v18l16-9z" })
-            )
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "jrn-rec-actions" },
-          React.createElement("button", { className: "jrn-rec-discard-btn", onClick: discard, "aria-label": "Discard", title: "Discard" }, "\xD7"),
-          React.createElement(
-            "button",
-            { className: "jrn-rec-confirm-btn", onClick: save, "aria-label": "Save", title: "Save" },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.6", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("polyline", { points: "20 6 9 17 4 12" })
-            )
-          )
-        ),
-        previewUrlRef.current && React.createElement("audio", {
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-content jrn-rec-preview" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-status" }, "Review"), /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-time" }, fmtTime(Math.floor((progress || 0) * (previewDurationRef.current || seconds))), /* @__PURE__ */ React.createElement("span", { className: "jrn-rec-time-total" }, " / " + fmtTime(previewDurationRef.current || seconds))), renderScrubWave(waveFinal, progress), /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-preview-actions" }, /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-pp", onClick: togglePreviewPlay, "aria-label": previewPlaying ? "Pause" : "Play", title: previewPlaying ? "Pause" : "Play" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, previewPlaying ? /* @__PURE__ */ React.createElement("path", { d: "M6 4h4v16H6zM14 4h4v16h-4z" }) : /* @__PURE__ */ React.createElement("path", { d: "M6 3v18l16-9z" })))), /* @__PURE__ */ React.createElement("div", { className: "jrn-rec-actions" }, /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-discard-btn", onClick: discard, "aria-label": "Discard", title: "Discard" }, "\xD7"), /* @__PURE__ */ React.createElement("button", { className: "jrn-rec-confirm-btn", onClick: save, "aria-label": "Save", title: "Save" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" })))), previewUrlRef.current && /* @__PURE__ */ React.createElement(
+        "audio",
+        {
           ref: previewAudioRef,
           src: previewUrlRef.current,
           style: { display: "none" },
@@ -4407,31 +4325,17 @@
             setProgress(0);
           },
           onTimeUpdate: onPreviewTimeUpdate
-        })
-      );
+        }
+      ));
     }
-    return React.createElement(
-      "div",
-      { className: "note-sheet-overlay", onClick: function(e) {
-        if (e.target === e.currentTarget) discard();
-      } },
-      React.createElement(
-        "div",
-        { className: "note-sheet jrn-rec-sheet", onClick: function(e) {
-          e.stopPropagation();
-        } },
-        React.createElement(
-          "div",
-          { className: "note-sheet-header" },
-          React.createElement("span", { className: "note-sheet-title", style: { flex: 1 } }, stage === "preview" ? "Review Recording" : "Voice Recording"),
-          stage !== "preview" && React.createElement("button", { className: "note-sheet-menu-btn", onClick: discard, "aria-label": "Close", style: { fontSize: "18px" } }, "\xD7")
-        ),
-        renderContent()
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "note-sheet-overlay", onClick: function(e) {
+      if (e.target === e.currentTarget) discard();
+    } }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet jrn-rec-sheet", onClick: function(e) {
+      e.stopPropagation();
+    } }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet-header" }, /* @__PURE__ */ React.createElement("span", { className: "note-sheet-title", style: { flex: 1 } }, stage === "preview" ? "Review Recording" : "Voice Recording"), stage !== "preview" && /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-btn", onClick: discard, "aria-label": "Close", style: { fontSize: "18px" } }, "\xD7")), renderContent()));
   }
 
-  // app/src/main/assets/src/ui/sheets/JournalInsertSheet.js
+  // app/src/main/assets/src/ui/sheets/JournalInsertSheet.jsx
   function JournalInsertSheet2(props) {
     var useState = React.useState;
     var useMemo = React.useMemo;
@@ -4645,149 +4549,27 @@
       else close();
     }
     var ICONS = {
-      card: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }),
-        React.createElement("line", { x1: "7", y1: "10", x2: "17", y2: "10" }),
-        React.createElement("line", { x1: "7", y1: "14", x2: "13", y2: "14" })
-      ),
-      excerpt: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("path", { d: "M6 9h.01M6 15h.01" }),
-        React.createElement("line", { x1: "10", y1: "8", x2: "20", y2: "8" }),
-        React.createElement("line", { x1: "10", y1: "12", x2: "20", y2: "12" }),
-        React.createElement("line", { x1: "10", y1: "16", x2: "16", y2: "16" }),
-        React.createElement("path", { d: "M3 4v16" })
-      ),
-      bookmark: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("path", { d: "M6 3a1 1 0 0 0-1 1v17l7-4 7 4V4a1 1 0 0 0-1-1H6z" })
-      ),
-      note: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-        React.createElement("polyline", { points: "14 2 14 8 20 8" }),
-        React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }),
-        React.createElement("line", { x1: "8", y1: "17", x2: "14", y2: "17" })
-      ),
-      journal: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("path", { d: "M19 4H8a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h11z" }),
-        React.createElement("line", { x1: "9", y1: "9", x2: "16", y2: "9" }),
-        React.createElement("line", { x1: "9", y1: "13", x2: "16", y2: "13" })
-      ),
-      notebook: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }),
-        React.createElement("polyline", { points: "15 4 15 9 20 9" }),
-        React.createElement("line", { x1: "8", y1: "14", x2: "15", y2: "14" })
-      ),
-      image: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }),
-        React.createElement("circle", { cx: "9", cy: "9", r: "1.6" }),
-        React.createElement("path", { d: "M21 15l-5-5L5 21" })
-      ),
-      audio: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("rect", { x: "9", y: "3", width: "6", height: "12", rx: "3" }),
-        React.createElement("path", { d: "M5 11a7 7 0 0 0 14 0" }),
-        React.createElement("line", { x1: "12", y1: "18", x2: "12", y2: "21" }),
-        React.createElement("line", { x1: "9", y1: "21", x2: "15", y2: "21" })
-      ),
-      divider: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("circle", { cx: "6", cy: "12", r: "1.5" }),
-        React.createElement("circle", { cx: "12", cy: "12", r: "1.5" }),
-        React.createElement("circle", { cx: "18", cy: "12", r: "1.5" })
-      ),
-      body: React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-        React.createElement("line", { x1: "4", y1: "7", x2: "20", y2: "7" }),
-        React.createElement("line", { x1: "4", y1: "12", x2: "20", y2: "12" }),
-        React.createElement("line", { x1: "4", y1: "17", x2: "14", y2: "17" })
-      )
+      card: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }), /* @__PURE__ */ React.createElement("line", { x1: "7", y1: "10", x2: "17", y2: "10" }), /* @__PURE__ */ React.createElement("line", { x1: "7", y1: "14", x2: "13", y2: "14" })),
+      excerpt: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M6 9h.01M6 15h.01" }), /* @__PURE__ */ React.createElement("line", { x1: "10", y1: "8", x2: "20", y2: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "10", y1: "12", x2: "20", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "10", y1: "16", x2: "16", y2: "16" }), /* @__PURE__ */ React.createElement("path", { d: "M3 4v16" })),
+      bookmark: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M6 3a1 1 0 0 0-1 1v17l7-4 7 4V4a1 1 0 0 0-1-1H6z" })),
+      note: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), /* @__PURE__ */ React.createElement("polyline", { points: "14 2 14 8 20 8" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "17", x2: "14", y2: "17" })),
+      journal: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M19 4H8a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h11z" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "9", x2: "16", y2: "9" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "13", x2: "16", y2: "13" })),
+      notebook: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 4 15 9 20 9" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "14", x2: "15", y2: "14" })),
+      image: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }), /* @__PURE__ */ React.createElement("circle", { cx: "9", cy: "9", r: "1.6" }), /* @__PURE__ */ React.createElement("path", { d: "M21 15l-5-5L5 21" })),
+      audio: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("rect", { x: "9", y: "3", width: "6", height: "12", rx: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M5 11a7 7 0 0 0 14 0" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "18", x2: "12", y2: "21" }), /* @__PURE__ */ React.createElement("line", { x1: "9", y1: "21", x2: "15", y2: "21" })),
+      divider: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "12", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "1.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "12", r: "1.5" })),
+      body: /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "7", x2: "20", y2: "7" }), /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "12", x2: "20", y2: "12" }), /* @__PURE__ */ React.createElement("line", { x1: "4", y1: "17", x2: "14", y2: "17" }))
     };
     function insertItem(icon, label, desc, onClick) {
-      return React.createElement(
-        "button",
-        { type: "button", className: "jrn-insert-item", onClick },
-        React.createElement("span", { className: "jrn-insert-icon" }, icon),
-        React.createElement(
-          "span",
-          { className: "jrn-insert-text" },
-          React.createElement("span", { className: "jrn-insert-label" }, label),
-          React.createElement("span", { className: "jrn-insert-desc" }, desc)
-        )
-      );
+      return /* @__PURE__ */ React.createElement("button", { type: "button", className: "jrn-insert-item", onClick }, /* @__PURE__ */ React.createElement("span", { className: "jrn-insert-icon" }, icon), /* @__PURE__ */ React.createElement("span", { className: "jrn-insert-text" }, /* @__PURE__ */ React.createElement("span", { className: "jrn-insert-label" }, label), /* @__PURE__ */ React.createElement("span", { className: "jrn-insert-desc" }, desc)));
     }
     function renderMenu() {
-      return React.createElement(
-        React.Fragment,
-        null,
-        React.createElement(
-          "div",
-          { className: "jrn-insert-section" },
-          React.createElement("h4", null, "From the Library"),
-          React.createElement(
-            "div",
-            { className: "jrn-insert-list" },
-            insertItem(ICONS.card, "Card", "Embed a chapter or letter title", openCardPicker),
-            insertItem(ICONS.excerpt, "Excerpt", "Embed a portion \u2014 pick word-precise text", openExcerptPicker)
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "jrn-insert-section" },
-          React.createElement("h4", null, "From Your Annotations"),
-          React.createElement(
-            "div",
-            { className: "jrn-insert-list" },
-            insertItem(ICONS.bookmark, "Bookmark", "Pull in a saved passage", pickBookmark),
-            insertItem(ICONS.note, "Note", "Reference one of your annotations", pickNote),
-            insertItem(ICONS.journal, "Journal Entry", "Link to another journal entry", pickJournal),
-            insertItem(ICONS.notebook, "Notebook", "Link to a notebook of notes", pickNotebook)
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "jrn-insert-section" },
-          React.createElement("h4", null, "Capture"),
-          React.createElement(
-            "div",
-            { className: "jrn-insert-list" },
-            insertItem(ICONS.image, "Image", "From device gallery", pickImage),
-            insertItem(ICONS.audio, "Voice Recording", "Record a memo or prayer", pickAudio)
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "jrn-insert-section", style: { paddingBottom: "20px" } },
-          React.createElement("h4", null, "Text"),
-          React.createElement(
-            "div",
-            { className: "jrn-insert-list" },
-            insertItem(ICONS.body, "Body Text", "A new line to write freely", insertBodyText),
-            insertItem(ICONS.divider, "Divider", "3-diamond ornament", insertDivider)
-          )
-        )
-      );
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "jrn-insert-section" }, /* @__PURE__ */ React.createElement("h4", null, "From the Library"), /* @__PURE__ */ React.createElement("div", { className: "jrn-insert-list" }, insertItem(ICONS.card, "Card", "Embed a chapter or letter title", openCardPicker), insertItem(ICONS.excerpt, "Excerpt", "Embed a portion \u2014 pick word-precise text", openExcerptPicker))), /* @__PURE__ */ React.createElement("div", { className: "jrn-insert-section" }, /* @__PURE__ */ React.createElement("h4", null, "From Your Annotations"), /* @__PURE__ */ React.createElement("div", { className: "jrn-insert-list" }, insertItem(ICONS.bookmark, "Bookmark", "Pull in a saved passage", pickBookmark), insertItem(ICONS.note, "Note", "Reference one of your annotations", pickNote), insertItem(ICONS.journal, "Journal Entry", "Link to another journal entry", pickJournal), insertItem(ICONS.notebook, "Notebook", "Link to a notebook of notes", pickNotebook))), /* @__PURE__ */ React.createElement("div", { className: "jrn-insert-section" }, /* @__PURE__ */ React.createElement("h4", null, "Capture"), /* @__PURE__ */ React.createElement("div", { className: "jrn-insert-list" }, insertItem(ICONS.image, "Image", "From device gallery", pickImage), insertItem(ICONS.audio, "Voice Recording", "Record a memo or prayer", pickAudio))), /* @__PURE__ */ React.createElement("div", { className: "jrn-insert-section", style: { paddingBottom: "20px" } }, /* @__PURE__ */ React.createElement("h4", null, "Text"), /* @__PURE__ */ React.createElement("div", { className: "jrn-insert-list" }, insertItem(ICONS.body, "Body Text", "A new line to write freely", insertBodyText), insertItem(ICONS.divider, "Divider", "3-diamond ornament", insertDivider))));
     }
     function searchPill() {
-      return React.createElement(
-        "div",
-        { className: "jrn-picker-search-row" },
-        React.createElement("input", {
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-search-row" }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
           className: "jrn-picker-search",
           type: "text",
           autoFocus: true,
@@ -4796,8 +4578,8 @@
           onChange: function(e) {
             setQuery(e.target.value);
           }
-        })
-      );
+        }
+      ));
     }
     function filterByText(items, getText) {
       var q = query.trim().toLowerCase();
@@ -4818,30 +4600,11 @@
       var filtered = filterByText(bms, function(b) {
         return (b.label || "") + " " + (b.thought || "") + " " + (sourceLabel(b.hlKey) || "");
       });
-      return React.createElement(
-        React.Fragment,
-        null,
-        searchPill(),
-        React.createElement(
-          "div",
-          { className: "jrn-picker-results" },
-          filtered.length === 0 ? React.createElement("div", { className: "jrn-picker-empty" }, bms.length === 0 ? "No bookmarks yet." : "No matches.") : filtered.map(function(b) {
-            return React.createElement(
-              "button",
-              { key: b.id, type: "button", className: "jrn-picker-item", onClick: function() {
-                chooseBookmark(b);
-              } },
-              React.createElement("span", { className: "jrn-picker-spine" }, "BK"),
-              React.createElement(
-                "span",
-                { className: "jrn-picker-text" },
-                React.createElement("span", { className: "jrn-picker-label" }, b.label || "Bookmark"),
-                React.createElement("span", { className: "jrn-picker-cat" }, sourceLabel(b.hlKey))
-              )
-            );
-          })
-        )
-      );
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, searchPill(), /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-results" }, filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-empty" }, bms.length === 0 ? "No bookmarks yet." : "No matches.") : filtered.map(function(b) {
+        return /* @__PURE__ */ React.createElement("button", { key: b.id, type: "button", className: "jrn-picker-item", onClick: function() {
+          chooseBookmark(b);
+        } }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-spine" }, "BK"), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-text" }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-label" }, b.label || "Bookmark"), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-cat" }, sourceLabel(b.hlKey))));
+      })));
     }
     function renderNotePicker() {
       var notes = [];
@@ -4868,37 +4631,18 @@
         }
         return (n.body || "") + " " + (n.fullText || "") + " " + src;
       });
-      return React.createElement(
-        React.Fragment,
-        null,
-        searchPill(),
-        React.createElement(
-          "div",
-          { className: "jrn-picker-results" },
-          filtered.length === 0 ? React.createElement("div", { className: "jrn-picker-empty" }, notes.length === 0 ? "No notes yet." : "No matches.") : filtered.slice(0, 200).map(function(n) {
-            var anchor = (n.fullText || "").substring(0, 80);
-            var label = (n.body || "").substring(0, 60) || anchor || "Note";
-            var src = "";
-            try {
-              src = noteLabel(n);
-            } catch (e) {
-            }
-            return React.createElement(
-              "button",
-              { key: n.groupId, type: "button", className: "jrn-picker-item", onClick: function() {
-                chooseNote(n);
-              } },
-              React.createElement("span", { className: "jrn-picker-spine" }, "NT"),
-              React.createElement(
-                "span",
-                { className: "jrn-picker-text" },
-                React.createElement("span", { className: "jrn-picker-label", style: { fontStyle: "italic", textTransform: "none", fontFamily: "EB Garamond, serif" } }, label),
-                React.createElement("span", { className: "jrn-picker-cat" }, src)
-              )
-            );
-          })
-        )
-      );
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, searchPill(), /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-results" }, filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-empty" }, notes.length === 0 ? "No notes yet." : "No matches.") : filtered.slice(0, 200).map(function(n) {
+        var anchor = (n.fullText || "").substring(0, 80);
+        var label = (n.body || "").substring(0, 60) || anchor || "Note";
+        var src = "";
+        try {
+          src = noteLabel(n);
+        } catch (e) {
+        }
+        return /* @__PURE__ */ React.createElement("button", { key: n.groupId, type: "button", className: "jrn-picker-item", onClick: function() {
+          chooseNote(n);
+        } }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-spine" }, "NT"), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-text" }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-label", style: { fontStyle: "italic", textTransform: "none", fontFamily: "EB Garamond, serif" } }, label), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-cat" }, src)));
+      })));
     }
     function renderJournalPicker() {
       var entries = [];
@@ -4925,46 +4669,27 @@
         var tags = (e.tags || []).join(" ");
         return title + " " + preview + " " + tags;
       });
-      return React.createElement(
-        React.Fragment,
-        null,
-        searchPill(),
-        React.createElement(
-          "div",
-          { className: "jrn-picker-results" },
-          filtered.length === 0 ? React.createElement("div", { className: "jrn-picker-empty" }, entries.length === 0 ? "No other journal entries yet." : "No matches.") : filtered.map(function(e) {
-            var title = "";
-            var preview = "";
-            try {
-              title = JournalHelpers.entryDisplayTitle(e) || "Untitled";
-            } catch (err) {
-              title = "Untitled";
-            }
-            try {
-              preview = JournalHelpers.previewText(e, 80) || "";
-            } catch (err) {
-            }
-            var dateStr = "";
-            try {
-              dateStr = JournalHelpers.shortDate(e.created);
-            } catch (err) {
-            }
-            return React.createElement(
-              "button",
-              { key: e.id, type: "button", className: "jrn-picker-item", onClick: function() {
-                chooseJournal(e);
-              } },
-              React.createElement("span", { className: "jrn-picker-spine" }, "JR"),
-              React.createElement(
-                "span",
-                { className: "jrn-picker-text" },
-                React.createElement("span", { className: "jrn-picker-label" }, title),
-                React.createElement("span", { className: "jrn-picker-cat" }, dateStr + (preview ? " \xB7 " + preview : ""))
-              )
-            );
-          })
-        )
-      );
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, searchPill(), /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-results" }, filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-empty" }, entries.length === 0 ? "No other journal entries yet." : "No matches.") : filtered.map(function(e) {
+        var title = "";
+        var preview = "";
+        try {
+          title = JournalHelpers.entryDisplayTitle(e) || "Untitled";
+        } catch (err) {
+          title = "Untitled";
+        }
+        try {
+          preview = JournalHelpers.previewText(e, 80) || "";
+        } catch (err) {
+        }
+        var dateStr = "";
+        try {
+          dateStr = JournalHelpers.shortDate(e.created);
+        } catch (err) {
+        }
+        return /* @__PURE__ */ React.createElement("button", { key: e.id, type: "button", className: "jrn-picker-item", onClick: function() {
+          chooseJournal(e);
+        } }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-spine" }, "JR"), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-text" }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-label" }, title), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-cat" }, dateStr + (preview ? " \xB7 " + preview : ""))));
+      })));
     }
     function renderJournalBlockPicker() {
       var e = drilledEntry;
@@ -4977,69 +4702,34 @@
       } catch (err) {
       }
       var title = JournalHelpers.entryDisplayTitle(fresh) || "Untitled";
-      return React.createElement(
-        React.Fragment,
-        null,
-        React.createElement(
-          "div",
-          { className: "jrn-blockpick-header" },
-          React.createElement("div", { className: "jrn-blockpick-title" }, title),
-          React.createElement("div", { className: "jrn-blockpick-date" }, dateStr)
-        ),
-        // Whole-entry option pinned at the top
-        React.createElement(
-          "div",
-          { className: "jrn-picker-results", style: { paddingBottom: 0 } },
-          React.createElement(
-            "button",
-            {
-              type: "button",
-              className: "jrn-picker-item jrn-blockpick-whole",
-              onClick: function() {
-                chooseWholeEntry(fresh);
-              }
-            },
-            React.createElement("span", { className: "jrn-picker-spine" }, "JR"),
-            React.createElement(
-              "span",
-              { className: "jrn-picker-text" },
-              React.createElement("span", { className: "jrn-picker-label" }, "Link the Whole Entry"),
-              React.createElement("span", { className: "jrn-picker-cat" }, "Inserts a card that opens this entry")
-            )
-          )
-        ),
-        React.createElement("div", { className: "jrn-blockpick-divider" }, "or pick a specific block"),
-        React.createElement(
-          "div",
-          { className: "jrn-picker-results" },
-          blocks.length === 0 ? React.createElement("div", { className: "jrn-picker-empty" }, "This entry has no embeddable blocks yet.") : blocks.map(function(b) {
-            var spine = b.type === "image" ? "IMG" : b.type === "audio" ? "REC" : b.type === "quote" ? "\u201C \u201D" : b.type === "h2" ? "H" : "TXT";
-            var desc = JournalHelpers.describeBlock(b);
-            return React.createElement(
-              "button",
-              {
-                key: b.id,
-                type: "button",
-                className: "jrn-picker-item",
-                onClick: function() {
-                  chooseEntryBlock(fresh, b);
-                }
-              },
-              React.createElement("span", { className: "jrn-picker-spine" }, spine),
-              React.createElement(
-                "span",
-                { className: "jrn-picker-text" },
-                React.createElement(
-                  "span",
-                  { className: "jrn-picker-label" },
-                  b.type === "image" ? "Image" : b.type === "audio" ? "Voice Recording" : "Text Excerpt"
-                ),
-                React.createElement("span", { className: "jrn-picker-cat" }, desc)
-              )
-            );
-          })
-        )
-      );
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "jrn-blockpick-header" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-blockpick-title" }, title), /* @__PURE__ */ React.createElement("div", { className: "jrn-blockpick-date" }, dateStr)), /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-results", style: { paddingBottom: 0 } }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          type: "button",
+          className: "jrn-picker-item jrn-blockpick-whole",
+          onClick: function() {
+            chooseWholeEntry(fresh);
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-spine" }, "JR"),
+        /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-text" }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-label" }, "Link the Whole Entry"), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-cat" }, "Inserts a card that opens this entry"))
+      )), /* @__PURE__ */ React.createElement("div", { className: "jrn-blockpick-divider" }, "or pick a specific block"), /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-results" }, blocks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-empty" }, "This entry has no embeddable blocks yet.") : blocks.map(function(b) {
+        var spine = b.type === "image" ? "IMG" : b.type === "audio" ? "REC" : b.type === "quote" ? "\u201C \u201D" : b.type === "h2" ? "H" : "TXT";
+        var desc = JournalHelpers.describeBlock(b);
+        return /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: b.id,
+            type: "button",
+            className: "jrn-picker-item",
+            onClick: function() {
+              chooseEntryBlock(fresh, b);
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-spine" }, spine),
+          /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-text" }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-label" }, b.type === "image" ? "Image" : b.type === "audio" ? "Voice Recording" : "Text Excerpt"), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-cat" }, desc))
+        );
+      })));
     }
     function renderNotebookPicker() {
       var nbs = typeof NotebookStore !== "undefined" ? NotebookStore.list() : [];
@@ -5061,31 +4751,12 @@
       if (q) rows = rows.filter(function(nb) {
         return (nb.name || "").toLowerCase().indexOf(q) >= 0;
       });
-      return React.createElement(
-        React.Fragment,
-        null,
-        searchPill(),
-        React.createElement(
-          "div",
-          { className: "jrn-picker-results" },
-          rows.length === 0 ? React.createElement("div", { className: "jrn-picker-empty" }, nbs.length === 0 ? "No notebooks yet \u2014 Uncategorized is always available." : "No matches.") : rows.map(function(nb) {
-            var cnt = noteCount(nb.id);
-            return React.createElement(
-              "button",
-              { key: nb.id, type: "button", className: "jrn-picker-item", onClick: function() {
-                chooseNotebook(nb.id);
-              } },
-              React.createElement("span", { className: "jrn-picker-spine" }, "NB"),
-              React.createElement(
-                "span",
-                { className: "jrn-picker-text" },
-                React.createElement("span", { className: "jrn-picker-label" }, nb.name),
-                React.createElement("span", { className: "jrn-picker-cat" }, cnt + (cnt === 1 ? " note" : " notes"))
-              )
-            );
-          })
-        )
-      );
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, searchPill(), /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-results" }, rows.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-empty" }, nbs.length === 0 ? "No notebooks yet \u2014 Uncategorized is always available." : "No matches.") : rows.map(function(nb) {
+        var cnt = noteCount(nb.id);
+        return /* @__PURE__ */ React.createElement("button", { key: nb.id, type: "button", className: "jrn-picker-item", onClick: function() {
+          chooseNotebook(nb.id);
+        } }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-spine" }, "NB"), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-text" }, /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-label" }, nb.name), /* @__PURE__ */ React.createElement("span", { className: "jrn-picker-cat" }, cnt + (cnt === 1 ? " note" : " notes"))));
+      })));
     }
     function titleStr() {
       if (mode === "pick-bookmark") return "Pick Bookmark";
@@ -5110,29 +4781,14 @@
         setMode("pick-journal");
       } else setMode("menu");
     }
-    return React.createElement(
-      "div",
-      { className: "note-sheet-overlay", onClick: function(e) {
-        if (e.target === e.currentTarget) close();
-      } },
-      React.createElement(
-        "div",
-        { className: "note-sheet jrn-insert-sheet", onClick: function(e) {
-          e.stopPropagation();
-        }, style: { maxWidth: "480px" } },
-        React.createElement(
-          "div",
-          { className: "note-sheet-header" },
-          mode !== "menu" && React.createElement("button", { className: "note-sheet-menu-btn", onClick: back, "aria-label": "Back", style: { fontSize: "18px" } }, "\u2039"),
-          React.createElement("span", { className: "note-sheet-title", style: { flex: 1 } }, titleStr()),
-          React.createElement("button", { className: "note-sheet-menu-btn", onClick: close, "aria-label": "Close", style: { fontSize: "18px" } }, "\xD7")
-        ),
-        body()
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "note-sheet-overlay", onClick: function(e) {
+      if (e.target === e.currentTarget) close();
+    } }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet jrn-insert-sheet", onClick: function(e) {
+      e.stopPropagation();
+    }, style: { maxWidth: "480px" } }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet-header" }, mode !== "menu" && /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-btn", onClick: back, "aria-label": "Back", style: { fontSize: "18px" } }, "\u2039"), /* @__PURE__ */ React.createElement("span", { className: "note-sheet-title", style: { flex: 1 } }, titleStr()), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-btn", onClick: close, "aria-label": "Close", style: { fontSize: "18px" } }, "\xD7")), body()));
   }
 
-  // app/src/main/assets/src/ui/sheets/JournalNotebookSheet.js
+  // app/src/main/assets/src/ui/sheets/JournalNotebookSheet.jsx
   function JournalNotebookSheet({ entryId, memberIds, onClose, onChanged }) {
     var useState = React.useState;
     var useEffect = React.useEffect;
@@ -5194,100 +4850,73 @@
       setConfirmDelete(null);
       reload();
     }
-    return React.createElement(
-      "div",
-      { className: "nb-picker-overlay", onClick: onClose },
-      React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "nb-picker-overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker", onClick: function(e) {
+      e.stopPropagation();
+    } }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker-header" }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-title" }, members.size > 0 ? "Manage Notebooks" : "Add to Notebook"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")), /* @__PURE__ */ React.createElement("div", { className: "nb-picker-new" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        ref: inputRef,
+        className: "nb-picker-new-input",
+        type: "text",
+        placeholder: "New notebook name\u2026",
+        value: newName,
+        onChange: function(e) {
+          setNewName(e.target.value);
+        },
+        onKeyDown: function(e) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            createNotebook();
+          }
+        },
+        maxLength: 60
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "nb-picker-new-btn" + (newName.trim() ? "" : " disabled"),
+        onClick: createNotebook,
+        disabled: !newName.trim()
+      },
+      "Create"
+    )), notebooks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : /* @__PURE__ */ React.createElement("div", { className: "nb-picker-list" }, notebooks.map(function(nb) {
+      if (confirmDelete === nb.id) {
+        return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, 'Delete "', nb.name, '"? Entries will move to Uncategorized.'), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
+          setConfirmDelete(null);
+        } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: function() {
+          deleteNb(nb.id);
+        } }, "Yes, delete"));
+      }
+      var checked = members.has(nb.id);
+      return /* @__PURE__ */ React.createElement(
         "div",
-        { className: "nb-picker", onClick: function(e) {
-          e.stopPropagation();
-        } },
-        React.createElement(
-          "div",
-          { className: "nb-picker-header" },
-          React.createElement("span", { className: "nb-picker-title" }, members.size > 0 ? "Manage Notebooks" : "Add to Notebook"),
-          React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")
-        ),
-        React.createElement(
-          "div",
-          { className: "nb-picker-new" },
-          React.createElement("input", {
-            ref: inputRef,
-            className: "nb-picker-new-input",
-            type: "text",
-            placeholder: "New notebook name\u2026",
-            value: newName,
-            onChange: function(e) {
-              setNewName(e.target.value);
+        {
+          key: nb.id,
+          className: "nb-picker-row" + (checked ? " checked" : ""),
+          onClick: function() {
+            toggle(nb.id);
+          },
+          role: "button"
+        },
+        /* @__PURE__ */ React.createElement("span", { className: "nb-picker-check" }, checked && /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))),
+        /* @__PURE__ */ React.createElement("span", { className: "nb-picker-row-name" }, nb.name),
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "nb-picker-row-delete",
+            onClick: function(e) {
+              e.stopPropagation();
+              setConfirmDelete(nb.id);
             },
-            onKeyDown: function(e) {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                createNotebook();
-              }
-            },
-            maxLength: 60
-          }),
-          React.createElement("button", {
-            className: "nb-picker-new-btn" + (newName.trim() ? "" : " disabled"),
-            onClick: createNotebook,
-            disabled: !newName.trim()
-          }, "Create")
-        ),
-        notebooks.length === 0 ? React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : React.createElement(
-          "div",
-          { className: "nb-picker-list" },
-          notebooks.map(function(nb) {
-            if (confirmDelete === nb.id) {
-              return React.createElement(
-                "div",
-                { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } },
-                React.createElement("span", { className: "ann-chip-confirm-q" }, 'Delete "', nb.name, '"? Entries will move to Uncategorized.'),
-                React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
-                  setConfirmDelete(null);
-                } }, "Cancel"),
-                React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: function() {
-                  deleteNb(nb.id);
-                } }, "Yes, delete")
-              );
-            }
-            var checked = members.has(nb.id);
-            return React.createElement(
-              "div",
-              {
-                key: nb.id,
-                className: "nb-picker-row" + (checked ? " checked" : ""),
-                onClick: function() {
-                  toggle(nb.id);
-                },
-                role: "button"
-              },
-              React.createElement(
-                "span",
-                { className: "nb-picker-check" },
-                checked && React.createElement(
-                  "svg",
-                  { viewBox: "0 0 24 24" },
-                  React.createElement("polyline", { points: "20 6 9 17 4 12" })
-                )
-              ),
-              React.createElement("span", { className: "nb-picker-row-name" }, nb.name),
-              React.createElement("button", {
-                className: "nb-picker-row-delete",
-                onClick: function(e) {
-                  e.stopPropagation();
-                  setConfirmDelete(nb.id);
-                },
-                "aria-label": "Delete notebook"
-              }, "\xD7")
-            );
-          })
+            "aria-label": "Delete notebook"
+          },
+          "\xD7"
         )
-      )
-    );
+      );
+    }))));
   }
 
-  // app/src/main/assets/src/ui/sheets/JournalInboundSheet.js
+  // app/src/main/assets/src/ui/sheets/JournalInboundSheet.jsx
   function JournalInboundSheet({ refKey, resourceLabel, onClose, onOpenEntry }) {
     var ids = typeof JournalIndexStore !== "undefined" ? JournalIndexStore.entriesReferencing(refKey) : [];
     var entries = ids.map(function(id) {
@@ -5298,45 +4927,27 @@
       return (b.updated || b.created || 0) - (a.updated || a.created || 0);
     });
     var headerText = entries.length === 1 ? "1 journal entry" : entries.length + " journal entries";
-    return React.createElement(
-      "div",
-      { className: "note-sheet-overlay", onClick: function(e) {
-        if (e.target === e.currentTarget) onClose && onClose();
-      } },
-      React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "note-sheet-overlay", onClick: (e) => {
+      if (e.target === e.currentTarget) onClose && onClose();
+    } }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet", onClick: (e) => {
+      e.stopPropagation();
+    }, style: { maxWidth: "480px" } }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet-header" }, /* @__PURE__ */ React.createElement("span", { className: "note-sheet-title", style: { flex: 1 } }, headerText, resourceLabel ? " \xB7 " + resourceLabel : ""), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-btn", onClick: onClose, "aria-label": "Close", style: { fontSize: "18px" } }, "\xD7")), entries.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: "40px 20px", textAlign: "center", fontStyle: "italic", color: "var(--cream-dim)", fontFamily: "EB Garamond, serif" } }, "No journal entries reference this yet.") : /* @__PURE__ */ React.createElement("div", { className: "jrn-inbound-list" }, entries.map(function(e) {
+      var title = JournalHelpers.entryDisplayTitle(e) || "Untitled";
+      return /* @__PURE__ */ React.createElement(
         "div",
-        { className: "note-sheet", onClick: function(e) {
-          e.stopPropagation();
-        }, style: { maxWidth: "480px" } },
-        React.createElement(
-          "div",
-          { className: "note-sheet-header" },
-          React.createElement("span", { className: "note-sheet-title", style: { flex: 1 } }, headerText, resourceLabel ? " \xB7 " + resourceLabel : ""),
-          React.createElement("button", { className: "note-sheet-menu-btn", onClick: onClose, "aria-label": "Close", style: { fontSize: "18px" } }, "\xD7")
-        ),
-        entries.length === 0 ? React.createElement("div", { style: { padding: "40px 20px", textAlign: "center", fontStyle: "italic", color: "var(--cream-dim)", fontFamily: "EB Garamond, serif" } }, "No journal entries reference this yet.") : React.createElement(
-          "div",
-          { className: "jrn-inbound-list" },
-          entries.map(function(e) {
-            var title = JournalHelpers.entryDisplayTitle(e) || "Untitled";
-            return React.createElement(
-              "div",
-              {
-                key: e.id,
-                className: "jrn-inbound-item",
-                role: "button",
-                onClick: function() {
-                  onOpenEntry && onOpenEntry(e);
-                }
-              },
-              React.createElement("div", { className: "jrn-inbound-title" }, title),
-              React.createElement("div", { className: "jrn-inbound-date" }, JournalHelpers.longDate(e.updated || e.created)),
-              React.createElement("div", { className: "jrn-inbound-preview" }, JournalHelpers.previewText(e, 100))
-            );
-          })
-        )
-      )
-    );
+        {
+          key: e.id,
+          className: "jrn-inbound-item",
+          role: "button",
+          onClick: () => {
+            onOpenEntry && onOpenEntry(e);
+          }
+        },
+        /* @__PURE__ */ React.createElement("div", { className: "jrn-inbound-title" }, title),
+        /* @__PURE__ */ React.createElement("div", { className: "jrn-inbound-date" }, JournalHelpers.longDate(e.updated || e.created)),
+        /* @__PURE__ */ React.createElement("div", { className: "jrn-inbound-preview" }, JournalHelpers.previewText(e, 100))
+      );
+    }))));
   }
 
   // app/src/main/assets/src/ui/screens/JournalHubScreen.js

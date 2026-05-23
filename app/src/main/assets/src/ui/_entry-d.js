@@ -144,19 +144,19 @@ import {
 } from './screens/HighlightsScreen.js';
 
 // ── Sheets ──────────────────────────────────────────────────────────────
-import { TabsOverview } from './sheets/TabsOverview.js';
-import { TabActionSheet } from './sheets/TabActionSheet.js';
-import { MultiNotePopover } from './sheets/MultiNotePopover.js';
-import { NotebookPickerSheet } from './sheets/NotebookPickerSheet.js';
-import { NoteSheet } from './sheets/NoteSheet.js';
-import { LetterExcerptPickerScreen } from './sheets/LetterExcerptPickerScreen.js';
-import { VersePickerScreen } from './sheets/VersePickerScreen.js';
-import { LinkPicker } from './sheets/LinkPicker.js';
-import { LinkSidebar } from './sheets/LinkSidebar.js';
-import { SelectionToolbar } from './sheets/SelectionToolbar.js';
-import { AnnotationActionChip } from './sheets/AnnotationActionChip.js';
-import { BookmarkCreateSheet } from './sheets/BookmarkCreateSheet.js';
-import { NotebookManagerSheet } from './sheets/NotebookManagerSheet.js';
+import { TabsOverview } from './sheets/TabsOverview.jsx';
+import { TabActionSheet } from './sheets/TabActionSheet.jsx';
+import { MultiNotePopover } from './sheets/MultiNotePopover.jsx';
+import { NotebookPickerSheet } from './sheets/NotebookPickerSheet.jsx';
+import { NoteSheet } from './sheets/NoteSheet.jsx';
+import { LetterExcerptPickerScreen } from './sheets/LetterExcerptPickerScreen.jsx';
+import { VersePickerScreen } from './sheets/VersePickerScreen.jsx';
+import { LinkPicker } from './sheets/LinkPicker.jsx';
+import { LinkSidebar } from './sheets/LinkSidebar.jsx';
+import { SelectionToolbar } from './sheets/SelectionToolbar.jsx';
+import { AnnotationActionChip } from './sheets/AnnotationActionChip.jsx';
+import { BookmarkCreateSheet } from './sheets/BookmarkCreateSheet.jsx';
+import { NotebookManagerSheet } from './sheets/NotebookManagerSheet.jsx';
 
 // ── Expose every public symbol on window ────────────────────────────────
 // Bridges the ES-module Cluster D to its classic-script consumers (the

@@ -1,12 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   SelectionToolbar — extracted React screen component
-   ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Self-contained — uses React.useX hooks directly (no dependency on the
-   inline script's `const { useState, ... } = React` destructuring).
-   All other call-time dependencies (Segments, FootnoteSheet, ScreenLayout,
-   findEntryContext, applyDOMHighlights, etc.) are global-lexical and
-   resolve at render time from the surrounding scripts.
+   SelectionToolbar — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onBookmarkRequest }) {
@@ -439,13 +432,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
       }
     }
     // Build/refresh the NoteStore record — but only if at least one
-    // segment actually exists for this groupId. The multi-container loop
-    // above skips any container whose snapped range collapses to empty;
-    // if ALL containers did so, no segments got added and we'd otherwise
-    // persist a phantom note with empty keys[] and fullText that's
-    // unremovable through the UI (row tap routes through noteSourceNav
-    // which returns null for keys:[], and the sheet returns null because
-    // segs.length === 0 → closes instantly).
+    // segment actually exists for this groupId.
     const segs = AnnotationStore.getByGroup(groupId);
     if (segs.length === 0) {
       window.getSelection().removeAllRanges();
@@ -513,10 +500,8 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
     //      the source container and a valid offset range. Keeps the label
     //      tidy when the user's drag ends mid-word.
     //   2. Raw selInfo.text fallback — needed for multi-container
-    //      selections (start/end are 0 in that branch — see the
-    //      setSelInfo({hlKey:null,start:0,end:0,...}) call in the
-    //      SelectionToolbar's compute path) and for the rare case where
-    //      the container DOM has unmounted between selection and tap.
+    //      selections (start/end are 0 in that branch) and for the rare case
+    //      where the container DOM has unmounted between selection and tap.
     //   3. Source-style fallback ("Bookmark in <Title>") only if both
     //      above produced nothing — defensive last resort.
     var labelText = '';
@@ -593,8 +578,6 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
 
   if (!visible || !selInfo) return null;
 
-  const svgIcon = (paths, extra) => React.createElement("svg", Object.assign({ viewBox: "0 0 24 24" }, extra || {}), paths);
-
   // Style label preview: the colored "A" varies based on activeStyle
   const styleAClass = (color) => 'sel-style-A sel-style-A-' + (activeStyle === 'underline' ? 'underline' : 'fill') + ' sel-style-A-' + color;
 
@@ -607,89 +590,107 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
     return HighlightStore.get(c.dataset.hlKey).length > 0;
   });
 
-  return React.createElement("div", {
-    ref: toolbarRef,
-    className: "sel-toolbar",
-    style: { left: pos.x, top: pos.y, transform: 'translateY(-100%)' },
-    onPointerDown: (e) => { e.stopPropagation(); suppressRef.current = true; },
-    onPointerUp: () => { setTimeout(() => { suppressRef.current = false; }, 300); }
-  },
-    // Top row: style toggle + colors
-    showColors && React.createElement("div", { className: "sel-toolbar-row sel-toolbar-styles" },
-      React.createElement("button", {
-        className: "sel-style-btn" + (activeStyle === 'highlight' ? ' active' : ''),
-        onClick: () => setActiveStyle('highlight'),
-        title: "Highlight"
-      }, "A"),
-      React.createElement("button", {
-        className: "sel-style-btn sel-style-btn-underline" + (activeStyle === 'underline' ? ' active' : ''),
-        onClick: () => setActiveStyle('underline'),
-        title: "Underline"
-      }, "A"),
-      React.createElement("div", { className: "sel-toolbar-divider" }),
-      React.createElement("div", { className: "sel-toolbar-colors" },
-        HL_COLORS.map(c => React.createElement("button", {
-          key: c,
-          className: "sel-color-btn sel-color-" + activeStyle + (selInfo.existingHl && selInfo.existingHl.color === c && (selInfo.existingHl.kind || 'highlight') === activeStyle ? ' active' : ''),
-          "data-color": c,
-          onClick: () => applyHighlight(c),
-          title: c
-        })),
-        (selInfo.existingHl || mvHasExisting) && React.createElement("button", {
-          className: "sel-color-btn sel-color-clear",
-          onClick: removeHighlight,
-          title: "Remove highlight"
-        }, "✕")
-      )
-    ),
-    // Action buttons: note only for single-container; link + copy/share/search always
-    React.createElement("div", { className: "sel-toolbar-row sel-toolbar-actions" },
-      !mv && React.createElement("button", { className: "sel-action-btn", onClick: handleNote, title: "Note" },
-        svgIcon([
-          React.createElement("path", { key: "a", d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-          React.createElement("polyline", { key: "b", points: "14 2 14 8 20 8" }),
-          React.createElement("line", { key: "c", x1: "8", y1: "13", x2: "16", y2: "13" }),
-          React.createElement("line", { key: "d", x1: "8", y1: "17", x2: "16", y2: "17" })
-        ]),
-        React.createElement("span", null, "Note")
-      ),
-      showColors && React.createElement("button", { className: "sel-action-btn", onClick: handleLink, title: "Link" },
-        svgIcon([
-          React.createElement("path", { key: "a", d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
-          React.createElement("path", { key: "b", d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })
-        ]),
-        React.createElement("span", null, "Link")
-      ),
-      React.createElement("button", { className: "sel-action-btn", onClick: copyText, title: "Copy" },
-        svgIcon([
-          React.createElement("rect", { key: "a", x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
-          React.createElement("path", { key: "b", d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
-        ]),
-        React.createElement("span", null, "Copy")
-      ),
-      React.createElement("button", { className: "sel-action-btn", onClick: handleShare, title: "Share" },
-        svgIcon([
-          React.createElement("circle", { key: "a", cx: "18", cy: "5", r: "3" }),
-          React.createElement("circle", { key: "b", cx: "6", cy: "12", r: "3" }),
-          React.createElement("circle", { key: "c", cx: "18", cy: "19", r: "3" }),
-          React.createElement("line", { key: "d", x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }),
-          React.createElement("line", { key: "e", x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" })
-        ]),
-        React.createElement("span", null, "Share")
-      ),
-      React.createElement("button", { className: "sel-action-btn", onClick: handleSearch, title: "Search" },
-        svgIcon([
-          React.createElement("circle", { key: "a", cx: "11", cy: "11", r: "8" }),
-          React.createElement("line", { key: "b", x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
-        ]),
-        React.createElement("span", null, "Search")
-      ),
-      React.createElement("button", { className: "sel-action-btn", onClick: handleBookmark, title: "Bookmark" },
-        svgIcon([
-          React.createElement("path", { key: "a", d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" })
-        ]),
-        React.createElement("span", null, "Bookmark")
-      )
-    )
+  return (
+    <div
+      ref={toolbarRef}
+      className="sel-toolbar"
+      style={{ left: pos.x, top: pos.y, transform: 'translateY(-100%)' }}
+      onPointerDown={(e) => { e.stopPropagation(); suppressRef.current = true; }}
+      onPointerUp={() => { setTimeout(() => { suppressRef.current = false; }, 300); }}
+    >
+      {/* Top row: style toggle + colors */}
+      {showColors && (
+        <div className="sel-toolbar-row sel-toolbar-styles">
+          <button
+            className={"sel-style-btn" + (activeStyle === 'highlight' ? ' active' : '')}
+            onClick={() => setActiveStyle('highlight')}
+            title="Highlight"
+          >
+            A
+          </button>
+          <button
+            className={"sel-style-btn sel-style-btn-underline" + (activeStyle === 'underline' ? ' active' : '')}
+            onClick={() => setActiveStyle('underline')}
+            title="Underline"
+          >
+            A
+          </button>
+          <div className="sel-toolbar-divider" />
+          <div className="sel-toolbar-colors">
+            {HL_COLORS.map(c => (
+              <button
+                key={c}
+                className={"sel-color-btn sel-color-" + activeStyle + (selInfo.existingHl && selInfo.existingHl.color === c && (selInfo.existingHl.kind || 'highlight') === activeStyle ? ' active' : '')}
+                data-color={c}
+                onClick={() => applyHighlight(c)}
+                title={c}
+              />
+            ))}
+            {(selInfo.existingHl || mvHasExisting) && (
+              <button
+                className="sel-color-btn sel-color-clear"
+                onClick={removeHighlight}
+                title="Remove highlight"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Action buttons: note only for single-container; link + copy/share/search always */}
+      <div className="sel-toolbar-row sel-toolbar-actions">
+        {!mv && (
+          <button className="sel-action-btn" onClick={handleNote} title="Note">
+            <svg viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="8" y1="13" x2="16" y2="13" />
+              <line x1="8" y1="17" x2="16" y2="17" />
+            </svg>
+            <span>Note</span>
+          </button>
+        )}
+        {showColors && (
+          <button className="sel-action-btn" onClick={handleLink} title="Link">
+            <svg viewBox="0 0 24 24">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+            <span>Link</span>
+          </button>
+        )}
+        <button className="sel-action-btn" onClick={copyText} title="Copy">
+          <svg viewBox="0 0 24 24">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          <span>Copy</span>
+        </button>
+        <button className="sel-action-btn" onClick={handleShare} title="Share">
+          <svg viewBox="0 0 24 24">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+          <span>Share</span>
+        </button>
+        <button className="sel-action-btn" onClick={handleSearch} title="Search">
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span>Search</span>
+        </button>
+        <button className="sel-action-btn" onClick={handleBookmark} title="Bookmark">
+          <svg viewBox="0 0 24 24">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+          </svg>
+          <span>Bookmark</span>
+        </button>
+      </div>
+    </div>
   );
 }

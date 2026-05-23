@@ -87,10 +87,10 @@ import {
 import { linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna } from '../data/letter-linking.js';
 
 // ── Journal UI (sheets) ─────────────────────────────────────────────────
-import { JournalRecordingSheet } from '../ui/sheets/JournalRecordingSheet.js';
-import { JournalInsertSheet } from '../ui/sheets/JournalInsertSheet.js';
-import { JournalNotebookSheet } from '../ui/sheets/JournalNotebookSheet.js';
-import { JournalInboundSheet } from '../ui/sheets/JournalInboundSheet.js';
+import { JournalRecordingSheet } from '../ui/sheets/JournalRecordingSheet.jsx';
+import { JournalInsertSheet } from '../ui/sheets/JournalInsertSheet.jsx';
+import { JournalNotebookSheet } from '../ui/sheets/JournalNotebookSheet.jsx';
+import { JournalInboundSheet } from '../ui/sheets/JournalInboundSheet.jsx';
 
 // ── Journal UI (screens) ────────────────────────────────────────────────
 import * as HubScreen from '../ui/screens/JournalHubScreen.js';

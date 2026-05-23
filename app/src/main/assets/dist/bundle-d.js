@@ -7893,7 +7893,7 @@
     );
   }
 
-  // app/src/main/assets/src/ui/sheets/TabsOverview.js
+  // app/src/main/assets/src/ui/sheets/TabsOverview.jsx
   function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onLongPress, onClearAll, clearAllStage, onDedupe, MAX_TABS, thumbnails }) {
     const total = tabs.length;
     const handleLongPress = React.useRef(null);
@@ -7925,129 +7925,80 @@
     const resetClearOnOutsideTap = (e) => {
       if (clearAllStage > 0) onClearAll && onClearAll(-1);
     };
-    return /* @__PURE__ */ React.createElement(
-      "div",
-      { className: "tabs-overview", onClick: resetClearOnOutsideTap },
-      /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "tabs-overview", onClick: resetClearOnOutsideTap }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-header" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-eyebrow" }, "Reading Places"), /* @__PURE__ */ React.createElement("h1", { className: "tabs-overview-title" }, "Tabs"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-diamond" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-meta" }, total, " / ", MAX_TABS, " ", total === 1 ? "tab" : "tabs", " open"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-actions" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: clearClassLocal,
+        onClick: (e) => {
+          e.stopPropagation();
+          onClearAll();
+        },
+        disabled: total <= 1 && clearAllStage === 0
+      },
+      clearLabelLocal
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "tabs-action-btn",
+        onClick: (e) => {
+          e.stopPropagation();
+          onDedupe();
+        },
+        disabled: dupeCount === 0,
+        title: dupeCount === 0 ? "No duplicate tabs" : `Merge ${dupeCount} duplicate ${dupeCount === 1 ? "tab" : "tabs"}`
+      },
+      "Deduplicate",
+      dupeCount > 0 ? ` \xB7 ${dupeCount}` : ""
+    ))), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-grid" }, tabs.map((t, i) => {
+      const { title, subtitle } = describeTab(t);
+      const scrollKey = scrollKeyForTab(t);
+      const saved = t.scrollPositions && t.scrollPositions[scrollKey];
+      const pctLive = saved == null ? 0 : typeof saved === "object" && typeof saved.pct === "number" ? saved.pct : 0;
+      const isActive = i === activeTabIdx;
+      const thumb = thumbnails ? thumbnails[tabContentKey(t)] : null;
+      return /* @__PURE__ */ React.createElement(
         "div",
-        { className: "tabs-overview-header" },
-        /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-eyebrow" }, "Reading Places"),
-        /* @__PURE__ */ React.createElement("h1", { className: "tabs-overview-title" }, "Tabs"),
+        {
+          key: i,
+          className: `tab-card${isActive ? " active" : ""}${thumb ? " has-thumb" : ""}`,
+          onClick: () => onSelect(i),
+          onTouchStart: startLongPress(i),
+          onTouchEnd: cancelLongPress,
+          onTouchMove: cancelLongPress,
+          onMouseDown: startLongPress(i),
+          onMouseUp: cancelLongPress,
+          onMouseLeave: cancelLongPress
+        },
         /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "tabs-overview-ornament" },
-          /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line" }),
-          /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-diamond" }, "\u2726"),
-          /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line r" })
-        ),
-        /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-meta" }, total, " / ", MAX_TABS, " ", total === 1 ? "tab" : "tabs", " open"),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "tabs-overview-actions" },
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              className: clearClassLocal,
-              onClick: (e) => {
-                e.stopPropagation();
-                onClearAll();
-              },
-              disabled: total <= 1 && clearAllStage === 0
-            },
-            clearLabelLocal
-          ),
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              className: "tabs-action-btn",
-              onClick: (e) => {
-                e.stopPropagation();
-                onDedupe();
-              },
-              disabled: dupeCount === 0,
-              title: dupeCount === 0 ? "No duplicate tabs" : `Merge ${dupeCount} duplicate ${dupeCount === 1 ? "tab" : "tabs"}`
-            },
-            "Deduplicate",
-            dupeCount > 0 ? ` \xB7 ${dupeCount}` : ""
-          )
-        )
-      ),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "tabs-overview-grid" },
-        tabs.map((t, i) => {
-          const { title, subtitle } = describeTab(t);
-          const scrollKey = scrollKeyForTab(t);
-          const saved = t.scrollPositions && t.scrollPositions[scrollKey];
-          const pctLive = saved == null ? 0 : typeof saved === "object" && typeof saved.pct === "number" ? saved.pct : 0;
-          const isActive = i === activeTabIdx;
-          const thumb = thumbnails ? thumbnails[tabContentKey(t)] : null;
-          return /* @__PURE__ */ React.createElement(
-            "div",
-            {
-              key: i,
-              className: `tab-card${isActive ? " active" : ""}${thumb ? " has-thumb" : ""}`,
-              onClick: () => onSelect(i),
-              onTouchStart: startLongPress(i),
-              onTouchEnd: cancelLongPress,
-              onTouchMove: cancelLongPress,
-              onMouseDown: startLongPress(i),
-              onMouseUp: cancelLongPress,
-              onMouseLeave: cancelLongPress
-            },
-            /* @__PURE__ */ React.createElement(
-              "button",
-              {
-                className: "tab-card-close",
-                onClick: (e) => {
-                  e.stopPropagation();
-                  onClose(i);
-                },
-                title: "Close tab",
-                "aria-label": "Close tab"
-              },
-              "\xD7"
-            ),
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "tab-card-thumb-wrap" },
-              thumb ? /* @__PURE__ */ React.createElement("img", { className: "tab-card-thumb", src: thumb, alt: "" }) : /* @__PURE__ */ React.createElement(
-                "div",
-                { className: "tab-card-thumb-placeholder" },
-                /* @__PURE__ */ React.createElement("div", { className: "tab-card-thumb-sigil" }, "\u2726")
-              ),
-              /* @__PURE__ */ React.createElement("div", { className: "tab-card-thumb-scrim" })
-            ),
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "tab-card-body" },
-              /* @__PURE__ */ React.createElement("div", { className: "tab-card-eyebrow" }, "Tab ", i + 1, " / ", total),
-              /* @__PURE__ */ React.createElement("div", { className: "tab-card-title" }, title),
-              /* @__PURE__ */ React.createElement("div", { className: "tab-card-subtitle" }, subtitle),
-              tabHasProgressBar(t) && /* @__PURE__ */ React.createElement(
-                "div",
-                { className: "tab-card-progress" },
-                /* @__PURE__ */ React.createElement("div", { className: "tab-card-progress-fill", style: { width: `${Math.round(pctLive * 100)}%` } })
-              )
-            )
-          );
-        }),
-        total < MAX_TABS && /* @__PURE__ */ React.createElement(
           "button",
           {
-            className: "tab-card tab-card-new",
-            onClick: () => onNewTab(),
-            title: "New tab",
-            "aria-label": "New tab"
+            className: "tab-card-close",
+            onClick: (e) => {
+              e.stopPropagation();
+              onClose(i);
+            },
+            title: "Close tab",
+            "aria-label": "Close tab"
           },
-          /* @__PURE__ */ React.createElement("span", { className: "tab-card-new-plus" }, "+"),
-          /* @__PURE__ */ React.createElement("span", { className: "tab-card-new-label" }, "New Tab")
-        )
-      )
-    );
+          "\xD7"
+        ),
+        /* @__PURE__ */ React.createElement("div", { className: "tab-card-thumb-wrap" }, thumb ? /* @__PURE__ */ React.createElement("img", { className: "tab-card-thumb", src: thumb, alt: "" }) : /* @__PURE__ */ React.createElement("div", { className: "tab-card-thumb-placeholder" }, /* @__PURE__ */ React.createElement("div", { className: "tab-card-thumb-sigil" }, "\u2726")), /* @__PURE__ */ React.createElement("div", { className: "tab-card-thumb-scrim" })),
+        /* @__PURE__ */ React.createElement("div", { className: "tab-card-body" }, /* @__PURE__ */ React.createElement("div", { className: "tab-card-eyebrow" }, "Tab ", i + 1, " / ", total), /* @__PURE__ */ React.createElement("div", { className: "tab-card-title" }, title), /* @__PURE__ */ React.createElement("div", { className: "tab-card-subtitle" }, subtitle), tabHasProgressBar(t) && /* @__PURE__ */ React.createElement("div", { className: "tab-card-progress" }, /* @__PURE__ */ React.createElement("div", { className: "tab-card-progress-fill", style: { width: `${Math.round(pctLive * 100)}%` } })))
+      );
+    }), total < MAX_TABS && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "tab-card tab-card-new",
+        onClick: () => onNewTab(),
+        title: "New tab",
+        "aria-label": "New tab"
+      },
+      /* @__PURE__ */ React.createElement("span", { className: "tab-card-new-plus" }, "+"),
+      /* @__PURE__ */ React.createElement("span", { className: "tab-card-new-label" }, "New Tab")
+    )));
   }
 
-  // app/src/main/assets/src/ui/sheets/TabActionSheet.js
+  // app/src/main/assets/src/ui/sheets/TabActionSheet.jsx
   function TabActionSheet({ idx, total, onCloseOthers, onCloseToRight, onDismiss }) {
     if (idx == null) return null;
     const tabNum = idx + 1;
@@ -8060,81 +8011,44 @@
         window.__closeSheet = prev || null;
       };
     }, [onDismiss]);
-    return /* @__PURE__ */ React.createElement(
-      React.Fragment,
-      null,
-      /* @__PURE__ */ React.createElement("div", { className: "select-sheet-backdrop open", onClick: onDismiss }),
-      /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "select-sheet", onClick: (e) => e.stopPropagation() },
-        /* @__PURE__ */ React.createElement("div", { className: "select-sheet-handle" }),
-        /* @__PURE__ */ React.createElement("div", { className: "select-sheet-eyebrow" }, "Tab ", tabNum),
-        /* @__PURE__ */ React.createElement("div", { className: "select-sheet-title" }, "Tab actions"),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "select-sheet-ornament" },
-          /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line" }),
-          /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-diamond" }, "\u2726"),
-          /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line r" })
-        ),
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "select-sheet-options" },
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              className: "select-sheet-option",
-              disabled: !hasOthers,
-              style: !hasOthers ? { opacity: 0.42, cursor: "not-allowed" } : void 0,
-              onClick: hasOthers ? () => {
-                onCloseOthers();
-                onDismiss();
-              } : void 0
-            },
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "select-sheet-option-main" },
-              /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-label" }, "Close other tabs")
-            ),
-            /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-desc" }, "Keep only this tab open. ", hasOthers ? `${total - 1} other ${total - 1 === 1 ? "tab" : "tabs"} will be closed.` : "No other tabs to close.")
-          ),
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              className: "select-sheet-option",
-              disabled: !hasRightTabs,
-              style: !hasRightTabs ? { opacity: 0.42, cursor: "not-allowed" } : void 0,
-              onClick: hasRightTabs ? () => {
-                onCloseToRight();
-                onDismiss();
-              } : void 0
-            },
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "select-sheet-option-main" },
-              /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-label" }, "Close tabs to the right")
-            ),
-            /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-desc" }, hasRightTabs ? `Close ${total - tabNum} ${total - tabNum === 1 ? "tab" : "tabs"} after this one.` : "No tabs to the right.")
-          ),
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              className: "select-sheet-option",
-              onClick: onDismiss,
-              style: { borderStyle: "dashed" }
-            },
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "select-sheet-option-main" },
-              /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-label" }, "Cancel")
-            )
-          )
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-backdrop open", onClick: onDismiss }), /* @__PURE__ */ React.createElement("div", { className: "select-sheet", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-handle" }), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-eyebrow" }, "Tab ", tabNum), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-title" }, "Tab actions"), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-diamond" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-options" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "select-sheet-option",
+        disabled: !hasOthers,
+        style: !hasOthers ? { opacity: 0.42, cursor: "not-allowed" } : void 0,
+        onClick: hasOthers ? () => {
+          onCloseOthers();
+          onDismiss();
+        } : void 0
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-main" }, /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-label" }, "Close other tabs")),
+      /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-desc" }, "Keep only this tab open. ", hasOthers ? `${total - 1} other ${total - 1 === 1 ? "tab" : "tabs"} will be closed.` : "No other tabs to close.")
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "select-sheet-option",
+        disabled: !hasRightTabs,
+        style: !hasRightTabs ? { opacity: 0.42, cursor: "not-allowed" } : void 0,
+        onClick: hasRightTabs ? () => {
+          onCloseToRight();
+          onDismiss();
+        } : void 0
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-main" }, /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-label" }, "Close tabs to the right")),
+      /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-desc" }, hasRightTabs ? `Close ${total - tabNum} ${total - tabNum === 1 ? "tab" : "tabs"} after this one.` : "No tabs to the right.")
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "select-sheet-option",
+        onClick: onDismiss,
+        style: { borderStyle: "dashed" }
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "select-sheet-option-main" }, /* @__PURE__ */ React.createElement("span", { className: "select-sheet-option-label" }, "Cancel"))
+    ))));
   }
 
-  // app/src/main/assets/src/ui/sheets/MultiNotePopover.js
+  // app/src/main/assets/src/ui/sheets/MultiNotePopover.jsx
   function MultiNotePopover({ payload, onClose, onPick }) {
     if (!payload) return null;
     const { groupIds, x, y } = payload;
@@ -8143,55 +8057,35 @@
     const popW = 320;
     const px = Math.max(8, Math.min(x - popW / 2, window.innerWidth - popW - 8));
     const py = Math.max(8, y + 12);
-    return React.createElement(
-      React.Fragment,
-      null,
-      React.createElement("div", { className: "multinote-overlay", onClick: onClose }),
-      React.createElement(
-        "div",
-        { className: "multinote-popover", style: { left: px, top: py, width: popW } },
-        React.createElement("div", { className: "multinote-header" }, notes.length, " notes here"),
-        notes.map((n) => {
-          const swatchBg = {
-            yellow: "#ffd700",
-            green: "#76ff03",
-            pink: "#ff4081",
-            red: "#f44336",
-            orange: "#ff9100",
-            blue: "#2196f3",
-            purple: "#ba68c8",
-            teal: "#00bcd4",
-            brown: "#8d6e63",
-            gray: "#9e9e9e",
-            cyan: "#00bcd4"
-          }[n.color] || "#ffd700";
-          const noteNbs = (n.notebookIds || []).map((id) => NotebookStore.get(id)).filter(Boolean);
-          return React.createElement(
-            "button",
-            {
-              key: n.groupId,
-              className: "multinote-row",
-              onClick: () => onPick(n.groupId)
-            },
-            React.createElement("span", { className: "multinote-row-swatch", style: { background: swatchBg } }),
-            React.createElement(
-              "span",
-              { className: "multinote-row-body" },
-              React.createElement("span", { className: "multinote-row-preview" }, n.body || (n.fullText ? "\u201C" + n.fullText + "\u201D" : "Empty note")),
-              React.createElement(
-                "span",
-                { className: "multinote-row-meta" },
-                relativeDate(n.updated || n.created),
-                noteNbs.length > 0 && " \xB7 " + noteNbs.map((nb) => nb.name).join(" \xB7 ")
-              )
-            )
-          );
-        })
-      )
-    );
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "multinote-overlay", onClick: onClose }), /* @__PURE__ */ React.createElement("div", { className: "multinote-popover", style: { left: px, top: py, width: popW } }, /* @__PURE__ */ React.createElement("div", { className: "multinote-header" }, notes.length, " notes here"), notes.map((n) => {
+      const swatchBg = {
+        yellow: "#ffd700",
+        green: "#76ff03",
+        pink: "#ff4081",
+        red: "#f44336",
+        orange: "#ff9100",
+        blue: "#2196f3",
+        purple: "#ba68c8",
+        teal: "#00bcd4",
+        brown: "#8d6e63",
+        gray: "#9e9e9e",
+        cyan: "#00bcd4"
+      }[n.color] || "#ffd700";
+      const noteNbs = (n.notebookIds || []).map((id) => NotebookStore.get(id)).filter(Boolean);
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: n.groupId,
+          className: "multinote-row",
+          onClick: () => onPick(n.groupId)
+        },
+        /* @__PURE__ */ React.createElement("span", { className: "multinote-row-swatch", style: { background: swatchBg } }),
+        /* @__PURE__ */ React.createElement("span", { className: "multinote-row-body" }, /* @__PURE__ */ React.createElement("span", { className: "multinote-row-preview" }, n.body || (n.fullText ? "\u201C" + n.fullText + "\u201D" : "Empty note")), /* @__PURE__ */ React.createElement("span", { className: "multinote-row-meta" }, relativeDate(n.updated || n.created), noteNbs.length > 0 && " \xB7 " + noteNbs.map((nb) => nb.name).join(" \xB7 ")))
+      );
+    })));
   }
 
-  // app/src/main/assets/src/ui/sheets/NotebookPickerSheet.js
+  // app/src/main/assets/src/ui/sheets/NotebookPickerSheet.jsx
   function NotebookPickerSheet({ groupId, hlTick, setHlTick, onClose }) {
     const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
     const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
@@ -8219,91 +8113,64 @@
       setHlTick((t) => t + 1);
       setConfirmDeleteNb(null);
     };
-    return React.createElement(
-      "div",
-      { className: "nb-picker-overlay", onClick: onClose },
-      React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "nb-picker-overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker-header" }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-title" }, memberIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")), /* @__PURE__ */ React.createElement("div", { className: "nb-picker-new" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        ref: inputRef,
+        className: "nb-picker-new-input",
+        type: "text",
+        placeholder: "New notebook name\u2026",
+        value: newName,
+        onChange: (e) => setNewName(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            createNotebook();
+          }
+        },
+        maxLength: 60
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "nb-picker-new-btn" + (newName.trim() ? "" : " disabled"),
+        onClick: createNotebook,
+        disabled: !newName.trim()
+      },
+      "Create"
+    )), notebooks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : /* @__PURE__ */ React.createElement("div", { className: "nb-picker-list" }, notebooks.map((nb) => {
+      if (confirmDeleteNb === nb.id) {
+        return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete \u201C", nb.name, "\u201D? Notes will move to Uncategorized."), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDeleteNb(null) }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: () => deleteNb(nb.id) }, "Yes, delete"));
+      }
+      const checked = memberIds.has(nb.id);
+      return /* @__PURE__ */ React.createElement(
         "div",
-        { className: "nb-picker", onClick: (e) => e.stopPropagation() },
-        React.createElement(
-          "div",
-          { className: "nb-picker-header" },
-          React.createElement("span", { className: "nb-picker-title" }, memberIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"),
-          React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")
-        ),
-        React.createElement(
-          "div",
-          { className: "nb-picker-new" },
-          React.createElement("input", {
-            ref: inputRef,
-            className: "nb-picker-new-input",
-            type: "text",
-            placeholder: "New notebook name\u2026",
-            value: newName,
-            onChange: (e) => setNewName(e.target.value),
-            onKeyDown: (e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                createNotebook();
-              }
+        {
+          key: nb.id,
+          className: "nb-picker-row" + (checked ? " checked" : ""),
+          onClick: () => toggle(nb.id),
+          role: "button"
+        },
+        /* @__PURE__ */ React.createElement("span", { className: "nb-picker-check" }, checked && /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))),
+        /* @__PURE__ */ React.createElement("span", { className: "nb-picker-name" }, nb.name),
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "nb-picker-row-delete",
+            onClick: (e) => {
+              e.stopPropagation();
+              setConfirmDeleteNb(nb.id);
             },
-            maxLength: 60
-          }),
-          React.createElement("button", {
-            className: "nb-picker-new-btn" + (newName.trim() ? "" : " disabled"),
-            onClick: createNotebook,
-            disabled: !newName.trim()
-          }, "Create")
-        ),
-        notebooks.length === 0 ? React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : React.createElement(
-          "div",
-          { className: "nb-picker-list" },
-          notebooks.map((nb) => {
-            if (confirmDeleteNb === nb.id) {
-              return React.createElement(
-                "div",
-                { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } },
-                React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete \u201C", nb.name, "\u201D? Notes will move to Uncategorized."),
-                React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDeleteNb(null) }, "Cancel"),
-                React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: () => deleteNb(nb.id) }, "Yes, delete")
-              );
-            }
-            const checked = memberIds.has(nb.id);
-            return React.createElement(
-              "div",
-              {
-                key: nb.id,
-                className: "nb-picker-row" + (checked ? " checked" : ""),
-                onClick: () => toggle(nb.id),
-                role: "button"
-              },
-              React.createElement(
-                "span",
-                { className: "nb-picker-check" },
-                checked && React.createElement(
-                  "svg",
-                  { viewBox: "0 0 24 24" },
-                  React.createElement("polyline", { points: "20 6 9 17 4 12" })
-                )
-              ),
-              React.createElement("span", { className: "nb-picker-name" }, nb.name),
-              React.createElement("button", {
-                className: "nb-picker-row-delete",
-                onClick: (e) => {
-                  e.stopPropagation();
-                  setConfirmDeleteNb(nb.id);
-                },
-                title: "Delete notebook",
-                "aria-label": "Delete notebook"
-              }, "\xD7")
-            );
-          })
+            title: "Delete notebook",
+            "aria-label": "Delete notebook"
+          },
+          "\xD7"
         )
-      )
-    );
+      );
+    }))));
   }
 
-  // app/src/main/assets/src/ui/sheets/NoteSheet.js
+  // app/src/main/assets/src/ui/sheets/NoteSheet.jsx
   function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpenNotebookPicker }) {
     const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
     const segs = React.useMemo(() => AnnotationStore.getByGroup(groupId), [groupId, hlTick]);
@@ -8378,187 +8245,99 @@
       setMenuOpen(false);
       setConfirmDelete(false);
     };
-    return React.createElement(
-      "div",
-      { className: "note-sheet-overlay", onClick: closeOverlay },
-      React.createElement(
-        "div",
-        { className: "note-sheet", onClick: (e) => e.stopPropagation() },
-        // Header: color dot (tappable) · "Note" · ⋯ menu (read mode only)
-        React.createElement(
-          "div",
-          { className: "note-sheet-header" },
-          React.createElement("button", {
-            className: "note-sheet-color-dot ann-chip-color-btn",
-            "data-color": color,
-            onClick: openColorPicker,
-            title: "Change color",
-            "aria-label": "Change note color"
-          }),
-          React.createElement("div", { className: "note-sheet-title" }, mode === "edit" ? note.body ? "Edit note" : "New note" : "Note"),
-          mode === "read" && React.createElement(
-            "button",
-            {
-              className: "note-sheet-menu-btn",
-              onClick: () => {
-                setMenuOpen((v) => !v);
-                setShowColors(false);
-                setConfirmDelete(false);
-              },
-              "aria-label": "Options"
-            },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "currentColor" },
-              React.createElement("circle", { cx: "12", cy: "5", r: "1.7" }),
-              React.createElement("circle", { cx: "12", cy: "12", r: "1.7" }),
-              React.createElement("circle", { cx: "12", cy: "19", r: "1.7" })
-            )
-          )
-        ),
-        // Color picker takes over the body area when opened — by tapping the
-        // header dot OR the ⋯ menu's "Change color" item.
-        showColors ? React.createElement(
-          "div",
-          { className: "note-sheet-menu-colors" },
-          React.createElement("button", { className: "ann-chip-back", onClick: () => setShowColors(false), title: "Back" }, "\u2039"),
-          HL_COLORS.map((c) => React.createElement("button", {
-            key: c,
-            className: "ann-chip-color-btn" + (color === c ? " active" : ""),
-            "data-color": c,
-            onClick: () => recolor(c),
-            title: c
-          }))
-        ) : React.createElement(
-          React.Fragment,
-          null,
-          // Anchor text (italic quote)
-          React.createElement("div", { className: "note-sheet-anchor" }, "\u201C", truncatedAnchor, "\u201D"),
-          // Date row — read mode only. Shows when the note was last edited
-          // (or when it was created if never edited). Subtle Cinzel caps
-          // so it doesn't compete with the body content.
-          mode === "read" && (note.updated || note.created) && React.createElement(
-            "div",
-            { className: "note-sheet-date" },
-            relativeDate(note.updated || note.created)
-          ),
-          // Edit mode: always-visible color row so users can pick a color
-          // without needing to open the ⋯ menu first.
-          mode === "edit" && React.createElement(
-            "div",
-            { className: "note-edit-colors" },
-            HL_COLORS.map((c) => React.createElement("button", {
-              key: c,
-              className: "ann-chip-color-btn" + (color === c ? " active" : ""),
-              "data-color": c,
-              onClick: () => recolor(c),
-              title: c
-            }))
-          ),
-          // Notebook chips (only in read mode and only if any are assigned)
-          mode === "read" && (note.notebookIds || []).length > 0 && React.createElement(
-            "div",
-            { className: "note-sheet-nb-chips" },
-            (note.notebookIds || []).map((id) => {
-              const nb = NotebookStore.get(id);
-              if (!nb) return null;
-              return React.createElement(
-                "span",
-                { key: id, className: "note-sheet-nb-chip" },
-                React.createElement(
-                  "svg",
-                  { viewBox: "0 0 24 24" },
-                  React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }),
-                  React.createElement("polyline", { points: "15 4 15 9 20 9" })
-                ),
-                nb.name
-              );
-            })
-          ),
-          // Body — read mode displays it; edit mode shows textarea
-          mode === "read" ? note.body ? React.createElement("div", { className: "note-sheet-body" }, note.body) : React.createElement("div", { className: "note-sheet-empty" }, "Empty note. Tap \u22EF \u2192 Edit to add text.") : React.createElement("textarea", {
-            ref: textareaRef,
-            className: "note-sheet-textarea",
-            value: body,
-            onChange: (e) => setBody(e.target.value),
-            placeholder: "Write your note\u2026",
-            onFocus: () => {
-              setTimeout(() => {
-                try {
-                  textareaRef.current && textareaRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
-                } catch (e) {
-                }
-              }, 220);
+    return /* @__PURE__ */ React.createElement("div", { className: "note-sheet-overlay", onClick: closeOverlay }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet-header" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "note-sheet-color-dot ann-chip-color-btn",
+        "data-color": color,
+        onClick: openColorPicker,
+        title: "Change color",
+        "aria-label": "Change note color"
+      }
+    ), /* @__PURE__ */ React.createElement("div", { className: "note-sheet-title" }, mode === "edit" ? note.body ? "Edit note" : "New note" : "Note"), mode === "read" && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "note-sheet-menu-btn",
+        onClick: () => {
+          setMenuOpen((v) => !v);
+          setShowColors(false);
+          setConfirmDelete(false);
+        },
+        "aria-label": "Options"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "5", r: "1.7" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "1.7" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "19", r: "1.7" }))
+    )), showColors ? /* @__PURE__ */ React.createElement("div", { className: "note-sheet-menu-colors" }, /* @__PURE__ */ React.createElement("button", { className: "ann-chip-back", onClick: () => setShowColors(false), title: "Back" }, "\u2039"), HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: c,
+        className: "ann-chip-color-btn" + (color === c ? " active" : ""),
+        "data-color": c,
+        onClick: () => recolor(c),
+        title: c
+      }
+    ))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "note-sheet-anchor" }, "\u201C", truncatedAnchor, "\u201D"), mode === "read" && (note.updated || note.created) && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-date" }, relativeDate(note.updated || note.created)), mode === "edit" && /* @__PURE__ */ React.createElement("div", { className: "note-edit-colors" }, HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: c,
+        className: "ann-chip-color-btn" + (color === c ? " active" : ""),
+        "data-color": c,
+        onClick: () => recolor(c),
+        title: c
+      }
+    ))), mode === "read" && (note.notebookIds || []).length > 0 && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-nb-chips" }, (note.notebookIds || []).map((id) => {
+      const nb = NotebookStore.get(id);
+      if (!nb) return null;
+      return /* @__PURE__ */ React.createElement("span", { key: id, className: "note-sheet-nb-chip" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 4 15 9 20 9" })), nb.name);
+    })), mode === "read" ? note.body ? /* @__PURE__ */ React.createElement("div", { className: "note-sheet-body" }, note.body) : /* @__PURE__ */ React.createElement("div", { className: "note-sheet-empty" }, "Empty note. Tap \u22EF \u2192 Edit to add text.") : /* @__PURE__ */ React.createElement(
+      "textarea",
+      {
+        ref: textareaRef,
+        className: "note-sheet-textarea",
+        value: body,
+        onChange: (e) => setBody(e.target.value),
+        placeholder: "Write your note\u2026",
+        onFocus: () => {
+          setTimeout(() => {
+            try {
+              textareaRef.current && textareaRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+            } catch (e) {
             }
-          }),
-          // Edit mode: notebook assignment row — always visible so users
-          // can assign to a notebook during creation, not just after.
-          mode === "edit" && React.createElement(
-            "button",
-            {
-              className: "note-edit-nb-row",
-              onClick: () => {
-                onOpenNotebookPicker && onOpenNotebookPicker(groupId);
-              }
-            },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }),
-              React.createElement("polyline", { points: "15 4 15 9 20 9" })
-            ),
-            (note.notebookIds || []).length > 0 ? (note.notebookIds || []).map((id) => {
-              const nb = NotebookStore.get(id);
-              return nb ? nb.name : null;
-            }).filter(Boolean).join(", ") || "Add to notebook\u2026" : "Add to notebook\u2026"
-          ),
-          // Read mode: no Edit footer — use ⋯ → Edit. Edit mode: Cancel + Save.
-          // Save is always enabled — blank notes are valid.
-          mode === "edit" && React.createElement(
-            "div",
-            { className: "note-sheet-footer" },
-            React.createElement("button", { className: "note-sheet-secondary", onClick: cancelEdit }, "Cancel"),
-            React.createElement("button", { className: "note-sheet-save", onClick: save }, "Save")
-          ),
-          // ⋯ menu panel (read mode only). Color sub-panel was hoisted above
-          // so the menu only carries the action items + delete confirm.
-          mode === "read" && menuOpen && React.createElement(
-            "div",
-            { className: "note-sheet-menu" },
-            confirmDelete ? React.createElement(
-              "div",
-              { className: "ann-chip-confirm" },
-              React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete this note?"),
-              React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDelete(false) }, "Cancel"),
-              React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: remove }, "Yes, delete")
-            ) : React.createElement(
-              React.Fragment,
-              null,
-              React.createElement("button", { className: "note-sheet-menu-item", onClick: () => {
-                setMenuOpen(false);
-                setMode("edit");
-              } }, "Edit note"),
-              React.createElement("button", { className: "note-sheet-menu-item", onClick: () => {
-                setMenuOpen(false);
-                openColorPicker();
-              } }, "Change color"),
-              React.createElement("button", {
-                className: "note-sheet-menu-item",
-                onClick: () => {
-                  setMenuOpen(false);
-                  onOpenNotebookPicker && onOpenNotebookPicker(groupId);
-                }
-              }, (note.notebookIds || []).length > 0 ? "Manage notebooks\u2026" : "Add to notebook\u2026"),
-              React.createElement("button", { className: "note-sheet-menu-item", onClick: share }, "Share"),
-              React.createElement("button", { className: "note-sheet-menu-item danger", onClick: () => setConfirmDelete(true) }, "Delete note")
-            )
-          )
-        )
-      )
-    );
+          }, 220);
+        }
+      }
+    ), mode === "edit" && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "note-edit-nb-row",
+        onClick: () => {
+          onOpenNotebookPicker && onOpenNotebookPicker(groupId);
+        }
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 4 15 9 20 9" })),
+      (note.notebookIds || []).length > 0 ? (note.notebookIds || []).map((id) => {
+        const nb = NotebookStore.get(id);
+        return nb ? nb.name : null;
+      }).filter(Boolean).join(", ") || "Add to notebook\u2026" : "Add to notebook\u2026"
+    ), mode === "edit" && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-footer" }, /* @__PURE__ */ React.createElement("button", { className: "note-sheet-secondary", onClick: cancelEdit }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-save", onClick: save }, "Save")), mode === "read" && menuOpen && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-menu" }, confirmDelete ? /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm" }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete this note?"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDelete(false) }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: remove }, "Yes, delete")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-item", onClick: () => {
+      setMenuOpen(false);
+      setMode("edit");
+    } }, "Edit note"), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-item", onClick: () => {
+      setMenuOpen(false);
+      openColorPicker();
+    } }, "Change color"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "note-sheet-menu-item",
+        onClick: () => {
+          setMenuOpen(false);
+          onOpenNotebookPicker && onOpenNotebookPicker(groupId);
+        }
+      },
+      (note.notebookIds || []).length > 0 ? "Manage notebooks\u2026" : "Add to notebook\u2026"
+    ), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-item", onClick: share }, "Share"), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-item danger", onClick: () => setConfirmDelete(true) }, "Delete note"))))));
   }
 
-  // app/src/main/assets/src/ui/sheets/LetterExcerptPickerScreen.js
+  // app/src/main/assets/src/ui/sheets/LetterExcerptPickerScreen.jsx
   function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
     const target = refineRequest.target;
     const item = refineRequest.item;
@@ -8651,74 +8430,45 @@
       onClose(newLink || null);
     }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink]);
     if (!entry) {
-      return React.createElement(
-        "div",
-        { className: "picker-screen" },
-        React.createElement(
-          "div",
-          { className: "picker-header" },
-          React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"),
-          React.createElement("span", { className: "picker-title" }, "Select Text to Link")
-        ),
-        React.createElement("div", { className: "picker-empty" }, "Letter not found.")
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "picker-screen" }, /* @__PURE__ */ React.createElement("div", { className: "picker-header" }, /* @__PURE__ */ React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"), /* @__PURE__ */ React.createElement("span", { className: "picker-title" }, "Select Text to Link")), /* @__PURE__ */ React.createElement("div", { className: "picker-empty" }, "Letter not found."));
     }
     const titleText = entry.title || item.label;
     const subtitleText = item.collection || (target.type === "blessed" ? "The Blessed" : target.type === "holy-days" ? "Holy Days" : "");
     const hasSelection = !!selInfo;
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "picker-screen" }, /* @__PURE__ */ React.createElement("div", { className: "picker-header" }, /* @__PURE__ */ React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"), /* @__PURE__ */ React.createElement("span", { className: "picker-title" }, "Select Text to Link"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "picker-confirm",
+        onClick: confirmLink,
+        "aria-label": "Confirm",
+        title: hasSelection ? "Link this excerpt" : "Link the whole letter"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))
+    )), /* @__PURE__ */ React.createElement(
       "div",
-      { className: "picker-screen" },
-      React.createElement(
-        "div",
-        { className: "picker-header" },
-        React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"),
-        React.createElement("span", { className: "picker-title" }, "Select Text to Link"),
-        React.createElement(
-          "button",
-          {
-            className: "picker-confirm",
-            onClick: confirmLink,
-            "aria-label": "Confirm",
-            title: hasSelection ? "Link this excerpt" : "Link the whole letter"
-          },
-          React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" },
-            React.createElement("polyline", { points: "20 6 9 17 4 12" })
-          )
-        )
-      ),
-      React.createElement(
-        "div",
+      {
+        className: "picker-body picker-body-letter",
+        ref: bodyRef,
+        onMouseUp: captureSelection,
+        onTouchEnd: captureSelection
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "picker-letter-title" }, titleText),
+      subtitleText && /* @__PURE__ */ React.createElement("div", { className: "picker-letter-subtitle" }, subtitleText),
+      hasSelection && /* @__PURE__ */ React.createElement("div", { className: "picker-selection-hint" }, '"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + "\u2026" : selInfo.text) + '"'),
+      !hasSelection && /* @__PURE__ */ React.createElement("div", { className: "picker-selection-hint picker-selection-hint-empty" }, "Long-press and drag to select an excerpt, then tap \u2713. Tap \u2713 without selecting to link the whole letter."),
+      blocks.map((b) => /* @__PURE__ */ React.createElement(
+        "p",
         {
-          className: "picker-body picker-body-letter",
-          ref: bodyRef,
-          onMouseUp: captureSelection,
-          onTouchEnd: captureSelection
-        },
-        React.createElement("div", { className: "picker-letter-title" }, titleText),
-        subtitleText && React.createElement("div", { className: "picker-letter-subtitle" }, subtitleText),
-        hasSelection && React.createElement(
-          "div",
-          { className: "picker-selection-hint" },
-          '"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + "\u2026" : selInfo.text) + '"'
-        ),
-        !hasSelection && React.createElement(
-          "div",
-          { className: "picker-selection-hint picker-selection-hint-empty" },
-          "Long-press and drag to select an excerpt, then tap \u2713. Tap \u2713 without selecting to link the whole letter."
-        ),
-        blocks.map((b) => React.createElement("p", {
           key: b.key,
           "data-block-key": b.key,
           className: "picker-letter-block"
-        }, b.text))
-      )
-    );
+        },
+        b.text
+      ))
+    ));
   }
 
-  // app/src/main/assets/src/ui/sheets/VersePickerScreen.js
+  // app/src/main/assets/src/ui/sheets/VersePickerScreen.jsx
   function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
     const target = refineRequest.target;
     const item = refineRequest.item;
@@ -8853,85 +8603,60 @@
       onClose(newLink || null);
     }, [selInfo, captureSelectionSync, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink]);
     if (!chapter) {
-      return React.createElement(
-        "div",
-        { className: "picker-screen" },
-        React.createElement(
-          "div",
-          { className: "picker-header" },
-          React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"),
-          React.createElement("span", { className: "picker-title" }, "Select Verse")
-        ),
-        React.createElement("div", { className: "picker-empty" }, "Chapter not found.")
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "picker-screen" }, /* @__PURE__ */ React.createElement("div", { className: "picker-header" }, /* @__PURE__ */ React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"), /* @__PURE__ */ React.createElement("span", { className: "picker-title" }, "Select Verse")), /* @__PURE__ */ React.createElement("div", { className: "picker-empty" }, "Chapter not found."));
     }
     const titleText = (item.title || target.label.replace(/\s\d+$/, "")) + " " + target.chapter;
     const hasSelection = !!selInfo;
     const previewText = selInfo ? selInfo.text || "" : "";
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "picker-screen" }, /* @__PURE__ */ React.createElement("div", { className: "picker-header" }, /* @__PURE__ */ React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"), /* @__PURE__ */ React.createElement("span", { className: "picker-title" }, "Select Text"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "picker-confirm",
+        onClick: confirmLink,
+        "aria-label": "Confirm",
+        title: hasSelection ? "Use this excerpt" : "Use the whole chapter"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))
+    )), /* @__PURE__ */ React.createElement(
       "div",
-      { className: "picker-screen" },
-      React.createElement(
-        "div",
-        { className: "picker-header" },
-        React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"),
-        React.createElement("span", { className: "picker-title" }, "Select Text"),
-        React.createElement(
-          "button",
-          {
-            className: "picker-confirm",
-            onClick: confirmLink,
-            "aria-label": "Confirm",
-            title: hasSelection ? "Use this excerpt" : "Use the whole chapter"
-          },
-          React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" },
-            React.createElement("polyline", { points: "20 6 9 17 4 12" })
-          )
-        )
-      ),
-      React.createElement(
+      {
+        className: "picker-body picker-body-letter",
+        onTouchEnd: captureSelection,
+        onMouseUp: captureSelection
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "picker-letter-title" }, titleText),
+      /* @__PURE__ */ React.createElement("div", { className: "picker-letter-subtitle" }, isStudy ? "Matthew Study Bible" : "Bible Chapter"),
+      /* @__PURE__ */ React.createElement(
         "div",
         {
-          className: "picker-body picker-body-letter",
-          onTouchEnd: captureSelection,
-          onMouseUp: captureSelection
+          className: "picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")
         },
-        React.createElement("div", { className: "picker-letter-title" }, titleText),
-        React.createElement("div", { className: "picker-letter-subtitle" }, isStudy ? "Matthew Study Bible" : "Bible Chapter"),
-        React.createElement(
-          "div",
+        hasSelection ? previewText : "Highlight any portion to link. Or tap a verse number to grab the whole verse."
+      ),
+      /* @__PURE__ */ React.createElement("div", { ref: bodyRef, className: "picker-verses" }, verses.map((v) => /* @__PURE__ */ React.createElement(
+        "p",
+        {
+          key: v.n,
+          className: "picker-verse-selectable",
+          "data-verse": v.n
+        },
+        /* @__PURE__ */ React.createElement(
+          "span",
           {
-            className: "picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")
+            className: "picker-verse-num",
+            onClick: function(e) {
+              e.stopPropagation();
+              handleVerseTap(v.n);
+            }
           },
-          hasSelection ? previewText : "Highlight any portion to link. Or tap a verse number to grab the whole verse."
+          v.n + " "
         ),
-        React.createElement(
-          "div",
-          { ref: bodyRef, className: "picker-verses" },
-          verses.map((v) => React.createElement(
-            "p",
-            {
-              key: v.n,
-              className: "picker-verse-selectable",
-              "data-verse": v.n
-            },
-            React.createElement("span", {
-              className: "picker-verse-num",
-              onClick: function(e) {
-                e.stopPropagation();
-                handleVerseTap(v.n);
-              }
-            }, v.n + " "),
-            React.createElement("span", { className: "picker-verse-text" }, v.text)
-          ))
-        )
-      )
-    );
+        /* @__PURE__ */ React.createElement("span", { className: "picker-verse-text" }, v.text)
+      )))
+    ));
   }
 
-  // app/src/main/assets/src/ui/sheets/LinkPicker.js
+  // app/src/main/assets/src/ui/sheets/LinkPicker.jsx
   function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, hlTick, setHlTick, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
     const [input, setInput] = React.useState("");
     const inputRef = React.useRef(null);
@@ -8984,110 +8709,55 @@
         onLinkCreated(newLink);
       }
     }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, bumpRecent, onLinkCreated, mode, onPickTarget]);
-    const renderItemRow = (item, key) => {
-      return React.createElement(
-        "button",
-        {
-          key,
-          className: "navpick-row",
-          onClick: () => createLinkTo(item)
-        },
-        React.createElement(
-          "div",
-          { className: "navpick-row-icon navpick-row-icon-" + item.kind },
-          item.kind === "bible-chapter" ? item.category === "Old Testament" ? "OT" : "NT" : item.kind === "study-chapter" ? "SB" : item.kind === "study-letter-chapter" ? "LS" : COL_NAV_ICON.get(item.collection) || "?"
-        ),
-        React.createElement(
-          "div",
-          { className: "navpick-row-text" },
-          React.createElement("div", { className: "navpick-row-label" }, item.label),
-          React.createElement("div", { className: "navpick-row-cat" }, item.category || "")
-        )
-      );
-    };
-    const isEmptyQuery = !input.trim();
-    return React.createElement(
-      "div",
-      { className: "link-picker-overlay", onClick: onClose },
-      React.createElement(
-        "div",
-        { className: "link-picker-sheet navpick-sheet", onClick: (e) => e.stopPropagation() },
-        // Header: title + red × (undo last link) + green ✓ (confirm & close)
-        React.createElement(
-          "div",
-          { className: "navpick-header" },
-          React.createElement("span", { className: "navpick-title" }, mode === "card" ? "Embed a Card" : mode === "excerpt" ? "Embed an Excerpt" : "Link"),
-          React.createElement("button", {
-            className: "navpick-close navpick-close-undo",
-            onClick: () => {
-              if (lastCreatedLink) {
-                LinkStore.remove(lastCreatedLink.id);
-                onLinkCreated(null);
-              }
-              onClose();
-            },
-            "aria-label": "Cancel"
-          }, "\xD7"),
-          lastCreatedLink && React.createElement(
-            "button",
-            {
-              className: "navpick-confirm-green",
-              onClick: onClose,
-              "aria-label": "Done"
-            },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("polyline", { points: "20 6 9 17 4 12" })
-            )
-          )
-        ),
-        // Search input (rounded pill matching reference)
-        React.createElement(
-          "div",
-          { className: "navpick-search-wrap" },
-          React.createElement("input", {
-            ref: inputRef,
-            className: "navpick-search-input",
-            placeholder: "Search for verses, letters, or titles\u2026",
-            value: input,
-            onChange: (e) => setInput(e.target.value),
-            onKeyDown: (e) => {
-              if (e.key === "Enter" && results.length > 0) createLinkTo(results[0]);
-            }
-          })
-        ),
-        // Body: Recent OR Results
-        React.createElement(
-          "div",
-          { className: "navpick-body" },
-          isEmptyQuery ? recent.length > 0 ? React.createElement(
-            React.Fragment,
-            null,
-            React.createElement("div", { className: "navpick-section-label" }, "Recent"),
-            recent.map((item, i) => renderItemRow(item, "r" + i))
-          ) : React.createElement(
-            "div",
-            { className: "navpick-empty" },
-            React.createElement("div", { className: "navpick-empty-title" }, "Search to link"),
-            React.createElement("div", { className: "navpick-empty-hint" }, 'Examples: "Eph 6:5", "v1l2", "WTLB1 33", or a letter title.')
-          ) : results.length > 0 ? React.createElement(
-            React.Fragment,
-            null,
-            React.createElement("div", { className: "navpick-section-label" }, "Results"),
-            results.map((item, i) => renderItemRow(item, "s" + i))
-          ) : React.createElement(
-            "div",
-            { className: "navpick-empty" },
-            React.createElement("div", { className: "navpick-empty-title" }, "No matches"),
-            React.createElement("div", { className: "navpick-empty-hint" }, 'Try "Genesis 1", "Eph 6:5", "V2 letter 5", "The Wide Path", "WTLB1 33".')
-          )
-        )
-      )
+    const renderItemRow = (item, key) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key,
+        className: "navpick-row",
+        onClick: () => createLinkTo(item)
+      },
+      /* @__PURE__ */ React.createElement("div", { className: "navpick-row-icon navpick-row-icon-" + item.kind }, item.kind === "bible-chapter" ? item.category === "Old Testament" ? "OT" : "NT" : item.kind === "study-chapter" ? "SB" : item.kind === "study-letter-chapter" ? "LS" : COL_NAV_ICON.get(item.collection) || "?"),
+      /* @__PURE__ */ React.createElement("div", { className: "navpick-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "navpick-row-label" }, item.label), /* @__PURE__ */ React.createElement("div", { className: "navpick-row-cat" }, item.category || ""))
     );
+    const isEmptyQuery = !input.trim();
+    return /* @__PURE__ */ React.createElement("div", { className: "link-picker-overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "link-picker-sheet navpick-sheet", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "navpick-header" }, /* @__PURE__ */ React.createElement("span", { className: "navpick-title" }, mode === "card" ? "Embed a Card" : mode === "excerpt" ? "Embed an Excerpt" : "Link"), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "navpick-close navpick-close-undo",
+        onClick: () => {
+          if (lastCreatedLink) {
+            LinkStore.remove(lastCreatedLink.id);
+            onLinkCreated(null);
+          }
+          onClose();
+        },
+        "aria-label": "Cancel"
+      },
+      "\xD7"
+    ), lastCreatedLink && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "navpick-confirm-green",
+        onClick: onClose,
+        "aria-label": "Done"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))
+    )), /* @__PURE__ */ React.createElement("div", { className: "navpick-search-wrap" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        ref: inputRef,
+        className: "navpick-search-input",
+        placeholder: "Search for verses, letters, or titles\u2026",
+        value: input,
+        onChange: (e) => setInput(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter" && results.length > 0) createLinkTo(results[0]);
+        }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { className: "navpick-body" }, isEmptyQuery ? recent.length > 0 ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "navpick-section-label" }, "Recent"), recent.map((item, i) => renderItemRow(item, "r" + i))) : /* @__PURE__ */ React.createElement("div", { className: "navpick-empty" }, /* @__PURE__ */ React.createElement("div", { className: "navpick-empty-title" }, "Search to link"), /* @__PURE__ */ React.createElement("div", { className: "navpick-empty-hint" }, 'Examples: "Eph 6:5", "v1l2", "WTLB1 33", or a letter title.')) : results.length > 0 ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "navpick-section-label" }, "Results"), results.map((item, i) => renderItemRow(item, "s" + i))) : /* @__PURE__ */ React.createElement("div", { className: "navpick-empty" }, /* @__PURE__ */ React.createElement("div", { className: "navpick-empty-title" }, "No matches"), /* @__PURE__ */ React.createElement("div", { className: "navpick-empty-hint" }, 'Try "Genesis 1", "Eph 6:5", "V2 letter 5", "The Wide Path", "WTLB1 33".')))));
   }
 
-  // app/src/main/assets/src/ui/sheets/LinkSidebar.js
+  // app/src/main/assets/src/ui/sheets/LinkSidebar.jsx
   function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
     const isBlockScope = hlKey && (hlKey.startsWith("letter:") || hlKey.startsWith("wtlb:") || hlKey.startsWith("blessed:") || hlKey.startsWith("holy-days:"));
     const links = React.useMemo(
@@ -9104,31 +8774,10 @@
     }, [hlKey, onClose]);
     if (!hlKey) return null;
     const countStr = links.length === 0 ? "No links" : links.length === 1 ? "1 link" : links.length + " links";
-    return React.createElement(
-      React.Fragment,
-      null,
-      React.createElement("div", { className: "link-sidebar-overlay", onClick: onClose }),
-      React.createElement(
-        "div",
-        { className: "link-sidebar" },
-        React.createElement(
-          "div",
-          { className: "link-sidebar-header" },
-          React.createElement("button", { className: "link-sidebar-close", onClick: onClose, title: "Close" }, "\xD7"),
-          React.createElement("span", { className: "link-sidebar-title" }, "Links")
-        ),
-        React.createElement("div", { className: "link-sidebar-date" }, countStr),
-        React.createElement(
-          "div",
-          { className: "link-sidebar-body" },
-          links.length === 0 && React.createElement("div", { className: "link-sidebar-empty" }, "No links yet"),
-          links.map((lnk) => React.createElement(LinkCard, { key: lnk.id, lnk, hlKey, isBlockScope, onNavigate, setHlTick }))
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-overlay", onClick: onClose }), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar" }, /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-header" }, /* @__PURE__ */ React.createElement("button", { className: "link-sidebar-close", onClick: onClose, title: "Close" }, "\xD7"), /* @__PURE__ */ React.createElement("span", { className: "link-sidebar-title" }, "Links")), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-date" }, countStr), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-body" }, links.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-empty" }, "No links yet"), links.map((lnk) => /* @__PURE__ */ React.createElement(LinkCard, { key: lnk.id, lnk, hlKey, isBlockScope, onNavigate, setHlTick })))));
   }
 
-  // app/src/main/assets/src/ui/sheets/SelectionToolbar.js
+  // app/src/main/assets/src/ui/sheets/SelectionToolbar.jsx
   function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onBookmarkRequest }) {
     const [visible, setVisible] = React.useState(false);
     const [pos, setPos] = React.useState({ x: 0, y: 0 });
@@ -9669,7 +9318,6 @@
       if (typeof onBookmarkRequest === "function") onBookmarkRequest(storedKey);
     }, [selInfo, setHlTick, onBookmarkRequest]);
     if (!visible || !selInfo) return null;
-    const svgIcon = (paths, extra) => React.createElement("svg", Object.assign({ viewBox: "0 0 24 24" }, extra || {}), paths);
     const styleAClass = (color) => "sel-style-A sel-style-A-" + (activeStyle === "underline" ? "underline" : "fill") + " sel-style-A-" + color;
     var mv = selInfo.multiVerse;
     var mvCanHighlight = mv && selInfo.multiContainers && selInfo.multiContainers.length > 0;
@@ -9677,7 +9325,7 @@
     var mvHasExisting = mvCanHighlight && (selInfo.multiContainers || []).some(function(c) {
       return HighlightStore.get(c.dataset.hlKey).length > 0;
     });
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement(
       "div",
       {
         ref: toolbarRef,
@@ -9693,105 +9341,45 @@
           }, 300);
         }
       },
-      // Top row: style toggle + colors
-      showColors && React.createElement(
-        "div",
-        { className: "sel-toolbar-row sel-toolbar-styles" },
-        React.createElement("button", {
+      showColors && /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-row sel-toolbar-styles" }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
           className: "sel-style-btn" + (activeStyle === "highlight" ? " active" : ""),
           onClick: () => setActiveStyle("highlight"),
           title: "Highlight"
-        }, "A"),
-        React.createElement("button", {
+        },
+        "A"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
           className: "sel-style-btn sel-style-btn-underline" + (activeStyle === "underline" ? " active" : ""),
           onClick: () => setActiveStyle("underline"),
           title: "Underline"
-        }, "A"),
-        React.createElement("div", { className: "sel-toolbar-divider" }),
-        React.createElement(
-          "div",
-          { className: "sel-toolbar-colors" },
-          HL_COLORS.map((c) => React.createElement("button", {
-            key: c,
-            className: "sel-color-btn sel-color-" + activeStyle + (selInfo.existingHl && selInfo.existingHl.color === c && (selInfo.existingHl.kind || "highlight") === activeStyle ? " active" : ""),
-            "data-color": c,
-            onClick: () => applyHighlight(c),
-            title: c
-          })),
-          (selInfo.existingHl || mvHasExisting) && React.createElement("button", {
-            className: "sel-color-btn sel-color-clear",
-            onClick: removeHighlight,
-            title: "Remove highlight"
-          }, "\u2715")
-        )
-      ),
-      // Action buttons: note only for single-container; link + copy/share/search always
-      React.createElement(
-        "div",
-        { className: "sel-toolbar-row sel-toolbar-actions" },
-        !mv && React.createElement(
-          "button",
-          { className: "sel-action-btn", onClick: handleNote, title: "Note" },
-          svgIcon([
-            React.createElement("path", { key: "a", d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-            React.createElement("polyline", { key: "b", points: "14 2 14 8 20 8" }),
-            React.createElement("line", { key: "c", x1: "8", y1: "13", x2: "16", y2: "13" }),
-            React.createElement("line", { key: "d", x1: "8", y1: "17", x2: "16", y2: "17" })
-          ]),
-          React.createElement("span", null, "Note")
-        ),
-        showColors && React.createElement(
-          "button",
-          { className: "sel-action-btn", onClick: handleLink, title: "Link" },
-          svgIcon([
-            React.createElement("path", { key: "a", d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }),
-            React.createElement("path", { key: "b", d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })
-          ]),
-          React.createElement("span", null, "Link")
-        ),
-        React.createElement(
-          "button",
-          { className: "sel-action-btn", onClick: copyText, title: "Copy" },
-          svgIcon([
-            React.createElement("rect", { key: "a", x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
-            React.createElement("path", { key: "b", d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })
-          ]),
-          React.createElement("span", null, "Copy")
-        ),
-        React.createElement(
-          "button",
-          { className: "sel-action-btn", onClick: handleShare, title: "Share" },
-          svgIcon([
-            React.createElement("circle", { key: "a", cx: "18", cy: "5", r: "3" }),
-            React.createElement("circle", { key: "b", cx: "6", cy: "12", r: "3" }),
-            React.createElement("circle", { key: "c", cx: "18", cy: "19", r: "3" }),
-            React.createElement("line", { key: "d", x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }),
-            React.createElement("line", { key: "e", x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" })
-          ]),
-          React.createElement("span", null, "Share")
-        ),
-        React.createElement(
-          "button",
-          { className: "sel-action-btn", onClick: handleSearch, title: "Search" },
-          svgIcon([
-            React.createElement("circle", { key: "a", cx: "11", cy: "11", r: "8" }),
-            React.createElement("line", { key: "b", x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
-          ]),
-          React.createElement("span", null, "Search")
-        ),
-        React.createElement(
-          "button",
-          { className: "sel-action-btn", onClick: handleBookmark, title: "Bookmark" },
-          svgIcon([
-            React.createElement("path", { key: "a", d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" })
-          ]),
-          React.createElement("span", null, "Bookmark")
-        )
-      )
+        },
+        "A"
+      ), /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-divider" }), /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-colors" }, HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: c,
+          className: "sel-color-btn sel-color-" + activeStyle + (selInfo.existingHl && selInfo.existingHl.color === c && (selInfo.existingHl.kind || "highlight") === activeStyle ? " active" : ""),
+          "data-color": c,
+          onClick: () => applyHighlight(c),
+          title: c
+        }
+      )), (selInfo.existingHl || mvHasExisting) && /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "sel-color-btn sel-color-clear",
+          onClick: removeHighlight,
+          title: "Remove highlight"
+        },
+        "\u2715"
+      ))),
+      /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-row sel-toolbar-actions" }, !mv && /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleNote, title: "Note" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), /* @__PURE__ */ React.createElement("polyline", { points: "14 2 14 8 20 8" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "17", x2: "16", y2: "17" })), /* @__PURE__ */ React.createElement("span", null, "Note")), showColors && /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleLink, title: "Link" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })), /* @__PURE__ */ React.createElement("span", null, "Link")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: copyText, title: "Copy" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })), /* @__PURE__ */ React.createElement("span", null, "Copy")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleShare, title: "Share" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "5", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "19", r: "3" }), /* @__PURE__ */ React.createElement("line", { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }), /* @__PURE__ */ React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" })), /* @__PURE__ */ React.createElement("span", null, "Share")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })), /* @__PURE__ */ React.createElement("span", null, "Search")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleBookmark, title: "Bookmark" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" })), /* @__PURE__ */ React.createElement("span", null, "Bookmark")))
     );
   }
 
-  // app/src/main/assets/src/ui/sheets/AnnotationActionChip.js
+  // app/src/main/assets/src/ui/sheets/AnnotationActionChip.jsx
   function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }) {
     const [mode, setMode] = React.useState("main");
     const lastGroupRef = React.useRef(null);
@@ -9837,108 +9425,80 @@
         true
       );
     };
-    return React.createElement(
-      React.Fragment,
-      null,
-      React.createElement("div", {
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      "div",
+      {
         style: { position: "fixed", inset: 0, zIndex: 2999 },
         onClick: onClose,
         onContextMenu: (e) => {
           e.preventDefault();
           onClose();
         }
-      }),
-      React.createElement(
-        "div",
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        className: "ann-chip",
+        style: { position: "fixed", left: cx, top: cy, zIndex: 3e3 },
+        onClick: (e) => e.stopPropagation()
+      },
+      mode === "main" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+        "button",
         {
-          className: "ann-chip",
-          style: { position: "fixed", left: cx, top: cy, zIndex: 3e3 },
-          onClick: (e) => e.stopPropagation()
+          className: "ann-chip-btn danger",
+          onClick: () => setMode("confirm"),
+          title: "Remove"
         },
-        mode === "main" && React.createElement(
-          React.Fragment,
-          null,
-          React.createElement(
-            "button",
-            {
-              className: "ann-chip-btn danger",
-              onClick: () => setMode("confirm"),
-              title: "Remove"
-            },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24" },
-              React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
-              React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
-            ),
-            React.createElement("span", null, "Remove")
-          ),
-          React.createElement(
-            "button",
-            {
-              className: "ann-chip-btn",
-              onClick: () => setMode("colors"),
-              title: "Recolor"
-            },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24" },
-              React.createElement("circle", { cx: "12", cy: "12", r: "8" }),
-              React.createElement("circle", { cx: "8", cy: "9", r: "1.4", fill: "currentColor", stroke: "none" }),
-              React.createElement("circle", { cx: "12", cy: "7", r: "1.4", fill: "currentColor", stroke: "none" }),
-              React.createElement("circle", { cx: "16", cy: "9", r: "1.4", fill: "currentColor", stroke: "none" }),
-              React.createElement("circle", { cx: "17", cy: "14", r: "1.4", fill: "currentColor", stroke: "none" })
-            ),
-            React.createElement("span", null, "Color")
-          ),
-          kind !== "note" && React.createElement(
-            "button",
-            {
-              className: "ann-chip-btn",
-              onClick: convertToNote,
-              title: "Convert to note"
-            },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24" },
-              React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-              React.createElement("polyline", { points: "14 2 14 8 20 8" }),
-              React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }),
-              React.createElement("line", { x1: "8", y1: "17", x2: "16", y2: "17" })
-            ),
-            React.createElement("span", null, "Note")
-          )
-        ),
-        mode === "confirm" && React.createElement(
-          "div",
-          { className: "ann-chip-confirm" },
-          React.createElement("span", { className: "ann-chip-confirm-q" }, "Remove this ", kindLabel, "?"),
-          React.createElement("button", {
-            className: "ann-chip-confirm-btn ann-chip-confirm-cancel",
-            onClick: () => setMode("main")
-          }, "Cancel"),
-          React.createElement("button", {
-            className: "ann-chip-confirm-btn ann-chip-confirm-yes",
-            onClick: remove
-          }, "Yes, remove")
-        ),
-        mode === "colors" && React.createElement(
-          "div",
-          { className: "ann-chip-colors" },
-          React.createElement("button", { className: "ann-chip-back", onClick: () => setMode("main"), title: "Back" }, "\u2039"),
-          HL_COLORS.map((c) => React.createElement("button", {
-            key: c,
-            className: "ann-chip-color-btn" + (ann.color === c ? " active" : ""),
-            "data-color": c,
-            onClick: () => recolor(c),
-            title: c
-          }))
-        )
-      )
-    );
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /* @__PURE__ */ React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })),
+        /* @__PURE__ */ React.createElement("span", null, "Remove")
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "ann-chip-btn",
+          onClick: () => setMode("colors"),
+          title: "Recolor"
+        },
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "8" }), /* @__PURE__ */ React.createElement("circle", { cx: "8", cy: "9", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "16", cy: "9", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "17", cy: "14", r: "1.4", fill: "currentColor", stroke: "none" })),
+        /* @__PURE__ */ React.createElement("span", null, "Color")
+      ), kind !== "note" && /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "ann-chip-btn",
+          onClick: convertToNote,
+          title: "Convert to note"
+        },
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), /* @__PURE__ */ React.createElement("polyline", { points: "14 2 14 8 20 8" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "17", x2: "16", y2: "17" })),
+        /* @__PURE__ */ React.createElement("span", null, "Note")
+      )),
+      mode === "confirm" && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm" }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Remove this ", kindLabel, "?"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "ann-chip-confirm-btn ann-chip-confirm-cancel",
+          onClick: () => setMode("main")
+        },
+        "Cancel"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "ann-chip-confirm-btn ann-chip-confirm-yes",
+          onClick: remove
+        },
+        "Yes, remove"
+      )),
+      mode === "colors" && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-colors" }, /* @__PURE__ */ React.createElement("button", { className: "ann-chip-back", onClick: () => setMode("main"), title: "Back" }, "\u2039"), HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: c,
+          className: "ann-chip-color-btn" + (ann.color === c ? " active" : ""),
+          "data-color": c,
+          onClick: () => recolor(c),
+          title: c
+        }
+      )))
+    ));
   }
 
-  // app/src/main/assets/src/ui/sheets/BookmarkCreateSheet.js
+  // app/src/main/assets/src/ui/sheets/BookmarkCreateSheet.jsx
   function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen }) {
     var useState = React.useState;
     var useEffect = React.useEffect;
@@ -10019,156 +9579,100 @@
     }
     var title = isEditMode ? "Edit Bookmark" : "New Bookmark";
     var saveTitle = isEditMode ? "Save changes" : "Save bookmark";
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "link-picker-overlay", onClick: onCancel }, /* @__PURE__ */ React.createElement(
       "div",
       {
-        className: "link-picker-overlay",
-        onClick: onCancel
+        className: "link-picker-sheet navpick-sheet bkm-create-sheet" + (isEditMode ? " bkm-create-sheet-edit" : ""),
+        onClick: function(e) {
+          e.stopPropagation();
+        }
       },
-      React.createElement(
-        "div",
+      /* @__PURE__ */ React.createElement("div", { className: "navpick-header" }, /* @__PURE__ */ React.createElement(
+        "button",
         {
-          className: "link-picker-sheet navpick-sheet bkm-create-sheet" + (isEditMode ? " bkm-create-sheet-edit" : ""),
-          onClick: function(e) {
-            e.stopPropagation();
-          }
+          className: "navpick-close navpick-close-undo",
+          onClick: onCancel,
+          "aria-label": "Cancel"
         },
-        React.createElement(
-          "div",
-          { className: "navpick-header" },
-          React.createElement("button", {
-            className: "navpick-close navpick-close-undo",
-            onClick: onCancel,
-            "aria-label": "Cancel"
-          }, "\xD7"),
-          React.createElement("span", { className: "navpick-title" }, title),
-          React.createElement(
-            "button",
-            {
-              className: "navpick-confirm-green",
-              onClick: canSave ? commit : void 0,
-              disabled: !canSave,
-              "aria-label": saveTitle,
-              title: canSave ? saveTitle : isEditMode ? "No changes to save" : "Add a label"
-            },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("polyline", { points: "20 6 9 17 4 12" })
-            )
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "bkm-create-body" },
-          pending.sourceLabel && React.createElement("div", { className: "bkm-create-source" }, pending.sourceLabel),
-          pending.excerpt && React.createElement("div", { className: "bkm-create-excerpt" }, "\u201C", pending.excerpt, "\u201D"),
-          React.createElement("div", { className: "bkm-create-field-label" }, "Label"),
-          React.createElement("input", {
-            ref: labelRef,
-            className: "bkm-create-label-input",
-            type: "text",
-            value: label,
-            onChange: function(e) {
-              setLabel(e.target.value);
-            },
-            onKeyDown: function(e) {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                if (canSave) commit();
-              } else if (e.key === "Escape") {
-                e.preventDefault();
-                onCancel();
-              }
-            },
-            placeholder: "A short name for this bookmark\u2026",
-            maxLength: 200
-          }),
-          React.createElement(
-            "div",
-            { className: "bkm-create-field-label" },
-            "A Thought",
-            React.createElement("span", { className: "bkm-create-field-hint" }, " (optional \u2014 why did you save this?)")
-          ),
-          React.createElement("textarea", {
-            className: "bkm-create-thought-input",
-            value: thought,
-            onChange: function(e) {
-              setThought(e.target.value);
-            },
-            onKeyDown: function(e) {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                onCancel();
-              } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                if (canSave) commit();
-              }
-            },
-            placeholder: "A few words for your future self\u2026",
-            rows: 4
-          }),
-          // Edit-mode actions: Open Source + Delete (tap-confirm). Only
-          // rendered when we're editing an existing bookmark.
-          // `pending.atSource` is set true by callers who know the user is
-          // already on the bookmarked passage (currently: inline-icon tap
-          // in dom-bookmarks.js). In that case the Open Source button is
-          // a no-op so we hide it — keeps the EDIT sheet tighter and
-          // avoids the dead-action confusion. Future callers from a list
-          // surface (e.g. BookmarksScreen → row → Edit, if/when wired)
-          // will leave atSource unset and get the Open button by default.
-          isEditMode && React.createElement(
-            "div",
-            { className: "bkm-create-edit-actions" },
-            !pending.atSource && React.createElement(
-              "button",
-              {
-                className: "bkm-create-edit-btn",
-                onClick: handleOpen,
-                title: "Open this passage"
-              },
-              React.createElement(
-                "svg",
-                { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-                React.createElement("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }),
-                React.createElement("polyline", { points: "15 3 21 3 21 9" }),
-                React.createElement("line", { x1: "10", y1: "14", x2: "21", y2: "3" })
-              ),
-              React.createElement("span", null, "Open Source")
-            ),
-            !confirmingDelete && React.createElement(
-              "button",
-              {
-                className: "bkm-create-edit-btn bkm-create-edit-btn-danger",
-                onClick: handleDelete,
-                title: "Delete this bookmark"
-              },
-              React.createElement(
-                "svg",
-                { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-                React.createElement("polyline", { points: "3 6 5 6 21 6" }),
-                React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }),
-                React.createElement("path", { d: "M10 11v6" }),
-                React.createElement("path", { d: "M14 11v6" })
-              ),
-              React.createElement("span", null, "Delete")
-            ),
-            confirmingDelete && React.createElement(
-              "div",
-              { className: "ann-chip-confirm bkm-create-edit-confirm" },
-              React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete bookmark?"),
-              React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
-                setConfirmingDelete(false);
-              } }, "Cancel"),
-              React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: handleDelete }, "Yes, delete")
-            )
-          )
-        )
-      )
-    );
+        "\xD7"
+      ), /* @__PURE__ */ React.createElement("span", { className: "navpick-title" }, title), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "navpick-confirm-green",
+          onClick: canSave ? commit : void 0,
+          disabled: !canSave,
+          "aria-label": saveTitle,
+          title: canSave ? saveTitle : isEditMode ? "No changes to save" : "Add a label"
+        },
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))
+      )),
+      /* @__PURE__ */ React.createElement("div", { className: "bkm-create-body" }, pending.sourceLabel && /* @__PURE__ */ React.createElement("div", { className: "bkm-create-source" }, pending.sourceLabel), pending.excerpt && /* @__PURE__ */ React.createElement("div", { className: "bkm-create-excerpt" }, "\u201C", pending.excerpt, "\u201D"), /* @__PURE__ */ React.createElement("div", { className: "bkm-create-field-label" }, "Label"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          ref: labelRef,
+          className: "bkm-create-label-input",
+          type: "text",
+          value: label,
+          onChange: function(e) {
+            setLabel(e.target.value);
+          },
+          onKeyDown: function(e) {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (canSave) commit();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              onCancel();
+            }
+          },
+          placeholder: "A short name for this bookmark\u2026",
+          maxLength: 200
+        }
+      ), /* @__PURE__ */ React.createElement("div", { className: "bkm-create-field-label" }, "A Thought", /* @__PURE__ */ React.createElement("span", { className: "bkm-create-field-hint" }, " (optional \u2014 why did you save this?)")), /* @__PURE__ */ React.createElement(
+        "textarea",
+        {
+          className: "bkm-create-thought-input",
+          value: thought,
+          onChange: function(e) {
+            setThought(e.target.value);
+          },
+          onKeyDown: function(e) {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              onCancel();
+            } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              if (canSave) commit();
+            }
+          },
+          placeholder: "A few words for your future self\u2026",
+          rows: 4
+        }
+      ), isEditMode && /* @__PURE__ */ React.createElement("div", { className: "bkm-create-edit-actions" }, !pending.atSource && /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "bkm-create-edit-btn",
+          onClick: handleOpen,
+          title: "Open this passage"
+        },
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 3 21 3 21 9" }), /* @__PURE__ */ React.createElement("line", { x1: "10", y1: "14", x2: "21", y2: "3" })),
+        /* @__PURE__ */ React.createElement("span", null, "Open Source")
+      ), !confirmingDelete && /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "bkm-create-edit-btn bkm-create-edit-btn-danger",
+          onClick: handleDelete,
+          title: "Delete this bookmark"
+        },
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" })),
+        /* @__PURE__ */ React.createElement("span", null, "Delete")
+      ), confirmingDelete && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm bkm-create-edit-confirm" }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete bookmark?"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
+        setConfirmingDelete(false);
+      } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: handleDelete }, "Yes, delete"))))
+    ));
   }
 
-  // app/src/main/assets/src/ui/sheets/NotebookManagerSheet.js
+  // app/src/main/assets/src/ui/sheets/NotebookManagerSheet.jsx
   function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
     const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
     const [newName, setNewName] = React.useState("");
@@ -10213,90 +9717,57 @@
       setHlTick((t) => t + 1);
       setConfirmDeleteId(null);
     };
-    return React.createElement(
-      "div",
-      { className: "nb-picker-overlay", onClick: onClose },
-      React.createElement(
-        "div",
-        { className: "nb-picker", onClick: (e) => e.stopPropagation() },
-        React.createElement(
-          "div",
-          { className: "nb-picker-header" },
-          React.createElement("span", { className: "nb-picker-title" }, "Manage Notebooks"),
-          React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")
-        ),
-        React.createElement(
-          "div",
-          { className: "nb-picker-new" },
-          React.createElement("input", {
+    return /* @__PURE__ */ React.createElement("div", { className: "nb-picker-overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker-header" }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-title" }, "Manage Notebooks"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")), /* @__PURE__ */ React.createElement("div", { className: "nb-picker-new" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        className: "nb-picker-new-input",
+        type: "text",
+        placeholder: "New notebook name\u2026",
+        value: newName,
+        onChange: (e) => setNewName(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            createNotebook();
+          }
+        },
+        maxLength: 60
+      }
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "nb-picker-new-btn" + (newName.trim() ? "" : " disabled"),
+        onClick: createNotebook,
+        disabled: !newName.trim()
+      },
+      "Create"
+    )), notebooks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : /* @__PURE__ */ React.createElement("div", { className: "nb-picker-list" }, notebooks.map((nb) => {
+      if (confirmDeleteId === nb.id) {
+        return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete \u201C", nb.name, "\u201D? Notes will move to Uncategorized."), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDeleteId(null) }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: () => deleteNb(nb.id) }, "Yes, delete"));
+      }
+      if (renameId === nb.id) {
+        return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "nb-picker-row checked", style: { gap: "8px" } }, /* @__PURE__ */ React.createElement(
+          "input",
+          {
             className: "nb-picker-new-input",
             type: "text",
-            placeholder: "New notebook name\u2026",
-            value: newName,
-            onChange: (e) => setNewName(e.target.value),
+            autoFocus: true,
+            value: renameValue,
+            onChange: (e) => setRenameValue(e.target.value),
             onKeyDown: (e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                createNotebook();
-              }
+                commitRename();
+              } else if (e.key === "Escape") cancelRename();
             },
-            maxLength: 60
-          }),
-          React.createElement("button", {
-            className: "nb-picker-new-btn" + (newName.trim() ? "" : " disabled"),
-            onClick: createNotebook,
-            disabled: !newName.trim()
-          }, "Create")
-        ),
-        notebooks.length === 0 ? React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : React.createElement(
-          "div",
-          { className: "nb-picker-list" },
-          notebooks.map((nb) => {
-            if (confirmDeleteId === nb.id) {
-              return React.createElement(
-                "div",
-                { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } },
-                React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete \u201C", nb.name, "\u201D? Notes will move to Uncategorized."),
-                React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDeleteId(null) }, "Cancel"),
-                React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: () => deleteNb(nb.id) }, "Yes, delete")
-              );
-            }
-            if (renameId === nb.id) {
-              return React.createElement(
-                "div",
-                { key: nb.id, className: "nb-picker-row checked", style: { gap: "8px" } },
-                React.createElement("input", {
-                  className: "nb-picker-new-input",
-                  type: "text",
-                  autoFocus: true,
-                  value: renameValue,
-                  onChange: (e) => setRenameValue(e.target.value),
-                  onKeyDown: (e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      commitRename();
-                    } else if (e.key === "Escape") cancelRename();
-                  },
-                  maxLength: 60,
-                  style: { flex: 1 }
-                }),
-                React.createElement("button", { className: "nb-picker-row-delete", onClick: cancelRename, title: "Cancel" }, "\u2715"),
-                React.createElement("button", { className: "nb-picker-new-btn", onClick: commitRename }, "Save")
-              );
-            }
-            const count = counts[nb.id] || 0;
-            return React.createElement(
-              "div",
-              { key: nb.id, className: "nb-picker-row", style: { cursor: "default" } },
-              React.createElement("span", { className: "nb-picker-name" }, nb.name),
-              React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: "0.52rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--cream-muted)", marginRight: "8px" } }, count, count === 1 ? " note" : " notes"),
-              React.createElement("button", { className: "nb-picker-row-delete", onClick: () => startRename(nb), title: "Rename", style: { color: "var(--cream-muted)", padding: "4px 8px" } }, "\u270E"),
-              React.createElement("button", { className: "nb-picker-row-delete", onClick: () => setConfirmDeleteId(nb.id), title: "Delete notebook", "aria-label": "Delete notebook" }, "\xD7")
-            );
-          })
-        )
-      )
-    );
+            maxLength: 60,
+            style: { flex: 1 }
+          }
+        ), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-row-delete", onClick: cancelRename, title: "Cancel" }, "\u2715"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-new-btn", onClick: commitRename }, "Save"));
+      }
+      const count = counts[nb.id] || 0;
+      return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "nb-picker-row", style: { cursor: "default" } }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-name" }, nb.name), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: "0.52rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--cream-muted)", marginRight: "8px" } }, count, count === 1 ? " note" : " notes"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-row-delete", onClick: () => startRename(nb), title: "Rename", style: { color: "var(--cream-muted)", padding: "4px 8px" } }, "\u270E"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-row-delete", onClick: () => setConfirmDeleteId(nb.id), title: "Delete notebook", "aria-label": "Delete notebook" }, "\xD7"));
+    }))));
   }
 
   // app/src/main/assets/src/ui/_entry-d.js

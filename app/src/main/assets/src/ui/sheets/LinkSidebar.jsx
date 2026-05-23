@@ -1,12 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   LinkSidebar — extracted React screen component
-   ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Self-contained — uses React.useX hooks directly (no dependency on the
-   inline script's `const { useState, ... } = React` destructuring).
-   All other call-time dependencies (Segments, FootnoteSheet, ScreenLayout,
-   findEntryContext, applyDOMHighlights, etc.) are global-lexical and
-   resolve at render time from the surrounding scripts.
+   LinkSidebar — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
@@ -31,18 +24,20 @@ export function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
   // fixed "today" date would be actively misleading. A count is always correct
   // and tells the user at a glance how many links are on this passage.
   const countStr = links.length === 0 ? 'No links' : (links.length === 1 ? '1 link' : links.length + ' links');
-  return React.createElement(React.Fragment, null,
-    React.createElement("div", { className: "link-sidebar-overlay", onClick: onClose }),
-    React.createElement("div", { className: "link-sidebar" },
-      React.createElement("div", { className: "link-sidebar-header" },
-        React.createElement("button", { className: "link-sidebar-close", onClick: onClose, title: "Close" }, "×"),
-        React.createElement("span", { className: "link-sidebar-title" }, "Links")
-      ),
-      React.createElement("div", { className: "link-sidebar-date" }, countStr),
-      React.createElement("div", { className: "link-sidebar-body" },
-        links.length === 0 && React.createElement("div", { className: "link-sidebar-empty" }, "No links yet"),
-        links.map(lnk => React.createElement(LinkCard, { key: lnk.id, lnk, hlKey, isBlockScope, onNavigate, setHlTick }))
-      )
-    )
+  return (
+    <>
+      <div className="link-sidebar-overlay" onClick={onClose} />
+      <div className="link-sidebar">
+        <div className="link-sidebar-header">
+          <button className="link-sidebar-close" onClick={onClose} title="Close">×</button>
+          <span className="link-sidebar-title">Links</span>
+        </div>
+        <div className="link-sidebar-date">{countStr}</div>
+        <div className="link-sidebar-body">
+          {links.length === 0 && <div className="link-sidebar-empty">No links yet</div>}
+          {links.map(lnk => <LinkCard key={lnk.id} lnk={lnk} hlKey={hlKey} isBlockScope={isBlockScope} onNavigate={onNavigate} setHlTick={setHlTick} />)}
+        </div>
+      </div>
+    </>
   );
 }

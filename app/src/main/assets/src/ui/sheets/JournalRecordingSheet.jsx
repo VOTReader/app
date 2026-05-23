@@ -1,26 +1,6 @@
-/* ═══════════════════════════════════════════════════════════════
-   JOURNAL RECORDING SHEET — voice memo capture UI
-   ═══════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Depends on: React, JournalMediaStore, JournalHelpers.
-
-   Flow:
-     'requesting' → 'recording' ⇄ 'paused' → 'preview' → save | discard
-                                                       → 'error'
-
-   Recording stage:
-     • live waveform sampled from AnalyserNode
-     • pause / resume via MediaRecorder.pause()/resume()
-     • cancel discards
-   Preview stage:
-     • plays back the captured Blob
-     • scrub-through-waveform: tap anywhere on the bars to seek
-     • Discard (×) drops everything, green ✓ saves to JournalMediaStore
-
-   Props:
-     onSave({mediaId, duration, samples})
-     onClose()
-═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   JournalRecordingSheet — Cluster D (esbuild bundle-d.js)
+   ═══════════════════════════════════════════════════════════════════════ */
 
 export function JournalRecordingSheet({ onSave, onClose }) {
   var useState = React.useState;
@@ -142,11 +122,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
 
     // doAttempt wraps getUserMedia with automatic retry for transient Android
     // audio-hardware errors (NotReadableError / TrackStartError / AbortError).
-    // These fire on Pixel/Samsung devices when the mic hardware is momentarily
-    // occupied — common right after the permission dialog closes or during a
-    // Bluetooth audio handoff. Re-arming the watchdog on every attempt prevents
-    // a hung promise leaving the sheet stuck on "Requesting microphone access…"
-    // indefinitely. Each retry backs off 400 ms further (400 / 800 / 1200 ms).
     function doAttempt() {
     if (watchdog) { clearTimeout(watchdog); watchdog = 0; }
     watchdog = setTimeout(function() {
@@ -162,15 +137,11 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       if (cancelled) { stream.getTracks().forEach(function(t) { t.stop(); }); return; }
       streamRef.current = stream;
 
-      // Tell the Android shell to switch to MODE_IN_COMMUNICATION so the mic
-      // AudioRecord session stays stable for the whole recording (Android 8+).
-      // No-op on desktop (no AndroidBridge).
       var _ab = (typeof window !== 'undefined') ? window.AndroidBridge : null;
       if (_ab && typeof _ab.startAudioSession === 'function') {
         try { _ab.startAudioSession(); } catch (e) {}
       }
 
-      // Pick a MIME type the WebView supports
       var mime = '';
       var candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
       for (var i = 0; i < candidates.length; i++) {
@@ -182,7 +153,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       try {
         rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       } catch (ctorErr) {
-        // Some old WebViews expose MediaRecorder but reject every container.
         try { stream.getTracks().forEach(function(t) { t.stop(); }); } catch (e) {}
         streamRef.current = null;
         console.warn('MediaRecorder construction failed', ctorErr);
@@ -198,8 +168,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
       rec.onstop = function() {
-        // Recording is done — restore the normal audio mode immediately so the
-        // preview <audio> plays through the speaker, not the call earpiece.
         var _ab2 = (typeof window !== 'undefined') ? window.AndroidBridge : null;
         if (_ab2 && typeof _ab2.endAudioSession === 'function') {
           try { _ab2.endAudioSession(); } catch (e) {}
@@ -207,7 +175,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         var type = rec.mimeType || 'audio/webm';
         var blob = new Blob(chunksRef.current, { type: type });
         previewBlobRef.current = blob;
-        // Release mic + analyser immediately
         if (streamRef.current) {
           try { streamRef.current.getTracks().forEach(function(t) { t.stop(); }); } catch (e) {}
           streamRef.current = null;
@@ -215,12 +182,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch (e) {} audioCtxRef.current = null; }
         analyserRef.current = null;
         try { previewUrlRef.current = URL.createObjectURL(blob); } catch (e) {}
-        // Snapshot the full sample buffer for the scrubbable preview waveform.
         setWaveFinal(samplesAccumRef.current.slice());
-        // If the user already tapped Save while the recorder was still
-        // flushing its final chunk (onstop is async), honour it now —
-        // otherwise the blob was null and the recording would be silently
-        // discarded.
         if (pendingSaveRef.current) {
           pendingSaveRef.current = false;
           persistRecording();
@@ -232,17 +194,12 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       accumulatedMsRef.current = 0;
       setStage('recording');
 
-      // Time ticker (only counts time while actively recording — when paused
-      // the accumulated total stays put).
       tickRef.current = setInterval(function() {
         if (rec.state === 'recording') {
           var sinceResume = Date.now() - startTimeRef.current;
           var totalMs = accumulatedMsRef.current + sinceResume;
           var s = Math.floor(totalMs / 1000);
           setSeconds(s);
-          // Cap at 5 min — must mirror stopRecording()'s teardown, otherwise
-          // the UI freezes on the recording screen, the tick interval keeps
-          // firing forever, and the waveform RAF loop never stops.
           if (s >= 300) {
             previewDurationRef.current = s;
             try { rec.stop(); } catch (e) {}
@@ -254,13 +211,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         }
       }, 200);
 
-      // Waveform sampling — runs continuously, only collects when recording.
-      // SKIPPED ON ANDROID: creating an AudioContext + createMediaStreamSource
-      // on the SAME getUserMedia stream that MediaRecorder is consuming triggers
-      // AAUDIO_ERROR_DISCONNECTED on Pixel 6+ (AAUDIO backend) — the capture
-      // drops out or never starts (a NotReadableError cause). Desktop browsers
-      // handle dual stream consumers fine. Trade-off: the live + preview
-      // waveform is flat on Android, but recording itself works reliably.
       var isAndroid = !!(typeof window !== 'undefined' && window.AndroidBridge);
       if (!isAndroid) {
       try {
@@ -288,12 +238,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
             if (now - lastSample > 80) {
               lastSample = now;
               if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                // 8× amplification: speech RMS through a typical mic is ~0.02–0.06,
-                // so 3× barely moved the 56px bars (read as flat). 8× maps normal
-                // speech to ~22–45px without clipping on moderately loud input.
                 var lvl = Math.min(1, rms * 8);
                 samplesAccumRef.current.push(lvl);
-                // Keep live display at ~48 samples
                 var live = samplesAccumRef.current.slice(-48);
                 setWaveLive(live);
               }
@@ -308,11 +254,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       if (watchdog) { clearTimeout(watchdog); watchdog = 0; }
       if (cancelled) return;
       var name = err && err.name;
-      // NotReadableError / TrackStartError / AbortError = the audio hardware was
-      // transiently unavailable (common on Android WebView right after a permission
-      // dialog closes, or during a Bluetooth audio handoff). Retry with exponential
-      // back-off before surfacing an error to the user — on most devices the second
-      // or third attempt succeeds within a second.
       var retriable = name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError';
       if (retriable && retryCount < MAX_RETRIES && !cancelled) {
         retryCount++;
@@ -338,14 +279,9 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     } // end beginCapture
 
     // ── Native Android recorder path ─────────────────────────
-    // Records via the OS MediaRecorder (Kotlin bridge) instead of WebView
-    // getUserMedia. This is the reliable path across the Android version /
-    // OEM matrix — getUserMedia in Android WebView is the fragile component.
-    // The live waveform is driven by MediaRecorder.getMaxAmplitude() polled
-    // through the bridge, so Android keeps a moving waveform.
     function beginNativeCapture() {
       if (cancelled || settled) return;
-      settled = true;   // native start is synchronous — no hanging promise to watchdog
+      settled = true;
       var AB = window.AndroidBridge;
       nativeRef.current = true;
       var res;
@@ -367,22 +303,18 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       accumulatedMsRef.current = 0;
       setStage('recording');
 
-      // Duration ticker — mirrors the getUserMedia path but keyed off
-      // nativeStateRef (there is no MediaRecorder object in native mode).
       tickRef.current = setInterval(function() {
         if (nativeStateRef.current === 'recording') {
           var sinceResume = Date.now() - startTimeRef.current;
           var s = Math.floor((accumulatedMsRef.current + sinceResume) / 1000);
           setSeconds(s);
-          if (s >= 300) {           // 5-min cap (mirror stopRecording)
+          if (s >= 300) {
             previewDurationRef.current = s;
             stopRecording();
           }
         }
       }, 200);
 
-      // Live waveform from MediaRecorder.getMaxAmplitude() (0..32767). sqrt
-      // curve so quiet speech is visible without loud speech clipping the bar.
       ampRef.current = setInterval(function() {
         if (nativeStateRef.current !== 'recording') return;
         var amp = 0;
@@ -393,9 +325,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       }, 80);
     }
 
-    // Called by the Kotlin bridge when nativeRecordStop finishes (or fails).
-    // Builds a Blob from the base64 AAC/MP4 and hands off to the existing
-    // preview / persist pipeline — identical downstream of getUserMedia's onstop.
     window.__onNativeRecordingComplete = function(b64, durMs, mime) {
       if (cancelled) return;
       nativeStateRef.current = 'inactive';
@@ -419,7 +348,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         previewDurationRef.current = d;
         setWaveFinal(samplesAccumRef.current.slice());
         setSeconds(d);
-        // Honour a Save tapped before the blob arrived (same as onstop path).
         if (pendingSaveRef.current) {
           pendingSaveRef.current = false;
           persistRecording();
@@ -433,7 +361,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       }
     };
 
-    // Pick the recorder: native bridge on Android, getUserMedia on desktop.
     function startCapture() {
       var _ab = (typeof window !== 'undefined') ? window.AndroidBridge : null;
       if (_ab && typeof _ab.nativeRecordStart === 'function') {
@@ -443,14 +370,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       }
     }
 
-    // ── Permission gate ──────────────────────────────────────
-    // On Android, proactively obtain the OS RECORD_AUDIO permission FIRST,
-    // via the native bridge, before getUserMedia runs. That way the
-    // WebView's onPermissionRequest sees the permission already granted and
-    // resolves synchronously — eliminating the grant-after-dialog race that
-    // left getUserMedia hanging on some devices (e.g. Pixel 9 Pro). On PC /
-    // preview (no bridge) the browser handles its own prompt, so capture
-    // begins immediately.
     var permTimer = 0;
     var AB = (typeof window !== 'undefined') ? window.AndroidBridge : null;
     if (AB && typeof AB.requestMicPermission === 'function') {
@@ -468,8 +387,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           setStage('error');
         }
       };
-      // Fallback: if the bridge never calls back (unexpected), try capture
-      // anyway so the sheet can't get permanently stuck on "Requesting…".
       permTimer = setTimeout(function() {
         if (permDecided || cancelled) return;
         permDecided = true;
@@ -532,7 +449,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
 
   function stopRecording() {
     if (nativeRef.current) {
-      // Finalise duration; the blob arrives async via __onNativeRecordingComplete.
       var totalMs = accumulatedMsRef.current;
       if (nativeStateRef.current === 'recording') totalMs += (Date.now() - startTimeRef.current);
       previewDurationRef.current = Math.max(1, Math.floor(totalMs / 1000));
@@ -546,7 +462,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     }
     var rec = mediaRecorderRef.current;
     if (rec && rec.state !== 'inactive') {
-      // Finalise the total duration BEFORE rec.stop fires its onstop.
       var totalMs2 = accumulatedMsRef.current;
       if (rec.state === 'recording') totalMs2 += (Date.now() - startTimeRef.current);
       previewDurationRef.current = Math.max(1, Math.floor(totalMs2 / 1000));
@@ -558,18 +473,14 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   }
 
   function discard() {
-    // Clear any queued save so a late onstop can't resurrect a discarded clip.
     pendingSaveRef.current = false;
     cleanup();
     onClose && onClose();
   }
 
-  // Actually write the captured blob to IDB. Only called once the blob is
-  // known to exist (either save() saw it, or onstop fired a pending save).
   function persistRecording() {
     var blob = previewBlobRef.current;
     if (!blob || !blob.size) {
-      // Recorder produced no audio at all (e.g. immediate stop, no chunks).
       setError('Nothing was recorded. Try again and speak after the timer starts.');
       setStage('error');
       return;
@@ -597,25 +508,19 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   }
 
   function save() {
-    // The recorder's onstop is async — if the user taps ✓ before the final
-    // chunk flushed, previewBlobRef is still null. Queue the save instead of
-    // discarding (the old behaviour silently lost the recording).
     if (!previewBlobRef.current) {
       var rec = mediaRecorderRef.current;
       if (rec && rec.state !== 'inactive') {
-        // Still recording somehow (defensive) — stop, then onstop saves.
         pendingSaveRef.current = true;
         try { rec.stop(); } catch (e) {}
         return;
       }
-      // rec already inactive but onstop hasn't run yet → wait for it.
       pendingSaveRef.current = true;
       return;
     }
     persistRecording();
   }
 
-  // ─── Preview audio lifecycle ────────────────────────────────
   function togglePreviewPlay() {
     var a = previewAudioRef.current;
     if (!a) return;
@@ -654,9 +559,9 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     for (var i = 0; i < count; i++) {
       var v = src.length ? src[Math.min(src.length - 1, Math.floor(i * src.length / count))] : 0.05;
       var h = Math.max(4, Math.min(56, Math.round(v * 56)));
-      bars.push(React.createElement('div', { key: i, className: 'bar', style: { height: h + 'px' } }));
+      bars.push(<div key={i} className="bar" style={{ height: h + 'px' }} />);
     }
-    return React.createElement('div', { className: 'jrn-rec-waveform' }, bars);
+    return <div className="jrn-rec-waveform">{bars}</div>;
   }
 
   function renderScrubWave(samples, prog) {
@@ -666,107 +571,130 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     for (var i = 0; i < count; i++) {
       var v = src.length ? src[Math.min(src.length - 1, Math.floor(i * src.length / count))] : 0.3;
       var h = Math.max(4, Math.min(56, Math.round(v * 56)));
-      bars.push(React.createElement('div', {
-        key: i,
-        className: 'bar' + ((i / count) <= prog ? ' is-played' : ''),
-        style: { height: h + 'px' }
-      }));
+      bars.push(
+        <div
+          key={i}
+          className={'bar' + ((i / count) <= prog ? ' is-played' : '')}
+          style={{ height: h + 'px' }}
+        />
+      );
     }
-    return React.createElement('div', {
-      className: 'jrn-rec-waveform is-scrubbable',
-      onClick: seekPreviewFromEvent,
-      role: 'slider', 'aria-label': 'Scrub recording'
-    }, bars);
+    return (
+      <div
+        className="jrn-rec-waveform is-scrubbable"
+        onClick={seekPreviewFromEvent}
+        role="slider"
+        aria-label="Scrub recording"
+      >
+        {bars}
+      </div>
+    );
   }
 
   function renderContent() {
     if (stage === 'error') {
-      return React.createElement('div', null,
-        React.createElement('div', { className: 'jrn-rec-error' }, error || 'Recording failed.'),
-        React.createElement('div', { className: 'jrn-rec-actions' },
-          React.createElement('button', { className: 'jrn-rec-cancel', onClick: discard }, 'Close')
-        )
+      return (
+        <div>
+          <div className="jrn-rec-error">{error || 'Recording failed.'}</div>
+          <div className="jrn-rec-actions">
+            <button className="jrn-rec-cancel" onClick={discard}>Close</button>
+          </div>
+        </div>
       );
     }
     if (stage === 'requesting') {
-      return React.createElement('div', { className: 'jrn-rec-content' },
-        React.createElement('div', { className: 'jrn-rec-requesting' }, 'Requesting microphone access…'),
-        React.createElement('div', { className: 'jrn-rec-actions' },
-          React.createElement('button', { className: 'jrn-rec-cancel', onClick: discard }, 'Cancel')
-        )
+      return (
+        <div className="jrn-rec-content">
+          <div className="jrn-rec-requesting">Requesting microphone access…</div>
+          <div className="jrn-rec-actions">
+            <button className="jrn-rec-cancel" onClick={discard}>Cancel</button>
+          </div>
+        </div>
       );
     }
     if (stage === 'recording' || stage === 'paused') {
       var isPaused = stage === 'paused';
-      return React.createElement('div', { className: 'jrn-rec-content' },
-        React.createElement('div', { className: 'jrn-rec-status' + (isPaused ? ' is-paused' : '') }, isPaused ? 'Paused' : 'Recording'),
-        React.createElement('div', { className: 'jrn-rec-time' }, fmtTime(seconds)),
-        renderRecordingWave(waveLive),
-        React.createElement('div', { className: 'jrn-rec-actions' },
-          React.createElement('button', { className: 'jrn-rec-cancel', onClick: discard, 'aria-label': 'Cancel' }, 'Cancel'),
-          isPaused
-            ? React.createElement('button', { className: 'jrn-rec-pause-btn', onClick: resumeRecording, 'aria-label': 'Resume', title: 'Resume' },
-                React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' },
-                  React.createElement('path', { d: 'M6 3v18l16-9z' })
-                )
-              )
-            : React.createElement('button', { className: 'jrn-rec-pause-btn', onClick: pauseRecording, 'aria-label': 'Pause', title: 'Pause' },
-                React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' },
-                  React.createElement('path', { d: 'M6 4h4v16H6zM14 4h4v16h-4z' })
-                )
-              ),
-          React.createElement('button', { className: 'jrn-rec-stop-btn', onClick: stopRecording, 'aria-label': 'Finish', title: 'Finish' },
-            React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' },
-              React.createElement('rect', { x: 6, y: 6, width: 12, height: 12, rx: 2 })
-            )
-          )
-        )
+      return (
+        <div className="jrn-rec-content">
+          <div className={"jrn-rec-status" + (isPaused ? ' is-paused' : '')}>{isPaused ? 'Paused' : 'Recording'}</div>
+          <div className="jrn-rec-time">{fmtTime(seconds)}</div>
+          {renderRecordingWave(waveLive)}
+          <div className="jrn-rec-actions">
+            <button className="jrn-rec-cancel" onClick={discard} aria-label="Cancel">Cancel</button>
+            {isPaused ? (
+              <button className="jrn-rec-pause-btn" onClick={resumeRecording} aria-label="Resume" title="Resume">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 3v18l16-9z" />
+                </svg>
+              </button>
+            ) : (
+              <button className="jrn-rec-pause-btn" onClick={pauseRecording} aria-label="Pause" title="Pause">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+                </svg>
+              </button>
+            )}
+            <button className="jrn-rec-stop-btn" onClick={stopRecording} aria-label="Finish" title="Finish">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <rect x={6} y={6} width={12} height={12} rx={2} />
+              </svg>
+            </button>
+          </div>
+        </div>
       );
     }
     // preview — scrub through real waveform, green ✓ to confirm
-    return React.createElement('div', { className: 'jrn-rec-content jrn-rec-preview' },
-      React.createElement('div', { className: 'jrn-rec-status' }, 'Review'),
-      React.createElement('div', { className: 'jrn-rec-time' },
-        fmtTime(Math.floor((progress || 0) * (previewDurationRef.current || seconds))),
-        React.createElement('span', { className: 'jrn-rec-time-total' }, ' / ' + fmtTime(previewDurationRef.current || seconds))
-      ),
-      renderScrubWave(waveFinal, progress),
-      React.createElement('div', { className: 'jrn-rec-preview-actions' },
-        React.createElement('button', { className: 'jrn-rec-pp', onClick: togglePreviewPlay, 'aria-label': previewPlaying ? 'Pause' : 'Play', title: previewPlaying ? 'Pause' : 'Play' },
-          React.createElement('svg', { viewBox: '0 0 24 24', fill: 'currentColor' },
-            previewPlaying
-              ? React.createElement('path', { d: 'M6 4h4v16H6zM14 4h4v16h-4z' })
-              : React.createElement('path', { d: 'M6 3v18l16-9z' })
-          )
-        )
-      ),
-      React.createElement('div', { className: 'jrn-rec-actions' },
-        React.createElement('button', { className: 'jrn-rec-discard-btn', onClick: discard, 'aria-label': 'Discard', title: 'Discard' }, '×'),
-        React.createElement('button', { className: 'jrn-rec-confirm-btn', onClick: save, 'aria-label': 'Save', title: 'Save' },
-          React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.6', strokeLinecap: 'round', strokeLinejoin: 'round' },
-            React.createElement('polyline', { points: '20 6 9 17 4 12' })
-          )
-        )
-      ),
-      previewUrlRef.current && React.createElement('audio', {
-        ref: previewAudioRef,
-        src: previewUrlRef.current,
-        style: { display: 'none' },
-        onPlay: function() { setPreviewPlaying(true); },
-        onPause: function() { setPreviewPlaying(false); },
-        onEnded: function() { setPreviewPlaying(false); setProgress(0); },
-        onTimeUpdate: onPreviewTimeUpdate
-      })
+    return (
+      <div className="jrn-rec-content jrn-rec-preview">
+        <div className="jrn-rec-status">Review</div>
+        <div className="jrn-rec-time">
+          {fmtTime(Math.floor((progress || 0) * (previewDurationRef.current || seconds)))}
+          <span className="jrn-rec-time-total">{' / ' + fmtTime(previewDurationRef.current || seconds)}</span>
+        </div>
+        {renderScrubWave(waveFinal, progress)}
+        <div className="jrn-rec-preview-actions">
+          <button className="jrn-rec-pp" onClick={togglePreviewPlay} aria-label={previewPlaying ? 'Pause' : 'Play'} title={previewPlaying ? 'Pause' : 'Play'}>
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              {previewPlaying
+                ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+                : <path d="M6 3v18l16-9z" />}
+            </svg>
+          </button>
+        </div>
+        <div className="jrn-rec-actions">
+          <button className="jrn-rec-discard-btn" onClick={discard} aria-label="Discard" title="Discard">×</button>
+          <button className="jrn-rec-confirm-btn" onClick={save} aria-label="Save" title="Save">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+        </div>
+        {previewUrlRef.current && (
+          <audio
+            ref={previewAudioRef}
+            src={previewUrlRef.current}
+            style={{ display: 'none' }}
+            onPlay={function() { setPreviewPlaying(true); }}
+            onPause={function() { setPreviewPlaying(false); }}
+            onEnded={function() { setPreviewPlaying(false); setProgress(0); }}
+            onTimeUpdate={onPreviewTimeUpdate}
+          />
+        )}
+      </div>
     );
   }
 
-  return React.createElement('div', { className: 'note-sheet-overlay', onClick: function(e) { if (e.target === e.currentTarget) discard(); } },
-    React.createElement('div', { className: 'note-sheet jrn-rec-sheet', onClick: function(e) { e.stopPropagation(); } },
-      React.createElement('div', { className: 'note-sheet-header' },
-        React.createElement('span', { className: 'note-sheet-title', style: { flex: 1 } }, stage === 'preview' ? 'Review Recording' : 'Voice Recording'),
-        stage !== 'preview' && React.createElement('button', { className: 'note-sheet-menu-btn', onClick: discard, 'aria-label': 'Close', style: { fontSize: '18px' } }, '×')
-      ),
-      renderContent()
-    )
+  return (
+    <div className="note-sheet-overlay" onClick={function(e) { if (e.target === e.currentTarget) discard(); }}>
+      <div className="note-sheet jrn-rec-sheet" onClick={function(e) { e.stopPropagation(); }}>
+        <div className="note-sheet-header">
+          <span className="note-sheet-title" style={{ flex: 1 }}>{stage === 'preview' ? 'Review Recording' : 'Voice Recording'}</span>
+          {stage !== 'preview' && (
+            <button className="note-sheet-menu-btn" onClick={discard} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
+          )}
+        </div>
+        {renderContent()}
+      </div>
+    </div>
   );
 }

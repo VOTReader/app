@@ -1,12 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   LetterExcerptPickerScreen — extracted React screen component
-   ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Self-contained — uses React.useX hooks directly (no dependency on the
-   inline script's `const { useState, ... } = React` destructuring).
-   All other call-time dependencies (Segments, FootnoteSheet, ScreenLayout,
-   findEntryContext, applyDOMHighlights, etc.) are global-lexical and
-   resolve at render time from the surrounding scripts.
+   LetterExcerptPickerScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
@@ -129,12 +122,14 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
   }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink]);
 
   if (!entry) {
-    return React.createElement("div", { className: "picker-screen" },
-      React.createElement("div", { className: "picker-header" },
-        React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "←"),
-        React.createElement("span", { className: "picker-title" }, "Select Text to Link")
-      ),
-      React.createElement("div", { className: "picker-empty" }, "Letter not found.")
+    return (
+      <div className="picker-screen">
+        <div className="picker-header">
+          <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
+          <span className="picker-title">Select Text to Link</span>
+        </div>
+        <div className="picker-empty">Letter not found.</div>
+      </div>
     );
   }
 
@@ -143,36 +138,40 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
                        target.type === 'holy-days' ? 'Holy Days' : '');
   const hasSelection = !!selInfo;
 
-  return React.createElement("div", { className: "picker-screen" },
-    React.createElement("div", { className: "picker-header" },
-      React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "←"),
-      React.createElement("span", { className: "picker-title" }, "Select Text to Link"),
-      React.createElement("button", {
-        className: "picker-confirm",
-        onClick: confirmLink, "aria-label": "Confirm",
-        title: hasSelection ? "Link this excerpt" : "Link the whole letter"
-      },
-        React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" },
-          React.createElement("polyline", { points: "20 6 9 17 4 12" })
-        )
-      )
-    ),
-    React.createElement("div", { className: "picker-body picker-body-letter", ref: bodyRef,
-      onMouseUp: captureSelection, onTouchEnd: captureSelection
-    },
-      React.createElement("div", { className: "picker-letter-title" }, titleText),
-      subtitleText && React.createElement("div", { className: "picker-letter-subtitle" }, subtitleText),
-      hasSelection && React.createElement("div", { className: "picker-selection-hint" },
-        '"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + '…' : selInfo.text) + '"'
-      ),
-      !hasSelection && React.createElement("div", { className: "picker-selection-hint picker-selection-hint-empty" },
-        "Long-press and drag to select an excerpt, then tap ✓. Tap ✓ without selecting to link the whole letter."
-      ),
-      blocks.map(b => React.createElement("p", {
-        key: b.key,
-        "data-block-key": b.key,
-        className: "picker-letter-block"
-      }, b.text))
-    )
+  return (
+    <div className="picker-screen">
+      <div className="picker-header">
+        <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
+        <span className="picker-title">Select Text to Link</span>
+        <button
+          className="picker-confirm"
+          onClick={confirmLink}
+          aria-label="Confirm"
+          title={hasSelection ? "Link this excerpt" : "Link the whole letter"}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+      </div>
+      <div
+        className="picker-body picker-body-letter"
+        ref={bodyRef}
+        onMouseUp={captureSelection}
+        onTouchEnd={captureSelection}
+      >
+        <div className="picker-letter-title">{titleText}</div>
+        {subtitleText && <div className="picker-letter-subtitle">{subtitleText}</div>}
+        {hasSelection && <div className="picker-selection-hint">{'"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + '…' : selInfo.text) + '"'}</div>}
+        {!hasSelection && <div className="picker-selection-hint picker-selection-hint-empty">Long-press and drag to select an excerpt, then tap ✓. Tap ✓ without selecting to link the whole letter.</div>}
+        {blocks.map(b => (
+          <p
+            key={b.key}
+            data-block-key={b.key}
+            className="picker-letter-block"
+          >{b.text}</p>
+        ))}
+      </div>
+    </div>
   );
 }
