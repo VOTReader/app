@@ -839,9 +839,9 @@
     return segments;
   }
 
-  // app/src/main/assets/src/utils/highlight.js
+  // app/src/main/assets/src/utils/highlight.jsx
   function normalizeForHighlight(s) {
-    return String(s || "").replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/[\u2013\u2014]/g, "-").toLowerCase();
+    return String(s || "").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").toLowerCase();
   }
   function splitWithHighlight2(text, needle, keyPrefix) {
     if (!text || !needle) return null;
@@ -853,13 +853,7 @@
     const before = text.slice(0, idx);
     const match = text.slice(idx, idx + need.length);
     const after = text.slice(idx + need.length);
-    return /* @__PURE__ */ React.createElement(
-      React.Fragment,
-      null,
-      before,
-      /* @__PURE__ */ React.createElement("mark", { key: `${keyPrefix}-mark`, className: "letter-highlight" }, match),
-      after
-    );
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, before, /* @__PURE__ */ React.createElement("mark", { key: `${keyPrefix}-mark`, className: "letter-highlight" }, match), after);
   }
   function highlightExcerptInDom2(mainEl, excerpt) {
     if (!mainEl || !excerpt) return [];
@@ -976,7 +970,7 @@
     return hits.map((r) => r.el);
   }
 
-  // app/src/main/assets/src/utils/render-text.js
+  // app/src/main/assets/src/utils/render-text.jsx
   function renderTextWithScripRefs2(text, baseClassName, onScripClick, highlightText) {
     if (!text) return baseClassName ? /* @__PURE__ */ React.createElement("span", { className: baseClassName }, text) : text;
     const hasRef = text.includes("{{ref:");
@@ -992,16 +986,20 @@
       const m = part.match(/^\{\{ref:(.+)\}\}$/);
       if (m) {
         const ref = m[1].trim();
-        return /* @__PURE__ */ React.createElement("a", {
-          key: i,
-          className: "inline-scrip-ref",
-          href: "#",
-          onClick: (e) => {
-            e.preventDefault();
-            onScripClick && onScripClick(ref);
+        return /* @__PURE__ */ React.createElement(
+          "a",
+          {
+            key: i,
+            className: "inline-scrip-ref",
+            href: "#",
+            onClick: (e) => {
+              e.preventDefault();
+              onScripClick && onScripClick(ref);
+            },
+            title: ref
           },
-          title: ref
-        }, ref);
+          ref
+        );
       }
       if (!part) return null;
       let content = part;

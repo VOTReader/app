@@ -53,7 +53,7 @@ import { JournalIndexStore } from './journal-index-store.js';
 import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
 
 // ── Components ──────────────────────────────────────────────────────────
-import { ExpandableText, JrnExpandable } from '../components/ExpandableText.js';
+import { ExpandableText, JrnExpandable } from '../components/ExpandableText.jsx';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 
 // ── Hooks ───────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ import {
   JournalChip,
   jrnRefKeyForLetter, jrnRefKeyForChapter,
   jrnRefKeyForBookmark, jrnRefKeyForLetterByLabel,
-} from '../renderer/dom-journal-chip.js';
+} from '../renderer/dom-journal-chip.jsx';
 
 // Expose every public symbol on window so classic-script consumers
 // (Cluster A, Cluster D, the inline App() block) can call by bare name.

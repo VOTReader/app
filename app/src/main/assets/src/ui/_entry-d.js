@@ -58,8 +58,8 @@ import {
   firstVerseOfRef, parseRefRanges, lastVerseOfFirstRange, echoVersesForRef,
   getNotesForVerse, getEchoesForVerse, parseRefRange, splitIntoVerses,
 } from '../utils/scripture-parse.js';
-import { normalizeForHighlight, splitWithHighlight, highlightExcerptInDom } from '../utils/highlight.js';
-import { renderTextWithScripRefs } from '../utils/render-text.js';
+import { normalizeForHighlight, splitWithHighlight, highlightExcerptInDom } from '../utils/highlight.jsx';
+import { renderTextWithScripRefs } from '../utils/render-text.jsx';
 import { srchGroupKey } from '../utils/search.js';
 
 // ── Late stores + data ──────────────────────────────────────────────────

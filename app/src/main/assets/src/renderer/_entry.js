@@ -26,7 +26,7 @@ import {
   applyActiveNoteState,
   applyDOMHighlights,
   StaticSubtree,
-} from './annotation-engine.js';
+} from './annotation-engine.jsx';
 
 // Expose to the global scope so classic-script consumers (the inline
 // App() block, BibleChapterView/ChapterView, etc.) can call by bare

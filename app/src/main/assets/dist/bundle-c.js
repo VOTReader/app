@@ -373,7 +373,7 @@
     }
   }
 
-  // app/src/main/assets/src/renderer/annotation-engine.js
+  // app/src/main/assets/src/renderer/annotation-engine.jsx
   function snapRangeToWords(text, start, end) {
     if (!text || typeof text !== "string") return { start, end };
     start = Math.max(0, Math.min(start, text.length));
@@ -394,11 +394,11 @@
     const annotations = React.useMemo(() => AnnotationStore.get(hlKey), [hlKey, hlTick]);
     if (!text) return null;
     if (!annotations || annotations.length === 0) {
-      return React.createElement("span", { "data-hl-key": hlKey }, text);
+      return /* @__PURE__ */ React.createElement("span", { "data-hl-key": hlKey }, text);
     }
     const valid = annotations.map((a) => ({ ann: a, s: Math.max(0, Math.min(a.start, text.length)), e: Math.max(0, Math.min(a.end, text.length)) })).filter((v) => v.s < v.e);
     if (valid.length === 0) {
-      return React.createElement("span", { "data-hl-key": hlKey }, text);
+      return /* @__PURE__ */ React.createElement("span", { "data-hl-key": hlKey }, text);
     }
     const set = /* @__PURE__ */ new Set([0, text.length]);
     valid.forEach((v) => {
@@ -429,37 +429,30 @@
         if (isWordChar(lastCh) && isWordChar(nextCh)) seg.noBreakAfter = true;
       }
     });
-    return React.createElement(
-      "span",
-      { "data-hl-key": hlKey },
-      segments.map((seg, segIdx) => {
-        const segText = text.slice(seg.start, seg.end);
-        if (seg.active.length === 0) {
-          if (seg.noBreakAfter) {
-            return React.createElement("span", { key: "p" + segIdx, "data-no-break-after": "1" }, segText);
-          }
-          return React.createElement(React.Fragment, { key: "p" + segIdx }, segText);
+    return /* @__PURE__ */ React.createElement("span", { "data-hl-key": hlKey }, segments.map((seg, segIdx) => {
+      const segText = text.slice(seg.start, seg.end);
+      if (seg.active.length === 0) {
+        if (seg.noBreakAfter) {
+          return /* @__PURE__ */ React.createElement("span", { key: "p" + segIdx, "data-no-break-after": "1" }, segText);
         }
-        let node = segText;
-        for (let i = seg.active.length - 1; i >= 0; i--) {
-          const ann = seg.active[i];
-          const kind = ann.kind || "highlight";
-          const isFirst = firstSegByGroup.get(ann.groupId) === segIdx;
-          const isLast = lastSegByGroup.get(ann.groupId) === segIdx;
-          const isOutermost = i === 0;
-          const props = {
-            key: isOutermost ? "m" + segIdx : "m" + segIdx + "_" + i,
-            className: annMarkClass(ann, isFirst, isLast),
-            "data-hl-id": ann.id,
-            "data-group-id": ann.groupId,
-            "data-kind": kind
-          };
-          if (isOutermost && seg.noBreakAfter) props["data-no-break-after"] = "1";
-          node = React.createElement("mark", props, node);
-        }
-        return node;
-      })
-    );
+        return /* @__PURE__ */ React.createElement(React.Fragment, { key: "p" + segIdx }, segText);
+      }
+      return seg.active.reduceRight((child, ann, i) => {
+        const kind = ann.kind || "highlight";
+        const isFirst = firstSegByGroup.get(ann.groupId) === segIdx;
+        const isLast = lastSegByGroup.get(ann.groupId) === segIdx;
+        const isOutermost = i === 0;
+        const props = {
+          key: isOutermost ? "m" + segIdx : "m" + segIdx + "_" + i,
+          className: annMarkClass(ann, isFirst, isLast),
+          "data-hl-id": ann.id,
+          "data-group-id": ann.groupId,
+          "data-kind": kind
+        };
+        if (isOutermost && seg.noBreakAfter) props["data-no-break-after"] = "1";
+        return /* @__PURE__ */ React.createElement("mark", { ...props }, child);
+      }, segText);
+    }));
   }
   function findNoteIconInsertionPoint(mark) {
     const container = mark.closest("[data-hl-key]");

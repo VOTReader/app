@@ -1630,7 +1630,7 @@
     }
   });
 
-  // app/src/main/assets/src/components/ExpandableText.js
+  // app/src/main/assets/src/components/ExpandableText.jsx
   function ExpandableText(props) {
     var useState = React.useState;
     var text = props.text || "";
@@ -1641,7 +1641,7 @@
     var expanded = _exp[0];
     var setExpanded = _exp[1];
     if (!text || text.length <= threshold) {
-      return React.createElement("div", { className }, text);
+      return /* @__PURE__ */ React.createElement("div", { className }, text);
     }
     var head = text.slice(0, threshold).trim();
     function toggle(e) {
@@ -1664,17 +1664,7 @@
       divProps.style = { cursor: "pointer" };
       divProps.title = expanded ? "Tap to collapse" : "Tap to read more";
     }
-    return React.createElement(
-      "div",
-      divProps,
-      expanded ? text : head + "\u2026",
-      " ",
-      React.createElement("button", {
-        type: "button",
-        className: "jrn-expand-toggle",
-        onClick: toggle
-      }, expanded ? "Show less" : "Show more")
-    );
+    return /* @__PURE__ */ React.createElement("div", { ...divProps }, expanded ? text : head + "\u2026", " ", /* @__PURE__ */ React.createElement("button", { type: "button", className: "jrn-expand-toggle", onClick: toggle }, expanded ? "Show less" : "Show more"));
   }
   var JrnExpandable2 = ExpandableText;
   if (typeof window !== "undefined") {
@@ -6345,7 +6335,7 @@
     ));
   }
 
-  // app/src/main/assets/src/renderer/dom-journal-chip.js
+  // app/src/main/assets/src/renderer/dom-journal-chip.jsx
   function JournalChip({ refKey, hlTick, onClick, label }) {
     var useMemo = React.useMemo;
     var ids = useMemo(function() {
@@ -6353,7 +6343,7 @@
       return JournalIndexStore.entriesReferencing(refKey);
     }, [refKey, hlTick]);
     if (!refKey || !ids || ids.length === 0) return null;
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement(
       "button",
       {
         className: "nav-search-btn jrn-inbound-chip",
@@ -6363,13 +6353,8 @@
         title: ids.length + " journal " + (ids.length === 1 ? "entry" : "entries"),
         "aria-label": "Journal entries"
       },
-      React.createElement(
-        "svg",
-        { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", style: { color: "var(--gold)" } },
-        React.createElement("path", { d: "M7 4h10a2 2 0 012 2v14l-7-3-7 3V6a2 2 0 012-2z" }),
-        React.createElement("path", { d: "M9 9h6M9 13h4" })
-      ),
-      React.createElement("span", { className: "jrn-inbound-chip-badge" }, ids.length)
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round", style: { color: "var(--gold)" } }, /* @__PURE__ */ React.createElement("path", { d: "M7 4h10a2 2 0 012 2v14l-7-3-7 3V6a2 2 0 012-2z" }), /* @__PURE__ */ React.createElement("path", { d: "M9 9h6M9 13h4" })),
+      /* @__PURE__ */ React.createElement("span", { className: "jrn-inbound-chip-badge" }, ids.length)
     );
   }
   function jrnRefKeyForLetter(volKey, letterId) {
