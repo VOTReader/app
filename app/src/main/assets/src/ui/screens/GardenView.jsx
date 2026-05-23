@@ -1,10 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   GardenView — extracted React screen component
-   ═══════════════════════════════════════════════════════════════════════
-   ES module (G.2.3). GARDEN_PRELOAD_AHEAD + GARDEN_CRAWL_DELAY are owned
-   here (only consumer); the cross-D shared garden constants live in
-   src/utils/garden.js and are accessed via window globals exposed by
-   _entry-d.js.
+   GardenView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const GARDEN_PRELOAD_AHEAD = 5;
@@ -96,57 +91,67 @@ export function GardenView({ page, onPageChange, onBack, theme, onThemeChange, t
     return () => {if (window.AndroidBridge?.setZoomEnabled) window.AndroidBridge.setZoomEnabled(false);};
   }, []);
 
-  return (/*#__PURE__*/
-    React.createElement("div", { className: "garden-fullscreen" }, /*#__PURE__*/
+  return (
+    <div className="garden-fullscreen">
+      <div className="garden-top-bar">
+        <button className="garden-back-btn" onClick={onBack}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        {jumpMode ? (
+          <form className="garden-jump-form" onSubmit={(e) => {e.preventDefault();handleJump();}}>
+            <input
+              ref={jumpRef}
+              type="number"
+              min="1"
+              max={GARDEN_TOTAL}
+              className="garden-jump-input"
+              value={jumpInput}
+              onChange={(e) => setJumpInput(e.target.value)}
+              onBlur={() => {setJumpMode(false);setJumpInput("");}}
+              placeholder={`1–${GARDEN_TOTAL}`}
+            />
+            <span className="garden-jump-hint">/ {GARDEN_TOTAL}</span>
+          </form>
+        ) : (
+          <button className="garden-page-counter" onClick={() => setJumpMode(true)}>
+            {page} / {GARDEN_TOTAL}
+          </button>
+        )}
+      </div>
 
-    React.createElement("div", { className: "garden-top-bar" }, /*#__PURE__*/
-    React.createElement("button", { className: "garden-back-btn", onClick: onBack }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("polyline", { points: "15 18 9 12 15 6" }))
-    ),
-    jumpMode ? /*#__PURE__*/
-    React.createElement("form", { className: "garden-jump-form", onSubmit: (e) => {e.preventDefault();handleJump();} }, /*#__PURE__*/
-    React.createElement("input", { ref: jumpRef, type: "number", min: "1", max: GARDEN_TOTAL,
-      className: "garden-jump-input",
-      value: jumpInput,
-      onChange: (e) => setJumpInput(e.target.value),
-      onBlur: () => {setJumpMode(false);setJumpInput("");},
-      placeholder: `1–${GARDEN_TOTAL}` }), /*#__PURE__*/
-    React.createElement("span", { className: "garden-jump-hint" }, "/ ", GARDEN_TOTAL)
-    ) : /*#__PURE__*/
+      <div className="garden-image-area">
+        {loading && (
+          <div className="garden-loading">
+            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" }}>
+              {error ? "Failed to load — check your connection" : `Loading page ${page}...`}
+            </div>
+          </div>
+        )}
+        <img
+          key={`${tier}-${page}`}
+          src={gardenUrl(page, tier)}
+          alt={`Garden page ${page}`}
+          className="garden-page-img"
+          style={{ opacity: loading ? 0 : 1, transition: "opacity 0.3s" }}
+          onLoad={() => setLoading(false)}
+          onError={() => {setLoading(true);setError(true);}}
+        />
+      </div>
 
-    React.createElement("button", { className: "garden-page-counter", onClick: () => setJumpMode(true) },
-    page, " / ", GARDEN_TOTAL
-    )
-
-    ), /*#__PURE__*/
-
-
-    React.createElement("div", { className: "garden-image-area" },
-    loading && /*#__PURE__*/
-    React.createElement("div", { className: "garden-loading" }, /*#__PURE__*/
-    React.createElement("div", { style: { color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" } }, error ? "Failed to load — check your connection" : `Loading page ${page}...`)
-    ), /*#__PURE__*/
-
-    React.createElement("img", {
-      key: `${tier}-${page}`,
-      src: gardenUrl(page, tier),
-      alt: `Garden page ${page}`,
-      className: "garden-page-img",
-      style: { opacity: loading ? 0 : 1, transition: "opacity 0.3s" },
-      onLoad: () => setLoading(false),
-      onError: () => {setLoading(true);setError(true);} }
-    )
-    ), /*#__PURE__*/
-
-
-    React.createElement("div", { className: "garden-bottom-bar" }, /*#__PURE__*/
-    React.createElement("button", { className: "garden-arrow-btn", onClick: goPrev, disabled: page <= 1 }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("polyline", { points: "15 18 9 12 15 6" }))
-    ), /*#__PURE__*/
-    React.createElement("button", { className: "garden-arrow-btn", onClick: goNext, disabled: page >= GARDEN_TOTAL }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("polyline", { points: "9 6 15 12 9 18" }))
-    )
-    )
-    ));
-
+      <div className="garden-bottom-bar">
+        <button className="garden-arrow-btn" onClick={goPrev} disabled={page <= 1}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <button className="garden-arrow-btn" onClick={goNext} disabled={page >= GARDEN_TOTAL}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="9 6 15 12 9 18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
 }

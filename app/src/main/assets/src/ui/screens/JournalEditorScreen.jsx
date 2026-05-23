@@ -1,26 +1,6 @@
-/* ═══════════════════════════════════════════════════════════════
-   JOURNAL EDITOR SCREEN — block-list editor
-   ═══════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Depends on: React, ScreenLayout, ThemeBtn, JournalStore,
-     JournalMediaStore, JournalHelpers, JournalRecordingSheet,
-     JournalInsertSheet, JournalNotebookSheet, JournalBlockView (viewer).
-
-   Implementation choice (per Plan §15 Option A): paragraph/h2/quote
-   blocks are textareas (auto-grow). Embed blocks are non-editable
-   cards with delete buttons. Markdown shorthand (`**bold**`, `_italic_`,
-   `{{ref:Book X:Y}}`, `[[letter:vol/id]]`) is visible while editing —
-   trade-off for implementation simplicity, no contenteditable.
-
-   Auto-save: 1.2s debounce after the last keystroke + on blur.
-
-   Props:
-     entryId
-     onBack()            — back to viewer (or hub if no viewer)
-     onSearch, onHistory, historyEnabled
-     hlTick, setHlTick
-     theme, onThemeChange
-═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   JournalEditorScreen — Cluster B (esbuild bundle-b.js)
+   ═══════════════════════════════════════════════════════════════════════ */
 
 export function JournalEditorScreen(props) {
   var useState = React.useState;
@@ -336,38 +316,42 @@ export function JournalEditorScreen(props) {
   function blockDeleteUI(idx) {
     if (confirmDelIdx === idx) {
       var step2 = confirmDelStep === 2;
-      return React.createElement('div', { className: 'jrn-block-confirm' + (step2 ? ' jrn-block-confirm-step2' : ''), onClick: function(e) { e.stopPropagation(); } },
-        React.createElement('span', { className: 'jrn-block-confirm-q' }, step2 ? 'Are you sure?' : 'Delete?'),
-        React.createElement('button', {
-          className: 'jrn-block-confirm-cancel',
-          onClick: function(e) { e.stopPropagation(); cancelDeleteBlock(); },
-          'aria-label': 'Cancel'
-        }, '×'),
-        React.createElement('button', {
-          className: 'jrn-block-confirm-yes',
-          onClick: function(e) {
-            e.stopPropagation();
-            if (step2) { deleteBlock(idx); }
-            else { setConfirmDelStep(2); }
-          },
-          'aria-label': step2 ? 'Confirm delete' : 'Continue'
-        },
-          React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.4', strokeLinecap: 'round', strokeLinejoin: 'round' },
-            React.createElement('polyline', { points: '20 6 9 17 4 12' })
-          )
-        )
+      return (
+        <div className={'jrn-block-confirm' + (step2 ? ' jrn-block-confirm-step2' : '')} onClick={function(e) { e.stopPropagation(); }}>
+          <span className="jrn-block-confirm-q">{step2 ? 'Are you sure?' : 'Delete?'}</span>
+          <button
+            className="jrn-block-confirm-cancel"
+            onClick={function(e) { e.stopPropagation(); cancelDeleteBlock(); }}
+            aria-label="Cancel"
+          >×</button>
+          <button
+            className="jrn-block-confirm-yes"
+            onClick={function(e) {
+              e.stopPropagation();
+              if (step2) { deleteBlock(idx); }
+              else { setConfirmDelStep(2); }
+            }}
+            aria-label={step2 ? 'Confirm delete' : 'Continue'}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+        </div>
       );
     }
-    return React.createElement('button', {
-      className: 'jrn-block-del-btn',
-      onClick: function(e) { e.stopPropagation(); requestDeleteBlock(idx); },
-      title: 'Delete block',
-      'aria-label': 'Delete block'
-    },
-      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round' },
-        React.createElement('line', { x1: '18', y1: '6', x2: '6', y2: '18' }),
-        React.createElement('line', { x1: '6', y1: '6', x2: '18', y2: '18' })
-      )
+    return (
+      <button
+        className="jrn-block-del-btn"
+        onClick={function(e) { e.stopPropagation(); requestDeleteBlock(idx); }}
+        title="Delete block"
+        aria-label="Delete block"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
     );
   }
 
@@ -379,94 +363,106 @@ export function JournalEditorScreen(props) {
       'data-block-id': b.id
     };
     if (b.type === 'p' || b.type === 'h2') {
-      return React.createElement('div', common,
-        React.createElement('textarea', {
-          className: 'jrn-block-textarea' + (b.type === 'h2' ? ' h2' : ''),
-          rows: 1,
-          value: b.text || '',
-          placeholder: idx === 0 ? 'Start writing…' : '',
-          onChange: function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); },
-          onFocus: function(e) { focusTextarea(idx, e.target); },
-          onSelect: function(e) { trackCaret(idx, e.target); },
-          onKeyUp: function(e) { trackCaret(idx, e.target); },
-          onClick: function(e) { trackCaret(idx, e.target); },
-          onBlur: function(e) { trackCaret(idx, e.target); commitSave(); },
-          ref: function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }
-        }),
-        blockDeleteUI(idx)
+      return (
+        <div {...common}>
+          <textarea
+            className={'jrn-block-textarea' + (b.type === 'h2' ? ' h2' : '')}
+            rows={1}
+            value={b.text || ''}
+            placeholder={idx === 0 ? 'Start writing…' : ''}
+            onChange={function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); }}
+            onFocus={function(e) { focusTextarea(idx, e.target); }}
+            onSelect={function(e) { trackCaret(idx, e.target); }}
+            onKeyUp={function(e) { trackCaret(idx, e.target); }}
+            onClick={function(e) { trackCaret(idx, e.target); }}
+            onBlur={function(e) { trackCaret(idx, e.target); commitSave(); }}
+            ref={function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+          />
+          {blockDeleteUI(idx)}
+        </div>
       );
     }
     if (b.type === 'quote') {
-      return React.createElement('div', common,
-        React.createElement('div', { className: 'jrn-block-quote' },
-          React.createElement('textarea', {
-            rows: 1,
-            value: b.text || '',
-            placeholder: 'Quoted text…',
-            onChange: function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); },
-            onFocus: function(e) { focusTextarea(idx, e.target); },
-            onSelect: function(e) { trackCaret(idx, e.target); },
-            onKeyUp: function(e) { trackCaret(idx, e.target); },
-            onClick: function(e) { trackCaret(idx, e.target); },
-            onBlur: function(e) { trackCaret(idx, e.target); commitSave(); },
-            ref: function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }
-          }),
-          React.createElement('input', {
-            type: 'text',
-            className: 'jrn-block-quote-cite',
-            value: b.cite || '',
-            placeholder: 'Citation (optional)',
-            onChange: function(e) { patchBlock(idx, { cite: e.target.value }); },
-            onBlur: function() { commitSave(); }
-          })
-        ),
-        blockDeleteUI(idx)
+      return (
+        <div {...common}>
+          <div className="jrn-block-quote">
+            <textarea
+              rows={1}
+              value={b.text || ''}
+              placeholder="Quoted text…"
+              onChange={function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); }}
+              onFocus={function(e) { focusTextarea(idx, e.target); }}
+              onSelect={function(e) { trackCaret(idx, e.target); }}
+              onKeyUp={function(e) { trackCaret(idx, e.target); }}
+              onClick={function(e) { trackCaret(idx, e.target); }}
+              onBlur={function(e) { trackCaret(idx, e.target); commitSave(); }}
+              ref={function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+            />
+            <input
+              type="text"
+              className="jrn-block-quote-cite"
+              value={b.cite || ''}
+              placeholder="Citation (optional)"
+              onChange={function(e) { patchBlock(idx, { cite: e.target.value }); }}
+              onBlur={function() { commitSave(); }}
+            />
+          </div>
+          {blockDeleteUI(idx)}
+        </div>
       );
     }
     if (b.type === 'divider') {
-      return React.createElement('div', common,
-        React.createElement('div', { className: 'jrn-divider' }, '❖  ❖  ❖'),
-        blockDeleteUI(idx)
+      return (
+        <div {...common}>
+          <div className="jrn-divider">❖  ❖  ❖</div>
+          {blockDeleteUI(idx)}
+        </div>
       );
     }
     if (b.type === 'image') {
-      return React.createElement('div', common,
-        React.createElement('div', { className: 'jrn-embed-image' },
-          // Linked-from-journal embed surfaces the source attribution
-          b.sourceJournalId && b.sourceJournalTitle && React.createElement('div', { className: 'jrn-linked-badge' }, 'From: ' + b.sourceJournalTitle),
-          React.createElement(JournalImageBlock, { mediaId: b.mediaId }),
-          React.createElement('input', {
-            type: 'text',
-            className: 'jrn-img-caption',
-            placeholder: 'Caption (optional)',
-            value: b.caption || '',
-            onChange: function(e) { patchBlock(idx, { caption: e.target.value }); },
-            onBlur: function() { commitSave(); }
-          })
-        ),
-        blockDeleteUI(idx)
+      return (
+        <div {...common}>
+          <div className="jrn-embed-image">
+            {/* Linked-from-journal embed surfaces the source attribution */}
+            {b.sourceJournalId && b.sourceJournalTitle && <div className="jrn-linked-badge">{'From: ' + b.sourceJournalTitle}</div>}
+            <JournalImageBlock mediaId={b.mediaId} />
+            <input
+              type="text"
+              className="jrn-img-caption"
+              placeholder="Caption (optional)"
+              value={b.caption || ''}
+              onChange={function(e) { patchBlock(idx, { caption: e.target.value }); }}
+              onBlur={function() { commitSave(); }}
+            />
+          </div>
+          {blockDeleteUI(idx)}
+        </div>
       );
     }
     if (b.type === 'audio') {
       var confirming = confirmAudioDelete === idx;
-      return React.createElement('div', common,
-        b.sourceJournalId && b.sourceJournalTitle && React.createElement('div', { className: 'jrn-linked-badge' }, 'From: ' + b.sourceJournalTitle),
-        React.createElement(JournalAudioBlock, {
-          mediaId: b.mediaId, duration: b.duration, caption: b.caption, samples: b.samples,
-          editable: true,
-          onRequestDelete: function() { setConfirmAudioDelete(idx); },
-          onCancelDelete: function() { setConfirmAudioDelete(null); },
-          onConfirmDelete: function() { setConfirmAudioDelete(null); deleteBlock(idx); },
-          confirming: confirming
-        })
+      return (
+        <div {...common}>
+          {b.sourceJournalId && b.sourceJournalTitle && <div className="jrn-linked-badge">{'From: ' + b.sourceJournalTitle}</div>}
+          <JournalAudioBlock
+            mediaId={b.mediaId} duration={b.duration} caption={b.caption} samples={b.samples}
+            editable={true}
+            onRequestDelete={function() { setConfirmAudioDelete(idx); }}
+            onCancelDelete={function() { setConfirmAudioDelete(null); }}
+            onConfirmDelete={function() { setConfirmAudioDelete(null); deleteBlock(idx); }}
+            confirming={confirming}
+          />
+        </div>
       );
     }
     // Everything else (letter-card, chapter-card, verse-block, bookmark-card,
     // note-card, journal-card, journal-excerpt) renders via JournalBlockView
     // for parity with the viewer, then gets the unified delete button.
-    return React.createElement('div', common,
-      React.createElement(JournalBlockView, { block: b, callbacks: {} }),
-      blockDeleteUI(idx)
+    return (
+      <div {...common}>
+        <JournalBlockView block={b} callbacks={{}} />
+        {blockDeleteUI(idx)}
+      </div>
     );
   }
 
@@ -498,7 +494,7 @@ export function JournalEditorScreen(props) {
   var navChildren = LibraryNav({
     onBack: function() { commitSave(); onBack && onBack(); },
     backTitle: 'Done',
-    leftExtras: React.createElement('span', { className: 'jrn-saved-ind' }, savedLabel),
+    leftExtras: <span className="jrn-saved-ind">{savedLabel}</span>,
     onSearch: props.onSearch ? function() { commitSave(); props.onSearch(); } : undefined,
     onHistory: props.onHistory ? function() { commitSave(); props.onHistory(); } : undefined,
     onSettings: props.onSettings ? function() { commitSave(); props.onSettings(); } : undefined,
@@ -506,45 +502,53 @@ export function JournalEditorScreen(props) {
     onThemeChange: props.onThemeChange
   });
 
-  return React.createElement(ScreenLayout, { navChildren: navChildren },
-    React.createElement('div', { className: 'jrn-editor' },
-      React.createElement('input', { ref: fileInputRef, type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: onFileChosen }),
-      React.createElement('div', { className: 'jrn-editor-meta' },
-        React.createElement('input', {
-          className: 'jrn-editor-title',
-          type: 'text',
-          value: title,
-          placeholder: 'Title',
-          onChange: function(e) { setTitle(e.target.value); scheduleSave(); },
-          onBlur: function() { commitSave(); }
-        })
-      ),
-      React.createElement('div', { ref: blocksContainerRef, className: 'jrn-blocks jrn-body-surface', onClick: focusLastTextBlock },
-        blocks.map(function(b, idx) { return renderEditableBlock(b, idx); })
-      )
-    ),
-    // Single + FAB. Voice recording is reached via + → Voice Recording
-    // (the standalone mic FAB was removed per user direction).
-    !showRec && React.createElement('button', {
-      className: 'jrn-fab jrn-fab-plus',
-      onClick: openInsertSheet,
-      title: 'Insert', 'aria-label': 'Insert'
-    },
-      React.createElement('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.2', strokeLinecap: 'round' },
-        React.createElement('path', { d: 'M12 5v14M5 12h14' })
-      )
-    ),
-    showInsert && React.createElement(JournalInsertSheet, {
-      excludeJournalId: entryId,
-      onClose: function() { setShowInsert(false); },
-      onInsertBlock: function(b) { handleBlockInsert(b); setShowInsert(false); },
-      onInsertImage: handleInsertImage,
-      onRecordAudio: handleInsertAudio,
-      onInsertInline: handleInsertInline
-    }),
-    showRec && React.createElement(JournalRecordingSheet, {
-      onSave: onRecordingSaved,
-      onClose: function() { setShowRec(false); }
-    })
+  return (
+    <ScreenLayout navChildren={navChildren}>
+      <div className="jrn-editor">
+        <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileChosen} />
+        <div className="jrn-editor-meta">
+          <input
+            className="jrn-editor-title"
+            type="text"
+            value={title}
+            placeholder="Title"
+            onChange={function(e) { setTitle(e.target.value); scheduleSave(); }}
+            onBlur={function() { commitSave(); }}
+          />
+        </div>
+        <div ref={blocksContainerRef} className="jrn-blocks jrn-body-surface" onClick={focusLastTextBlock}>
+          {blocks.map(function(b, idx) { return renderEditableBlock(b, idx); })}
+        </div>
+      </div>
+      {/* Single + FAB. Voice recording is reached via + → Voice Recording
+          (the standalone mic FAB was removed per user direction). */}
+      {!showRec && (
+        <button
+          className="jrn-fab jrn-fab-plus"
+          onClick={openInsertSheet}
+          title="Insert" aria-label="Insert"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      )}
+      {showInsert && (
+        <JournalInsertSheet
+          excludeJournalId={entryId}
+          onClose={function() { setShowInsert(false); }}
+          onInsertBlock={function(b) { handleBlockInsert(b); setShowInsert(false); }}
+          onInsertImage={handleInsertImage}
+          onRecordAudio={handleInsertAudio}
+          onInsertInline={handleInsertInline}
+        />
+      )}
+      {showRec && (
+        <JournalRecordingSheet
+          onSave={onRecordingSaved}
+          onClose={function() { setShowRec(false); }}
+        />
+      )}
+    </ScreenLayout>
   );
 }

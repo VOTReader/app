@@ -1,12 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   SearchScreen — extracted React screen component
-   ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Self-contained — uses React.useX hooks directly (no dependency on the
-   inline script's `const { useState, ... } = React` destructuring).
-   All other call-time dependencies (Segments, FootnoteSheet, ScreenLayout,
-   findEntryContext, applyDOMHighlights, etc.) are global-lexical and
-   resolve at render time from the surrounding scripts.
+   SearchScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand }) {
@@ -165,155 +158,165 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     }
   };
 
-  return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { hideTabsBtn: true, navChildren: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
-      React.createElement("button", { className: "nav-home", onClick: onBack, "aria-label": "Back" }, "\u2190"), /*#__PURE__*/
-      React.createElement("div", { className: "srch-input-row" }, /*#__PURE__*/
-      React.createElement("input", {
-        ref: inputRef,
-        className: "search-input",
-        type: "text",
-        placeholder: "Search scriptures, volumes, studies\u2026",
-        value: query,
-        onChange: (e) => onQueryChange(e.target.value),
-        onFocus: () => setShowSuggest(suggestions.length > 0),
-        onKeyDown: handleKey,
-        autoComplete: "off",
-        autoCorrect: "off",
-        spellCheck: false }
-      ),
-      query ? /*#__PURE__*/React.createElement("button", { className: "srch-clear-btn", onClick: clearQuery }, "\u2715") : null
-      )
-      ) }, /*#__PURE__*/
-    React.createElement("div", { className: "search-screen" }, /*#__PURE__*/
+  return (
+    <ScreenLayout hideTabsBtn={true} navChildren={
+      <>
+        <button className="nav-home" onClick={onBack} aria-label="Back">{"←"}</button>
+        <div className="srch-input-row">
+          <input
+            ref={inputRef}
+            className="search-input"
+            type="text"
+            placeholder="Search scriptures, volumes, studies…"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onFocus={() => setShowSuggest(suggestions.length > 0)}
+            onKeyDown={handleKey}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          {query ? <button className="srch-clear-btn" onClick={clearQuery}>{"✕"}</button> : null}
+        </div>
+      </>
+    }>
+      <div className="search-screen">
 
-    React.createElement("div", { className: "srch-corpus-row", role: "tablist", "aria-label": "Search corpus" },
-    [
-    { k: 'all', label: 'All' },
-    { k: 'scriptures', label: 'Scriptures' },
-    { k: 'volumes', label: 'Volumes' }].
-    map((opt) => {
-      const active = (settings.searchCorpus || 'all') === opt.k;
-      return (/*#__PURE__*/
-        React.createElement("button", {
-          key: opt.k,
-          role: "tab",
-          "aria-selected": active,
-          className: "srch-corpus-btn" + (active ? " active" : ""),
-          onClick: () => onSettingsChange('searchCorpus', opt.k) },
-        opt.label));
+        <div className="srch-corpus-row" role="tablist" aria-label="Search corpus">
+          {[
+            { k: 'all', label: 'All' },
+            { k: 'scriptures', label: 'Scriptures' },
+            { k: 'volumes', label: 'Volumes' }
+          ].map((opt) => {
+            const active = (settings.searchCorpus || 'all') === opt.k;
+            return (
+              <button
+                key={opt.k}
+                role="tab"
+                aria-selected={active}
+                className={"srch-corpus-btn" + (active ? " active" : "")}
+                onClick={() => onSettingsChange('searchCorpus', opt.k)}
+              >{opt.label}</button>
+            );
+          })}
+        </div>
 
-    })
-    ),
+        {searchContext && (
+          <button
+            className={"srch-scope-chip " + (searchScope ? "active" : "")}
+            onClick={onToggleScope}
+          >
+            {searchScope ? (
+              <>
+                <span className="srch-scope-chip-icon">{"✓"}</span>
+                <span>Scoped to {searchContext.label}</span>
+                <span className="srch-scope-chip-x">{"✕"}</span>
+              </>
+            ) : (
+              <>
+                <span className="srch-scope-chip-icon">{"⌕"}</span>
+                <span>Search in {searchContext.label}</span>
+              </>
+            )}
+          </button>
+        )}
 
+        {buildInfo.error && <div className="srch-error">{buildInfo.error}</div>}
 
-    searchContext && /*#__PURE__*/
-    React.createElement("button", {
-      className: "srch-scope-chip " + (searchScope ? "active" : ""),
-      onClick: onToggleScope },
+        {buildInfo.building && !buildInfo.progress && (
+          <div className="srch-progress">
+            <span>Building search index…</span>
+          </div>
+        )}
 
-    searchScope ? /*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", { className: "srch-scope-chip-icon" }, "\u2713"), /*#__PURE__*/React.createElement("span", null, "Scoped to ", searchContext.label), /*#__PURE__*/React.createElement("span", { className: "srch-scope-chip-x" }, "\u2715")) : /*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", { className: "srch-scope-chip-icon" }, "\u2315"), /*#__PURE__*/React.createElement("span", null, "Search in ", searchContext.label))
+        {buildInfo.building && buildInfo.progress && (
+          <div className="srch-progress">
+            <span>Building search index… {buildInfo.progress.done.toLocaleString()} / {buildInfo.progress.total.toLocaleString()}</span>
+            <div className="srch-progress-bar">
+              <div className="srch-progress-bar-fill" style={{ width: 100 * buildInfo.progress.done / Math.max(1, buildInfo.progress.total) + '%' }} />
+            </div>
+          </div>
+        )}
 
-    ),
+        {showSuggest && suggestions.length > 0 && (
+          <div className="srch-suggest">
+            {suggestions.map((s, i) => (
+              <button key={i} className="srch-suggest-item" onMouseDown={(e) => {e.preventDefault();fireSuggestion(s);}}>
+                <span className="srch-suggest-kind">{s.kind}</span>
+                <span className="srch-suggest-label">{s.label}</span>
+                {s.hint && <span className="srch-suggest-hint">{s.hint}</span>}
+              </button>
+            ))}
+          </div>
+        )}
 
+        {state.error && <div className="srch-error">Error: {state.error}</div>}
 
+        {!query && buildInfo.ready && (
+          <>
+            <div className="srch-empty-hero">
+              <h3>Search everything</h3>
+              <p>Verses, letters, study notes, headings, footnotes — across all 66 books and every Volume.</p>
+            </div>
+            <div className="srch-section-label">Quick picks</div>
+            <div className="srch-quick-row">
+              {SRCH_QUICK_PICKS.map((q) => (
+                <button key={q} className="srch-quick-chip" onClick={() => onQueryChange(q.toLowerCase())}>{q}</button>
+              ))}
+            </div>
+          </>
+        )}
 
-    buildInfo.error && /*#__PURE__*/
-    React.createElement("div", { className: "srch-error" }, buildInfo.error),
+        {didYouMean && (
+          <div className="srch-did-you-mean">
+            No results for "{didYouMean.original}" — did you mean <button onClick={() => onQueryChange(didYouMean.rewrite)}>{didYouMean.suggestion}</button>?
+          </div>
+        )}
 
-    buildInfo.building && !buildInfo.progress && /*#__PURE__*/
-    React.createElement("div", { className: "srch-progress" }, /*#__PURE__*/
-    React.createElement("span", null, "Building search index\u2026")
-    ),
+        {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
+          <div className="srch-results-summary">
+            Found <strong>{state.results.length} {state.results.length === 1 ? "match" : "matches"}</strong>
+            {" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong>
+          </div>
+        )}
 
-    buildInfo.building && buildInfo.progress && /*#__PURE__*/
-    React.createElement("div", { className: "srch-progress" }, /*#__PURE__*/
-    React.createElement("span", null, "Building search index\u2026 ", buildInfo.progress.done.toLocaleString(), " / ", buildInfo.progress.total.toLocaleString()), /*#__PURE__*/
-    React.createElement("div", { className: "srch-progress-bar" }, /*#__PURE__*/React.createElement("div", { className: "srch-progress-bar-fill", style: { width: 100 * buildInfo.progress.done / Math.max(1, buildInfo.progress.total) + '%' } }))
-    ),
+        {directEntries.length > 0 && (
+          <div className="srch-groups">
+            {directEntries.map((d, i) => (
+              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={onSelect} isDirect={true} />
+            ))}
+          </div>
+        )}
 
+        {topResults.length > 0 && (
+          <div className="srch-top-results">
+            <div className="srch-section-label">Best Matches</div>
+            {topResults.map((entry, i) => (
+              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={onSelect} />
+            ))}
+          </div>
+        )}
 
+        {grouped.length > 0 && (
+          <div className="srch-groups">
+            {grouped.map((g, i) => (
+              <SrchGroup
+                key={g.key + '|' + query}
+                gkey={g.key}
+                items={g.items}
+                terms={state.terms}
+                onSelect={onSelect}
+                defaultOpen={state.results.length <= 30 || i < 5}
+              />
+            ))}
+          </div>
+        )}
 
+        {query && buildInfo.ready && state.phase === 'done' && state.results.length === 0 && directEntries.length === 0 && !didYouMean && (
+          <div className="search-no-results">No results for "{query.trim()}"</div>
+        )}
 
-    showSuggest && suggestions.length > 0 && /*#__PURE__*/
-    React.createElement("div", { className: "srch-suggest" },
-    suggestions.map((s, i) => /*#__PURE__*/
-    React.createElement("button", { key: i, className: "srch-suggest-item", onMouseDown: (e) => {e.preventDefault();fireSuggestion(s);} }, /*#__PURE__*/
-    React.createElement("span", { className: "srch-suggest-kind" }, s.kind), /*#__PURE__*/
-    React.createElement("span", { className: "srch-suggest-label" }, s.label),
-    s.hint && /*#__PURE__*/React.createElement("span", { className: "srch-suggest-hint" }, s.hint)
-    )
-    )
-    ),
-
-
-
-    state.error && /*#__PURE__*/React.createElement("div", { className: "srch-error" }, "Error: ", state.error),
-
-
-    !query && buildInfo.ready && /*#__PURE__*/
-    React.createElement(React.Fragment, null, /*#__PURE__*/
-    React.createElement("div", { className: "srch-empty-hero" }, /*#__PURE__*/
-    React.createElement("h3", null, "Search everything"), /*#__PURE__*/
-    React.createElement("p", null, "Verses, letters, study notes, headings, footnotes \u2014 across all 66 books and every Volume.")
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "srch-section-label" }, "Quick picks"), /*#__PURE__*/
-    React.createElement("div", { className: "srch-quick-row" },
-    SRCH_QUICK_PICKS.map((q) => /*#__PURE__*/
-    React.createElement("button", { key: q, className: "srch-quick-chip", onClick: () => onQueryChange(q.toLowerCase()) }, q)
-    )
-    )
-    ),
-
-
-
-    didYouMean && /*#__PURE__*/
-    React.createElement("div", { className: "srch-did-you-mean" }, "No results for \"",
-    didYouMean.original, "\" \u2014 did you mean ", /*#__PURE__*/React.createElement("button", { onClick: () => onQueryChange(didYouMean.rewrite) }, didYouMean.suggestion), "?"
-    ),
-
-    query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && /*#__PURE__*/
-    React.createElement("div", { className: "srch-results-summary" },
-    "Found ", /*#__PURE__*/React.createElement("strong", null, state.results.length, " ", state.results.length === 1 ? "match" : "matches"),
-    " across ", /*#__PURE__*/React.createElement("strong", null, grouped.length, " ", grouped.length === 1 ? "section" : "sections")
-    ),
-
-    directEntries.length > 0 && /*#__PURE__*/
-    React.createElement("div", { className: "srch-groups" },
-    directEntries.map((d, i) => /*#__PURE__*/
-    React.createElement(SrchCard, { key: 'd' + i, entry: d, terms: [], onSelect: onSelect, isDirect: true })
-    )
-    ),
-
-    topResults.length > 0 && /*#__PURE__*/
-    React.createElement("div", { className: "srch-top-results" }, /*#__PURE__*/
-    React.createElement("div", { className: "srch-section-label" }, "Best Matches"),
-    topResults.map((entry, i) => /*#__PURE__*/
-    React.createElement(SrchCard, { key: 'top' + i, entry: entry, terms: state.terms, onSelect: onSelect })
-    )
-    ),
-
-    grouped.length > 0 && /*#__PURE__*/
-    React.createElement("div", { className: "srch-groups" },
-    grouped.map((g, i) => /*#__PURE__*/
-    React.createElement(SrchGroup, {
-      key: g.key + '|' + query,
-      gkey: g.key,
-      items: g.items,
-      terms: state.terms,
-      onSelect: onSelect,
-      defaultOpen: state.results.length <= 30 || i < 5 })
-    )
-    ),
-
-
-
-    query && buildInfo.ready && state.phase === 'done' && state.results.length === 0 && directEntries.length === 0 && !didYouMean && /*#__PURE__*/
-    React.createElement("div", { className: "search-no-results" }, "No results for \"", query.trim(), "\"")
-
-    )
-    ));
-
+      </div>
+    </ScreenLayout>
+  );
 }

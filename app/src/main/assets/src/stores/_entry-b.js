@@ -93,9 +93,9 @@ import { JournalNotebookSheet } from '../ui/sheets/JournalNotebookSheet.jsx';
 import { JournalInboundSheet } from '../ui/sheets/JournalInboundSheet.jsx';
 
 // ── Journal UI (screens) ────────────────────────────────────────────────
-import * as HubScreen from '../ui/screens/JournalHubScreen.js';
-import * as ViewerScreen from '../ui/screens/JournalViewerScreen.js';
-import * as EditorScreen from '../ui/screens/JournalEditorScreen.js';
+import * as HubScreen from '../ui/screens/JournalHubScreen.jsx';
+import * as ViewerScreen from '../ui/screens/JournalViewerScreen.jsx';
+import * as EditorScreen from '../ui/screens/JournalEditorScreen.jsx';
 
 // ── Renderer ────────────────────────────────────────────────────────────
 import {

@@ -4950,7 +4950,7 @@
     }))));
   }
 
-  // app/src/main/assets/src/ui/screens/JournalHubScreen.js
+  // app/src/main/assets/src/ui/screens/JournalHubScreen.jsx
   var JournalHubScreen_exports = {};
   __export(JournalHubScreen_exports, {
     JournalCardMenu: () => JournalCardMenu,
@@ -4969,129 +4969,52 @@
     function close() {
       props.onClose && props.onClose();
     }
-    return React.createElement(
-      "div",
-      { className: "link-action-overlay", onClick: close },
-      React.createElement(
-        "div",
-        { className: "link-action-sheet", onClick: function(e) {
-          e.stopPropagation();
-        } },
-        React.createElement("div", { className: "link-action-handle" }),
-        step === 0 && React.createElement(
-          React.Fragment,
-          null,
-          React.createElement(
-            "button",
-            { className: "link-action-btn", onClick: function() {
-              close();
-              props.onOpen();
-            } },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("path", { d: "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" }),
-              React.createElement("circle", { cx: "12", cy: "12", r: "3" })
-            ),
-            React.createElement("span", null, "Open Entry")
-          ),
-          React.createElement(
-            "button",
-            { className: "link-action-btn", onClick: function() {
-              close();
-              props.onEdit();
-            } },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("path", { d: "M12 20h9" }),
-              React.createElement("path", { d: "M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" })
-            ),
-            React.createElement("span", null, "Edit Entry")
-          ),
-          React.createElement(
-            "button",
-            { className: "link-action-btn", onClick: function() {
-              props.onTogglePin();
-              close();
-            } },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: entry.pinned ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("path", { d: "M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" }),
-              React.createElement("path", { d: "M8 12 L3 19" })
-            ),
-            React.createElement("span", null, entry.pinned ? "Unpin Entry" : "Pin Entry")
-          ),
-          React.createElement(
-            "button",
-            { className: "link-action-btn link-action-btn-danger", onClick: function() {
-              setStep(1);
-              setTyped("");
-            } },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("polyline", { points: "3 6 5 6 21 6" }),
-              React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }),
-              React.createElement("path", { d: "M10 11v6M14 11v6" })
-            ),
-            React.createElement("span", null, "Delete Entry")
-          )
-        ),
-        step > 0 && React.createElement(
-          "div",
-          { className: "jrn-tripledel", style: { margin: "6px 4px 4px" } },
-          React.createElement("div", { className: "jrn-tripledel-step-label" }, "Step " + step + " of 3"),
-          React.createElement(
-            "div",
-            { className: "jrn-tripledel-question" },
-            step === 1 ? "Delete this entry?" : step === 2 ? "Are you sure? This cannot be undone." : "Type DELETE to permanently remove this entry."
-          ),
-          (function() {
-            var summary = typeof JournalStore !== "undefined" && JournalStore.associatedDataSummary ? JournalStore.associatedDataSummary(entry.id) : null;
-            return summary && React.createElement(
-              "div",
-              { className: "jrn-tripledel-cascade" },
-              "This will also permanently delete " + summary + " you placed inside this entry."
-            );
-          })(),
-          step === 3 && React.createElement("input", {
-            type: "text",
-            className: "jrn-tripledel-input",
-            placeholder: "Type DELETE",
-            value: typed,
-            autoFocus: true,
-            onChange: function(e) {
-              setTyped(e.target.value);
-            }
-          }),
-          React.createElement(
-            "div",
-            { className: "jrn-tripledel-actions" },
-            React.createElement("button", { className: "jrn-tripledel-cancel", onClick: function() {
-              setStep(0);
-              setTyped("");
-            } }, "Cancel"),
-            step < 3 && React.createElement(
-              "button",
-              { className: "jrn-tripledel-next", onClick: function() {
-                setStep(step + 1);
-              } },
-              step === 1 ? "Continue" : "I am sure"
-            ),
-            step === 3 && React.createElement("button", {
-              className: "jrn-tripledel-final",
-              disabled: typed.trim().toUpperCase() !== "DELETE",
-              onClick: function() {
-                props.onDelete();
-                close();
-              }
-            }, "Delete forever")
-          )
-        )
-      )
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "link-action-overlay", onClick: close }, /* @__PURE__ */ React.createElement("div", { className: "link-action-sheet", onClick: function(e) {
+      e.stopPropagation();
+    } }, /* @__PURE__ */ React.createElement("div", { className: "link-action-handle" }), step === 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "link-action-btn", onClick: function() {
+      close();
+      props.onOpen();
+    } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" })), /* @__PURE__ */ React.createElement("span", null, "Open Entry")), /* @__PURE__ */ React.createElement("button", { className: "link-action-btn", onClick: function() {
+      close();
+      props.onEdit();
+    } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M12 20h9" }), /* @__PURE__ */ React.createElement("path", { d: "M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" })), /* @__PURE__ */ React.createElement("span", null, "Edit Entry")), /* @__PURE__ */ React.createElement("button", { className: "link-action-btn", onClick: function() {
+      props.onTogglePin();
+      close();
+    } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: entry.pinned ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" }), /* @__PURE__ */ React.createElement("path", { d: "M8 12 L3 19" })), /* @__PURE__ */ React.createElement("span", null, entry.pinned ? "Unpin Entry" : "Pin Entry")), /* @__PURE__ */ React.createElement("button", { className: "link-action-btn link-action-btn-danger", onClick: function() {
+      setStep(1);
+      setTyped("");
+    } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6M14 11v6" })), /* @__PURE__ */ React.createElement("span", null, "Delete Entry"))), step > 0 && /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel", style: { margin: "6px 4px 4px" } }, /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel-step-label" }, "Step " + step + " of 3"), /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel-question" }, step === 1 ? "Delete this entry?" : step === 2 ? "Are you sure? This cannot be undone." : "Type DELETE to permanently remove this entry."), (function() {
+      var summary = typeof JournalStore !== "undefined" && JournalStore.associatedDataSummary ? JournalStore.associatedDataSummary(entry.id) : null;
+      return summary && /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel-cascade" }, "This will also permanently delete " + summary + " you placed inside this entry.");
+    })(), step === 3 && /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        className: "jrn-tripledel-input",
+        placeholder: "Type DELETE",
+        value: typed,
+        autoFocus: true,
+        onChange: function(e) {
+          setTyped(e.target.value);
+        }
+      }
+    ), /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel-actions" }, /* @__PURE__ */ React.createElement("button", { className: "jrn-tripledel-cancel", onClick: function() {
+      setStep(0);
+      setTyped("");
+    } }, "Cancel"), step < 3 && /* @__PURE__ */ React.createElement("button", { className: "jrn-tripledel-next", onClick: function() {
+      setStep(step + 1);
+    } }, step === 1 ? "Continue" : "I am sure"), step === 3 && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "jrn-tripledel-final",
+        disabled: typed.trim().toUpperCase() !== "DELETE",
+        onClick: function() {
+          props.onDelete();
+          close();
+        }
+      },
+      "Delete forever"
+    )))));
   }
   function JournalHubScreen(props) {
     var useState = React.useState;
@@ -5136,7 +5059,7 @@
       var preview = JournalHelpers.previewText(entry, 160);
       var attachments = JournalHelpers.attachmentSummary(entry);
       var moodClass = entry.mood ? entry.mood : "";
-      return React.createElement(
+      return /* @__PURE__ */ React.createElement(
         "div",
         {
           key: entry.id,
@@ -5154,20 +5077,9 @@
             }
           }
         },
-        React.createElement("span", { className: "jrn-card-mood " + moodClass }),
-        entry.pinned && React.createElement(
-          "div",
-          { className: "jrn-card-pin-marker", title: "Pinned" },
-          React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.9", strokeLinecap: "round", strokeLinejoin: "round" },
-            React.createElement("path", { d: "M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" }),
-            React.createElement("path", { d: "M8 12 L3 19" })
-          )
-        ),
-        // 3-dot menu button (upper right). Stops propagation so it doesn't
-        // also open the entry.
-        React.createElement(
+        /* @__PURE__ */ React.createElement("span", { className: "jrn-card-mood " + moodClass }),
+        entry.pinned && /* @__PURE__ */ React.createElement("div", { className: "jrn-card-pin-marker", title: "Pinned" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.9", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" }), /* @__PURE__ */ React.createElement("path", { d: "M8 12 L3 19" }))),
+        /* @__PURE__ */ React.createElement(
           "button",
           {
             className: "jrn-card-menu-btn",
@@ -5178,44 +5090,16 @@
             "aria-label": "Entry options",
             title: "Options"
           },
-          React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "currentColor" },
-            React.createElement("circle", { cx: "12", cy: "5", r: "1.6" }),
-            React.createElement("circle", { cx: "12", cy: "12", r: "1.6" }),
-            React.createElement("circle", { cx: "12", cy: "19", r: "1.6" })
-          )
+          /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "5", r: "1.6" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "1.6" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "19", r: "1.6" }))
         ),
-        React.createElement(
-          "div",
-          { className: "jrn-card-row" },
-          React.createElement("h3", { className: "jrn-card-title" + (title ? "" : " untitled") }, title || "Untitled"),
-          React.createElement(
-            "span",
-            { className: "jrn-card-date" },
-            JournalHelpers.shortDate(entry.updated || entry.created),
-            React.createElement("span", { className: "jrn-card-time" }, " \xB7 " + JournalHelpers.shortTime(entry.updated || entry.created))
-          )
-        ),
-        preview && React.createElement("p", { className: "jrn-card-preview" }, preview),
-        attachments.length > 0 && React.createElement(
-          "div",
-          { className: "jrn-card-attachments" },
-          attachments.map(function(a, i) {
-            return React.createElement("span", { key: i, className: "jrn-attach" }, a.label);
-          })
-        ),
-        entry.tags && entry.tags.length > 0 && React.createElement(
-          "div",
-          { className: "jrn-card-meta" },
-          React.createElement(
-            "div",
-            { className: "jrn-tags" },
-            entry.tags.slice(0, 4).map(function(t, i) {
-              return React.createElement("span", { key: i, className: "jrn-tag" }, "#" + t);
-            })
-          )
-        )
+        /* @__PURE__ */ React.createElement("div", { className: "jrn-card-row" }, /* @__PURE__ */ React.createElement("h3", { className: "jrn-card-title" + (title ? "" : " untitled") }, title || "Untitled"), /* @__PURE__ */ React.createElement("span", { className: "jrn-card-date" }, JournalHelpers.shortDate(entry.updated || entry.created), /* @__PURE__ */ React.createElement("span", { className: "jrn-card-time" }, " \xB7 " + JournalHelpers.shortTime(entry.updated || entry.created)))),
+        preview && /* @__PURE__ */ React.createElement("p", { className: "jrn-card-preview" }, preview),
+        attachments.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "jrn-card-attachments" }, attachments.map(function(a, i) {
+          return /* @__PURE__ */ React.createElement("span", { key: i, className: "jrn-attach" }, a.label);
+        })),
+        entry.tags && entry.tags.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "jrn-card-meta" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-tags" }, entry.tags.slice(0, 4).map(function(t, i) {
+          return /* @__PURE__ */ React.createElement("span", { key: i, className: "jrn-tag" }, "#" + t);
+        })))
       );
     }
     function renderEntries(list, isPinnedTab) {
@@ -5235,44 +5119,30 @@
         var cmp = a.id < b.id ? -1 : 1;
         return sortNewest ? cmp : -cmp;
       });
-      return React.createElement(
-        React.Fragment,
-        null,
-        React.createElement(
-          "div",
-          { className: "jrn-controls" },
-          React.createElement("input", {
-            className: "jrn-search",
-            type: "text",
-            placeholder: "Search entries\u2026",
-            value: query,
-            onChange: function(e) {
-              setQuery(e.target.value);
-            }
-          }),
-          React.createElement("button", {
-            // Standardized sort control — same class + wording as every
-            // other Library list (Notes/Bookmarks/Links/Highlights).
-            className: "notes-index-sort-btn",
-            onClick: function() {
-              setSortNewest(function(v) {
-                return !v;
-              });
-            },
-            title: "Toggle sort order"
-          }, sortNewest ? "Sort: Newest \u2193" : "Sort: Oldest \u2191")
-        ),
-        filtered.length === 0 ? React.createElement(
-          "div",
-          { className: "jrn-empty" },
-          React.createElement("div", { className: "jrn-empty-title" }, isPinnedTab ? list.length === 0 ? "No Pinned Entries" : "No Matches" : list.length === 0 ? "No Entries Yet" : "No Matches"),
-          React.createElement(
-            "div",
-            { className: "jrn-empty-hint" },
-            isPinnedTab && list.length === 0 ? "Pin your favorite or most-used journal entries here to access them easily." : list.length === 0 ? 'Tap "New Entry" below to write your first reflection. You can embed letters, bookmarks, images, and voice recordings.' : "Try a different search term."
-          )
-        ) : React.createElement("div", { className: "jrn-list" }, filtered.map(renderCard))
-      );
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "jrn-controls" }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          className: "jrn-search",
+          type: "text",
+          placeholder: "Search entries\u2026",
+          value: query,
+          onChange: function(e) {
+            setQuery(e.target.value);
+          }
+        }
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "notes-index-sort-btn",
+          onClick: function() {
+            setSortNewest(function(v) {
+              return !v;
+            });
+          },
+          title: "Toggle sort order"
+        },
+        sortNewest ? "Sort: Newest \u2193" : "Sort: Oldest \u2191"
+      )), filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "jrn-empty" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-empty-title" }, isPinnedTab ? list.length === 0 ? "No Pinned Entries" : "No Matches" : list.length === 0 ? "No Entries Yet" : "No Matches"), /* @__PURE__ */ React.createElement("div", { className: "jrn-empty-hint" }, isPinnedTab && list.length === 0 ? "Pin your favorite or most-used journal entries here to access them easily." : list.length === 0 ? 'Tap "New Entry" below to write your first reflection. You can embed letters, bookmarks, images, and voice recordings.' : "Try a different search term.")) : /* @__PURE__ */ React.createElement("div", { className: "jrn-list" }, filtered.map(renderCard)));
     }
     var navChildren = LibraryNav({
       onBack,
@@ -5285,73 +5155,46 @@
     var pinnedEntries = allEntries.filter(function(e) {
       return e.pinned;
     });
-    return React.createElement(
-      ScreenLayout,
-      { navChildren },
-      React.createElement(
-        "div",
-        { className: "jrn-hub" },
-        React.createElement(
-          "div",
-          { className: "jrn-hub-header" },
-          React.createElement("h1", { className: "jrn-hub-title" }, "My Journal"),
-          React.createElement("span", { className: "jrn-hub-count" }, allEntries.length + (allEntries.length === 1 ? " entry" : " entries"))
-        ),
-        React.createElement(
-          "div",
-          { className: "jrn-tabs" },
-          React.createElement("button", { className: "jrn-tab" + (tab === "all" ? " active" : ""), onClick: function() {
-            setTab("all");
-          } }, "All Entries"),
-          React.createElement("button", { className: "jrn-tab" + (tab === "pinned" ? " active" : ""), onClick: function() {
-            setTab("pinned");
-          } }, "Pinned")
-        ),
-        tab === "all" && renderEntries(allEntries, false),
-        tab === "pinned" && renderEntries(pinnedEntries, true),
-        // "New Entry" pill — replaces the old +/edit FAB. The "+" insert
-        // affordance now lives ONLY in the editor.
-        React.createElement(
-          "button",
-          {
-            className: "jrn-fab jrn-fab-newentry",
-            onClick: function() {
-              onCreateEntry && onCreateEntry();
-            },
-            title: "New Entry",
-            "aria-label": "New Entry"
-          },
-          React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.9", strokeLinecap: "round", strokeLinejoin: "round" },
-            React.createElement("path", { d: "M12 20h9" }),
-            React.createElement("path", { d: "M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" })
-          ),
-          React.createElement("span", { className: "jrn-fab-newentry-label" }, "New Entry")
-        ),
-        menuEntry && React.createElement(JournalCardMenu, {
-          entry: menuEntry,
-          onClose: function() {
-            setMenuEntry(null);
-          },
-          onOpen: function() {
-            onOpenEntry && onOpenEntry(menuEntry.id);
-          },
-          onEdit: function() {
-            onEditEntry ? onEditEntry(menuEntry.id) : onOpenEntry && onOpenEntry(menuEntry.id);
-          },
-          onTogglePin: function() {
-            togglePin(menuEntry.id);
-          },
-          onDelete: function() {
-            deleteEntry(menuEntry.id);
-          }
-        })
-      )
-    );
+    return /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren }, /* @__PURE__ */ React.createElement("div", { className: "jrn-hub" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-hub-header" }, /* @__PURE__ */ React.createElement("h1", { className: "jrn-hub-title" }, "My Journal"), /* @__PURE__ */ React.createElement("span", { className: "jrn-hub-count" }, allEntries.length + (allEntries.length === 1 ? " entry" : " entries"))), /* @__PURE__ */ React.createElement("div", { className: "jrn-tabs" }, /* @__PURE__ */ React.createElement("button", { className: "jrn-tab" + (tab === "all" ? " active" : ""), onClick: function() {
+      setTab("all");
+    } }, "All Entries"), /* @__PURE__ */ React.createElement("button", { className: "jrn-tab" + (tab === "pinned" ? " active" : ""), onClick: function() {
+      setTab("pinned");
+    } }, "Pinned")), tab === "all" && renderEntries(allEntries, false), tab === "pinned" && renderEntries(pinnedEntries, true), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "jrn-fab jrn-fab-newentry",
+        onClick: function() {
+          onCreateEntry && onCreateEntry();
+        },
+        title: "New Entry",
+        "aria-label": "New Entry"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.9", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M12 20h9" }), /* @__PURE__ */ React.createElement("path", { d: "M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" })),
+      /* @__PURE__ */ React.createElement("span", { className: "jrn-fab-newentry-label" }, "New Entry")
+    ), menuEntry && /* @__PURE__ */ React.createElement(
+      JournalCardMenu,
+      {
+        entry: menuEntry,
+        onClose: function() {
+          setMenuEntry(null);
+        },
+        onOpen: function() {
+          onOpenEntry && onOpenEntry(menuEntry.id);
+        },
+        onEdit: function() {
+          onEditEntry ? onEditEntry(menuEntry.id) : onOpenEntry && onOpenEntry(menuEntry.id);
+        },
+        onTogglePin: function() {
+          togglePin(menuEntry.id);
+        },
+        onDelete: function() {
+          deleteEntry(menuEntry.id);
+        }
+      }
+    )));
   }
 
-  // app/src/main/assets/src/ui/screens/JournalViewerScreen.js
+  // app/src/main/assets/src/ui/screens/JournalViewerScreen.jsx
   var JournalViewerScreen_exports = {};
   __export(JournalViewerScreen_exports, {
     JournalAudioBlock: () => JournalAudioBlock2,
@@ -5372,18 +5215,26 @@
     while ((m = re.exec(text)) !== null) {
       if (m.index > last) nodes.push(text.substring(last, m.index));
       if (m[1] != null) {
-        nodes.push(React.createElement("strong", { key: "i" + keyCounter++ }, m[1]));
+        nodes.push(/* @__PURE__ */ React.createElement("strong", { key: "i" + keyCounter++ }, m[1]));
       } else if (m[2] != null) {
-        nodes.push(React.createElement("em", { key: "i" + keyCounter++ }, m[2]));
+        nodes.push(/* @__PURE__ */ React.createElement("em", { key: "i" + keyCounter++ }, m[2]));
       } else if (m[3] != null) {
         var ref = m[3].trim();
-        nodes.push(React.createElement("span", {
-          key: "i" + keyCounter++,
-          className: "jrn-inline-ref",
-          onClick: function() {
-            callbacks.onScriptureRef && callbacks.onScriptureRef(ref);
-          }
-        }, ref));
+        nodes.push(
+          /* @__PURE__ */ React.createElement(
+            "span",
+            {
+              key: "i" + keyCounter++,
+              className: "jrn-inline-ref",
+              onClick: /* @__PURE__ */ (function(rr) {
+                return function() {
+                  callbacks.onScriptureRef && callbacks.onScriptureRef(rr);
+                };
+              })(ref)
+            },
+            ref
+          )
+        );
       } else if (m[4] != null) {
         var kind = m[4];
         var data = m[5].trim();
@@ -5399,13 +5250,21 @@
           var je = typeof JournalStore !== "undefined" ? JournalStore.get(data) : null;
           if (je) label = JournalHelpers.entryDisplayTitle(je) || "Journal Entry";
         }
-        nodes.push(React.createElement("span", {
-          key: "i" + keyCounter++,
-          className: "jrn-inline-" + kind,
-          onClick: function() {
-            callbacks.onInlineLink && callbacks.onInlineLink(kind, data);
-          }
-        }, label));
+        nodes.push(
+          /* @__PURE__ */ React.createElement(
+            "span",
+            {
+              key: "i" + keyCounter++,
+              className: "jrn-inline-" + kind,
+              onClick: /* @__PURE__ */ (function(k, d) {
+                return function() {
+                  callbacks.onInlineLink && callbacks.onInlineLink(k, d);
+                };
+              })(kind, data)
+            },
+            label
+          )
+        );
       }
       last = m.index + m[0].length;
     }
@@ -5417,71 +5276,41 @@
     callbacks = callbacks || {};
     var b = block;
     var hlKey = entryId != null && blockIndex != null ? "journal:" + entryId + ":" + blockIndex : null;
-    var hlProps = hlKey ? { "data-hl-key": hlKey, "data-hl-dom": true } : null;
+    var hlProps = hlKey ? { "data-hl-key": hlKey, "data-hl-dom": true } : {};
     if (b.type === "p") {
-      return React.createElement("p", Object.assign({ className: "jrn-p" }, hlProps || {}), jrnRenderInline(b.text || "", callbacks));
+      return /* @__PURE__ */ React.createElement("p", { className: "jrn-p", ...hlProps }, jrnRenderInline(b.text || "", callbacks));
     }
     if (b.type === "h2") {
-      return React.createElement("h2", Object.assign({ className: "jrn-h2" }, hlProps || {}), jrnRenderInline(b.text || "", callbacks));
+      return /* @__PURE__ */ React.createElement("h2", { className: "jrn-h2", ...hlProps }, jrnRenderInline(b.text || "", callbacks));
     }
     if (b.type === "quote") {
       var qText = b.text || "";
       var qLong = qText.length > 240;
-      return React.createElement(
-        "div",
-        { className: "jrn-block-quote" },
-        qLong ? React.createElement(JrnExpandable, {
-          text: qText,
-          threshold: 240,
-          className: "jrn-block-quote-body"
-        }) : React.createElement("div", Object.assign({ className: "jrn-block-quote-body" }, hlProps || {}), jrnRenderInline(qText, callbacks)),
-        b.cite && React.createElement("div", { className: "jrn-block-quote-cite" }, b.cite)
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-block-quote" }, qLong ? /* @__PURE__ */ React.createElement(JrnExpandable, { text: qText, threshold: 240, className: "jrn-block-quote-body" }) : /* @__PURE__ */ React.createElement("div", { className: "jrn-block-quote-body", ...hlProps }, jrnRenderInline(qText, callbacks)), b.cite && /* @__PURE__ */ React.createElement("div", { className: "jrn-block-quote-cite" }, b.cite));
     }
     if (b.type === "divider") {
-      return React.createElement("div", { className: "jrn-divider" }, "\u2756  \u2756  \u2756");
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-divider" }, "\u2756  \u2756  \u2756");
     }
     if (b.type === "letter-card") {
       var lc = JournalHelpers.resolveLetterCard(b.volKey, b.letterId, b.excerpt);
-      if (!lc) return React.createElement(
-        "div",
-        { className: "jrn-embed-letter", onClick: function() {
-          callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId);
-        } },
-        React.createElement("div", { className: "jrn-emb-eyebrow" }, "Letter"),
-        React.createElement("h4", { className: "jrn-emb-title" }, b.letterId)
-      );
-      return React.createElement(
-        "div",
-        { className: "jrn-embed-letter" + (lc.isExcerpt ? " is-excerpt" : ""), onClick: function() {
-          callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId);
-        }, role: "button" },
-        lc.date && React.createElement("div", { className: "jrn-emb-date" }, lc.date),
-        React.createElement("div", { className: "jrn-emb-eyebrow" }, lc.isExcerpt ? lc.eyebrow + " \xB7 Excerpt" : lc.eyebrow),
-        React.createElement("h4", { className: "jrn-emb-title" }, lc.title),
-        lc.body && React.createElement(JrnExpandable, {
-          text: lc.body,
-          threshold: lc.isExcerpt ? 240 : 180,
-          className: "jrn-emb-body" + (lc.isExcerpt ? " jrn-emb-excerpt" : "")
-        })
-      );
+      if (!lc) return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-letter", onClick: function() {
+        callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId);
+      } }, /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-eyebrow" }, "Letter"), /* @__PURE__ */ React.createElement("h4", { className: "jrn-emb-title" }, b.letterId));
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-letter" + (lc.isExcerpt ? " is-excerpt" : ""), onClick: function() {
+        callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId);
+      }, role: "button" }, lc.date && /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-date" }, lc.date), /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-eyebrow" }, lc.isExcerpt ? lc.eyebrow + " \xB7 Excerpt" : lc.eyebrow), /* @__PURE__ */ React.createElement("h4", { className: "jrn-emb-title" }, lc.title), lc.body && /* @__PURE__ */ React.createElement(JrnExpandable, { text: lc.body, threshold: lc.isExcerpt ? 240 : 180, className: "jrn-emb-body" + (lc.isExcerpt ? " jrn-emb-excerpt" : "") }));
     }
     if (b.type === "chapter-card") {
       var cc = JournalHelpers.resolveChapterCard(b.bookId, b.chapter);
-      return React.createElement(
-        "div",
-        { className: "jrn-embed-chapter", onClick: function() {
-          callbacks.onChapterCard && callbacks.onChapterCard(b.bookId, b.chapter, b.isStudy);
-        }, role: "button" },
-        React.createElement("div", { className: "jrn-emb-eyebrow" }, cc ? cc.eyebrow : "Bible"),
-        React.createElement("h4", { className: "jrn-emb-title" }, cc ? cc.title : b.bookId + " " + b.chapter)
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-chapter", onClick: function() {
+        callbacks.onChapterCard && callbacks.onChapterCard(b.bookId, b.chapter, b.isStudy);
+      }, role: "button" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-eyebrow" }, cc ? cc.eyebrow : "Bible"), /* @__PURE__ */ React.createElement("h4", { className: "jrn-emb-title" }, cc ? cc.title : b.bookId + " " + b.chapter));
     }
     if (b.type === "verse-block") {
       var vb = JournalHelpers.resolveVerseBlock(b.ref, b.text);
       var isExcerpt = !!b.partial || !!vb.isExcerpt;
       var verseText = vb.text || "";
-      return React.createElement(
+      return /* @__PURE__ */ React.createElement(
         "div",
         {
           className: "jrn-embed-verse" + (isExcerpt ? " is-excerpt" : ""),
@@ -5492,58 +5321,32 @@
           role: callbacks.onChapterCard && b.bookId != null ? "button" : null,
           style: callbacks.onChapterCard && b.bookId != null ? { cursor: "pointer" } : null
         },
-        React.createElement("div", { className: "jrn-emb-cite" }, isExcerpt ? vb.cite + " \xB7 Excerpt" : vb.cite),
-        verseText ? React.createElement(JrnExpandable, {
-          text: verseText,
-          threshold: 240,
-          className: "jrn-emb-text" + (isExcerpt ? " jrn-emb-excerpt" : "")
-        }) : React.createElement(
-          "div",
-          { className: "jrn-emb-text" },
-          React.createElement("em", { style: { color: "var(--gold-dim)" } }, "Verse text not available offline.")
-        )
+        /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-cite" }, isExcerpt ? vb.cite + " \xB7 Excerpt" : vb.cite),
+        verseText ? /* @__PURE__ */ React.createElement(JrnExpandable, { text: verseText, threshold: 240, className: "jrn-emb-text" + (isExcerpt ? " jrn-emb-excerpt" : "") }) : /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-text" }, /* @__PURE__ */ React.createElement("em", { style: { color: "var(--gold-dim)" } }, "Verse text not available offline."))
       );
     }
     if (b.type === "bookmark-card") {
       var bc = JournalHelpers.resolveBookmarkCard(b.bookmarkId);
-      return React.createElement(
-        "div",
-        { className: "jrn-embed-bookmark", onClick: function() {
-          callbacks.onBookmarkCard && callbacks.onBookmarkCard(b.bookmarkId);
-        }, role: "button" },
-        React.createElement("div", { className: "jrn-emb-eyebrow" }, bc ? bc.eyebrow : "Bookmark"),
-        React.createElement("h4", { className: "jrn-emb-title" }, bc ? bc.title : "Bookmark"),
-        bc && bc.body && React.createElement(JrnExpandable, { text: bc.body, threshold: 200, className: "jrn-emb-body" })
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-bookmark", onClick: function() {
+        callbacks.onBookmarkCard && callbacks.onBookmarkCard(b.bookmarkId);
+      }, role: "button" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-eyebrow" }, bc ? bc.eyebrow : "Bookmark"), /* @__PURE__ */ React.createElement("h4", { className: "jrn-emb-title" }, bc ? bc.title : "Bookmark"), bc && bc.body && /* @__PURE__ */ React.createElement(JrnExpandable, { text: bc.body, threshold: 200, className: "jrn-emb-body" }));
     }
     if (b.type === "note-card") {
       var nc = JournalHelpers.resolveNoteCard(b.noteGroupId);
-      return React.createElement(
-        "div",
-        { className: "jrn-embed-note", onClick: function() {
-          callbacks.onNoteCard && callbacks.onNoteCard(b.noteGroupId);
-        }, role: "button" },
-        React.createElement("div", { className: "jrn-emb-eyebrow" }, nc ? nc.eyebrow : "Note"),
-        React.createElement("h4", { className: "jrn-emb-title" }, nc ? nc.title : "Note"),
-        nc && nc.body && React.createElement(JrnExpandable, { text: nc.body, threshold: 200, className: "jrn-emb-body", tapToToggle: true })
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-note", onClick: function() {
+        callbacks.onNoteCard && callbacks.onNoteCard(b.noteGroupId);
+      }, role: "button" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-eyebrow" }, nc ? nc.eyebrow : "Note"), /* @__PURE__ */ React.createElement("h4", { className: "jrn-emb-title" }, nc ? nc.title : "Note"), nc && nc.body && /* @__PURE__ */ React.createElement(JrnExpandable, { text: nc.body, threshold: 200, className: "jrn-emb-body", tapToToggle: true }));
     }
     if (b.type === "journal-card") {
       var je = typeof JournalStore !== "undefined" ? JournalStore.get(b.entryId) : null;
       var jcPreview = je ? JournalHelpers.previewText(je, 320) : "";
-      return React.createElement(
-        "div",
-        { className: "jrn-embed-journal", onClick: function() {
-          callbacks.onJournalCard && callbacks.onJournalCard(b.entryId);
-        }, role: "button" },
-        React.createElement("div", { className: "jrn-emb-eyebrow" }, "Linked Entry"),
-        React.createElement("h4", { className: "jrn-emb-title" }, je ? JournalHelpers.entryDisplayTitle(je) || "Untitled" : "(Deleted)"),
-        jcPreview && React.createElement(JrnExpandable, { text: jcPreview, threshold: 180, className: "jrn-emb-body" })
-      );
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-journal", onClick: function() {
+        callbacks.onJournalCard && callbacks.onJournalCard(b.entryId);
+      }, role: "button" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-eyebrow" }, "Linked Entry"), /* @__PURE__ */ React.createElement("h4", { className: "jrn-emb-title" }, je ? JournalHelpers.entryDisplayTitle(je) || "Untitled" : "(Deleted)"), jcPreview && /* @__PURE__ */ React.createElement(JrnExpandable, { text: jcPreview, threshold: 180, className: "jrn-emb-body" }));
     }
     if (b.type === "notebook-card") {
       var nbc = JournalHelpers.resolveNotebookCard(b.notebookId);
-      return React.createElement(
+      return /* @__PURE__ */ React.createElement(
         "div",
         {
           className: "jrn-embed-notebook",
@@ -5552,24 +5355,9 @@
             callbacks.onNotebookCard && callbacks.onNotebookCard(b.notebookId);
           }
         },
-        React.createElement(
-          "div",
-          { className: "jrn-emb-notebook-icon" },
-          React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" },
-            React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }),
-            React.createElement("polyline", { points: "15 4 15 9 20 9" }),
-            React.createElement("line", { x1: "8", y1: "14", x2: "15", y2: "14" })
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "jrn-emb-notebook-text" },
-          React.createElement("div", { className: "jrn-emb-eyebrow" }, nbc ? nbc.eyebrow : "Notebook"),
-          React.createElement("h4", { className: "jrn-emb-title" }, nbc ? nbc.title : "Notebook")
-        ),
-        React.createElement("span", { className: "jrn-emb-notebook-arrow" }, "\u203A")
+        /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-notebook-icon" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 4 15 9 20 9" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "14", x2: "15", y2: "14" }))),
+        /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-notebook-text" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-eyebrow" }, nbc ? nbc.eyebrow : "Notebook"), /* @__PURE__ */ React.createElement("h4", { className: "jrn-emb-title" }, nbc ? nbc.title : "Notebook")),
+        /* @__PURE__ */ React.createElement("span", { className: "jrn-emb-notebook-arrow" }, "\u203A")
       );
     }
     if (b.type === "journal-excerpt") {
@@ -5582,17 +5370,14 @@
         if (e) e.stopPropagation();
         if (b.sourceJournalId && callbacks.onJournalCard) callbacks.onJournalCard(b.sourceJournalId);
       };
-      return React.createElement(
-        "div",
-        { className: "jrn-embed-journal-excerpt" + (b.originType === "h2" ? " is-heading" : "") },
-        srcTitle && React.createElement("div", { className: "jrn-emb-eyebrow jrn-excerpt-source", onClick: openSource, role: "button" }, "From: " + srcTitle),
-        React.createElement(JrnExpandable, {
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-journal-excerpt" + (b.originType === "h2" ? " is-heading" : "") }, srcTitle && /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-eyebrow jrn-excerpt-source", onClick: openSource, role: "button" }, "From: " + srcTitle), /* @__PURE__ */ React.createElement(
+        JrnExpandable,
+        {
           text: b.text || "",
           threshold: 240,
           className: "jrn-emb-excerpt-body" + (b.originType === "quote" ? " is-quote" : "")
-        }),
-        b.cite && React.createElement("div", { className: "jrn-emb-cite" }, b.cite)
-      );
+        }
+      ), b.cite && /* @__PURE__ */ React.createElement("div", { className: "jrn-emb-cite" }, b.cite));
     }
     if (b.type === "image") {
       var srcImg = b.sourceJournalTitle || "";
@@ -5600,18 +5385,17 @@
         var srcEnt = JournalStore.get(b.sourceJournalId);
         if (srcEnt) srcImg = JournalHelpers.entryDisplayTitle(srcEnt) || "Untitled";
       }
-      return React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-linked-wrap" + (b.sourceJournalId ? " is-linked" : "") }, b.sourceJournalId && srcImg && /* @__PURE__ */ React.createElement(
         "div",
-        { className: "jrn-linked-wrap" + (b.sourceJournalId ? " is-linked" : "") },
-        b.sourceJournalId && srcImg && React.createElement("div", {
+        {
           className: "jrn-emb-eyebrow jrn-excerpt-source",
           onClick: function() {
             if (callbacks.onJournalCard) callbacks.onJournalCard(b.sourceJournalId);
           },
           role: "button"
-        }, "From: " + srcImg),
-        React.createElement(JournalImageBlock2, { mediaId: b.mediaId, caption: b.caption })
-      );
+        },
+        "From: " + srcImg
+      ), /* @__PURE__ */ React.createElement(JournalImageBlock2, { mediaId: b.mediaId, caption: b.caption }));
     }
     if (b.type === "audio") {
       var srcAud = b.sourceJournalTitle || "";
@@ -5619,18 +5403,17 @@
         var srcEnt2 = JournalStore.get(b.sourceJournalId);
         if (srcEnt2) srcAud = JournalHelpers.entryDisplayTitle(srcEnt2) || "Untitled";
       }
-      return React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-linked-wrap" + (b.sourceJournalId ? " is-linked" : "") }, b.sourceJournalId && srcAud && /* @__PURE__ */ React.createElement(
         "div",
-        { className: "jrn-linked-wrap" + (b.sourceJournalId ? " is-linked" : "") },
-        b.sourceJournalId && srcAud && React.createElement("div", {
+        {
           className: "jrn-emb-eyebrow jrn-excerpt-source",
           onClick: function() {
             if (callbacks.onJournalCard) callbacks.onJournalCard(b.sourceJournalId);
           },
           role: "button"
-        }, "From: " + srcAud),
-        React.createElement(JournalAudioBlock2, { mediaId: b.mediaId, duration: b.duration, caption: b.caption, samples: b.samples })
-      );
+        },
+        "From: " + srcAud
+      ), /* @__PURE__ */ React.createElement(JournalAudioBlock2, { mediaId: b.mediaId, duration: b.duration, caption: b.caption, samples: b.samples }));
     }
     return null;
   }
@@ -5651,12 +5434,7 @@
         cancelled = true;
       };
     }, [mediaId]);
-    return React.createElement(
-      "div",
-      { className: "jrn-embed-image" },
-      src ? React.createElement("img", { src, alt: caption || "" }) : React.createElement("div", { style: { width: "100%", height: "180px", background: "var(--bg3)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold-dim)", fontStyle: "italic", fontFamily: "EB Garamond, serif" } }, "Image unavailable"),
-      caption && React.createElement("div", { className: "jrn-img-caption", style: { padding: "8px 14px" } }, caption)
-    );
+    return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-image" }, src ? /* @__PURE__ */ React.createElement("img", { src, alt: caption || "" }) : /* @__PURE__ */ React.createElement("div", { style: { width: "100%", height: "180px", background: "var(--bg3)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold-dim)", fontStyle: "italic", fontFamily: "EB Garamond, serif" } }, "Image unavailable"), caption && /* @__PURE__ */ React.createElement("div", { className: "jrn-img-caption", style: { padding: "8px 14px" } }, caption));
   }
   function JournalAudioBlock2(props) {
     var useState = React.useState;
@@ -5729,48 +5507,47 @@
       } else {
         h = 6 + Math.round(Math.abs(Math.sin(i * 0.6 + i * 0.13)) * 16);
       }
-      bars.push(React.createElement("div", {
-        key: i,
-        className: "bar" + (progress > 0 && i / barCount <= progress ? " is-played" : ""),
-        style: { height: h + "px" }
-      }));
+      bars.push(
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: i,
+            className: "bar" + (progress > 0 && i / barCount <= progress ? " is-played" : ""),
+            style: { height: h + "px" }
+          }
+        )
+      );
     }
     var deleteUI = null;
     if (editable) {
       if (confirming) {
-        deleteUI = React.createElement(
-          "div",
-          { className: "jrn-aud-delete-confirm", onClick: function(e) {
-            e.stopPropagation();
-          } },
-          React.createElement("span", { className: "jrn-aud-delete-q" }, "Delete?"),
-          React.createElement("button", {
+        deleteUI = /* @__PURE__ */ React.createElement("div", { className: "jrn-aud-delete-confirm", onClick: function(e) {
+          e.stopPropagation();
+        } }, /* @__PURE__ */ React.createElement("span", { className: "jrn-aud-delete-q" }, "Delete?"), /* @__PURE__ */ React.createElement(
+          "button",
+          {
             className: "jrn-aud-delete-cancel",
             onClick: function(e) {
               e.stopPropagation();
               props.onCancelDelete && props.onCancelDelete();
             },
             "aria-label": "Cancel"
-          }, "\xD7"),
-          React.createElement(
-            "button",
-            {
-              className: "jrn-aud-delete-yes",
-              onClick: function(e) {
-                e.stopPropagation();
-                props.onConfirmDelete && props.onConfirmDelete();
-              },
-              "aria-label": "Confirm delete"
+          },
+          "\xD7"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "jrn-aud-delete-yes",
+            onClick: function(e) {
+              e.stopPropagation();
+              props.onConfirmDelete && props.onConfirmDelete();
             },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("polyline", { points: "20 6 9 17 4 12" })
-            )
-          )
-        );
+            "aria-label": "Confirm delete"
+          },
+          /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))
+        ));
       } else {
-        deleteUI = React.createElement(
+        deleteUI = /* @__PURE__ */ React.createElement(
           "button",
           {
             className: "jrn-aud-delete",
@@ -5781,49 +5558,25 @@
               props.onRequestDelete && props.onRequestDelete();
             }
           },
-          React.createElement(
-            "svg",
-            { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" },
-            React.createElement("polyline", { points: "3 6 5 6 21 6" }),
-            React.createElement("path", { d: "M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" }),
-            React.createElement("path", { d: "M10 11v6M14 11v6" })
-          )
+          /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6M14 11v6" }))
         );
       }
     }
     var dur = duration || 0;
     var timeStr = JournalHelpers.formatDuration(curTime || 0) + " / " + JournalHelpers.formatDuration(dur);
-    return React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-audio" + (editable ? " is-editable" : "") }, /* @__PURE__ */ React.createElement("button", { className: "jrn-aud-play", onClick: toggle, "aria-label": playing ? "Pause" : "Play" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, playing ? /* @__PURE__ */ React.createElement("path", { d: "M6 4h4v16H6zM14 4h4v16h-4z" }) : /* @__PURE__ */ React.createElement("path", { d: "M6 3v18l16-9z" }))), /* @__PURE__ */ React.createElement("div", { className: "jrn-aud-body" }, /* @__PURE__ */ React.createElement(
       "div",
-      { className: "jrn-embed-audio" + (editable ? " is-editable" : "") },
-      React.createElement(
-        "button",
-        { className: "jrn-aud-play", onClick: toggle, "aria-label": playing ? "Pause" : "Play" },
-        React.createElement(
-          "svg",
-          { viewBox: "0 0 24 24", fill: "currentColor" },
-          playing ? React.createElement("path", { d: "M6 4h4v16H6zM14 4h4v16h-4z" }) : React.createElement("path", { d: "M6 3v18l16-9z" })
-        )
-      ),
-      React.createElement(
-        "div",
-        { className: "jrn-aud-body" },
-        React.createElement("div", {
-          className: "jrn-aud-waveform",
-          onClick: seekFromEvent,
-          role: "slider",
-          "aria-label": "Seek",
-          style: { cursor: "pointer" }
-        }, bars),
-        React.createElement(
-          "div",
-          { className: "jrn-aud-meta" },
-          React.createElement("span", null, caption || "Voice memo"),
-          React.createElement("span", null, timeStr)
-        )
-      ),
-      deleteUI,
-      src && React.createElement("audio", {
+      {
+        className: "jrn-aud-waveform",
+        onClick: seekFromEvent,
+        role: "slider",
+        "aria-label": "Seek",
+        style: { cursor: "pointer" }
+      },
+      bars
+    ), /* @__PURE__ */ React.createElement("div", { className: "jrn-aud-meta" }, /* @__PURE__ */ React.createElement("span", null, caption || "Voice memo"), /* @__PURE__ */ React.createElement("span", null, timeStr))), deleteUI, src && /* @__PURE__ */ React.createElement(
+      "audio",
+      {
         ref: audioRef,
         src,
         style: { display: "none" },
@@ -5839,16 +5592,11 @@
           setCurTime(0);
         },
         onTimeUpdate
-      })
-    );
+      }
+    ));
   }
   function jrnPinIcon(filled) {
-    return React.createElement(
-      "svg",
-      { viewBox: "0 0 24 24", fill: filled ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-      React.createElement("path", { d: "M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" }),
-      React.createElement("path", { d: "M8 12 L3 19", stroke: "currentColor", fill: "none" })
-    );
+    return /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: filled ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" }), /* @__PURE__ */ React.createElement("path", { d: "M8 12 L3 19", stroke: "currentColor", fill: "none" }));
   }
   function JournalViewerScreen(props) {
     var useState = React.useState;
@@ -5911,16 +5659,7 @@
       });
     }
     if (!entry) {
-      return React.createElement(
-        ScreenLayout,
-        { navChildren: buildNavChildren() },
-        React.createElement(
-          "div",
-          { className: "jrn-empty" },
-          React.createElement("div", { className: "jrn-empty-title" }, "Entry Not Found"),
-          React.createElement("div", { className: "jrn-empty-hint" }, "This journal entry may have been deleted.")
-        )
-      );
+      return /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: buildNavChildren() }, /* @__PURE__ */ React.createElement("div", { className: "jrn-empty" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-empty-title" }, "Entry Not Found"), /* @__PURE__ */ React.createElement("div", { className: "jrn-empty-hint" }, "This journal entry may have been deleted.")));
     }
     var sourceMeta = { sourceLetterTitle: "My Journal \xB7 " + (JournalHelpers.entryDisplayTitle(entry) || "Entry") };
     var callbacks = {
@@ -5982,51 +5721,36 @@
       bump();
       onBack && onBack();
     }
-    var navExtras = React.createElement(
-      React.Fragment,
-      null,
-      React.createElement("button", {
+    var navExtras = /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      "button",
+      {
         className: "nav-search-btn jrn-pin-btn" + (entry.pinned ? " is-pinned" : ""),
         onClick: togglePin,
         title: entry.pinned ? "Unpin entry" : "Pin entry",
         "aria-label": entry.pinned ? "Unpin entry" : "Pin entry",
         "aria-pressed": !!entry.pinned
-      }, jrnPinIcon(!!entry.pinned)),
-      React.createElement(
-        "button",
-        {
-          className: "nav-search-btn jrn-del-btn",
-          onClick: startDelete,
-          title: "Delete entry",
-          "aria-label": "Delete entry"
-        },
-        React.createElement(
-          "svg",
-          { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" },
-          React.createElement("polyline", { points: "3 6 5 6 21 6" }),
-          React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }),
-          React.createElement("path", { d: "M10 11v6M14 11v6" })
-        )
-      )
-    );
+      },
+      jrnPinIcon(!!entry.pinned)
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "nav-search-btn jrn-del-btn",
+        onClick: startDelete,
+        title: "Delete entry",
+        "aria-label": "Delete entry"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6M14 11v6" }))
+    ));
     function renderDeleteBanner() {
       if (confirmStep === 0) return null;
       var stepLabel = confirmStep === 1 ? "Step 1 of 3" : confirmStep === 2 ? "Step 2 of 3" : "Step 3 of 3";
       var question = confirmStep === 1 ? "Delete this entry?" : confirmStep === 2 ? "Are you sure? This cannot be undone." : "Type DELETE to permanently remove this entry.";
-      return React.createElement(
-        "div",
-        { className: "jrn-tripledel jrn-tripledel-step" + confirmStep },
-        React.createElement("div", { className: "jrn-tripledel-step-label" }, stepLabel),
-        React.createElement("div", { className: "jrn-tripledel-question" }, question),
-        (function() {
-          var summary = typeof JournalStore !== "undefined" && JournalStore.associatedDataSummary ? JournalStore.associatedDataSummary(entryId) : null;
-          return summary && React.createElement(
-            "div",
-            { className: "jrn-tripledel-cascade" },
-            "This will also permanently delete " + summary + " you placed inside this entry."
-          );
-        })(),
-        confirmStep === 3 && React.createElement("input", {
+      return /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel jrn-tripledel-step" + confirmStep }, /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel-step-label" }, stepLabel), /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel-question" }, question), (function() {
+        var summary = typeof JournalStore !== "undefined" && JournalStore.associatedDataSummary ? JournalStore.associatedDataSummary(entryId) : null;
+        return summary && /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel-cascade" }, "This will also permanently delete " + summary + " you placed inside this entry.");
+      })(), confirmStep === 3 && /* @__PURE__ */ React.createElement(
+        "input",
+        {
           type: "text",
           className: "jrn-tripledel-input",
           placeholder: "Type DELETE",
@@ -6035,90 +5759,42 @@
           onChange: function(e) {
             setTypedDelete(e.target.value);
           }
-        }),
-        React.createElement(
-          "div",
-          { className: "jrn-tripledel-actions" },
-          React.createElement("button", { className: "jrn-tripledel-cancel", onClick: cancelDelete }, "Cancel"),
-          confirmStep < 3 && React.createElement(
-            "button",
-            { className: "jrn-tripledel-next", onClick: nextDeleteStep },
-            confirmStep === 1 ? "Continue" : "I am sure"
-          ),
-          confirmStep === 3 && React.createElement("button", {
-            className: "jrn-tripledel-final",
-            onClick: doDelete,
-            disabled: typedDelete.trim().toUpperCase() !== "DELETE"
-          }, "Delete forever")
-        )
-      );
-    }
-    var displayTitle = JournalHelpers.entryDisplayTitle(entry);
-    return React.createElement(
-      ScreenLayout,
-      { navChildren: buildNavChildren({ right: navExtras }) },
-      React.createElement(
-        "div",
-        { className: "jrn-viewer" },
-        // Single-shot "Back to <origin>" pill for journal→journal tap-throughs.
-        jrnBack && React.createElement(
-          "div",
-          { className: "back-hint-row" },
-          React.createElement(
-            "button",
-            { className: "back-hint-pill", onClick: jrnGoBack, "aria-label": "Back to " + jrnBack.fromTitle },
-            React.createElement("span", { className: "back-hint-arrow" }, "\u2039"),
-            "Back to ",
-            React.createElement("span", { className: "back-hint-title" }, jrnBack.fromTitle)
-          )
-        ),
-        React.createElement(
-          "div",
-          { className: "jrn-viewer-meta" },
-          React.createElement("h1", { className: "jrn-viewer-title" + (displayTitle ? "" : " untitled") }, displayTitle || "Untitled"),
-          React.createElement(
-            "div",
-            { className: "jrn-viewer-date" },
-            JournalHelpers.longDate(entry.created),
-            React.createElement("span", { className: "jrn-card-time" }, " \xB7 " + JournalHelpers.shortTime(entry.created)),
-            entry.pinned && " \xB7 Pinned"
-          )
-        ),
-        renderDeleteBanner(),
-        React.createElement(
-          "div",
-          { className: "jrn-viewer-blocks" },
-          (entry.blocks || []).map(function(b, i) {
-            return React.createElement(JournalBlockView2, {
-              key: b.id,
-              block: b,
-              callbacks,
-              entryId: entry.id,
-              blockIndex: i
-            });
-          })
-        )
-      ),
-      // Edit FAB — bottom right, pencil icon. Taps open the editor.
-      React.createElement(
+        }
+      ), /* @__PURE__ */ React.createElement("div", { className: "jrn-tripledel-actions" }, /* @__PURE__ */ React.createElement("button", { className: "jrn-tripledel-cancel", onClick: cancelDelete }, "Cancel"), confirmStep < 3 && /* @__PURE__ */ React.createElement("button", { className: "jrn-tripledel-next", onClick: nextDeleteStep }, confirmStep === 1 ? "Continue" : "I am sure"), confirmStep === 3 && /* @__PURE__ */ React.createElement(
         "button",
         {
-          className: "jrn-fab jrn-fab-action is-edit",
-          onClick: onEdit,
-          title: "Edit entry",
-          "aria-label": "Edit entry"
+          className: "jrn-tripledel-final",
+          onClick: doDelete,
+          disabled: typedDelete.trim().toUpperCase() !== "DELETE"
         },
-        React.createElement(
-          "svg",
-          { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" },
-          React.createElement("path", { d: "M12 20h9" }),
-          React.createElement("path", { d: "M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" })
-        )
-      )
-    );
+        "Delete forever"
+      )));
+    }
+    var displayTitle = JournalHelpers.entryDisplayTitle(entry);
+    return /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: buildNavChildren({ right: navExtras }) }, /* @__PURE__ */ React.createElement("div", { className: "jrn-viewer" }, jrnBack && /* @__PURE__ */ React.createElement("div", { className: "back-hint-row" }, /* @__PURE__ */ React.createElement("button", { className: "back-hint-pill", onClick: jrnGoBack, "aria-label": "Back to " + jrnBack.fromTitle }, /* @__PURE__ */ React.createElement("span", { className: "back-hint-arrow" }, "\u2039"), "Back to", " ", /* @__PURE__ */ React.createElement("span", { className: "back-hint-title" }, jrnBack.fromTitle))), /* @__PURE__ */ React.createElement("div", { className: "jrn-viewer-meta" }, /* @__PURE__ */ React.createElement("h1", { className: "jrn-viewer-title" + (displayTitle ? "" : " untitled") }, displayTitle || "Untitled"), /* @__PURE__ */ React.createElement("div", { className: "jrn-viewer-date" }, JournalHelpers.longDate(entry.created), /* @__PURE__ */ React.createElement("span", { className: "jrn-card-time" }, " \xB7 " + JournalHelpers.shortTime(entry.created)), entry.pinned && " \xB7 Pinned")), renderDeleteBanner(), /* @__PURE__ */ React.createElement("div", { className: "jrn-viewer-blocks" }, (entry.blocks || []).map(function(b, i) {
+      return /* @__PURE__ */ React.createElement(
+        JournalBlockView2,
+        {
+          key: b.id,
+          block: b,
+          callbacks,
+          entryId: entry.id,
+          blockIndex: i
+        }
+      );
+    }))), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "jrn-fab jrn-fab-action is-edit",
+        onClick: onEdit,
+        title: "Edit entry",
+        "aria-label": "Edit entry"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M12 20h9" }), /* @__PURE__ */ React.createElement("path", { d: "M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" }))
+    ));
   }
 
-  // app/src/main/assets/src/ui/screens/JournalEditorScreen.js
+  // app/src/main/assets/src/ui/screens/JournalEditorScreen.jsx
   var JournalEditorScreen_exports = {};
   __export(JournalEditorScreen_exports, {
     JournalEditorScreen: () => JournalEditorScreen
@@ -6390,43 +6066,37 @@
     function blockDeleteUI(idx) {
       if (confirmDelIdx === idx) {
         var step2 = confirmDelStep === 2;
-        return React.createElement(
-          "div",
-          { className: "jrn-block-confirm" + (step2 ? " jrn-block-confirm-step2" : ""), onClick: function(e) {
-            e.stopPropagation();
-          } },
-          React.createElement("span", { className: "jrn-block-confirm-q" }, step2 ? "Are you sure?" : "Delete?"),
-          React.createElement("button", {
+        return /* @__PURE__ */ React.createElement("div", { className: "jrn-block-confirm" + (step2 ? " jrn-block-confirm-step2" : ""), onClick: function(e) {
+          e.stopPropagation();
+        } }, /* @__PURE__ */ React.createElement("span", { className: "jrn-block-confirm-q" }, step2 ? "Are you sure?" : "Delete?"), /* @__PURE__ */ React.createElement(
+          "button",
+          {
             className: "jrn-block-confirm-cancel",
             onClick: function(e) {
               e.stopPropagation();
               cancelDeleteBlock();
             },
             "aria-label": "Cancel"
-          }, "\xD7"),
-          React.createElement(
-            "button",
-            {
-              className: "jrn-block-confirm-yes",
-              onClick: function(e) {
-                e.stopPropagation();
-                if (step2) {
-                  deleteBlock(idx);
-                } else {
-                  setConfirmDelStep(2);
-                }
-              },
-              "aria-label": step2 ? "Confirm delete" : "Continue"
+          },
+          "\xD7"
+        ), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "jrn-block-confirm-yes",
+            onClick: function(e) {
+              e.stopPropagation();
+              if (step2) {
+                deleteBlock(idx);
+              } else {
+                setConfirmDelStep(2);
+              }
             },
-            React.createElement(
-              "svg",
-              { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" },
-              React.createElement("polyline", { points: "20 6 9 17 4 12" })
-            )
-          )
-        );
+            "aria-label": step2 ? "Confirm delete" : "Continue"
+          },
+          /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))
+        ));
       }
-      return React.createElement(
+      return /* @__PURE__ */ React.createElement(
         "button",
         {
           className: "jrn-block-del-btn",
@@ -6437,12 +6107,7 @@
           title: "Delete block",
           "aria-label": "Delete block"
         },
-        React.createElement(
-          "svg",
-          { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" },
-          React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
-          React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
-        )
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" }, /* @__PURE__ */ React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /* @__PURE__ */ React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" }))
       );
     }
     function renderEditableBlock(b, idx) {
@@ -6452,10 +6117,9 @@
         "data-block-id": b.id
       };
       if (b.type === "p" || b.type === "h2") {
-        return React.createElement(
-          "div",
-          common,
-          React.createElement("textarea", {
+        return /* @__PURE__ */ React.createElement("div", { ...common }, /* @__PURE__ */ React.createElement(
+          "textarea",
+          {
             className: "jrn-block-textarea" + (b.type === "h2" ? " h2" : ""),
             rows: 1,
             value: b.text || "",
@@ -6486,105 +6150,84 @@
                 el.style.height = el.scrollHeight + "px";
               }
             }
-          }),
-          blockDeleteUI(idx)
-        );
+          }
+        ), blockDeleteUI(idx));
       }
       if (b.type === "quote") {
-        return React.createElement(
-          "div",
-          common,
-          React.createElement(
-            "div",
-            { className: "jrn-block-quote" },
-            React.createElement("textarea", {
-              rows: 1,
-              value: b.text || "",
-              placeholder: "Quoted text\u2026",
-              onChange: function(e) {
-                patchBlock(idx, { text: e.target.value });
-                trackCaret(idx, e.target);
-              },
-              onFocus: function(e) {
-                focusTextarea(idx, e.target);
-              },
-              onSelect: function(e) {
-                trackCaret(idx, e.target);
-              },
-              onKeyUp: function(e) {
-                trackCaret(idx, e.target);
-              },
-              onClick: function(e) {
-                trackCaret(idx, e.target);
-              },
-              onBlur: function(e) {
-                trackCaret(idx, e.target);
-                commitSave();
-              },
-              ref: function(el) {
-                if (el) {
-                  el.style.height = "auto";
-                  el.style.height = el.scrollHeight + "px";
-                }
+        return /* @__PURE__ */ React.createElement("div", { ...common }, /* @__PURE__ */ React.createElement("div", { className: "jrn-block-quote" }, /* @__PURE__ */ React.createElement(
+          "textarea",
+          {
+            rows: 1,
+            value: b.text || "",
+            placeholder: "Quoted text\u2026",
+            onChange: function(e) {
+              patchBlock(idx, { text: e.target.value });
+              trackCaret(idx, e.target);
+            },
+            onFocus: function(e) {
+              focusTextarea(idx, e.target);
+            },
+            onSelect: function(e) {
+              trackCaret(idx, e.target);
+            },
+            onKeyUp: function(e) {
+              trackCaret(idx, e.target);
+            },
+            onClick: function(e) {
+              trackCaret(idx, e.target);
+            },
+            onBlur: function(e) {
+              trackCaret(idx, e.target);
+              commitSave();
+            },
+            ref: function(el) {
+              if (el) {
+                el.style.height = "auto";
+                el.style.height = el.scrollHeight + "px";
               }
-            }),
-            React.createElement("input", {
-              type: "text",
-              className: "jrn-block-quote-cite",
-              value: b.cite || "",
-              placeholder: "Citation (optional)",
-              onChange: function(e) {
-                patchBlock(idx, { cite: e.target.value });
-              },
-              onBlur: function() {
-                commitSave();
-              }
-            })
-          ),
-          blockDeleteUI(idx)
-        );
+            }
+          }
+        ), /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            type: "text",
+            className: "jrn-block-quote-cite",
+            value: b.cite || "",
+            placeholder: "Citation (optional)",
+            onChange: function(e) {
+              patchBlock(idx, { cite: e.target.value });
+            },
+            onBlur: function() {
+              commitSave();
+            }
+          }
+        )), blockDeleteUI(idx));
       }
       if (b.type === "divider") {
-        return React.createElement(
-          "div",
-          common,
-          React.createElement("div", { className: "jrn-divider" }, "\u2756  \u2756  \u2756"),
-          blockDeleteUI(idx)
-        );
+        return /* @__PURE__ */ React.createElement("div", { ...common }, /* @__PURE__ */ React.createElement("div", { className: "jrn-divider" }, "\u2756  \u2756  \u2756"), blockDeleteUI(idx));
       }
       if (b.type === "image") {
-        return React.createElement(
-          "div",
-          common,
-          React.createElement(
-            "div",
-            { className: "jrn-embed-image" },
-            // Linked-from-journal embed surfaces the source attribution
-            b.sourceJournalId && b.sourceJournalTitle && React.createElement("div", { className: "jrn-linked-badge" }, "From: " + b.sourceJournalTitle),
-            React.createElement(JournalImageBlock, { mediaId: b.mediaId }),
-            React.createElement("input", {
-              type: "text",
-              className: "jrn-img-caption",
-              placeholder: "Caption (optional)",
-              value: b.caption || "",
-              onChange: function(e) {
-                patchBlock(idx, { caption: e.target.value });
-              },
-              onBlur: function() {
-                commitSave();
-              }
-            })
-          ),
-          blockDeleteUI(idx)
-        );
+        return /* @__PURE__ */ React.createElement("div", { ...common }, /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-image" }, b.sourceJournalId && b.sourceJournalTitle && /* @__PURE__ */ React.createElement("div", { className: "jrn-linked-badge" }, "From: " + b.sourceJournalTitle), /* @__PURE__ */ React.createElement(JournalImageBlock, { mediaId: b.mediaId }), /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            type: "text",
+            className: "jrn-img-caption",
+            placeholder: "Caption (optional)",
+            value: b.caption || "",
+            onChange: function(e) {
+              patchBlock(idx, { caption: e.target.value });
+            },
+            onBlur: function() {
+              commitSave();
+            }
+          }
+        )), blockDeleteUI(idx));
       }
       if (b.type === "audio") {
         var confirming = confirmAudioDelete === idx;
-        return React.createElement(
-          "div",
-          common,
-          b.sourceJournalId && b.sourceJournalTitle && React.createElement("div", { className: "jrn-linked-badge" }, "From: " + b.sourceJournalTitle),
-          React.createElement(JournalAudioBlock, {
+        return /* @__PURE__ */ React.createElement("div", { ...common }, b.sourceJournalId && b.sourceJournalTitle && /* @__PURE__ */ React.createElement("div", { className: "jrn-linked-badge" }, "From: " + b.sourceJournalTitle), /* @__PURE__ */ React.createElement(
+          JournalAudioBlock,
+          {
             mediaId: b.mediaId,
             duration: b.duration,
             caption: b.caption,
@@ -6601,15 +6244,10 @@
               deleteBlock(idx);
             },
             confirming
-          })
-        );
+          }
+        ));
       }
-      return React.createElement(
-        "div",
-        common,
-        React.createElement(JournalBlockView, { block: b, callbacks: {} }),
-        blockDeleteUI(idx)
-      );
+      return /* @__PURE__ */ React.createElement("div", { ...common }, /* @__PURE__ */ React.createElement(JournalBlockView, { block: b, callbacks: {} }), blockDeleteUI(idx));
     }
     function focusLastTextBlock(e) {
       if (e.target !== e.currentTarget) return;
@@ -6639,7 +6277,7 @@
         onBack && onBack();
       },
       backTitle: "Done",
-      leftExtras: React.createElement("span", { className: "jrn-saved-ind" }, savedLabel),
+      leftExtras: /* @__PURE__ */ React.createElement("span", { className: "jrn-saved-ind" }, savedLabel),
       onSearch: props.onSearch ? function() {
         commitSave();
         props.onSearch();
@@ -6655,55 +6293,35 @@
       theme: props.theme,
       onThemeChange: props.onThemeChange
     });
-    return React.createElement(
-      ScreenLayout,
-      { navChildren },
-      React.createElement(
-        "div",
-        { className: "jrn-editor" },
-        React.createElement("input", { ref: fileInputRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: onFileChosen }),
-        React.createElement(
-          "div",
-          { className: "jrn-editor-meta" },
-          React.createElement("input", {
-            className: "jrn-editor-title",
-            type: "text",
-            value: title,
-            placeholder: "Title",
-            onChange: function(e) {
-              setTitle(e.target.value);
-              scheduleSave();
-            },
-            onBlur: function() {
-              commitSave();
-            }
-          })
-        ),
-        React.createElement(
-          "div",
-          { ref: blocksContainerRef, className: "jrn-blocks jrn-body-surface", onClick: focusLastTextBlock },
-          blocks.map(function(b, idx) {
-            return renderEditableBlock(b, idx);
-          })
-        )
-      ),
-      // Single + FAB. Voice recording is reached via + → Voice Recording
-      // (the standalone mic FAB was removed per user direction).
-      !showRec && React.createElement(
-        "button",
-        {
-          className: "jrn-fab jrn-fab-plus",
-          onClick: openInsertSheet,
-          title: "Insert",
-          "aria-label": "Insert"
+    return /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren }, /* @__PURE__ */ React.createElement("div", { className: "jrn-editor" }, /* @__PURE__ */ React.createElement("input", { ref: fileInputRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: onFileChosen }), /* @__PURE__ */ React.createElement("div", { className: "jrn-editor-meta" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        className: "jrn-editor-title",
+        type: "text",
+        value: title,
+        placeholder: "Title",
+        onChange: function(e) {
+          setTitle(e.target.value);
+          scheduleSave();
         },
-        React.createElement(
-          "svg",
-          { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round" },
-          React.createElement("path", { d: "M12 5v14M5 12h14" })
-        )
-      ),
-      showInsert && React.createElement(JournalInsertSheet, {
+        onBlur: function() {
+          commitSave();
+        }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { ref: blocksContainerRef, className: "jrn-blocks jrn-body-surface", onClick: focusLastTextBlock }, blocks.map(function(b, idx) {
+      return renderEditableBlock(b, idx);
+    }))), !showRec && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "jrn-fab jrn-fab-plus",
+        onClick: openInsertSheet,
+        title: "Insert",
+        "aria-label": "Insert"
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M12 5v14M5 12h14" }))
+    ), showInsert && /* @__PURE__ */ React.createElement(
+      JournalInsertSheet,
+      {
         excludeJournalId: entryId,
         onClose: function() {
           setShowInsert(false);
@@ -6715,14 +6333,16 @@
         onInsertImage: handleInsertImage,
         onRecordAudio: handleInsertAudio,
         onInsertInline: handleInsertInline
-      }),
-      showRec && React.createElement(JournalRecordingSheet, {
+      }
+    ), showRec && /* @__PURE__ */ React.createElement(
+      JournalRecordingSheet,
+      {
         onSave: onRecordingSaved,
         onClose: function() {
           setShowRec(false);
         }
-      })
-    );
+      }
+    ));
   }
 
   // app/src/main/assets/src/renderer/dom-journal-chip.js

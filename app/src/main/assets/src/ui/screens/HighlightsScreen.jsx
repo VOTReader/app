@@ -1,28 +1,6 @@
-/* =================================================================
-   HIGHLIGHTS & UNDERLINES SCREEN — browser for all color marks.
-   =================================================================
-   Global-scope module. Concatenates with index.html via <script src>.
-   Loads AFTER BookmarksScreen.js so it can reuse the shared
-   _bookmarkSourceLabel / _bookmarkSourceEndpoint resolvers (highlight
-   hlKeys use the exact same format as bookmark hlKeys).
-
-   Depends on (load first): AnnotationStore (vot-annotations),
-     _bookmarkSourceLabel, _bookmarkSourceEndpoint, relativeDate,
-     ScreenLayout, ThemeBtn.
-
-   DATA: AnnotationStore.all() → { hlKey: [ { id, groupId, kind,
-     color, start, end, text, created, updated } ] }. We surface only
-     kind 'highlight' | 'underline' (notes live in the Notes hub).
-     Segments are grouped by groupId (a multi-paragraph mark is one
-     logical row even though it has N segments across keys).
-
-   SORT: by Date (newest/oldest), by Type (highlight ↔ underline),
-     by Color (palette order). One active mode at a time; Date + Type
-     have a direction toggle.
-
-   Tap a row → navigate to the source passage with a single-shot
-   "Back to My Highlights" pill (same contract as Bookmarks/Notes).
-   ================================================================= */
+/* ═══════════════════════════════════════════════════════════════════════
+   HighlightsScreen — Cluster D (esbuild bundle-d.js)
+   ═══════════════════════════════════════════════════════════════════════ */
 
 /* Self-contained CSS injection (segregated from the main stylesheet,
    same pattern as journal-styles.js). All classes prefixed `hlx-`. */
@@ -133,24 +111,26 @@ export function HighlightRow(props) {
   var date = (typeof relativeDate === 'function') ? relativeDate(m.updated || m.created) : '';
   var hex = _hlColorHex(m.color);
   var isUnderline = m.kind === 'underline';
-  return React.createElement('div', {
-    className: 'hlx-row',
-    role: 'button', tabIndex: 0,
-    onClick: function() { props.onNavigate && props.onNavigate(m); },
-    onKeyDown: function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); props.onNavigate && props.onNavigate(m); } }
-  },
-    React.createElement('span', {
-      className: 'hlx-swatch' + (isUnderline ? ' is-underline' : ''),
-      style: isUnderline ? { borderBottomColor: hex } : { background: hex }
-    }),
-    React.createElement('span', { className: 'hlx-body' },
-      React.createElement('span', { className: 'hlx-top' },
-        React.createElement('span', { className: 'hlx-source' }, sourceLabel),
-        React.createElement('span', { className: 'hlx-kind' }, isUnderline ? 'Underline' : 'Highlight')
-      ),
-      m.text && React.createElement('span', { className: 'hlx-text' }, '“', m.text, '”'),
-      date && React.createElement('span', { className: 'hlx-date' }, date)
-    )
+  return (
+    <div
+      className="hlx-row"
+      role="button" tabIndex={0}
+      onClick={function() { props.onNavigate && props.onNavigate(m); }}
+      onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); props.onNavigate && props.onNavigate(m); } }}
+    >
+      <span
+        className={'hlx-swatch' + (isUnderline ? ' is-underline' : '')}
+        style={isUnderline ? { borderBottomColor: hex } : { background: hex }}
+      />
+      <span className="hlx-body">
+        <span className="hlx-top">
+          <span className="hlx-source">{sourceLabel}</span>
+          <span className="hlx-kind">{isUnderline ? 'Underline' : 'Highlight'}</span>
+        </span>
+        {m.text && <span className="hlx-text">{'“'}{m.text}{'”'}</span>}
+        {date && <span className="hlx-date">{date}</span>}
+      </span>
+    </div>
   );
 }
 
@@ -217,10 +197,12 @@ export function HighlightsScreen(props) {
   }
 
   function typeChip(val, label) {
-    return React.createElement('button', {
-      className: 'hlx-type-chip' + (typeFilter === val ? ' active' : ''),
-      onClick: function() { setTypeFilter(val); }
-    }, label);
+    return (
+      <button
+        className={'hlx-type-chip' + (typeFilter === val ? ' active' : '')}
+        onClick={function() { setTypeFilter(val); }}
+      >{label}</button>
+    );
   }
 
   // Standard app-wide Library nav (back + Home left, icon cluster right).
@@ -230,68 +212,81 @@ export function HighlightsScreen(props) {
     theme: props.theme, onThemeChange: props.onThemeChange
   });
 
-  return React.createElement(ScreenLayout, { navChildren: navChildren },
-    React.createElement('div', { className: 'hlx-screen' },
-      React.createElement('div', { className: 'hlx-header' },
-        React.createElement('span', { className: 'hlx-eyebrow' }, 'My Marks'),
-        React.createElement('h1', { className: 'hlx-title' }, 'Highlights & Underlines'),
-        React.createElement('span', { className: 'hlx-count' }, marks.length + (marks.length === 1 ? ' mark' : ' marks'))
-      ),
-      marks.length > 0 && React.createElement('div', { className: 'hlx-controls' },
-        React.createElement('input', {
-          className: 'hlx-search', type: 'text', placeholder: 'Search marks…',
-          value: query, onChange: function(e) { setQuery(e.target.value); }
-        }),
-        // Standardized date sort — identical class + wording to every
-        // other Library list (Notes/Bookmarks/Links/Journal).
-        React.createElement('div', { className: 'hlx-sort-row' },
-          React.createElement('button', {
-            className: 'notes-index-sort-btn',
-            onClick: function() { setSortNewest(function(v) { return !v; }); },
-            title: 'Toggle sort order'
-          }, sortNewest ? 'Sort: Newest ↓' : 'Sort: Oldest ↑')
-        ),
-        // Type filter chips
-        React.createElement('div', { className: 'hlx-filter-row' },
-          React.createElement('span', { className: 'hlx-sort-label' }, 'Type'),
-          typeChip('all', 'All'),
-          typeChip('highlight', 'Highlights'),
-          typeChip('underline', 'Underlines')
-        ),
-        // Granular color filter — always available, the actual color dots
-        // just like the highlight/underline picker. Tap a dot to show only
-        // that color; tap "All" (or the active dot again) to clear.
-        presentColors.length > 0 && React.createElement('div', { className: 'hlx-filter-row' },
-          React.createElement('span', { className: 'hlx-sort-label' }, 'Color'),
-          React.createElement('button', {
-            className: 'hlx-color-all' + (colorFilter === null ? ' active' : ''),
-            onClick: function() { setColorFilter(null); }
-          }, 'All'),
-          presentColors.map(function(c) {
-            return React.createElement('button', {
-              key: c,
-              type: 'button',
-              className: 'hlx-color-dot' + (colorFilter === c ? ' active' : ''),
-              style: { backgroundColor: _hlColorHex(c) },
-              title: c.charAt(0).toUpperCase() + c.slice(1),
-              'aria-label': 'Filter ' + c,
-              onClick: function() { setColorFilter(colorFilter === c ? null : c); }
-            });
-          })
-        )
-      ),
-      sorted.length === 0
-        ? React.createElement('div', { className: 'hlx-empty' },
-            React.createElement('div', { className: 'hlx-empty-title' }, marks.length === 0 ? 'No Marks Yet' : 'No Matches'),
-            React.createElement('div', { className: 'hlx-empty-hint' }, marks.length === 0
-              ? 'Select any passage while reading and tap a color to highlight or underline it. Your marks collect here.'
-              : 'Try a different search term.')
-          )
-        : React.createElement('div', { className: 'hlx-list' },
-            sorted.map(function(m) {
-              return React.createElement(HighlightRow, { key: m.groupId, mark: m, onNavigate: navigate });
-            })
-          )
-    )
+  return (
+    <ScreenLayout navChildren={navChildren}>
+      <div className="hlx-screen">
+        <div className="hlx-header">
+          <span className="hlx-eyebrow">My Marks</span>
+          <h1 className="hlx-title">Highlights & Underlines</h1>
+          <span className="hlx-count">{marks.length + (marks.length === 1 ? ' mark' : ' marks')}</span>
+        </div>
+        {marks.length > 0 && (
+          <div className="hlx-controls">
+            <input
+              className="hlx-search" type="text" placeholder="Search marks…"
+              value={query} onChange={function(e) { setQuery(e.target.value); }}
+            />
+            {/* Standardized date sort — identical class + wording to every
+                other Library list (Notes/Bookmarks/Links/Journal). */}
+            <div className="hlx-sort-row">
+              <button
+                className="notes-index-sort-btn"
+                onClick={function() { setSortNewest(function(v) { return !v; }); }}
+                title="Toggle sort order"
+              >{sortNewest ? 'Sort: Newest ↓' : 'Sort: Oldest ↑'}</button>
+            </div>
+            {/* Type filter chips */}
+            <div className="hlx-filter-row">
+              <span className="hlx-sort-label">Type</span>
+              {typeChip('all', 'All')}
+              {typeChip('highlight', 'Highlights')}
+              {typeChip('underline', 'Underlines')}
+            </div>
+            {/* Granular color filter — always available, the actual color dots
+                just like the highlight/underline picker. Tap a dot to show only
+                that color; tap "All" (or the active dot again) to clear. */}
+            {presentColors.length > 0 && (
+              <div className="hlx-filter-row">
+                <span className="hlx-sort-label">Color</span>
+                <button
+                  className={'hlx-color-all' + (colorFilter === null ? ' active' : '')}
+                  onClick={function() { setColorFilter(null); }}
+                >All</button>
+                {presentColors.map(function(c) {
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      className={'hlx-color-dot' + (colorFilter === c ? ' active' : '')}
+                      style={{ backgroundColor: _hlColorHex(c) }}
+                      title={c.charAt(0).toUpperCase() + c.slice(1)}
+                      aria-label={'Filter ' + c}
+                      onClick={function() { setColorFilter(colorFilter === c ? null : c); }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+        {sorted.length === 0
+          ? (
+              <div className="hlx-empty">
+                <div className="hlx-empty-title">{marks.length === 0 ? 'No Marks Yet' : 'No Matches'}</div>
+                <div className="hlx-empty-hint">{marks.length === 0
+                  ? 'Select any passage while reading and tap a color to highlight or underline it. Your marks collect here.'
+                  : 'Try a different search term.'}</div>
+              </div>
+            )
+          : (
+              <div className="hlx-list">
+                {sorted.map(function(m) {
+                  return <HighlightRow key={m.groupId} mark={m} onNavigate={navigate} />;
+                })}
+              </div>
+            )
+        }
+      </div>
+    </ScreenLayout>
   );
 }

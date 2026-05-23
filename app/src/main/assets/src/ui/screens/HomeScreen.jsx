@@ -1,12 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   HomeScreen — extracted React screen component
-   ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
-   Self-contained — uses React.useX hooks directly (no dependency on the
-   inline script's `const { useState, ... } = React` destructuring).
-   All other call-time dependencies (Segments, FootnoteSheet, ScreenLayout,
-   findEntryContext, applyDOMHighlights, etc.) are global-lexical and
-   resolve at render time from the surrounding scripts.
+   HomeScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onInfo, onAbout, history, theme, onThemeChange }) {
@@ -286,65 +279,80 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     return true;
   });
 
-  return (/*#__PURE__*/
-    React.createElement(ScreenLayout, { navChildren: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/
-      React.createElement("button", { className: "nav-search-btn", onClick: onInfo, title: "Welcome image", "aria-label": "Show welcome image", style: { marginRight: '0.25rem', color: 'var(--gold)' } }, /*#__PURE__*/
-      React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /*#__PURE__*/React.createElement("rect", { x: "10.5", y: "2", width: "3", height: "20", rx: "1" }), /*#__PURE__*/React.createElement("rect", { x: "4", y: "8", width: "16", height: "3", rx: "1" }))
-      ), /*#__PURE__*/
-      React.createElement("button", { className: "nav-search-btn", onClick: onAbout, title: "About VOTReader", "aria-label": "About VOTReader", style: { marginRight: 'auto', color: 'var(--gold)' } }, /*#__PURE__*/
-      React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8" }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "9.5" }), /*#__PURE__*/React.createElement("line", { x1: "12", y1: "11", x2: "12", y2: "17", strokeLinecap: "round" }), /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "7.5", r: "1.2", fill: "currentColor", stroke: "none" }))
-      ), /*#__PURE__*/
-      React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /*#__PURE__*/
-      React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))
-      ), /*#__PURE__*/
-      React.createElement(ThemeBtn, { theme: theme, onThemeChange: onThemeChange })) }, /*#__PURE__*/
-    React.createElement("div", { className: `home-screen home-screen-app${isFirstVisit ? "" : " home-fast"}` }, /*#__PURE__*/
-    React.createElement("h1", { className: "home-main-title" }, "The Volumes of Truth"), /*#__PURE__*/
-    React.createElement("div", { className: "home-main-amp", "aria-hidden": "true" }, "&"), /*#__PURE__*/
-    React.createElement("h2", { className: "home-main-title2" }, "The Scriptures of Truth"), /*#__PURE__*/
-    React.createElement("div", { className: "home-ornament" }, /*#__PURE__*/
-    React.createElement("div", { className: "home-ornament-line" }), /*#__PURE__*/
-    React.createElement("div", { className: "home-ornament-diamond" }), /*#__PURE__*/
-    React.createElement("div", { className: "home-ornament-line r" })
-    ), /*#__PURE__*/
-    React.createElement("div", { className: "home-nav-list" },
-    orderedItems.map((item, i) => /*#__PURE__*/
-    React.createElement("button", { key: item.id,
-      ref: setCardRef(i),
-      className: `home-nav-item${i === pressingIdx ? " pressing" : ""}${i === dragIdx ? " dragging" : ""}`,
-      onTouchStart: (e) => {
-        if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientY);
-      },
-      onMouseDown: (e) => {
-        if (e.button === 0) startPress(i, e.clientY);
-      },
-      onClick: (e) => {
-        if (justDraggedRef.current) {e.preventDefault();e.stopPropagation();return;}
-        handleTap(item.id);
-      } }, /*#__PURE__*/
-    React.createElement("span", { className: "hni-text" }, /*#__PURE__*/
-    React.createElement("span", { className: "hni-eyebrow" }, item.eyebrow), /*#__PURE__*/
-    React.createElement("span", { className: "hni-title" }, item.title), /*#__PURE__*/
-    React.createElement("span", { className: "hni-detail" }, item.detail)
-    ), /*#__PURE__*/
-    React.createElement("span", { className: "hni-arrow" }, "\u203A")
-    )
-    )
-    ),
-    isFirstVisit && /*#__PURE__*/React.createElement("span", { className: "home-rearrange-hint" }, "Hold to rearrange")
-    ),
-    showSurprise && /*#__PURE__*/
-    React.createElement("button", { className: "surprise-fab", onClick: onSurprise, title: "Open a Random Chapter or Letter", "aria-label": "Surprise Me" }, /*#__PURE__*/
-    React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /*#__PURE__*/
-    React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "3.5" }), /*#__PURE__*/
-    React.createElement("circle", { cx: "8", cy: "8", r: "1.15", fill: "currentColor", stroke: "none" }), /*#__PURE__*/
-    React.createElement("circle", { cx: "16", cy: "8", r: "1.15", fill: "currentColor", stroke: "none" }), /*#__PURE__*/
-    React.createElement("circle", { cx: "12", cy: "12", r: "1.15", fill: "currentColor", stroke: "none" }), /*#__PURE__*/
-    React.createElement("circle", { cx: "8", cy: "16", r: "1.15", fill: "currentColor", stroke: "none" }), /*#__PURE__*/
-    React.createElement("circle", { cx: "16", cy: "16", r: "1.15", fill: "currentColor", stroke: "none" })
-    )
-    )
-
-    ));
-
+  return (
+    <ScreenLayout navChildren={
+      <>
+        <button className="nav-search-btn" onClick={onInfo} title="Welcome image" aria-label="Show welcome image" style={{ marginRight: '0.25rem', color: 'var(--gold)' }}>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <rect x="10.5" y="2" width="3" height="20" rx="1" />
+            <rect x="4" y="8" width="16" height="3" rx="1" />
+          </svg>
+        </button>
+        <button className="nav-search-btn" onClick={onAbout} title="About VOTReader" aria-label="About VOTReader" style={{ marginRight: 'auto', color: 'var(--gold)' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="12" cy="12" r="9.5" />
+            <line x1="12" y1="11" x2="12" y2="17" strokeLinecap="round" />
+            <circle cx="12" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+        <button className="nav-search-btn" onClick={onSearch} title="Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
+        <ThemeBtn theme={theme} onThemeChange={onThemeChange} />
+      </>
+    }>
+      <div className={`home-screen home-screen-app${isFirstVisit ? "" : " home-fast"}`}>
+        <h1 className="home-main-title">The Volumes of Truth</h1>
+        <div className="home-main-amp" aria-hidden="true">&amp;</div>
+        <h2 className="home-main-title2">The Scriptures of Truth</h2>
+        <div className="home-ornament">
+          <div className="home-ornament-line" />
+          <div className="home-ornament-diamond" />
+          <div className="home-ornament-line r" />
+        </div>
+        <div className="home-nav-list">
+          {orderedItems.map((item, i) => (
+            <button
+              key={item.id}
+              ref={setCardRef(i)}
+              className={`home-nav-item${i === pressingIdx ? " pressing" : ""}${i === dragIdx ? " dragging" : ""}`}
+              onTouchStart={(e) => {
+                if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientY);
+              }}
+              onMouseDown={(e) => {
+                if (e.button === 0) startPress(i, e.clientY);
+              }}
+              onClick={(e) => {
+                if (justDraggedRef.current) {e.preventDefault();e.stopPropagation();return;}
+                handleTap(item.id);
+              }}
+            >
+              <span className="hni-text">
+                <span className="hni-eyebrow">{item.eyebrow}</span>
+                <span className="hni-title">{item.title}</span>
+                <span className="hni-detail">{item.detail}</span>
+              </span>
+              <span className="hni-arrow">{"›"}</span>
+            </button>
+          ))}
+        </div>
+        {isFirstVisit && <span className="home-rearrange-hint">Hold to rearrange</span>}
+      </div>
+      {showSurprise && (
+        <button className="surprise-fab" onClick={onSurprise} title="Open a Random Chapter or Letter" aria-label="Surprise Me">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="3.5" />
+            <circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" />
+            <circle cx="16" cy="8" r="1.15" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none" />
+            <circle cx="8" cy="16" r="1.15" fill="currentColor" stroke="none" />
+            <circle cx="16" cy="16" r="1.15" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+      )}
+    </ScreenLayout>
+  );
 }

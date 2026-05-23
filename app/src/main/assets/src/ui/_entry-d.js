@@ -110,38 +110,38 @@ import { LinkIcon } from './components/LinkIcon.jsx';
 import { BookmarkIcon } from './components/BookmarkIcon.jsx';
 
 // ── Screens ─────────────────────────────────────────────────────────────
-import { LetterView } from './screens/LetterView.js';
-import { WtlbEntryView } from './screens/WtlbEntryView.js';
-import { BibleChapterView } from './screens/BibleChapterView.js';
-import { ChapterView } from './screens/ChapterView.js';
-import { LibraryScreen } from './screens/LibraryScreen.js';
-import { NotesIndexScreen } from './screens/NotesIndexScreen.js';
-import { VolumesHome } from './screens/VolumesHome.js';
-import { StudiesHome } from './screens/StudiesHome.js';
-import { HistoryScreen } from './screens/HistoryScreen.js';
-import { AboutScreen } from './screens/AboutScreen.js';
-import { SettingsScreen } from './screens/SettingsScreen.js';
-import { HomeScreen } from './screens/HomeScreen.js';
-import { SearchScreen } from './screens/SearchScreen.js';
-import { BibleStudyIndex } from './screens/BibleStudyIndex.js';
-import { ChapterIndex } from './screens/ChapterIndex.js';
+import { LetterView } from './screens/LetterView.jsx';
+import { WtlbEntryView } from './screens/WtlbEntryView.jsx';
+import { BibleChapterView } from './screens/BibleChapterView.jsx';
+import { ChapterView } from './screens/ChapterView.jsx';
+import { LibraryScreen } from './screens/LibraryScreen.jsx';
+import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
+import { VolumesHome } from './screens/VolumesHome.jsx';
+import { StudiesHome } from './screens/StudiesHome.jsx';
+import { HistoryScreen } from './screens/HistoryScreen.jsx';
+import { AboutScreen } from './screens/AboutScreen.jsx';
+import { SettingsScreen } from './screens/SettingsScreen.jsx';
+import { HomeScreen } from './screens/HomeScreen.jsx';
+import { SearchScreen } from './screens/SearchScreen.jsx';
+import { BibleStudyIndex } from './screens/BibleStudyIndex.jsx';
+import { ChapterIndex } from './screens/ChapterIndex.jsx';
 import {
   GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
-} from './screens/GardenView.js';
-import { ScriptureGenre } from './screens/ScriptureGenre.js';
-import { ScripturesHome } from './screens/ScripturesHome.js';
+} from './screens/GardenView.jsx';
+import { ScriptureGenre } from './screens/ScriptureGenre.jsx';
+import { ScripturesHome } from './screens/ScripturesHome.jsx';
 import {
   _linkEndpointCategory, _endpointResolves, _epSearchText,
   LinkRow, LinkRowActionSheet, LinksScreen,
-} from './screens/LinksScreen.js';
+} from './screens/LinksScreen.jsx';
 import {
   _bookmarkSourceLabel, _bookmarkSourceEndpoint,
   BookmarkRow, BookmarkRowActionSheet, BookmarkPopover, BookmarksScreen,
-} from './screens/BookmarksScreen.js';
+} from './screens/BookmarksScreen.jsx';
 import {
   _HL_COLOR_ORDER, _HL_COLOR_HEX, _hlColorHex, _hlColorIndex,
   _collectMarks, HighlightRow, HighlightsScreen,
-} from './screens/HighlightsScreen.js';
+} from './screens/HighlightsScreen.jsx';
 
 // ── Sheets ──────────────────────────────────────────────────────────────
 import { TabsOverview } from './sheets/TabsOverview.jsx';
