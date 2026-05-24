@@ -373,6 +373,16 @@
       }
     };
   }
+  function extendStore(base, methods) {
+    return (
+      /** @type {B & M} */
+      Object.assign(
+        /** @type {any} */
+        base,
+        methods
+      )
+    );
+  }
 
   // app/src/main/assets/src/stores/annotation-store.js
   function migrateAnnotations() {
@@ -532,133 +542,242 @@
   var HighlightStore = AnnotationStore2;
 
   // app/src/main/assets/src/stores/note-store.js
-  var NoteStore2 = Object.assign(CachedStore("vot-notes", {}), {
-    get(groupId) {
-      return this._load()[groupId] || null;
-    },
-    all() {
-      return this._load();
-    },
-    list() {
-      const data = this._load();
-      return Object.keys(data).map((k) => data[k]).sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0));
-    },
-    count() {
-      return Object.keys(this._load()).length;
-    },
-    set(groupId, fields) {
-      const data = this._load();
-      const existing = data[groupId];
-      const ts = Date.now();
-      data[groupId] = {
-        groupId,
-        notebookIds: [],
-        body: "",
-        color: "yellow",
-        fullText: "",
-        keys: [],
-        created: ts,
-        ...existing || {},
-        ...fields,
-        updated: ts
-      };
-      this._save();
-    },
-    update(groupId, patch) {
-      const data = this._load();
-      if (!data[groupId]) return;
-      data[groupId] = { ...data[groupId], ...patch, updated: Date.now() };
-      this._save();
-    },
-    remove(groupId) {
-      const data = this._load();
-      delete data[groupId];
-      this._save();
-    },
-    // Toggle a notebook membership on a note. No-op if the note doesn't exist.
-    toggleNotebook(groupId, notebookId) {
-      const data = this._load();
-      const note = data[groupId];
-      if (!note) return;
-      const ids = Array.isArray(note.notebookIds) ? note.notebookIds.slice() : [];
-      const i = ids.indexOf(notebookId);
-      if (i >= 0) ids.splice(i, 1);
-      else ids.push(notebookId);
-      data[groupId] = { ...note, notebookIds: ids, updated: Date.now() };
-      this._save();
-    },
-    // Strip a notebook from every note (used when a notebook is deleted).
-    pruneNotebook(notebookId) {
-      const data = this._load();
-      const ts = Date.now();
-      Object.keys(data).forEach((k) => {
-        const ids = (data[k].notebookIds || []).filter((id) => id !== notebookId);
-        if (ids.length !== (data[k].notebookIds || []).length) {
-          data[k] = { ...data[k], notebookIds: ids, updated: ts };
-        }
-      });
-      this._save();
-    }
-  });
-
-  // app/src/main/assets/src/stores/notebook-store.js
-  var NotebookStore2 = Object.assign(CachedStore("vot-notebooks", { list: [] }), {
-    list() {
-      const data = this._load();
-      return (data.list || []).slice().sort((a, b) => (a.sortIndex || 0) - (b.sortIndex || 0) || (a.created || 0) - (b.created || 0));
-    },
-    get(id) {
-      return (this._load().list || []).find((n) => n.id === id) || null;
-    },
-    add(name) {
-      const trimmed = (name || "").trim();
-      if (!trimmed) return null;
-      const data = this._load();
-      if (!data.list) data.list = [];
-      const existing = data.list.find((n) => (n.name || "").trim().toLowerCase() === trimmed.toLowerCase());
-      if (existing) return existing;
-      const id = "nb_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
-      const ts = Date.now();
-      const nb = { id, name: trimmed, sortIndex: data.list.length, created: ts, updated: ts };
-      data.list.push(nb);
-      this._save();
-      return nb;
-    },
-    rename(id, name) {
-      const trimmed = (name || "").trim();
-      if (!trimmed) return;
-      const data = this._load();
-      const nb = (data.list || []).find((n) => n.id === id);
-      if (nb) {
-        nb.name = trimmed;
-        nb.updated = Date.now();
+  var NoteStore2 = extendStore(
+    CachedStore(
+      "vot-notes",
+      /** @type {Record<string, Note>} */
+      {}
+    ),
+    {
+      /**
+       * Look up a note by its groupId.
+       * @param {string} groupId
+       * @returns {Note | null}
+       */
+      get(groupId) {
+        return this._load()[groupId] || null;
+      },
+      /**
+       * The full underlying map (groupId → Note). Mutations through this
+       * persist on next _save() but callers should prefer the typed methods.
+       * @returns {Record<string, Note>}
+       */
+      all() {
+        return this._load();
+      },
+      /**
+       * All notes, newest first (by `updated`, falling back to `created`).
+       * @returns {Note[]}
+       */
+      list() {
+        const data = this._load();
+        return Object.keys(data).map((k) => data[k]).sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0));
+      },
+      /**
+       * Total number of notes.
+       * @returns {number}
+       */
+      count() {
+        return Object.keys(this._load()).length;
+      },
+      /**
+       * Upsert a note. Merges with the existing record (preserving created/
+       * notebookIds when not overridden); stamps updated to now.
+       * @param {string} groupId
+       * @param {Partial<Note>} fields
+       * @returns {void}
+       */
+      set(groupId, fields) {
+        const data = this._load();
+        const existing = data[groupId];
+        const ts = Date.now();
+        data[groupId] = {
+          groupId,
+          notebookIds: [],
+          body: "",
+          color: "yellow",
+          fullText: "",
+          keys: [],
+          created: ts,
+          ...existing || {},
+          ...fields,
+          updated: ts
+        };
+        this._save();
+      },
+      /**
+       * Patch an existing note's fields. No-op when groupId is unknown.
+       * @param {string} groupId
+       * @param {Partial<Note>} patch
+       * @returns {void}
+       */
+      update(groupId, patch) {
+        const data = this._load();
+        if (!data[groupId]) return;
+        data[groupId] = { ...data[groupId], ...patch, updated: Date.now() };
+        this._save();
+      },
+      /**
+       * Delete a note record. Idempotent.
+       * @param {string} groupId
+       * @returns {void}
+       */
+      remove(groupId) {
+        const data = this._load();
+        delete data[groupId];
+        this._save();
+      },
+      /**
+       * Toggle a notebook membership on a note. No-op when the note doesn't
+       * exist. Mutates the notebookIds list in place + bumps updated.
+       * @param {string} groupId
+       * @param {string} notebookId
+       * @returns {void}
+       */
+      toggleNotebook(groupId, notebookId) {
+        const data = this._load();
+        const note = data[groupId];
+        if (!note) return;
+        const ids = Array.isArray(note.notebookIds) ? note.notebookIds.slice() : [];
+        const i = ids.indexOf(notebookId);
+        if (i >= 0) ids.splice(i, 1);
+        else ids.push(notebookId);
+        data[groupId] = { ...note, notebookIds: ids, updated: Date.now() };
+        this._save();
+      },
+      /**
+       * Strip a notebookId from every note (called when a notebook is
+       * deleted). Only touches notes that actually had the membership.
+       * @param {string} notebookId
+       * @returns {void}
+       */
+      pruneNotebook(notebookId) {
+        const data = this._load();
+        const ts = Date.now();
+        Object.keys(data).forEach((k) => {
+          const ids = (data[k].notebookIds || []).filter((id) => id !== notebookId);
+          if (ids.length !== (data[k].notebookIds || []).length) {
+            data[k] = { ...data[k], notebookIds: ids, updated: ts };
+          }
+        });
         this._save();
       }
-    },
-    remove(id) {
-      const data = this._load();
-      data.list = (data.list || []).filter((n) => n.id !== id);
-      this._save();
-      NoteStore2.pruneNotebook(id);
     }
-  });
+  );
+
+  // app/src/main/assets/src/stores/notebook-store.js
+  var NotebookStore2 = extendStore(
+    CachedStore(
+      "vot-notebooks",
+      /** @type {NotebookStoreData} */
+      { list: [] }
+    ),
+    {
+      /**
+       * All notebooks sorted by sortIndex, then created. Returns a copy
+       * (callers can mutate without affecting the cache).
+       * @returns {Notebook[]}
+       */
+      list() {
+        const data = this._load();
+        return (data.list || []).slice().sort((a, b) => (a.sortIndex || 0) - (b.sortIndex || 0) || (a.created || 0) - (b.created || 0));
+      },
+      /**
+       * Look up a notebook by id.
+       * @param {string} id
+       * @returns {Notebook | null}
+       */
+      get(id) {
+        return (this._load().list || []).find((n) => n.id === id) || null;
+      },
+      /**
+       * Create (or return existing dup) a notebook by name. Case-insensitive
+       * dedup means tapping "Create" twice on "Devotional" returns the same
+       * notebook both times. Returns null when name is blank.
+       * @param {string | null | undefined} name
+       * @returns {Notebook | null}
+       */
+      add(name) {
+        const trimmed = (name || "").trim();
+        if (!trimmed) return null;
+        const data = this._load();
+        if (!data.list) data.list = [];
+        const existing = data.list.find((n) => (n.name || "").trim().toLowerCase() === trimmed.toLowerCase());
+        if (existing) return existing;
+        const id = "nb_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+        const ts = Date.now();
+        const nb = { id, name: trimmed, sortIndex: data.list.length, created: ts, updated: ts };
+        data.list.push(nb);
+        this._save();
+        return nb;
+      },
+      /**
+       * Rename a notebook in place. No-op when name is blank or id is unknown.
+       * @param {string} id
+       * @param {string | null | undefined} name
+       * @returns {void}
+       */
+      rename(id, name) {
+        const trimmed = (name || "").trim();
+        if (!trimmed) return;
+        const data = this._load();
+        const nb = (data.list || []).find((n) => n.id === id);
+        if (nb) {
+          nb.name = trimmed;
+          nb.updated = Date.now();
+          this._save();
+        }
+      },
+      /**
+       * Delete a notebook AND strip its id from every note that referenced
+       * it (cascading via NoteStore.pruneNotebook). Notes themselves are
+       * preserved — they just lose this notebook tag.
+       * @param {string} id
+       * @returns {void}
+       */
+      remove(id) {
+        const data = this._load();
+        data.list = (data.list || []).filter((n) => n.id !== id);
+        this._save();
+        NoteStore2.pruneNotebook(id);
+      }
+    }
+  );
 
   // app/src/main/assets/src/stores/recent-nav-store.js
-  var RecentNavStore = Object.assign(CachedStore("vot-recent-nav", []), {
-    list() {
-      return this._load().slice(0, 20);
-    },
-    add(item) {
-      if (!item || !item.kind) return;
-      let data = this._load();
-      const sig = JSON.stringify({ kind: item.kind, bookId: item.bookId, chapter: item.chapter, letterId: item.letterId, entryId: item.entryId });
-      data = data.filter((x) => JSON.stringify({ kind: x.kind, bookId: x.bookId, chapter: x.chapter, letterId: x.letterId, entryId: x.entryId }) !== sig);
-      data.unshift({ ...item, ts: Date.now() });
-      data = data.slice(0, 30);
-      this._cache = data;
-      this._save();
+  var RecentNavStore = extendStore(
+    CachedStore(
+      "vot-recent-nav",
+      /** @type {NavItemRecord[]} */
+      []
+    ),
+    {
+      /**
+       * Top-20 of the recent list (newest first).
+       * @returns {NavItemRecord[]}
+       */
+      list() {
+        return this._load().slice(0, 20);
+      },
+      /**
+       * Insert a nav item at the top of the list. No-op when item is null
+       * or has no `kind`. Dedups against the (kind/bookId/chapter/letterId/
+       * entryId) tuple and trims the list to 30 entries.
+       * @param {NavItemRecord | null | undefined} item
+       * @returns {void}
+       */
+      add(item) {
+        if (!item || !item.kind) return;
+        let data = this._load();
+        const sig = JSON.stringify({ kind: item.kind, bookId: item.bookId, chapter: item.chapter, letterId: item.letterId, entryId: item.entryId });
+        data = data.filter((x) => JSON.stringify({ kind: x.kind, bookId: x.bookId, chapter: x.chapter, letterId: x.letterId, entryId: x.entryId }) !== sig);
+        data.unshift({ ...item, ts: Date.now() });
+        data = data.slice(0, 30);
+        this._cache = data;
+        this._save();
+      }
     }
-  });
+  );
 
   // app/src/main/assets/src/stores/link-store.js
   function hlId() {

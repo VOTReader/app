@@ -61,3 +61,22 @@ export function CachedStore(storageKey, defaultVal) {
     raw() { return this._load(); }
   };
 }
+
+/**
+ * Compose a CachedStore base with store-specific methods. Identical at
+ * runtime to `Object.assign(base, methods)` — the only purpose is to give
+ * TypeScript a `ThisType<B & M>` annotation so `this` inside the methods
+ * literal correctly resolves to BOTH the base (with `_load`/`_save`/`_cache`)
+ * AND the sibling methods. Without this helper, plain `Object.assign` loses
+ * the base type through TS's narrow inference of object-literal methods.
+ *
+ * All 11 stores import + use this instead of `Object.assign`.
+ *
+ * @template B, M
+ * @param {B} base
+ * @param {M & ThisType<B & M>} methods
+ * @returns {B & M}
+ */
+export function extendStore(base, methods) {
+  return /** @type {B & M} */ (Object.assign(/** @type {any} */ (base), methods));
+}
