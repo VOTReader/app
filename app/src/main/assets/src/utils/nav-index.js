@@ -1,8 +1,7 @@
-// @ts-nocheck -- Q4.1 placeholder; will be removed when this file gets proper JSDoc in Q4.2 (utils) or Q4.3 (stores).
 /* ===================================================================
    Cross-app navigation index — flat searchable list of every navigable destination (Bible chapter, Volume letter, WTLB entry, etc). Powers LinkPicker scoped search + RecentNavStore.
    ===================================================================
-   Global-scope module. Concatenates with index.html via <script src>.
+   Global-scope module. Bundled into bundle-b via _entry-b.js.
    Bundled helpers (P5e):
    - buildNavIndex
    - searchNavIndex
@@ -11,7 +10,27 @@
    - buildSourceEndpoint
    =================================================================== */
 
+/**
+ * A navigable item in the index. Discriminated by `kind`; fields vary by
+ * kind (bible-chapter has bookId/chapter; letter has letterId/screen/
+ * collection; study-chapter has bookId/chapter/verse; etc.). The shape is
+ * intentionally loose — typed as `any` here because callers branch on
+ * `kind` and access kind-specific fields. Q5+ could tighten this to a
+ * proper discriminated union if test coverage exists to verify the
+ * narrowing.
+ *
+ * @typedef {any} NavItem
+ */
 
+/**
+ * Build (or return cached) the flat nav index. Memoizes on
+ * `window.__NAV_INDEX` — subsequent calls return the same array reference.
+ * Items: Bible chapters from `_allBooks()`, letters/entries from every
+ * COLLECTION, Matthew study chapters, plus Bible Study (non-Matthew)
+ * chapters.
+ *
+ * @returns {NavItem[]}
+ */
 export function buildNavIndex() {
   if (window.__NAV_INDEX) return window.__NAV_INDEX;
   const items = [];
@@ -183,6 +202,16 @@ export function buildNavIndex() {
   return items;
 }
 
+/**
+ * Fuzzy-search the nav index. Tries `parseRefStr` first (catches Bible-ref
+ * queries like "Eph 6:5" with a 1000-score boost), then matches every
+ * item's `aliases` (exact/starts-with/contains tiers + a title-contains
+ * fallback). Returns the top `limit` items sorted by score.
+ *
+ * @param {string | null | undefined} query
+ * @param {number} [limit]   defaults to 30 when omitted/falsy
+ * @returns {NavItem[]}
+ */
 export function searchNavIndex(query, limit) {
   limit = limit || 30;
   if (!query) return [];
@@ -246,6 +275,14 @@ export function searchNavIndex(query, limit) {
   return scored.slice(0, limit);
 }
 
+/**
+ * Resolve the preview text for a nav item — used by LinkPicker rows.
+ * Bible/study chapter items return the verse text (if `it.verse` set)
+ * OR the chapter title/first heading. Other kinds return ''.
+ *
+ * @param {NavItem} it
+ * @returns {string}
+ */
 export function navItemPreview(it) {
   if (it.kind === 'bible-chapter') {
     const b = _allBooks()[it.bookId];
@@ -273,6 +310,15 @@ export function navItemPreview(it) {
   return '';
 }
 
+/**
+ * Convert a NavItem into a link-endpoint object — shape varies by kind
+ * (bible / letter / wtlb / blessed / holy-days / study / study-letter).
+ * Returns null on unknown kind. Used when the user picks a target in
+ * LinkPicker; the endpoint is what gets persisted to LinkStore.
+ *
+ * @param {NavItem} it
+ * @returns {any}  endpoint object | null
+ */
 export function navItemToEndpoint(it) {
   if (it.kind === 'bible-chapter') {
     const hasVerse = it.verse != null;
@@ -324,6 +370,20 @@ export function navItemToEndpoint(it) {
   return null;
 }
 
+/**
+ * Build a SOURCE endpoint object from an hlKey + optional excerpt selection.
+ * Parses the kind from the key prefix (bible/study/letter/wtlb/blessed/
+ * holy-days/journal) and resolves the right screen/collection via
+ * findEntryContext when applicable. Excerpt fields are spread in iff
+ * sourceStart is provided.
+ *
+ * @param {string} sourceKey
+ * @param {string | null | undefined} sourceLabel
+ * @param {number | null | undefined} sourceStart
+ * @param {number | null | undefined} sourceEnd
+ * @param {string | null | undefined} sourceText
+ * @returns {any}  source-endpoint object
+ */
 export function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText) {
   const parts = sourceKey.split(':');
   const excerpt = sourceStart != null ? { start: sourceStart, end: sourceEnd, text: sourceText } : {};
@@ -355,6 +415,10 @@ export function buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceE
       };
     }
     if (ctx) {
+      // `base` carries either letterId OR entryId based on ctx.kind; the
+      // /** @type {any} */ cast keeps TS from rejecting the conditional
+      // field assignment (would otherwise infer a strict literal shape).
+      /** @type {any} */
       const base = {
         type: ctx.kind, key: sourceKey, screen: ctx.screen,
         collection: ctx.collection, label: sourceLabel || ctx.title, ...excerpt
