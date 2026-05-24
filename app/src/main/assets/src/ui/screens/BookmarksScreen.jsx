@@ -12,7 +12,7 @@ export function _bookmarkSourceLabel(hlKey) {
     var bookId = parts[1];
     var chap = parts[2];
     var verse = parts[3];
-    var title = (typeof _bookTitle === 'function') ? _bookTitle(bookId) : bookId;
+    let title = (typeof _bookTitle === 'function') ? _bookTitle(bookId) : bookId;
     return verse ? (title + ' ' + chap + ':' + verse) : (title + ' ' + chap);
   }
 
@@ -37,7 +37,7 @@ export function _bookmarkSourceLabel(hlKey) {
     var eid = parts[1];
     var je = (typeof JournalStore !== 'undefined') ? JournalStore.get(eid) : null;
     if (je) {
-      var title = (typeof JournalHelpers !== 'undefined' && JournalHelpers.entryDisplayTitle)
+      let title = (typeof JournalHelpers !== 'undefined' && JournalHelpers.entryDisplayTitle)
         ? (JournalHelpers.entryDisplayTitle(je) || 'Untitled')
         : (je.title || 'Untitled');
       return 'Journal · ' + title;

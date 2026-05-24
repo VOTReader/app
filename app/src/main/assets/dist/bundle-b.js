@@ -2792,7 +2792,12 @@
     goScripturesHome,
     goStudiesHome,
     goVolumesHome,
-    goJournalViewer
+    goJournalViewer,
+    getStudyById
+    // App()-local helper; threaded so the bible-study-chapter
+    // back path can introspect the current study's chapter count.
+    // (Pre-fix this was a bare reference inside the handler that
+    // would throw ReferenceError if ever hit — lint caught it.)
   }) {
     const screenRef = useRefMirror(screen);
     const bookIdRef = useRefMirror(bookId);

@@ -5056,7 +5056,7 @@
       var bookId = parts[1];
       var chap = parts[2];
       var verse = parts[3];
-      var title = typeof _bookTitle === "function" ? _bookTitle(bookId) : bookId;
+      let title = typeof _bookTitle === "function" ? _bookTitle(bookId) : bookId;
       return verse ? title + " " + chap + ":" + verse : title + " " + chap;
     }
     if (kind === "study") {
@@ -5079,7 +5079,7 @@
       var eid = parts[1];
       var je = typeof JournalStore !== "undefined" ? JournalStore.get(eid) : null;
       if (je) {
-        var title = typeof JournalHelpers !== "undefined" && JournalHelpers.entryDisplayTitle ? JournalHelpers.entryDisplayTitle(je) || "Untitled" : je.title || "Untitled";
+        let title = typeof JournalHelpers !== "undefined" && JournalHelpers.entryDisplayTitle ? JournalHelpers.entryDisplayTitle(je) || "Untitled" : je.title || "Untitled";
         return "Journal \xB7 " + title;
       }
       return "Journal Entry";
@@ -8445,7 +8445,7 @@
         return;
       }
       if (action === "random") {
-        if (typeof surpriseMe === "function") surpriseMe();
+        handleSurprise();
         return;
       }
     };
@@ -8586,7 +8586,8 @@
       goScripturesHome,
       goStudiesHome,
       goVolumesHome,
-      goJournalViewer
+      goJournalViewer,
+      getStudyById
     });
     const selectStudy = (id) => {
       const study = getStudyById(id);

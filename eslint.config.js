@@ -67,6 +67,11 @@ export default [
       globals: {
         ...globals.browser,
         ...projectGlobals,
+        // Override: __scrollEl is module-mutable (declared `let` in inline #3
+        // at index.html, written by ScreenLayout's ref callback). The
+        // generator defaults all globals to readonly; this is the one
+        // exception. If more module-mutable globals surface, list them here.
+        __scrollEl: 'writable',
       },
     },
     plugins: {

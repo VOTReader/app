@@ -107,6 +107,10 @@ export function useAndroidBack({
   setTabsOverviewOpen,
   cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
   goStudiesHome, goVolumesHome, goJournalViewer,
+  getStudyById,  // App()-local helper; threaded so the bible-study-chapter
+                 // back path can introspect the current study's chapter count.
+                 // (Pre-fix this was a bare reference inside the handler that
+                 // would throw ReferenceError if ever hit — lint caught it.)
 }) {
   // Call-time mirrors — handleAndroidBack reads the LATEST nav state when
   // the user presses back, not the value frozen into its []-deps closure.

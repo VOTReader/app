@@ -781,8 +781,11 @@ function App() {
       return;
     }
     if (action === 'random') {
-      // trigger random scripture/letter — uses existing Surprise Me flow if available
-      if (typeof surpriseMe === 'function') surpriseMe();
+      // trigger random scripture/letter — uses existing Surprise Me flow.
+      // (Was `if (typeof surpriseMe === 'function') surpriseMe();` — a typo;
+      //  the actual handler in App's closure is handleSurprise. The typeof
+      //  guard masked the dead reference; lint caught it.)
+      handleSurprise();
       return;
     }
   };
@@ -914,6 +917,7 @@ function App() {
     setTabsOverviewOpen,
     cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
     goStudiesHome, goVolumesHome, goJournalViewer,
+    getStudyById,
   });
 
   const selectStudy = (id) => {
