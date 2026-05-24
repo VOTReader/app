@@ -786,69 +786,112 @@
   function lnkId() {
     return "lnk_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
   }
-  var LinkStore2 = Object.assign(CachedStore("vot-links", []), {
-    /* Override _load to migrate legacy {a,b} records to {source,target} on
-       first access. Migration is one-time per user: after it runs the
-       persisted data is already in the new shape, so subsequent loads are
-       no-ops in the migration branch. */
-    _load() {
-      if (this._cache) return this._cache;
-      try {
-        this._cache = JSON.parse(localStorage.getItem("vot-links") || "[]");
-      } catch (_e) {
-        this._cache = [];
+  var LinkStore2 = extendStore(
+    CachedStore(
+      "vot-links",
+      /** @type {Link[]} */
+      []
+    ),
+    {
+      /**
+       * Override _load to migrate legacy {a,b} records to {source,target}
+       * on first access. Migration is one-time per user: after it runs
+       * the persisted data is already in the new shape, so subsequent
+       * loads are no-ops in the migration branch.
+       *
+       * Coalesces FIRST so a half-migrated record (source set but `a`
+       * still present, or vice-versa — e.g. an interrupted prior
+       * migration or a hand-edited export) is healed instead of silently
+       * dropped (was real data-loss in an earlier version).
+       *
+       * @returns {Link[]}
+       */
+      _load() {
+        if (this._cache) return this._cache;
+        try {
+          this._cache = JSON.parse(localStorage.getItem("vot-links") || "[]");
+        } catch (_e) {
+          this._cache = [];
+        }
+        let migrated = false;
+        this._cache = this._cache.filter(function(lnk) {
+          if (!lnk || typeof lnk !== "object") return false;
+          if (!lnk.source && lnk.a) {
+            lnk.source = lnk.a;
+            migrated = true;
+          }
+          if (!lnk.target && lnk.b) {
+            lnk.target = lnk.b;
+            migrated = true;
+          }
+          if (lnk.a) {
+            delete lnk.a;
+            migrated = true;
+          }
+          if (lnk.b) {
+            delete lnk.b;
+            migrated = true;
+          }
+          if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) {
+            console.warn("[LinkStore] dropping malformed record (incomplete endpoints):", lnk.id);
+            return false;
+          }
+          return true;
+        });
+        if (migrated) this._save();
+        return this._cache;
+      },
+      /**
+       * All links touching `key` on either endpoint.
+       * @param {string} key
+       * @returns {Link[]}
+       */
+      getForKey(key) {
+        return this._load().filter((lnk) => lnk.source && lnk.source.key === key || lnk.target && lnk.target.key === key);
+      },
+      /**
+       * All links touching `prefix` (or having `prefix` as a key prefix)
+       * on either endpoint. Bidirectional prefix-match — useful for the
+       * inline link icon scan in LetterView/WtlbEntryView where block-
+       * level keys may have selection-range suffixes.
+       * @param {string} prefix
+       * @returns {Link[]}
+       */
+      getForKeyPrefix(prefix) {
+        return this._load().filter((lnk) => {
+          if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) return false;
+          const srcMatch = lnk.source.key === prefix || lnk.source.key.startsWith(prefix + ":") || prefix.startsWith(lnk.source.key + ":");
+          const tgtMatch = lnk.target.key === prefix || lnk.target.key.startsWith(prefix + ":") || prefix.startsWith(lnk.target.key + ":");
+          return srcMatch || tgtMatch;
+        });
+      },
+      /**
+       * Every link in the store.
+       * @returns {Link[]}
+       */
+      all() {
+        return this._load();
+      },
+      /**
+       * Append a link record.
+       * @param {Link} link
+       * @returns {void}
+       */
+      add(link) {
+        this._load().push(link);
+        this._save();
+      },
+      /**
+       * Delete a link by id. Idempotent.
+       * @param {string} linkId
+       * @returns {void}
+       */
+      remove(linkId) {
+        this._cache = this._load().filter((l) => l.id !== linkId);
+        this._save();
       }
-      let migrated = false;
-      this._cache = this._cache.filter(function(lnk) {
-        if (!lnk || typeof lnk !== "object") return false;
-        if (!lnk.source && lnk.a) {
-          lnk.source = lnk.a;
-          migrated = true;
-        }
-        if (!lnk.target && lnk.b) {
-          lnk.target = lnk.b;
-          migrated = true;
-        }
-        if (lnk.a) {
-          delete lnk.a;
-          migrated = true;
-        }
-        if (lnk.b) {
-          delete lnk.b;
-          migrated = true;
-        }
-        if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) {
-          console.warn("[LinkStore] dropping malformed record (incomplete endpoints):", lnk.id);
-          return false;
-        }
-        return true;
-      });
-      if (migrated) this._save();
-      return this._cache;
-    },
-    getForKey(key) {
-      return this._load().filter((lnk) => lnk.source && lnk.source.key === key || lnk.target && lnk.target.key === key);
-    },
-    getForKeyPrefix(prefix) {
-      return this._load().filter((lnk) => {
-        if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) return false;
-        const srcMatch = lnk.source.key === prefix || lnk.source.key.startsWith(prefix + ":") || prefix.startsWith(lnk.source.key + ":");
-        const tgtMatch = lnk.target.key === prefix || lnk.target.key.startsWith(prefix + ":") || prefix.startsWith(lnk.target.key + ":");
-        return srcMatch || tgtMatch;
-      });
-    },
-    all() {
-      return this._load();
-    },
-    add(link) {
-      this._load().push(link);
-      this._save();
-    },
-    remove(linkId) {
-      this._cache = this._load().filter((l) => l.id !== linkId);
-      this._save();
     }
-  });
+  );
   function persistLink(sourceEndpoint, targetEndpoint) {
     if (!sourceEndpoint || !sourceEndpoint.key) return null;
     const existing = LinkStore2.getForKey(sourceEndpoint.key);
@@ -863,58 +906,107 @@
   function bkmId() {
     return "bkm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
   }
-  var BookmarkStore2 = Object.assign(CachedStore("vot-bookmarks", []), {
-    get(id) {
-      return this._load().find(function(b) {
-        return b.id === id;
-      }) || null;
-    },
-    all() {
-      return this._load();
-    },
-    count() {
-      return this._load().length;
-    },
-    /* Get all bookmarks whose hlKey exactly matches `key`. */
-    getForKey(key) {
-      return this._load().filter(function(b) {
-        return b.hlKey === key || b.hlKey.split(":").slice(0, -1).join(":") === key;
-      });
-    },
-    /* Get all bookmarks whose hlKey starts with `prefix` (block-level match),
-       or whose prefix portion of the key starts with `prefix`.
-       Mirrors the LinkStore.getForKeyPrefix() convention. */
-    getForKeyPrefix(prefix) {
-      return this._load().filter(function(b) {
-        var k = b.hlKey;
-        return k === prefix || k.indexOf(prefix + ":") === 0 || prefix.indexOf(k + ":") === 0;
-      });
-    },
-    add(bookmark) {
-      if (!bookmark || !bookmark.id || !bookmark.hlKey) return;
-      var ts = Date.now();
-      if (!bookmark.created) bookmark.created = ts;
-      if (!bookmark.updated) bookmark.updated = ts;
-      this._load().push(bookmark);
-      this._save();
-    },
-    /* Replace the label on an existing bookmark. */
-    update(id, patch) {
-      var data = this._load();
-      var idx = data.findIndex(function(b) {
-        return b.id === id;
-      });
-      if (idx < 0) return;
-      data[idx] = Object.assign({}, data[idx], patch, { updated: Date.now() });
-      this._save();
-    },
-    remove(id) {
-      this._cache = this._load().filter(function(b) {
-        return b.id !== id;
-      });
-      this._save();
+  var BookmarkStore2 = extendStore(
+    CachedStore(
+      "vot-bookmarks",
+      /** @type {Bookmark[]} */
+      []
+    ),
+    {
+      /**
+       * Look up a bookmark by id.
+       * @param {string} id
+       * @returns {Bookmark | null}
+       */
+      get(id) {
+        return this._load().find(function(b) {
+          return b.id === id;
+        }) || null;
+      },
+      /**
+       * The full bookmark list (mutation through it persists on _save()).
+       * @returns {Bookmark[]}
+       */
+      all() {
+        return this._load();
+      },
+      /**
+       * Total bookmark count.
+       * @returns {number}
+       */
+      count() {
+        return this._load().length;
+      },
+      /**
+       * Get all bookmarks whose hlKey exactly matches `key`, OR whose
+       * key's prefix (everything before the last colon) matches — this
+       * second branch lets a verse-level key match a bookmark stored on
+       * the whole verse plus selection range.
+       * @param {string} key
+       * @returns {Bookmark[]}
+       */
+      getForKey(key) {
+        return this._load().filter(function(b) {
+          return b.hlKey === key || b.hlKey.split(":").slice(0, -1).join(":") === key;
+        });
+      },
+      /**
+       * Get all bookmarks whose hlKey shares a block-level prefix with
+       * `prefix`, OR whose stored key is itself a prefix of `prefix`.
+       * Mirrors the LinkStore.getForKeyPrefix() convention used by inline
+       * icon scanners.
+       * @param {string} prefix
+       * @returns {Bookmark[]}
+       */
+      getForKeyPrefix(prefix) {
+        return this._load().filter(function(b) {
+          var k = b.hlKey;
+          return k === prefix || k.indexOf(prefix + ":") === 0 || prefix.indexOf(k + ":") === 0;
+        });
+      },
+      /**
+       * Append a bookmark. No-op when bookmark is null or missing id/hlKey.
+       * Stamps created/updated if absent.
+       * @param {Bookmark | null | undefined} bookmark
+       * @returns {void}
+       */
+      add(bookmark) {
+        if (!bookmark || !bookmark.id || !bookmark.hlKey) return;
+        var ts = Date.now();
+        if (!bookmark.created) bookmark.created = ts;
+        if (!bookmark.updated) bookmark.updated = ts;
+        this._load().push(bookmark);
+        this._save();
+      },
+      /**
+       * Patch an existing bookmark — typically used to update label/thought.
+       * No-op when id is unknown. Bumps updated.
+       * @param {string} id
+       * @param {Partial<Bookmark>} patch
+       * @returns {void}
+       */
+      update(id, patch) {
+        var data = this._load();
+        var idx = data.findIndex(function(b) {
+          return b.id === id;
+        });
+        if (idx < 0) return;
+        data[idx] = Object.assign({}, data[idx], patch, { updated: Date.now() });
+        this._save();
+      },
+      /**
+       * Delete a bookmark by id. Idempotent.
+       * @param {string} id
+       * @returns {void}
+       */
+      remove(id) {
+        this._cache = this._load().filter(function(b) {
+          return b.id !== id;
+        });
+        this._save();
+      }
     }
-  });
+  );
 
   // app/src/main/assets/src/stores/journal-media-store.js
   var JournalMediaStore2 = /* @__PURE__ */ (function() {

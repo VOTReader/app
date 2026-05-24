@@ -1,8 +1,7 @@
-// @ts-nocheck -- Q4.1 placeholder; will be removed when this file gets proper JSDoc in Q4.2 (utils) or Q4.3 (stores).
 /* ═══════════════════════════════════════════════════════════════
    BOOKMARK STORE — saved passage anchors
    ═══════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html; no import/export.
+   Global-scope module. Bundled into bundle-b via _entry-b.js.
    Depends on: CachedStore (defined earlier in the main script block).
 
    Data model:
@@ -31,53 +30,119 @@
        text if the user doesn't provide one.
 ═══════════════════════════════════════════════════════════════ */
 
-import { CachedStore } from './cached-store.js';
+import { CachedStore, extendStore } from './cached-store.js';
 
-/* ID generator for bookmarks — parallel to lnkId in link-store.js */
+/**
+ * A bookmark record — see the file header schema for field semantics.
+ *
+ * @typedef {{
+ *   id: string,
+ *   hlKey: string,
+ *   label: string,
+ *   thought?: string,
+ *   created: number,
+ *   updated: number
+ * }} Bookmark
+ */
+
+/**
+ * Generate a fresh bookmark id. Parallel to lnkId in link-store.js;
+ * timestamp + random suffix gives microsecond-level uniqueness even
+ * across rapid-fire creates.
+ *
+ * @returns {string}
+ */
 export function bkmId() { return 'bkm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
 
-export const BookmarkStore = Object.assign(CachedStore('vot-bookmarks', []), {
-  get(id) {
-    return this._load().find(function(b) { return b.id === id; }) || null;
-  },
-  all() { return this._load(); },
-  count() { return this._load().length; },
+export const BookmarkStore = extendStore(
+  CachedStore('vot-bookmarks', /** @type {Bookmark[]} */ ([])),
+  {
+    /**
+     * Look up a bookmark by id.
+     * @param {string} id
+     * @returns {Bookmark | null}
+     */
+    get(id) {
+      return this._load().find(function(b) { return b.id === id; }) || null;
+    },
 
-  /* Get all bookmarks whose hlKey exactly matches `key`. */
-  getForKey(key) {
-    return this._load().filter(function(b) { return b.hlKey === key || b.hlKey.split(':').slice(0, -1).join(':') === key; });
-  },
+    /**
+     * The full bookmark list (mutation through it persists on _save()).
+     * @returns {Bookmark[]}
+     */
+    all() { return this._load(); },
 
-  /* Get all bookmarks whose hlKey starts with `prefix` (block-level match),
-     or whose prefix portion of the key starts with `prefix`.
-     Mirrors the LinkStore.getForKeyPrefix() convention. */
-  getForKeyPrefix(prefix) {
-    return this._load().filter(function(b) {
-      var k = b.hlKey;
-      return k === prefix || k.indexOf(prefix + ':') === 0 || prefix.indexOf(k + ':') === 0;
-    });
-  },
+    /**
+     * Total bookmark count.
+     * @returns {number}
+     */
+    count() { return this._load().length; },
 
-  add(bookmark) {
-    if (!bookmark || !bookmark.id || !bookmark.hlKey) return;
-    var ts = Date.now();
-    if (!bookmark.created) bookmark.created = ts;
-    if (!bookmark.updated) bookmark.updated = ts;
-    this._load().push(bookmark);
-    this._save();
-  },
+    /**
+     * Get all bookmarks whose hlKey exactly matches `key`, OR whose
+     * key's prefix (everything before the last colon) matches — this
+     * second branch lets a verse-level key match a bookmark stored on
+     * the whole verse plus selection range.
+     * @param {string} key
+     * @returns {Bookmark[]}
+     */
+    getForKey(key) {
+      return this._load().filter(function(b) { return b.hlKey === key || b.hlKey.split(':').slice(0, -1).join(':') === key; });
+    },
 
-  /* Replace the label on an existing bookmark. */
-  update(id, patch) {
-    var data = this._load();
-    var idx = data.findIndex(function(b) { return b.id === id; });
-    if (idx < 0) return;
-    data[idx] = Object.assign({}, data[idx], patch, { updated: Date.now() });
-    this._save();
-  },
+    /**
+     * Get all bookmarks whose hlKey shares a block-level prefix with
+     * `prefix`, OR whose stored key is itself a prefix of `prefix`.
+     * Mirrors the LinkStore.getForKeyPrefix() convention used by inline
+     * icon scanners.
+     * @param {string} prefix
+     * @returns {Bookmark[]}
+     */
+    getForKeyPrefix(prefix) {
+      return this._load().filter(function(b) {
+        var k = b.hlKey;
+        return k === prefix || k.indexOf(prefix + ':') === 0 || prefix.indexOf(k + ':') === 0;
+      });
+    },
 
-  remove(id) {
-    this._cache = this._load().filter(function(b) { return b.id !== id; });
-    this._save();
+    /**
+     * Append a bookmark. No-op when bookmark is null or missing id/hlKey.
+     * Stamps created/updated if absent.
+     * @param {Bookmark | null | undefined} bookmark
+     * @returns {void}
+     */
+    add(bookmark) {
+      if (!bookmark || !bookmark.id || !bookmark.hlKey) return;
+      var ts = Date.now();
+      if (!bookmark.created) bookmark.created = ts;
+      if (!bookmark.updated) bookmark.updated = ts;
+      this._load().push(bookmark);
+      this._save();
+    },
+
+    /**
+     * Patch an existing bookmark — typically used to update label/thought.
+     * No-op when id is unknown. Bumps updated.
+     * @param {string} id
+     * @param {Partial<Bookmark>} patch
+     * @returns {void}
+     */
+    update(id, patch) {
+      var data = this._load();
+      var idx = data.findIndex(function(b) { return b.id === id; });
+      if (idx < 0) return;
+      data[idx] = Object.assign({}, data[idx], patch, { updated: Date.now() });
+      this._save();
+    },
+
+    /**
+     * Delete a bookmark by id. Idempotent.
+     * @param {string} id
+     * @returns {void}
+     */
+    remove(id) {
+      this._cache = this._load().filter(function(b) { return b.id !== id; });
+      this._save();
+    }
   }
-});
+);

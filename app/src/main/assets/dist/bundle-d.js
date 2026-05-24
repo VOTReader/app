@@ -1030,17 +1030,26 @@
   // app/src/main/assets/src/stores/thumb-store.js
   var THUMB_DB = "vot-thumbs";
   var THUMB_STORE = "thumbs";
-  var _thumbDbPromise = null;
+  var _thumbDbPromise = (
+    /** @type {Promise<IDBDatabase | null> | null} */
+    null
+  );
   function openThumbDB() {
     if (_thumbDbPromise) return _thumbDbPromise;
     _thumbDbPromise = new Promise((resolve) => {
       try {
         const req = indexedDB.open(THUMB_DB, 1);
         req.onupgradeneeded = (e) => {
-          const db = e.target.result;
+          const db = (
+            /** @type {IDBOpenDBRequest} */
+            e.target.result
+          );
           if (!db.objectStoreNames.contains(THUMB_STORE)) db.createObjectStore(THUMB_STORE);
         };
-        req.onsuccess = (e) => resolve(e.target.result);
+        req.onsuccess = (e) => resolve(
+          /** @type {IDBOpenDBRequest} */
+          e.target.result
+        );
         req.onerror = () => resolve(null);
       } catch (_e) {
         resolve(null);
@@ -1055,11 +1064,11 @@
         try {
           const tx = db.transaction(THUMB_STORE, "readwrite");
           tx.objectStore(THUMB_STORE).put(value, key);
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => resolve();
-          tx.onabort = () => resolve();
+          tx.oncomplete = () => resolve(void 0);
+          tx.onerror = () => resolve(void 0);
+          tx.onabort = () => resolve(void 0);
         } catch (_e) {
-          resolve();
+          resolve(void 0);
         }
       });
     });
@@ -1071,17 +1080,20 @@
         try {
           const tx = db.transaction(THUMB_STORE, "readwrite");
           tx.objectStore(THUMB_STORE).delete(key);
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => resolve();
+          tx.oncomplete = () => resolve(void 0);
+          tx.onerror = () => resolve(void 0);
         } catch (_e) {
-          resolve();
+          resolve(void 0);
         }
       });
     });
   }
   function idbReadAll() {
     return openThumbDB().then((db) => {
-      if (!db) return {};
+      if (!db) return (
+        /** @type {Record<string, any>} */
+        {}
+      );
       return new Promise((resolve) => {
         try {
           const tx = db.transaction(THUMB_STORE, "readonly");
@@ -1089,16 +1101,22 @@
           const out = {};
           const req = store.openCursor();
           req.onsuccess = (e) => {
-            const c = e.target.result;
+            const c = (
+              /** @type {IDBRequest<IDBCursorWithValue | null>} */
+              e.target.result
+            );
             if (c) {
-              out[c.key] = c.value;
+              out[String(c.key)] = c.value;
               c.continue();
             } else
               resolve(out);
           };
           req.onerror = () => resolve(out);
         } catch (_e) {
-          resolve({});
+          resolve(
+            /** @type {Record<string, any>} */
+            {}
+          );
         }
       });
     });
