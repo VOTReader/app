@@ -406,7 +406,10 @@
             const hasNote = entries.some(function(e) {
               return e.note && e.note.trim();
             });
-            const kind = hasNote ? "note" : entries[0].style === "underline" ? "underline" : "highlight";
+            const kind = (
+              /** @type {'highlight' | 'underline' | 'note'} */
+              hasNote ? "note" : entries[0].style === "underline" ? "underline" : "highlight"
+            );
             entries.forEach(function(e) {
               out.push({
                 id: e.id,
@@ -451,94 +454,174 @@
     }
   }
   migrateAnnotations();
-  var AnnotationStore2 = Object.assign(CachedStore("vot-annotations", {}), {
-    get(key) {
-      return this._load()[key] || [];
-    },
-    all() {
-      return this._load();
-    },
-    add(key, ann) {
-      if (!ann.groupId) ann.groupId = ann.id;
-      if (!ann.kind) ann.kind = "highlight";
-      if (!ann.created) ann.created = Date.now();
-      ann.updated = Date.now();
-      const data = this._load();
-      if (!data[key]) data[key] = [];
-      data[key].push(ann);
-      this._save();
-    },
-    update(key, annId, patch) {
-      const data = this._load();
-      const arr = data[key];
-      if (!arr) return;
-      const idx = arr.findIndex((h) => h.id === annId);
-      if (idx >= 0) {
-        arr[idx] = { ...arr[idx], ...patch, updated: Date.now() };
+  var AnnotationStore2 = extendStore(
+    CachedStore(
+      "vot-annotations",
+      /** @type {AnnotationData} */
+      {}
+    ),
+    {
+      /**
+       * All annotation segments anchored at `key`. Empty array if none.
+       * @param {string} key
+       * @returns {Annotation[]}
+       */
+      get(key) {
+        return this._load()[key] || [];
+      },
+      /**
+       * The full map (hlKey → segments). Mutations through it persist on
+       * next _save(); callers prefer the typed methods.
+       * @returns {AnnotationData}
+       */
+      all() {
+        return this._load();
+      },
+      /**
+       * Append an annotation segment. Stamps defaults (groupId → id, kind
+       * → 'highlight', created/updated) when missing.
+       * @param {string} key
+       * @param {Partial<Annotation> & { id: string, start: number, end: number }} ann
+       * @returns {void}
+       */
+      add(key, ann) {
+        if (!ann.groupId) ann.groupId = ann.id;
+        if (!ann.kind) ann.kind = "highlight";
+        if (!ann.created) ann.created = Date.now();
+        ann.updated = Date.now();
+        const data = this._load();
+        if (!data[key]) data[key] = [];
+        data[key].push(
+          /** @type {Annotation} */
+          ann
+        );
         this._save();
+      },
+      /**
+       * Patch a single annotation by id (within key's bucket). No-op when
+       * key or id is unknown. Bumps updated.
+       * @param {string} key
+       * @param {string} annId
+       * @param {Partial<Annotation>} patch
+       * @returns {void}
+       */
+      update(key, annId, patch) {
+        const data = this._load();
+        const arr = data[key];
+        if (!arr) return;
+        const idx = arr.findIndex((h) => h.id === annId);
+        if (idx >= 0) {
+          arr[idx] = { ...arr[idx], ...patch, updated: Date.now() };
+          this._save();
+        }
+      },
+      /**
+       * Remove a single annotation by id. Deletes the key's bucket when it
+       * becomes empty.
+       * @param {string} key
+       * @param {string} annId
+       * @returns {void}
+       */
+      remove(key, annId) {
+        const data = this._load();
+        if (!data[key]) return;
+        data[key] = data[key].filter((h) => h.id !== annId);
+        if (data[key].length === 0) delete data[key];
+        this._save();
+      },
+      /**
+       * Remove every annotation under `key`.
+       * @param {string} key
+       * @returns {void}
+       */
+      removeAllForKey(key) {
+        const data = this._load();
+        delete data[key];
+        this._save();
+      },
+      /**
+       * Remove every segment belonging to a group across all keys. Cleans
+       * up empty key buckets as it goes.
+       * @param {string} groupId
+       * @returns {void}
+       */
+      removeGroup(groupId) {
+        const data = this._load();
+        Object.keys(data).forEach((k) => {
+          data[k] = data[k].filter((h) => h.groupId !== groupId);
+          if (data[k].length === 0) delete data[k];
+        });
+        this._cache = data;
+        this._save();
+      },
+      /**
+       * All segments belonging to a group, with each tagged by its key.
+       * Used by NoteSheet/MultiNotePopover to gather the multi-paragraph
+       * pieces of a single note.
+       * @param {string} groupId
+       * @returns {{ key: string, ann: Annotation }[]}
+       */
+      getByGroup(groupId) {
+        const data = this._load();
+        const out = [];
+        Object.keys(data).forEach((k) => data[k].forEach((h) => {
+          if (h.groupId === groupId) out.push({ key: k, ann: h });
+        }));
+        return out;
+      },
+      /**
+       * Recolor every segment in a group. Single _save() for the whole
+       * batch. Bumps updated on each touched segment.
+       * @param {string} groupId
+       * @param {string} color
+       * @returns {void}
+       */
+      recolorGroup(groupId, color) {
+        const data = this._load();
+        const ts = Date.now();
+        Object.keys(data).forEach((k) => data[k].forEach((h) => {
+          if (h.groupId === groupId) {
+            h.color = color;
+            h.updated = ts;
+          }
+        }));
+        this._save();
+      },
+      /**
+       * Convert a group from one kind to another (e.g. highlight → note).
+       * Caller is responsible for creating/removing the corresponding
+       * NoteStore record — this method only touches AnnotationStore.
+       * @param {string} groupId
+       * @param {'highlight' | 'underline' | 'note'} kind
+       * @returns {void}
+       */
+      convertGroup(groupId, kind) {
+        const data = this._load();
+        const ts = Date.now();
+        Object.keys(data).forEach((k) => data[k].forEach((h) => {
+          if (h.groupId === groupId) {
+            h.kind = kind;
+            h.updated = ts;
+          }
+        }));
+        this._save();
+      },
+      /**
+       * Find the group whose segment spans the given range within `key`.
+       * Returns the FIRST matching segment (which carries the groupId);
+       * null if no segment fully covers [start, end].
+       * @param {string} key
+       * @param {number} start
+       * @param {number} end
+       * @returns {Annotation | null}
+       */
+      groupAt(key, start, end) {
+        const arr = this.get(key);
+        const hit = arr.find((h) => h.start <= start && h.end >= end);
+        return hit || null;
       }
-    },
-    remove(key, annId) {
-      const data = this._load();
-      if (!data[key]) return;
-      data[key] = data[key].filter((h) => h.id !== annId);
-      if (data[key].length === 0) delete data[key];
-      this._save();
-    },
-    removeAllForKey(key) {
-      const data = this._load();
-      delete data[key];
-      this._save();
-    },
-    removeGroup(groupId) {
-      const data = this._load();
-      Object.keys(data).forEach((k) => {
-        data[k] = data[k].filter((h) => h.groupId !== groupId);
-        if (data[k].length === 0) delete data[k];
-      });
-      this._cache = data;
-      this._save();
-    },
-    getByGroup(groupId) {
-      const data = this._load();
-      const out = [];
-      Object.keys(data).forEach((k) => data[k].forEach((h) => {
-        if (h.groupId === groupId) out.push({ key: k, ann: h });
-      }));
-      return out;
-    },
-    // Recolor every segment in a group to a new color. One save.
-    recolorGroup(groupId, color) {
-      const data = this._load();
-      const ts = Date.now();
-      Object.keys(data).forEach((k) => data[k].forEach((h) => {
-        if (h.groupId === groupId) {
-          h.color = color;
-          h.updated = ts;
-        }
-      }));
-      this._save();
-    },
-    // Convert a group from one kind to another (e.g. highlight → note).
-    // Caller is responsible for creating/removing the corresponding NoteStore record.
-    convertGroup(groupId, kind) {
-      const data = this._load();
-      const ts = Date.now();
-      Object.keys(data).forEach((k) => data[k].forEach((h) => {
-        if (h.groupId === groupId) {
-          h.kind = kind;
-          h.updated = ts;
-        }
-      }));
-      this._save();
-    },
-    // Find the group that covers the given range in `key`, if any.
-    groupAt(key, start, end) {
-      const arr = this.get(key);
-      const hit = arr.find((h) => h.start <= start && h.end >= end);
-      return hit || null;
     }
-  });
+  );
   var HighlightStore = AnnotationStore2;
 
   // app/src/main/assets/src/stores/note-store.js
