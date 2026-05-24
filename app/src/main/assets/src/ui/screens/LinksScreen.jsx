@@ -172,7 +172,6 @@ export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateT
 /* ── LinksScreen ─────────────────────────────────────────────────── */
 export function LinksScreen(props) {
   var onBack = props.onBack;
-  var onHome = props.onHome;
   var onNavigateToSource = props.onNavigateToSource;
   var onNavigateToTarget = props.onNavigateToTarget;
   var hlTick = props.hlTick;
@@ -181,7 +180,7 @@ export function LinksScreen(props) {
   var onThemeChange = props.onThemeChange;
   var onSearch = props.onSearch;
   var onHistory = props.onHistory;
-  var historyEnabled = props.historyEnabled;
+  // (onHome, historyEnabled props accepted by API but unused here.)
 
   var useState = React.useState;
   var useMemo = React.useMemo;
@@ -194,9 +193,8 @@ export function LinksScreen(props) {
   var sortMode = _ss[0];
   var setSortMode = _ss[1];
 
-  var _sm = useState(false);
-  var showSortMenu = _sm[0];
-  var setShowSortMenu = _sm[1];
+  // (Pre-Q3.3f-dead: var _sm = useState(false) + showSortMenu/setShowSortMenu
+  //  destructure — neither half was referenced. Removed.)
 
   var _as = useState(null);
   var actionTarget = _as[0];
@@ -237,7 +235,7 @@ export function LinksScreen(props) {
     });
   }, [allLinks]);
 
-  var sortLabels = { recent: 'Recent', oldest: 'Oldest', 'source-az': 'Source A–Z', 'target-az': 'Target A–Z' };
+  // (Pre-Q3.3f-dead: var sortLabels = {...} — defined but never referenced.)
 
   var navigateToEndpoint = function(endpoint, label) {
     if (!endpoint) return;

@@ -82,15 +82,10 @@ export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditSta
   var editValue = _editState[0];
   var setEditValue = _editState[1];
 
-  var _thoughtExp = useState(false);
-  var thoughtExpanded = _thoughtExp[0];
-  var setThoughtExpanded = _thoughtExp[1];
-
   var isEditing = editingId === bkm.id;
   var sourceLabel = _bookmarkSourceLabel(bkm.hlKey);
   var date = (typeof relativeDate === 'function') ? relativeDate(bkm.updated || bkm.created) : '';
   var hasThought = !isEditing && bkm.thought && bkm.thought.trim();
-  var thoughtIsLong = hasThought && bkm.thought.length > 80;
 
   useEffect(function() {
     if (isEditing) {
@@ -114,11 +109,6 @@ export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditSta
     if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
     else if (e.key === 'Escape') { onEditCancel(); }
   };
-
-  function toggleThought(e) {
-    e.stopPropagation();
-    if (thoughtIsLong) setThoughtExpanded(function(v) { return !v; });
-  }
 
   return (
     <div
@@ -293,7 +283,7 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
   var _ci = useState(null); var confirmingId = _ci[0]; var setConfirmingId = _ci[1];
   var _ei = useState(null); var editingId = _ei[0]; var setEditingId = _ei[1];
   var _et = useState(''); var editText = _et[0]; var setEditText = _et[1];
-  var _tick = useState(0); var tick = _tick[0]; var setTick = _tick[1];
+  var _tick = useState(0); var setTick = _tick[1]; // value unread; setter forces re-render
   function bump() { setTick(function(t) { return t + 1; }); }
 
   if (!bkmIds || !bkmIds.length) return null;
@@ -391,7 +381,6 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
 /* ── BookmarksScreen ─────────────────────────────────────────── */
 export function BookmarksScreen(props) {
   var onBack = props.onBack;
-  var onHome = props.onHome;
   var onNavigateToSource = props.onNavigateToSource;
   var hlTick = props.hlTick;
   var setHlTick = props.setHlTick;
@@ -399,7 +388,8 @@ export function BookmarksScreen(props) {
   var onThemeChange = props.onThemeChange;
   var onSearch = props.onSearch;
   var onHistory = props.onHistory;
-  var historyEnabled = props.historyEnabled;
+  // (onHome, historyEnabled props are accepted by the component's API but
+  //  this screen doesn't use them — removed local var bindings.)
 
   var useState = React.useState;
   var useMemo = React.useMemo;
@@ -412,9 +402,8 @@ export function BookmarksScreen(props) {
   var sortMode = _ss[0];
   var setSortMode = _ss[1];
 
-  var _sm = useState(false);
-  var showSortMenu = _sm[0];
-  var setShowSortMenu = _sm[1];
+  // (Pre-Q3.3f-dead: var _sm = useState(false) + showSortMenu/setShowSortMenu
+  //  destructure — neither half was referenced. Removed.)
 
   var _as = useState(null);
   var actionTarget = _as[0];
@@ -455,7 +444,7 @@ export function BookmarksScreen(props) {
     return filtered;
   }, [allBookmarks, searchQuery, sortMode]);
 
-  var sortLabels = { recent: 'Recent', oldest: 'Oldest', 'source-az': 'Source A-Z', 'label-az': 'Label A-Z' };
+  // (Pre-Q3.3f-dead: var sortLabels = {...} — defined but never referenced.)
 
   var navigateToBookmark = function(bkm) {
     var endpoint = _bookmarkSourceEndpoint(bkm.hlKey);

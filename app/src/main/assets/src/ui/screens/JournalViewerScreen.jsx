@@ -455,7 +455,6 @@ export function JournalViewerScreen(props) {
 
   var entryId = props.entryId;
   var onBack = props.onBack;
-  var onHome = props.onHome;
   var onEdit = props.onEdit;
   var onNavigateToLink = props.onNavigateToLink;
   var onOpenJournalEntry = props.onOpenJournalEntry;

@@ -106,7 +106,6 @@ export function JournalHubScreen(props) {
   var useMemo = React.useMemo;
 
   var onBack = props.onBack;
-  var onHome = props.onHome;
   var onOpenEntry = props.onOpenEntry;
   var onEditEntry = props.onEditEntry;
   var onCreateEntry = props.onCreateEntry;

@@ -4333,7 +4333,6 @@
   // app/src/main/assets/src/ui/sheets/JournalInsertSheet.jsx
   function JournalInsertSheet2(props) {
     var useState = React.useState;
-    var useMemo = React.useMemo;
     var onClose = props.onClose;
     var onInsertBlock = props.onInsertBlock;
     var onInsertImage = props.onInsertImage;
@@ -5015,7 +5014,6 @@
     var useState = React.useState;
     var useMemo = React.useMemo;
     var onBack = props.onBack;
-    var onHome = props.onHome;
     var onOpenEntry = props.onOpenEntry;
     var onEditEntry = props.onEditEntry;
     var onCreateEntry = props.onCreateEntry;
@@ -5598,7 +5596,6 @@
     var useMemo = React.useMemo;
     var entryId = props.entryId;
     var onBack = props.onBack;
-    var onHome = props.onHome;
     var onEdit = props.onEdit;
     var onNavigateToLink = props.onNavigateToLink;
     var onOpenJournalEntry = props.onOpenJournalEntry;
@@ -5813,7 +5810,7 @@
     var setBlocks = _blocks[1];
     var _mood = useState(initial && initial.mood || null);
     var mood = _mood[0];
-    var setMood = _mood[1];
+    var _setMood = _mood[1];
     var _saved = useState("Saved");
     var savedLabel = _saved[0];
     var setSavedLabel = _saved[1];
@@ -6265,7 +6262,6 @@
       });
       scheduleSave();
     }
-    var onHome = props.onHome;
     var navChildren = LibraryNav({
       onBack: function() {
         commitSave();

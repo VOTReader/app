@@ -76,8 +76,8 @@ export function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose
     onClose();
   };
 
-  // Blank notes are allowed — the body can be empty.
-  const canSave = true;
+  // Blank notes are allowed — the body can be empty. (Pre-Q3.3f-dead a
+  // `const canSave = true` lived here; the Save button never reads it.)
   // Tapping the header color dot opens the color picker — works in either
   // mode AND closes any other panel that's open (menu, delete confirm).
   const openColorPicker = () => {

@@ -134,7 +134,6 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     if (v2 && v2 !== v1) refinedTarget.verseEnd = v2;
     const v1Obj = verses.find(v => v.n === v1) || null;
     const v2Obj = verses.find(v => v.n === v2) || null;
-    const v1FullLen = v1Obj ? (v1Obj.text || '').length : 0;
     const v2FullLen = v2Obj ? (v2Obj.text || '').length : 0;
     const isPartialStart = info.charStart > 0;
     const isPartialEnd = info.charEnd < v2FullLen;

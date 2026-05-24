@@ -25,7 +25,12 @@ export function JournalEditorScreen(props) {
   var blocks = _blocks[0]; var setBlocks = _blocks[1];
 
   var _mood = useState((initial && initial.mood) || null);
-  var mood = _mood[0]; var setMood = _mood[1];
+  // TODO Q3-followup: setMood is never called — mood loads from the existing
+  //   entry but the editor has no UI to change it. Likely a wiring gap
+  //   (mood-picker UI was never built or got removed). Keeping the read
+  //   plumbing intact so existing-mood persists round-trip; underscore on
+  //   the setter marks "intentionally unused for now" per Q3 exit criteria.
+  var mood = _mood[0]; var _setMood = _mood[1];
 
   var _saved = useState('Saved');
   var savedLabel = _saved[0]; var setSavedLabel = _saved[1];
@@ -486,7 +491,6 @@ export function JournalEditorScreen(props) {
   }
 
   // ─── Nav (back left; saved indicator + right cluster) ───────
-  var onHome = props.onHome;
   // Standard app-wide Library nav. Editor specifics preserved: "Done"
   // back label, commitSave() before every navigation, and the "Saved"
   // status chip as a leftExtra (stays on the left, next to Home). The

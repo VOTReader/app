@@ -18,7 +18,7 @@
    The destructure below mirrors index.html inline #1 — kept here for
    clarity so this file reads as self-contained.
    ═══════════════════════════════════════════════════════════════════════ */
-const { useState, useEffect, useCallback, useRef, useMemo } = React;
+const { useState, useEffect, useCallback } = React;
 
 function App() {
   // screens: "home" | "scriptures-home" | "volumes-home" | "matthew-idx" | "matthew-ch" | "bible-idx" | "bible-ch" | "vot-index" | "vot-letter" | "search"
@@ -86,11 +86,13 @@ function App() {
   const [theme, setTheme] = useState(saved.theme || "dark");
   // Increments each time an alt translation finishes loading — forces a
   // re-render so translateVerse() starts returning the loaded text.
-  const [translationTick, setTranslationTick] = useState(0);
+  // Value (_translationTick) is unread; only the setter side effect matters.
+  const [_translationTick, setTranslationTick] = useState(0);
   // Increments when bible-studies.js finishes loading — forces a re-render so
   // STUDIES = _studies() picks up the new data. studiesLoading tracks the
   // in-flight state so StudiesHome can show a brief loading indicator.
-  const [studiesTick, setStudiesTick] = useState(0);
+  // Value (_studiesTick) is unread; only the setter side effect matters.
+  const [_studiesTick, setStudiesTick] = useState(0);
   const [studiesLoading, setStudiesLoading] = useState(false);
 
   /* ═══════════════════════════════════════════════════════════════
@@ -105,7 +107,7 @@ function App() {
   const {
     annChip, setAnnChip,
     linkSidebarKey, openLinkSidebar, closeLinkSidebar,
-    linkPickerSource, openLinkPicker, openLinkPickerForTarget, closeLinkPicker,
+    linkPickerSource, openLinkPicker, closeLinkPicker,
     linkRefineRequest, setLinkRefineRequest,
     lastLinkCreated, setLastLinkCreated,
     linkPickerMode, linkPickerOnPickRef,
@@ -896,7 +898,6 @@ function App() {
 
   /* ── Bible Letter Studies ── */
   const STUDIES = _studies();
-  const ACTIVE_STUDIES = STUDIES.filter((s) => !s.locked && s.chapters && s.chapters.length > 0);
   const getStudyById = (id) => STUDIES.find((s) => s.id === id) || null;
   const getStudyChapter = (study, chId) => study && study.chapters ? study.chapters.find((c) => c.id === chId) : null;
   const studyReadKey = (slug) => `bible-study-${slug}`;
@@ -1000,11 +1001,10 @@ function App() {
     selectStudyChapter(slug, s.chapters[s.chapters.length - 1].id);
   };
 
-  // Legacy aliases retained so older call sites keep working
-  const goToStudyFirstChapter = (sid) => goToChainEntryFirst(sid);
-  const goToStudyLastChapter = (sid) => goToChainEntryLast(sid);
-  const goToMatthewStudyFromStudies = () => {setFromStudies(true);setBookId("matthew");setChapterNum(null);setScreen("matthew-idx");};
-  const goToMatthewStudyFirstCh = goToChainEntryFirst('matthew-study');
+  // (Pre-Q3.3f-dead: 4 legacy aliases — goToStudyFirstChapter,
+  //  goToStudyLastChapter, goToMatthewStudyFromStudies, goToMatthewStudyFirstCh
+  //  — lived here "retained so older call sites keep working." Lint confirmed
+  //  no caller exists. Removed.)
 
   /* ── Ephesians / Hebrews ── */
   const selectBibleCh = (num) => {setChapterNum(num);setScreen("bible-ch");setActiveReadKey(bookId, () => setLastReadChapters((prev) => ({ ...prev, [bookId]: num })));};

@@ -578,8 +578,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
 
   if (!visible || !selInfo) return null;
 
-  // Style label preview: the colored "A" varies based on activeStyle
-  const styleAClass = (color) => 'sel-style-A sel-style-A-' + (activeStyle === 'underline' ? 'underline' : 'fill') + ' sel-style-A-' + color;
+  // (Pre-Q3.3f-dead a styleAClass(color) helper lived here; no caller.)
 
   var mv = selInfo.multiVerse;
   // Show color row for multi-verse too, as long as there are hl-key containers affected

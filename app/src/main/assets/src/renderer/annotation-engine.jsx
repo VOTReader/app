@@ -265,7 +265,6 @@ export function applyDOMHighlights() {
       var ann = sorted[hi];
       var seenIdx = groupSeen[ann.groupId] || 0;
       var isFirst = seenIdx === 0;
-      var isLast = seenIdx === groupCounts[ann.groupId] - 1;
       groupSeen[ann.groupId] = seenIdx + 1;
       var kind = ann.kind || 'highlight';
 

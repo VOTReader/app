@@ -4,7 +4,6 @@
 
 export function JournalInsertSheet(props) {
   var useState = React.useState;
-  var useMemo = React.useMemo;
 
   var onClose = props.onClose;
   var onInsertBlock = props.onInsertBlock;

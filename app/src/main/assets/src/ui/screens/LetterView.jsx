@@ -6,7 +6,7 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
-  const [surpriseBlockId, setSurpriseBlockId] = React.useState(null);
+  const [_surpriseBlockId, setSurpriseBlockId] = React.useState(null); // value unread; setter drives the highlight-pulse effect
   const [highlightExcerpt, setHighlightExcerpt] = React.useState(null);
   const [expandSignal, setExpandSignal] = React.useState(0);
   const [allExpanded, setAllExpanded] = React.useState(true);

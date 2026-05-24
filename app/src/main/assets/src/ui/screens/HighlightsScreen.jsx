@@ -139,7 +139,6 @@ export function HighlightsScreen(props) {
   var useMemo = React.useMemo;
 
   var onBack = props.onBack;
-  var onHome = props.onHome;
   var onNavigateToSource = props.onNavigateToSource;
   var hlTick = props.hlTick;
 

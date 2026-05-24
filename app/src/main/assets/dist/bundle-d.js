@@ -2052,7 +2052,7 @@
     const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
     const [highlightedFn, setHighlightedFn] = React.useState(null);
     const [sheetFn, setSheetFn] = React.useState(null);
-    const [surpriseBlockId, setSurpriseBlockId] = React.useState(null);
+    const [_surpriseBlockId, setSurpriseBlockId] = React.useState(null);
     const [highlightExcerpt, setHighlightExcerpt] = React.useState(null);
     const [expandSignal, setExpandSignal] = React.useState(0);
     const [allExpanded, setAllExpanded] = React.useState(true);
@@ -4906,7 +4906,6 @@
   }
   function LinksScreen2(props) {
     var onBack = props.onBack;
-    var onHome = props.onHome;
     var onNavigateToSource = props.onNavigateToSource;
     var onNavigateToTarget = props.onNavigateToTarget;
     var hlTick = props.hlTick;
@@ -4915,25 +4914,21 @@
     var onThemeChange = props.onThemeChange;
     var onSearch = props.onSearch;
     var onHistory = props.onHistory;
-    var historyEnabled = props.historyEnabled;
     var useState2 = React.useState;
-    var useMemo2 = React.useMemo;
+    var useMemo = React.useMemo;
     var _sq = useState2("");
     var searchQuery = _sq[0];
     var setSearchQuery = _sq[1];
     var _ss = useState2("recent");
     var sortMode = _ss[0];
     var setSortMode = _ss[1];
-    var _sm = useState2(false);
-    var showSortMenu = _sm[0];
-    var setShowSortMenu = _sm[1];
     var _as = useState2(null);
     var actionTarget = _as[0];
     var setActionTarget = _as[1];
-    var allLinks = useMemo2(function() {
+    var allLinks = useMemo(function() {
       return LinkStore.all();
     }, [hlTick]);
-    var displayLinks = useMemo2(function() {
+    var displayLinks = useMemo(function() {
       var q = searchQuery.trim().toLowerCase();
       var filtered = q ? allLinks.filter(function(lnk) {
         return _epSearchText(lnk.source).includes(q) || _epSearchText(lnk.target).includes(q);
@@ -4954,12 +4949,11 @@
       });
       return filtered;
     }, [allLinks, searchQuery, sortMode]);
-    var brokenLinks = useMemo2(function() {
+    var brokenLinks = useMemo(function() {
       return allLinks.filter(function(lnk) {
         return !_endpointResolves(lnk.source) || !_endpointResolves(lnk.target);
       });
     }, [allLinks]);
-    var sortLabels = { recent: "Recent", oldest: "Oldest", "source-az": "Source A\u2013Z", "target-az": "Target A\u2013Z" };
     var navigateToEndpoint = function(endpoint, label) {
       if (!endpoint) return;
       if (typeof onNavigateToSource === "function") {
@@ -5109,19 +5103,15 @@
   function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart: _onEditStart, onEditSave, onEditCancel }) {
     var useState2 = React.useState;
     var useEffect2 = React.useEffect;
-    var useRef2 = React.useRef;
-    var inputRef = useRef2(null);
+    var useRef = React.useRef;
+    var inputRef = useRef(null);
     var _editState = useState2(bkm.label || "");
     var editValue = _editState[0];
     var setEditValue = _editState[1];
-    var _thoughtExp = useState2(false);
-    var thoughtExpanded = _thoughtExp[0];
-    var setThoughtExpanded = _thoughtExp[1];
     var isEditing = editingId === bkm.id;
     var sourceLabel = _bookmarkSourceLabel2(bkm.hlKey);
     var date = typeof relativeDate === "function" ? relativeDate(bkm.updated || bkm.created) : "";
     var hasThought = !isEditing && bkm.thought && bkm.thought.trim();
-    var thoughtIsLong = hasThought && bkm.thought.length > 80;
     useEffect2(function() {
       if (isEditing) {
         setEditValue(bkm.label || "");
@@ -5146,12 +5136,6 @@
         onEditCancel();
       }
     };
-    function toggleThought(e) {
-      e.stopPropagation();
-      if (thoughtIsLong) setThoughtExpanded(function(v) {
-        return !v;
-      });
-    }
     return /* @__PURE__ */ React.createElement(
       "div",
       {
@@ -5292,7 +5276,6 @@
     var editText = _et[0];
     var setEditText = _et[1];
     var _tick = useState2(0);
-    var tick = _tick[0];
     var setTick = _tick[1];
     function bump() {
       setTick(function(t) {
@@ -5379,7 +5362,6 @@
   }
   function BookmarksScreen2(props) {
     var onBack = props.onBack;
-    var onHome = props.onHome;
     var onNavigateToSource = props.onNavigateToSource;
     var hlTick = props.hlTick;
     var setHlTick = props.setHlTick;
@@ -5387,28 +5369,24 @@
     var onThemeChange = props.onThemeChange;
     var onSearch = props.onSearch;
     var onHistory = props.onHistory;
-    var historyEnabled = props.historyEnabled;
     var useState2 = React.useState;
-    var useMemo2 = React.useMemo;
+    var useMemo = React.useMemo;
     var _sq = useState2("");
     var searchQuery = _sq[0];
     var setSearchQuery = _sq[1];
     var _ss = useState2("recent");
     var sortMode = _ss[0];
     var setSortMode = _ss[1];
-    var _sm = useState2(false);
-    var showSortMenu = _sm[0];
-    var setShowSortMenu = _sm[1];
     var _as = useState2(null);
     var actionTarget = _as[0];
     var setActionTarget = _as[1];
     var _ei = useState2(null);
     var editingId = _ei[0];
     var setEditingId = _ei[1];
-    var allBookmarks = useMemo2(function() {
+    var allBookmarks = useMemo(function() {
       return BookmarkStore.all().slice();
     }, [hlTick]);
-    var displayBookmarks = useMemo2(function() {
+    var displayBookmarks = useMemo(function() {
       var q = searchQuery.trim().toLowerCase();
       var filtered = q ? allBookmarks.filter(function(bkm) {
         var srcLabel = _bookmarkSourceLabel2(bkm.hlKey).toLowerCase();
@@ -5431,7 +5409,6 @@
       });
       return filtered;
     }, [allBookmarks, searchQuery, sortMode]);
-    var sortLabels = { recent: "Recent", oldest: "Oldest", "source-az": "Source A-Z", "label-az": "Label A-Z" };
     var navigateToBookmark = function(bkm) {
       var endpoint = _bookmarkSourceEndpoint2(bkm.hlKey);
       if (!endpoint) return;
@@ -5673,9 +5650,8 @@
   }
   function HighlightsScreen2(props) {
     var useState2 = React.useState;
-    var useMemo2 = React.useMemo;
+    var useMemo = React.useMemo;
     var onBack = props.onBack;
-    var onHome = props.onHome;
     var onNavigateToSource = props.onNavigateToSource;
     var hlTick = props.hlTick;
     var _sn = useState2(true);
@@ -5690,10 +5666,10 @@
     var _cf = useState2(null);
     var colorFilter = _cf[0];
     var setColorFilter = _cf[1];
-    var marks = useMemo2(function() {
+    var marks = useMemo(function() {
       return _collectMarks();
     }, [hlTick]);
-    var presentColors = useMemo2(function() {
+    var presentColors = useMemo(function() {
       var seen = {};
       marks.forEach(function(m) {
         seen[m.color === "cyan" ? "teal" : m.color] = 1;
@@ -5702,7 +5678,7 @@
         return seen[c];
       });
     }, [marks]);
-    var sorted = useMemo2(function() {
+    var sorted = useMemo(function() {
       var q = query.trim().toLowerCase();
       var list = q ? marks.filter(function(m) {
         var lbl = typeof _bookmarkSourceLabel === "function" ? _bookmarkSourceLabel(m.hlKey) : "";
@@ -6153,7 +6129,6 @@
       }
       onClose();
     };
-    const canSave = true;
     const openColorPicker = () => {
       setShowColors(true);
       setMenuOpen(false);
@@ -6485,7 +6460,6 @@
       if (v2 && v2 !== v1) refinedTarget.verseEnd = v2;
       const v1Obj = verses.find((v) => v.n === v1) || null;
       const v2Obj = verses.find((v) => v.n === v2) || null;
-      const v1FullLen = v1Obj ? (v1Obj.text || "").length : 0;
       const v2FullLen = v2Obj ? (v2Obj.text || "").length : 0;
       const isPartialStart = info.charStart > 0;
       const isPartialEnd = info.charEnd < v2FullLen;
@@ -7232,7 +7206,6 @@
       if (typeof onBookmarkRequest === "function") onBookmarkRequest(storedKey);
     }, [selInfo, setHlTick, onBookmarkRequest]);
     if (!visible || !selInfo) return null;
-    const styleAClass = (color) => "sel-style-A sel-style-A-" + (activeStyle === "underline" ? "underline" : "fill") + " sel-style-A-" + color;
     var mv = selInfo.multiVerse;
     var mvCanHighlight = mv && selInfo.multiContainers && selInfo.multiContainers.length > 0;
     var showColors = !mv || mvCanHighlight;
@@ -7416,8 +7389,8 @@
   function BookmarkCreateSheet2({ pending, onConfirm, onCancel, onDelete, onOpen }) {
     var useState2 = React.useState;
     var useEffect2 = React.useEffect;
-    var useRef2 = React.useRef;
-    var labelRef = useRef2(null);
+    var useRef = React.useRef;
+    var labelRef = useRef(null);
     var isEditMode = !!(pending && pending.editId);
     var _label = useState2(
       isEditMode ? pending.currentLabel || "" : pending && pending.defaultLabel || ""
@@ -7430,7 +7403,7 @@
     var _confirmDel = useState2(false);
     var confirmingDelete = _confirmDel[0];
     var setConfirmingDelete = _confirmDel[1];
-    var initialRef = useRef2({ label: "", thought: "" });
+    var initialRef = useRef({ label: "", thought: "" });
     useEffect2(function() {
       if (!pending) return;
       if (pending.editId) {
@@ -7685,7 +7658,7 @@
   }
 
   // app/src/main/assets/src/app.jsx
-  var { useState, useEffect, useCallback, useRef, useMemo } = React;
+  var { useState, useEffect, useCallback } = React;
   function App() {
     var sharedViewProps, _navToChapter, _idxNav;
     const saved = useSavedState();
@@ -7703,8 +7676,8 @@
     const [genreId, setGenreId] = tabField("genreId");
     const [surpriseAnchor, setSurpriseAnchor] = tabField("surpriseAnchor");
     const [theme, setTheme] = useState(saved.theme || "dark");
-    const [translationTick, setTranslationTick] = useState(0);
-    const [studiesTick, setStudiesTick] = useState(0);
+    const [_translationTick, setTranslationTick] = useState(0);
+    const [_studiesTick, setStudiesTick] = useState(0);
     const [studiesLoading, setStudiesLoading] = useState(false);
     const [hlTick, setHlTick] = useState(0);
     const {
@@ -7715,7 +7688,6 @@
       closeLinkSidebar,
       linkPickerSource,
       openLinkPicker,
-      openLinkPickerForTarget,
       closeLinkPicker,
       linkRefineRequest,
       setLinkRefineRequest,
@@ -8548,7 +8520,6 @@
       setScreen("matthew-idx");
     };
     const STUDIES = _studies();
-    const ACTIVE_STUDIES = STUDIES.filter((s) => !s.locked && s.chapters && s.chapters.length > 0);
     const getStudyById = (id) => STUDIES.find((s) => s.id === id) || null;
     const getStudyChapter = (study, chId) => study && study.chapters ? study.chapters.find((c) => c.id === chId) : null;
     const studyReadKey = (slug) => `bible-study-${slug}`;
@@ -8666,15 +8637,6 @@
       if (!s || !s.chapters?.length) return;
       selectStudyChapter(slug, s.chapters[s.chapters.length - 1].id);
     };
-    const goToStudyFirstChapter = (sid) => goToChainEntryFirst(sid);
-    const goToStudyLastChapter = (sid) => goToChainEntryLast(sid);
-    const goToMatthewStudyFromStudies = () => {
-      setFromStudies(true);
-      setBookId("matthew");
-      setChapterNum(null);
-      setScreen("matthew-idx");
-    };
-    const goToMatthewStudyFirstCh = goToChainEntryFirst("matthew-study");
     const selectBibleCh = (num) => {
       setChapterNum(num);
       setScreen("bible-ch");
