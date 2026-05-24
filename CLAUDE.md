@@ -29,11 +29,16 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
   - Bin 3 — disable + mount-only or setter-stability cite (`[]`-deps intent; useState setters passed through hook returns)
   - Bin 4 — disable + cache-bust / identity-churn cite (hlTick bump signal, commitDwellNow per-render rebinding)
 
-### Q4 (NEXT) — JSDoc / `tsc --checkJs`
+### Q4 — JSDoc / `tsc --checkJs` (IN PROGRESS, 2026-05-24)
 
-**Scope pinned 2026-05-24:** hooks + stores + utils ONLY. App() and the ui/ tree are deferred until App() decomposition lands as its own phase. Rationale: App() at 2,191 lines is the bottleneck for both types AND tests; the 15 hooks + 11 stores + 11 utils have clean interfaces that type cleanly.
+**Scope pinned:** hooks + stores + utils ONLY. App() and the ui/ tree are deferred until App() decomposition lands as its own phase. Rationale: App() at 2,191 lines is the bottleneck for both types AND tests; the 15 hooks + 11 stores + 11 utils have clean interfaces that type cleanly.
 
-Q4 deliverables: `jsconfig.json` with `"checkJs": true`, JSDoc on every export in scope, CI `tsc --noEmit` step (zero-tolerance from day one per [[lint-regression-gate]]).
+- **Q4.1 infrastructure DONE** (`001747b`): `tsconfig.json` flipped to `checkJs: true` + `strict: false`; include narrowed to `utils/stores/hooks` only; `_entry-b.js` excluded (bundler entry drags everything); `@types/react` installed; `tools/gen-eslint-globals.py` extended to emit a parallel `tools/globals.generated.d.ts` (331 ambient `declare const X: any;` + Window index signature — cross-bundle is untyped by design). CachedStore typed as the Q4 type root with `CachedStoreBase<T>` generic typedef. CI `npm run typecheck` step zero-tolerance; pre-commit Step 3 runs full-project tsc (~3.5s) on any source-file stage.
+- **Q4.2 utils DONE** (3 commits — `8f8190d` + `83ec36b` + `46beecc`): 11/11 utils with full JSDoc. Trivial leaves (book-category, dates, garden, hl-keys, search, tabs, render-text), medium (note-source, scripture-parse, highlight.jsx), and the larger nav-index.js (lifted its @ts-nocheck via a narrow `/** @type {any} */` cast at the union-narrowing site). NavItem/VerseRange/GardenTier/TabState/NoteShape typedefs introduced; cross-bundle bare-names resolve through `globals.generated.d.ts`.
+- **Q4.3 stores IN PROGRESS**: 11 stores carry `// @ts-nocheck` placeholders from Q4.1, to be lifted per-store as JSDoc lands. Pattern: each store extends CachedStore via `Object.assign(CachedStore('vot-key', defaultVal), {<methods>})` and uses `this._load()` / `this._save()` from inside methods — TS loses the base type through Object.assign. Will solve with a per-store `/** @type {CachedStoreBase<T> & {...}} */` cast on the methods literal that rebinds `this` to the merged shape.
+- **Q4.4 hooks** pending — 15 files; P6 OWNS/PARAMS/RETURNS headers already document the surface, conversion to formal JSDoc should be mechanical.
+
+**Q4 gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
 
 ### Roadmap
 
