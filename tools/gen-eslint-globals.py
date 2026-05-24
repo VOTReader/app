@@ -44,15 +44,73 @@ VENDOR_GLOBALS = [
 ]
 
 
-def extract_object_assign_idents(text):
-    """Find Object.assign(window, { ... }) and pull every identifier inside."""
+def extract_object_assign_idents(text, entry_file):
+    """Find every Object.assign(window, ...) call and harvest its exports.
+
+    Three call shapes appear in the entry files:
+      1. Object.assign(window, { A, B, C })        — explicit named exports
+      2. Object.assign(window, NS1, NS2, NS3)      — wildcard namespace spreads
+      3. Mixed: Object.assign(window, NS1, { D })  — combo
+    """
     out = set()
-    for m in re.finditer(r'Object\.assign\s*\(\s*window\s*,\s*\{([^}]+)\}\s*\)', text, re.DOTALL):
-        body = m.group(1)
-        for ident in re.findall(r'(?:^|[,\s])([A-Za-z_$][A-Za-z0-9_$]*)\s*(?=[,}\n])', body):
-            if ident not in ('window', 'Object', 'assign'):
-                out.add(ident)
+    # Match Object.assign(window, <args...>) and split on top-level commas.
+    for m in re.finditer(
+        r'Object\.assign\s*\(\s*window\s*,\s*((?:[^()]*|\([^()]*\))*)\)',
+        text, re.DOTALL,
+    ):
+        args = m.group(1)
+        # Walk args, splitting on commas that are at brace depth 0
+        parts, buf, depth = [], '', 0
+        for ch in args:
+            if ch == '{': depth += 1
+            if ch == '}': depth -= 1
+            if ch == ',' and depth == 0:
+                parts.append(buf.strip()); buf = ''
+            else:
+                buf += ch
+        if buf.strip(): parts.append(buf.strip())
+
+        for part in parts:
+            if part.startswith('{'):
+                # Inline object — pull every identifier
+                body = part.strip('{}')
+                for ident in re.findall(r'(?:^|[,\s])([A-Za-z_$][A-Za-z0-9_$]*)\s*(?=[,}\n])', body):
+                    if ident not in ('window', 'Object', 'assign'):
+                        out.add(ident)
+            else:
+                # Bare identifier — a wildcard namespace import. Resolve to the
+                # module it was imported from and extract its named exports.
+                ns = part.strip()
+                if not re.match(r'^[A-Za-z_$][A-Za-z0-9_$]*$', ns):
+                    continue
+                ns_idents = resolve_wildcard_namespace(ns, text, entry_file)
+                out |= ns_idents
     return out
+
+
+def resolve_wildcard_namespace(ns_name, entry_text, entry_file):
+    """Given a namespace identifier like 'HubScreen', find its
+    `import * as HubScreen from '...'` line in the entry file, then read
+    that target file and extract its top-level `export function|const|let|var|class NAME`.
+    """
+    m = re.search(
+        r'import\s+\*\s+as\s+' + re.escape(ns_name) + r"\s+from\s+['\"]([^'\"]+)['\"]",
+        entry_text,
+    )
+    if not m:
+        return set()
+    rel_path = m.group(1)
+    # Resolve relative to the entry file's directory
+    target = (entry_file.parent / rel_path).resolve()
+    if not target.exists():
+        return set()
+    target_text = target.read_text(encoding='utf-8')
+    # All top-level `export NAME` (function/const/let/var/class)
+    exports = set(re.findall(
+        r'^export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][A-Za-z0-9_$]*)',
+        target_text, re.MULTILINE,
+    ))
+    return exports
 
 
 def extract_top_level_decls(text):
@@ -94,7 +152,7 @@ def main():
             print(f'WARN: missing entry file {f}', file=sys.stderr)
             continue
         text = f.read_text(encoding='utf-8')
-        idents = extract_object_assign_idents(text)
+        idents = extract_object_assign_idents(text, f)
         all_globals |= idents
 
     # 2 + 3. index.html — top-level decls + window.X = …

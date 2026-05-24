@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 322 distinct identifiers.
+// Total: 331 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -82,8 +82,14 @@ export const projectGlobals = {
   InAppLinkButton: "readonly",
   InlineEcho: "readonly",
   InlineNotes: "readonly",
+  JournalAudioBlock: "readonly",
+  JournalBlockView: "readonly",
+  JournalCardMenu: "readonly",
   JournalChip: "readonly",
+  JournalEditorScreen: "readonly",
   JournalHelpers: "readonly",
+  JournalHubScreen: "readonly",
+  JournalImageBlock: "readonly",
   JournalInboundSheet: "readonly",
   JournalIndexStore: "readonly",
   JournalInsertSheet: "readonly",
@@ -93,6 +99,7 @@ export const projectGlobals = {
   JournalRecordingSheet: "readonly",
   JournalStatsStore: "readonly",
   JournalStore: "readonly",
+  JournalViewerScreen: "readonly",
   JrnExpandable: "readonly",
   LETTERS: "readonly",
   LETTERS_FLOCK: "readonly",
@@ -271,10 +278,12 @@ export const projectGlobals = {
   idbReadAll: "readonly",
   isHiddenManna: "readonly",
   jrnId: "readonly",
+  jrnPinIcon: "readonly",
   jrnRefKeyForBookmark: "readonly",
   jrnRefKeyForChapter: "readonly",
   jrnRefKeyForLetter: "readonly",
   jrnRefKeyForLetterByLabel: "readonly",
+  jrnRenderInline: "readonly",
   jrnShowMilestoneToast: "readonly",
   lastVerseOfFirstRange: "readonly",
   letterHlKey: "readonly",

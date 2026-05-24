@@ -87,6 +87,10 @@ export default [
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'react/prop-types': 'off',   // JSDoc types will cover this (Q4 phase)
       'react/display-name': 'off', // anonymous components are fine in this codebase
+      // jsx-no-undef's default is to ignore languageOptions.globals (legacy
+      // eslintrc behavior). allowGlobals: true makes it respect the globals
+      // list, which is the whole point of having a 322-entry generated list.
+      'react/jsx-no-undef': ['error', { allowGlobals: true }],
     },
   },
 ];
