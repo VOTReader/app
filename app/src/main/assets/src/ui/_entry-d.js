@@ -158,6 +158,13 @@ import { AnnotationActionChip } from './sheets/AnnotationActionChip.jsx';
 import { BookmarkCreateSheet } from './sheets/BookmarkCreateSheet.jsx';
 import { NotebookManagerSheet } from './sheets/NotebookManagerSheet.jsx';
 
+// ── App — the composition root ──────────────────────────────────────────
+// Extracted from index.html in Q2.7-1 as a verbatim move (still uses
+// React.createElement). JSX conversion lands in Q2.7-2. Riding in
+// bundle-d because that's where its dominant consumers (screens/sheets/
+// components) already live — adds no new bundle, no new script tag.
+import { App } from '../app.js';
+
 // ── Expose every public symbol on window ────────────────────────────────
 // Bridges the ES-module Cluster D to its classic-script consumers (the
 // inline App() block in index.html + the lexical-mirror script before
@@ -218,4 +225,6 @@ Object.assign(window, {
   LinkPicker, LinkSidebar,
   SelectionToolbar, AnnotationActionChip,
   BookmarkCreateSheet, NotebookManagerSheet,
+  // App (composition root)
+  App,
 });
