@@ -32,7 +32,10 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
   // Re-sync local state if a different `pending` arrives. The two-key
   // dependency captures both mode (editId) and instance (hlKey), so
   // back-to-back opens (e.g. close edit → open create on another spot)
-  // both reset cleanly.
+  // both reset cleanly. Names extracted to satisfy
+  // react-hooks/exhaustive-deps's "no complex expressions in dep array".
+  var pendingEditId = pending && pending.editId;
+  var pendingHlKey = pending && pending.hlKey;
   useEffect(function() {
     if (!pending) return;
     if (pending.editId) {
@@ -59,7 +62,8 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
         labelRef.current.select();
       }
     }, 60);
-  }, [pending && pending.editId, pending && pending.hlKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent is re-sync ONLY when pending switches identity (editId/hlKey are the mode + instance keys). pending itself reads other fields at fire-time but tracking it would re-fire on every parent re-render. setLabel/setThought/setConfirmingDelete are tuple-unpacked useState setters (identity-stable).
+  }, [pendingEditId, pendingHlKey]);
 
   // canSave drives both the visual disabled state and the keyboard-shortcut
   // guard. EDIT-mode: only if at least one field differs from what we

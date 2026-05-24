@@ -7408,6 +7408,8 @@
     var confirmingDelete = _confirmDel[0];
     var setConfirmingDelete = _confirmDel[1];
     var initialRef = useRef({ label: "", thought: "" });
+    var pendingEditId = pending && pending.editId;
+    var pendingHlKey = pending && pending.hlKey;
     useEffect2(function() {
       if (!pending) return;
       if (pending.editId) {
@@ -7432,7 +7434,7 @@
           labelRef.current.select();
         }
       }, 60);
-    }, [pending && pending.editId, pending && pending.hlKey]);
+    }, [pendingEditId, pendingHlKey]);
     var canSave;
     if (isEditMode) {
       canSave = label.trim() !== initialRef.current.label.trim() || thought.trim() !== initialRef.current.thought.trim();

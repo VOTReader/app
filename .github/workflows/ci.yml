@@ -34,14 +34,15 @@ jobs:
       - name: Install dependencies (npm ci — exact lockfile)
         run: npm ci
 
-      - name: Lint (0 errors hard gate, warning ceiling --max-warnings)
+      - name: Lint (0 errors + 0 warnings hard gate)
         # `npm run lint` chains `npm run lint:globals` (regenerates the
         # auto-globals list) and `eslint app/src/main/assets/src`. ESLint
-        # exits nonzero on ANY error, so the 0-error floor (achieved at
-        # 7eb491b) is enforced for free — no flag needed.
-        # --max-warnings is the ratchet: drops with each Q3.3e commit
-        # until exhaustive-deps warnings reach 0, then the value stays at 0.
-        run: npm run lint -- --max-warnings 11
+        # exits nonzero on ANY error, and --max-warnings 0 means any new
+        # warning fails CI. This is the permanent steady state after
+        # Q3.3e closed all 59 exhaustive-deps warnings (every remaining
+        # exception is a documented `eslint-disable-next-line` with a
+        # named rationale; the disable comment IS the policy).
+        run: npm run lint -- --max-warnings 0
 
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build

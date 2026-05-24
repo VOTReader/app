@@ -98,6 +98,7 @@ export function useScrollMemory({
     updateActiveTab((t) => ({
       scrollPositions: { ...(t.scrollPositions || {}), [key]: { y: scrollTop, pct } }
     }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsOverviewOpenRef is a useRef ref read via .current — call-time fresh, stable object identity. Per HARD INVARIANT above, deps are intentionally [updateActiveTab] only.
   }, [updateActiveTab]);
 
   // ── Effect 1: debounced scroll-listener attach ─────────────────────────
@@ -154,6 +155,7 @@ export function useScrollMemory({
     }
     // Fresh screen / no saved position → top
     setTimeout(() => {if (__scrollEl) __scrollEl.scrollTop = 0;}, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
 
   // ── Return ─────────────────────────────────────────────────────────────

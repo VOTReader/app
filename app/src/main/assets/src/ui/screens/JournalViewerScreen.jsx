@@ -267,6 +267,7 @@ export function JournalImageBlock({ mediaId, caption }) {
       });
     }
     return function() { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSrc is a tuple-unpacked useState setter (`var _src = useState(null); var setSrc = _src[1]`) — eslint can't trace this back to its useState origin; identity-stable per React invariant.
   }, [mediaId]);
 
   return (
@@ -308,6 +309,7 @@ export function JournalAudioBlock(props) {
       });
     }
     return function() { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSrc is a tuple-unpacked useState setter (`var _src = useState(null); var setSrc = _src[1]`) — eslint can't trace this back to its useState origin; identity-stable per React invariant.
   }, [mediaId]);
 
   function toggle(e) {

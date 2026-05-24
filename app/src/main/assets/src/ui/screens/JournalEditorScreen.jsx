@@ -69,6 +69,7 @@ export function JournalEditorScreen(props) {
     }
     document.addEventListener('pointerdown', onDocDown, true);
     return function() { document.removeEventListener('pointerdown', onDocDown, true); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setConfirmDelIdx + setConfirmDelStep are useState setters in this component (declared as `var _x = useState(...); var setX = _x[1];` tuple-unpacking pattern; eslint can't always trace this form back to its useState origin). Identity-stable per React invariant.
   }, [confirmDelIdx]);
 
   var fileInputRef = useRef(null);
@@ -102,6 +103,7 @@ export function JournalEditorScreen(props) {
       if (setHlTick) setHlTick(function(tx) { return tx + 1; });
     }, 1200);
     return function() { clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSavedLabel is a tuple-unpacked useState setter (identity-stable); setHlTick is a prop from App() whose origin is useState (identity-stable per React invariant). Effect intent is debounced-save on content change, not on setter-identity churn.
   }, [entryId, title, blocks, mood]);
 
   // Final flush on real unmount. Reads from refs so the latest state

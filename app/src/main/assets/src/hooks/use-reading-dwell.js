@@ -92,6 +92,7 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   // __onDwellCommit bridge effect's [commitDwellNow] dep relies on that
   // identity churn to re-bind the window hook each render.
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional identity churn: commitDwellNow is a plain function per the invariant above; the __onDwellCommit bridge effect (below) relies on per-render identity to re-bind window.__onDwellCommit with a fresh closure. eslint's suggested fix (useCallback) would break the design.
   const commitDwellNow = () => {
     if (!dwellKeyRef.current) return;
     if (dwellTimerRef.current) {clearTimeout(dwellTimerRef.current);dwellTimerRef.current = null;}
@@ -136,6 +137,8 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   // Expose the commit-now callback for ScreenLayout's scroll/fit checks.
   // dep [commitDwellNow]: identity churn each render intentionally
   // re-binds the bridge so ScreenLayout always holds a fresh reference.
+  // (The disable cite lives at the commitDwellNow declaration, where
+  // eslint reports the warning.)
   React.useEffect(() => {
     window.__onDwellCommit = commitDwellNow;
     return () => {if (window.__onDwellCommit === commitDwellNow) window.__onDwellCommit = null;};
@@ -147,6 +150,7 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
     const onVis = () => {if (document.visibilityState === 'hidden') pauseDwell();else scheduleDwell();};
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only listener attach. pauseDwell + scheduleDwell are local plain functions (per the file's "Do NOT useCallback" invariant) whose bodies operate only on dwellTimerRef/dwellAccRef/dwellStartRef/dwellKeyRef/pendingReadCommitRef via .current — stable behavior regardless of identity. Stale-safe.
   }, []);
 
   // ── Return ─────────────────────────────────────────────────────────────
