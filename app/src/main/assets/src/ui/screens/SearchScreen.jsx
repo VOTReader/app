@@ -72,6 +72,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (state.parsed && state.parsed.kind === 'command') {
       if (onCommand) onCommand(state.parsed.action);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect should fire only when parsed-result changes. Adding onCommand would re-fire on every parent re-render that rebuilds the callback, calling the command handler multiple times for the same parsed.command. Closure always picks up the latest onCommand at the point state.parsed actually changes.
   }, [state.parsed]);
 
   // Group results by source

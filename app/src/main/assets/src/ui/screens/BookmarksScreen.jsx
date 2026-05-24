@@ -97,6 +97,7 @@ export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditSta
         }
       }, 50);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot at edit-start: fires only when isEditing flips. bkm.label is read at that moment for the seed; tracking it in deps would clobber in-progress edits if the underlying bookmark mutated externally. setEditValue is a useState setter (identity-stable).
   }, [isEditing]);
 
   var commitEdit = function() {

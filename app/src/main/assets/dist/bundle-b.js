@@ -2244,7 +2244,7 @@
       setLinkPickerMode(null);
       linkPickerOnPickRef.current = null;
       setHlTick((t) => t + 1);
-    }, []);
+    }, [setHlTick]);
     const openLinkPickerForTarget = React.useCallback((mode, onPick) => {
       linkPickerOnPickRef.current = typeof onPick === "function" ? onPick : null;
       setLinkPickerSource({ key: null, label: null, picker: true });

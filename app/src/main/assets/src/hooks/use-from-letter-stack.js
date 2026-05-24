@@ -134,6 +134,7 @@ export function useFromLetterStack({
     if (!_destMatches(top.destSnapshot)) {
       setFromLetterStack((prev) => prev.slice(0, -1));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- _destMatches is a local helper that closes over screen/bookId/chapterNum/letterId/studyId/studyChapterId — all already in deps — so each re-fire gets a fresh helper. setFromLetterStack is a useState setter from useTabs (identity-stable). Adding either would either re-fire the effect on every render or no-op.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, fromLetterStack]);
 
   // Top-of-stack back-hint — shows above the hero on tap-through destinations

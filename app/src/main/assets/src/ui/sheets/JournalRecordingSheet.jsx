@@ -411,6 +411,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       try { delete window.__onNativeRecordingComplete; } catch (_e) { window.__onNativeRecordingComplete = undefined; }
       cleanup();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: one recording session per sheet open, start at mount + cleanup at unmount. setError/setSeconds/setStage/setWaveFinal/setWaveLive are useState setters (identity-stable); persistRecording/stopRecording are local functions whose closure reads the same setters + refs that this effect's closure does — same lifecycle, no stale-value risk.
   }, []);
 
   function pauseRecording() {

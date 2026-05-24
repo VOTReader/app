@@ -184,6 +184,7 @@ export function useThumbnails({
       captureInFlightRef.current = false;
       document.body.classList.remove('capturing-thumb');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTabIdxRef/tabsOverviewOpenRef/tabsRef are useRef refs read via .current inside the callback — call-time fresh, never stale. The ref objects themselves are stable; inclusion would add noise without changing behavior.
   }, [tabsEnabled]);
 
   // ── Scroll-stop capture effect ─────────────────────────────────────────

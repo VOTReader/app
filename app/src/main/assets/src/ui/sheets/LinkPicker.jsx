@@ -80,7 +80,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       bumpRecent();
       onLinkCreated(newLink);
     }
-  }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, bumpRecent, onLinkCreated, mode, onPickTarget]);
+  }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, bumpRecent, onLinkCreated, mode, onPickTarget, onRequestRefine]);
 
   // Render a row for a nav item (used in both Results and Recent lists)
   const renderItemRow = (item, key) => (

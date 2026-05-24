@@ -6599,7 +6599,7 @@
         bumpRecent();
         onLinkCreated(newLink);
       }
-    }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, bumpRecent, onLinkCreated, mode, onPickTarget]);
+    }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, bumpRecent, onLinkCreated, mode, onPickTarget, onRequestRefine]);
     const renderItemRow = (item, key) => /* @__PURE__ */ React.createElement(
       "button",
       {
