@@ -1,3 +1,4 @@
+// @ts-nocheck -- Q4.1 placeholder; will be removed when this file gets proper JSDoc in Q4.2 (utils) or Q4.3 (stores).
 /* ===================================================================
    Tab thumbnail store — IndexedDB-backed dataURL cache
    ===================================================================

@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit hook — three pre-flight checks gated on what's staged:
+# pre-commit hook — four pre-flight checks gated on what's staged:
 #
 #   1. check_balance.py     when corpus data files change
 #      Catches black-screen failure modes that brace-balance alone
@@ -12,7 +12,14 @@
 #      so regressions fail at the commit-message prompt — not after push.
 #      Config: package.json → "lint-staged" → eslint --max-warnings 0.
 #
-#   3. python tools/build.py  when any bundle-source file changes
+#   3. tsc --noEmit (Q4.1)   when any .js/.jsx source file changes
+#      `npm run typecheck` against tsconfig.json's Q4 scope (utils +
+#      stores + hooks). ~3.5s. tsc requires the whole project graph;
+#      can't typecheck a single file in isolation, so we run the full
+#      project on any source change. Zero-tolerance: any type error
+#      fails the commit.
+#
+#   4. python tools/build.py  when any bundle-source file changes
 #      Rebuilds dist/bundle-{a,b,c,d}.js and stages the regenerated
 #      output so the commit lands with bundles in sync with source.
 #      Replaces the "remember to run the build" trap — the hook does
@@ -23,7 +30,7 @@
 #   git config core.hooksPath .githooks
 # (See CLAUDE.md for the one-line setup.)
 #
-# All three checks are skipped automatically when no relevant file is
+# All four checks are skipped automatically when no relevant file is
 # staged, so commits to CLAUDE.md / PLAN.txt / gradle files / etc. run
 # without any delay.
 
@@ -95,9 +102,27 @@ if [ -n "$src_changed" ]; then
   fi
   echo "[pre-commit] Lint OK."
   echo ""
+
+  # ─── Step 3: typecheck (Q4.1) ─────────────────────────────────────
+  # Source files changed → run tsc --noEmit against the Q4 scope.
+  # Reuses the npm path probe from above. ~3.5s for the full project.
+  echo "[pre-commit] Source files staged — running tsc --noEmit (Q4 scope)..."
+  npm run typecheck
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Typecheck FAILED — see tsc output above."
+    echo "Fix the type errors, re-stage the file(s), then retry."
+    echo "Emergency bypass (not recommended): git commit --no-verify"
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Typecheck OK."
+  echo ""
 fi
 
-# ─── Step 3: bundle rebuild ─────────────────────────────────────────
+# ─── Step 4: bundle rebuild ─────────────────────────────────────────
 # Any change to a bundled source file means dist/bundle-*.js is stale.
 # Rebuild + stage the regenerated bundles so the commit lands with
 # bundles in sync. Source files for the 4 clusters:

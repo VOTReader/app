@@ -1,4 +1,3 @@
-"use strict";
 (() => {
   var __defProp = Object.defineProperty;
   var __export = (target, all) => {
@@ -354,9 +353,13 @@
         try {
           this._cache = JSON.parse(localStorage.getItem(storageKey) || JSON.stringify(defaultVal));
         } catch (_e) {
-          this._cache = typeof defaultVal === "object" ? Array.isArray(defaultVal) ? [] : {} : defaultVal;
+          this._cache = /** @type {any} */
+          typeof defaultVal === "object" ? Array.isArray(defaultVal) ? [] : {} : defaultVal;
         }
-        return this._cache;
+        return (
+          /** @type {T} */
+          this._cache
+        );
       },
       _save() {
         try {

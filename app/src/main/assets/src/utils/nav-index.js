@@ -1,3 +1,4 @@
+// @ts-nocheck -- Q4.1 placeholder; will be removed when this file gets proper JSDoc in Q4.2 (utils) or Q4.3 (stores).
 /* ===================================================================
    Cross-app navigation index — flat searchable list of every navigable destination (Bible chapter, Volume letter, WTLB entry, etc). Powers LinkPicker scoped search + RecentNavStore.
    ===================================================================

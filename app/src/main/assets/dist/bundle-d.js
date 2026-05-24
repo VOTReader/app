@@ -1,4 +1,3 @@
-"use strict";
 (() => {
   // app/src/main/assets/src/utils/hl-keys.js
   function bibleHlKey2(bookId, chapter, verse) {

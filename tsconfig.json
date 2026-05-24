@@ -1,14 +1,23 @@
 {
   "compilerOptions": {
     "allowJs": true,
-    "checkJs": false,
+    "checkJs": true,
     "noEmit": true,
-    "strict": true,
+    "strict": false,
     "target": "ES2020",
     "module": "ES2020",
     "moduleResolution": "bundler",
     "jsx": "react",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "esModuleInterop": true
   },
-  "include": ["app/src/main/assets/src/**/*"]
+  "include": [
+    "tools/globals.generated.d.ts",
+    "app/src/main/assets/src/utils/**/*",
+    "app/src/main/assets/src/stores/**/*",
+    "app/src/main/assets/src/hooks/**/*"
+  ],
+  "exclude": [
+    "app/src/main/assets/src/stores/_entry-b.js"
+  ]
 }
