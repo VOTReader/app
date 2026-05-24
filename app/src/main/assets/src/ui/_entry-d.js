@@ -167,7 +167,7 @@ import { NotebookManagerSheet } from './sheets/NotebookManagerSheet.jsx';
 // React.createElement). JSX conversion lands in Q2.7-2. Riding in
 // bundle-d because that's where its dominant consumers (screens/sheets/
 // components) already live — adds no new bundle, no new script tag.
-import { App } from '../app.js';
+import { App } from '../app.jsx';
 
 // ── Expose every public symbol on window ────────────────────────────────
 // Bridges the ES-module Cluster D to its classic-script consumers (the

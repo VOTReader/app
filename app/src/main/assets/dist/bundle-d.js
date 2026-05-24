@@ -7682,7 +7682,7 @@
     }))));
   }
 
-  // app/src/main/assets/src/app.js
+  // app/src/main/assets/src/app.jsx
   var { useState, useEffect, useCallback, useRef, useMemo } = React;
   function App() {
     var sharedViewProps, _navToChapter, _idxNav;
@@ -8822,294 +8822,234 @@
         markAsReadEnabled: settings.markAsRead
       };
     }
-    return /* @__PURE__ */ React.createElement(
-      TabsContext.Provider,
-      { value: tabsCtxValue },
-      /* CSS is now a static app.css loaded via <link> in <head> — this slot
-         intentionally renders nothing (null is a valid no-op React child). */
-      null,
-      settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && /* @__PURE__ */ React.createElement(
-        "button",
-        { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" },
-        /* @__PURE__ */ React.createElement("span", { className: "rdg-inner" })
-      ),
-      showWelcome && /* @__PURE__ */ React.createElement(
-        "div",
-        { style: {
-          position: "fixed",
-          inset: 0,
-          zIndex: 9999,
-          backgroundImage: 'url("splash.jpg")',
-          backgroundColor: "#0a0e1a",
-          backgroundSize: "contain",
-          backgroundPosition: "center center",
-          backgroundRepeat: "no-repeat",
+    return /* @__PURE__ */ React.createElement(TabsContext.Provider, { value: tabsCtxValue }, null, settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && /* @__PURE__ */ React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /* @__PURE__ */ React.createElement("span", { className: "rdg-inner" })), showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 9999,
+      backgroundImage: 'url("splash.jpg")',
+      backgroundColor: "#0a0e1a",
+      backgroundSize: "contain",
+      backgroundPosition: "center center",
+      backgroundRepeat: "no-repeat",
+      display: "flex",
+      flexDirection: "column"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: dismissWelcome,
+        style: {
+          margin: "calc(var(--inset-top, 0px) + 1rem) 1rem 0 0",
+          background: "rgba(0,0,0,0.55)",
+          border: "1.5px solid rgba(255,255,255,0.35)",
+          borderRadius: "50%",
+          width: "2.4rem",
+          height: "2.4rem",
+          color: "#fff",
+          fontSize: "1.2rem",
+          lineHeight: 1,
+          cursor: "pointer",
           display: "flex",
-          flexDirection: "column"
-        } },
-        /* @__PURE__ */ React.createElement(
-          "div",
-          { style: { display: "flex", justifyContent: "flex-end" } },
-          /* @__PURE__ */ React.createElement(
-            "button",
-            {
-              onClick: dismissWelcome,
-              style: {
-                margin: "calc(var(--inset-top, 0px) + 1rem) 1rem 0 0",
-                background: "rgba(0,0,0,0.55)",
-                border: "1.5px solid rgba(255,255,255,0.35)",
-                borderRadius: "50%",
-                width: "2.4rem",
-                height: "2.4rem",
-                color: "#fff",
-                fontSize: "1.2rem",
-                lineHeight: 1,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }
-            },
-            "\u2715"
-          )
-        ),
-        isOnline && /* @__PURE__ */ React.createElement(
-          "a",
-          {
-            href: "https://www.thevolumesoftruth.com",
-            target: "_blank",
-            rel: "noopener noreferrer",
-            style: {
-              position: "absolute",
-              left: "50%",
-              top: "37%",
-              transform: "translateX(-50%)",
-              width: "60%",
-              maxWidth: "400px",
-              height: "8%",
-              zIndex: 1,
-              borderBottom: "1.5px solid #6cacf0"
-            }
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      },
+      "\u2715"
+    )), isOnline && /* @__PURE__ */ React.createElement(
+      "a",
+      {
+        href: "https://www.thevolumesoftruth.com",
+        target: "_blank",
+        rel: "noopener noreferrer",
+        style: {
+          position: "absolute",
+          left: "50%",
+          top: "37%",
+          transform: "translateX(-50%)",
+          width: "60%",
+          maxWidth: "400px",
+          height: "8%",
+          zIndex: 1,
+          borderBottom: "1.5px solid #6cacf0"
+        }
+      }
+    )), settings.tabsEnabled && tabsOverviewOpen && /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-layer" }, /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: () => setTabsOverviewOpen(false) }, "\u2190 Back"), /* @__PURE__ */ React.createElement(HomeBtn, null)) }, /* @__PURE__ */ React.createElement(
+      TabsOverview,
+      {
+        tabs,
+        activeTabIdx,
+        onSelect: (i) => {
+          lastTabCloseStrikes.current = 0;
+          switchToTab(i);
+          setTabsOverviewOpen(false);
+        },
+        onClose: (i) => closeTab(i),
+        onNewTab: () => {
+          lastTabCloseStrikes.current = 0;
+          openNewTab();
+          setTabsOverviewOpen(false);
+        },
+        onLongPress: (i) => setTabActionIdx(i),
+        onClearAll: (signal) => {
+          if (signal === -1) {
+            setClearAllStage(0);
+            return;
           }
-        )
-      ),
-      settings.tabsEnabled && tabsOverviewOpen && /* @__PURE__ */ React.createElement(
-        "div",
-        { className: "tabs-overview-layer" },
-        /* @__PURE__ */ React.createElement(
-          ScreenLayout,
-          { navChildren: /* @__PURE__ */ React.createElement(
-            React.Fragment,
-            null,
-            /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: () => setTabsOverviewOpen(false) }, "\u2190 Back"),
-            /* @__PURE__ */ React.createElement(HomeBtn, null)
-          ) },
-          /* @__PURE__ */ React.createElement(
-            TabsOverview,
-            {
-              tabs,
-              activeTabIdx,
-              onSelect: (i) => {
-                lastTabCloseStrikes.current = 0;
-                switchToTab(i);
-                setTabsOverviewOpen(false);
-              },
-              onClose: (i) => closeTab(i),
-              onNewTab: () => {
-                lastTabCloseStrikes.current = 0;
-                openNewTab();
-                setTabsOverviewOpen(false);
-              },
-              onLongPress: (i) => setTabActionIdx(i),
-              onClearAll: (signal) => {
-                if (signal === -1) {
-                  setClearAllStage(0);
-                  return;
-                }
-                if (clearAllStage === 0) setClearAllStage(1);
-                else if (clearAllStage === 1) setClearAllStage(2);
-                else {
-                  closeAllTabs();
-                  setClearAllStage(0);
-                  lastTabCloseStrikes.current = 0;
-                }
-              },
-              clearAllStage,
-              onDedupe: () => deduplicateTabs(),
-              MAX_TABS,
-              thumbnails: tabThumbnails
-            }
-          )
-        ),
-        tabActionIdx != null && /* @__PURE__ */ React.createElement(
-          TabActionSheet,
-          {
-            idx: tabActionIdx,
-            total: tabs.length,
-            onCloseOthers: () => {
-              closeOtherTabs(tabActionIdx);
-              lastTabCloseStrikes.current = 0;
-            },
-            onCloseToRight: () => {
-              closeTabsToTheRight(tabActionIdx);
-              lastTabCloseStrikes.current = 0;
-            },
-            onDismiss: () => setTabActionIdx(null)
+          if (clearAllStage === 0) setClearAllStage(1);
+          else if (clearAllStage === 1) setClearAllStage(2);
+          else {
+            closeAllTabs();
+            setClearAllStage(0);
+            lastTabCloseStrikes.current = 0;
           }
-        ),
-        disableTabsPromptOpen && /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "disable-tabs-overlay", onClick: () => setDisableTabsPromptOpen(false) },
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "disable-tabs-dialog", onClick: (e) => e.stopPropagation() },
-            /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-eyebrow" }, "You keep closing your last tab"),
-            /* @__PURE__ */ React.createElement("h2", { className: "disable-tabs-title" }, "Disable tabs?"),
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "disable-tabs-body" },
-              "Tabs let you juggle multiple reading places \u2014 a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button. You can re-enable tabs anytime in Settings \u2014 your open tabs will be waiting."
-            ),
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "disable-tabs-actions" },
-              /* @__PURE__ */ React.createElement(
-                "button",
-                {
-                  className: "disable-tabs-btn secondary",
-                  onClick: () => setDisableTabsPromptOpen(false)
-                },
-                "Keep Tabs On"
-              ),
-              /* @__PURE__ */ React.createElement(
-                "button",
-                {
-                  className: "disable-tabs-btn primary",
-                  onClick: () => {
-                    updateSetting("tabsEnabled", false);
-                    setDisableTabsPromptOpen(false);
-                    setTabsOverviewOpen(false);
-                  }
-                },
-                "Disable Tabs"
-              )
-            )
-          )
-        )
-      ),
-      screen === "settings" && /* @__PURE__ */ React.createElement(
-        SettingsScreen,
-        {
-          settings,
-          onToggle: toggleSetting,
-          onSetting: updateSetting,
-          onBack: goNavOrigin,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          readItems,
-          onClearBook: (bid) => setReadItems((prev) => {
-            const next = { ...prev };
-            Object.keys(next).forEach((k) => {
-              if (k.startsWith(`${VERSION_ID}:${bid}:`)) delete next[k];
-            });
-            return next;
-          }),
-          onClearAll: clearAllProgress,
-          onClearHistory: clearHistory,
-          historyCount: readHistory.length,
-          theme,
-          onThemeChange: setTheme
+        },
+        clearAllStage,
+        onDedupe: () => deduplicateTabs(),
+        MAX_TABS,
+        thumbnails: tabThumbnails
+      }
+    ))), tabActionIdx != null && /* @__PURE__ */ React.createElement(
+      TabActionSheet,
+      {
+        idx: tabActionIdx,
+        total: tabs.length,
+        onCloseOthers: () => {
+          closeOtherTabs(tabActionIdx);
+          lastTabCloseStrikes.current = 0;
+        },
+        onCloseToRight: () => {
+          closeTabsToTheRight(tabActionIdx);
+          lastTabCloseStrikes.current = 0;
+        },
+        onDismiss: () => setTabActionIdx(null)
+      }
+    ), disableTabsPromptOpen && /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-overlay", onClick: () => setDisableTabsPromptOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-dialog", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-eyebrow" }, "You keep closing your last tab"), /* @__PURE__ */ React.createElement("h2", { className: "disable-tabs-title" }, "Disable tabs?"), /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-body" }, "Tabs let you juggle multiple reading places \u2014 a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button. You can re-enable tabs anytime in Settings \u2014 your open tabs will be waiting."), /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-actions" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "disable-tabs-btn secondary",
+        onClick: () => setDisableTabsPromptOpen(false)
+      },
+      "Keep Tabs On"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "disable-tabs-btn primary",
+        onClick: () => {
+          updateSetting("tabsEnabled", false);
+          setDisableTabsPromptOpen(false);
+          setTabsOverviewOpen(false);
         }
-      ),
-      screen === "search" && /* @__PURE__ */ React.createElement(
-        SearchScreen,
-        {
-          query: searchQuery,
-          onQueryChange: setSearchQuery,
-          settings,
-          onSettingsChange: (key, val) => setSettings((prev) => ({ ...prev, [key]: val })),
-          onSelect: handleSearchSelect,
-          onCommand: handleSearchCommand,
-          onBack: goSearchOrigin,
-          searchScope,
-          searchContext,
-          onToggleScope: () => setSearchScope((prev) => prev ? null : searchContext)
-        }
-      ),
-      screen === "home" && /* @__PURE__ */ React.createElement(
-        HomeScreen,
-        {
-          onSelect: handleSelect,
-          onSurprise: handleSurprise,
-          showSurprise: settings.showSurpriseButton,
-          onSettings: goSettings,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          onInfo: () => setShowWelcome(true),
-          onAbout: goAbout,
-          history: readHistory,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      screen === "about" && /* @__PURE__ */ React.createElement(
-        AboutScreen,
-        {
-          onContinue: () => {
-            try {
-              localStorage.setItem("vot-about-seen", "1");
-            } catch (e) {
-            }
-            goNavOrigin();
-          },
-          onBack: () => {
-            try {
-              localStorage.setItem("vot-about-seen", "1");
-            } catch (e) {
-            }
-            goNavOrigin();
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      screen === "history" && /* @__PURE__ */ React.createElement(
-        HistoryScreen,
-        {
-          history: readHistory,
-          onBack: goNavOrigin,
-          onSelect: (entry) => {
-            if (entry.type === "study-chapter") {
-              const study = getStudyById(entry.studyId);
-              if (!study) return;
-              setStudyId(entry.studyId);
-              setStudyChapterId(entry.studyChapterId);
-              setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
-              setScreen("bible-study-chapter");
-            } else if (entry.type === "letter") {
-              setLetterId(entry.letterId);
-              var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get("one") : COL_BY_KEY.get("two"));
-              setActiveReadKey("vol:" + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
-              setScreen(_hc.letterScreen);
-            } else {
-              setBookId(entry.bookId);
-              setChapterNum(entry.chapterNum);
-              setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
-              setScreen(entry.bookId === "matthew" ? "matthew-ch" : "bible-ch");
-            }
-          },
-          onSearch: goSearch,
-          onSettings: goSettings,
-          onHistory: goHistory,
-          onPruneDay: pruneHistoryDay,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      screen === "library" && /* @__PURE__ */ React.createElement(LibraryScreen, {
+      },
+      "Disable Tabs"
+    )))), screen === "settings" && /* @__PURE__ */ React.createElement(
+      SettingsScreen,
+      {
+        settings,
+        onToggle: toggleSetting,
+        onSetting: updateSetting,
+        onBack: goNavOrigin,
+        onSearch: goSearch,
+        onHistory: goHistory,
+        readItems,
+        onClearBook: (bid) => setReadItems((prev) => {
+          const next = { ...prev };
+          Object.keys(next).forEach((k) => {
+            if (k.startsWith(`${VERSION_ID}:${bid}:`)) delete next[k];
+          });
+          return next;
+        }),
+        onClearAll: clearAllProgress,
+        onClearHistory: clearHistory,
+        historyCount: readHistory.length,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "search" && /* @__PURE__ */ React.createElement(
+      SearchScreen,
+      {
+        query: searchQuery,
+        onQueryChange: setSearchQuery,
+        settings,
+        onSettingsChange: (key, val) => setSettings((prev) => ({ ...prev, [key]: val })),
+        onSelect: handleSearchSelect,
+        onCommand: handleSearchCommand,
+        onBack: goSearchOrigin,
+        searchScope,
+        searchContext,
+        onToggleScope: () => setSearchScope((prev) => prev ? null : searchContext)
+      }
+    ), screen === "home" && /* @__PURE__ */ React.createElement(
+      HomeScreen,
+      {
+        onSelect: handleSelect,
+        onSurprise: handleSurprise,
+        showSurprise: settings.showSurpriseButton,
+        onSettings: goSettings,
+        onSearch: goSearch,
+        onHistory: goHistory,
+        historyEnabled: settings.historyEnabled !== false,
+        onInfo: () => setShowWelcome(true),
+        onAbout: goAbout,
+        history: readHistory,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "about" && /* @__PURE__ */ React.createElement(
+      AboutScreen,
+      {
+        onContinue: () => {
+          try {
+            localStorage.setItem("vot-about-seen", "1");
+          } catch (e) {
+          }
+          goNavOrigin();
+        },
+        onBack: () => {
+          try {
+            localStorage.setItem("vot-about-seen", "1");
+          } catch (e) {
+          }
+          goNavOrigin();
+        },
+        onSearch: goSearch,
+        onHistory: goHistory,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "history" && /* @__PURE__ */ React.createElement(
+      HistoryScreen,
+      {
+        history: readHistory,
+        onBack: goNavOrigin,
+        onSelect: (entry) => {
+          if (entry.type === "study-chapter") {
+            const study = getStudyById(entry.studyId);
+            if (!study) return;
+            setStudyId(entry.studyId);
+            setStudyChapterId(entry.studyChapterId);
+            setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
+            setScreen("bible-study-chapter");
+          } else if (entry.type === "letter") {
+            setLetterId(entry.letterId);
+            var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get("one") : COL_BY_KEY.get("two"));
+            setActiveReadKey("vol:" + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
+            setScreen(_hc.letterScreen);
+          } else {
+            setBookId(entry.bookId);
+            setChapterNum(entry.chapterNum);
+            setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
+            setScreen(entry.bookId === "matthew" ? "matthew-ch" : "bible-ch");
+          }
+        },
+        onSearch: goSearch,
+        onSettings: goSettings,
+        onHistory: goHistory,
+        onPruneDay: pruneHistoryDay,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "library" && /* @__PURE__ */ React.createElement(
+      LibraryScreen,
+      {
         onBack: goHome,
         onOpenNotes: goNotesIndex,
         onOpenLinks: goLinksIndex,
@@ -9123,8 +9063,10 @@
         hlTick,
         theme,
         onThemeChange: setTheme
-      }),
-      screen === "highlights-index" && typeof HighlightsScreen !== "undefined" && /* @__PURE__ */ React.createElement(HighlightsScreen, {
+      }
+    ), screen === "highlights-index" && typeof HighlightsScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+      HighlightsScreen,
+      {
         onSettings: goSettings,
         onBack: () => setScreen("library"),
         onHome: goHome,
@@ -9141,8 +9083,10 @@
         setHlTick,
         theme,
         onThemeChange: setTheme
-      }),
-      screen === "journal-home" && typeof JournalHubScreen !== "undefined" && /* @__PURE__ */ React.createElement(JournalHubScreen, {
+      }
+    ), screen === "journal-home" && typeof JournalHubScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+      JournalHubScreen,
+      {
         onSettings: goSettings,
         onBack: () => setScreen("library"),
         onHome: goHome,
@@ -9156,8 +9100,10 @@
         setHlTick,
         theme,
         onThemeChange: setTheme
-      }),
-      screen === "journal-viewer" && typeof JournalViewerScreen !== "undefined" && /* @__PURE__ */ React.createElement(JournalViewerScreen, {
+      }
+    ), screen === "journal-viewer" && typeof JournalViewerScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+      JournalViewerScreen,
+      {
         onSettings: goSettings,
         entryId: journalEntryId,
         onBack: () => setScreen("journal-home"),
@@ -9182,8 +9128,10 @@
         setHlTick,
         theme,
         onThemeChange: setTheme
-      }),
-      screen === "journal-editor" && typeof JournalEditorScreen !== "undefined" && /* @__PURE__ */ React.createElement(JournalEditorScreen, {
+      }
+    ), screen === "journal-editor" && typeof JournalEditorScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+      JournalEditorScreen,
+      {
         onSettings: goSettings,
         entryId: journalEntryId,
         onBack: () => goJournalViewer(journalEntryId),
@@ -9195,8 +9143,10 @@
         setHlTick,
         theme,
         onThemeChange: setTheme
-      }),
-      screen === "notes-index" && /* @__PURE__ */ React.createElement(NotesIndexScreen, {
+      }
+    ), screen === "notes-index" && /* @__PURE__ */ React.createElement(
+      NotesIndexScreen,
+      {
         onSettings: goSettings,
         onBack: () => setScreen("library"),
         onHome: goHome,
@@ -9214,8 +9164,10 @@
         setHlTick,
         theme,
         onThemeChange: setTheme
-      }),
-      screen === "links-index" && /* @__PURE__ */ React.createElement(LinksScreen, {
+      }
+    ), screen === "links-index" && /* @__PURE__ */ React.createElement(
+      LinksScreen,
+      {
         onSettings: goSettings,
         onBack: () => setScreen("library"),
         onHome: goHome,
@@ -9238,8 +9190,10 @@
         setHlTick,
         theme,
         onThemeChange: setTheme
-      }),
-      screen === "bookmarks-index" && /* @__PURE__ */ React.createElement(BookmarksScreen, {
+      }
+    ), screen === "bookmarks-index" && /* @__PURE__ */ React.createElement(
+      BookmarksScreen,
+      {
         onSettings: goSettings,
         onBack: () => setScreen("library"),
         onHome: goHome,
@@ -9256,329 +9210,298 @@
         setHlTick,
         theme,
         onThemeChange: setTheme
-      }),
-      screen === "scriptures-home" && /* @__PURE__ */ React.createElement(
-        ScripturesHome,
-        {
-          onSelect: handleScriptureSelect,
-          onGenre: goScriptureGenre,
-          onBack: goHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          onMatthewStudy: () => {
-            setBookId("matthew");
-            setChapterNum(null);
-            setScreen("matthew-idx");
-          },
-          theme,
-          onThemeChange: setTheme,
-          layout: settings.scriptureLayout
-        }
-      ),
-      screen === "scripture-genre" && genreId && /* @__PURE__ */ React.createElement(
-        ScriptureGenre,
-        {
-          genreId,
-          onSelect: handleScriptureSelect,
-          onBack: goScripturesHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      screen === "volumes-home" && /* @__PURE__ */ React.createElement(
-        VolumesHome,
-        {
-          onSelect: handleVolumeSelect,
-          onBack: goHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      screen === "matthew-idx" && /* @__PURE__ */ React.createElement(
-        ChapterIndex,
+      }
+    ), screen === "scriptures-home" && /* @__PURE__ */ React.createElement(
+      ScripturesHome,
+      {
+        onSelect: handleScriptureSelect,
+        onGenre: goScriptureGenre,
+        onBack: goHome,
+        onSearch: goSearch,
+        onHistory: goHistory,
+        onSettings: goSettings,
+        onMatthewStudy: () => {
+          setBookId("matthew");
+          setChapterNum(null);
+          setScreen("matthew-idx");
+        },
+        theme,
+        onThemeChange: setTheme,
+        layout: settings.scriptureLayout
+      }
+    ), screen === "scripture-genre" && genreId && /* @__PURE__ */ React.createElement(
+      ScriptureGenre,
+      {
+        genreId,
+        onSelect: handleScriptureSelect,
+        onBack: goScripturesHome,
+        onSearch: goSearch,
+        onHistory: goHistory,
+        onSettings: goSettings,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "volumes-home" && /* @__PURE__ */ React.createElement(
+      VolumesHome,
+      {
+        onSelect: handleVolumeSelect,
+        onBack: goHome,
+        onSearch: goSearch,
+        onHistory: goHistory,
+        onSettings: goSettings,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "matthew-idx" && /* @__PURE__ */ React.createElement(
+      ChapterIndex,
+      {
+        book: MATTHEW,
+        onSelect: selectMatthewCh,
+        onBack: () => {
+          if (fromStudies) {
+            setFromStudies(false);
+            goStudiesHome();
+          } else {
+            goHome();
+          }
+        },
+        onSearch: goSearch,
+        onHistory: goHistory,
+        onSettings: goSettings,
+        currentChapter: settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null,
+        isRead: (num) => isRead("matthew", num),
+        markAsReadEnabled: settings.markAsRead,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "matthew-ch" && chapter && (() => {
+      const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
+      const atFirstCh = chapter.num === 1;
+      const atLastCh = chapter.num === mtLastNum;
+      const chainPrev = fromStudies && atFirstCh ? prevChainEntry("matthew-study") : null;
+      const chainNext = fromStudies && atLastCh ? nextChainEntry("matthew-study") : null;
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+        ChapterView,
         {
           book: MATTHEW,
-          onSelect: selectMatthewCh,
-          onBack: () => {
-            if (fromStudies) {
-              setFromStudies(false);
-              goStudiesHome();
-            } else {
-              goHome();
-            }
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          currentChapter: settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null,
-          isRead: (num) => isRead("matthew", num),
-          markAsReadEnabled: settings.markAsRead,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      screen === "matthew-ch" && chapter && (() => {
-        const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
-        const atFirstCh = chapter.num === 1;
-        const atLastCh = chapter.num === mtLastNum;
-        const chainPrev = fromStudies && atFirstCh ? prevChainEntry("matthew-study") : null;
-        const chainNext = fromStudies && atLastCh ? nextChainEntry("matthew-study") : null;
-        return /* @__PURE__ */ React.createElement(
-          React.Fragment,
-          null,
-          /* @__PURE__ */ React.createElement(
-            ChapterView,
-            {
-              book: MATTHEW,
-              chapter,
-              mode,
-              showStudy,
-              showEchoes: settings.showInlineEchoes !== false,
-              showChapterTitle: settings.showChapterTitle !== false,
-              titleFocusHidden,
-              setTitleFocusHidden,
-              onIndex: goMatthewIdx,
-              onNavigate: (num) => {
-                setSurpriseAnchor(null);
-                selectMatthewCh(num);
-              },
-              onMarkRead: () => markRead("matthew", chapterNum),
-              markAsReadEnabled: settings.markAsRead,
-              showProgressBar: settings.showProgressBar,
-              prevBoundary: chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null,
-              onPrevBoundary: chainPrev ? () => {
-                setFromStudies(true);
-                goToChainEntryLast(chainPrev.slug)();
-              } : null,
-              nextBoundary: chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null,
-              onNextBoundary: chainNext ? () => {
-                setFromStudies(true);
-                goToChainEntryFirst(chainNext.slug)();
-              } : null,
-              onSearch: goSearch,
-              onSettings: goSettings,
-              onHistory: goHistory,
-              theme,
-              onThemeChange: setTheme,
-              surpriseAnchor,
-              onVotLetterClick: goToLetterFromMatthew,
-              backHint,
-              onTapThroughBack: tapThroughBack,
-              hlTick,
-              onLinkOpen: openLinkSidebar
-            }
-          ),
-          /* @__PURE__ */ React.createElement(ModeToggle, { mode, onChange: setMode, showStudy, onShowStudyChange: setShowStudy })
-        );
-      })(),
-      screen === "studies-home" && /* @__PURE__ */ React.createElement(
-        StudiesHome,
-        {
-          studies: UNIFIED_CHAIN,
-          studiesLoading,
-          onSelectStudy: (slug) => {
-            if (slug === "matthew-study") {
-              setFromStudies(true);
-              setBookId("matthew");
-              setChapterNum(null);
-              setScreen("matthew-idx");
-            } else {
-              selectStudy(slug);
-            }
-          },
-          onBack: goHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      screen === "bible-study-index" && studyId && (() => {
-        const study = getStudyById(studyId);
-        if (!study) return studiesLoading ? React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
-        return /* @__PURE__ */ React.createElement(
-          BibleStudyIndex,
-          {
-            study,
-            onSelect: (chId) => selectStudyChapter(studyId, chId),
-            onBack: goStudiesHome,
-            onSearch: goSearch,
-            onHistory: goHistory,
-            onSettings: goSettings,
-            currentChapter: settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null,
-            isRead: (chId) => isRead(studyReadKey(study.slug), chId),
-            markAsReadEnabled: settings.markAsRead,
-            theme,
-            onThemeChange: setTheme
-          }
-        );
-      })(),
-      screen === "bible-idx" && book && /* @__PURE__ */ React.createElement(
-        ChapterIndex,
-        {
-          book,
-          onSelect: selectBibleCh,
-          onBack: genreId ? () => setScreen("scripture-genre") : goScripturesHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          currentChapter: settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null,
-          isRead: (num) => isRead(bookId, num),
-          markAsReadEnabled: settings.markAsRead,
-          restoredNames: settings.restoredNames,
-          showChapterTitle: settings.showChapterTitle !== false,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      screen === "bible-ch" && book && chapter && /* @__PURE__ */ React.createElement(
-        BibleChapterView,
-        {
-          book,
           chapter,
-          onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
-          onNavigate: (num) => {
-            setSurpriseAnchor(null);
-            selectBibleCh(num);
-          },
-          onMarkRead: () => markRead(bookId, chapterNum),
-          markAsReadEnabled: settings.markAsRead,
-          showProgressBar: settings.showProgressBar,
-          translation: settings.translation,
-          restoredNames: settings.restoredNames,
+          mode,
+          showStudy,
+          showEchoes: settings.showInlineEchoes !== false,
           showChapterTitle: settings.showChapterTitle !== false,
-          showSectionHeadings: settings.showSectionHeadings !== false,
           titleFocusHidden,
           setTitleFocusHidden,
-          headingsFocusHidden,
-          setHeadingsFocusHidden,
-          prevBook: bcvPrevBook,
-          nextBook: bcvNextBook,
-          onPrevBook: bcvOnPrevBook,
-          onNextBook: bcvOnNextBook,
-          prevBoundaryTitle: bcvPrevBoundaryTitle,
-          nextBoundaryTitle: bcvNextBoundaryTitle,
+          onIndex: goMatthewIdx,
+          onNavigate: (num) => {
+            setSurpriseAnchor(null);
+            selectMatthewCh(num);
+          },
+          onMarkRead: () => markRead("matthew", chapterNum),
+          markAsReadEnabled: settings.markAsRead,
+          showProgressBar: settings.showProgressBar,
+          prevBoundary: chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null,
+          onPrevBoundary: chainPrev ? () => {
+            setFromStudies(true);
+            goToChainEntryLast(chainPrev.slug)();
+          } : null,
+          nextBoundary: chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null,
+          onNextBoundary: chainNext ? () => {
+            setFromStudies(true);
+            goToChainEntryFirst(chainNext.slug)();
+          } : null,
           onSearch: goSearch,
           onSettings: goSettings,
           onHistory: goHistory,
           theme,
           onThemeChange: setTheme,
           surpriseAnchor,
+          onVotLetterClick: goToLetterFromMatthew,
           backHint,
           onTapThroughBack: tapThroughBack,
           hlTick,
           onLinkOpen: openLinkSidebar
         }
-      ),
-      void (_idxNav = function() {
-        return /* @__PURE__ */ React.createElement(
-          React.Fragment,
-          null,
-          /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: goVolumesHome }, "\u2190 Volumes"),
-          /* @__PURE__ */ React.createElement(HomeBtn, null),
-          /* @__PURE__ */ React.createElement(NavButtons, { onSettings: goSettings, onHistory: goHistory, onSearch: goSearch, theme, onThemeChange: setTheme })
-        );
-      }),
-      screen === "vot-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume Two", letters: LETTERS }, colIdxProps("two")))
-      ),
-      screen === "vot-one-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume One", letters: LETTERS_V1, preface: LETTERS_V1_PREFACE }, colIdxProps("one")))
-      ),
-      /* ── Shared props passed to every LetterView and WtlbEntryView ── */
-      void (sharedViewProps = {
+      ), /* @__PURE__ */ React.createElement(ModeToggle, { mode, onChange: setMode, showStudy, onShowStudyChange: setShowStudy }));
+    })(), screen === "studies-home" && /* @__PURE__ */ React.createElement(
+      StudiesHome,
+      {
+        studies: UNIFIED_CHAIN,
+        studiesLoading,
+        onSelectStudy: (slug) => {
+          if (slug === "matthew-study") {
+            setFromStudies(true);
+            setBookId("matthew");
+            setChapterNum(null);
+            setScreen("matthew-idx");
+          } else {
+            selectStudy(slug);
+          }
+        },
+        onBack: goHome,
+        onSearch: goSearch,
+        onHistory: goHistory,
+        onSettings: goSettings,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "bible-study-index" && studyId && (() => {
+      const study = getStudyById(studyId);
+      if (!study) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
+      return /* @__PURE__ */ React.createElement(
+        BibleStudyIndex,
+        {
+          study,
+          onSelect: (chId) => selectStudyChapter(studyId, chId),
+          onBack: goStudiesHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          currentChapter: settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null,
+          isRead: (chId) => isRead(studyReadKey(study.slug), chId),
+          markAsReadEnabled: settings.markAsRead,
+          theme,
+          onThemeChange: setTheme
+        }
+      );
+    })(), screen === "bible-idx" && book && /* @__PURE__ */ React.createElement(
+      ChapterIndex,
+      {
+        book,
+        onSelect: selectBibleCh,
+        onBack: genreId ? () => setScreen("scripture-genre") : goScripturesHome,
+        onSearch: goSearch,
+        onHistory: goHistory,
+        onSettings: goSettings,
+        currentChapter: settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null,
+        isRead: (num) => isRead(bookId, num),
+        markAsReadEnabled: settings.markAsRead,
+        restoredNames: settings.restoredNames,
+        showChapterTitle: settings.showChapterTitle !== false,
+        theme,
+        onThemeChange: setTheme
+      }
+    ), screen === "bible-ch" && book && chapter && /* @__PURE__ */ React.createElement(
+      BibleChapterView,
+      {
+        book,
+        chapter,
+        onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
+        onNavigate: (num) => {
+          setSurpriseAnchor(null);
+          selectBibleCh(num);
+        },
+        onMarkRead: () => markRead(bookId, chapterNum),
+        markAsReadEnabled: settings.markAsRead,
+        showProgressBar: settings.showProgressBar,
+        translation: settings.translation,
+        restoredNames: settings.restoredNames,
+        showChapterTitle: settings.showChapterTitle !== false,
+        showSectionHeadings: settings.showSectionHeadings !== false,
+        titleFocusHidden,
+        setTitleFocusHidden,
+        headingsFocusHidden,
+        setHeadingsFocusHidden,
+        prevBook: bcvPrevBook,
+        nextBook: bcvNextBook,
+        onPrevBook: bcvOnPrevBook,
+        onNextBook: bcvOnNextBook,
+        prevBoundaryTitle: bcvPrevBoundaryTitle,
+        nextBoundaryTitle: bcvNextBoundaryTitle,
         onSearch: goSearch,
         onSettings: goSettings,
         onHistory: goHistory,
         theme,
         onThemeChange: setTheme,
         surpriseAnchor,
-        onInAppLink: openInAppLetter,
         backHint,
+        onTapThroughBack: tapThroughBack,
         hlTick,
-        onLinkOpen: openLinkSidebar,
-        onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
-        markAsReadEnabled: settings.markAsRead,
-        showProgressBar: settings.showProgressBar
-      }),
-      void (_navToChapter = (bid, ch) => {
-        setFromWtlb(screen);
-        setBookId(bid);
-        setChapterNum(ch);
-        setScreen("bible-ch");
-      }),
-      screen === "bible-study-chapter" && studyId && studyChapterId && (() => {
-        const study = getStudyById(studyId);
-        const ch = getStudyChapter(study, studyChapterId);
-        if (!study || !ch) return studiesLoading ? React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
-        const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
-        const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
-        const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
-        const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
-        const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
-        const pick = (chVal, studyVal, empty) => {
-          if (chVal === void 0 || chVal === null) return studyVal != null ? studyVal : empty;
-          if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
-          return chVal;
-        };
-        const letterShim = {
-          id: ch.id,
-          title: ch.title,
-          subtitle: ch.subtitle || null,
-          num: ch.num,
-          date: null,
-          from: null,
-          spoken: null,
-          forLine: null,
-          preamble: ch.part ? `Part ${ch.part}` : null,
-          blocks: ch.blocks || [],
-          sectionIntro: ch.sectionIntro || null,
-          footnotes: ch.footnotes || {},
-          nkjv: ch.nkjv || {},
-          prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
-          nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
-          relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
-          bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
-          videos: pick(ch.videos, study.videos, []),
-          audioUrl: pick(ch.audioUrl, study.audioUrl, null),
-          soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
-          videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
-          videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
-          videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
-          addendum: pick(ch.addendum, study.addendum, null)
-        };
-        const jumpToStudy = (targetSlug) => {
-          if (targetSlug === "matthew-study") {
-            setFromStudies(true);
-            setBookId("matthew");
-            setChapterNum(null);
-            setScreen("matthew-idx");
-            return;
-          }
-          const target = getStudyById(targetSlug);
-          if (!target || target.locked) return;
-          selectStudy(targetSlug);
-        };
-        const handleLetterClick = (lid, sc) => {
+        onLinkOpen: openLinkSidebar
+      }
+    ), void (_idxNav = function() {
+      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: goVolumesHome }, "\u2190 Volumes"), /* @__PURE__ */ React.createElement(HomeBtn, null), /* @__PURE__ */ React.createElement(NavButtons, { onSettings: goSettings, onHistory: goHistory, onSearch: goSearch, theme, onThemeChange: setTheme }));
+    }), screen === "vot-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Two", letters: LETTERS, ...colIdxProps("two") })), screen === "vot-one-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume One", letters: LETTERS_V1, preface: LETTERS_V1_PREFACE, ...colIdxProps("one") })), void (sharedViewProps = {
+      onSearch: goSearch,
+      onSettings: goSettings,
+      onHistory: goHistory,
+      theme,
+      onThemeChange: setTheme,
+      surpriseAnchor,
+      onInAppLink: openInAppLetter,
+      backHint,
+      hlTick,
+      onLinkOpen: openLinkSidebar,
+      onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
+      markAsReadEnabled: settings.markAsRead,
+      showProgressBar: settings.showProgressBar
+    }), void (_navToChapter = (bid, ch) => {
+      setFromWtlb(screen);
+      setBookId(bid);
+      setChapterNum(ch);
+      setScreen("bible-ch");
+    }), screen === "bible-study-chapter" && studyId && studyChapterId && (() => {
+      const study = getStudyById(studyId);
+      const ch = getStudyChapter(study, studyChapterId);
+      if (!study || !ch) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
+      const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
+      const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
+      const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
+      const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
+      const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
+      const pick = (chVal, studyVal, empty) => {
+        if (chVal === void 0 || chVal === null) return studyVal != null ? studyVal : empty;
+        if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
+        return chVal;
+      };
+      const letterShim = {
+        id: ch.id,
+        title: ch.title,
+        subtitle: ch.subtitle || null,
+        num: ch.num,
+        date: null,
+        from: null,
+        spoken: null,
+        forLine: null,
+        preamble: ch.part ? `Part ${ch.part}` : null,
+        blocks: ch.blocks || [],
+        sectionIntro: ch.sectionIntro || null,
+        footnotes: ch.footnotes || {},
+        nkjv: ch.nkjv || {},
+        prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
+        nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
+        relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
+        bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
+        videos: pick(ch.videos, study.videos, []),
+        audioUrl: pick(ch.audioUrl, study.audioUrl, null),
+        soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
+        videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
+        videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
+        videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
+        addendum: pick(ch.addendum, study.addendum, null)
+      };
+      const jumpToStudy = (targetSlug) => {
+        if (targetSlug === "matthew-study") {
           setFromStudies(true);
-          setLetterId(lid);
-          const _col = COL_BY_LETTER_SC.get(sc);
-          if (_col) setActiveReadKey(_col.readKey);
-          setScreen(sc);
-        };
-        return /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, {
+          setBookId("matthew");
+          setChapterNum(null);
+          setScreen("matthew-idx");
+          return;
+        }
+        const target = getStudyById(targetSlug);
+        if (!target || target.locked) return;
+        selectStudy(targetSlug);
+      };
+      const handleLetterClick = (lid, sc) => {
+        setFromStudies(true);
+        setLetterId(lid);
+        const _col = COL_BY_LETTER_SC.get(sc);
+        if (_col) setActiveReadKey(_col.readKey);
+        setScreen(sc);
+      };
+      return /* @__PURE__ */ React.createElement(
+        LetterView,
+        {
+          ...sharedViewProps,
           letter: letterShim,
           studyMode: true,
           volumeLabel: study.title,
@@ -9605,303 +9528,101 @@
           onNextBoundary: nextEntry ? goToChainEntryFirst(nextEntry.slug) : null,
           prophecyCardStatesRef,
           saveProphecyCardStates
-        }));
-      })(),
-      screen === "vot-one-letter" && letterV1 && /* @__PURE__ */ React.createElement(
-        LetterView,
-        Object.assign({}, sharedViewProps, colReadNavProps("one", true), boundaryConfig("one", letterV1), {
-          letter: letterV1,
-          volumeLabel: "Volume One"
-        })
-      ),
-      screen === "vot-letter" && letter && /* @__PURE__ */ React.createElement(
-        LetterView,
-        Object.assign({}, sharedViewProps, colReadNavProps("two", true), boundaryConfig("two", letter), {
-          letter
-        })
-      ),
-      screen === "vot-three-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume Three", letters: LETTERS_V3, preface: LETTERS_V3_PREFACE }, colIdxProps("three")))
-      ),
-      screen === "vot-three-letter" && letterV3 && /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("three", true), boundaryConfig("three", letterV3), {
-        letter: letterV3,
-        volumeLabel: "Volume Three"
-      })),
-      screen === "vot-four-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume Four", letters: LETTERS_V4, preface: LETTERS_V4_PREFACE }, colIdxProps("four")))
-      ),
-      screen === "vot-four-letter" && letterV4 && /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("four", true), boundaryConfig("four", letterV4), {
-        letter: letterV4,
-        volumeLabel: "Volume Four"
-      })),
-      screen === "vot-five-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume Five", letters: LETTERS_V5, preface: LETTERS_V5_PREFACE }, colIdxProps("five")))
-      ),
-      screen === "vot-five-letter" && letterV5 && /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("five", true), boundaryConfig("five", letterV5), {
-        letter: letterV5,
-        volumeLabel: "Volume Five"
-      })),
-      screen === "vot-six-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume Six", letters: LETTERS_V6, preface: LETTERS_V6_PREFACE }, colIdxProps("six")))
-      ),
-      screen === "vot-six-letter" && letterV6 && /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("six", true), boundaryConfig("six", letterV6), {
-        letter: letterV6,
-        volumeLabel: "Volume Six"
-      })),
-      screen === "vot-seven-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Volume Seven", letters: LETTERS_V7, preface: LETTERS_V7_PREFACE }, colIdxProps("seven")))
-      ),
-      screen === "vot-seven-letter" && letterV7 && /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("seven", true), boundaryConfig("seven", letterV7), {
-        letter: letterV7,
-        volumeLabel: "Volume Seven"
-      })),
-      screen === "vot-timothy-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Letters from Timothy", eyebrow: "The Volumes of Truth", letters: LETTERS_TIMOTHY, preface: LETTERS_TIMOTHY_PREFACE }, colIdxProps("timothy")))
-      ),
-      screen === "vot-timothy-letter" && letterTimothy && /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("timothy", true), boundaryConfig("timothy", letterTimothy), {
-        letter: letterTimothy,
-        volumeLabel: "Letters from Timothy"
-      })),
-      screen === "vot-flock-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Letters to The Lord's Little Flock", eyebrow: "The Volumes of Truth", letters: LETTERS_FLOCK, preface: LETTERS_FLOCK_PREFACE }, colIdxProps("flock")))
-      ),
-      screen === "vot-flock-letter" && letterFlock && /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("flock", true), boundaryConfig("flock", letterFlock), {
-        letter: letterFlock,
-        volumeLabel: "Letters to The Lord's Little Flock"
-      })),
-      screen === "vot-rebuke-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "The Lord's Rebuke", eyebrow: "A Testament Against The World", letters: LETTERS_REBUKE, preface: LETTERS_REBUKE_PREFACE }, colIdxProps("rebuke")))
-      ),
-      screen === "vot-rebuke-letter" && letterRebuke && /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("rebuke", true), boundaryConfig("rebuke", letterRebuke), {
-        letter: letterRebuke,
-        volumeLabel: "The Lord's Rebuke"
-      })),
-      screen === "wtlb-one-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Words To Live By", eyebrow: "Part One \xB7 Words of Wisdom", letters: WTLB_ONE, columns: 2 }, colIdxProps("wtlb1")))
-      ),
-      screen === "wtlb-one-entry" && wtlb1Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, Object.assign({}, sharedViewProps, colReadNavProps("wtlb1"), boundaryConfig("wtlb1", wtlb1Entry), {
-        entry: wtlb1Entry,
-        partLabel: "Part One",
-        onNavToChapter: _navToChapter
-      })),
-      screen === "wtlb-two-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Words To Live By", eyebrow: "Part Two \xB7 More Words of Wisdom", letters: WTLB_TWO, columns: 2 }, colIdxProps("wtlb2")))
-      ),
-      screen === "wtlb-two-entry" && wtlb2Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, Object.assign({}, sharedViewProps, colReadNavProps("wtlb2"), boundaryConfig("wtlb2", wtlb2Entry), {
-        entry: wtlb2Entry,
-        partLabel: "Part Two",
-        onNavToChapter: _navToChapter
-      })),
-      screen === "blessed-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: _idxNav() },
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "The Blessed", eyebrow: "Blessings & Promises", letters: colLetterArr(COL_BY_KEY.get("blessed")).map((e) => ({ ...e, date: e.sourceLabel || "" })) }, colIdxProps("blessed")))
-      ),
-      screen === "blessed-entry" && blessedEntry && /* @__PURE__ */ React.createElement(WtlbEntryView, Object.assign({}, sharedViewProps, colReadNavProps("blessed"), boundaryConfig("blessed", blessedEntry), {
-        entry: blessedEntry,
-        partLabel: "The Blessed",
-        onNavToChapter: _navToChapter
-      })),
-      screen === "holy-days-index" && /* @__PURE__ */ React.createElement(
-        ScreenLayout,
-        { navChildren: /* @__PURE__ */ React.createElement(
-          React.Fragment,
-          null,
-          /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: goVolumesHome }, "\u2190 Volumes"),
-          /* @__PURE__ */ React.createElement(HomeBtn, null),
-          /* @__PURE__ */ React.createElement(NavButtons, { onSettings: goSettings, onHistory: goHistory, onSearch: goSearch, theme, onThemeChange: setTheme })
-        ) },
-        typeof HOLY_DAYS_META !== "undefined" && (HOLY_DAYS_META.audioPlaylist || HOLY_DAYS_META.videoPlaylist) && /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "hd-playlists" },
-          HOLY_DAYS_META.audioPlaylist && /* @__PURE__ */ React.createElement(
-            "a",
-            { className: "hd-playlist-btn", href: HOLY_DAYS_META.audioPlaylist, target: "_blank", rel: "noopener noreferrer" },
-            /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("path", { d: "M9 18V5l12-2v13" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "18", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "16", r: "3" })),
-            /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Audio Playlist"),
-            /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Listen on Bandcamp")
-          ),
-          HOLY_DAYS_META.videoPlaylist && /* @__PURE__ */ React.createElement(
-            "a",
-            { className: "hd-playlist-btn", href: HOLY_DAYS_META.videoPlaylist, target: "_blank", rel: "noopener noreferrer" },
-            /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polygon", { points: "23 7 16 12 23 17 23 7" }), /* @__PURE__ */ React.createElement("rect", { x: "1", y: "5", width: "15", height: "14", rx: "2", ry: "2" })),
-            /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Video Playlist"),
-            /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Watch on YouTube")
-          )
-        ),
-        /* @__PURE__ */ React.createElement(VolumeLetterIndex, Object.assign({ volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })) }, colIdxProps("holydays")))
-      ),
-      screen === "holy-days-entry" && hdEntry && (() => {
-        const bc = boundaryConfig("holydays", hdEntry);
-        if (hdEntry.type === "wtlb") {
-          return /* @__PURE__ */ React.createElement(WtlbEntryView, Object.assign({}, sharedViewProps, colReadNavProps("holydays"), bc, {
-            entry: hdEntry,
-            partLabel: "Regarding The Holy Days",
-            onNavToChapter: _navToChapter,
-            footnotesMode: true
-          }));
         }
-        const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
-        return /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("holydays"), bc, {
-          letter: letterShim,
-          volumeLabel: "Regarding The Holy Days"
-        }));
-      })(),
-      screen === "hm-letter" && hmEntry && (() => {
-        const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
-        const goHomeFromHM = () => {
-          if (fromMatthewChRef.current) {
-            setFromMatthewCh(null);
-            setScreen("matthew-ch");
-          } else {
-            goHome();
-          }
-        };
-        return /* @__PURE__ */ React.createElement(LetterView, Object.assign({}, sharedViewProps, colReadNavProps("hm"), {
-          letter: letterShim,
-          volumeLabel: "Hidden Manna",
-          onHome: goHomeFromHM,
-          onNavigate: (id) => {
-            setLetterId(id);
-          }
-        }));
-      })(),
-      screen === "garden-view" && /* @__PURE__ */ React.createElement(
-        GardenView,
+      );
+    })(), screen === "vot-one-letter" && letterV1 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("one", true), ...boundaryConfig("one", letterV1), letter: letterV1, volumeLabel: "Volume One" }), screen === "vot-letter" && letter && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("two", true), ...boundaryConfig("two", letter), letter }), screen === "vot-three-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Three", letters: LETTERS_V3, preface: LETTERS_V3_PREFACE, ...colIdxProps("three") })), screen === "vot-three-letter" && letterV3 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("three", true), ...boundaryConfig("three", letterV3), letter: letterV3, volumeLabel: "Volume Three" }), screen === "vot-four-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Four", letters: LETTERS_V4, preface: LETTERS_V4_PREFACE, ...colIdxProps("four") })), screen === "vot-four-letter" && letterV4 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("four", true), ...boundaryConfig("four", letterV4), letter: letterV4, volumeLabel: "Volume Four" }), screen === "vot-five-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Five", letters: LETTERS_V5, preface: LETTERS_V5_PREFACE, ...colIdxProps("five") })), screen === "vot-five-letter" && letterV5 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("five", true), ...boundaryConfig("five", letterV5), letter: letterV5, volumeLabel: "Volume Five" }), screen === "vot-six-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Six", letters: LETTERS_V6, preface: LETTERS_V6_PREFACE, ...colIdxProps("six") })), screen === "vot-six-letter" && letterV6 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("six", true), ...boundaryConfig("six", letterV6), letter: letterV6, volumeLabel: "Volume Six" }), screen === "vot-seven-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Seven", letters: LETTERS_V7, preface: LETTERS_V7_PREFACE, ...colIdxProps("seven") })), screen === "vot-seven-letter" && letterV7 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("seven", true), ...boundaryConfig("seven", letterV7), letter: letterV7, volumeLabel: "Volume Seven" }), screen === "vot-timothy-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters from Timothy", eyebrow: "The Volumes of Truth", letters: LETTERS_TIMOTHY, preface: LETTERS_TIMOTHY_PREFACE, ...colIdxProps("timothy") })), screen === "vot-timothy-letter" && letterTimothy && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("timothy", true), ...boundaryConfig("timothy", letterTimothy), letter: letterTimothy, volumeLabel: "Letters from Timothy" }), screen === "vot-flock-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters to The Lord's Little Flock", eyebrow: "The Volumes of Truth", letters: LETTERS_FLOCK, preface: LETTERS_FLOCK_PREFACE, ...colIdxProps("flock") })), screen === "vot-flock-letter" && letterFlock && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("flock", true), ...boundaryConfig("flock", letterFlock), letter: letterFlock, volumeLabel: "Letters to The Lord's Little Flock" }), screen === "vot-rebuke-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Lord's Rebuke", eyebrow: "A Testament Against The World", letters: LETTERS_REBUKE, preface: LETTERS_REBUKE_PREFACE, ...colIdxProps("rebuke") })), screen === "vot-rebuke-letter" && letterRebuke && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("rebuke", true), ...boundaryConfig("rebuke", letterRebuke), letter: letterRebuke, volumeLabel: "The Lord's Rebuke" }), screen === "wtlb-one-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part One \xB7 Words of Wisdom", letters: WTLB_ONE, columns: 2, ...colIdxProps("wtlb1") })), screen === "wtlb-one-entry" && wtlb1Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb1"), ...boundaryConfig("wtlb1", wtlb1Entry), entry: wtlb1Entry, partLabel: "Part One", onNavToChapter: _navToChapter }), screen === "wtlb-two-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part Two \xB7 More Words of Wisdom", letters: WTLB_TWO, columns: 2, ...colIdxProps("wtlb2") })), screen === "wtlb-two-entry" && wtlb2Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb2"), ...boundaryConfig("wtlb2", wtlb2Entry), entry: wtlb2Entry, partLabel: "Part Two", onNavToChapter: _navToChapter }), screen === "blessed-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Blessed", eyebrow: "Blessings & Promises", letters: colLetterArr(COL_BY_KEY.get("blessed")).map((e) => ({ ...e, date: e.sourceLabel || "" })), ...colIdxProps("blessed") })), screen === "blessed-entry" && blessedEntry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("blessed"), ...boundaryConfig("blessed", blessedEntry), entry: blessedEntry, partLabel: "The Blessed", onNavToChapter: _navToChapter }), screen === "holy-days-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: goVolumesHome }, "\u2190 Volumes"), /* @__PURE__ */ React.createElement(HomeBtn, null), /* @__PURE__ */ React.createElement(NavButtons, { onSettings: goSettings, onHistory: goHistory, onSearch: goSearch, theme, onThemeChange: setTheme })) }, typeof HOLY_DAYS_META !== "undefined" && (HOLY_DAYS_META.audioPlaylist || HOLY_DAYS_META.videoPlaylist) && /* @__PURE__ */ React.createElement("div", { className: "hd-playlists" }, HOLY_DAYS_META.audioPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.audioPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("path", { d: "M9 18V5l12-2v13" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "18", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "16", r: "3" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Audio Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Listen on Bandcamp")), HOLY_DAYS_META.videoPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.videoPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polygon", { points: "23 7 16 12 23 17 23 7" }), /* @__PURE__ */ React.createElement("rect", { x: "1", y: "5", width: "15", height: "14", rx: "2", ry: "2" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Video Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Watch on YouTube"))), /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })), ...colIdxProps("holydays") })), screen === "holy-days-entry" && hdEntry && (() => {
+      const bc = boundaryConfig("holydays", hdEntry);
+      if (hdEntry.type === "wtlb") {
+        return /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, entry: hdEntry, partLabel: "Regarding The Holy Days", onNavToChapter: _navToChapter, footnotesMode: true });
+      }
+      const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
+      return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, letter: letterShim, volumeLabel: "Regarding The Holy Days" });
+    })(), screen === "hm-letter" && hmEntry && (() => {
+      const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
+      const goHomeFromHM = () => {
+        if (fromMatthewChRef.current) {
+          setFromMatthewCh(null);
+          setScreen("matthew-ch");
+        } else {
+          goHome();
+        }
+      };
+      return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("hm"), letter: letterShim, volumeLabel: "Hidden Manna", onHome: goHomeFromHM, onNavigate: (id) => {
+        setLetterId(id);
+      } });
+    })(), screen === "garden-view" && /* @__PURE__ */ React.createElement(
+      GardenView,
+      {
+        page: gardenPage,
+        onPageChange: (p) => setGardenPage(p),
+        onBack: goVolumesHome,
+        theme,
+        onThemeChange: setTheme,
+        tier: settings.gardenTier || GARDEN_DEFAULT_TIER
+      }
+    ), gardenWarningOpen && (() => {
+      const selectedTier = getGardenTier(settings.gardenTier);
+      return /* @__PURE__ */ React.createElement("div", { className: "garden-warning-overlay", onClick: () => setGardenWarningOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "garden-warning-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "garden-warning-title" }, "Before You Begin"), /* @__PURE__ */ React.createElement("div", { className: "garden-warning-body" }, /* @__PURE__ */ React.createElement("em", null, "A Return to The Garden"), " contains ", /* @__PURE__ */ React.createElement("strong", null, "209 high-resolution photographs"), " totaling approximately ", /* @__PURE__ */ React.createElement("strong", null, selectedTier.size), " at the selected quality. Pages stream from the internet as you read and are cached on your device.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "For the best experience, connect to ", /* @__PURE__ */ React.createElement("strong", null, "Wi-Fi"), " before proceeding. Mobile data charges may apply otherwise.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "Please also ensure your device has sufficient ", /* @__PURE__ */ React.createElement("strong", null, "free storage"), " available to cache the full collection."), /* @__PURE__ */ React.createElement("div", { className: "garden-tier-selector" }, /* @__PURE__ */ React.createElement("div", { className: "garden-tier-label" }, "Image Quality"), /* @__PURE__ */ React.createElement("div", { className: "garden-tier-hint" }, "You can change this anytime from the Settings menu."), GARDEN_TIERS.map((t) => /* @__PURE__ */ React.createElement(
+        "button",
         {
-          page: gardenPage,
-          onPageChange: (p) => setGardenPage(p),
-          onBack: goVolumesHome,
-          theme,
-          onThemeChange: setTheme,
-          tier: settings.gardenTier || GARDEN_DEFAULT_TIER
-        }
-      ),
-      gardenWarningOpen && (() => {
-        const selectedTier = getGardenTier(settings.gardenTier);
-        return /* @__PURE__ */ React.createElement(
-          "div",
-          { className: "garden-warning-overlay", onClick: () => setGardenWarningOpen(false) },
-          /* @__PURE__ */ React.createElement(
-            "div",
-            { className: "garden-warning-modal", onClick: (e) => e.stopPropagation() },
-            /* @__PURE__ */ React.createElement("div", { className: "garden-warning-title" }, "Before You Begin"),
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "garden-warning-body" },
-              /* @__PURE__ */ React.createElement("em", null, "A Return to The Garden"),
-              " contains ",
-              /* @__PURE__ */ React.createElement("strong", null, "209 high-resolution photographs"),
-              " totaling approximately ",
-              /* @__PURE__ */ React.createElement("strong", null, selectedTier.size),
-              " at the selected quality. Pages stream from the internet as you read and are cached on your device.",
-              /* @__PURE__ */ React.createElement("br", null),
-              /* @__PURE__ */ React.createElement("br", null),
-              "For the best experience, connect to ",
-              /* @__PURE__ */ React.createElement("strong", null, "Wi-Fi"),
-              " before proceeding. Mobile data charges may apply otherwise.",
-              /* @__PURE__ */ React.createElement("br", null),
-              /* @__PURE__ */ React.createElement("br", null),
-              "Please also ensure your device has sufficient ",
-              /* @__PURE__ */ React.createElement("strong", null, "free storage"),
-              " available to cache the full collection."
-            ),
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "garden-tier-selector" },
-              /* @__PURE__ */ React.createElement("div", { className: "garden-tier-label" }, "Image Quality"),
-              /* @__PURE__ */ React.createElement("div", { className: "garden-tier-hint" }, "You can change this anytime from the Settings menu."),
-              GARDEN_TIERS.map(
-                (t) => /* @__PURE__ */ React.createElement(
-                  "button",
-                  {
-                    key: t.id,
-                    className: `garden-tier-option${settings.gardenTier === t.id ? " selected" : ""}`,
-                    onClick: () => setSettings((s) => ({ ...s, gardenTier: t.id }))
-                  },
-                  /* @__PURE__ */ React.createElement(
-                    "div",
-                    { className: "garden-tier-option-main" },
-                    /* @__PURE__ */ React.createElement("span", { className: "garden-tier-option-name" }, t.label),
-                    /* @__PURE__ */ React.createElement("span", { className: "garden-tier-option-size" }, t.size)
-                  ),
-                  /* @__PURE__ */ React.createElement("div", { className: "garden-tier-option-desc" }, t.res, " \xB7 ", t.desc)
-                )
-              )
-            ),
-            /* @__PURE__ */ React.createElement(
-              "div",
-              { className: "garden-warning-actions" },
-              /* @__PURE__ */ React.createElement(
-                "button",
-                {
-                  className: "garden-warning-btn garden-warning-btn-cancel",
-                  onClick: () => setGardenWarningOpen(false)
-                },
-                "Go Back"
-              ),
-              /* @__PURE__ */ React.createElement(
-                "button",
-                {
-                  className: "garden-warning-btn garden-warning-btn-proceed",
-                  onClick: () => {
-                    try {
-                      localStorage.setItem("vot-garden-warning-acked", "1");
-                    } catch (e) {
-                    }
-                    setGardenWarningOpen(false);
-                    setScreen("garden-view");
-                  }
-                },
-                "Proceed"
-              )
-            )
-          )
-        );
-      })(),
-      /* ── Highlight & Link overlays (always mounted) ── */
-      React.createElement(SelectionToolbar, {
+          key: t.id,
+          className: `garden-tier-option${settings.gardenTier === t.id ? " selected" : ""}`,
+          onClick: () => setSettings((s) => ({ ...s, gardenTier: t.id }))
+        },
+        /* @__PURE__ */ React.createElement("div", { className: "garden-tier-option-main" }, /* @__PURE__ */ React.createElement("span", { className: "garden-tier-option-name" }, t.label), /* @__PURE__ */ React.createElement("span", { className: "garden-tier-option-size" }, t.size)),
+        /* @__PURE__ */ React.createElement("div", { className: "garden-tier-option-desc" }, t.res, " \xB7 ", t.desc)
+      ))), /* @__PURE__ */ React.createElement("div", { className: "garden-warning-actions" }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "garden-warning-btn garden-warning-btn-cancel",
+          onClick: () => setGardenWarningOpen(false)
+        },
+        "Go Back"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "garden-warning-btn garden-warning-btn-proceed",
+          onClick: () => {
+            try {
+              localStorage.setItem("vot-garden-warning-acked", "1");
+            } catch (e) {
+            }
+            setGardenWarningOpen(false);
+            setScreen("garden-view");
+          }
+        },
+        "Proceed"
+      ))));
+    })(), /* @__PURE__ */ React.createElement(
+      SelectionToolbar,
+      {
         hlTick,
         setHlTick,
         onLinkRequest: openLinkPicker,
         onNoteRequest: openNoteSheet,
         onBookmarkRequest: function(bkm) {
         }
-      }),
-      annChip && React.createElement(AnnotationActionChip, {
+      }
+    ), annChip && /* @__PURE__ */ React.createElement(
+      AnnotationActionChip,
+      {
         chip: annChip,
         setHlTick,
         onClose: () => setAnnChip(null),
         onNoteRequest: openNoteSheet
-      }),
-      linkSidebarKey && React.createElement(LinkSidebar, {
+      }
+    ), linkSidebarKey && /* @__PURE__ */ React.createElement(
+      LinkSidebar,
+      {
         hlKey: linkSidebarKey,
         hlTick,
         setHlTick,
         onClose: closeLinkSidebar,
         onNavigate: navigateToLink
-      }),
-      linkPickerSource && !linkRefineRequest && React.createElement(LinkPicker, {
+      }
+    ), linkPickerSource && !linkRefineRequest && /* @__PURE__ */ React.createElement(
+      LinkPicker,
+      {
         sourceKey: linkPickerSource.key,
         sourceLabel: linkPickerSource.label,
         sourceStart: linkPickerSource.start,
@@ -9918,33 +9639,10 @@
           if (linkPickerOnPickRef.current) linkPickerOnPickRef.current(target, item);
           closeLinkPicker();
         } : null
-      }),
-      linkRefineRequest && linkRefineRequest.kind === "verse" && linkPickerSource && React.createElement(VersePickerScreen, {
-        refineRequest: linkRefineRequest,
-        sourceKey: linkPickerSource.key,
-        sourceLabel: linkPickerSource.label,
-        sourceStart: linkPickerSource.start,
-        sourceEnd: linkPickerSource.end,
-        sourceText: linkPickerSource.text,
-        setHlTick,
-        returnTargetInsteadOfLink: !!linkPickerMode,
-        // Link mode: confirm passes new link object; back passes null.
-        // Picker mode: confirm passes refined target → hand to onPick + close.
-        onClose: (result) => {
-          if (linkPickerMode) {
-            if (result && linkPickerOnPickRef.current) linkPickerOnPickRef.current(result);
-            if (result) {
-              closeLinkPicker();
-            } else {
-              setLinkRefineRequest(null);
-            }
-            return;
-          }
-          setLinkRefineRequest(null);
-          if (result) setLastLinkCreated(result);
-        }
-      }),
-      linkRefineRequest && linkRefineRequest.kind === "excerpt" && linkPickerSource && React.createElement(LetterExcerptPickerScreen, {
+      }
+    ), linkRefineRequest && linkRefineRequest.kind === "verse" && linkPickerSource && /* @__PURE__ */ React.createElement(
+      VersePickerScreen,
+      {
         refineRequest: linkRefineRequest,
         sourceKey: linkPickerSource.key,
         sourceLabel: linkPickerSource.label,
@@ -9966,13 +9664,35 @@
           setLinkRefineRequest(null);
           if (result) setLastLinkCreated(result);
         }
-      }),
-      noteSheetTarget && React.createElement(NoteSheet, {
-        // key forces a remount whenever the target group OR the edit-mode
-        // intent changes — otherwise the internal `useState(startInEditMode ?
-        // 'edit' : 'read')` captures the first prop value and never updates,
-        // so opening a fresh note in edit mode after reading another note
-        // would silently land in read mode.
+      }
+    ), linkRefineRequest && linkRefineRequest.kind === "excerpt" && linkPickerSource && /* @__PURE__ */ React.createElement(
+      LetterExcerptPickerScreen,
+      {
+        refineRequest: linkRefineRequest,
+        sourceKey: linkPickerSource.key,
+        sourceLabel: linkPickerSource.label,
+        sourceStart: linkPickerSource.start,
+        sourceEnd: linkPickerSource.end,
+        sourceText: linkPickerSource.text,
+        setHlTick,
+        returnTargetInsteadOfLink: !!linkPickerMode,
+        onClose: (result) => {
+          if (linkPickerMode) {
+            if (result && linkPickerOnPickRef.current) linkPickerOnPickRef.current(result);
+            if (result) {
+              closeLinkPicker();
+            } else {
+              setLinkRefineRequest(null);
+            }
+            return;
+          }
+          setLinkRefineRequest(null);
+          if (result) setLastLinkCreated(result);
+        }
+      }
+    ), noteSheetTarget && /* @__PURE__ */ React.createElement(
+      NoteSheet,
+      {
         key: noteSheetTarget.groupId + ":" + (noteSheetTarget.startInEditMode ? "edit" : "read"),
         groupId: noteSheetTarget.groupId,
         startInEditMode: noteSheetTarget.startInEditMode,
@@ -9980,27 +9700,28 @@
         setHlTick,
         onClose: closeNoteSheet,
         onOpenNotebookPicker: (gid) => setNotebookPickerTarget(gid)
-      }),
-      notebookPickerTarget && React.createElement(NotebookPickerSheet, {
+      }
+    ), notebookPickerTarget && /* @__PURE__ */ React.createElement(
+      NotebookPickerSheet,
+      {
         groupId: notebookPickerTarget,
         hlTick,
         setHlTick,
         onClose: () => setNotebookPickerTarget(null)
-      }),
-      multiNotePayload && React.createElement(MultiNotePopover, {
+      }
+    ), multiNotePayload && /* @__PURE__ */ React.createElement(
+      MultiNotePopover,
+      {
         payload: multiNotePayload,
         onClose: () => setMultiNotePayload(null),
         onPick: (gid) => {
           setMultiNotePayload(null);
           setNoteSheetTarget({ groupId: gid, startInEditMode: false });
         }
-      }),
-      bookmarkPopoverPayload && React.createElement(BookmarkPopover, {
-        // BookmarkPopover's signature is ({ bkmIds, x, y, onClose,
-        // onNavigate, onDeleteDone }) — pass the unpacked payload, not a
-        // `payload` prop. (Pre-2026-05-20 this render passed `payload` +
-        // `onNavigateToSource`, which the component never read, so the
-        // popover silently returned null. Fixed: real props now.)
+      }
+    ), bookmarkPopoverPayload && /* @__PURE__ */ React.createElement(
+      BookmarkPopover,
+      {
         bkmIds: bookmarkPopoverPayload.bkmIds,
         x: bookmarkPopoverPayload.x,
         y: bookmarkPopoverPayload.y,
@@ -10011,15 +9732,10 @@
         },
         onDeleteDone: () => setHlTick((t) => t + 1),
         onClose: () => setBookmarkPopoverPayload(null)
-      }),
-      // BookmarkCreateSheet — pre-commit form for new bookmarks. Opens
-      // from SelectionToolbar's Bookmark action and from the chapter-
-      // bookmark NavButton (both via window.__bookmarkCreate). Saving
-      // commits to BookmarkStore + bumps hlTick so the inline icon
-      // pulse fires on the source passage.
-      // Journal inbound sheet — triggered by tapping the journal chip in
-      // letter/chapter nav (or anywhere else that calls __openJournalInbound).
-      inboundJournalPayload && typeof JournalInboundSheet !== "undefined" && React.createElement(JournalInboundSheet, {
+      }
+    ), inboundJournalPayload && typeof JournalInboundSheet !== "undefined" && /* @__PURE__ */ React.createElement(
+      JournalInboundSheet,
+      {
         refKey: inboundJournalPayload.refKey,
         resourceLabel: inboundJournalPayload.label,
         onClose: () => setInboundJournalPayload(null),
@@ -10027,8 +9743,10 @@
           setInboundJournalPayload(null);
           if (entry && entry.id) goJournalViewer(entry.id);
         }
-      }),
-      bookmarkCreatePending && React.createElement(BookmarkCreateSheet, {
+      }
+    ), bookmarkCreatePending && /* @__PURE__ */ React.createElement(
+      BookmarkCreateSheet,
+      {
         pending: bookmarkCreatePending,
         onCancel: () => setBookmarkCreatePending(null),
         onConfirm: (bkm) => {
@@ -10067,8 +9785,8 @@
           setBookmarkCreatePending(null);
           if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: "Bookmark" });
         }
-      })
-    );
+      }
+    ));
   }
 
   // app/src/main/assets/src/ui/_entry-d.js
