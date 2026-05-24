@@ -3,7 +3,23 @@
 ![CI](https://github.com/corbinlythgoe/VOTReader-studio/actions/workflows/ci.yml/badge.svg)
 
 > Living document. Update after every major examination or change.
-> Last major update: 2026-05-20 (G.2.3 LANDED IN WORKING TREE — Cluster D now ES modules via esbuild; **all four clusters are now in their final build form**. Next: P6 App() hook extraction.).
+> Last major update: 2026-05-24 (Q2.7 + Q3 in progress on origin/main).
+>
+> **NEWEST STATE (origin/main past `e162877`)**:
+> - **Q2.7-1 (`c1e3da1`) + Q2.7-1a (`9aa8571`)** — `function App()` extracted from inline index.html → `app/src/main/assets/src/app.js` (verbatim move, then sloppy-self-assign cleanup). App() is now bundled into bundle-d via `_entry-d.js`. Window scoping verified clean (lexical-env globals like `useState`, `BIBLE_BOOK_LIST`, `TabsContext` resolve correctly through bundle-d IIFE's scope chain — no `window.*` shims required).
+> - **Q2.7-2 (`b233cc3`)** — `src/app.js` → `src/app.jsx`, all 142 in-body `React.createElement(...)` calls → JSX literals + all 31 `Object.assign({...},...)` spread props → JSX `{...}` spread. Bit-perfect smoke. Bundle-d shrank 552.5 → 546.4 KB. jsx-progress total 156 → 3 (only the createRoot wrapping in index.html remains). **The "no JSX" original sin is closed.** Every React component in the codebase is now JSX.
+> - **Q3 (ESLint) IN PROGRESS** — `eslint-plugin-react-hooks` v7 + `eslint-plugin-react` + auto-generated globals (322 distinct identifiers, scanned mechanically from `_entry-*.js` + index.html + `src/data/*.js`). Generator runs as `npm run lint:globals`, chained before `eslint` in `npm run lint`, and via the pre-commit hook. Cumulative drop:
+>   - Baseline (Q3.1b): 154 errors / 216 warnings
+>   - After Q3.3a (rules-of-hooks, 2 real bugs): 152 / 216
+>   - After Q3.3a-compiler-disable (14 React Compiler rules off): 98 / 216
+>   - After Q3.3b (63 empty catches documented with 5 canonical reason comments): 35 / 216
+>   - After Q3.3c (26 unescaped-entities + 5 useless-escape, typography-aware): **4 / 216**
+> - **Q3 REMAINING**: Q3.3d (4 trivia errors: no-undef, no-global-assign, no-redeclare), Q3.3e (59 exhaustive-deps warnings — slowest, most judgment), Q3.3f (157 no-unused-vars with 3-way triage), Q3.4 (CI lint integration with `--max-warnings N` ratchet), Q3.5 (pre-commit hook extension).
+> - **Q3 EXIT CRITERIA (pinned)**: 0 errors AND warnings only in 3 accepted categories (exhaustive-deps with named rationale, no-unused-vars with intentional `_` prefix, no-empty with reason comment) AND CI `--max-warnings N` set to the exact post-fix count AND votSmoke() PASS. See `feedback_lint_regression_gate.md` + `project_q3_exit_criteria.md` in memory.
+> - **Plan reordering**: the original quality-uplift-plan.txt sequenced ESLint as Q6 (last), reasoning "JSX must exist first." Now that JSX exists (Q2.7-2), ESLint moved to first-of-Q3-Q6 — it's infrastructure that JSDoc (Q4) and Vitest (Q5) layer on top of. CSS (was Q3) moves to last. See plan's PHASE ORDER REVISED block.
+>
+> ---
+>
 >
 > **CURRENT STATE (working tree past `e429848`)**:
 > - **index.html**: 4,043 lines / 212 KB (down from 17,200 / 944 KB pre-modularization). Inline App() block + tiny lexical-mirror script + ReactDOM.render — that's it.
@@ -120,9 +136,11 @@
 >    (a) **Hook-header consistency pass** — normalize all 15 `src/hooks/*.js` to the OWNS / DOES NOT OWN / PARAMS / RETURNS / STORAGE / WINDOW template. Per hook, check: all 6 sections present; PARAMS lists every destructured key with its source (e.g. "screen — useTabs via tabField"); WINDOW names every `window.__*` bridge + its cleanup form, or says "none"; a boxed warning block exists wherever there's a load-bearing structural decision. The early hooks (`useMarkAsRead`, `useRefMirror`, `useSavedState`) predate the template — `useRefMirror` (10 lines) needs only OWNS/RETURNS; `useSavedState` should document the `_validateTabState` coupling under DOES NOT OWN.
 >    (b) **Hook DAG comment block** at the App() hook-call site — a ~15-line numbered `// 1. useSavedState (no hook deps) … // 15. usePersistedState (← …)` list, so the load-bearing call order is visible at the point violations would happen, not three files away. Must match the §Hook DAG above.
 >    (c) **`votSmoke({ tabsOn: true })` variant** — a REAL deliverable, not optional. Smoke runs tabs-off, so the whole tab state machine has zero automated coverage (the stability probe catches identity churn only). Scope: enable tabs, open a 2nd tab, run the 12-screen walk in tab 2, switch back to tab 1, confirm it held — the multi-tab round-trip, automated.
+>    (d) **CSS audit catalog (Q0.5)** — grep and list every `!important` (with file:line and reason), every raw hex color not behind a CSS variable, every dead/duplicate rule. Output to `css-audit.txt`. Catalog only — no edits in this step. This becomes the work list for the CSS hardening phase (Q3).
 >    (`journalEntryId` follow-up fix — DONE, `1c45b88`.)
 > 2. **THEN JSX conversion** — outside-in, module-by-module (now safe: every consumer is a module with explicit imports, so a converted `.jsx` can co-exist with un-converted `.js` callers). The finalized hook DAG above is the map for it — converting a screen means knowing which hook its props come from.
 > P6 landed across this arc: `80eed25` (P6i), `9031be9` (P6j), `aaef0f8` (P6k-A useTabs core + invariant 1), `70d646a` (P6k-B useTabActions), `4714a92` (P6k+1 usePersistedState), `96dee20` (P6l useAndroidBack).
+> **Quality uplift roadmap (Q0–Q6, ~12 sessions):** `C:\Users\corbi\OneDrive\Desktop\quality-uplift-plan.txt` — covers JSX conversion, JSDoc types, vitest tests, GitHub Actions CI, CSS hardening, ESLint. Read before starting any post-P6 work.
 >
 > **FIXED — BookmarkPopover prop mismatch (discovered during P6h, fixed in a follow-up commit):** the `BookmarkPopover` render in index.html passed a `payload` prop, but `BookmarkPopover` (src/ui/screens/BookmarksScreen.js:371) destructures `{ bkmIds, x, y, onClose, onNavigate, onDeleteDone }` — so `bkmIds` was `undefined` and the component returned `null` at its line 381 every time; the inline-bookmark-icon tap popover never displayed. git-blame proved it: the component (`52ac90b2`) and its render call (`03c9fd32`) were committed 9 seconds apart on 2026-05-14 — mismatched from birth, a copy-paste of the sibling `MultiNotePopover` render (which legitimately uses `payload`). The render was the malformed side (the component is internally consistent — its body uses every one of those props). Fix: render now passes the real props — `bkmIds`/`x`/`y` unpacked from `bookmarkPopoverPayload`, `onNavigate` (resolves `bkm.hlKey` via `_bookmarkSourceEndpoint` → `navigateToLink`, mirroring the BookmarkCreateSheet "Open Source" path), `onDeleteDone` (`setHlTick` bump so the inline icon refreshes after a delete), `onClose`. Verified live: popover renders with label/thought/3 actions; Delete (confirm strip → store removal → close) and Open (navigates + "Back to Bookmark" pill) both work; 0 console errors.
 >
