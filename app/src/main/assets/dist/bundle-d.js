@@ -1550,11 +1550,12 @@
 
   // app/src/main/assets/src/ui/components/ChapterBookmarkBtn.jsx
   function ChapterBookmarkBtn2({ chapterBookmark, hlTick }) {
-    if (!chapterBookmark || !chapterBookmark.hlKey || typeof BookmarkStore === "undefined") return null;
+    const hlKey = chapterBookmark && chapterBookmark.hlKey;
     const existing = React.useMemo(
-      () => BookmarkStore.getForKey(chapterBookmark.hlKey),
-      [chapterBookmark.hlKey, hlTick]
+      () => hlKey && typeof BookmarkStore !== "undefined" ? BookmarkStore.getForKey(hlKey) : [],
+      [hlKey, hlTick]
     );
+    if (!hlKey || typeof BookmarkStore === "undefined") return null;
     const isBookmarked = existing.length > 0;
     const onClick = (e) => {
       e.stopPropagation();
@@ -5912,17 +5913,18 @@
 
   // app/src/main/assets/src/ui/sheets/TabActionSheet.jsx
   function TabActionSheet2({ idx, total, onCloseOthers, onCloseToRight, onDismiss }) {
-    if (idx == null) return null;
-    const tabNum = idx + 1;
-    const hasOthers = total > 1;
-    const hasRightTabs = idx < total - 1;
     React.useEffect(() => {
+      if (idx == null) return;
       const prev = window.__closeSheet;
       window.__closeSheet = onDismiss;
       return () => {
         window.__closeSheet = prev || null;
       };
-    }, [onDismiss]);
+    }, [idx, onDismiss]);
+    if (idx == null) return null;
+    const tabNum = idx + 1;
+    const hasOthers = total > 1;
+    const hasRightTabs = idx < total - 1;
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-backdrop open", onClick: onDismiss }), /* @__PURE__ */ React.createElement("div", { className: "select-sheet", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-handle" }), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-eyebrow" }, "Tab ", tabNum), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-title" }, "Tab actions"), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-diamond" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "select-sheet-options" }, /* @__PURE__ */ React.createElement(
       "button",
       {

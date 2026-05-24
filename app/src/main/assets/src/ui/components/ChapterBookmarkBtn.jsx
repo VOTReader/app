@@ -3,12 +3,16 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ChapterBookmarkBtn({ chapterBookmark, hlTick }) {
-  if (!chapterBookmark || !chapterBookmark.hlKey || typeof BookmarkStore === 'undefined') return null;
-  // React.useMemo so we re-derive only when hlTick changes (after a create/delete).
+  // Hook must run on every render (rules-of-hooks) — guard moved INSIDE the
+  // memo so we always call useMemo regardless of whether we'll render anything.
+  const hlKey = chapterBookmark && chapterBookmark.hlKey;
   const existing = React.useMemo(
-    () => BookmarkStore.getForKey(chapterBookmark.hlKey),
-    [chapterBookmark.hlKey, hlTick]
+    () => (hlKey && typeof BookmarkStore !== 'undefined')
+      ? BookmarkStore.getForKey(hlKey)
+      : [],
+    [hlKey, hlTick]
   );
+  if (!hlKey || typeof BookmarkStore === 'undefined') return null;
   const isBookmarked = existing.length > 0;
 
   const onClick = (e) => {

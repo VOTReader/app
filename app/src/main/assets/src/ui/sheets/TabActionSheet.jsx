@@ -3,15 +3,20 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function TabActionSheet({ idx, total, onCloseOthers, onCloseToRight, onDismiss }) {
+  // Hook must run on every render (rules-of-hooks) — early-return moved AFTER
+  // the effect. The idx==null guard inside the effect makes it a no-op when
+  // the sheet isn't shown; the cleanup still fires correctly when idx
+  // transitions from non-null → null.
+  React.useEffect(() => {
+    if (idx == null) return;
+    const prev = window.__closeSheet;
+    window.__closeSheet = onDismiss;
+    return () => {window.__closeSheet = prev || null;};
+  }, [idx, onDismiss]);
   if (idx == null) return null;
   const tabNum = idx + 1;
   const hasOthers = total > 1;
   const hasRightTabs = idx < total - 1;
-  React.useEffect(() => {
-    const prev = window.__closeSheet;
-    window.__closeSheet = onDismiss;
-    return () => {window.__closeSheet = prev || null;};
-  }, [onDismiss]);
   return (
     <>
       <div className="select-sheet-backdrop open" onClick={onDismiss} />
