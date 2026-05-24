@@ -21,23 +21,22 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 ### Q3 ESLint status (live — 2026-05-24)
 
-- **0 errors / 30 warnings.** Baseline was 154/216. All errors and all warning categories EXCEPT `react-hooks/exhaustive-deps` cleared. Original 59 exhaustive-deps warnings being burned down through Q3.3e.
-- **Q3.4 CI lint gate DONE** (`cc5c2ad`). `npm run lint -- --max-warnings N` runs in CI between install and build. Errors are gated implicitly (eslint exits nonzero on any error; no separate flag needed). Current ratchet: **`--max-warnings 30`** in `.github/workflows/ci.yml`. Decrement in the same commit as each Q3.3e fix.
-- **Q3.3e IN PROGRESS — 29 of 59 cleared (49%):**
-  - `a5a2531` — 24 cache-bust disables for the `hlTick` "unnecessary dep" pattern (`AnnotationStore.get(hlKey)` reads + `hlTick` cache-bust signal). New rationale class **Bin 4** added beyond the user's original Bin 1/2/3.
-  - `5832d5f` — `use-android-back.js`: 32-dep []-deps useEffect; audited nav helpers (`app.jsx:509-905`) close only over stable setters and refs → mount-only disable is safe.
-  - `11246a9` — 4 screen/component effects (ProphecyCard, BibleStudyIndex, WtlbEntryView, LetterView): identity-cache + mount-only patterns.
-- **Q3.3e remaining 30 warnings** distributed across:
-  - 7 single-warning easy files (SearchScreen, LinkPicker, use-from-letter-stack, use-sheet-orchestration, use-thumbnails, BookmarksScreen, JournalRecordingSheet)
-  - 5 two-three-warning medium files (use-scroll-memory, JournalViewerScreen, JournalEditorScreen, BookmarkCreateSheet, use-reading-dwell)
-  - 3 harder (use-tab-actions has 7 setter warnings, app.jsx has 5, JournalRecordingSheet has 1 with many missing deps)
-- **Q3.5 (pre-commit lint-staged), Q3 phase exit** — pending. Q3 exit includes: update HISTORY.md with Q3.3e/Q3.4 chapter, audit all `eslint-disable.*exhaustive-deps` rationales (grep + verify cited refs are actually read in effect body), update memory entries that pinned conditions which have now resolved (`feedback_lint_regression_gate.md`, `project_q3_exit_criteria.md`).
+- **0 errors / 0 warnings.** Baseline was 154/216. Q3.3e CLEARED all 59 exhaustive-deps warnings through 7 commits this session (`a5a2531`, `5832d5f`, `11246a9`, `bea2e55`, `143ed31`, `939415f`, `d955e98`).
+- **CI: `--max-warnings 0`** locked in `.github/workflows/ci.yml` at `d955e98`. The ratchet phase is over; 0/0 is the permanent steady state. Any new warning fails CI; the only legitimate exceptions are explicit `eslint-disable-next-line ...` cites with named rationale (55 such cites across 31 files, audited at Q3.3e close).
+- **Bin classification framework** established through Q3.3e:
+  - Bin 1 — add the dep (eslint's recommended fix)
+  - Bin 2 — disable + ref-mirror / closure-stable cite
+  - Bin 3 — disable + mount-only or setter-stability cite
+  - Bin 4 — disable + cache-bust / identity-churn cite (intentional pattern; new this session)
+- **Post-Q3 flagged for follow-up** (separate sessions):
+  - `useNavHistoryTracking` extraction (app.jsx:814 — documented in use-history.js:13-14 as the auto-track effect that stayed in App() because of App()-local helper deps)
+  - `useSyncExternalStore` migration (eliminates Bin 4 hlTick cites; logged in PLAN.txt POST-Q3)
+  - Q3.5: pre-commit lint via lint-staged
+  - Q3 exit cleanup: HISTORY.md chapter, prune PLAN.txt to POST-Q3 strategic items + archive May-10 research reports to HISTORY.md
 
-### Roadmap location (drift warning)
+### Roadmap
 
-The active strategic roadmap is `C:\Users\corbi\OneDrive\Desktop\quality-uplift-plan.txt` — outside the repo. **This is fragile**: not version-controlled, not in any agent's default search path, dies with the user's machine. The in-repo `PLAN.txt` (2026-05-11) is partially stale.
-
-Reconcile in Q3 phase exit (or sooner): copy quality-uplift-plan.txt into the repo OR designate CLAUDE.md's current-state block as the sole source. See `PLAN.txt` POST-Q3 section for the full list of 4 cross-cutting strategic items (smoke-lite.js for CI, bundle-a.js lazy-load, --max-warnings 0 transition, this drift).
+**`PLAN.txt`** (repo root) is the strategic working memory. The Desktop copy (`quality-uplift-plan.txt`) is the legacy original — PLAN.txt in-repo is canonical. CLAUDE.md's current-state block is the 30-second summary; PLAN.txt has the full rationale and cross-cutting items (smoke-lite.js for CI, bundle-a.js lazy-load, `--max-warnings 0` transition).
 
 ---
 
