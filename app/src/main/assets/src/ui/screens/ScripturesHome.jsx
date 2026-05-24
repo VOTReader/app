@@ -2,7 +2,7 @@
    ScripturesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy, layout }) {
+export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout }) {
   const handleTile = (group) => {
     if (group.single) {onSelect(group.books[0].id, true);} else
     onGenre(group.id);

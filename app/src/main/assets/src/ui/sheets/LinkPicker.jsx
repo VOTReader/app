@@ -2,7 +2,7 @@
    LinkPicker — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, hlTick, setHlTick, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
+export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, hlTick: _hlTick, setHlTick, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
   const [input, setInput] = React.useState('');
   const inputRef = React.useRef(null);
   // Re-read RecentNavStore every render so newly-added picks float to the top

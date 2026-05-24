@@ -5,7 +5,7 @@
 export const GARDEN_PRELOAD_AHEAD = 5;
 export const GARDEN_CRAWL_DELAY = 500; // ms between background crawl downloads
 
-export function GardenView({ page, onPageChange, onBack, theme, onThemeChange, tier }) {
+export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeChange: _onThemeChange, tier }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(false);
   const [jumpMode, setJumpMode] = React.useState(false);

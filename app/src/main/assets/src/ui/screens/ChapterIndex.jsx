@@ -42,7 +42,7 @@ export function ChapterIndex({ book, onSelect, onBack, onSearch, onHistory, onSe
           </div>
         </div>
         <div className="chapter-cards">
-          {book.chapters.map((ch, i) => {
+          {book.chapters.map((ch, _i) => {
             const isCurrent = ch.num === currentChapter;
             return (
               <button

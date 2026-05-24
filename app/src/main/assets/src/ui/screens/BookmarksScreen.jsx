@@ -71,7 +71,7 @@ export function _bookmarkSourceEndpoint(hlKey) {
 }
 
 /* ── BookmarkRow component ───────────────────────────────────── */
-export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onEditSave, onEditCancel }) {
+export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart: _onEditStart, onEditSave, onEditCancel }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
   var useRef = React.useRef;

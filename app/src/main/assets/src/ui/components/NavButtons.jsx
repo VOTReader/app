@@ -2,7 +2,7 @@
    NavButtons — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey, journalRefLabel }) {
+export function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey: _journalRefKey, journalRefLabel: _journalRefLabel }) {
   return (
     <>
       <button className="settings-gear-btn" onClick={onSettings} title="Settings">

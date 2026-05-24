@@ -1159,7 +1159,7 @@
   }
 
   // app/src/main/assets/src/ui/components/Segments.jsx
-  function Segments2({ segments, activeFn, onFnClick, onScripClick, onLetterClick, onInAppLink, studyMode, footnotes, highlightText }) {
+  function Segments2({ segments, activeFn, onFnClick, onScripClick, onLetterClick, onInAppLink, studyMode: _studyMode, footnotes: _footnotes, highlightText }) {
     return segments.map((seg, i) => {
       if (seg.t === "fn") {
         return /* @__PURE__ */ React.createElement(
@@ -1599,7 +1599,7 @@
   }
 
   // app/src/main/assets/src/ui/components/NavButtons.jsx
-  function NavButtons2({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey, journalRefLabel }) {
+  function NavButtons2({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey: _journalRefKey, journalRefLabel: _journalRefLabel }) {
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "settings-gear-btn", onClick: onSettings, title: "Settings" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))), /* @__PURE__ */ React.createElement("button", { className: reading ? "nav-search-btn nav-history-reading" : "nav-search-btn", onClick: onHistory, title: "History" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polyline", { points: "1 4 1 10 7 10" }), /* @__PURE__ */ React.createElement("path", { d: "M3.51 15a9 9 0 1 0 .49-5.01" }))), /* @__PURE__ */ React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))), chapterBookmark && /* @__PURE__ */ React.createElement(ChapterBookmarkBtn, { chapterBookmark, hlTick }), /* @__PURE__ */ React.createElement(ThemeBtn, { theme, onThemeChange }));
   }
 
@@ -2048,7 +2048,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/LetterView.jsx
-  function LetterView2({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark, isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, hlTick, onLinkOpen }) {
+  function LetterView2({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, hlTick, onLinkOpen: _onLinkOpen }) {
     const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
     const [highlightedFn, setHighlightedFn] = React.useState(null);
     const [sheetFn, setSheetFn] = React.useState(null);
@@ -2293,7 +2293,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/WtlbEntryView.jsx
-  function WtlbEntryView2({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark, isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel, footnotesMode, backHint, onBack, hlTick, onLinkOpen, onInAppLink }) {
+  function WtlbEntryView2({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, hlTick, onLinkOpen: _onLinkOpen, onInAppLink }) {
     const [scriptureRef, setScriptureRef] = React.useState(null);
     const [scriptureText, setScriptureText] = React.useState(null);
     const [highlightedFn, setHighlightedFn] = React.useState(null);
@@ -2354,7 +2354,7 @@
       setScriptureRef(ref);
       setScriptureText(lookupVerse(ref));
     };
-    const handleBubbleClick = (ref, n) => {
+    const handleBubbleClick = (ref, _n) => {
       openSheetForRef(ref);
     };
     useMarkAsRead(markAsReadEnabled, onMarkRead);
@@ -2800,7 +2800,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/LibraryScreen.jsx
-  function LibraryScreen2({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, hlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled }) {
+  function LibraryScreen2({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, hlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
     const noteCount = React.useMemo(() => NoteStore.count(), [hlTick]);
     const linkCount = React.useMemo(() => LinkStore.all().length, [hlTick]);
     const bookmarkCount = React.useMemo(() => typeof BookmarkStore !== "undefined" ? BookmarkStore.count() : 0, [hlTick]);
@@ -2881,7 +2881,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/NotesIndexScreen.jsx
-  function NotesIndexScreen2({ onBack, onHome, onOpenNote, onNavigateToSource, hlTick, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled }) {
+  function NotesIndexScreen2({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, hlTick, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
     const allNotes = React.useMemo(() => NoteStore.list(), [hlTick]);
     const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
     const _notesRet = typeof window !== "undefined" && window.__notesReturnCtx || null;
@@ -3108,7 +3108,7 @@
       {
         navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: onBack }, "\u2190 Home"), /* @__PURE__ */ React.createElement(NavButtons, { onSettings, onHistory, onSearch, theme, onThemeChange }))
       },
-      /* @__PURE__ */ React.createElement("div", { className: "home-screen volumes-landing" }, /* @__PURE__ */ React.createElement("div", { className: "home-eyebrow" }, "Prophetic Letters"), /* @__PURE__ */ React.createElement("h1", { className: "home-title" }, "The Volumes of Truth"), /* @__PURE__ */ React.createElement("p", { className: "home-sub" }, "Letters from The Lord, Our God and Savior"), /* @__PURE__ */ React.createElement("div", { className: "home-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "home-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "home-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "home-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "genre-columns" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col genre-col-stretch" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col-label" }, "The Seven Volumes"), volumes.map((v, i) => /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("div", { className: "home-screen volumes-landing" }, /* @__PURE__ */ React.createElement("div", { className: "home-eyebrow" }, "Prophetic Letters"), /* @__PURE__ */ React.createElement("h1", { className: "home-title" }, "The Volumes of Truth"), /* @__PURE__ */ React.createElement("p", { className: "home-sub" }, "Letters from The Lord, Our God and Savior"), /* @__PURE__ */ React.createElement("div", { className: "home-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "home-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "home-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "home-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "genre-columns" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col genre-col-stretch" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col-label" }, "The Seven Volumes"), volumes.map((v, _i) => /* @__PURE__ */ React.createElement(
         "button",
         {
           key: v.id,
@@ -3118,7 +3118,7 @@
         /* @__PURE__ */ React.createElement("div", { className: "genre-tile-title" }, v.title),
         (v.detail || v.sub) && /* @__PURE__ */ React.createElement("div", { className: "genre-tile-sub" }, [v.detail, v.sub].filter(Boolean).join(" \xB7 ")),
         v.locked && /* @__PURE__ */ React.createElement("div", { className: "genre-tile-badge" }, "Coming Soon")
-      ))), /* @__PURE__ */ React.createElement("div", { className: "genre-col genre-col-stretch" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col-label" }, "Collections"), collections.map((b, i) => /* @__PURE__ */ React.createElement(
+      ))), /* @__PURE__ */ React.createElement("div", { className: "genre-col genre-col-stretch" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col-label" }, "Collections"), collections.map((b, _i) => /* @__PURE__ */ React.createElement(
         "button",
         {
           key: b.id,
@@ -4004,7 +4004,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/HomeScreen.jsx
-  function HomeScreen2({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onInfo, onAbout, history, theme, onThemeChange }) {
+  function HomeScreen2({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onInfo, onAbout, history: _history, theme, onThemeChange }) {
     const ITEMS_BY_ID = {
       volumes: { id: "volumes", eyebrow: "Prophetic Letters", title: "The Volumes of Truth", detail: "Letters from The Lord, Our God and Savior" },
       scriptures: { id: "scriptures", eyebrow: "The Holy Bible", title: "The Scriptures of Truth", detail: "Genesis to Revelation \xB7 NKJV" },
@@ -4577,7 +4577,7 @@
       {
         navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: onBack }, "\u2190 Books"), /* @__PURE__ */ React.createElement(HomeBtn, null), /* @__PURE__ */ React.createElement(NavButtons, { onSettings, onHistory, onSearch, theme, onThemeChange }))
       },
-      /* @__PURE__ */ React.createElement("div", { className: "vol-index" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-header" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-eyebrow" }, "Scriptures of Truth"), /* @__PURE__ */ React.createElement("h1", { className: "vol-index-title" }, book.title), /* @__PURE__ */ React.createElement("div", { className: "vol-index-subtitle" }, book.subtitle), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line r" }))), /* @__PURE__ */ React.createElement("div", { className: "chapter-cards" }, book.chapters.map((ch, i) => {
+      /* @__PURE__ */ React.createElement("div", { className: "vol-index" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-header" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-eyebrow" }, "Scriptures of Truth"), /* @__PURE__ */ React.createElement("h1", { className: "vol-index-title" }, book.title), /* @__PURE__ */ React.createElement("div", { className: "vol-index-subtitle" }, book.subtitle), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line r" }))), /* @__PURE__ */ React.createElement("div", { className: "chapter-cards" }, book.chapters.map((ch, _i) => {
         const isCurrent = ch.num === currentChapter;
         return /* @__PURE__ */ React.createElement(
           "button",
@@ -4602,7 +4602,7 @@
   // app/src/main/assets/src/ui/screens/GardenView.jsx
   var GARDEN_PRELOAD_AHEAD = 5;
   var GARDEN_CRAWL_DELAY = 500;
-  function GardenView2({ page, onPageChange, onBack, theme, onThemeChange, tier }) {
+  function GardenView2({ page, onPageChange, onBack, theme: _theme, onThemeChange: _onThemeChange, tier }) {
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(false);
     const [jumpMode, setJumpMode] = React.useState(false);
@@ -4733,7 +4733,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/ScripturesHome.jsx
-  function ScripturesHome2({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy, layout }) {
+  function ScripturesHome2({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout }) {
     const handleTile = (group) => {
       if (group.single) {
         onSelect(group.books[0].id, true);
@@ -5106,7 +5106,7 @@
     }
     return null;
   }
-  function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart, onEditSave, onEditCancel }) {
+  function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditStart: _onEditStart, onEditSave, onEditCancel }) {
     var useState2 = React.useState;
     var useEffect2 = React.useEffect;
     var useRef2 = React.useRef;
@@ -5810,7 +5810,7 @@
   function TabsOverview2({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onLongPress, onClearAll, clearAllStage, onDedupe, MAX_TABS, thumbnails }) {
     const total = tabs.length;
     const handleLongPress = React.useRef(null);
-    const startLongPress = (idx) => (e) => {
+    const startLongPress = (idx) => (_e) => {
       handleLongPress.current = setTimeout(() => {
         onLongPress && onLongPress(idx);
         handleLongPress.current = null;
@@ -5835,7 +5835,7 @@
     }, [tabs]);
     const clearLabelLocal = clearAllStage === 0 ? "Clear All" : CLEAR_LABELS[clearAllStage];
     const clearClassLocal = CLEAR_CLASSES[clearAllStage];
-    const resetClearOnOutsideTap = (e) => {
+    const resetClearOnOutsideTap = (_e) => {
       if (clearAllStage > 0) onClearAll && onClearAll(-1);
     };
     return /* @__PURE__ */ React.createElement("div", { className: "tabs-overview", onClick: resetClearOnOutsideTap }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-header" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-eyebrow" }, "Reading Places"), /* @__PURE__ */ React.createElement("h1", { className: "tabs-overview-title" }, "Tabs"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-diamond" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-meta" }, total, " / ", MAX_TABS, " ", total === 1 ? "tab" : "tabs", " open"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-actions" }, /* @__PURE__ */ React.createElement(
@@ -6571,7 +6571,7 @@
   }
 
   // app/src/main/assets/src/ui/sheets/LinkPicker.jsx
-  function LinkPicker2({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, hlTick, setHlTick, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
+  function LinkPicker2({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, hlTick: _hlTick, setHlTick, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
     const [input, setInput] = React.useState("");
     const inputRef = React.useRef(null);
     const [, setRecentTick] = React.useState(0);
@@ -9603,7 +9603,7 @@
         setHlTick,
         onLinkRequest: openLinkPicker,
         onNoteRequest: openNoteSheet,
-        onBookmarkRequest: function(bkm) {
+        onBookmarkRequest: function(_bkm) {
         }
       }
     ), annChip && /* @__PURE__ */ React.createElement(

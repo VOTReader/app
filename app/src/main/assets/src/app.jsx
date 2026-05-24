@@ -2067,7 +2067,7 @@ function App() {
         hlTick={hlTick} setHlTick={setHlTick}
         onLinkRequest={openLinkPicker}
         onNoteRequest={openNoteSheet}
-        onBookmarkRequest={function(bkm) { /* bookmark created; icon injected via applyDOMBookmarks */ }}
+        onBookmarkRequest={function(_bkm) { /* bookmark created; icon injected via applyDOMBookmarks */ }}
       />
       {annChip && (
         <AnnotationActionChip

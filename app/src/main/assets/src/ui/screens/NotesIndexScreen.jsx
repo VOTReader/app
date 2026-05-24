@@ -2,7 +2,7 @@
    NotesIndexScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NotesIndexScreen({ onBack, onHome, onOpenNote, onNavigateToSource, hlTick, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled }) {
+export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, hlTick, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // All notes — annotations on letters, scripture, AND journal paragraphs.
   // Notes from inside journal entries are real annotations and belong here,
   // labeled with their journal source via noteSourceLabel.

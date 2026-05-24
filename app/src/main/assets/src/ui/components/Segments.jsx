@@ -2,7 +2,7 @@
    Segments — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetterClick, onInAppLink, studyMode, footnotes, highlightText }) {
+export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetterClick, onInAppLink, studyMode: _studyMode, footnotes: _footnotes, highlightText }) {
   return segments.map((seg, i) => {
     if (seg.t === "fn") {
       // Always render as a gold circled number (Volumes style). Studies

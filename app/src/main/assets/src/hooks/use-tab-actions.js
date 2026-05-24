@@ -79,7 +79,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
     // the previous tab's "read 90%, fire commit" timer would land on the
     // newly-active tab and mark the wrong letter as read.
     cancelDwell();
-    setActiveTabIdx((prev) => {
+    setActiveTabIdx((_prev) => {
       if (idx < 0) return 0;
       return Math.min(idx, tabs.length - 1);
     });

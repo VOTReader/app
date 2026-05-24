@@ -5,7 +5,7 @@
 export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onLongPress, onClearAll, clearAllStage, onDedupe, MAX_TABS, thumbnails }) {
   const total = tabs.length;
   const handleLongPress = React.useRef(null);
-  const startLongPress = (idx) => (e) => {
+  const startLongPress = (idx) => (_e) => {
     handleLongPress.current = setTimeout(() => {
       onLongPress && onLongPress(idx);
       handleLongPress.current = null;
@@ -31,7 +31,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
   // overview instantly resets stage back to 0.
   const clearLabelLocal = clearAllStage === 0 ? 'Clear All' : CLEAR_LABELS[clearAllStage];
   const clearClassLocal = CLEAR_CLASSES[clearAllStage];
-  const resetClearOnOutsideTap = (e) => {
+  const resetClearOnOutsideTap = (_e) => {
     if (clearAllStage > 0) onClearAll && onClearAll(-1); // -1 signals reset
   };
   return (

@@ -42,7 +42,7 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
         <div className="genre-columns">
           <div className="genre-col genre-col-stretch">
             <div className="genre-col-label">The Seven Volumes</div>
-            {volumes.map((v, i) => (
+            {volumes.map((v, _i) => (
               <button
                 key={v.id}
                 className={`genre-tile${v.locked ? " locked" : ""}`}
@@ -56,7 +56,7 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
           </div>
           <div className="genre-col genre-col-stretch">
             <div className="genre-col-label">Collections</div>
-            {collections.map((b, i) => (
+            {collections.map((b, _i) => (
               <button
                 key={b.id}
                 className={`genre-tile${b.locked ? " locked" : ""}`}
