@@ -1,7 +1,7 @@
 {
   "name": "votreader-build",
   "version": "0.0.0",
-  "description": "Build pipeline for VOTReader's WebView assets (Objective G — bundler + ES modules).",
+  "description": "Build pipeline for VOTReader's WebView assets (Objective G \u00e2\u20ac\u201d bundler + ES modules).",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,10 +10,18 @@
     "build:c": "esbuild app/src/main/assets/src/renderer/_entry.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-c.js",
     "build:d": "esbuild app/src/main/assets/src/ui/_entry-d.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-d.js",
     "typecheck": "tsc --noEmit",
-    "jsx-progress": "python tools/jsx-progress.py"
+    "jsx-progress": "python tools/jsx-progress.py",
+    "lint:globals": "python tools/gen-eslint-globals.py",
+    "lint": "npm run lint:globals && eslint app/src/main/assets/src",
+    "lint:fix": "npm run lint:globals && eslint app/src/main/assets/src --fix"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "esbuild": "^0.28.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.6.0",
     "typescript": "^6.0.3"
   },
   "engines": {
