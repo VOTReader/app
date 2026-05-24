@@ -9,6 +9,14 @@
    - highlightExcerptInDom (imperative DOM mutation)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Normalize text for highlight-matching: smart quotes → ASCII, en/em dash
+ * → hyphen, lowercase. Used by both splitWithHighlight (in-component) and
+ * highlightExcerptInDom (post-render). Stringifies any input.
+ *
+ * @param {unknown} s
+ * @returns {string}
+ */
 export function normalizeForHighlight(s) {
   return String(s || "").
   replace(/[‘’]/g, "'").
@@ -17,6 +25,17 @@ export function normalizeForHighlight(s) {
   toLowerCase();
 }
 
+/**
+ * Split a string at the first normalized occurrence of `needle` and wrap
+ * the match in a `<mark class="letter-highlight">`. Returns a React
+ * Fragment (or null if no match). Caller is responsible for wrapping the
+ * result in any containing element.
+ *
+ * @param {string | null | undefined} text
+ * @param {string | null | undefined} needle  search term (normalized internally)
+ * @param {string} keyPrefix                  used to build a stable React key
+ * @returns {any}  React fragment | null
+ */
 export function splitWithHighlight(text, needle, keyPrefix) {
   if (!text || !needle) return null;
   const hay = normalizeForHighlight(text);
@@ -36,6 +55,23 @@ export function splitWithHighlight(text, needle, keyPrefix) {
   );
 }
 
+/**
+ * Imperatively highlight an excerpt inside a rendered letter/body DOM tree.
+ * Run AFTER React paints. Tokenizes paragraphs, finds an anchor (longest-
+ * prefix match falling back from 8 → 6 → 4 tokens), walks forward through
+ * the excerpt with limited drift tolerance, then wraps matching text nodes
+ * in `<mark class="letter-highlight">`. Auto-clears after 8.4s by unwrapping
+ * the marks. Skips footnote refs / inline scrip refs / pre-existing marks.
+ *
+ * Returns the paragraph elements that ended up wrapped (for scrollIntoView
+ * inspection in callers). Returns [] when the anchor isn't found or the
+ * match was too broad (≥85% of paragraphs would be wrapped — likely a bad
+ * normalization, not a real excerpt match).
+ *
+ * @param {HTMLElement | null | undefined} mainEl
+ * @param {string | null | undefined} excerpt
+ * @returns {HTMLElement[]}
+ */
 export function highlightExcerptInDom(mainEl, excerpt) {
   if (!mainEl || !excerpt) return [];
   const tokenize = (s) => normalizeForHighlight(s).match(/[a-z0-9']+/g) || [];

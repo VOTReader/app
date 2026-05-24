@@ -1,7 +1,7 @@
 /* ===================================================================
    Scripture reference parsing — verse range splitting + footnote helpers + echo lookups
    ===================================================================
-   Global-scope module. Concatenates with index.html via <script src>.
+   Global-scope module. Bundled into bundle-b via _entry-b.js.
    Bundled helpers (P5e):
    - firstVerseOfRef
    - parseRefRanges
@@ -13,13 +13,35 @@
    - splitIntoVerses
    =================================================================== */
 
+/**
+ * A verse range, optionally with an explicit verse list for comma refs
+ * like "7:7, 9, 11" (where the range is [7..11] but verses is [7, 9, 11]).
+ *
+ * @typedef {{ start: number, end: number, verses?: number[] }} VerseRange
+ */
 
+/**
+ * Extract the FIRST verse number from a reference string. Strips a leading
+ * "N:" chapter prefix if present, then reads the first integer. Used as a
+ * lightweight "what verse does this annotation anchor to" lookup.
+ *
+ * @param {string} refStr  e.g. "12:5-7", "5", "12:5"
+ * @returns {number | null}
+ */
 export function firstVerseOfRef(refStr) {
   const stripped = refStr.replace(/^\d+:\s*/, '').trim();
   const m = stripped.match(/\d+/);
   return m ? parseInt(m[0], 10) : null;
 }
 
+/**
+ * Parse a reference string into one or more verse ranges. Strips chapter
+ * prefix; handles comma-separated ranges like "5, 7-9, 12". Each range
+ * has start/end (end === start for single verses).
+ *
+ * @param {string} refStr
+ * @returns {{ start: number, end: number }[]}
+ */
 export function parseRefRanges(refStr) {
   const stripped = refStr.replace(/^\d+:\s*/, '').trim();
   const parts = stripped.split(/,\s*/);
@@ -31,29 +53,73 @@ export function parseRefRanges(refStr) {
   return ranges;
 }
 
+/**
+ * Last verse of the FIRST range in a refStr. For "5-7, 9-11" returns 7;
+ * for "5" returns 5. Used by note-attachment logic to decide which verse
+ * a footnote sits on.
+ *
+ * @param {string} refStr
+ * @returns {number | null}
+ */
 export function lastVerseOfFirstRange(refStr) {
   const ranges = parseRefRanges(refStr);
   return ranges.length > 0 ? ranges[0].end : firstVerseOfRef(refStr);
 }
 
+/**
+ * Echo-verse list: every range END after the first range. For
+ * "5-7, 9, 11-12" returns [9, 12] — these are the verses where the
+ * footnote should also appear as a small echo marker.
+ *
+ * @param {string} refStr
+ * @returns {number[]}
+ */
 export function echoVersesForRef(refStr) {
   const ranges = parseRefRanges(refStr);
   if (ranges.length <= 1) return [];
   return ranges.slice(1).map((r) => r.end);
 }
 
+/**
+ * Notes (scripture refs + Volume of Truth notes) that ANCHOR on a specific
+ * verse — i.e. their first range's end === verseNum. Used by the verse
+ * gutter to render footnote bubbles.
+ *
+ * @param {{ scriptures?: any[], votNotes?: any[] }} chapter
+ * @param {number} verseNum
+ * @returns {{ scriptures: any[], votNotes: any[] }}
+ */
 export function getNotesForVerse(chapter, verseNum) {
   const scriptures = (chapter.scriptures || []).filter((s) => lastVerseOfFirstRange(s.ref) === verseNum);
   const votNotes = (chapter.votNotes || []).filter((n) => lastVerseOfFirstRange(n.ref) === verseNum);
   return { scriptures, votNotes };
 }
 
+/**
+ * Notes whose ECHO verses include this verseNum — same shape as
+ * getNotesForVerse, but for the secondary attachments.
+ *
+ * @param {{ scriptures?: any[], votNotes?: any[] }} chapter
+ * @param {number} verseNum
+ * @returns {{ scriptures: any[], votNotes: any[] }}
+ */
 export function getEchoesForVerse(chapter, verseNum) {
   const scriptures = (chapter.scriptures || []).filter((s) => echoVersesForRef(s.ref).includes(verseNum));
   const votNotes = (chapter.votNotes || []).filter((n) => echoVersesForRef(n.ref).includes(verseNum));
   return { scriptures, votNotes };
 }
 
+/**
+ * Parse the verse-range portion of a reference like "Exodus 12:18-20",
+ * "Psalm 7:7, 9", or "John 3:16". Returns a VerseRange with explicit
+ * `verses` array for comma refs, or just start/end for contiguous.
+ * Returns null when the ref has no parsable verse range OR a single
+ * verse (the strategy depends on the caller — single verses use
+ * firstVerseOfRef).
+ *
+ * @param {string} ref
+ * @returns {VerseRange | null}
+ */
 export function parseRefRange(ref) {
   const clean = ref.replace(/\s*\(.*?\)\s*/g, "").trim();
   // Comma-separated verses: "7:7, 9" or "7:7, 9, 11"
@@ -69,6 +135,21 @@ export function parseRefRange(ref) {
   return end > start ? { start, end } : null;
 }
 
+/**
+ * Split a verse-text block into per-verse segments. Tries three strategies
+ * in order:
+ *   - Strategy 0: explicit "N. text" markers (accept the longest valid prefix)
+ *   - Strategy 0b: Unicode superscript markers (e.g. "²when ³if")
+ *   - Strategy 1: sentence-boundary split
+ *   - Strategy 2: comma-chain split for genealogies ("the X, the Y, the Z")
+ * Returns null when the ref has no parsable range OR the range has only
+ * one verse. Returns a single-element array tagged with start verse when
+ * heuristics fail to split adequately.
+ *
+ * @param {string} text
+ * @param {string} ref
+ * @returns {{ vNum: number, text: string }[] | null}
+ */
 export function splitIntoVerses(text, ref) {
   const range = parseRefRange(ref);
   if (!range) return null;
