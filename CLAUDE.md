@@ -19,24 +19,25 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
   - `bundle-d.js` 546 KB — screens + sheets + components + utils + late stores + App() itself (esbuild IIFE, 82 files)
 
-### Q3 ESLint status (live — 2026-05-24)
+### Q3 ESLint — CLOSED 2026-05-24
 
-- **0 errors / 0 warnings.** Baseline was 154/216. Q3.3e CLEARED all 59 exhaustive-deps warnings through 7 commits this session (`a5a2531`, `5832d5f`, `11246a9`, `bea2e55`, `143ed31`, `939415f`, `d955e98`).
-- **CI: `--max-warnings 0`** locked in `.github/workflows/ci.yml` at `d955e98`. The ratchet phase is over; 0/0 is the permanent steady state. Any new warning fails CI; the only legitimate exceptions are explicit `eslint-disable-next-line ...` cites with named rationale (55 such cites across 31 files, audited at Q3.3e close).
-- **Bin classification framework** established through Q3.3e:
-  - Bin 1 — add the dep (eslint's recommended fix)
-  - Bin 2 — disable + ref-mirror / closure-stable cite
-  - Bin 3 — disable + mount-only or setter-stability cite
-  - Bin 4 — disable + cache-bust / identity-churn cite (intentional pattern; new this session)
-- **Post-Q3 flagged for follow-up** (separate sessions):
-  - `useNavHistoryTracking` extraction (app.jsx:814 — documented in use-history.js:13-14 as the auto-track effect that stayed in App() because of App()-local helper deps)
-  - `useSyncExternalStore` migration (eliminates Bin 4 hlTick cites; logged in PLAN.txt POST-Q3)
-  - Q3.5: pre-commit lint via lint-staged
-  - Q3 exit cleanup: HISTORY.md chapter, prune PLAN.txt to POST-Q3 strategic items + archive May-10 research reports to HISTORY.md
+- **0 errors / 0 warnings.** Baseline 154/216 → 0/0. CI `--max-warnings 0` locked at `d955e98`; any new warning fails CI. The 55 `eslint-disable-next-line` cites across 31 files were audited at phase close (each cite's named identifiers verified to be read in the corresponding effect body).
+- **Pre-commit lint via lint-staged** (`a545d81`): sub-second per-file lint at the commit prompt; same `--max-warnings 0` policy as CI.
+- **Bin classification framework** (durable reference for Q4/Q5/Q6 disable cites):
+  - Bin 1 — add the dep (eslint's recommended fix; safe for stable setters/callbacks)
+  - Bin 2 — disable + ref-mirror / closure-stable cite (useRefMirror, local helpers reading already-tracked closure values)
+  - Bin 3 — disable + mount-only or setter-stability cite (`[]`-deps intent; useState setters passed through hook returns)
+  - Bin 4 — disable + cache-bust / identity-churn cite (hlTick bump signal, commitDwellNow per-render rebinding)
+
+### Q4 (NEXT) — JSDoc / `tsc --checkJs`
+
+**Scope pinned 2026-05-24:** hooks + stores + utils ONLY. App() and the ui/ tree are deferred until App() decomposition lands as its own phase. Rationale: App() at 2,191 lines is the bottleneck for both types AND tests; the 15 hooks + 11 stores + 11 utils have clean interfaces that type cleanly.
+
+Q4 deliverables: `jsconfig.json` with `"checkJs": true`, JSDoc on every export in scope, CI `tsc --noEmit` step (zero-tolerance from day one per [[lint-regression-gate]]).
 
 ### Roadmap
 
-**`PLAN.txt`** (repo root) is the strategic working memory. The Desktop copy (`quality-uplift-plan.txt`) is the legacy original — PLAN.txt in-repo is canonical. CLAUDE.md's current-state block is the 30-second summary; PLAN.txt has the full rationale and cross-cutting items (smoke-lite.js for CI, bundle-a.js lazy-load, `--max-warnings 0` transition).
+**`PLAN.txt`** (repo root) is the strategic working memory — slim, post-Q3 pruned. HISTORY.md has the landed-work chapter. CLAUDE.md is the 30-second briefing. Q4 sequencing + post-Q4 backlog (smoke-lite, useNavHistoryTracking, useSyncExternalStore migration, bundle-a.js lazy-load, App() decomposition) lives in PLAN.txt.
 
 ---
 
