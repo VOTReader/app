@@ -2244,9 +2244,4 @@ multiNotePayload && React.createElement(MultiNotePopover, {
 
 }
 
-// Expose App on window for the createRoot script at the bottom of
-// index.html to find it. Replaces the implicit window.App that the
-// top-level `function App() {}` declaration created when this lived
-// in a classic-script inline block.
-if (typeof window !== 'undefined') { window.App = App; }
 export { App };

@@ -1,20 +1,24 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Cluster D entry — screens + sheets + components + utils + late stores
+   Cluster D entry — screens + sheets + components + utils + late stores + App
    ═══════════════════════════════════════════════════════════════════════
    This file is the esbuild entry point for dist/bundle-d.js. It imports
-   every public symbol from the cluster's 81 modules and re-exposes them
-   on `window` so the rest of the app (the inline App() block in
-   index.html, plus cross-cluster consumers in A/B/C) can continue to
-   call them by bare name.
+   every public symbol from the cluster's 82 modules and re-exposes them
+   on `window` so the rest of the app (the boot script at the bottom of
+   index.html — ReactDOM.createRoot + render — plus the lexical-mirror
+   script that runs just before it, plus cross-cluster consumers in
+   A/B/C) can continue to call them by bare name.
 
-   Cluster D is the LAST and LARGEST conversion (G.2.3):
+   Cluster D contents:
    - 21 screens (LetterView, WtlbEntryView, BibleChapterView, …)
    - 33 components (Segments, FootnoteSheet, NavButtons, …)
    - 13 sheets (NoteSheet, SelectionToolbar, LinkPicker, …)
    - 11 utility modules (hl-keys, dates, garden, nav-index, …)
    - thumb-store + translations (late stores/data that load after the
      stores cluster's stores — kept here historically because they're
-     called by inline App() code only, never by the modules in B/C)
+     called by App code only, never by the modules in B/C)
+   - App — the composition root (Q2.7-1). The function the boot script
+     mounts via ReactDOM.createRoot. Lives at src/app.js, alongside
+     ui/, hooks/, stores/, data/, etc.
 
    Like Clusters B and C, this bundle is emitted as an esbuild IIFE — it
    ships as a classic <script src="dist/bundle-d.js"> tag, NOT a

@@ -10070,9 +10070,6 @@
       })
     );
   }
-  if (typeof window !== "undefined") {
-    window.App = App;
-  }
 
   // app/src/main/assets/src/ui/_entry-d.js
   Object.assign(window, {
