@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
   const [newName, setNewName] = React.useState('');
   const [renameId, setRenameId] = React.useState(null);    // notebook id being renamed
@@ -15,6 +16,7 @@ export function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
       (n.notebookIds || []).forEach(id => { map[id] = (map[id] || 0) + 1; });
     });
     return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   }, [hlTick]);
 
   const createNotebook = () => {

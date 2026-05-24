@@ -463,6 +463,7 @@ export function JournalViewerScreen(props) {
 
   var entry = useMemo(function() {
     return entryId ? JournalStore.get(entryId) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: props.hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   }, [entryId, props.hlTick]);
 
   var _confirmStep = useState(0);

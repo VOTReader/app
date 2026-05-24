@@ -8,6 +8,7 @@ export function LinkIcon({ hlKey, hlTick, onClick, prefix }) {
   // because excerpts append ":start-end" to the block-level key.
   const links = React.useMemo(
     () => prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
     [hlKey, hlTick, prefix]
   );
   if (!links || links.length === 0) return null;

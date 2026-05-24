@@ -126,6 +126,7 @@ export function JournalHubScreen(props) {
 
   var allEntries = useMemo(function() {
     return JournalStore.all();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   }, [hlTick]);
 
   function bump() { if (setHlTick) setHlTick(function(t) { return t + 1; }); }

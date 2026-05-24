@@ -3,9 +3,17 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, hlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+  // hlTick deps below are cache-bust signals (bump on store mutation, force
+  // memo recompute) — see ARCHITECTURE.md §"Annotation rendering". The stores
+  // expose getters that don't reference hlTick, so eslint can't see the dep
+  // is load-bearing; the disable cite is consistent across all 5 sites.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const noteCount = React.useMemo(() => NoteStore.count(), [hlTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const linkCount = React.useMemo(() => LinkStore.all().length, [hlTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const bookmarkCount = React.useMemo(() => (typeof BookmarkStore !== 'undefined' ? BookmarkStore.count() : 0), [hlTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const journalCount = React.useMemo(() => (typeof JournalStore !== 'undefined' ? JournalStore.count() : 0), [hlTick]);
   // Distinct highlight/underline groups (notes excluded — they have their
   // own hub). Counts groupIds so a multi-paragraph mark is one mark.
@@ -17,6 +25,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
       if (a.kind === 'highlight' || a.kind === 'underline') seen[a.groupId || a.id] = 1;
     }));
     return Object.keys(seen).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   }, [hlTick]);
   const noteDetail = noteCount === 0 ? 'No notes yet' : (noteCount + (noteCount === 1 ? ' note' : ' notes'));
   const linkDetail = linkCount === 0 ? 'No links yet' : (linkCount + (linkCount === 1 ? ' link' : ' links'));

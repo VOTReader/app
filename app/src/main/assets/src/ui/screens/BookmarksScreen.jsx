@@ -415,6 +415,7 @@ export function BookmarksScreen(props) {
 
   var allBookmarks = useMemo(function() {
     return BookmarkStore.all().slice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   }, [hlTick]);
 
   var displayBookmarks = useMemo(function() {

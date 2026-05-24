@@ -3,7 +3,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function NotebookPickerSheet({ groupId, hlTick, setHlTick, onClose }) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
   const [newName, setNewName] = React.useState('');
   const [confirmDeleteNb, setConfirmDeleteNb] = React.useState(null); // notebook id or null

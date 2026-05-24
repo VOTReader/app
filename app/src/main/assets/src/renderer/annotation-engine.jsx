@@ -40,6 +40,7 @@ function annMarkClass(ann, isFirst, isLast) {
    → inside-out <mark> nesting per segment using reduceRight (outer = i=0,
    inner = i=N-1; CSS cascade gives "more-specific overrides broader"). */
 export function HighlightableText({ text, hlKey, hlTick }) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const annotations = React.useMemo(() => AnnotationStore.get(hlKey), [hlKey, hlTick]);
   if (!text) return null;
   if (!annotations || annotations.length === 0) {

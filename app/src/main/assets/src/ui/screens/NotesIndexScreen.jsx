@@ -6,7 +6,9 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   // All notes — annotations on letters, scripture, AND journal paragraphs.
   // Notes from inside journal entries are real annotations and belong here,
   // labeled with their journal source via noteSourceLabel.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const allNotes = React.useMemo(() => NoteStore.list(), [hlTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
   // Restore the user's place (tab + drilled notebook) when returning from a
   // source tap-through. window.__notesReturnCtx is set in onRowTap before we

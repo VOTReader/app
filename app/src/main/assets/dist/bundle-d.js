@@ -1553,6 +1553,7 @@
     const hlKey = chapterBookmark && chapterBookmark.hlKey;
     const existing = React.useMemo(
       () => hlKey && typeof BookmarkStore !== "undefined" ? BookmarkStore.getForKey(hlKey) : [],
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
       [hlKey, hlTick]
     );
     if (!hlKey || typeof BookmarkStore === "undefined") return null;
@@ -1990,6 +1991,7 @@
   function LinkIcon2({ hlKey, hlTick, onClick, prefix }) {
     const links = React.useMemo(
       () => prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
       [hlKey, hlTick, prefix]
     );
     if (!links || links.length === 0) return null;
@@ -2011,6 +2013,7 @@
   function BookmarkIcon2({ hlKey, hlTick }) {
     const bookmarks = React.useMemo(
       () => BookmarkStore.getForKeyPrefix(hlKey),
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
       [hlKey, hlTick]
     );
     if (!bookmarks || bookmarks.length === 0) return null;
@@ -6650,6 +6653,7 @@
     const isBlockScope = hlKey && (hlKey.startsWith("letter:") || hlKey.startsWith("wtlb:") || hlKey.startsWith("blessed:") || hlKey.startsWith("holy-days:"));
     const links = React.useMemo(
       () => isBlockScope ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
       [hlKey, hlTick, isBlockScope]
     );
     React.useEffect(() => {

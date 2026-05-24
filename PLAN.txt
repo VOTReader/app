@@ -7174,5 +7174,44 @@ END OF DOCUMENT — last updated 2026-05-10 (1/4 agents reported, integrating)
 ───────────────────────────────────────────────────────────────────────────────
 
 ───────────────────────────────────────────────────────────────────────────────
+POST-Q3 FUTURE WORK — captured during Q3.3e (2026-05-24)
+───────────────────────────────────────────────────────────────────────────────
+
+  USE-SYNC-EXTERNAL-STORE MIGRATION (Q5/Q6 candidate)
+  ────────────────────────────────────────────────────
+  Q3.3e added 24 `eslint-disable-next-line react-hooks/exhaustive-deps` cites
+  across 16 files for the canonical hlTick cache-bust pattern:
+
+      const x = React.useMemo(() => SomeStore.get(hlKey), [hlKey, hlTick]);
+
+  hlTick is a bump-counter that increments on AnnotationStore/BookmarkStore/
+  NoteStore/LinkStore/JournalStore/NotebookStore mutations, signaling memos
+  to re-read. ESLint flags hlTick as "unnecessary" because the body doesn't
+  reference it; the disable cites that it's a load-bearing store-mutation
+  signal, not an unused dep.
+
+  React 18's useSyncExternalStore replaces this pattern idiomatically. Each
+  store would expose `subscribe(cb) → unsubscribe` + `getSnapshot()`, and
+  consumers would call:
+
+      const x = React.useSyncExternalStore(store.subscribe, () => store.get(hlKey));
+
+  No tick counter. No false-positive lint warnings. Stores become
+  first-class external state, fully observed by React's concurrent renderer.
+
+  Scope: refactor — touches the 6 stores' subscribe/snapshot surface AND
+  the 16 consumer sites. Needs testing because it changes runtime
+  re-render semantics (currently every consumer re-renders on any store
+  mutation; useSyncExternalStore lets stores fan out subscriptions more
+  precisely).
+
+  NOT a Q3 task. Schedule for Q5 (tests) or Q6 (architecture polish). Track
+  via task #6 in the active session task list.
+
+───────────────────────────────────────────────────────────────────────────────
+END OF DOCUMENT — last updated 2026-05-10 (1/4 agents reported, integrating)
+───────────────────────────────────────────────────────────────────────────────
+
+───────────────────────────────────────────────────────────────────────────────
 END OF DOCUMENT — last updated 2026-05-10 (live punch list active)
 ───────────────────────────────────────────────────────────────────────────────

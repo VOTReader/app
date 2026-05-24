@@ -150,6 +150,7 @@ export function HighlightsScreen(props) {
   var _tf = useState('all'); var typeFilter = _tf[0]; var setTypeFilter = _tf[1];
   var _cf = useState(null); var colorFilter = _cf[0]; var setColorFilter = _cf[1];
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   var marks = useMemo(function() { return _collectMarks(); }, [hlTick]);
 
   // Distinct colors present, in palette order — drives the filter dots.

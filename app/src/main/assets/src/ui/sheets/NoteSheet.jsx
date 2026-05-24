@@ -3,7 +3,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpenNotebookPicker }) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   const segs = React.useMemo(() => AnnotationStore.getByGroup(groupId), [groupId, hlTick]);
   const [mode, setMode] = React.useState(startInEditMode ? 'edit' : 'read');
   const [body, setBody] = React.useState(note ? note.body || '' : '');

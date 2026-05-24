@@ -12,6 +12,7 @@ export function JournalChip({ refKey, hlTick, onClick, label }) {
   var ids = useMemo(function() {
     if (!refKey || typeof JournalIndexStore === 'undefined') return [];
     return JournalIndexStore.entriesReferencing(refKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
   }, [refKey, hlTick]);
   if (!refKey || !ids || ids.length === 0) return null;
 
