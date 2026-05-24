@@ -6,6 +6,24 @@
    Used by Notes index, Bookmark cards, etc.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Render a string with embedded `{{ref:Book Chapter:Verse}}` patterns as
+ * a React tree: literal segments become text (optionally wrapped in a
+ * span with `baseClassName`), and ref tokens become `<a>` tags that fire
+ * `onScripClick(ref)`. If `highlightText` is provided, plain segments
+ * are passed through `splitWithHighlight` (a global) to surface a span
+ * around the match.
+ *
+ * Returns either a React.ReactNode tree (when refs/highlights are
+ * present) or the bare string (no refs, no highlight, no className) —
+ * callers must handle both shapes.
+ *
+ * @param {string | null | undefined} text
+ * @param {string} [baseClassName]   wraps plain segments + the highlighted span
+ * @param {((ref: string) => void) | null | undefined} [onScripClick]
+ * @param {string | null | undefined} [highlightText]  substring to highlight, if any
+ * @returns {any}  React node | string
+ */
 export function renderTextWithScripRefs(text, baseClassName, onScripClick, highlightText) {
   if (!text) return baseClassName ? <span className={baseClassName}>{text}</span> : text;
   const hasRef = text.includes('{{ref:');

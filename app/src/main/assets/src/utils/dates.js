@@ -8,6 +8,14 @@
    =================================================================== */
 
 
+/**
+ * Format a past timestamp as a sentence-cased relative string ("Just now",
+ * "5m ago", "3d ago", "Jan 14"). For ages older than ~a month, falls back
+ * to a Month-Day locale date (year omitted by design).
+ *
+ * @param {number | null | undefined} ts  epoch ms; falsy → '' (no anchor)
+ * @returns {string}
+ */
 export function relativeDate(ts) {
   if (!ts) return '';
   const diff = Date.now() - ts;
@@ -23,6 +31,14 @@ export function relativeDate(ts) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/**
+ * Format a past timestamp as a lowercase compact relative string ("just now",
+ * "5m ago", "3w ago", "2mo ago"). Differs from relativeDate in casing and
+ * its older-than-a-month behavior (compact months vs. locale date).
+ *
+ * @param {number} ts  epoch ms
+ * @returns {string}
+ */
 export function timeAgo(ts) {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);

@@ -1,7 +1,7 @@
 /* ===================================================================
    Tab metadata helpers — content key, progress flag, scroll key, describe
    ===================================================================
-   Global-scope module. Concatenates with index.html via <script src>.
+   Global-scope module. Bundled into bundle-b via _entry-b.js.
    Bundled helpers (P5e):
    - describeTab
    - tabContentKey
@@ -9,7 +9,33 @@
    - scrollKeyForTab
    =================================================================== */
 
+/**
+ * The tab-state shape these helpers consume. Sourced from useTabs (P6k-A)
+ * and the tabField setters; every field is optional (a fresh tab on home
+ * has only `screen: 'home'`). Bare-name globals (MATTHEW, BOOKS, etc.)
+ * are typed via the auto-generated globals.d.ts and read at runtime.
+ *
+ * @typedef {{
+ *   screen?: string,
+ *   bookId?: string,
+ *   chapterNum?: number | null,
+ *   letterId?: string | null,
+ *   studyId?: string | null,
+ *   studyChapterId?: string | null,
+ *   genreId?: string | null,
+ *   gardenPage?: number | null,
+ *   searchQuery?: string | null
+ * }} TabState
+ */
 
+/**
+ * Resolve a TabState into the display title/subtitle pair used by the
+ * Tabs Overview cards. Falls back gracefully — every branch ends with a
+ * defined return, and the final default lands on Home.
+ *
+ * @param {TabState} tab
+ * @returns {{ title: string, subtitle: string }}
+ */
 export function describeTab(tab) {
   // Returns { title, subtitle } for the card. Falls back gracefully.
   const s = tab.screen || 'home';
@@ -64,14 +90,40 @@ export function describeTab(tab) {
   return { title: 'Home', subtitle: 'VOT Study Bible' };
 }
 
+/**
+ * Build the dedup key for a tab — used by `deduplicateTabs` to fold tabs
+ * whose visible content matches into a single entry. Pipe-separated field
+ * concatenation; unset numerics serialize as empty (so chapter=0 and
+ * chapter=undefined would collide, but chapter is 1-indexed in this app).
+ *
+ * @param {TabState} tab
+ * @returns {string}
+ */
 export function tabContentKey(tab) {
   return `${tab.screen || 'home'}|${tab.bookId || ''}|${tab.chapterNum ?? ''}|${tab.letterId || ''}|${tab.studyId || ''}|${tab.studyChapterId || ''}|${tab.genreId || ''}|${tab.gardenPage ?? ''}`;
 }
 
+/**
+ * True iff this tab is on a screen where the dwell-based read-tracking
+ * progress bar should render. Driven by the READING_SCREENS module global
+ * (declared in index.html / globals.d.ts).
+ *
+ * @param {TabState} tab
+ * @returns {boolean}
+ */
 export function tabHasProgressBar(tab) {
   return READING_SCREENS.has(tab.screen);
 }
 
+/**
+ * Build the scroll-position key for a tab — used by useScrollMemory to
+ * save/restore scroll between navigations. Different screen kinds get
+ * different prefixes (bible vs. study vs. letter) so per-tab restoration
+ * doesn't collide across genres.
+ *
+ * @param {TabState} tab
+ * @returns {string}
+ */
 export function scrollKeyForTab(tab) {
   const s = tab.screen;
   if (s === 'matthew-ch' || s === 'bible-ch') return `${tab.bookId}-${tab.chapterNum}`;

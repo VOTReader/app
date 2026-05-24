@@ -53,7 +53,10 @@
   var GARDEN_DEFAULT_TIER2 = "standard";
   var gardenImageCache2 = {};
   function getGardenTier2(id) {
-    return GARDEN_TIERS2.find((t) => t.id === id) || GARDEN_TIERS2.find((t) => t.id === GARDEN_DEFAULT_TIER2);
+    return (
+      /** @type {GardenTier} */
+      GARDEN_TIERS2.find((t) => t.id === id) || GARDEN_TIERS2.find((t) => t.id === GARDEN_DEFAULT_TIER2)
+    );
   }
   function gardenUrl2(n, tierId) {
     const tier = getGardenTier2(tierId);
@@ -72,7 +75,7 @@
   }
   function gardenIsCached2(n, tierId) {
     const img = gardenImageCache2[gardenCacheKey2(n, tierId)];
-    return img && img.complete && img.naturalWidth > 0;
+    return !!(img && img.complete && img.naturalWidth > 0);
   }
 
   // app/src/main/assets/src/utils/tabs.js
