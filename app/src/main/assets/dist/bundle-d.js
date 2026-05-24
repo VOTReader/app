@@ -8761,6 +8761,7 @@
       activeIdx: activeTabIdx,
       onOpen: goTabs,
       isOnTabsScreen: tabsOverviewOpen
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- goTabs is an App()-local nav helper (line 554) whose body only calls state setters + reads stable values; adding it to deps would force this useMemo to rebuild on every parent render (since goTabs identity changes per render), defeating the memoization. The TabsContext consumers only need a fresh value when the LISTED deps change.
     }), [settings.tabsEnabled, tabs.length, activeTabIdx, tabsOverviewOpen]);
     function colReadNavProps(volKey, clearSurprise) {
       var rk = COL_BY_KEY.get(volKey).readKey;

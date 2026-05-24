@@ -207,6 +207,7 @@ function App() {
       }
     }, 0);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setNoteSheetTarget is a useState setter from useSheetOrchestration() (identity-stable per React invariant; eslint can't trace through hook-return destructuring at line 114).
   }, [hlTick, screen, letterId]);
   // Toggle .is-active on every mark/icon belonging to the open note's group.
   // Default state: notes show only the trailing 📝 icon (no tint, no ribbon).
@@ -384,6 +385,7 @@ function App() {
     });
   }, [screen]);
   // Reset Clear-all confirmation stage whenever overview opens/closes
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setClearAllStage is a useState setter from useTabActions() (identity-stable per React invariant; eslint can't trace through hook-return destructuring).
   useEffect(() => {setClearAllStage(0);}, [tabsOverviewOpen]);
 
   // Per-tab focus-mode overrides. Each tab has independent state.
@@ -811,6 +813,7 @@ function App() {
       const ch = getStudyChapter(study, studyChapterId);
       if (study && ch) addToHistory({ type: 'study-chapter', studyId, studyChapterId, studyTitle: study.title, studySlug: study.slug, chapterTitle: ch.title, chapterNum: ch.num });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- App()-local helpers with stable-by-behavior bodies: _findLetter reads COLLECTIONS data (module global), getStudyById reads BIBLE_STUDIES (module global), addToHistory reads enabledRef + readHistory state via closure (see use-history.js:13-14 — the hook's header explicitly documents this auto-track effect as a future extraction candidate that lives here because of App()-local helper deps). All three change identity every render but behave identically; adding them to deps would force an every-render fire and lose the nav-change intent. POST-Q3: candidate for `useNavHistoryTracking({navState}, {addToHistory, _findLetter, getStudyById})` extraction.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
 
   const fromMatthewChRef = useRefMirror(fromMatthewCh);  // also used in the render (~line 3001)
@@ -850,6 +853,7 @@ function App() {
       setScreen("home");setBookId(null);setChapterNum(null);
     };
     return () => {if (window.__goHome) delete window.__goHome;};
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: window.__goHome wired once + cleaned up at unmount. setFromSearch/setFromWtlb/setFromLetterStack/setScreen/setBookId/setChapterNum are all useState setters from useTabs/useFromLetterStack (identity-stable per React invariant).
   }, []);
 
   /* useAndroidBack(...) call → moved below, after goStudiesHome — that
@@ -1124,6 +1128,7 @@ function App() {
     activeIdx: activeTabIdx,
     onOpen: goTabs,
     isOnTabsScreen: tabsOverviewOpen
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- goTabs is an App()-local nav helper (line 554) whose body only calls state setters + reads stable values; adding it to deps would force this useMemo to rebuild on every parent render (since goTabs identity changes per render), defeating the memoization. The TabsContext consumers only need a fresh value when the LISTED deps change.
   }), [settings.tabsEnabled, tabs.length, activeTabIdx, tabsOverviewOpen]);
 
   function colReadNavProps(volKey, clearSurprise) {
