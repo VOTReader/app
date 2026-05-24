@@ -1,8 +1,10 @@
 name: CI
 
-# Day-one pipeline (Q1): prove all 4 bundles compile and every src/ module
-# parses. Typecheck / lint / test steps land later — Q4 / Q6 / Q5 — as those
-# tools are introduced. See quality-uplift-plan.txt.
+# CI pipeline:
+#   Q1 — build all 4 bundles, verify committed dist/ matches source, syntax-check src/
+#   Q3.4 — lint gate: 0 errors enforced by eslint's default (any error → nonzero exit),
+#          warning ceiling pinned by --max-warnings; ratchet down with each Q3.3e fix
+# Typecheck / test land later (Q4 / Q5). See quality-uplift-plan.txt.
 
 on:
   push:
@@ -31,6 +33,15 @@ jobs:
 
       - name: Install dependencies (npm ci — exact lockfile)
         run: npm ci
+
+      - name: Lint (0 errors hard gate, warning ceiling --max-warnings)
+        # `npm run lint` chains `npm run lint:globals` (regenerates the
+        # auto-globals list) and `eslint app/src/main/assets/src`. ESLint
+        # exits nonzero on ANY error, so the 0-error floor (achieved at
+        # 7eb491b) is enforced for free — no flag needed.
+        # --max-warnings is the ratchet: drops with each Q3.3e commit
+        # until exhaustive-deps warnings reach 0, then the value stays at 0.
+        run: npm run lint -- --max-warnings 59
 
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build
