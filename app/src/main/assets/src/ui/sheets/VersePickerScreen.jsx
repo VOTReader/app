@@ -68,7 +68,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
       r.selectNodeContents(textEl);
       try {
         r.setEnd(container, offset);
-      } catch (e) {
+      } catch (_e) {
         // Selection endpoint sits outside the verse text (e.g. on the
         // verse-number span). Snap to 0 or verse-text length depending on
         // which side this is.
@@ -119,7 +119,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     try {
       const sel = window.getSelection();
       sel && sel.removeAllRanges && sel.removeAllRanges();
-    } catch (e) { /* DOM access — element may not exist or API unsupported */ }
+    } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
   }, [verses]);
 
   const confirmLink = React.useCallback(() => {

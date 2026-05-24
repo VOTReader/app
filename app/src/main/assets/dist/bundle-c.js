@@ -488,7 +488,7 @@
       range.selectNodeContents(container);
       range.setEndAfter(mark);
       return range.toString().length;
-    } catch (e) {
+    } catch (_e) {
       return -1;
     }
   }

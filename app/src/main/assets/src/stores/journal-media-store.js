@@ -79,7 +79,7 @@ export var JournalMediaStore = (function() {
           var req = store.put(record);
           req.onsuccess = function() {
             // Pre-warm the URL cache so the next render is instant.
-            try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
+            try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
             resolve(record.id);
           };
           req.onerror = function(e) { reject(e.target.error); };
@@ -101,7 +101,7 @@ export var JournalMediaStore = (function() {
     delete: function(id) {
       if (!id) return Promise.resolve();
       if (_urlCache[id]) {
-        try { URL.revokeObjectURL(_urlCache[id]); } catch (e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
+        try { URL.revokeObjectURL(_urlCache[id]); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
         delete _urlCache[id];
       }
       return tx('readwrite').then(function(store) {
@@ -164,7 +164,7 @@ export var JournalMediaStore = (function() {
           var url = URL.createObjectURL(rec.blob);
           _urlCache[id] = url;
           return url;
-        } catch (e) { return null; }
+        } catch (_e) { return null; }
       });
     },
 
@@ -203,7 +203,7 @@ export var JournalMediaStore = (function() {
           var ctx = canvas.getContext('2d');
           if (!ctx) { cleanup && cleanup(); reject(new Error('Canvas 2D unavailable')); return; }
           try { ctx.drawImage(source, 0, 0, nw, nh); }
-          catch (e) { cleanup && cleanup(); reject(new Error('Image draw failed')); return; }
+          catch (_e) { cleanup && cleanup(); reject(new Error('Image draw failed')); return; }
           if (!canvas.toBlob) {
             // Pre-toBlob WebView fallback: dataURL → Blob.
             cleanup && cleanup();
@@ -213,7 +213,7 @@ export var JournalMediaStore = (function() {
               var arr = new Uint8Array(bin.length);
               for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
               resolve({ blob: new Blob([arr], { type: 'image/jpeg' }), width: nw, height: nh });
-            } catch (e2) { reject(new Error('Image encoding failed')); }
+            } catch (_e2) { reject(new Error('Image encoding failed')); }
             return;
           }
           canvas.toBlob(function(blob) {
@@ -234,7 +234,7 @@ export var JournalMediaStore = (function() {
         return createImageBitmap(fileOrBlob, { imageOrientation: 'from-image' })
           .then(function(bmp) {
             return encodeFrom(bmp, bmp.width, bmp.height, function() {
-              try { bmp.close && bmp.close(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+              try { bmp.close && bmp.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
             });
           })
           .catch(function() {
@@ -242,7 +242,7 @@ export var JournalMediaStore = (function() {
             // without the option, then fall back to the <img> path.
             return createImageBitmap(fileOrBlob).then(function(bmp) {
               return encodeFrom(bmp, bmp.width, bmp.height, function() {
-                try { bmp.close && bmp.close(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+                try { bmp.close && bmp.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
               });
             }).catch(function() { return imgPath(); });
           });

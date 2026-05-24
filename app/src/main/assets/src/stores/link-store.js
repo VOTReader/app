@@ -41,7 +41,7 @@ export const LinkStore = Object.assign(CachedStore('vot-links', []), {
   _load() {
     if (this._cache) return this._cache;
     try { this._cache = JSON.parse(localStorage.getItem('vot-links') || '[]'); }
-    catch (e) { this._cache = []; }
+    catch (_e) { this._cache = []; }
 
     // Migrate legacy {a, b} records → {source, target}. Coalesce FIRST so a
     // half-migrated record (source set but a still present, or vice-versa —

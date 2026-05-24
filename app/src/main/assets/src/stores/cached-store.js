@@ -13,7 +13,7 @@ export function CachedStore(storageKey, defaultVal) {
     _load() {
       if (this._cache) return this._cache;
       try { this._cache = JSON.parse(localStorage.getItem(storageKey) || JSON.stringify(defaultVal)); }
-      catch (e) { this._cache = typeof defaultVal === 'object' ? (Array.isArray(defaultVal) ? [] : {}) : defaultVal; }
+      catch (_e) { this._cache = typeof defaultVal === 'object' ? (Array.isArray(defaultVal) ? [] : {}) : defaultVal; }
       return this._cache;
     },
     _save() {

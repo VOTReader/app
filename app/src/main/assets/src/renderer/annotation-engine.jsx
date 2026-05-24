@@ -156,7 +156,7 @@ function _markCharEnd(mark) {
     range.selectNodeContents(container);
     range.setEndAfter(mark);
     return range.toString().length;
-  } catch (e) { return -1; }
+  } catch (_e) { return -1; }
 }
 
 export function applyNoteIcons() {

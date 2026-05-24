@@ -200,7 +200,7 @@ function App() {
           try {
             const el = document.querySelector('[data-hl-key="' + sk.replace(/"/g, '\\"') + '"]');
             if (el) el.scrollIntoView({ block: 'center' });
-          } catch (e) { /* DOM access — element may not exist or API unsupported */ }
+          } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
         }, 70);
       }
     }, 0);
@@ -242,12 +242,12 @@ function App() {
   // Prophecy card expand/collapse state — persisted to localStorage
   // Key format: "chapterId:blockIndex:cardType" → boolean
   const prophecyCardStatesRef = React.useRef(() => {
-    try {return JSON.parse(localStorage.getItem("vot-prophecy-cards") || "{}");} catch (e) {return {};}
+    try {return JSON.parse(localStorage.getItem("vot-prophecy-cards") || "{}");} catch (_e) {return {};}
   });
   // Lazy-init: if it's still the initializer function, call it
   if (typeof prophecyCardStatesRef.current === "function") prophecyCardStatesRef.current = prophecyCardStatesRef.current();
   const saveProphecyCardStates = useCallback(() => {
-    try {localStorage.setItem("vot-prophecy-cards", JSON.stringify(prophecyCardStatesRef.current));} catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+    try {localStorage.setItem("vot-prophecy-cards", JSON.stringify(prophecyCardStatesRef.current));} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
   }, []);
   /* cancelDwell + scheduleDwell + pauseDwell + setActiveReadKey + __onDwellCommit effect → src/hooks/use-reading-dwell.js (P6f) */
   const setLastReadForVol = (volId, id) => {
@@ -388,7 +388,7 @@ function App() {
   const [titleFocusHidden, setTitleFocusHidden] = tabField('titleFocusHidden');
   const [headingsFocusHidden, setHeadingsFocusHidden] = tabField('headingsFocusHidden');
   const [showWelcome, setShowWelcome] = useState(() => {
-    try {return !localStorage.getItem('vot-welcomed');} catch (e) {return true;}
+    try {return !localStorage.getItem('vot-welcomed');} catch (_e) {return true;}
   });
   const [isOnline, setIsOnline] = useState(false);
   useEffect(() => {
@@ -402,7 +402,7 @@ function App() {
     return () => {cancelled = true;};
   }, [showWelcome]);
   const dismissWelcome = () => {
-    try {localStorage.setItem('vot-welcomed', '1');} catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+    try {localStorage.setItem('vot-welcomed', '1');} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
     setShowWelcome(false);
     // First-time users see the About intro right after the splash. After
     // CONTINUE marks `vot-about-seen`, this path becomes a no-op and the
@@ -412,7 +412,7 @@ function App() {
         setNavOrigin({ screen: 'home', bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
         setScreen('about');
       }
-    } catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+    } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
   };
   // Tab-local search/nav breadcrumbs (each tab has its own search context)
   const [searchQuery, setSearchQuery] = tabField('searchQuery');
@@ -658,7 +658,7 @@ function App() {
     if (col && col.indexScreen) { setScreen(col.indexScreen); return; }
     if (id === "garden") {
       let acked = false;
-      try {acked = !!localStorage.getItem('vot-garden-warning-acked');} catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+      try {acked = !!localStorage.getItem('vot-garden-warning-acked');} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
       if (acked) setScreen("garden-view");else
       setGardenWarningOpen(true);
     }
@@ -1320,11 +1320,11 @@ function App() {
       {screen === "about" && (
         <AboutScreen
           onContinue={() => {
-            try { localStorage.setItem('vot-about-seen', '1'); } catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+            try { localStorage.setItem('vot-about-seen', '1'); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
             goNavOrigin();
           }}
           onBack={() => {
-            try { localStorage.setItem('vot-about-seen', '1'); } catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+            try { localStorage.setItem('vot-about-seen', '1'); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
             goNavOrigin();
           }}
           onSearch={goSearch}
@@ -2052,7 +2052,7 @@ function App() {
                   onClick={() => setGardenWarningOpen(false)}>Go Back</button>
                 <button className="garden-warning-btn garden-warning-btn-proceed"
                   onClick={() => {
-                    try {localStorage.setItem('vot-garden-warning-acked', '1');} catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+                    try {localStorage.setItem('vot-garden-warning-acked', '1');} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
                     setGardenWarningOpen(false);
                     setScreen("garden-view");
                   }}>Proceed</button>

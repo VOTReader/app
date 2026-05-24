@@ -151,9 +151,9 @@ export function JournalEditorScreen(props) {
           referencedElsewhere = (typeof JournalStore !== 'undefined' && JournalStore.isMediaReferencedElsewhere)
             ? JournalStore.isMediaReferencedElsewhere(removed.mediaId, entryIdRef.current)
             : false;
-        } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+        } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
         if (!isLinkedEmbed && !reusedHere && !referencedElsewhere) {
-          try { JournalMediaStore.delete(removed.mediaId); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+          try { JournalMediaStore.delete(removed.mediaId); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
         }
       }
       return next.length === 0 ? JournalHelpers.defaultBlocks() : next;
@@ -233,7 +233,7 @@ export function JournalEditorScreen(props) {
     pendingFocusIdRef.current = null;
     var el = blocksContainerRef.current && blocksContainerRef.current.querySelector('[data-block-id="' + pid + '"] textarea');
     if (el) {
-      try { el.focus(); el.setSelectionRange(0, 0); } catch (e) { /* DOM access — element may not exist or API unsupported */ }
+      try { el.focus(); el.setSelectionRange(0, 0); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
     }
   });
 
@@ -475,7 +475,7 @@ export function JournalEditorScreen(props) {
     var tas = container.querySelectorAll('.jrn-block-textarea');
     if (tas.length > 0) {
       var last = tas[tas.length - 1];
-      try { last.focus(); last.setSelectionRange(last.value.length, last.value.length); } catch (e) { /* DOM access — element may not exist or API unsupported */ }
+      try { last.focus(); last.setSelectionRange(last.value.length, last.value.length); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
       return;
     }
     // No text block exists — append a fresh paragraph.

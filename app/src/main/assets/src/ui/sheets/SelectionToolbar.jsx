@@ -43,7 +43,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
   React.useEffect(() => {
     window.__hideSelectionToolbar = () => {
       setVisible(false);
-      try { const s = window.getSelection(); if (s) s.removeAllRanges(); } catch (e) { /* DOM access — element may not exist or API unsupported */ }
+      try { const s = window.getSelection(); if (s) s.removeAllRanges(); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
     };
     return () => { window.__hideSelectionToolbar = null; };
   }, []);
@@ -65,7 +65,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon').forEach(function(el) { el.remove(); });
           return frag.textContent.trim();
-        } catch (e) {
+        } catch (_e) {
           return sel.toString().trim();
         }
       })();
@@ -168,7 +168,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
                     if (g) overlapGids.add(g);
                   }
                 });
-              } catch (e) { /* DOM access — element may not exist or API unsupported */ }
+              } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
               if (overlapGids.size > 1 && window.__showMultiNote) {
                 window.__showMultiNote([...overlapGids], pos.x, pos.y);
                 return;

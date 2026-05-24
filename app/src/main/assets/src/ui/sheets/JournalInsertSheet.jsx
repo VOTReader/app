@@ -22,7 +22,7 @@ export function JournalInsertSheet(props) {
   var _drilled = useState(null);
   var drilledEntry = _drilled[0]; var setDrilledEntry = _drilled[1];
 
-  function close() { try { onClose && onClose(); } catch (e) { /* helper may throw on malformed data; treat as missing */ } }
+  function close() { try { onClose && onClose(); } catch (_e) { /* helper may throw on malformed data; treat as missing */ } }
 
   function emitBlock(block) {
     if (!block) { close(); return; }
@@ -357,7 +357,7 @@ export function JournalInsertSheet(props) {
     var noteLabel = (typeof noteSourceLabel === 'function') ? noteSourceLabel : function() { return ''; };
     var filtered = filterByText(notes, function(n) {
       var src = '';
-      try { src = noteLabel(n) || ''; } catch (e) { /* helper may throw on malformed data; treat as missing */ }
+      try { src = noteLabel(n) || ''; } catch (_e) { /* helper may throw on malformed data; treat as missing */ }
       return (n.body || '') + ' ' + (n.fullText || '') + ' ' + src;
     });
     return (
@@ -370,7 +370,7 @@ export function JournalInsertSheet(props) {
                 var anchor = (n.fullText || '').substring(0, 80);
                 var label = (n.body || '').substring(0, 60) || anchor || 'Note';
                 var src = '';
-                try { src = noteLabel(n); } catch (e) { /* helper may throw on malformed data; treat as missing */ }
+                try { src = noteLabel(n); } catch (_e) { /* helper may throw on malformed data; treat as missing */ }
                 return (
                   <button key={n.groupId} type="button" className="jrn-picker-item" onClick={function() { chooseNote(n); }}>
                     <span className="jrn-picker-spine">NT</span>
@@ -395,8 +395,8 @@ export function JournalInsertSheet(props) {
     var filtered = filterByText(entries, function(e) {
       var title = '';
       var preview = '';
-      try { title = JournalHelpers.entryDisplayTitle(e) || ''; } catch (err) { /* helper may throw on malformed data; treat as missing */ }
-      try { preview = JournalHelpers.previewText(e, 400) || ''; } catch (err) { /* helper may throw on malformed data; treat as missing */ }
+      try { title = JournalHelpers.entryDisplayTitle(e) || ''; } catch (_err) { /* helper may throw on malformed data; treat as missing */ }
+      try { preview = JournalHelpers.previewText(e, 400) || ''; } catch (_err) { /* helper may throw on malformed data; treat as missing */ }
       var tags = (e.tags || []).join(' ');
       return title + ' ' + preview + ' ' + tags;
     });
@@ -410,10 +410,10 @@ export function JournalInsertSheet(props) {
             : filtered.map(function(e) {
                 var title = '';
                 var preview = '';
-                try { title = JournalHelpers.entryDisplayTitle(e) || 'Untitled'; } catch (err) { title = 'Untitled'; }
-                try { preview = JournalHelpers.previewText(e, 80) || ''; } catch (err) { /* helper may throw on malformed data; treat as missing */ }
+                try { title = JournalHelpers.entryDisplayTitle(e) || 'Untitled'; } catch (_err) { title = 'Untitled'; }
+                try { preview = JournalHelpers.previewText(e, 80) || ''; } catch (_err) { /* helper may throw on malformed data; treat as missing */ }
                 var dateStr = '';
-                try { dateStr = JournalHelpers.shortDate(e.created); } catch (err) { /* helper may throw on malformed data; treat as missing */ }
+                try { dateStr = JournalHelpers.shortDate(e.created); } catch (_err) { /* helper may throw on malformed data; treat as missing */ }
                 return (
                   <button key={e.id} type="button" className="jrn-picker-item" onClick={function() { chooseJournal(e); }}>
                     <span className="jrn-picker-spine">JR</span>
@@ -436,7 +436,7 @@ export function JournalInsertSheet(props) {
     var fresh = (typeof JournalStore !== 'undefined') ? (JournalStore.get(e.id) || e) : e;
     var blocks = (fresh.blocks || []).filter(JournalHelpers.isEmbeddableBlock);
     var dateStr = '';
-    try { dateStr = JournalHelpers.shortDate(fresh.created); } catch (err) { /* helper may throw on malformed data; treat as missing */ }
+    try { dateStr = JournalHelpers.shortDate(fresh.created); } catch (_err) { /* helper may throw on malformed data; treat as missing */ }
     var title = JournalHelpers.entryDisplayTitle(fresh) || 'Untitled';
     return (
       <>
@@ -499,7 +499,7 @@ export function JournalInsertSheet(props) {
         var all = (typeof NoteStore !== 'undefined') ? NoteStore.list() : [];
         if (nbId === 'uncategorized') return all.filter(function(n) { return !n.notebookIds || n.notebookIds.length === 0; }).length;
         return all.filter(function(n) { return (n.notebookIds || []).indexOf(nbId) >= 0; }).length;
-      } catch (e) { return 0; }
+      } catch (_e) { return 0; }
     };
     var rows = [{ id: 'uncategorized', name: 'Uncategorized' }].concat(nbs);
     var q = query.trim().toLowerCase();

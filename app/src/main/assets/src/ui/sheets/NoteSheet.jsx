@@ -185,7 +185,7 @@ export function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose
                 placeholder="Write your note…"
                 onFocus={() => {
                   setTimeout(() => {
-                    try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* DOM access — element may not exist or API unsupported */ }
+                    try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
                   }, 220);
                 }}
               />

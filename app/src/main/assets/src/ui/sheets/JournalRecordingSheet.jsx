@@ -62,35 +62,35 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     // the saved mode, so calling it again after onstop is harmless.
     var _abc = (typeof window !== 'undefined') ? window.AndroidBridge : null;
     if (_abc && typeof _abc.endAudioSession === 'function') {
-      try { _abc.endAudioSession(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { _abc.endAudioSession(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
     }
     // Native mode: abort the OS recorder + delete its temp file. Safe to call
     // even after a successful stop — Kotlin no-ops when the recorder is null.
     if (nativeRef.current && _abc && typeof _abc.nativeRecordCancel === 'function') {
-      try { _abc.nativeRecordCancel(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { _abc.nativeRecordCancel(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
     }
     nativeStateRef.current = 'inactive';
-    try { if (ampRef.current) clearInterval(ampRef.current); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+    try { if (ampRef.current) clearInterval(ampRef.current); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
     ampRef.current = 0;
-    try { if (rafRef.current) cancelAnimationFrame(rafRef.current); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
-    try { if (tickRef.current) clearInterval(tickRef.current); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+    try { if (rafRef.current) cancelAnimationFrame(rafRef.current); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+    try { if (tickRef.current) clearInterval(tickRef.current); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
     rafRef.current = 0;
     tickRef.current = 0;
     try {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
-    } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+    } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
     if (streamRef.current) {
-      try { streamRef.current.getTracks().forEach(function(t) { t.stop(); }); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { streamRef.current.getTracks().forEach(function(t) { t.stop(); }); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
       streamRef.current = null;
     }
     if (audioCtxRef.current) {
-      try { audioCtxRef.current.close(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { audioCtxRef.current.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
       audioCtxRef.current = null;
     }
     if (previewUrlRef.current) {
-      try { URL.revokeObjectURL(previewUrlRef.current); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { URL.revokeObjectURL(previewUrlRef.current); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
       previewUrlRef.current = null;
     }
   }
@@ -139,7 +139,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
 
       var _ab = (typeof window !== 'undefined') ? window.AndroidBridge : null;
       if (_ab && typeof _ab.startAudioSession === 'function') {
-        try { _ab.startAudioSession(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+        try { _ab.startAudioSession(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
       }
 
       var mime = '';
@@ -153,7 +153,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       try {
         rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       } catch (ctorErr) {
-        try { stream.getTracks().forEach(function(t) { t.stop(); }); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+        try { stream.getTracks().forEach(function(t) { t.stop(); }); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
         streamRef.current = null;
         console.warn('MediaRecorder construction failed', ctorErr);
         setError('Audio recording is not supported on this device.');
@@ -170,18 +170,18 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       rec.onstop = function() {
         var _ab2 = (typeof window !== 'undefined') ? window.AndroidBridge : null;
         if (_ab2 && typeof _ab2.endAudioSession === 'function') {
-          try { _ab2.endAudioSession(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+          try { _ab2.endAudioSession(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
         }
         var type = rec.mimeType || 'audio/webm';
         var blob = new Blob(chunksRef.current, { type: type });
         previewBlobRef.current = blob;
         if (streamRef.current) {
-          try { streamRef.current.getTracks().forEach(function(t) { t.stop(); }); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+          try { streamRef.current.getTracks().forEach(function(t) { t.stop(); }); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
           streamRef.current = null;
         }
-        if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ } audioCtxRef.current = null; }
+        if (audioCtxRef.current) { try { audioCtxRef.current.close(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ } audioCtxRef.current = null; }
         analyserRef.current = null;
-        try { previewUrlRef.current = URL.createObjectURL(blob); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+        try { previewUrlRef.current = URL.createObjectURL(blob); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
         setWaveFinal(samplesAccumRef.current.slice());
         if (pendingSaveRef.current) {
           pendingSaveRef.current = false;
@@ -202,7 +202,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           setSeconds(s);
           if (s >= 300) {
             previewDurationRef.current = s;
-            try { rec.stop(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+            try { rec.stop(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
             if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = 0; }
             if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
             setSeconds(s);
@@ -248,7 +248,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           };
           loop();
         }
-      } catch (e) { /* analyser optional */ }
+      } catch (_e) { /* analyser optional */ }
       }
     }).catch(function(err) {
       if (watchdog) { clearTimeout(watchdog); watchdog = 0; }
@@ -285,7 +285,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       var AB = window.AndroidBridge;
       nativeRef.current = true;
       var res;
-      try { res = AB.nativeRecordStart(); } catch (e) { res = 'error:exception'; }
+      try { res = AB.nativeRecordStart(); } catch (_e) { res = 'error:exception'; }
       if (res !== 'ok') {
         nativeRef.current = false;
         setError(
@@ -318,7 +318,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       ampRef.current = setInterval(function() {
         if (nativeStateRef.current !== 'recording') return;
         var amp = 0;
-        try { amp = AB.nativeRecordAmplitude() || 0; } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+        try { amp = AB.nativeRecordAmplitude() || 0; } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
         var lvl = Math.min(1, Math.sqrt(amp / 32767) * 1.8);
         samplesAccumRef.current.push(lvl);
         setWaveLive(samplesAccumRef.current.slice(-48));
@@ -328,9 +328,9 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     window.__onNativeRecordingComplete = function(b64, durMs, mime) {
       if (cancelled) return;
       nativeStateRef.current = 'inactive';
-      try { if (ampRef.current) clearInterval(ampRef.current); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { if (ampRef.current) clearInterval(ampRef.current); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
       ampRef.current = 0;
-      try { if (tickRef.current) clearInterval(tickRef.current); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { if (tickRef.current) clearInterval(tickRef.current); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
       tickRef.current = 0;
       if (!b64) {
         setError('Nothing was recorded. Try again and speak after the timer starts.');
@@ -343,7 +343,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
         var blob = new Blob([arr], { type: mime || 'audio/mp4' });
         previewBlobRef.current = blob;
-        try { previewUrlRef.current = URL.createObjectURL(blob); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+        try { previewUrlRef.current = URL.createObjectURL(blob); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
         var d = Math.max(1, Math.round((durMs || 0) / 1000));
         previewDurationRef.current = d;
         setWaveFinal(samplesAccumRef.current.slice());
@@ -378,7 +378,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         if (permDecided || cancelled) return;
         permDecided = true;
         if (permTimer) { clearTimeout(permTimer); permTimer = 0; }
-        try { delete window.__onMicPermissionResult; } catch (e) { window.__onMicPermissionResult = undefined; }
+        try { delete window.__onMicPermissionResult; } catch (_e) { window.__onMicPermissionResult = undefined; }
         if (granted) {
           startCapture();
         } else {
@@ -390,11 +390,11 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       permTimer = setTimeout(function() {
         if (permDecided || cancelled) return;
         permDecided = true;
-        try { delete window.__onMicPermissionResult; } catch (e) { window.__onMicPermissionResult = undefined; }
+        try { delete window.__onMicPermissionResult; } catch (_e) { window.__onMicPermissionResult = undefined; }
         startCapture();
       }, 15000);
       try { AB.requestMicPermission(); }
-      catch (e) {
+      catch (_e) {
         permDecided = true;
         if (permTimer) { clearTimeout(permTimer); permTimer = 0; }
         startCapture();
@@ -407,8 +407,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       cancelled = true;
       if (watchdog) { clearTimeout(watchdog); watchdog = 0; }
       if (permTimer) { clearTimeout(permTimer); permTimer = 0; }
-      try { delete window.__onMicPermissionResult; } catch (e) { window.__onMicPermissionResult = undefined; }
-      try { delete window.__onNativeRecordingComplete; } catch (e) { window.__onNativeRecordingComplete = undefined; }
+      try { delete window.__onMicPermissionResult; } catch (_e) { window.__onMicPermissionResult = undefined; }
+      try { delete window.__onNativeRecordingComplete; } catch (_e) { window.__onNativeRecordingComplete = undefined; }
       cleanup();
     };
   }, []);
@@ -417,7 +417,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     if (nativeRef.current) {
       if (nativeStateRef.current !== 'recording') return;
       var _ab = window.AndroidBridge;
-      try { if (_ab) _ab.nativeRecordPause(); } catch (e) { return; }
+      try { if (_ab) _ab.nativeRecordPause(); } catch (_e) { return; }
       accumulatedMsRef.current += (Date.now() - startTimeRef.current);
       nativeStateRef.current = 'paused';
       setStage('paused');
@@ -425,7 +425,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     }
     var rec = mediaRecorderRef.current;
     if (!rec || rec.state !== 'recording') return;
-    try { rec.pause(); } catch (e) { return; }
+    try { rec.pause(); } catch (_e) { return; }
     accumulatedMsRef.current += (Date.now() - startTimeRef.current);
     setStage('paused');
   }
@@ -434,7 +434,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     if (nativeRef.current) {
       if (nativeStateRef.current !== 'paused') return;
       var _ab = window.AndroidBridge;
-      try { if (_ab) _ab.nativeRecordResume(); } catch (e) { return; }
+      try { if (_ab) _ab.nativeRecordResume(); } catch (_e) { return; }
       startTimeRef.current = Date.now();
       nativeStateRef.current = 'recording';
       setStage('recording');
@@ -442,7 +442,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     }
     var rec = mediaRecorderRef.current;
     if (!rec || rec.state !== 'paused') return;
-    try { rec.resume(); } catch (e) { return; }
+    try { rec.resume(); } catch (_e) { return; }
     startTimeRef.current = Date.now();
     setStage('recording');
   }
@@ -456,7 +456,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = 0; }
       if (ampRef.current) { clearInterval(ampRef.current); ampRef.current = 0; }
       var _ab = window.AndroidBridge;
-      try { if (_ab) _ab.nativeRecordStop(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { if (_ab) _ab.nativeRecordStop(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
       setStage('preview');
       return;
     }
@@ -465,7 +465,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       var totalMs2 = accumulatedMsRef.current;
       if (rec.state === 'recording') totalMs2 += (Date.now() - startTimeRef.current);
       previewDurationRef.current = Math.max(1, Math.floor(totalMs2 / 1000));
-      try { rec.stop(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+      try { rec.stop(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
     }
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = 0; }
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
@@ -512,7 +512,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       var rec = mediaRecorderRef.current;
       if (rec && rec.state !== 'inactive') {
         pendingSaveRef.current = true;
-        try { rec.stop(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
+        try { rec.stop(); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
         return;
       }
       pendingSaveRef.current = true;

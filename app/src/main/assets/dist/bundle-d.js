@@ -1040,7 +1040,7 @@
         };
         req.onsuccess = (e) => resolve(e.target.result);
         req.onerror = () => resolve(null);
-      } catch (e) {
+      } catch (_e) {
         resolve(null);
       }
     });
@@ -1056,7 +1056,7 @@
           tx.oncomplete = () => resolve();
           tx.onerror = () => resolve();
           tx.onabort = () => resolve();
-        } catch (e) {
+        } catch (_e) {
           resolve();
         }
       });
@@ -1071,7 +1071,7 @@
           tx.objectStore(THUMB_STORE).delete(key);
           tx.oncomplete = () => resolve();
           tx.onerror = () => resolve();
-        } catch (e) {
+        } catch (_e) {
           resolve();
         }
       });
@@ -1095,7 +1095,7 @@
               resolve(out);
           };
           req.onerror = () => resolve(out);
-        } catch (e) {
+        } catch (_e) {
           resolve({});
         }
       });
@@ -1682,7 +1682,7 @@
       try {
         const el = document.querySelector(`.fn-ref[data-fn-num="${num}"]`);
         if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-      } catch (e) {
+      } catch (_e) {
       }
     };
     return /* @__PURE__ */ React.createElement("div", { className: "footnote-list" }, /* @__PURE__ */ React.createElement("div", { className: "footnote-list-header" }, "Footnotes"), entries.map(([num, fn]) => /* @__PURE__ */ React.createElement(
@@ -3573,7 +3573,7 @@
           try {
             URL.revokeObjectURL(url);
             a.remove();
-          } catch (e) {
+          } catch (_e) {
           }
         }, 0);
       } catch (e) {
@@ -3597,7 +3597,7 @@
           _collectVotKeys().forEach((k) => {
             try {
               localStorage.removeItem(k);
-            } catch (e) {
+            } catch (_e) {
             }
           });
           Object.keys(parsed.data).forEach((k) => {
@@ -3622,7 +3622,7 @@
           if (!b64OrNull) return;
           try {
             _doImport(atob(b64OrNull));
-          } catch (e) {
+          } catch (_e) {
             alert("Import failed: could not decode file.");
           }
         };
@@ -3648,16 +3648,16 @@
         _collectVotKeys().forEach((k) => {
           try {
             localStorage.removeItem(k);
-          } catch (e) {
+          } catch (_e) {
           }
         });
         try {
           indexedDB.deleteDatabase("vot-thumbs");
-        } catch (e) {
+        } catch (_e) {
         }
         try {
           indexedDB.deleteDatabase("vot-search-cache");
-        } catch (e) {
+        } catch (_e) {
         }
         alert("All personal data cleared. The app will now reload.");
         window.location.reload();
@@ -4018,7 +4018,7 @@
       try {
         const saved = JSON.parse(localStorage.getItem("vot-home-order") || "null");
         if (Array.isArray(saved) && saved.length === DEFAULT_ORDER.length && DEFAULT_ORDER.every((id) => saved.includes(id))) return saved;
-      } catch (e) {
+      } catch (_e) {
       }
       return DEFAULT_ORDER;
     });
@@ -4094,7 +4094,7 @@
         if (dragIdxRef.current >= 0 && e.cancelable) {
           try {
             e.preventDefault();
-          } catch (err) {
+          } catch (_err) {
           }
         }
         if (dragIdxRef.current >= 0) {
@@ -4185,7 +4185,7 @@
         if (navigator.vibrate) {
           try {
             navigator.vibrate(55);
-          } catch (e) {
+          } catch (_e) {
           }
         }
       }, 1380);
@@ -4218,7 +4218,7 @@
             setOrder(newOrder);
             try {
               localStorage.setItem("vot-home-order", JSON.stringify(newOrder));
-            } catch (e) {
+            } catch (_e) {
             }
           }
           setDragIdx(-1);
@@ -6214,7 +6214,7 @@
           setTimeout(() => {
             try {
               textareaRef.current && textareaRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
-            } catch (e) {
+            } catch (_e) {
             }
           }, 220);
         }
@@ -6429,7 +6429,7 @@
         r.selectNodeContents(textEl);
         try {
           r.setEnd(container, offset);
-        } catch (e) {
+        } catch (_e) {
           return 0;
         }
         return r.toString().length;
@@ -6469,7 +6469,7 @@
       try {
         const sel = window.getSelection();
         sel && sel.removeAllRanges && sel.removeAllRanges();
-      } catch (e) {
+      } catch (_e) {
       }
     }, [verses]);
     const confirmLink = React.useCallback(() => {
@@ -6723,7 +6723,7 @@
         try {
           const s = window.getSelection();
           if (s) s.removeAllRanges();
-        } catch (e) {
+        } catch (_e) {
         }
       };
       return () => {
@@ -6746,7 +6746,7 @@
               el.remove();
             });
             return frag.textContent.trim();
-          } catch (e) {
+          } catch (_e) {
             return sel.toString().trim();
           }
         })();
@@ -6853,7 +6853,7 @@
                       if (g) overlapGids.add(g);
                     }
                   });
-                } catch (e2) {
+                } catch (_e) {
                 }
                 if (overlapGids.size > 1 && window.__showMultiNote) {
                   window.__showMultiNote([...overlapGids], pos2.x, pos2.y);
@@ -7811,7 +7811,7 @@
             try {
               const el = document.querySelector('[data-hl-key="' + sk.replace(/"/g, '\\"') + '"]');
               if (el) el.scrollIntoView({ block: "center" });
-            } catch (e) {
+            } catch (_e) {
             }
           }, 70);
         }
@@ -7833,7 +7833,7 @@
     const prophecyCardStatesRef = React.useRef(() => {
       try {
         return JSON.parse(localStorage.getItem("vot-prophecy-cards") || "{}");
-      } catch (e) {
+      } catch (_e) {
         return {};
       }
     });
@@ -7841,7 +7841,7 @@
     const saveProphecyCardStates = useCallback(() => {
       try {
         localStorage.setItem("vot-prophecy-cards", JSON.stringify(prophecyCardStatesRef.current));
-      } catch (e) {
+      } catch (_e) {
       }
     }, []);
     const setLastReadForVol = (volId, id) => {
@@ -7966,7 +7966,7 @@
     const [showWelcome, setShowWelcome] = useState(() => {
       try {
         return !localStorage.getItem("vot-welcomed");
-      } catch (e) {
+      } catch (_e) {
         return true;
       }
     });
@@ -7988,7 +7988,7 @@
     const dismissWelcome = () => {
       try {
         localStorage.setItem("vot-welcomed", "1");
-      } catch (e) {
+      } catch (_e) {
       }
       setShowWelcome(false);
       try {
@@ -7996,7 +7996,7 @@
           setNavOrigin({ screen: "home", bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
           setScreen("about");
         }
-      } catch (e) {
+      } catch (_e) {
       }
     };
     const [searchQuery, setSearchQuery] = tabField("searchQuery");
@@ -8322,7 +8322,7 @@
         let acked = false;
         try {
           acked = !!localStorage.getItem("vot-garden-warning-acked");
-        } catch (e) {
+        } catch (_e) {
         }
         if (acked) setScreen("garden-view");
         else
@@ -9002,14 +9002,14 @@
         onContinue: () => {
           try {
             localStorage.setItem("vot-about-seen", "1");
-          } catch (e) {
+          } catch (_e) {
           }
           goNavOrigin();
         },
         onBack: () => {
           try {
             localStorage.setItem("vot-about-seen", "1");
-          } catch (e) {
+          } catch (_e) {
           }
           goNavOrigin();
         },
@@ -9588,7 +9588,7 @@
           onClick: () => {
             try {
               localStorage.setItem("vot-garden-warning-acked", "1");
-            } catch (e) {
+            } catch (_e) {
             }
             setGardenWarningOpen(false);
             setScreen("garden-view");

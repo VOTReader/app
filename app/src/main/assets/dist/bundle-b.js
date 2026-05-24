@@ -353,7 +353,7 @@
         if (this._cache) return this._cache;
         try {
           this._cache = JSON.parse(localStorage.getItem(storageKey) || JSON.stringify(defaultVal));
-        } catch (e) {
+        } catch (_e) {
           this._cache = typeof defaultVal === "object" ? Array.isArray(defaultVal) ? [] : {} : defaultVal;
         }
         return this._cache;
@@ -673,7 +673,7 @@
       if (this._cache) return this._cache;
       try {
         this._cache = JSON.parse(localStorage.getItem("vot-links") || "[]");
-      } catch (e) {
+      } catch (_e) {
         this._cache = [];
       }
       let migrated = false;
@@ -848,7 +848,7 @@
             req.onsuccess = function() {
               try {
                 _urlCache[record.id] = URL.createObjectURL(record.blob);
-              } catch (e) {
+              } catch (_e) {
               }
               resolve(record.id);
             };
@@ -877,7 +877,7 @@
         if (_urlCache[id]) {
           try {
             URL.revokeObjectURL(_urlCache[id]);
-          } catch (e) {
+          } catch (_e) {
           }
           delete _urlCache[id];
         }
@@ -945,7 +945,7 @@
             var url = URL.createObjectURL(rec.blob);
             _urlCache[id] = url;
             return url;
-          } catch (e) {
+          } catch (_e) {
             return null;
           }
         });
@@ -1001,7 +1001,7 @@
             }
             try {
               ctx.drawImage(source, 0, 0, nw, nh);
-            } catch (e) {
+            } catch (_e) {
               cleanup && cleanup();
               reject(new Error("Image draw failed"));
               return;
@@ -1014,7 +1014,7 @@
                 var arr = new Uint8Array(bin.length);
                 for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
                 resolve({ blob: new Blob([arr], { type: "image/jpeg" }), width: nw, height: nh });
-              } catch (e2) {
+              } catch (_e2) {
                 reject(new Error("Image encoding failed"));
               }
               return;
@@ -1038,7 +1038,7 @@
             return encodeFrom(bmp, bmp.width, bmp.height, function() {
               try {
                 bmp.close && bmp.close();
-              } catch (e) {
+              } catch (_e) {
               }
             });
           }).catch(function() {
@@ -1046,7 +1046,7 @@
               return encodeFrom(bmp, bmp.width, bmp.height, function() {
                 try {
                   bmp.close && bmp.close();
-                } catch (e) {
+                } catch (_e) {
                 }
               });
             }).catch(function() {
@@ -1403,7 +1403,7 @@
             if (hit) linkIds.push(ln.id);
           });
         }
-      } catch (e) {
+      } catch (_e) {
       }
       return {
         annKeys,
@@ -1466,7 +1466,7 @@
             LinkStore.remove(lid);
           });
         }
-      } catch (e) {
+      } catch (_e) {
       }
     },
     remove(id) {
@@ -1729,7 +1729,7 @@
         _validateTabState(s);
         if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
         return s;
-      } catch (e) {
+      } catch (_e) {
         return {};
       }
     }, []);
@@ -1848,7 +1848,7 @@
         try {
           const dataUrl = window.AndroidBridge.takeScreenshot(navHeightDp, 1440, 90);
           applyThumb(dataUrl);
-        } catch (e) {
+        } catch (_e) {
         }
         captureInFlightRef.current = false;
         document.body.classList.remove("capturing-thumb");
@@ -1887,7 +1887,7 @@
           captureInFlightRef.current = false;
           document.body.classList.remove("capturing-thumb");
         });
-      } catch (e) {
+      } catch (_e) {
         captureInFlightRef.current = false;
         document.body.classList.remove("capturing-thumb");
       }
@@ -2844,7 +2844,7 @@
         } else if (s === "about") {
           try {
             localStorage.setItem("vot-about-seen", "1");
-          } catch (e) {
+          } catch (_e) {
           }
           goNavOrigin();
           return "true";
@@ -3650,28 +3650,28 @@
       if (_abc && typeof _abc.endAudioSession === "function") {
         try {
           _abc.endAudioSession();
-        } catch (e) {
+        } catch (_e) {
         }
       }
       if (nativeRef.current && _abc && typeof _abc.nativeRecordCancel === "function") {
         try {
           _abc.nativeRecordCancel();
-        } catch (e) {
+        } catch (_e) {
         }
       }
       nativeStateRef.current = "inactive";
       try {
         if (ampRef.current) clearInterval(ampRef.current);
-      } catch (e) {
+      } catch (_e) {
       }
       ampRef.current = 0;
       try {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      } catch (e) {
+      } catch (_e) {
       }
       try {
         if (tickRef.current) clearInterval(tickRef.current);
-      } catch (e) {
+      } catch (_e) {
       }
       rafRef.current = 0;
       tickRef.current = 0;
@@ -3679,28 +3679,28 @@
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
           mediaRecorderRef.current.stop();
         }
-      } catch (e) {
+      } catch (_e) {
       }
       if (streamRef.current) {
         try {
           streamRef.current.getTracks().forEach(function(t) {
             t.stop();
           });
-        } catch (e) {
+        } catch (_e) {
         }
         streamRef.current = null;
       }
       if (audioCtxRef.current) {
         try {
           audioCtxRef.current.close();
-        } catch (e) {
+        } catch (_e) {
         }
         audioCtxRef.current = null;
       }
       if (previewUrlRef.current) {
         try {
           URL.revokeObjectURL(previewUrlRef.current);
-        } catch (e) {
+        } catch (_e) {
         }
         previewUrlRef.current = null;
       }
@@ -3751,7 +3751,7 @@
             if (_ab && typeof _ab.startAudioSession === "function") {
               try {
                 _ab.startAudioSession();
-              } catch (e) {
+              } catch (_e) {
               }
             }
             var mime = "";
@@ -3770,7 +3770,7 @@
                 stream.getTracks().forEach(function(t) {
                   t.stop();
                 });
-              } catch (e) {
+              } catch (_e) {
               }
               streamRef.current = null;
               console.warn("MediaRecorder construction failed", ctorErr);
@@ -3789,7 +3789,7 @@
               if (_ab2 && typeof _ab2.endAudioSession === "function") {
                 try {
                   _ab2.endAudioSession();
-                } catch (e) {
+                } catch (_e) {
                 }
               }
               var type = rec.mimeType || "audio/webm";
@@ -3800,21 +3800,21 @@
                   streamRef.current.getTracks().forEach(function(t) {
                     t.stop();
                   });
-                } catch (e) {
+                } catch (_e) {
                 }
                 streamRef.current = null;
               }
               if (audioCtxRef.current) {
                 try {
                   audioCtxRef.current.close();
-                } catch (e) {
+                } catch (_e) {
                 }
                 audioCtxRef.current = null;
               }
               analyserRef.current = null;
               try {
                 previewUrlRef.current = URL.createObjectURL(blob);
-              } catch (e) {
+              } catch (_e) {
               }
               setWaveFinal(samplesAccumRef.current.slice());
               if (pendingSaveRef.current) {
@@ -3836,7 +3836,7 @@
                   previewDurationRef.current = s;
                   try {
                     rec.stop();
-                  } catch (e) {
+                  } catch (_e) {
                   }
                   if (tickRef.current) {
                     clearInterval(tickRef.current);
@@ -3888,7 +3888,7 @@
                   };
                   loop();
                 }
-              } catch (e) {
+              } catch (_e) {
               }
             }
           }).catch(function(err) {
@@ -3925,7 +3925,7 @@
         var res;
         try {
           res = AB2.nativeRecordStart();
-        } catch (e) {
+        } catch (_e) {
           res = "error:exception";
         }
         if (res !== "ok") {
@@ -3958,7 +3958,7 @@
           var amp = 0;
           try {
             amp = AB2.nativeRecordAmplitude() || 0;
-          } catch (e) {
+          } catch (_e) {
           }
           var lvl = Math.min(1, Math.sqrt(amp / 32767) * 1.8);
           samplesAccumRef.current.push(lvl);
@@ -3970,12 +3970,12 @@
         nativeStateRef.current = "inactive";
         try {
           if (ampRef.current) clearInterval(ampRef.current);
-        } catch (e) {
+        } catch (_e) {
         }
         ampRef.current = 0;
         try {
           if (tickRef.current) clearInterval(tickRef.current);
-        } catch (e) {
+        } catch (_e) {
         }
         tickRef.current = 0;
         if (!b64) {
@@ -3991,7 +3991,7 @@
           previewBlobRef.current = blob;
           try {
             previewUrlRef.current = URL.createObjectURL(blob);
-          } catch (e) {
+          } catch (_e) {
           }
           var d = Math.max(1, Math.round((durMs || 0) / 1e3));
           previewDurationRef.current = d;
@@ -4030,7 +4030,7 @@
           }
           try {
             delete window.__onMicPermissionResult;
-          } catch (e) {
+          } catch (_e) {
             window.__onMicPermissionResult = void 0;
           }
           if (granted) {
@@ -4046,14 +4046,14 @@
           permDecided = true;
           try {
             delete window.__onMicPermissionResult;
-          } catch (e) {
+          } catch (_e) {
             window.__onMicPermissionResult = void 0;
           }
           startCapture();
         }, 15e3);
         try {
           AB.requestMicPermission();
-        } catch (e) {
+        } catch (_e) {
           permDecided = true;
           if (permTimer) {
             clearTimeout(permTimer);
@@ -4076,12 +4076,12 @@
         }
         try {
           delete window.__onMicPermissionResult;
-        } catch (e) {
+        } catch (_e) {
           window.__onMicPermissionResult = void 0;
         }
         try {
           delete window.__onNativeRecordingComplete;
-        } catch (e) {
+        } catch (_e) {
           window.__onNativeRecordingComplete = void 0;
         }
         cleanup();
@@ -4093,7 +4093,7 @@
         var _ab = window.AndroidBridge;
         try {
           if (_ab) _ab.nativeRecordPause();
-        } catch (e) {
+        } catch (_e) {
           return;
         }
         accumulatedMsRef.current += Date.now() - startTimeRef.current;
@@ -4105,7 +4105,7 @@
       if (!rec || rec.state !== "recording") return;
       try {
         rec.pause();
-      } catch (e) {
+      } catch (_e) {
         return;
       }
       accumulatedMsRef.current += Date.now() - startTimeRef.current;
@@ -4117,7 +4117,7 @@
         var _ab = window.AndroidBridge;
         try {
           if (_ab) _ab.nativeRecordResume();
-        } catch (e) {
+        } catch (_e) {
           return;
         }
         startTimeRef.current = Date.now();
@@ -4129,7 +4129,7 @@
       if (!rec || rec.state !== "paused") return;
       try {
         rec.resume();
-      } catch (e) {
+      } catch (_e) {
         return;
       }
       startTimeRef.current = Date.now();
@@ -4152,7 +4152,7 @@
         var _ab = window.AndroidBridge;
         try {
           if (_ab) _ab.nativeRecordStop();
-        } catch (e) {
+        } catch (_e) {
         }
         setStage("preview");
         return;
@@ -4164,7 +4164,7 @@
         previewDurationRef.current = Math.max(1, Math.floor(totalMs2 / 1e3));
         try {
           rec.stop();
-        } catch (e) {
+        } catch (_e) {
         }
       }
       if (tickRef.current) {
@@ -4215,7 +4215,7 @@
           pendingSaveRef.current = true;
           try {
             rec.stop();
-          } catch (e) {
+          } catch (_e) {
           }
           return;
         }
@@ -4351,7 +4351,7 @@
     function close() {
       try {
         onClose && onClose();
-      } catch (e) {
+      } catch (_e) {
       }
     }
     function emitBlock(block) {
@@ -4622,7 +4622,7 @@
         var src = "";
         try {
           src = noteLabel(n) || "";
-        } catch (e) {
+        } catch (_e) {
         }
         return (n.body || "") + " " + (n.fullText || "") + " " + src;
       });
@@ -4632,7 +4632,7 @@
         var src = "";
         try {
           src = noteLabel(n);
-        } catch (e) {
+        } catch (_e) {
         }
         return /* @__PURE__ */ React.createElement("button", { key: n.groupId, type: "button", className: "jrn-picker-item", onClick: function() {
           chooseNote(n);
@@ -4655,11 +4655,11 @@
         var preview = "";
         try {
           title = JournalHelpers.entryDisplayTitle(e) || "";
-        } catch (err) {
+        } catch (_err) {
         }
         try {
           preview = JournalHelpers.previewText(e, 400) || "";
-        } catch (err) {
+        } catch (_err) {
         }
         var tags = (e.tags || []).join(" ");
         return title + " " + preview + " " + tags;
@@ -4669,17 +4669,17 @@
         var preview = "";
         try {
           title = JournalHelpers.entryDisplayTitle(e) || "Untitled";
-        } catch (err) {
+        } catch (_err) {
           title = "Untitled";
         }
         try {
           preview = JournalHelpers.previewText(e, 80) || "";
-        } catch (err) {
+        } catch (_err) {
         }
         var dateStr = "";
         try {
           dateStr = JournalHelpers.shortDate(e.created);
-        } catch (err) {
+        } catch (_err) {
         }
         return /* @__PURE__ */ React.createElement("button", { key: e.id, type: "button", className: "jrn-picker-item", onClick: function() {
           chooseJournal(e);
@@ -4694,7 +4694,7 @@
       var dateStr = "";
       try {
         dateStr = JournalHelpers.shortDate(fresh.created);
-      } catch (err) {
+      } catch (_err) {
       }
       var title = JournalHelpers.entryDisplayTitle(fresh) || "Untitled";
       return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "jrn-blockpick-header" }, /* @__PURE__ */ React.createElement("div", { className: "jrn-blockpick-title" }, title), /* @__PURE__ */ React.createElement("div", { className: "jrn-blockpick-date" }, dateStr)), /* @__PURE__ */ React.createElement("div", { className: "jrn-picker-results", style: { paddingBottom: 0 } }, /* @__PURE__ */ React.createElement(
@@ -4737,7 +4737,7 @@
           return all.filter(function(n) {
             return (n.notebookIds || []).indexOf(nbId) >= 0;
           }).length;
-        } catch (e) {
+        } catch (_e) {
           return 0;
         }
       };
@@ -5915,12 +5915,12 @@
           var referencedElsewhere = false;
           try {
             referencedElsewhere = typeof JournalStore !== "undefined" && JournalStore.isMediaReferencedElsewhere ? JournalStore.isMediaReferencedElsewhere(removed.mediaId, entryIdRef.current) : false;
-          } catch (e) {
+          } catch (_e) {
           }
           if (!isLinkedEmbed && !reusedHere && !referencedElsewhere) {
             try {
               JournalMediaStore.delete(removed.mediaId);
-            } catch (e) {
+            } catch (_e) {
             }
           }
         }
@@ -5995,7 +5995,7 @@
         try {
           el.focus();
           el.setSelectionRange(0, 0);
-        } catch (e) {
+        } catch (_e) {
         }
       }
     });
@@ -6254,7 +6254,7 @@
         try {
           last.focus();
           last.setSelectionRange(last.value.length, last.value.length);
-        } catch (e2) {
+        } catch (_e) {
         }
         return;
       }

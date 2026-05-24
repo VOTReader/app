@@ -89,7 +89,11 @@ export default [
       // React Hooks recommended (rules-of-hooks + exhaustive-deps)
       ...reactHooksPlugin.configs.recommended.rules,
       // Local tweaks
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      // caughtErrorsIgnorePattern: '^_' makes `catch (_e)` exempt from
+      // no-unused-vars's caughtErrors check (which defaults to 'all' in
+      // ESLint 9). Matches the existing argsIgnorePattern / varsIgnorePattern
+      // convention so all three unused-var classes share one prefix policy.
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       'react/prop-types': 'off',   // JSDoc types will cover this (Q4 phase)
       'react/display-name': 'off', // anonymous components are fine in this codebase
       // jsx-no-undef's default is to ignore languageOptions.globals (legacy

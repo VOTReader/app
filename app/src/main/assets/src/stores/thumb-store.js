@@ -27,7 +27,7 @@ export function openThumbDB() {
       };
       req.onsuccess = (e) => resolve(e.target.result);
       req.onerror = () => resolve(null);
-    } catch (e) {resolve(null);}
+    } catch (_e) {resolve(null);}
   });
   return _thumbDbPromise;
 }
@@ -42,7 +42,7 @@ export function idbPut(key, value) {
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
         tx.onabort = () => resolve();
-      } catch (e) {resolve();}
+      } catch (_e) {resolve();}
     });
   });
 }
@@ -56,7 +56,7 @@ export function idbDelete(key) {
         tx.objectStore(THUMB_STORE).delete(key);
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
-      } catch (e) {resolve();}
+      } catch (_e) {resolve();}
     });
   });
 }
@@ -76,7 +76,7 @@ export function idbReadAll() {
           resolve(out);
         };
         req.onerror = () => resolve(out);
-      } catch (e) {resolve({});}
+      } catch (_e) {resolve({});}
     });
   });
 }

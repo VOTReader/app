@@ -34,7 +34,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
       const saved = JSON.parse(localStorage.getItem("vot-home-order") || "null");
       if (Array.isArray(saved) && saved.length === DEFAULT_ORDER.length &&
       DEFAULT_ORDER.every((id) => saved.includes(id))) return saved;
-    } catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+    } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
     return DEFAULT_ORDER;
   });
 
@@ -119,7 +119,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     const onMove = (e) => {
       const y = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
       if (dragIdxRef.current >= 0 && e.cancelable) {
-        try {e.preventDefault();} catch (err) { /* DOM access — element may not exist or API unsupported */ }
+        try {e.preventDefault();} catch (_err) { /* DOM access — element may not exist or API unsupported */ }
       }
 
       if (dragIdxRef.current >= 0) {
@@ -217,7 +217,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
         document.body.appendChild(clone);
         dragCloneRef.current = clone;
       }
-      if (navigator.vibrate) {try {navigator.vibrate(55);} catch (e) { /* DOM access — element may not exist or API unsupported */ }}
+      if (navigator.vibrate) {try {navigator.vibrate(55);} catch (_e) { /* DOM access — element may not exist or API unsupported */ }}
     }, 1380); // 280ms buffer + 1100ms hold — forgiving enough to avoid false triggers on quick taps
   };
 
@@ -250,7 +250,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           const [moved] = newOrder.splice(from, 1);
           newOrder.splice(to, 0, moved);
           setOrder(newOrder);
-          try {localStorage.setItem("vot-home-order", JSON.stringify(newOrder));} catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+          try {localStorage.setItem("vot-home-order", JSON.stringify(newOrder));} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
         }
         setDragIdx(-1);
         targetIdxRef.current = -1;

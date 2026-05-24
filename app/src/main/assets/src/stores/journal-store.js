@@ -163,7 +163,7 @@ export var JournalStore = Object.assign(CachedStore('vot-journal', { list: [] })
           if (hit) linkIds.push(ln.id);
         });
       }
-    } catch (e) { /* counting must never block deletion */ }
+    } catch (_e) { /* counting must never block deletion */ }
     return {
       annKeys: annKeys, noteGroupIds: Object.keys(noteG),
       bookmarkIds: bkmIds, linkIds: linkIds,
@@ -209,7 +209,7 @@ export var JournalStore = Object.assign(CachedStore('vot-journal', { list: [] })
       if (typeof LinkStore !== 'undefined') {
         s.linkIds.forEach(function(lid) { LinkStore.remove(lid); });
       }
-    } catch (e) { /* best-effort cascade; entry deletion still proceeds */ }
+    } catch (_e) { /* best-effort cascade; entry deletion still proceeds */ }
   },
 
   remove(id) {

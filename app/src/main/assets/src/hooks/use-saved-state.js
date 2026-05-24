@@ -72,6 +72,6 @@ export function useSavedState() {
       _validateTabState(s);
       if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
       return s;
-    } catch (e) { return {}; }
+    } catch (_e) { return {}; }
   }, []);
 }
