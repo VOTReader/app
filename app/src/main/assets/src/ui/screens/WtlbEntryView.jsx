@@ -47,6 +47,7 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
       perParagraph.push(arr);
     });
     return { perParagraph, refNumMap, orderedRefs };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- identity-based cache key: entry.paragraphs is corpus data (read-only after boot); entry.id uniquely identifies the entry, so [entry.id, footnotesMode] is sufficient. Using [entry, ...] would force re-memoize on any parent re-render that hands a fresh object literal.
   }, [entry.id, footnotesMode]);
 
   const lookupVerse = (ref) => {

@@ -12,6 +12,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
       const ownerPart = study.parts.find((p) => p.chapterIds.includes(currentChapter));
       if (ownerPart) setExpandedPart(ownerPart.num);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: one-shot auto-expand at study load. study + currentChapter together identify the load; a different study or chapter routes through the parent's setStudyId/setStudyChapterId, which remounts this index via the parent's key=. The []-deps captures the values for THIS instance's lifetime.
   }, []);
 
   // Scroll current chapter into view after expand

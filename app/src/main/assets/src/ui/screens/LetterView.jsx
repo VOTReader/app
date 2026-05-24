@@ -61,6 +61,7 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
     }, 150);
     const fadeTimer = setTimeout(() => setSurpriseBlockId(null), 4000);
     return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- identity-based cache key: letter.blocks is corpus data (read-only after boot); letter.id uniquely identifies the letter. Re-running when surpriseAnchor changes OR letter.id changes is the intent — letter.blocks changing without letter.id changing is impossible by design.
   }, [surpriseAnchor, letter.id]);
 
   const handleFnClick = (num) => {

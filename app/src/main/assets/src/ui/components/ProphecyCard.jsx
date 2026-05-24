@@ -26,6 +26,7 @@ export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, stat
       setExpandedRaw(newVal);
       if (statesRef) statesRef.current[stateKey] = newVal;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally fires only on expandSignal change. statesRef is a parent-owned useRef (stable object identity, .current freshness is exempt); stateKey is identity-stable per card (parent keys the list by it, so a different stateKey = different mounted instance). Adding either would either spuriously re-fire or no-op.
   }, [expandSignal]);
   const cls = `prophecy-card pc-${type}`;
   const cardFnProps = fnProps;
