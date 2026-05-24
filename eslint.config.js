@@ -91,6 +91,15 @@ export default [
       // eslintrc behavior). allowGlobals: true makes it respect the globals
       // list, which is the whole point of having a 322-entry generated list.
       'react/jsx-no-undef': ['error', { allowGlobals: true }],
+      // no-empty: downgraded to warn (Q3.3b). Every empty catch in the
+      // codebase intentionally swallows a non-fatal failure (localStorage
+      // quota, IDB unsupported, native bridge missing, helper malformed-data).
+      // Each site has a one-line inline reason comment naming the category.
+      // The rule stays as warn so future empty-catch additions without a
+      // reason still surface for review. See Q3 exit criteria — no-empty
+      // warnings are an accepted category alongside exhaustive-deps and
+      // no-unused-vars.
+      'no-empty': 'warn',
 
       // ─── React Compiler rule shed (Q3.3a-compiler-disable) ────────────────
       // eslint-plugin-react-hooks@7's recommended set ships 16 rules. Two of

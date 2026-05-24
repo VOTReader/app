@@ -206,7 +206,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => { try { URL.revokeObjectURL(url); a.remove(); } catch (e) {} }, 0);
+      setTimeout(() => { try { URL.revokeObjectURL(url); a.remove(); } catch (e) { /* DOM access — element may not exist or API unsupported */ } }, 0);
     } catch (e) {
       console.warn('export failed', e);
       alert('Export failed. See console for details.');
@@ -225,7 +225,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           'Importing the backup from ' + dateLabel + ' will REPLACE all your current notes, highlights, notebooks, journal entries, bookmarks, links, reading progress, history, tabs, and settings on this device. This cannot be undone.\n\nContinue?'
         );
         if (!proceed) return;
-        _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+        _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
         Object.keys(parsed.data).forEach((k) => {
           if (k.indexOf('vot-') === 0 && typeof parsed.data[k] === 'string') {
             try { localStorage.setItem(k, parsed.data[k]); } catch (e) {
@@ -263,9 +263,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   };
   const clearAllPersonalData = () => {
     try {
-      _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
-      try { indexedDB.deleteDatabase('vot-thumbs'); } catch (e) {}
-      try { indexedDB.deleteDatabase('vot-search-cache'); } catch (e) {}
+      _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
+      try { indexedDB.deleteDatabase('vot-thumbs'); } catch (e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
+      try { indexedDB.deleteDatabase('vot-search-cache'); } catch (e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
       alert('All personal data cleared. The app will now reload.');
       window.location.reload();
     } catch (e) {

@@ -79,7 +79,7 @@ export var JournalMediaStore = (function() {
           var req = store.put(record);
           req.onsuccess = function() {
             // Pre-warm the URL cache so the next render is instant.
-            try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (e) {}
+            try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
             resolve(record.id);
           };
           req.onerror = function(e) { reject(e.target.error); };
@@ -101,7 +101,7 @@ export var JournalMediaStore = (function() {
     delete: function(id) {
       if (!id) return Promise.resolve();
       if (_urlCache[id]) {
-        try { URL.revokeObjectURL(_urlCache[id]); } catch (e) {}
+        try { URL.revokeObjectURL(_urlCache[id]); } catch (e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
         delete _urlCache[id];
       }
       return tx('readwrite').then(function(store) {
@@ -234,7 +234,7 @@ export var JournalMediaStore = (function() {
         return createImageBitmap(fileOrBlob, { imageOrientation: 'from-image' })
           .then(function(bmp) {
             return encodeFrom(bmp, bmp.width, bmp.height, function() {
-              try { bmp.close && bmp.close(); } catch (e) {}
+              try { bmp.close && bmp.close(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
             });
           })
           .catch(function() {
@@ -242,7 +242,7 @@ export var JournalMediaStore = (function() {
             // without the option, then fall back to the <img> path.
             return createImageBitmap(fileOrBlob).then(function(bmp) {
               return encodeFrom(bmp, bmp.width, bmp.height, function() {
-                try { bmp.close && bmp.close(); } catch (e) {}
+                try { bmp.close && bmp.close(); } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
               });
             }).catch(function() { return imgPath(); });
           });

@@ -119,7 +119,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     try {
       const sel = window.getSelection();
       sel && sel.removeAllRanges && sel.removeAllRanges();
-    } catch (e) {}
+    } catch (e) { /* DOM access — element may not exist or API unsupported */ }
   }, [verses]);
 
   const confirmLink = React.useCallback(() => {

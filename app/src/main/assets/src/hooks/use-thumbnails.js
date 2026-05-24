@@ -139,7 +139,7 @@ export function useThumbnails({
       try {
         const dataUrl = window.AndroidBridge.takeScreenshot(navHeightDp, 1440, 90);
         applyThumb(dataUrl);
-      } catch (e) {}
+      } catch (e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
       captureInFlightRef.current = false;
       document.body.classList.remove('capturing-thumb');
       return;

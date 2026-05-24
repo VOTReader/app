@@ -12,7 +12,7 @@ export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLin
     try {
       const el = document.querySelector(`.fn-ref[data-fn-num="${num}"]`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } catch (e) {}
+    } catch (e) { /* DOM access — element may not exist or API unsupported */ }
   };
   return (
     <div className="footnote-list">
