@@ -1,12 +1,18 @@
 #!/bin/sh
-# pre-commit hook — two pre-flight checks gated on what's staged:
+# pre-commit hook — three pre-flight checks gated on what's staged:
 #
 #   1. check_balance.py     when corpus data files change
 #      Catches black-screen failure modes that brace-balance alone
 #      misses: esprima parse errors, smart-quote delimiters, non-ASCII
 #      dashes in verse ranges.
 #
-#   2. python tools/build.py  when any bundle-source file changes
+#   2. lint-staged (Q3.5)    when any .js/.jsx source file changes
+#      Runs `eslint --max-warnings 0` ONLY on staged source files.
+#      Mirrors CI's lint gate but in seconds (per-file, not full-repo),
+#      so regressions fail at the commit-message prompt — not after push.
+#      Config: package.json → "lint-staged" → eslint --max-warnings 0.
+#
+#   3. python tools/build.py  when any bundle-source file changes
 #      Rebuilds dist/bundle-{a,b,c,d}.js and stages the regenerated
 #      output so the commit lands with bundles in sync with source.
 #      Replaces the "remember to run the build" trap — the hook does
@@ -17,9 +23,9 @@
 #   git config core.hooksPath .githooks
 # (See CLAUDE.md for the one-line setup.)
 #
-# Both checks are skipped automatically when no relevant file is staged,
-# so commits to CLAUDE.md / PLAN.txt / gradle files / etc. run without
-# any delay.
+# All three checks are skipped automatically when no relevant file is
+# staged, so commits to CLAUDE.md / PLAN.txt / gradle files / etc. run
+# without any delay.
 
 exec 1>&2  # all output to stderr so it appears during commit
 
@@ -54,7 +60,44 @@ if [ -n "$data_changed" ]; then
   echo ""
 fi
 
-# ─── Step 2: bundle rebuild ─────────────────────────────────────────
+# ─── Step 2: lint staged source files (Q3.5) ───────────────────────
+# Mirrors CI's `npm run lint -- --max-warnings 0` gate but only on
+# staged files. Sub-second on typical commits; fails fast at the commit
+# prompt instead of after push.
+src_changed=$(echo "$staged" | grep -E '^app/src/main/assets/src/.*\.(js|jsx)$' || true)
+
+if [ -n "$src_changed" ]; then
+  echo "[pre-commit] Source files staged — running lint-staged..."
+  # Probe for npm on the path (winget-installed Node may not be on the
+  # inherited PATH — mirrors the bundle-rebuild step's fallback).
+  if ! command -v npm >/dev/null 2>&1; then
+    for candidate in \
+        "/c/Program Files/nodejs" \
+        "/c/Program Files (x86)/nodejs" \
+        "$LOCALAPPDATA/Programs/Node.js" \
+        "$HOME/AppData/Roaming/npm"; do
+      if [ -x "$candidate/npm" ] || [ -x "$candidate/npm.cmd" ]; then
+        export PATH="$candidate:$PATH"
+        break
+      fi
+    done
+  fi
+  npx lint-staged
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Lint failed — see eslint output above."
+    echo "Fix the warnings/errors, re-stage the file(s), then retry."
+    echo "Emergency bypass (not recommended): git commit --no-verify"
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Lint OK."
+  echo ""
+fi
+
+# ─── Step 3: bundle rebuild ─────────────────────────────────────────
 # Any change to a bundled source file means dist/bundle-*.js is stale.
 # Rebuild + stage the regenerated bundles so the commit lands with
 # bundles in sync. Source files for the 4 clusters:
