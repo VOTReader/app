@@ -1,8 +1,7 @@
-// @ts-nocheck -- Q4.1 placeholder; will be removed when this file gets proper JSDoc in Q4.2 (utils) or Q4.3 (stores).
 /* ═══════════════════════════════════════════════════════════════
    JOURNAL STATS STORE — streaks + milestones
    ═══════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
+   Global-scope module. Bundled into bundle-b via _entry-b.js.
    Depends on: CachedStore (defined earlier in main script block).
 
    Tracks:
@@ -31,8 +30,37 @@
      streak-100 — 100-day streak
 ═══════════════════════════════════════════════════════════════ */
 
-import { CachedStore } from './cached-store.js';
+import { CachedStore, extendStore } from './cached-store.js';
 
+/**
+ * On-disk shape.
+ *
+ * @typedef {{
+ *   totalEntries: number,
+ *   currentStreak: number,
+ *   longestStreak: number,
+ *   lastEntryDate: string | null,
+ *   milestonesUnlocked: string[]
+ * }} JournalStatsData
+ */
+
+/**
+ * @typedef {{
+ *   key: string,
+ *   type: 'entries' | 'streak',
+ *   threshold: number,
+ *   label: string
+ * }} MilestoneDef
+ */
+
+/**
+ * Format a timestamp (or now) as a local-timezone date string
+ * (YYYY-MM-DD). Used by the streak logic to compare calendar days
+ * regardless of clock time within a day.
+ *
+ * @param {number | undefined} [ts]  defaults to Date.now()
+ * @returns {string}
+ */
 export function _jrnDateStr(ts) {
   var d = ts ? new Date(ts) : new Date();
   var y = d.getFullYear();
@@ -41,13 +69,22 @@ export function _jrnDateStr(ts) {
   return y + '-' + m + '-' + day;
 }
 
+/**
+ * Whole-day delta between two YYYY-MM-DD dates (d2 - d1). Negative
+ * when d2 precedes d1. Uses local-midnight anchors so timezone DST
+ * shifts don't off-by-one the result.
+ *
+ * @param {string} d1
+ * @param {string} d2
+ * @returns {number}
+ */
 export function _jrnDaysBetween(d1, d2) {
-  // d1, d2 are 'YYYY-MM-DD'. Returns whole-day delta (d2 - d1).
   var a = new Date(d1 + 'T00:00:00');
   var b = new Date(d2 + 'T00:00:00');
-  return Math.round((b - a) / 86400000);
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
+/** Milestone definitions, evaluated in order. @type {MilestoneDef[]} */
 export var MILESTONE_DEFS = [
   { key: 'first',        type: 'entries', threshold: 1,    label: 'First entry' },
   { key: 'entries-10',   type: 'entries', threshold: 10,   label: '10 entries' },
@@ -58,100 +95,143 @@ export var MILESTONE_DEFS = [
   { key: 'streak-100',   type: 'streak',  threshold: 100,  label: '100-day streak' }
 ];
 
-export var JournalStatsStore = Object.assign(CachedStore('vot-journal-stats', {
-  totalEntries: 0,
-  currentStreak: 0,
-  longestStreak: 0,
-  lastEntryDate: null,
-  milestonesUnlocked: []
-}), {
-  get() { return this._load(); },
+export var JournalStatsStore = extendStore(
+  CachedStore('vot-journal-stats', /** @type {JournalStatsData} */ ({
+    totalEntries: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    lastEntryDate: null,
+    milestonesUnlocked: []
+  })),
+  {
+    /**
+     * Read the full stats object.
+     * @returns {JournalStatsData}
+     */
+    get() { return this._load(); },
 
-  /* Returns the milestone defs in a fixed order, with `unlocked` flag. */
-  milestones() {
-    var data = this._load();
-    var u = data.milestonesUnlocked || [];
-    return MILESTONE_DEFS.map(function(m) {
-      return { key: m.key, label: m.label, unlocked: u.indexOf(m.key) >= 0 };
-    });
-  },
+    /**
+     * Milestone defs paired with their unlocked flag, in MILESTONE_DEFS order.
+     * @returns {{ key: string, label: string, unlocked: boolean }[]}
+     */
+    milestones() {
+      var data = this._load();
+      var u = data.milestonesUnlocked || [];
+      return MILESTONE_DEFS.map(function(m) {
+        return { key: m.key, label: m.label, unlocked: u.indexOf(m.key) >= 0 };
+      });
+    },
 
-  unlockedMilestones() {
-    return this.milestones().filter(function(m) { return m.unlocked; });
-  },
+    /**
+     * Only milestones the user has unlocked.
+     * @returns {{ key: string, label: string, unlocked: boolean }[]}
+     */
+    unlockedMilestones() {
+      return this.milestones().filter(function(m) { return m.unlocked; });
+    },
 
-  /* Called when a new entry is created (NOT on edits). Increments total,
-     updates streak if it's a new calendar day, checks milestones, and
-     returns the list of newly-unlocked milestones (for toast display). */
-  recordNewEntry(ts) {
-    var data = this._load();
-    var today = _jrnDateStr(ts);
-    data.totalEntries = (data.totalEntries || 0) + 1;
-    if (!data.lastEntryDate) {
-      data.currentStreak = 1;
-    } else {
-      var delta = _jrnDaysBetween(data.lastEntryDate, today);
-      if (delta === 0) {
-        // Same-day entry — streak unchanged.
-      } else if (delta === 1) {
-        data.currentStreak = (data.currentStreak || 0) + 1;
-      } else {
+    /**
+     * Record a NEW entry (not edits). Increments total, advances streak
+     * if it's a new calendar day, checks milestones, returns the newly-
+     * unlocked milestones so the caller can fire a toast.
+     *
+     * @param {number} ts  epoch ms (typically Date.now())
+     * @returns {MilestoneDef[]}  newly-unlocked milestones (may be empty)
+     */
+    recordNewEntry(ts) {
+      var data = this._load();
+      var today = _jrnDateStr(ts);
+      data.totalEntries = (data.totalEntries || 0) + 1;
+      if (!data.lastEntryDate) {
         data.currentStreak = 1;
+      } else {
+        var delta = _jrnDaysBetween(data.lastEntryDate, today);
+        if (delta === 0) {
+          // Same-day entry — streak unchanged.
+        } else if (delta === 1) {
+          data.currentStreak = (data.currentStreak || 0) + 1;
+        } else {
+          data.currentStreak = 1;
+        }
       }
-    }
-    data.lastEntryDate = today;
-    if (data.currentStreak > (data.longestStreak || 0)) {
-      data.longestStreak = data.currentStreak;
-    }
-    var newlyUnlocked = this._checkMilestones(data);
-    this._save();
-    return newlyUnlocked;
-  },
-
-  /* Called on app load. If the user has missed a day, breaks the streak.
-     Pure read; only writes when the streak state actually changes. */
-  recomputeFromLoad() {
-    var data = this._load();
-    if (!data.lastEntryDate) return data;
-    var today = _jrnDateStr();
-    var delta = _jrnDaysBetween(data.lastEntryDate, today);
-    if (delta >= 2 && data.currentStreak > 0) {
-      data.currentStreak = 0;
+      data.lastEntryDate = today;
+      if (data.currentStreak > (data.longestStreak || 0)) {
+        data.longestStreak = data.currentStreak;
+      }
+      var newlyUnlocked = this._checkMilestones(data);
       this._save();
-    }
-    return data;
-  },
+      return newlyUnlocked;
+    },
 
-  /* Decrement total + check if the user's last entry was on a different
-     day — used when an entry is deleted. We don't try to recompute the
-     streak history exactly (that would need walking every entry); we
-     just bump total down. The streak field stays as-is. */
-  recordDeletion() {
-    var data = this._load();
-    data.totalEntries = Math.max(0, (data.totalEntries || 0) - 1);
-    this._save();
-  },
-
-  _checkMilestones(data) {
-    var u = data.milestonesUnlocked || (data.milestonesUnlocked = []);
-    var newly = [];
-    MILESTONE_DEFS.forEach(function(m) {
-      if (u.indexOf(m.key) >= 0) return;
-      var n = (m.type === 'entries') ? data.totalEntries : data.currentStreak;
-      if (n >= m.threshold) {
-        u.push(m.key);
-        newly.push(m);
+    /**
+     * Called on app load. Breaks the streak if the user missed a day
+     * (today - lastEntryDate >= 2). Pure read otherwise; only writes
+     * when the streak state actually changes.
+     *
+     * @returns {JournalStatsData}
+     */
+    recomputeFromLoad() {
+      var data = this._load();
+      if (!data.lastEntryDate) return data;
+      var today = _jrnDateStr();
+      var delta = _jrnDaysBetween(data.lastEntryDate, today);
+      if (delta >= 2 && data.currentStreak > 0) {
+        data.currentStreak = 0;
+        this._save();
       }
-    });
-    return newly;
+      return data;
+    },
+
+    /**
+     * Decrement total on entry deletion. Does NOT recompute streak
+     * history (that would require walking every entry); the streak
+     * field stays as-is and self-heals on the next recordNewEntry().
+     *
+     * @returns {void}
+     */
+    recordDeletion() {
+      var data = this._load();
+      data.totalEntries = Math.max(0, (data.totalEntries || 0) - 1);
+      this._save();
+    },
+
+    /**
+     * Check every milestone def against the current stats; add newly-
+     * met ones to unlocked. Returns the just-added defs (caller fires
+     * toasts).
+     *
+     * @param {JournalStatsData} data
+     * @returns {MilestoneDef[]}
+     */
+    _checkMilestones(data) {
+      var u = data.milestonesUnlocked || (data.milestonesUnlocked = []);
+      /** @type {MilestoneDef[]} */
+      var newly = [];
+      MILESTONE_DEFS.forEach(function(m) {
+        if (u.indexOf(m.key) >= 0) return;
+        var n = (m.type === 'entries') ? data.totalEntries : data.currentStreak;
+        if (n >= m.threshold) {
+          u.push(m.key);
+          newly.push(m);
+        }
+      });
+      return newly;
+    }
   }
-});
+);
 
 /* Run once on page load: break the streak if the user skipped a day. */
 JournalStatsStore.recomputeFromLoad();
 
-/* Toast helper — pop a small in-app toast at the top of the screen when
-   a milestone unlocks. The element is auto-created on first use. */
+/**
+ * Pop a small in-app toast at the top of the screen when a milestone
+ * unlocks. The toast element is auto-created on first use; subsequent
+ * calls reuse + retrigger the same DOM node. Stores its dismiss timer
+ * on the function itself (`jrnShowMilestoneToast._t`).
+ *
+ * @param {MilestoneDef | { label?: string, key?: string } | null | undefined} milestone
+ * @returns {void}
+ */
 export function jrnShowMilestoneToast(milestone) {
   if (!milestone) return;
   var toast = document.getElementById('jrn-milestone-toast');
@@ -163,6 +243,6 @@ export function jrnShowMilestoneToast(milestone) {
   }
   toast.innerHTML = '<span style="font-size:14px">✦</span><span>Milestone: ' + (milestone.label || milestone.key) + '</span>';
   toast.classList.add('show');
-  clearTimeout(jrnShowMilestoneToast._t);
-  jrnShowMilestoneToast._t = setTimeout(function() { toast.classList.remove('show'); }, 3000);
+  clearTimeout(/** @type {any} */ (jrnShowMilestoneToast)._t);
+  /** @type {any} */ (jrnShowMilestoneToast)._t = setTimeout(function() { /** @type {HTMLElement} */ (toast).classList.remove('show'); }, 3000);
 }

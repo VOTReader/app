@@ -1384,7 +1384,7 @@
   function _jrnDaysBetween(d1, d2) {
     var a = /* @__PURE__ */ new Date(d1 + "T00:00:00");
     var b = /* @__PURE__ */ new Date(d2 + "T00:00:00");
-    return Math.round((b - a) / 864e5);
+    return Math.round((b.getTime() - a.getTime()) / 864e5);
   }
   var MILESTONE_DEFS = [
     { key: "first", type: "entries", threshold: 1, label: "First entry" },
@@ -1395,91 +1395,130 @@
     { key: "streak-30", type: "streak", threshold: 30, label: "30-day streak" },
     { key: "streak-100", type: "streak", threshold: 100, label: "100-day streak" }
   ];
-  var JournalStatsStore2 = Object.assign(CachedStore("vot-journal-stats", {
-    totalEntries: 0,
-    currentStreak: 0,
-    longestStreak: 0,
-    lastEntryDate: null,
-    milestonesUnlocked: []
-  }), {
-    get() {
-      return this._load();
-    },
-    /* Returns the milestone defs in a fixed order, with `unlocked` flag. */
-    milestones() {
-      var data = this._load();
-      var u = data.milestonesUnlocked || [];
-      return MILESTONE_DEFS.map(function(m) {
-        return { key: m.key, label: m.label, unlocked: u.indexOf(m.key) >= 0 };
-      });
-    },
-    unlockedMilestones() {
-      return this.milestones().filter(function(m) {
-        return m.unlocked;
-      });
-    },
-    /* Called when a new entry is created (NOT on edits). Increments total,
-       updates streak if it's a new calendar day, checks milestones, and
-       returns the list of newly-unlocked milestones (for toast display). */
-    recordNewEntry(ts) {
-      var data = this._load();
-      var today = _jrnDateStr(ts);
-      data.totalEntries = (data.totalEntries || 0) + 1;
-      if (!data.lastEntryDate) {
-        data.currentStreak = 1;
-      } else {
-        var delta = _jrnDaysBetween(data.lastEntryDate, today);
-        if (delta === 0) {
-        } else if (delta === 1) {
-          data.currentStreak = (data.currentStreak || 0) + 1;
-        } else {
+  var JournalStatsStore2 = extendStore(
+    CachedStore(
+      "vot-journal-stats",
+      /** @type {JournalStatsData} */
+      {
+        totalEntries: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastEntryDate: null,
+        milestonesUnlocked: []
+      }
+    ),
+    {
+      /**
+       * Read the full stats object.
+       * @returns {JournalStatsData}
+       */
+      get() {
+        return this._load();
+      },
+      /**
+       * Milestone defs paired with their unlocked flag, in MILESTONE_DEFS order.
+       * @returns {{ key: string, label: string, unlocked: boolean }[]}
+       */
+      milestones() {
+        var data = this._load();
+        var u = data.milestonesUnlocked || [];
+        return MILESTONE_DEFS.map(function(m) {
+          return { key: m.key, label: m.label, unlocked: u.indexOf(m.key) >= 0 };
+        });
+      },
+      /**
+       * Only milestones the user has unlocked.
+       * @returns {{ key: string, label: string, unlocked: boolean }[]}
+       */
+      unlockedMilestones() {
+        return this.milestones().filter(function(m) {
+          return m.unlocked;
+        });
+      },
+      /**
+       * Record a NEW entry (not edits). Increments total, advances streak
+       * if it's a new calendar day, checks milestones, returns the newly-
+       * unlocked milestones so the caller can fire a toast.
+       *
+       * @param {number} ts  epoch ms (typically Date.now())
+       * @returns {MilestoneDef[]}  newly-unlocked milestones (may be empty)
+       */
+      recordNewEntry(ts) {
+        var data = this._load();
+        var today = _jrnDateStr(ts);
+        data.totalEntries = (data.totalEntries || 0) + 1;
+        if (!data.lastEntryDate) {
           data.currentStreak = 1;
+        } else {
+          var delta = _jrnDaysBetween(data.lastEntryDate, today);
+          if (delta === 0) {
+          } else if (delta === 1) {
+            data.currentStreak = (data.currentStreak || 0) + 1;
+          } else {
+            data.currentStreak = 1;
+          }
         }
-      }
-      data.lastEntryDate = today;
-      if (data.currentStreak > (data.longestStreak || 0)) {
-        data.longestStreak = data.currentStreak;
-      }
-      var newlyUnlocked = this._checkMilestones(data);
-      this._save();
-      return newlyUnlocked;
-    },
-    /* Called on app load. If the user has missed a day, breaks the streak.
-       Pure read; only writes when the streak state actually changes. */
-    recomputeFromLoad() {
-      var data = this._load();
-      if (!data.lastEntryDate) return data;
-      var today = _jrnDateStr();
-      var delta = _jrnDaysBetween(data.lastEntryDate, today);
-      if (delta >= 2 && data.currentStreak > 0) {
-        data.currentStreak = 0;
+        data.lastEntryDate = today;
+        if (data.currentStreak > (data.longestStreak || 0)) {
+          data.longestStreak = data.currentStreak;
+        }
+        var newlyUnlocked = this._checkMilestones(data);
         this._save();
-      }
-      return data;
-    },
-    /* Decrement total + check if the user's last entry was on a different
-       day — used when an entry is deleted. We don't try to recompute the
-       streak history exactly (that would need walking every entry); we
-       just bump total down. The streak field stays as-is. */
-    recordDeletion() {
-      var data = this._load();
-      data.totalEntries = Math.max(0, (data.totalEntries || 0) - 1);
-      this._save();
-    },
-    _checkMilestones(data) {
-      var u = data.milestonesUnlocked || (data.milestonesUnlocked = []);
-      var newly = [];
-      MILESTONE_DEFS.forEach(function(m) {
-        if (u.indexOf(m.key) >= 0) return;
-        var n = m.type === "entries" ? data.totalEntries : data.currentStreak;
-        if (n >= m.threshold) {
-          u.push(m.key);
-          newly.push(m);
+        return newlyUnlocked;
+      },
+      /**
+       * Called on app load. Breaks the streak if the user missed a day
+       * (today - lastEntryDate >= 2). Pure read otherwise; only writes
+       * when the streak state actually changes.
+       *
+       * @returns {JournalStatsData}
+       */
+      recomputeFromLoad() {
+        var data = this._load();
+        if (!data.lastEntryDate) return data;
+        var today = _jrnDateStr();
+        var delta = _jrnDaysBetween(data.lastEntryDate, today);
+        if (delta >= 2 && data.currentStreak > 0) {
+          data.currentStreak = 0;
+          this._save();
         }
-      });
-      return newly;
+        return data;
+      },
+      /**
+       * Decrement total on entry deletion. Does NOT recompute streak
+       * history (that would require walking every entry); the streak
+       * field stays as-is and self-heals on the next recordNewEntry().
+       *
+       * @returns {void}
+       */
+      recordDeletion() {
+        var data = this._load();
+        data.totalEntries = Math.max(0, (data.totalEntries || 0) - 1);
+        this._save();
+      },
+      /**
+       * Check every milestone def against the current stats; add newly-
+       * met ones to unlocked. Returns the just-added defs (caller fires
+       * toasts).
+       *
+       * @param {JournalStatsData} data
+       * @returns {MilestoneDef[]}
+       */
+      _checkMilestones(data) {
+        var u = data.milestonesUnlocked || (data.milestonesUnlocked = []);
+        var newly = [];
+        MILESTONE_DEFS.forEach(function(m) {
+          if (u.indexOf(m.key) >= 0) return;
+          var n = m.type === "entries" ? data.totalEntries : data.currentStreak;
+          if (n >= m.threshold) {
+            u.push(m.key);
+            newly.push(m);
+          }
+        });
+        return newly;
+      }
     }
-  });
+  );
   JournalStatsStore2.recomputeFromLoad();
   function jrnShowMilestoneToast(milestone) {
     if (!milestone) return;
@@ -1492,98 +1531,137 @@
     }
     toast.innerHTML = '<span style="font-size:14px">\u2726</span><span>Milestone: ' + (milestone.label || milestone.key) + "</span>";
     toast.classList.add("show");
-    clearTimeout(jrnShowMilestoneToast._t);
+    clearTimeout(
+      /** @type {any} */
+      jrnShowMilestoneToast._t
+    );
     jrnShowMilestoneToast._t = setTimeout(function() {
       toast.classList.remove("show");
     }, 3e3);
   }
 
   // app/src/main/assets/src/stores/journal-index-store.js
-  var JournalIndexStore2 = Object.assign(CachedStore("vot-journal-index", {}), {
-    /* Returns the list of journal entry IDs referencing the given key. */
-    entriesReferencing(refKey) {
-      if (!refKey) return [];
-      var data = this._load();
-      return (data[refKey] || []).slice();
-    },
-    /* Returns true if ANY entry references the given key — cheap path
-       for "should we render the inbound chip?" checks. */
-    hasReferences(refKey) {
-      if (!refKey) return false;
-      var data = this._load();
-      return Array.isArray(data[refKey]) && data[refKey].length > 0;
-    },
-    /* Update the index for one entry. `refs` is the deduped list of
-       refKeys this entry now points at. Removes the entry from every
-       refKey it used to point at but no longer does, and adds it to
-       every new refKey. Net effect: the index is consistent with this
-       entry's current state. */
-    rebuildForEntry(entryId, refs) {
-      if (!entryId) return;
-      var data = this._load();
-      var newSet = {};
-      (refs || []).forEach(function(r) {
-        newSet[r] = true;
-      });
-      var keys = Object.keys(data);
-      for (var i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        if (newSet[k]) continue;
-        var list = data[k];
-        if (!Array.isArray(list)) continue;
-        var idx = list.indexOf(entryId);
-        if (idx >= 0) {
-          list.splice(idx, 1);
-          if (list.length === 0) delete data[k];
+  var JournalIndexStore2 = extendStore(
+    CachedStore(
+      "vot-journal-index",
+      /** @type {JournalIndexData} */
+      {}
+    ),
+    {
+      /**
+       * Journal-entry ids that reference `refKey`. Returns a defensive copy
+       * (callers can mutate without affecting the cache). Empty array for
+       * unknown keys.
+       * @param {string | null | undefined} refKey
+       * @returns {string[]}
+       */
+      entriesReferencing(refKey) {
+        if (!refKey) return [];
+        var data = this._load();
+        return (data[refKey] || []).slice();
+      },
+      /**
+       * Cheap "any references?" check — used by the inbound-chip render
+       * guard. Avoids the array copy that entriesReferencing makes.
+       * @param {string | null | undefined} refKey
+       * @returns {boolean}
+       */
+      hasReferences(refKey) {
+        if (!refKey) return false;
+        var data = this._load();
+        return Array.isArray(data[refKey]) && data[refKey].length > 0;
+      },
+      /**
+       * Sync the index against one entry's current refs. Removes entryId
+       * from every refKey it used to point at but no longer does, then
+       * adds it to every new refKey. Net effect: the index is consistent
+       * with this entry's current state.
+       *
+       * Caller computes `refs` via JournalHelpers.collectRefs(entry).
+       *
+       * @param {string} entryId
+       * @param {string[]} refs
+       * @returns {void}
+       */
+      rebuildForEntry(entryId, refs) {
+        if (!entryId) return;
+        var data = this._load();
+        var newSet = {};
+        (refs || []).forEach(function(r) {
+          newSet[r] = true;
+        });
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          if (newSet[k]) continue;
+          var list = data[k];
+          if (!Array.isArray(list)) continue;
+          var idx = list.indexOf(entryId);
+          if (idx >= 0) {
+            list.splice(idx, 1);
+            if (list.length === 0) delete data[k];
+          }
         }
-      }
-      Object.keys(newSet).forEach(function(k2) {
-        if (!Array.isArray(data[k2])) data[k2] = [];
-        if (data[k2].indexOf(entryId) < 0) data[k2].push(entryId);
-      });
-      this._save();
-    },
-    /* Strip entryId from every refKey list (entry deletion). */
-    removeEntry(entryId) {
-      if (!entryId) return;
-      var data = this._load();
-      var keys = Object.keys(data);
-      var changed = false;
-      for (var i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        var list = data[k];
-        if (!Array.isArray(list)) continue;
-        var idx = list.indexOf(entryId);
-        if (idx >= 0) {
-          list.splice(idx, 1);
-          changed = true;
-          if (list.length === 0) delete data[k];
+        Object.keys(newSet).forEach(function(k2) {
+          if (!Array.isArray(data[k2])) data[k2] = [];
+          if (data[k2].indexOf(entryId) < 0) data[k2].push(entryId);
+        });
+        this._save();
+      },
+      /**
+       * Strip entryId from every refKey list. Called on entry deletion.
+       * Prunes empty buckets as it goes.
+       * @param {string} entryId
+       * @returns {void}
+       */
+      removeEntry(entryId) {
+        if (!entryId) return;
+        var data = this._load();
+        var keys = Object.keys(data);
+        var changed = false;
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          var list = data[k];
+          if (!Array.isArray(list)) continue;
+          var idx = list.indexOf(entryId);
+          if (idx >= 0) {
+            list.splice(idx, 1);
+            changed = true;
+            if (list.length === 0) delete data[k];
+          }
         }
+        if (changed) this._save();
+      },
+      /**
+       * Slow-path reverse lookup: which refKeys does this entry contribute
+       * to. Used rarely — only on entry deletion if we want to know which
+       * inbound chips will lose a count. Most callers should use
+       * entriesReferencing() instead.
+       * @param {string} entryId
+       * @returns {string[]}
+       */
+      refsForEntry(entryId) {
+        if (!entryId) return [];
+        var data = this._load();
+        var out = [];
+        var keys = Object.keys(data);
+        for (var i = 0; i < keys.length; i++) {
+          var k = keys[i];
+          if (Array.isArray(data[k]) && data[k].indexOf(entryId) >= 0) out.push(k);
+        }
+        return out;
+      },
+      /**
+       * Wipe everything. Used when journal is fully cleared via import or
+       * "Clear All Personal Data".
+       * @returns {void}
+       */
+      clear() {
+        this._cache = {};
+        this._save();
       }
-      if (changed) this._save();
-    },
-    /* Returns refKeys this specific entry contributes to. Slow path
-       (linear scan of all keys); used rarely — only on entry deletion if
-       we want to know which inbound chips will lose a count. Most callers
-       should use entriesReferencing() instead. */
-    refsForEntry(entryId) {
-      if (!entryId) return [];
-      var data = this._load();
-      var out = [];
-      var keys = Object.keys(data);
-      for (var i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        if (Array.isArray(data[k]) && data[k].indexOf(entryId) >= 0) out.push(k);
-      }
-      return out;
-    },
-    /* Wipe everything. Used when journal is fully cleared via import or
-       "Clear All Personal Data". */
-    clear() {
-      this._cache = {};
-      this._save();
     }
-  });
+  );
 
   // app/src/main/assets/src/stores/journal-store.js
   function jrnId() {
