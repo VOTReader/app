@@ -1,0 +1,681 @@
+# HISTORY.md — Landed work log
+
+Append-only record. Read when you need context on past decisions. Not required for routine work. For the current briefing, see CLAUDE.md. For deep system reference, see ARCHITECTURE.md.
+
+---
+
+## Q2.7 + Q3 (2026-05-24, origin/main past `e162877`)
+
+- **Q2.7-1 (`c1e3da1`) + Q2.7-1a (`9aa8571`)** — `function App()` extracted from inline index.html → `app/src/main/assets/src/app.js` (verbatim move, then sloppy-self-assign cleanup). App() is now bundled into bundle-d via `_entry-d.js`. Window scoping verified clean (lexical-env globals like `useState`, `BIBLE_BOOK_LIST`, `TabsContext` resolve correctly through bundle-d IIFE's scope chain — no `window.*` shims required).
+- **Q2.7-2 (`b233cc3`)** — `src/app.js` → `src/app.jsx`, all 142 in-body `React.createElement(...)` calls → JSX literals + all 31 `Object.assign({...},...)` spread props → JSX `{...}` spread. Bit-perfect smoke. Bundle-d shrank 552.5 → 546.4 KB. jsx-progress total 156 → 3 (only the createRoot wrapping in index.html remains). **The "no JSX" original sin is closed.** Every React component in the codebase is now JSX.
+- **Q3 (ESLint) IN PROGRESS** — `eslint-plugin-react-hooks` v7 + `eslint-plugin-react` + auto-generated globals (322 distinct identifiers, scanned mechanically from `_entry-*.js` + index.html + `src/data/*.js`). Generator runs as `npm run lint:globals`, chained before `eslint` in `npm run lint`, and via the pre-commit hook. Cumulative drop:
+  - Baseline (Q3.1b): 154 errors / 216 warnings
+  - After Q3.3a (rules-of-hooks, 2 real bugs): 152 / 216
+  - After Q3.3a-compiler-disable (14 React Compiler rules off): 98 / 216
+  - After Q3.3b (63 empty catches documented with 5 canonical reason comments): 35 / 216
+  - After Q3.3c (26 unescaped-entities + 5 useless-escape, typography-aware): 4 / 216
+  - After Q3.3d (`7eb491b` — 4 trivia errors: no-undef × 3 + no-global-assign): **0 / 216** ← Q3 hits 0 errors. Real bugs surfaced: `surpriseMe` typo in app.jsx (SearchScreen's `/random` was silently no-op'd for years), missing `getStudyById` import in use-android-back.js, missing `colReadNavProps` import.
+- **Q3 REMAINING**: Q3.3e (59 exhaustive-deps warnings — slowest, most judgment), Q3.3f (157 no-unused-vars with 3-way triage), Q3.4 (CI lint integration — `--max-errors=0` enforceable immediately + `--max-warnings N` ratchet), Q3.5 (pre-commit hook extension).
+- **Plan reordering**: the original quality-uplift-plan.txt sequenced ESLint as Q6 (last), reasoning "JSX must exist first." Now that JSX exists (Q2.7-2), ESLint moved to first-of-Q3-Q6 — it's infrastructure that JSDoc (Q4) and Vitest (Q5) layer on top of. CSS (was Q3) moves to last.
+
+---
+
+## P6 — App() hook extraction (COMPLETE)
+
+All 15 hooks extracted: `useMarkAsRead` (P5d warmup), `useSavedState`+`_validateTabState` (P6a), `useRefMirror` (P6b), `useHistory` (P6c), `useThumbnails` (P6d), `useScrollMemory` (P6e), `useReadingDwell` (P6f), `useSettings` (P6g), `useSheetOrchestration` (P6h), `useFromLetterStack` (P6i), `useNavigateToLink` (P6j), `useTabs` (P6k-A), `useTabActions` (P6k-B), `usePersistedState` (P6k+1), `useAndroidBack` (P6l).
+
+App() went from ~2,815 (P6d) to **2,191** lines. The 6-step extraction workflow held zero regressions across all of it. The P6l recon surfaced one pre-existing `[]`-deps stale-closure bug (`journalEntryId` read stale inside `useAndroidBack` → Android back from `journal-editor` was a no-op) — preserved verbatim by the P6l extraction, then fixed in the immediate follow-up `1c45b88` (journalEntryId mirrored via `useRefMirror` like the 9 nav reads).
+
+**App() LINE COUNT progression**: ~2,815 post-P6d → 2,735 → 2,693 → 2,641 → 2,516 post-P6h → 2,461 post-P6i → 2,398 post-P6j → 2,323 post-P6k-A → 2,246 post-P6k-B → 2,241 post-P6k+1 → 2,191 post-P6l (all measured).
+
+**Commits**: `80eed25` (P6i), `9031be9` (P6j), `aaef0f8` (P6k-A useTabs core + invariant 1), `70d646a` (P6k-B useTabActions), `4714a92` (P6k+1 usePersistedState), `96dee20` (P6l useAndroidBack), `1c45b88` (journalEntryId follow-up fix).
+
+**FIXED — BookmarkPopover prop mismatch (discovered during P6h):** the `BookmarkPopover` render in index.html passed a `payload` prop, but `BookmarkPopover` (src/ui/screens/BookmarksScreen.js:371) destructures `{ bkmIds, x, y, onClose, onNavigate, onDeleteDone }` — so `bkmIds` was `undefined` and the component returned `null` at its line 381 every time; the inline-bookmark-icon tap popover never displayed. git-blame proved it: the component (`52ac90b2`) and its render call (`03c9fd32`) were committed 9 seconds apart on 2026-05-14 — mismatched from birth, a copy-paste of the sibling `MultiNotePopover` render. Fix: render now passes the real props — `bkmIds`/`x`/`y` unpacked from `bookmarkPopoverPayload`, `onNavigate` (resolves `bkm.hlKey` via `_bookmarkSourceEndpoint` → `navigateToLink`), `onDeleteDone` (`setHlTick` bump), `onClose`. Verified live.
+
+**FIXED — bookmark inline icon missing on Bible/study verse views (`c828982`, 2026-05-21):** a bookmark made on a Bible verse (e.g. `bible:proverbs:2:1:0-69`) saved to `BookmarkStore` and appeared in the Library, but no inline icon rendered in the chapter. Root cause: Bible verses (`BibleChapterView`) and Matthew study verses (`ChapterView`) render each verse via the React `<HighlightableText>` component, NOT a `[data-hl-dom]` container — and `applyDOMBookmarks()` only walks `[data-hl-key][data-hl-dom]`. Fix: new `BookmarkIcon` component (`src/ui/components/BookmarkIcon.js`) mirroring `LinkIcon`. Rendered after `LinkIcon` at all 3 `HighlightableText` callsites (1 BibleChapterView, 2 ChapterView).
+
+---
+
+## OBJECTIVE G LANDED COMMITS (Build system)
+
+- **G.1 (`f919017`)** — `tools/build.py` concatenates 139 `<script src>` tags into 4 cluster bundles (`dist/bundle-{a,b,c,d}.js`). Pure Python. byte-equivalent output to pre-G.1 load order. Smoke PASS identically.
+- **Pre-commit hook fix (`47a87ee`)** — relocated `.git/hooks/pre-commit` → `.githooks/pre-commit` (versioned). Per-clone setup: `git config core.hooksPath .githooks`. Path inside `check_balance.py` updated to use `_HERE`-relative resolution (was stale `C:\` absolute path since P3.5b — silently dead validator). Extended hook with bundle-rebuild step: if any bundle source is staged, run `npm run build` and restage `dist/`.
+- **G.2.0 (`47d1b70`)** — installed Node 24.15.0 (via `winget install OpenJS.NodeJS.LTS`) + esbuild 0.28.0 (via `npm install esbuild --save-dev`). `package.json` + `package-lock.json` committed; `node_modules/` gitignored. Toolchain installed, NOT yet invoked. Smoke PASS identically.
+- **G.2.1 (`894b996`)** — Cluster C (renderer) → ES modules. 9 public exports across `dom-links.js`, `dom-bookmarks.js`, `annotation-engine.js`. New `src/renderer/_entry.js` is esbuild's entry — imports all + `Object.assign(window, {...})` for classic-script interop with the still-unconverted rest of the app. `tools/build.py` skips cluster C (`C = []`). `package.json` scripts: `build` chains python + esbuild; `build:c` = `esbuild ... --bundle --format=iife`. `dist/bundle-c.js` shrunk 49 KB classic-concat → 26.5 KB esbuild IIFE. Smoke PASS in 20.9s.
+- **G.2.2 (`e429848`)** — Cluster B (stores + components + hooks + journal + scripture-resolution + letter-linking) → ES modules. 29 files, complex web of intra-cluster dependencies handled via a mix of explicit imports (for true eval-time deps like `CachedStore()` calls at module-top) and bare-name + window-bridge (for everything else). `_entry-b.js` lives at `src/stores/_entry-b.js`. Journal screens/sheets imported via wildcard so internal helpers (`JournalCardMenu`, `jrnRenderInline`, `JournalBlockView`) propagate to window without enumeration. `journal-helpers.js ↔ journal-store.js` true-cycle preserved with `typeof X !== 'undefined'` guards — eval-time safe because neither module touches the other at top level. Smoke PASS identically.
+- **G.2.3 (`a4a4506`)** — Cluster D (screens + sheets + components + utils + late stores) → ES modules. 81 files, **131 exports added** by a mechanical transformation script (`tools/_g23_add_exports.py` — column-0 `function/const/let/var/class` → `export <kw>`, idempotency-guarded). New `src/ui/_entry-d.js` is esbuild's entry — explicit named imports (no wildcards needed; survey found NO true eval-time intra-D dependencies — every cross-file reference is inside a function body, so import ordering is irrelevant). `tools/build.py` now emits only `bundle-a.js`; the docstring + main() updated to reflect this. `package.json` `build` chains `python tools/build.py && build:b && build:c && build:d`. `dist/bundle-d.js` = 495 KB esbuild IIFE. **Strict-mode discovery**: ES modules are implicitly strict, so the in-function `_thumbDbPromise = X` / `_bibleStudiesPromise = X` assignments in `thumb-store.js` / `translations.js` would throw `ReferenceError` if those identifiers weren't bound at module scope. Same applies to any module-private mutable state. Fix: moved `THUMB_DB / THUMB_STORE / _thumbDbPromise / _translationPromises / _translationLoaded / _bibleStudiesPromise / GARDEN_TOTAL / GARDEN_TIERS / GARDEN_DEFAULT_TIER / gardenImageCache / EXPAND_THRESHOLD / MIN_HIDDEN_WORDS / GARDEN_PRELOAD_AHEAD / GARDEN_CRAWL_DELAY` into their owning modules. Used `export const` / `export let` for everything. Smoke PASS — 12/12 screens reached, 0 crashed, 0 unreached, both annotation round-trips exact-match to G.2.1 baseline (133+13 / 51+6 marks/icons), 0 console.error, 0 resource404.
+- **G.2.3 follow-up** — 14 dead module-state declarations removed from index.html (the dupes left behind by G.2.3 since the modules now own those bindings). Three surgical edits, each leaves an audit-trail breadcrumb comment pointing to the owning module. Smoke PASS — globals still resolve via window (cleanup probes confirmed: `EXPAND_THRESHOLD: number`, `GARDEN_TIERS: object`, `GARDEN_DEFAULT_TIER: string`, `GARDEN_TOTAL: number`, `THUMB_DB: string`, `openThumbDB: function`, `loadTranslation: function`, `gardenPreload: function`), letter+wtlb annotation round-trips bit-perfect to baseline.
+
+---
+
+## PHASES LANDED (modularization push P0–P5g)
+
+- **Phase-0 (`cedd7ed`)** — smoke harness (`tools/smoke.js` + `tools/SMOKE.md`). Globals audit + COLLECTIONS data-wiring + 12-screen render walk + annotation round-trip. Lives outside the shipped asset path; runs IN the app page via `preview_eval` or `chrome://inspect`. Green baseline captured here; every subsequent phase verified against it.
+- **P1 (`dff8d7b`)** — annotation engine → `src/renderer/annotation-engine.js` (9 symbols, ~345 lines: `snapRangeToWords`, `annMarkClass`, `HighlightableText`, `findNoteIconInsertionPoint`, `_markCharEnd`, `applyNoteIcons`, `applyActiveNoteState`, `applyDOMHighlights`, `StaticSubtree`). `HighlightableText` upgraded to `React.useMemo` for self-containment.
+- **P2 (`675b12b`)** — CSS-in-JS → static `app.css` + `<link>` in `<head>`. **Eliminates the `const CSS = \`...\`` backtick-template-literal black-screen footgun entirely** (no template literal anywhere). Only transform needed was `\\2060` → `\2060` on 2 word-joiner lines (provably the only backslash sequences in the 4.4k-line block). CSP `style-src 'self'` already permitted `<link>`. React `<style>` consumer replaced with a no-op `null` child.
+- **P3 (`51a9972`)** — scripture/data resolution → `src/data/scripture-resolution.js` (27 symbols: `COLLECTIONS` registry + `COL_BY_*` derived maps + `parseRefStr` / `findBook` / `parseScriptureRef` / `resolveVerseText` / `findEntryContext` / `lookupVersesFromBooks` + `colLetters`/`colPreface`/`colLetterArr` + `LETTER_SCREEN_SET` + `_allBooks`/`_matthew`/`_studies` + `READING_CHAIN` + boundary helpers).
+- **P3.5a (`b1a79ee`)** — the 5 remaining inline stores → `src/stores/`: `cached-store.js` (factory, loads first), `annotation-store.js` (+ `HighlightStore` alias + `migrateAnnotations` + the on-load migration call), `note-store.js`, `notebook-store.js`, `recent-nav-store.js`. Every store now lives in its own module — none left inline.
+- **P3.5b (`d952c23`)** — all 29 raw corpus data files moved `app/src/main/assets/data/` → `app/src/main/assets/src/data/` via `git mv` (preserves history). 25 path references updated (21 static `<script src>` + 2 dynamic in `index.html` for `loadTranslation` + lazy bible-studies + 2 in `search.js`). Empty `data/` dir removed. **Single home for all data + code under `src/`.**
+- **P4b–P4e (`3fa54d5`, `8ee6cbb`, `10fce2a`)** — the 4 big reading-screen components → `src/ui/screens/`: `LetterView.js` (~27 KB), `WtlbEntryView.js` (~18 KB), `BibleChapterView.js` (~13 KB), `ChapterView.js` (~12 KB).
+- **P5a (`ed5603d`)** — 9 remaining screens → `src/ui/screens/`: `HomeScreen`, `SettingsScreen` (~38 KB, the largest), `HistoryScreen`, `SearchScreen`, `NotesIndexScreen`, `LibraryScreen`, `AboutScreen`, `VolumesHome`, `StudiesHome`. ~123 KB / ~3,000 lines.
+- **P5b (`36657e5`)** — 23 shared components → `src/ui/components/`: `Segments`, `FootnoteSheet`, `InAppLinkButton`, `ScreenLayout`, `NavButtons`, `LibraryNav`, `ProphecyCard`/`Group`/`ExpandToggle`, `ThemeBtn`, `HomeBtn`, `TabsNavBtn`, `StickyChapterNav`, `ModeToggle`, `ChapterBookmarkBtn`, `ExpandableVerse`, `VerseWithNumbers`, `ScriptureSheet`, `ScriptureVerseText`, `FootnoteListSection`, `InlineNotes`, `InlineEcho`, `StudyPanels`. ~88 KB.
+- **P5c (`8cf2081`)** — 11 sheet/picker components → `src/ui/sheets/`: `SelectionToolbar` (~34 KB, by far the largest), `NoteSheet`, `VersePickerScreen`, `LetterExcerptPickerScreen`, `LinkPicker`, `TabsOverview`, `AnnotationActionChip`, `NotebookPickerSheet`, `TabActionSheet`, `LinkSidebar`, `MultiNotePopover`. ~92 KB / ~1,900 lines. Bottom-up extraction order. Zero new console errors introduced.
+- **P5d (`5ea3e66`)** — VolumeIndex consolidation + 18 small components/hooks. Deleted legacy `VolumeIndex` (V2-hardcoded) and `VolumeOneIndex` (V1-hardcoded); both call sites now use the generic `VolumeLetterIndex`. All 14 collections share ONE index component. Extracted: `SrchCard`/`SrchSnippet`/`SrchGroup`, `ClearProgressRow`/`SettingsRow`/`SelectField`, `VolumeLetterIndex`, `HistoryEntryCard`, `NoteRow`, `LinkCard`/`LinkIcon`, `NotebookManagerSheet`, `BibleStudyIndex`/`ChapterIndex`/`GardenView`/`ScriptureGenre`/`ScripturesHome`, `ErrorBoundary` (class), and `useMarkAsRead` (FIRST hook extracted — P6 warmup). Hardened extractor with proper JS brace-matching.
+- **P5e (`449dd46`)** — 46 helpers extracted to 13 domain bundles via new `tools/_p5e_bundle_helpers.py` (same brace-match logic, multi-function-per-file). Buckets: `utils/hl-keys` · `utils/dates` · `utils/garden` · `utils/tabs` · `utils/nav-index` (16 KB — LinkPicker's brain) · `utils/note-source` · `utils/book-category` · `utils/scripture-parse` · `utils/highlight` · `utils/render-text` · `utils/search` · `stores/thumb-store` · `data/translations` · `data/letter-linking`. Load-order fix landed: letter-linking.js must load BEFORE the big inline `<script>` block (top-level boot code calls `linkPreface`/`linkWtlbEntries` at module scope).
+- **P5f (`72c6b7d`)** — dead-code audit. Removed `ann.style` defensive fallback guards (5 sites — one-shot annotation migration makes them unreachable). Discipline directive ("real bugs surface, never bandaid") kept: the `|| 'highlight'` default stays for kind-less entries, only the dead style→kind translation is gone.
+- **P5g (`1693715`)** — smoke harness hardened. CSP-safe `resolve()` (window-first, eval fallback only when privileged — works under production CSP); `EXPECTED_GLOBALS` expanded with all P5d/P5e symbols (50+ new probes); new `wtlbAnnotationRoundTrip()` exercises the WtlbEntryView path. 11 lexical-only consts mirrored to `window` via a tiny inline script at end of body. Live-verified: **PASS | globals ok | data ok | 12 screens 0 crashed | letterAnn ok | wtlbAnn ok (51 marks + 6 note icons) | 0 console.error | 18s**.
+
+---
+
+## Recent landings (chronological)
+
+**2026-05-19** — Status truth-up + stale-flag clearance. User-confirmed on real device this session: Journal voice recording WORKS on PC + Android (clears the §22 "needs on-device APK test" caveat); app icon finalized → Objective D FULLY complete (only release-signing deferred by policy). The 05-15 "IN PROGRESS" items — keyboard-aware sheets via visualViewport `--keyboard-height`, and BookmarkCreateSheet edit-mode + `__bookmarkEdit` bridge — are CONFIRMED complete and on-device-verified. Commit `2db70f5` landed: the annotation-nav crash + stale-content corruption ROOT fix (new `StaticSubtree` freezes each `[data-hl-dom]` block + content-keyed remount so React never reconciles the text nodes `applyDOMHighlights` splits/re-parents → kills both the `removeChild` NotFoundError crash AND the prev-letter-bleeds-into-next corruption; footnote active-state moved to a DOM class toggle; pipeline try/catch + stale-node guards), footnote title de-dup (`_fnTextRedundantWithLink`), Library `onSettings` threaded to all 7 sub-screens, and journal-stats wiring (orphaned `journal-stats-store.js` now loaded + recompute on boot + record create/delete).
+
+**2026-05-15 (Journal voice recording)** — Rearchitected + cross-platform mic fixes. DESKTOP: `index.html` CSP had `media-src 'none'` which silently blocked EVERY `<audio>` blob: URL on all platforms; changed to `media-src blob:`; waveform amplification `rms*3`→`rms*8`. ANDROID: replaced the unreliable WebView `getUserMedia` path with a NATIVE Kotlin `MediaRecorder` bridge (AAC/.m4a in cacheDir). See "Journal voice recording" section below.
+
+**2026-05-15 (Library hub feature push)** — Links system (schema migration {a,b}→{source,target} with source/target visual distinction on inline icons, LinksScreen browser, Library "My Links" tile, two adjacent fixes); Bookmarks system (full Library tile + BookmarksScreen browser, BookmarkStore + applyDOMBookmarks with creation-pulse animation, `thought` field on every bookmark with inline edit in popover + action sheet, chapter-level NavButton on every reading screen, date surfacing across BookmarkPopover / NoteSheet / LinkSidebar cards, Android SVG-fill icon visibility fix, read-more / collapse for long thoughts, pre-commit BookmarkCreateSheet replacing silent-add).
+
+**2026-05-14** — bible-studies.js lazy-loaded (b9b769b — removes 4.3 MB from cold-boot; studiesLoading indicator in StudiesHome); .git/hooks/pre-commit added to auto-run check_balance.py on data-file commits.
+
+**2026-05-12 (Objective D autonomous finish)** — Android 12+ SplashScreen API holds until WebView's first paint, JS-side "Keep Screen On While Reading" toggle in Settings → Reading Experience bridging the Kotlin setKeepScreenOn at ac439b3, [object CSS] React #31 investigation closed as Android-only or already silenced by the Objective E batch.
+
+**2026-05-11 (Objective C complete + Objective E Android polish)** — improvement2.txt Day 1 + Day 2 footnote system + 10 §12 critical bugs + WTLB attribution tap-through + universal single-shot back-pill + Day 4-5 polish + 3 footnote audit fixes from a parallel session; About screen + first-run flow gated by `vot-about-seen`; all 9 session commits fast-forward-merged into `origin/main` at `b19f511` so the GitHub repo's `main` is now the canonical "live" version; AI deferred indefinitely per user direction.
+
+### Recent landings on `claude/jovial-yalow-bf2629` (2026-05-11)
+
+- Objective A: junction verified, NIM proxy infrastructure entirely deleted, 9 `.bak-pre-*` files (~39 MB) + `orama.min.js` (~70 KB) deleted from the asset tree
+- Objective B: `allowBackup="false"`, app name + `<title>` = "VOTReader", `migrateAnnotations` silent-flag-on-failure fixed, `vot-state` save warns on quota now, Settings → "Your Data" section with Export / Import / Clear All Personal Data (verified live)
+- improvement2.txt Day 1: back-pill missing space, handleAndroidBack Library + Notes-Index cases, SCHEMA_VERSION 11→12, removed two no-op settings (`searchFuzzy`/`searchAllTranslations`), welcome catch return value (verified live)
+- Objective D piece: AboutScreen + home-nav `i` button. Home now has two buttons side-by-side in the upper left — cross icon reopens the splash image (titled "Welcome image"), new `i` icon opens the About VOTReader screen. About uses a card layout with 3-diamond ornaments top + bottom, "ABOUT VOTREADER" Cinzel uppercase heading, 4 EB-Garamond paragraphs, and a gold-outlined CONTINUE button. First-run flow: splash → ✕ → About auto-opens (only once, gated by new `vot-about-seen` localStorage flag) → CONTINUE → home.
+- improvement2.txt Day 2 (footnote system) — silent verse-blank fallback, fn.link+fn.url coexistence, prev/next nav inside the sheet ("Footnote N of M" + circular ‹/› buttons), `.fn-ref.active` visible on touch (`activeFn` now reads `sheetFn ?? highlightedFn`), and tap-to-scroll-back from FootnoteListSection (bubble lookup via new `data-fn-num` attribute). Verified live on Volume 2 / "The Wide Path".
+- §12 critical bugs — ALL 10 LANDED:
+    - Prophecy card persistence (setExpanded now handles updater fn)
+    - Matthew Study note labels (verse at p[2] not p[3] for studies)
+    - NoteSheet startInEditMode (key prop forces remount on groupId change)
+    - destSnapshot null/undefined matcher (loose-equal nullish — pill now shows)
+    - Phantom empty notes (zero-segment + zero-width guards in handleNote)
+    - Holy Days letter-type note routing (findEntryContext HD fallback)
+    - WTLB Part 1 + 2 intros (data-level — emphasis spans now line-contained)
+    - 20 D8 glued-text bugs in WTLB One/Two (regex sweep with backslash-aware lookbehind)
+    - Translation-tagged inline refs (lookupVersesFromBooks honors p.tag + lazy-loads)
+    - Android hardware back button (MainActivity.kt — evaluateJavascript window.handleAndroidBack, finish() on "false")
+- WTLB attribution tap-through: `[From "Title" ~ Volume N]` inline patterns in WTLB/Blessed are now live letter-links. WtlbEntryView's renderLine got a new split pattern; the parsed volume number maps to "Volume One"..."Volume Seven" via `_attrCollectionLabel` and calls `onInAppLink` with source meta so the destination pill reads "Back to <Part Label> · <Entry>".
+- All back-pills universally single-shot: `openInAppLetter` now computes a `destSnapshot` from the resolved letter (studies + regular). The existing prune useEffect + `_destMatches` now hide the pill the moment the user navigates away from the destination. Every back-pill in the app — Notes index, footnote tap-throughs, attribution links, letter-link segments, addendum cards — is single-shot.
+- **Objective D Kotlin + manifest + CSP batch:** WebChromeClient.onConsoleMessage routes JS console to Logcat as `WebViewJS` tag; URL-scheme allowlist (`https`, `http`, `mailto`, `tel`) in shouldOverrideUrlLoading replaces the previous "anything to ACTION_VIEW" behavior; `Type.ime()` added to window-inset injection so floating UI moves above the soft keyboard; `setKeepScreenOn(Boolean)` AndroidBridge method; `launchMode="singleTask"` + expanded `configChanges="...|smallestScreenSize|uiMode|screenLayout"`; CSP meta tag with policy locking to `self` + appassets-loader host + GitHub raw for Garden images + thevolumesoftruth.com for the online-check ping.
+- **Build-fix note:** the gradle "Unable to delete directory" build failure user hit is a Windows file-lock issue (gradle daemon / OneDrive sync / AV scanning), not a code bug. Fix: `./gradlew --stop` then `rm -rf app/build/`. Long-term: tell OneDrive to ignore `app/build/`, add AV exclusion.
+- **Footnote audit fixes** — three broken cross-link `letterTitle` mismatches: (1) `letters-timothy.js` "the-shadow-of-the-almighty" fn1 — ASCII apostrophe replaced with U+2019; (2) `letters-flock.js` "a-wise-servant-and-the-line" fn1 — removed trailing `.`; (3) `volume-six.js` "full-circle" fn2 — removed broken `link` object (was pointing at an external wiki article name, not a VOT letter).
+- improvement2.txt Day 4-5 polish — ALL DONE:
+    - MATTHEW.chapters.length guarded via `_matthew()?.chapters?.length || 0`
+    - LinkPicker overlay z-index 8500 → 8502 (above NoteSheet)
+    - Keyboard focus indicators restored via `:focus-visible` + `:focus:not(:focus-visible)` pair
+    - cancelDwell() added to switchToTab (no more wrong-tab mark-as-read)
+    - NoteSheet textarea scrollIntoView on focus (Android keyboard)
+    - NotebookPickerSheet title "Add to Notebook" / "Manage Notebooks" context-aware
+    - SelectionToolbar + NoteSheet + AnnChip + MultiNote all auto-dismiss on screen/letter/book/chapter/study navigation via App-level useEffect + window.__hideSelectionToolbar bridge
+    - 12 http:// URLs upgraded to https:// across 5 data files (check_balance.py passes)
+
+---
+
+## Section 14 — Sweep progress log (data audit)
+
+### After-action progress (consolidated)
+
+**All audits complete. Bugs found across all collections (excluding Studies):**
+- **17 D3 orphan brackets** in 14 letters (V3, V4, V6, Rebuke, Flock, Timothy, Holy Days)
+- **1 D1 ref-text-crammed** (V3 "I Am With You Always" John 16:13-15)
+- **23 D8 glued-text** (mostly WTLB Two: 19, WTLB One: 3, Blessed: 2)
+- **1 D9 compound ref** (Blessed — already correctly formatted, false positive)
+- **12 D3 in WTLB** (different format — bracketed numbers like [11], [20], [37] suggest stale wiki refs that may need to become inline cites or be removed)
+- **1 stub letter** (V5 Letter 14 "Do Not Look Back...")
+
+**Fixes applied (Phase 1 — main collections):**
+
+| Collection | Fixed | Method |
+|---|---|---|
+| Holy Days Entry 12 | D3 [1] → fn 1 | manual |
+| V3 L14 + L27 | 2× D3 → fn segments (Matthew 7:22-23, John 3:3-5) | agent |
+| V3 "I Am With You Always" | D1 ref→nkjv split | manual |
+| V4 L5 | D3 → note-link to V5 "I AM COME" | manual |
+| V6 L9 + L24 | 2× D3 → scripture fn (Psalm 50:7, 2 Peter 2:3) | agent |
+| Rebuke "blood-pours-down" | D3 → note-link to V5 "I AM COME" | manual |
+| Rebuke "far-removed" | D3 → note-link to V5 "I AM COME" | manual |
+| Rebuke "the-cup-of-the-wrath" | D3 → fn 4 note-link to V7 "I Shall Remove My Hand…" | manual |
+| Flock × 8 letters | 8× D3 → mostly note-links to other letters | agent |
+| Timothy "the-shadow-of-the-almighty" | D3 → typo bracket removed | agent |
+| Timothy "stealing-from-the-power-of-the-cross" | D3 → fn 1 (Acts 10:15) | agent |
+| Blessed × 2 | 2× D8 space inserts | agent |
+| WTLB Two × 19 | 19× D8 space inserts | agent |
+
+**Phase 2 — completed:**
+
+| Collection | Fixed | Method |
+|---|---|---|
+| WTLB One | 4× D8 + 4× D3 (deletions — Type C vestigial) | agent |
+| WTLB Two | 8× D3 (deletions — Type C vestigial) | agent |
+| V5 Letter 14 stub | full population from live (4 blocks, 3 media URLs, 2 related topics) | agent |
+| Holy Days entries 5-15 | sourceLabel populated (Volume Two/Three/Four/Six/Seven, Letters to Flock, Letters from Timothy) | manual |
+
+**Final verification:** all 11 modified data files pass brace/bracket/paren balance check.
+
+### Cross-collection bug pattern frequency (after main-volume + letter-collection audits)
+
+| Pattern | Count | Notes |
+|---|---|---|
+| **D3** (defunct `[N]`) | **17** | DOMINANT pattern. 2 V3 + 1 V4 + 2 V6 + 3 Rebuke + 8 Flock + 2 Timothy. Always orphaned (empty footnotes dict). |
+| D1 (ref text crammed) | 1 | Only V3's I Am With You Always — already fixed |
+| D2-D10 | 0 | None observed in main volumes/letters |
+| Stub letters | 1 | V5 Letter 14 — completely empty body |
+
+**Insight:** Almost all data corruption is **D3 orphaned brackets**. Likely root cause: a previous data-fetch pass converted some `[N]` markers to fn segments, but missed cases where the bracket appeared at the END of a segment, after a period, or in italic-styled segments. The fix pattern is uniform.
+
+### Fix template for D3 with empty footnotes dict
+
+When `[N]` is in body but `footnotes: {}` and `nkjv: {}`:
+1. WebFetch the live VOT page to find what footnote N should cite
+2. Replace `"text": "...word [N] more..."` with three segments: text/fn/text
+3. Populate `footnotes[N] = { type: "scripture", ref: "<ref>" }`
+4. Populate `nkjv["<ref>"] = "<NKJV verse text>"`
+5. For multi-verse refs use `"1. text 2. text"` format
+6. For (KJV)/(ASV)/(GNT) tagged refs use that translation, not NKJV
+
+### Holy Days source attribution map (for sourceLabel population, derived from entry dates)
+
+| # | Entry | Date | Likely source |
+|---|---|---|---|
+| 5 | Walking in the Footsteps of The Messiah's Passion | 2/10/10 | Letters to the Flock |
+| 6 | Do This in Remembrance of Me | 4/25/05 | Volume Two |
+| 7 | I Am The Passover and The Lamb | 4/18/05 | Volume Two |
+| 8 | Keep The Passover | 3/20/07 | Volume Three |
+| 9 | Unleavened | 4/19/06 | Volume Three |
+| 10 | Devotion | 3/7/10 | Letters to the Flock |
+| 11 | I AM RISEN | 4/21/06 | Volume Three |
+| 12 | I Shall Remove My Hand... | 5/19/10 | Letters to the Flock or Volume Six |
+| 13 | Pentecost | 6/6/11 | Letters to the Flock |
+| 14 | To Be Set Apart | 9/7/10 | Letters to the Flock |
+| 15 | Atonement | 2010 | Letters from Timothy |
+
+### Key learnings from the sweep
+
+1. **WebFetch unreliable for wiki footnotes.** The MediaWiki render hides footnote content from text extraction. Workaround: use exact-question prompts ("is there a [1] after phrase X?"); cross-reference within the data files for canonical footnote patterns (e.g. "I AM COME" + V5 link is a recurring template).
+
+2. **The "I AM COME" pattern is canonical.** When a letter has the phrase "I AM COME!" or "I AM COME DOWN!" with a [1] marker, that footnote is consistently a `note` type linking to Volume Five letter "I AM COME". Reused across V3, V4, V6, Rebuke (multiple letters).
+
+3. **Audit IDs were sometimes imprecise.** Audit agents identified `blood-pours-down-2` (actual: `blood-pours-down`), `woe-to-the-abominable` (actual: `the-cup-of-the-wrath…`), `consider-the-testimony` (actual: `stealing-from-the-power-of-the-cross`). Always verify the actual id before fix dispatch.
+
+4. **WTLB [N] brackets are different from Volume D3.** In Volumes, [N] is a missed conversion of a numbered footnote to an fn segment. In WTLB, [N] is likely a vestigial cross-reference marker since WTLB uses inline `{{ref:...}}` cites natively. Treat WTLB [N] as Type A/B/C (scripture/cross-ref/vestigial) per case.
+
+5. **Footnote types — three flavors:**
+   - `{ type: "scripture", ref: "Book X:Y" }` — gold bubble, NKJV verse text in nkjv dict
+   - `{ type: "note", text: "Also read: X", link: { collection, letterTitle } }` — gold bubble, sheet shows "Open in App" button
+   - `{ type: "note", text: "X", url: "..." }` — gold bubble, sheet shows external link
+
+### Format-style note (V2 vs others)
+
+V2 uses unquoted JS keys (`id: "...", title: "..."`). All others use JSON-quoted (`"id": "..."`). **This is cosmetic — both render identically.** Per user discussion 2026-05-03: a stylistic reformatting pass to V2-style across all volumes is a possible future task ("if wise and necessary"), but is large mechanical work with no functional impact. **Quality fixes (D-pattern bugs, completeness) are what matter.**
+
+### Sweep totals
+
+| Metric | Count |
+|---|---|
+| Letters audited | ~570 (across 11 collections) |
+| D-pattern bugs found | 54 |
+| D-pattern bugs fixed | 54 |
+| Stub letters populated | 1 |
+| Holy Days metadata gaps closed | 11 (sourceLabel) |
+| Files modified | 12 (V3, V4, V5, V6, V7, Rebuke, Flock, Timothy, WTLB One, WTLB Two, Blessed, Holy Days) |
+| Files confirmed clean (no changes needed) | 2 (V1, V2) |
+| PDFs OCR'd | 3 (Lamb 34p, Matthew SB 189p, MTAM 450p) |
+| OCR compute (local Ollama Qwen3 VL) | 9.4 hr total on user's machine |
+| OCR phrase-coverage of existing data | 93.2% MTAM, 97.1% Lamb of God, 79.3% Matthew SB (remaining "gaps" are schema/formatting differences, not content) |
+
+---
+
+## Section 14.5 — PDF / Studies sweep (Phase 3)
+
+**Three studies are PDF-sourced and require careful page-by-page OCR per user direction:**
+
+| Study | PDF file | Pages | OCR Status | Data Status |
+|---|---|---|---|---|
+| YAHUSHUA More Than a Man (MTAM) | `YAHUSHUA_MoreThanaMan.pdf` | 450 | ✅ Complete (450/450) | Audit OCR vs existing data + integrate gaps |
+| Matthew Study Bible | `New_Testament_Study_Bible-Matthew.pdf` | 189 | ✅ Complete (189/189) | Existing matthew.js spot-checked complete; OCR available for cross-verification |
+| Lamb of God (Chronology) | `THELAMBOFGODstudy.pdf` | 34 | ✅ Complete (34/34) | ✅ Complete — all 16 chapters populated, 8 letter cross-refs wired |
+
+**OCR aggregated outputs (in `_ocr_out/<study>/all.txt`):**
+- Lamb of God: 49KB
+- Matthew SB: 470KB
+- MTAM: 920KB
+
+**OCR was completed by local Ollama Qwen3 VL 8b** running in background through `run_ocr_all.sh`. The early pages took ~128s/page but later pages averaged 8-15s/page (warmer model + simpler back-matter pages). Total wall time well under the 24h estimate.
+
+PDFs located at: `C:/Users/corbi/CrossDevice/Pixel 9 Pro/storage/Download/`
+
+**Why OCR (not pdftotext):**
+- MTAM has 3 complex columns that pdftotext mangles — user confirmed this
+- Matthew SB is also unreliable per user
+- Lamb of God is mostly images (25.7MB but only 202 lines text-extractable)
+
+**Tooling installed:**
+- `pypdfium2` — PDF page rendering (pure Python, no system deps)
+- `pillow` — image processing
+- `requests` — HTTP for OCR APIs
+
+**OCR scripts in project root:**
+- `ocr_pipeline.py` — Local Ollama Qwen3 VL 8b (slow ~128s/page, but unlimited)
+- `ocr_gemini.py` — Gemini 2.0 Flash (fast ~3s/page, but daily quota limits)
+- `run_ocr_all.sh` — Sequential runner: Lamb → Matthew SB → MTAM
+- `test_keys.py` — Tests each Gemini key for 200/429
+
+**Output:** `_ocr_out/<pdf-name>/page_NNNN.txt` + `_progress.json` per PDF.
+
+**RESUMABLE:** Both scripts read `_progress.json` and skip already-done pages. Safe to interrupt + re-run.
+
+### Integration plan (per-study)
+
+For each study after its OCR completes:
+
+1. **Audit pass** — read OCR pages 0, mid, last; sample 3 existing data chapters; identify:
+   - Page-to-chapter mapping
+   - Existing schema (`sectionIntro`, `prophecyGroups`, `paragraphs`, `verses`, `letterLinks`, etc.)
+   - Cross-references to VOT letters that need tap-through links
+   - Footnote markers and scripture refs that need conversion to fn segments + nkjv
+
+2. **Synthesis pass** — dispatch agents (one chapter at a time) to:
+   - Read its assigned OCR pages
+   - Read the existing chapter's data shape from `bible-studies.js` or `matthew.js`
+   - Output a JS data block matching the schema with:
+     - Body content from OCR
+     - Section/heading structure preserved
+     - Scripture refs as `{{ref:...}}` (WTLB-style for studies) OR fn segments depending on schema
+     - Letter cross-references as `letter-link` segments with `{collection, letterTitle}` shape so tap-through + back-pill work
+     - NKJV verse text hardcoded into the chapter's nkjv dict for any scripture footnotes
+
+3. **Replace pass** — apply the new chapter content via Edit, preserving surrounding chapters
+
+4. **Verify** — re-Read modified region + brace balance check + sample render
+
+### Letter cross-reference target (schema reference)
+
+The studies have an existing `letterLinks` mechanism (visible in `matthew.js` votNotes). New cross-refs should use the same shape so the renderer wires them correctly. Pattern:
+```js
+{ "t": "letter-link", "label": "Visible Text", "link": { "collection": "Volume Two", "letterTitle": "I Am The Passover and The Lamb..." } }
+```
+
+The renderer's `Segments` function handles `letter-link` segments and routes through `openInAppLetter` for proper tap-through + back-pill behavior.
+
+---
+
+## Section 14.6 — Phase 3 fixes log (post-spot-check)
+
+After the main sweep, a final spot check across all 13 collections found 11 additional orphan `[1]` brackets that prior agents missed. Of these:
+
+**Fixed (8):**
+- V5 "Brought to a Close" line 3763 — "True Repentance" link
+- V7 "Salvation Is Given..." line 1024 — "True Repentance" link
+- V7 "The Prophets Are Sent Out..." line 1618 — V5 "I AM COME" link
+- V7 "I Shall Remove My Hand..." line 11391 — existing Matthew 13:15 (KJV) fn was already there, just needed segment split
+- V7 "I Am Calling You Out! (Part 2)" line 14990 — Proverbs 13:24 scripture fn (added)
+- Letters to Flock "A Wise Servant and the Line" line 4090 — V7 "I Am Calling You Out!" link
+- Letters to Flock "Blessed Are Those Who Hunger..." line 4800 — V4 "Awaken... Partake of The Living Bread" link
+- Letters from Timothy "The Shadow of The Almighty" line 402 — fixed segment value typo + link to "Timothy's Vision..."
+
+**Resolved (3 fixes applied 2026-05-03 — all 3 brackets were in DIFFERENT letters, audit was wrong about all being in "My Word Is Fire"):**
+
+- V7 "My Word Is Fire" (line 13696): "darkness of faces [1]" → fn 1 = note with url to `http://trumpetcallofgodonline.com/index.php5?title=Darkness_of_Faces`
+- V7 "Dividing the Spoils" (line 14001): the `[1][2][3][4]` segment is REAL — 4 distinct footnotes per wiki:
+  - fn 1: Regarding the Churches of Men (answersonlygodcangive.com)
+  - fn 2: Regarding the Catholic Church
+  - fn 3: False Doctrines Within the Churches of Men Regarding...
+  - fn 4: Regarding the Holidays of Men
+- V7 "I Am Calling You Out! (Part 1)" (line 14393): "darkness of faces [1]" → fn 1 = same Darkness_of_Faces topic link
+
+**LESSON: audit agents may misattribute line numbers to wrong letter ids.** Always re-grep `^    "id":` boundaries before treating an audit's letter-id claim as authoritative.
+
+---
+
+## Section 14.7 — Studies integration (Phase 4 — completed 2026-05-03)
+
+**Matthew Study Bible front-matter:** added `preface` block to `matthew.js` containing the intro/dedication content from PDF pages 0–8 (title, copyright, YAHUSHUA name etymology, Psalm 118:14, Isaiah 12:2, "Word of My Mouth" excerpt, "Mistranslation and Misinterpretation..." excerpt, 2 Timothy 2:15) — with tap-through letter-links to:
+- "The Word of My Mouth" (Volume Seven)
+- "Mistranslation and Misinterpretation Leading to Great Obscurity Among Many Faces" (Volume Four)
+
+**MTAM letter-link misattributions fixed (6 confirmed real bugs):**
+| Location | Was linked to | Correctly linked to |
+|---|---|---|
+| line ~26793 | (plain text only — no link) | "Who Among You, O Israel..." (V7) — converted to tap-through |
+| line ~45213 | "Subject to No Man" (V6) | "A Just God and A Savior" (V6) |
+| line ~25278 | "A Heavy Stone, a Bitter Burden" (V6) | "The Harvest Is Separated, All Bundles Set in Their Places" (V6) |
+| line ~11569 | "The Lord Your Righteousness" (WTLB Two) | "The King Eternal" (WTLB One) |
+| line ~6259 | "Enemies of Israel, Come Forth" (V7) | "Enemies of The Lord, Come Forth" (Lord's Rebuke) |
+| line ~1932 | "Proclaim The Name of The Lord" (V7) | "Blessed Be The Name" (WTLB Two) |
+| line ~3464 | "Proclaim The Name of The Lord" (V7) | "Blessed Be The Name" (WTLB Two) |
+
+These were genuinely mis-routed cross-references — the excerpt text content matches the OCR-attributed letter, but the existing data linked to a different (sometimes thematically related, sometimes unrelated) letter.
+
+**Final attribution accuracy (after 9 fixes total this session + improved checker):**
+- **178 of 216 (82.4%)** MTAM excerpt-with-link pairs **confirmed correctly attributed** via fingerprint + fuzzy match (multi-OCR-attribution-aware, plural/singular tolerance, ≥92% char overlap)
+- **0 misattributions remaining** confirmed
+- 38 data excerpts have fingerprints my tool couldn't match in OCR (text-formatting variations between OCR and data — sampled 3 manually, all confirmed correctly attributed; remaining 35 likely also correct, just below the tool's verification threshold)
+
+### Misattributions discovered and fixed this session (9 total)
+
+In addition to the structural fixes earlier (Matthew SB front-matter, Wedding Garment case-mismatch, plain-text "Who Among You" → letter-link, the original 4 letter-link target swaps), discovered and fixed these via systematic checker:
+
+- 2× "Proclaim The Name of The Lord" (V7) → "Blessed Be The Name" (WTLB Two)
+- 1× "It Is Time" (WTLB Two short title, wrong link) → "It Is Time... Prepare to Meet Your God" (V2)
+- 2× "It Is Time; Prepare to Meet Your God" with wrong link target (was wtlb-two-entry / "It Is Time") → V2 letter
+- Reverted line 8585 back to original "All Have Been Purchased" (V2) — original was correct, my "fix" was based on a misread of OCR context where "Water of Siloam" is a metaphor INSIDE the "All Have Been Purchased" letter excerpt, not its source
+
+### Wedding Garment scripture-ref tap-through fix
+
+Bug: matthew.js verse 22:11 has cite "Wedding Garment: Colossians 3:9-10" but matthew-nkjv.js had the matching key with **lowercase** "wedding garment:" — the lookup `MATTHEW_NKJV[s.cite]` is case-sensitive, so the rendered cite fell to the plain-text branch (no tap-through).
+
+Fix: changed matthew-nkjv.js key from `"wedding garment: Colossians 3:9-10"` to `"Wedding Garment: Colossians 3:9-10"`. Now matches the cite case-exactly → renderer's `hasVerse` check returns true → button branch with onScriptureClick → opens scripture sheet with Colossians 3:9-10 NKJV text → back-pill works as expected.
+
+Also normalized the verse text: dropped the redundant "Colossians 3:9–10 — " prefix (cite header already shows it) and converted the Unicode superscript "¹⁰" mid-text to the standard `"9. text 10. text"` decimal-marker format that triggers the gold inlay verse-sup rendering.
+
+**Audit tools created (kept in project root for re-use):**
+- `excerpt_audit.py` — extracts every `(An excerpt from "X" - Y)` from OCR, confirms each title exists somewhere in the data
+- `misattribution_check.py` — fingerprint-matches OCR attributions against data letter-links, flags title mismatches
+- `ocr_gap_check.py` — programmatic phrase-coverage check
+- `check_balance.py` — JSON validity check across all data files
+
+---
+
+## Section 20 — Objective E (Android polish batch, 2026-05-11)
+
+Five targeted fixes applied to `index.html` and `MainActivity.kt`:
+
+### 20.1 Note icon tap on Android
+
+**Problem:** `.hl-note-icon` spans injected by `applyNoteIcons()` couldn't be tapped on Android WebView. The root cause: Android WebView treats small `<span>` elements inside text containers as text nodes for touch purposes, firing long-press selection rather than a click. The 14×14px icon was also smaller than Android's minimum comfortable tap target.
+
+**Fix:**
+- CSS: added `touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent` to `.hl-note-icon`. `touch-action: manipulation` disables double-tap zoom and long-press text selection, making the icon behave like a button.
+- `applyNoteIcons()`: added a `touchend` listener (alongside the existing `click` listener) with `e.preventDefault()` + `e.stopPropagation()` that directly calls the note-open logic. `preventDefault` stops Android from triggering the text-selection machinery after the touch.
+
+### 20.2 Link picker screen Android inset
+
+**Problem:** When the link picker sheet is at `max-height: 92vh`, its top overlaps the Android status bar / camera cutout on tall sheets.
+
+**Fix:** Added `padding-top: var(--inset-top, 0px)` to `.link-picker-overlay`. Because the overlay uses `display: flex; align-items: flex-end`, the padding reduces the flex container's effective content height — the sheet's max-height therefore can't exceed `100vh − inset-top`, keeping the top of the sheet safely below the notch. `--inset-top` is injected by `MainActivity.injectInsets()` on every window-inset change.
+
+### 20.3 NoteSheet redesign — blank notes + options on creation screen
+
+**Three user-facing changes:**
+
+1. **Blank notes allowed.** `canSave = body.trim().length > 0` replaced with `const canSave = true`. The Save button now always works. Empty-state read-mode text updated from "No note text yet. Tap ⋯ → Edit to add one." → "Empty note. Tap ⋯ → Edit to add text."
+
+2. **Color picker visible on creation screen.** A `.note-edit-colors` row (the 10 color circles, using existing `.ann-chip-color-btn` styles) is rendered directly below the anchor text in edit mode — always visible, no ⋯ menu required. Tapping a circle calls `recolor(c)` immediately.
+
+3. **Notebook assignment on creation screen.** A `.note-edit-nb-row` button is rendered between the textarea and the Cancel/Save footer in edit mode. Tapping it opens the existing `NotebookPickerSheet` (via `onOpenNotebookPicker` prop). Shows "Add to notebook…" or the current notebook name(s).
+
+**`cancelEdit` fix:** Previously, cancelling edit mode discarded the note whenever `note.body` was falsy — this would incorrectly discard a saved blank note when the user re-opened edit mode. Fixed to `if (startInEditMode && !note.body)` so only a brand-new note that was never saved is discarded on cancel.
+
+### 20.4 Import / Export data on Android
+
+**Problem:** Export used `URL.createObjectURL` + anchor click (not supported as a file download in Android WebView). Import used `<input type="file">` with no `onShowFileChooser` WebChromeClient implementation (file chooser never opens).
+
+**Fix — two new `AndroidBridge` methods in `MainActivity.AppInterface`:**
+
+- **`saveToDownloads(filename, content): String`** — writes the JSON string to the system Downloads folder via `MediaStore.Downloads` (Android 10+ / API 29+). Returns `"ok"` on success or `"error:<reason>"` on failure. For API < 29 returns `"error:requires_android_10"`.
+
+- **`openFilePicker()`** — launches the system file chooser via `ActivityResultContracts.GetContent()` (registered in `onCreate` as `filePickerLauncher`). When the user picks a file, Kotlin reads the bytes, base64-encodes them, and calls `window.__onImportFile(b64)` back in JS. User cancel → `window.__onImportFile(null)`.
+
+**JS side:** `exportPersonalData()` checks `window.AndroidBridge.saveToDownloads` first; falls back to blob URL for PC. `importPersonalData()` extracted the parse/apply logic into `_doImport(jsonText)` shared between both paths; Android path sets `window.__onImportFile` callback then calls `openFilePicker()`; PC path uses the existing `<input type="file">` flow.
+
+**New imports added to MainActivity.kt:** `android.content.ContentValues`, `android.os.Build`, `android.provider.MediaStore`, `androidx.activity.result.ActivityResultLauncher`, `androidx.activity.result.contract.ActivityResultContracts`.
+
+### 20.5 Reading dot excluded from special screens
+
+Added `"library"`, `"notes-index"`, and `"about"` to the screen exclusion list in the `settings.showReadingDot` condition. The dot now correctly hides on the Library hub, Notes index, and About VOTReader screens (in addition to the previously excluded `settings`, `history`, `search`, `garden-view`, `bible-ch`, `matthew-ch`, and all letter/WTLB/etc. reading screens via `LETTER_SCREEN_SET`).
+
+---
+
+## Section 21 — Objective D autonomous finish (2026-05-12)
+
+Three remaining autonomous items from `handoff_for_next_session_2026-05-11.txt` §3 landed this session. Main was at `641b031` (Objective E Android polish) entering; working tree had a ~505-line uncommitted `index.html` diff from an active parallel session (LinkPicker rewrite with red ✕ undo + green ✓ confirm, one-icon-per-block applyDOMLinks, snapRangeToWords no longer expands forward, bidirectional LinkStore prefix match, NoteSheet cancelEdit converts to highlight instead of removing). All edits this session routed around that parallel work into disjoint line ranges.
+
+### 21.1 Android 12+ SplashScreen API (no JS overlap)
+
+Five files, fully self-contained:
+
+- `gradle/libs.versions.toml`: new `coreSplashscreen = "1.0.1"` + `androidx-core-splashscreen` library entry.
+- `app/build.gradle.kts`: added `implementation(libs.androidx.core.splashscreen)`.
+- `app/src/main/res/values/styles.xml`: new `Theme.VotReader.Splash` with parent `Theme.SplashScreen`, black `windowSplashScreenBackground`, `@drawable/ic_launcher_foreground` icon, and `postSplashScreenTheme=@style/Theme.VotReader` so the activity transitions to the existing dark theme once the splash dismisses.
+- `app/src/main/AndroidManifest.xml`: activity `android:theme` changed `@style/Theme.VotReader` → `@style/Theme.VotReader.Splash`.
+- `app/src/main/java/com/votreader/sacredui/MainActivity.kt`:
+  - import `androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen`
+  - new `@Volatile var splashHolding = true`
+  - `installSplashScreen()` BEFORE `super.onCreate()`, then `splash.setKeepOnScreenCondition { splashHolding }`
+  - in `onPageFinished`: `view.postDelayed({ splashHolding = false }, 80L)` — holds the splash through the cold-boot beat where the WebView has loaded but React hasn't mounted yet. 80 ms covers the gap without making the splash feel slow.
+
+`core-splashscreen` backports the Android 12+ SplashScreen API to API 23+; we target 26+, so the backport is just future-proofing for older devices that might still be paired with the app.
+
+### 21.2 JS-side "Keep Screen On While Reading" toggle
+
+The Kotlin bridge for this landed at `ac439b3` but no JS-side Settings UI was wired. Now closed in three edits in `index.html`:
+
+1. Settings defaults block: added `keepScreenOn: true,` next to `haptic: true,`.
+2. SettingsScreen Reading Experience section: added a `SettingsRow` ("Keep Screen On While Reading" / "Don't let the screen dim or lock while the app is open. Helpful for long reading sessions; turn off to save battery. Has no effect on desktop browsers.") as the last row in the section, immediately before the "Tabs, Search & History" divider.
+3. App() useEffect that toggles body classes + calls `setLightStatusBar`: added
+   ```js
+   if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === 'function') {
+     window.AndroidBridge.setKeepScreenOn(settings.keepScreenOn !== false);
+   }
+   ```
+   so the Kotlin bridge fires whenever settings mutate. On PC the bridge is `undefined` and the call is no-op.
+
+Verified live in Chrome preview.
+
+### 21.3 [object CSS] React #31 warnings — closed as not reproducible
+
+The handoff reported "12 instances per render" of Minified React error #31 with `args=[object CSS]`, pre-existing and stable across page changes. Investigation this session:
+
+- Patched `window.React.createElement` to capture any call with a CSS-typed child (`window.CSS` or `constructor.name === 'CSS'`).
+- Drove the app through Home → Volumes Home → Volume One Index → preface letter → "The Wide Path" letter, watching the capture buffer and `console.error` / `console.warn` streams.
+- Result: **zero** CSS-typed-child captures, **zero** React #31 firings, **zero** render-time warnings.
+
+Two equally-likely explanations: (1) Android-WebView only (now diagnosable via `adb logcat -s WebViewJS`); (2) already silenced by the Objective E batch (`641b031`). Closing the investigation as not actionable without a real Android device.
+
+---
+
+## Section 22 — Journal voice recording (dual-path architecture, 2026-05-15)
+
+The journal voice-memo recorder (`app/src/main/assets/src/ui/sheets/JournalRecordingSheet.js`) had two **independent** failures, root-caused by two parallel research agents and fixed together. This section is the canonical reference for how recording works now.
+
+### 22.1 The two original bugs
+
+| Platform | Symptom | Root cause | Fix |
+|---|---|---|---|
+| **Desktop** (Chrome/FF/Edge) | Mic permission granted, but waveform flat, preview silent, saved audio silent | `index.html` CSP line had `media-src 'none'` — this blocks **every** `<audio>`/`<video>` `src`, including `blob:` URLs, on all browsers + Android WebView. Recording always worked; playback could never load the blob. Live-tested error: `MEDIA_ELEMENT_ERROR: Media load rejected by URL safety check`. | `media-src 'none'` → `media-src blob:` (index.html ~line 18). Verified live: `<audio>` reaches `readyState 4`. |
+| **Desktop** (secondary) | Waveform barely moved even when audio captured | `var lvl = Math.min(1, rms * 3)` — speech RMS is ~0.02–0.06, so 3× → ~4–10px bars on a 56px max (reads as flat) | `rms * 3` → `rms * 8` |
+| **Android** (Pixel 9 Pro, all OEMs) | "Requesting…" ~2s → "Could not open the microphone" | WebView Chromium `getUserMedia` rejects with `NotReadableError`/`TrackStartError` even with RECORD_AUDIO granted + no other app recording. | **Rearchitected to a native Kotlin recorder** (see §22.3). |
+
+### 22.2 WebView getUserMedia hardening (still active on desktop; dead-defense on Android)
+
+These were the first-pass Android fixes. The native path (§22.3) supersedes them on Android, but they're kept (zero cost, still protect the desktop getUserMedia path):
+
+- `AndroidManifest.xml`: `<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />` (normal perm; lets WebView's internal `setMode()` work)
+- `MainActivity.kt` `AppInterface.startAudioSession()` / `endAudioSession()` — sets `AudioManager.MODE_IN_COMMUNICATION` during capture, restores prior mode before playback. JS calls `startAudioSession()` after `getUserMedia` resolves, `endAudioSession()` in `rec.onstop` + `cleanup()`. (Native path does NOT call these — MODE_IN_COMMUNICATION is wrong for MediaRecorder.)
+- `MainActivity.kt` `onPermissionRequest` already-granted fast-path: 250ms `webView.postDelayed` before `request.grant()` (matches the delay in `micPermissionLauncher` / `micPrepLauncher`)
+- `JournalRecordingSheet.js` `beginCapture()`: `getUserMedia` retries `NotReadableError`/`TrackStartError`/`AbortError` 3× with 400/800/1200ms back-off; watchdog re-armed per attempt; error copy no longer falsely says "in use by another app"
+- `JournalRecordingSheet.js`: the `AudioContext`/analyser block is wrapped in `if (!isAndroid)` (`isAndroid = !!window.AndroidBridge`) — the dual-consumer stream is what crashes AAUDIO devices
+
+### 22.3 The native Android recorder (the robust path — current production design)
+
+**Why:** WebView `getUserMedia` is the single fragile component across the Android version / WebView-build / OEM-audio-HAL matrix. Native `android.media.MediaRecorder` is the same OS API every voice-memo app uses — reliable everywhere, and exposes `getMaxAmplitude()` so the live waveform works on Android again.
+
+**Kotlin (`MainActivity.kt`)** — state fields guarded by `recLock` (the `@JavascriptInterface` methods run on a binder thread, not main): `nativeRecorder: MediaRecorder?`, `nativeRecordFile: File?`, start/pause-accum timestamps. Records **AAC in MPEG-4 (`.m4a`)** via `MediaRecorder` (`MIC` → `MPEG_4` → `AAC`, 96 kbps / 44.1 kHz) to a temp file in `cacheDir`. Bridge methods on `AppInterface`:
+
+| Method | Returns | Purpose |
+|---|---|---|
+| `nativeRecordStart()` | `"ok"` / `"error:<reason>"` | rechecks RECORD_AUDIO, creates+prepares+starts MediaRecorder |
+| `nativeRecordPause()` / `nativeRecordResume()` | `"ok"`/`"error:…"` | `MediaRecorder.pause()`/`resume()` (API 24+, minSdk is 26) |
+| `nativeRecordAmplitude()` | `Int` 0..32767 | `MediaRecorder.getMaxAmplitude()` — drives the waveform |
+| `nativeRecordStop()` | (async) | stops, reads file, base64, → `postNativeComplete()` |
+| `nativeRecordCancel()` | — | stop+release+delete temp file, no callback |
+
+`postNativeComplete(base64, durationMs)` is a private `MainActivity` method (touches `webView`): `webView.post { evaluateJavascript("window.__onNativeRecordingComplete(arg,dur,'audio/mp4')") }`, `arg` is `null` on failure. `onDestroy()` releases a still-running recorder + deletes its temp file. `MediaRecorder(context)` ctor on API 31+, deprecated `MediaRecorder()` below.
+
+**JS (`JournalRecordingSheet.js`)** — `startCapture()` is the dispatcher: `window.AndroidBridge.nativeRecordStart` exists → `beginNativeCapture()`; else (desktop) → `beginCapture()` (the unchanged getUserMedia path). The 4 post-permission call sites in the permission gate were changed from `beginCapture()` → `startCapture()`. `beginNativeCapture()` mirrors the existing UI state machine (requesting → recording ⇄ paused → preview → save/discard): a `tickRef` duration timer keyed off `nativeStateRef` ('recording'|'paused'|'inactive') and an `ampRef` 80ms interval polling `nativeRecordAmplitude()` (`lvl = Math.min(1, Math.sqrt(amp/32767)*1.8)`) into the same `samplesAccumRef`/`setWaveLive` buffer. `window.__onNativeRecordingComplete` (registered in the mount `useEffect`, deleted in its cleanup alongside `__onMicPermissionResult`) builds a `Blob` from the base64 and feeds the **unchanged** preview / `JournalMediaStore.put` / `onSave` pipeline — it honours `pendingSaveRef` exactly like the getUserMedia `rec.onstop` did (Save tapped before the blob arrived). `pauseRecording`/`resumeRecording`/`stopRecording` branch on `nativeRef.current` first. `cleanup()` calls `nativeRecordCancel()` (idempotent — Kotlin no-ops on null recorder) and clears `ampRef`. New refs: `nativeRef`, `nativeStateRef`, `ampRef`.
+
+**Downstream unchanged:** `.m4a`/`audio/mp4` is universally playable by `<audio>` and stores as a `Blob` exactly like the old WebM, so `JournalMediaStore`, the viewer's `JournalAudioBlock`, and previously-saved recordings are unaffected. The base64-over-`evaluateJavascript` handoff matches the existing import/export bridge pattern; fine for typical memos, heavy only near the 5-min cap (acceptable, not yet optimized).
+
+### 22.4 Status / caveats
+
+- **Desktop**: verified live in the preview (CSP `media-src blob:` confirmed; `<audio>` blob reaches `readyState 4`; `startCapture()` confirmed routing to `beginCapture()` when no `AndroidBridge`; app loads with zero console errors; JS syntactically valid). No regression.
+- **Android**: ✅ CONFIRMED working on real device by the user (2026-05-19) — prompt → recording with moving waveform → preview playback → save all function correctly.
+- All of the above was **committed in `2db70f5`** (2026-05-19) as part of the one bundled commit, alongside this session's annotation-crash / footnote-dedup / Library-settings-gear / journal-stats fixes.
+- minSdk = 26 (gradle), so `MediaRecorder.pause()/resume()` (API 24+) are always available.
+
+---
+
+## Outstanding / future work
+
+1. **Studies (deferred per user):** Bible/Letter Studies (`bible-studies.js`, `matthew.js`) skipped the main sweep. The user's screenshots showed similar D-patterns there (doubled superscript markers in John 17:20-23, parser glitch in 1 Cor 7:32-35 cite). To be addressed in a future sweep.
+2. **Format-style migration (V2-style unquoted keys across all collections):** Possible future task; cosmetic only, no functional impact.
+3. **Holy Days content sync:** Now that source volumes are clean, a verification pass could confirm Holy Days excerpts match their source verbatim (currently they're independent copies, so source updates don't auto-propagate).
+4. **WTLB orphan brackets removal philosophy:** All [N] markers in WTLB were treated as Type C (vestigial) and deleted. If the user wants any of these to be preserved as cross-references, would need to revisit per-entry with live wiki access.
+
+Remaining Objective D items (handoff §3 / PLAN.txt §19):
+- ☐ App icon + monochrome icon layer for Android 13+ themed icons (needs design assets).
+- ☐ Release signing config (deferred until Play Store discussion — Timothy's permission first per user policy).
+
+Bigger objectives still open (PLAN.txt §19):
+- ☐ E — Data unified (wire `data-normalize.js`, unified `resolveScriptureText`, migrate 28 files).
+- ☐ H — Library completes (Bookmarks, Journal, Highlights & Underlines tiles).
+- ☐ I — Reading-app baseline (TTS, in-app video, synonyms, sepia, font controls).
+- ☐ K — PWA evaluation (architectural decision pending user input).
+
+---
+
+## The "Big Sweep" plan — per-letter data audit (workflow used 2026-05-03)
+
+### Goals
+1. Every letter has complete metadata: `id`, `num`, `title`, `date`, `from`, `spoken`, `forLine`, `audioUrl` (if exists on site), `videoVoiceUrl` (if exists), `videoMusicUrl` (if exists), `soundcloudUrl` (if exists), `relatedTopics[]`, `prevLetter`, `nextLetter`.
+2. Every footnote has hardcoded NKJV verse text in the letter's `nkjv` dict (unless `(ASV)`/`(KJV)` tag specifies otherwise — then bake that translation's text).
+3. Compound refs use `" | "` separator with `"Book X:Y — verse text | Book A:B — verse text"` form.
+4. Cross-letter footnotes use `{ type: "note", text: "Also read: ...", link: { collection, letterTitle } }` OR `{ type: "scripture", ref, seeAlso: { collection, letterTitle, label } }` for combined.
+5. No leftover `[matthew4:4]` glued-text patterns. All text properly spaced at source.
+6. WTLB / The Blessed: simple `(Ref)` parenthetical cites — NO numbered footnote bubbles (they're short-form).
+
+### Volume Two = gold standard
+Volume Two has the most uniform, complete metadata structure:
+- Every letter has all media URLs that exist on the site
+- `relatedTopics` is consistently populated
+- Footnotes use mixed `scripture` + `note` types correctly
+- `nkjv` dict is complete per letter
+
+**Model all other volumes (V1, V3-V7, Flock, Timothy, Rebuke) on Volume Two's structure.**
+
+### Sweep order used
+1. Foundation fixes (B1-B4) — fix renderer bugs FIRST so when we sweep, fixes are consistent
+2. Holy Days album (16 entries) — user requested first
+3. Volume Two (gold-standard, smaller diffs)
+4. Volumes One, Three, Four, Five, Six, Seven
+5. Lord's Rebuke
+6. Letters to the Flock
+7. Letters from Timothy
+8. WTLB Part One, WTLB Part Two
+9. The Blessed
+10. Final cross-collection verify
+
+### Sub-agent dispatch protocol
+
+- Use **Haiku 4.5** sub-agents with `subagent_type: general-purpose` and `model: haiku`.
+- **One letter per agent** — bite-sized, verifiable.
+- Pass agent: (a) the existing data in the file, (b) the live website URL for that letter, (c) explicit instructions on metadata fields and footnote format.
+- Dispatch in parallel batches of 4 (not more — agent quality degrades when many run at once and verification load grows).
+- After each agent returns, **read the diff** to verify before moving on. Do not chain sweeps; verify between each.
+- Prefer Edit (string replacement) over Write (full file rewrite) so changes are easy to review.
+
+### Wiki source-of-truth
+
+The website thevolumesoftruth.com is a wiki. Letter pages live at canonical URLs like `https://www.thevolumesoftruth.com/<Page_Name>` (underscores between words, exact case).
+
+For agents:
+- Fetch ONLY the canonical staged page — e.g. `https://www.thevolumesoftruth.com/The_Wide_Path`
+- DO NOT fetch revision history URLs (`?action=history`, `oldid=...`, `&diff=...`) or talk pages
+- DO NOT fetch ?action=edit or printable version URLs
+- If a fetch returns a duplicate/revision/redirect, REPORT and stop — do not infer
+
+URL slug derivation:
+- Title "The Wide Path" → `/The_Wide_Path`
+- Title with apostrophe "I AM He" → check for variants since wiki may URL-encode or strip punctuation
+- When in doubt, the existing data file's `audioUrl` Bandcamp slug usually matches the page slug pattern (lowercase, hyphenated)
+
+### Sub-agent instruction template
+
+```
+You are auditing ONE single letter in a data file. Be surgical.
+
+==== INPUTS ====
+DATA FILE: app/src/main/assets/src/data/<file>.js
+LETTER ID: <id>
+LETTER TITLE: <title>
+LIVE URL: https://www.thevolumesoftruth.com/<URL_slug>
+GOLD STANDARD: app/src/main/assets/src/data/volume-two.js letter id "the-wide-path" — copy that shape EXACTLY for metadata, footnote format, and nkjv dict.
+
+==== THE 10 BUG PATTERNS TO HUNT ====
+(D1-D10 — see ARCHITECTURE §6.6 for the full table.)
+
+==== STEP-BY-STEP ====
+1. Read the GOLD STANDARD letter "the-wide-path" in volume-two.js so you know exact shape.
+2. Read the target letter's full block in the DATA FILE.
+3. WebFetch the LIVE URL. Compare body text, all inline footnote markers, all metadata (date, attribution, audio link, video links, Related Topics, prev/next titles, addendum links).
+4. For EACH footnote, look up the verse text from the canonical Bible (use NKJV unless ref has (ASV)/(KJV)/(GNT)/(CJB)/(BSB)/(YLT)/(LSV)/(WEB)/(HNV) tag — then use that translation). ALWAYS hardcode the verse text into the letter's nkjv dict.
+5. Apply D1-D10 fixes if present.
+6. Use the Edit tool to make surgical changes to ONLY this one letter block. Do NOT touch other letters.
+7. After Edit, re-Read the modified region to verify the change took effect cleanly.
+
+==== HARD RULES ====
+- ONE letter only. Do NOT batch-edit multiple letters.
+- NO regex replace_all at file scope. Targeted Edits only.
+- Match the file's existing format style (V2 unquoted vs JSON-quoted). Do not change format.
+- Preserve every other letter in the file byte-for-byte.
+- If the live URL is unreachable, REPORT and stop — do NOT invent metadata.
+- If translation-tagged ref but no translation file available, REPORT and stop.
+- Do not add audio/video URLs that don't exist on the live site.
+
+==== REPORT FORMAT ====
+- LETTER: <id> in <file>
+- D-PATTERNS FIXED: D1, D3, ... (or "none")
+- METADATA UPDATES: list (or "none")
+- NKJV ENTRIES ADDED/FIXED: list of refs
+- ANOMALIES / OPEN QUESTIONS: anything you couldn't resolve
+```
+
+### Working principles (synthesized from user direction)
+
+- **Just work, no plan mode.** Don't deliberate visibly; act, verify, report deltas.
+- **One letter per agent.** Bite-sized. Trade verbosity in instructions for clarity.
+- **Diligence is the project.** Bugs are scattered and not pattern-searchable; only a complete sweep finds them all. The user has accepted this is tedious.
+- **Foundation, not bandaids.** Fix the data so renderer guards become unnecessary. Don't add new CSS/JS workarounds.
+- **Verify, don't trust.** After each agent returns, Read the modified region. Trust ≠ done.
+- **Skip Studies.** Bible/Letter Studies (`bible-studies.js`, `matthew.js`, etc.) are out of scope unless explicitly requested.
+- **Holy Days = ghost album.** It mirrors content from source volumes. Audit once for structure/nav, defer content sync until after source sweeps.
+- **Wiki = source of truth.** Fetch live pages with WebFetch; canonical staged URLs only.
+
+---
+
+## Auto-resume mechanism (scheduled tasks — historical workflow)
+
+When token limits exhaust mid-task, schedule a wake-up via `mcp__scheduled-tasks__create_scheduled_task` so the work resumes after the 5-hour window resets.
+
+**Active wake-ups: NONE.**
+
+**Critical reminders about Anthropic agent OCR limitations:**
+
+1. **Content filter (server-side) blocks MTAM OCR**: Sonnet AND Haiku refuse to output the prophetic/judgment language. Local Ollama Qwen3 VL is the ONLY viable path for MTAM. **Don't dispatch Sonnet/Haiku for MTAM.**
+
+2. **Copyright refusal is non-deterministic for Matthew SB**: Sonnet sometimes transcribes 50+ pages successfully, sometimes refuses on first request citing "verbatim copying of copyrighted work."
+
+3. **Implication**: Agent-based OCR is unreliable for this content. **Local Ollama is the SAFE default**. Use Sonnet only opportunistically.
+
+---
+
+## NIM Proxy — FULLY DEFUNCT, AI DEFERRED INDEFINITELY
+
+The entire NIM/LiteLLM proxy infrastructure is gone (verified 2026-05-11). `C:\Users\corbi\.claude\nim-proxy\` contains only two empty 0-byte log files. No `proxy.py`, no `litellm-config.yaml`, no startup scripts. Port 4000 has nothing listening.
+
+**AI is deferred indefinitely.** Per user direction 2026-05-11: *"no ai no nothing, no api keys, etc, those are security risks anyway, we'll defer a.i feature."* Do not reintroduce a proxy. If a future session is tempted to talk to an LLM backend, surface that to the user first — it is contrary to current direction.
