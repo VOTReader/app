@@ -7208,6 +7208,72 @@ POST-Q3 FUTURE WORK — captured during Q3.3e (2026-05-24)
   NOT a Q3 task. Schedule for Q5 (tests) or Q6 (architecture polish). Track
   via task #6 in the active session task list.
 
+  CROSS-CUTTING STRATEGIC ITEMS (captured 2026-05-24 during Q3.3e)
+  ────────────────────────────────────────────────────────────────
+
+  These are not specific lint warnings — they are project-level gaps the user
+  surfaced after Q3.3e-android-back. Higher long-term leverage than the
+  remaining ~33 lint warnings; don't lose them.
+
+  1. SMOKE-LITE.JS — Node-runnable subset of tools/smoke.js for CI.
+     Today, tools/smoke.js (34 KB, ~681 lines) is browser-only — runs via
+     preview_eval, requires a human or coordinator to trigger. CI can't use
+     it, so it catches regressions only when someone remembers to run it.
+     Extract the non-DOM subset into a Node script:
+       - Every .js in app/src/main/assets/src parses cleanly (already covered
+         by CI syntax-check — keep for completeness).
+       - All COLLECTIONS entries resolve to non-empty letter arrays or a
+         preface (today this only runs after the bundles load in a browser).
+       - Module export validation — the lexical-mirror script writes 143
+         globals; verify the source-of-truth list matches what the entry
+         files export.
+       - No circular imports in stores/_entry-b.js, renderer/_entry.js,
+         ui/_entry-d.js (esbuild rejects cycles but the regression mode
+         "module reorders inside an entry file and one shadows another" is
+         not always caught).
+       - check_balance.py-equivalent in Node so the smoke runs even on
+         Linux CI without a Python dependency? (or just keep Python.)
+     Estimated effort: ~half-day. Higher value than the remaining 33 lint
+     warnings combined.
+
+  2. RECONCILE QUALITY-UPLIFT-PLAN.TXT VS PLAN.TXT
+     CLAUDE.md currently references the active roadmap as
+     `C:\Users\corbi\OneDrive\Desktop\quality-uplift-plan.txt` — outside the
+     repo, lives only on the user's machine, not version-controlled. Mean-
+     while PLAN.txt in the repo is from 2026-05-11 and partially stale.
+     Pick one canonical location (in-repo preferred) and reconcile. Two
+     roadmap docs in two locations is the exact drift problem that the
+     CLAUDE.md → CLAUDE.md/HISTORY.md/ARCHITECTURE.md split was supposed
+     to solve. Action: copy quality-uplift-plan.txt into the repo (or
+     merge into a refreshed PLAN.txt), then update CLAUDE.md's "Active
+     roadmap" reference to the in-repo path.
+
+  3. BUNDLE-A.JS LAZY-LOAD (UX, not Q3-Q6 lint)
+     bundle-a.js is 11.7 MB loaded on every cold WebView boot — 21 corpus
+     files + vendor + search engine, concatenated into one classic-script.
+     On mid-range Android, that's ~3-5 seconds of parse time before any
+     UI paints. Splitting into:
+       - bundle-a-core.js (~2 MB): vendor + search engine + small registries
+       - bundle-a-corpus-{volKey}.js (lazy): each Volume/WTLB/etc.
+     loaded on-demand when the user opens that collection would be the
+     single biggest UX win available. Post-Q6 candidate; needs the
+     COLLECTIONS registry to gate corpus loading and a fetch-and-await
+     wrapper that doesn't break the existing synchronous `colLetterArr`
+     contract. Significant refactor — schedule deliberately.
+
+  4. --MAX-WARNINGS AUTOMATION (Q3.3e transition)
+     The current ratchet (CI --max-warnings N, hand-decremented per commit)
+     works only while a human/agent remembers to decrement. If anyone forgets,
+     the gate is looser than reality. Two paths:
+       a) Once Q3.3e clears the 33-34 remaining warnings to 0, switch CI to
+          --max-warnings 0 permanently. Problem disappears.
+       b) During the transition, replace the hardcoded N with a one-liner
+          that runs `npx eslint --format json` and computes N from the
+          actual output, then enforces "N must not increase commit-over-
+          commit." More complex; only worth doing if the path to 0 is long.
+     Recommendation: (a). The remaining 33 warnings should be the LAST
+     transition; CI --max-warnings 0 is the steady state.
+
 ───────────────────────────────────────────────────────────────────────────────
 END OF DOCUMENT — last updated 2026-05-10 (1/4 agents reported, integrating)
 ───────────────────────────────────────────────────────────────────────────────
