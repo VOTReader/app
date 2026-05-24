@@ -50,7 +50,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
                     <span className="vot-note-vol">{n.vol}</span>
                     {badge}
                   </div>
-                  <div className="vot-note-letter">"{n.letter}"</div>
+                  <div className="vot-note-letter">“{n.letter}”</div>
                   {n.excerpt && <div className="vot-note-excerpt">{n.excerpt}</div>}
                 </>
               );

@@ -64,7 +64,7 @@
     return icon;
   }
   function _insertLinkIconAt(container, hlKey, endPos, count, isSource) {
-    var WORD = /[\w''\-]/;
+    var WORD = /[\w’'-]/;
     var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
     var SKIP_RX = /\b(fn-ref|tap-ref|letter-link-ref|verse-link-icon|hl-note-icon)\b/;
     function isSkip(el) {
@@ -260,7 +260,7 @@
     return icon;
   }
   function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds, justCreated) {
-    var WORD = /[\w''\-]/;
+    var WORD = /[\w’'-]/;
     var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
     var SKIP_RX = /\b(fn-ref|tap-ref|letter-link-ref|verse-link-icon|hl-note-icon|inline-link-icon|inline-bookmark-icon)\b/;
     function isSkip(el) {
@@ -457,7 +457,7 @@
   function findNoteIconInsertionPoint(mark) {
     const container = mark.closest("[data-hl-key]");
     if (!container) return { kind: "afterMark" };
-    const boundaryRx = /[\s.,;:!?)\]}”’—\-]/;
+    const boundaryRx = /[\s.,;:!?)\]}”’—-]/;
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
     let pastMark = false;
     while (walker.nextNode()) {

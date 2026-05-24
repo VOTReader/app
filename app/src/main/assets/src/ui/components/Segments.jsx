@@ -39,7 +39,7 @@ export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetter
     // paren/bracket, or opening quote. Avoids false positives before trailing
     // punctuation (commas, periods, etc.) that the fetch script split into segments.
     const prevV = i > 0 ? segments[i - 1].v || '' : '';
-    const v = seg.v && /^[\w(\[{"\u201c\u2018]/.test(seg.v) && /\S$/.test(prevV) ? ' ' + seg.v : seg.v || '';
+    const v = seg.v && /^[\w([{"\u201c\u2018]/.test(seg.v) && /\S$/.test(prevV) ? ' ' + seg.v : seg.v || '';
     if (seg.t === "bold-italic") return <React.Fragment key={i}>{renderTextWithScripRefs(v, "bold-italic", onScripClick, highlightText)}</React.Fragment>;
     if (seg.t === "italic") return <React.Fragment key={i}>{renderTextWithScripRefs(v, "italic-text", onScripClick, highlightText)}</React.Fragment>;
     if (seg.t === "caps") return <span key={i} style={{ fontWeight: 600, letterSpacing: '0.03em' }}>{v}</span>;

@@ -157,7 +157,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
             ) : (
               <div className="navpick-empty">
                 <div className="navpick-empty-title">Search to link</div>
-                <div className="navpick-empty-hint">Examples: "Eph 6:5", "v1l2", "WTLB1 33", or a letter title.</div>
+                <div className="navpick-empty-hint">Examples: &quot;Eph 6:5&quot;, &quot;v1l2&quot;, &quot;WTLB1 33&quot;, or a letter title.</div>
               </div>
             )
           ) : (
@@ -169,7 +169,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
             ) : (
               <div className="navpick-empty">
                 <div className="navpick-empty-title">No matches</div>
-                <div className="navpick-empty-hint">Try "Genesis 1", "Eph 6:5", "V2 letter 5", "The Wide Path", "WTLB1 33".</div>
+                <div className="navpick-empty-hint">Try &quot;Genesis 1&quot;, &quot;Eph 6:5&quot;, &quot;V2 letter 5&quot;, &quot;The Wide Path&quot;, &quot;WTLB1 33&quot;.</div>
               </div>
             )
           )}

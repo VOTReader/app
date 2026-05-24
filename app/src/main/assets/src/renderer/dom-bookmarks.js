@@ -146,7 +146,7 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
 }
 
 function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds, justCreated) {
-  var WORD = /[\w''\-]/;
+  var WORD = /[\w’'-]/;
   var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
   // Elements the icon must NOT land directly before — reuses the same
   // skip list as _insertLinkIconAt.

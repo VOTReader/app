@@ -134,7 +134,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const q = (query || '').trim();
     if (!q || q.length < 4 || q.length > 15) return null;
     if (/\s/.test(q)) return null; // multi-word: not a book attempt
-    if (/[0-9:.,;\-]/.test(q)) return null; // has digits/punctuation: already a ref attempt
+    if (/[0-9:.,;-]/.test(q)) return null; // has digits/punctuation: already a ref attempt
     const guess = window.VotSearch.fuzzyBookSuggest(q);
     if (!guess) return null;
     const disp = window.VotSearchData.BOOK_DISPLAY[guess] || guess;
@@ -269,7 +269,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {didYouMean && (
           <div className="srch-did-you-mean">
-            No results for "{didYouMean.original}" — did you mean <button onClick={() => onQueryChange(didYouMean.rewrite)}>{didYouMean.suggestion}</button>?
+            No results for “{didYouMean.original}” — did you mean <button onClick={() => onQueryChange(didYouMean.rewrite)}>{didYouMean.suggestion}</button>?
           </div>
         )}
 
@@ -313,7 +313,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         )}
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length === 0 && directEntries.length === 0 && !didYouMean && (
-          <div className="search-no-results">No results for "{query.trim()}"</div>
+          <div className="search-no-results">No results for “{query.trim()}”</div>
         )}
 
       </div>

@@ -126,7 +126,7 @@ export function HighlightableText({ text, hlKey, hlTick }) {
 export function findNoteIconInsertionPoint(mark) {
   const container = mark.closest('[data-hl-key]');
   if (!container) return { kind: 'afterMark' };
-  const boundaryRx = /[\s.,;:!?)\]}”’—\-]/;
+  const boundaryRx = /[\s.,;:!?)\]}”’—-]/;
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
   let pastMark = false;
   while (walker.nextNode()) {

@@ -150,7 +150,7 @@ function _buildLinkIcon(hlKey, count, isSource) {
 }
 
 function _insertLinkIconAt(container, hlKey, endPos, count, isSource) {
-  var WORD = /[\w''\-]/;
+  var WORD = /[\w’'-]/;
   var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
   // Inline elements the icon must NOT land directly before — sliding
   // past keeps their tap targets clear and matches user intent

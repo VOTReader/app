@@ -103,7 +103,7 @@ export function JournalNotebookSheet({ entryId, memberIds, onClose, onChanged })
                 if (confirmDelete === nb.id) {
                   return (
                     <div key={nb.id} className="ann-chip-confirm" style={{ padding: '10px 12px' }}>
-                      <span className="ann-chip-confirm-q">Delete "{nb.name}"? Entries will move to Uncategorized.</span>
+                      <span className="ann-chip-confirm-q">Delete “{nb.name}”? Entries will move to Uncategorized.</span>
                       <button className="ann-chip-confirm-btn ann-chip-confirm-cancel" onClick={function() { setConfirmDelete(null); }}>Cancel</button>
                       <button className="ann-chip-confirm-btn ann-chip-confirm-yes" onClick={function() { deleteNb(nb.id); }}>Yes, delete</button>
                     </div>

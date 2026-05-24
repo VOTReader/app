@@ -62,7 +62,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
                   </div>
                 ) : (
                   <div className="fn-sheet-verse-missing">
-                    Verse text isn't available for this reference. The footnote points to <strong>{fn.ref}</strong>, but no matching entry was found in this letter's scripture dictionary.
+                    Verse text isn’t available for this reference. The footnote points to <strong>{fn.ref}</strong>, but no matching entry was found in this letter’s scripture dictionary.
                   </div>
                 )}
                 {fn.seeAlso && (
