@@ -66,6 +66,17 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
   const [clearAllStage, setClearAllStage] = React.useState(0); // 0 = idle, 1 = "Are You Sure?", 2 = confirmed
   const lastTabCloseStrikes = React.useRef(0); // 3-strike counter for last-tab close
 
+  // All 7 useCallbacks below intentionally omit setters from their deps. Rationale
+  // (one disable per site so the rule still catches new non-setter deps):
+  //   setTabs / setActiveTabIdx     useState setters via tabState param (useTabs)
+  //   setTabThumbnails              useState setter param (useThumbnails)
+  //   setDisableTabsPromptOpen      useState setter local to this hook
+  //   cancelDwell                   ref-only function (use-reading-dwell.js:103)
+  //                                  — body operates on .current writes, stale
+  //                                  identity is safe
+  // useState-setter identity stability is a React invariant; ref-only functions
+  // are stale-safe by inspection. Including them in deps would either no-op
+  // (setters) or destroy useCallback's referential stability (cancelDwell).
   const openNewTab = React.useCallback(() => {
     setTabs((prev) => {
       if (prev.length >= MAX_TABS) return prev;
@@ -73,6 +84,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       setActiveTabIdx(next.length - 1);
       return next;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
   const switchToTab = React.useCallback((idx) => {
     // Cancel any in-flight dwell timer BEFORE flipping tabs — otherwise
@@ -83,6 +95,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       if (idx < 0) return 0;
       return Math.min(idx, tabs.length - 1);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setActiveTabIdx is a useState setter (stable); cancelDwell is a ref-only function (stale-safe); see header above.
   }, [tabs.length]);
   const closeTab = React.useCallback((idx) => {
     setTabs((prev) => {
@@ -109,6 +122,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       });
       return next;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
   const closeOtherTabs = React.useCallback((keepIdx) => {
     setTabs((prev) => {
@@ -118,6 +132,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       setActiveTabIdx(0);
       return [kept];
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
   const closeTabsToTheRight = React.useCallback((keepIdx) => {
     setTabs((prev) => {
@@ -125,11 +140,13 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       setActiveTabIdx((cur) => Math.min(cur, keepIdx));
       return prev.slice(0, keepIdx + 1);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
   const closeAllTabs = React.useCallback(() => {
     setTabs([{ ...DEFAULT_TAB }]);
     setActiveTabIdx(0);
     setTabThumbnails({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState + setTabThumbnails param (all useState origin); see header above.
   }, []);
   // Merge duplicates: if two tabs have the same content signature, drop later duplicates
   const deduplicateTabs = React.useCallback(() => {
@@ -154,6 +171,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       setActiveTabIdx(newActiveIdx);
       return keep;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, [activeTabIdx]);
 
   return {

@@ -41,7 +41,7 @@ jobs:
         # 7eb491b) is enforced for free — no flag needed.
         # --max-warnings is the ratchet: drops with each Q3.3e commit
         # until exhaustive-deps warnings reach 0, then the value stays at 0.
-        run: npm run lint -- --max-warnings 23
+        run: npm run lint -- --max-warnings 16
 
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build
