@@ -10,16 +10,34 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 ## Current state (2026-05-24)
 
-- **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component in the codebase is now JSX. The "no JSX" original sin is closed.
-- **App() lives in `app/src/main/assets/src/app.jsx`** (extracted Q2.7-1, `c1e3da1`). 2,191 lines after P6 hook extraction completed (all 15 hooks out — see HISTORY for the list). App() is now hook composition + render tree + nav-helper glue.
-- **130+ modules** under `app/src/main/assets/src/`. Every screen, sheet, component, store, hook, utility, and renderer helper is an ES module.
+- **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
+- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). 2,191 lines after P6 hook extraction completed (15 hooks out — see HISTORY). App() is hook composition + render tree + nav-helper glue.
+- **130+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
   - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)
-  - `bundle-b.js` 267 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 29 files)
+  - `bundle-b.js` 302 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 29 files)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
-  - `bundle-d.js` ~546 KB — screens + sheets + components + utils + late stores + App() itself (esbuild IIFE, 82 files)
-- **ESLint IN PROGRESS (Q3)** — current count: **0 errors / 216 warnings** (baseline was 154/216; Q3.3d at `7eb491b` cleared the last 4 errors). Generator runs as `npm run lint:globals`, chained before `eslint` in `npm run lint`, and via the pre-commit hook. Remaining: Q3.3e (59 exhaustive-deps warnings — slowest, most judgment), Q3.3f (157 no-unused-vars triage), Q3.4 (CI `--max-errors=0` + `--max-warnings N` ratchet — `--max-errors=0` is enforceable immediately), Q3.5 (pre-commit extension).
-- **Active roadmap:** `C:\Users\corbi\OneDrive\Desktop\quality-uplift-plan.txt` — covers JSX (done), JSDoc, vitest, GitHub Actions CI, CSS hardening, ESLint. ESLint moved from Q6 to first-of-Q3-Q6 now that JSX exists. Read before starting any post-Q3 work.
+  - `bundle-d.js` 546 KB — screens + sheets + components + utils + late stores + App() itself (esbuild IIFE, 82 files)
+
+### Q3 ESLint status (live — 2026-05-24)
+
+- **0 errors / 30 warnings.** Baseline was 154/216. All errors and all warning categories EXCEPT `react-hooks/exhaustive-deps` cleared. Original 59 exhaustive-deps warnings being burned down through Q3.3e.
+- **Q3.4 CI lint gate DONE** (`cc5c2ad`). `npm run lint -- --max-warnings N` runs in CI between install and build. Errors are gated implicitly (eslint exits nonzero on any error; no separate flag needed). Current ratchet: **`--max-warnings 30`** in `.github/workflows/ci.yml`. Decrement in the same commit as each Q3.3e fix.
+- **Q3.3e IN PROGRESS — 29 of 59 cleared (49%):**
+  - `a5a2531` — 24 cache-bust disables for the `hlTick` "unnecessary dep" pattern (`AnnotationStore.get(hlKey)` reads + `hlTick` cache-bust signal). New rationale class **Bin 4** added beyond the user's original Bin 1/2/3.
+  - `5832d5f` — `use-android-back.js`: 32-dep []-deps useEffect; audited nav helpers (`app.jsx:509-905`) close only over stable setters and refs → mount-only disable is safe.
+  - `11246a9` — 4 screen/component effects (ProphecyCard, BibleStudyIndex, WtlbEntryView, LetterView): identity-cache + mount-only patterns.
+- **Q3.3e remaining 30 warnings** distributed across:
+  - 7 single-warning easy files (SearchScreen, LinkPicker, use-from-letter-stack, use-sheet-orchestration, use-thumbnails, BookmarksScreen, JournalRecordingSheet)
+  - 5 two-three-warning medium files (use-scroll-memory, JournalViewerScreen, JournalEditorScreen, BookmarkCreateSheet, use-reading-dwell)
+  - 3 harder (use-tab-actions has 7 setter warnings, app.jsx has 5, JournalRecordingSheet has 1 with many missing deps)
+- **Q3.5 (pre-commit lint-staged), Q3 phase exit** — pending. Q3 exit includes: update HISTORY.md with Q3.3e/Q3.4 chapter, audit all `eslint-disable.*exhaustive-deps` rationales (grep + verify cited refs are actually read in effect body), update memory entries that pinned conditions which have now resolved (`feedback_lint_regression_gate.md`, `project_q3_exit_criteria.md`).
+
+### Roadmap location (drift warning)
+
+The active strategic roadmap is `C:\Users\corbi\OneDrive\Desktop\quality-uplift-plan.txt` — outside the repo. **This is fragile**: not version-controlled, not in any agent's default search path, dies with the user's machine. The in-repo `PLAN.txt` (2026-05-11) is partially stale.
+
+Reconcile in Q3 phase exit (or sooner): copy quality-uplift-plan.txt into the repo OR designate CLAUDE.md's current-state block as the sole source. See `PLAN.txt` POST-Q3 section for the full list of 4 cross-cutting strategic items (smoke-lite.js for CI, bundle-a.js lazy-load, --max-warnings 0 transition, this drift).
 
 ---
 
