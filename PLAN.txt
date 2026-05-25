@@ -139,14 +139,25 @@ POST-Q4 BACKLOG (priority order — top = next)
         flushScrollToActiveTab + captureActiveTabThumbnail +
         settings.tabsEnabled. App.jsx lines ~554-606.
 
-     2. useBibleStudies.
+     2. useBibleStudies. ── PRIORITY: do this immediately after P7c. ──
         STUDIES / getStudyById / getStudyChapter / studyReadKey /
         selectStudy / selectStudyChapter / MATTHEW_CHAIN_ENTRY /
         CHAIN_ORDER / UNIFIED_CHAIN / chainIdx / prevChainEntry /
         nextChainEntry / goToChainEntryFirst / goToChainEntryLast.
-        Resolves the original TDZ issue from P7a/P7b call sites
-        (those have to live below this block today). App.jsx lines
-        ~889-995.
+        App.jsx lines ~889-995.
+
+        WHY EARLY: this is a STRUCTURAL BLOCKER for everything after it.
+        Today, P7a (useNavHistoryTracking) and P7b/useAndroidBack call
+        sites are forced to live BELOW the const arrow definitions of
+        getStudyById/getStudyChapter (~line 890) because those helpers
+        are passed as PARAMS and would TDZ otherwise. Every future
+        extraction that uses these helpers inherits that same call-site-
+        ordering constraint. Move them into a hook (where they're
+        exported by name, not a TDZ'd const) and the ordering constraint
+        disappears for ALL subsequent extractions. Same rationale as
+        typing CachedStore before individual stores in Q4: clear the
+        structural constraint first, then the remaining work is all
+        independent. Don't defer this — it pays interest.
 
      3. useReadingChainNav.
         _first / _last / _firstPreface / _goFirst / _goLast /
@@ -172,12 +183,44 @@ POST-Q4 BACKLOG (priority order — top = next)
         Bible Studies block) — sequence after useBibleStudies.
         App.jsx lines ~247-256, ~627-651, ~885, ~1007.
 
-     6. useHandlers (or useDispatchers).
-        handleScriptureSelect / handleVolumeSelect / handleSearchSelect /
-        handleSearchCommand / handleSelect / handleSurprise +
-        srchVolLookup / SRCH_VOL_MAP / srchResolveLetterId. App-shell
-        dispatch entry points from various pickers/cards. Largest
-        single concern (handleSearchSelect alone is ~80 lines).
+     6. Dissolve handlers into their domains. ── NOT a single hook. ──
+        Per [[dont-group-by-shape]]: "useHandlers" is a junk drawer
+        grouping by syntactic shape (all are on*/handle* callbacks),
+        not by domain. Each handler routes to a different subsystem;
+        bundling them creates a 15-param monolith that does 5
+        unrelated things.
+
+        Distribute per-handler instead:
+          handleSearchSelect  → use(Complex)Nav (search domain — owns
+                                goSearch / searchOrigin / searchContext;
+                                handleSearchSelect is the consumer-side
+                                routing of a search result back to its
+                                source screen). Carries srchVolLookup /
+                                SRCH_VOL_MAP / srchResolveLetterId with
+                                it — they're search-internal helpers.
+          handleSearchCommand → use(Complex)Nav (same domain — handles
+                                clear/refresh/etc. for the search list).
+          handleScriptureSelect → useReadingChainNav (bible nav domain
+                                — picks between matthew-ch / bible-ch /
+                                bible-idx based on book selection).
+          handleVolumeSelect  → useNav (volume nav — calls goColIdx
+                                indirectly via colReadKey + setScreen).
+                                Tiny; could fold cleanly into useNav.
+          handleSelect        → useNav (home category dispatch — routes
+                                to goScripturesHome / goVolumesHome /
+                                goStudiesHome / goLibrary). Already
+                                lives in useNav's domain.
+          handleSurprise      → useSurprise (small dedicated hook —
+                                discovery domain, owns the random-pick
+                                logic across all collections). No
+                                existing home; small enough to justify
+                                its own focused hook.
+
+        Sequence: handle each as a small add-on to its target hook
+        (P7c, useNav-followup, useReadingChainNav) or as the
+        standalone useSurprise commit. Do NOT create a "useHandlers"
+        hook even temporarily.
+
         App.jsx lines ~653-783, ~849-882.
 
      7. useTapThrough.
