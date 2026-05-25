@@ -38,9 +38,9 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q4 (JSDoc / tsc --checkJs)  ✅ DONE  — 37 files typed, CI gate zero-tolerance
   smoke-lite.js for CI        ✅ DONE  — Node CLI; globals + collections + cycles
   Q5 (Vitest)                 ✅ DONE  — 218 tests / 9 files; ratchet 1→14 stmts
-  App() decomposition (P7)    🚧 ACTIVE — P7a+b+c+d landed; 364 tests;
-                                          App() 2,261 → 2,056 lines;
-                                          5 of 12 concerns extracted
+  App() decomposition (P7)    🚧 ACTIVE — P7a-g landed; 402 tests;
+                                          App() 2,261 → 1,987 lines;
+                                          8 of 12 concerns extracted
   Q6 (CSS hardening)          ⬜ PENDING
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -168,9 +168,12 @@ POST-Q4 BACKLOG (priority order — top = next)
 
    ## CONCERNS REMAINING IN App() (Phase 1 checklist, 9 left)
 
-   Extracted so far (5): useHistory (P6c) · useNavHistoryTracking (P7a)
+   Extracted so far (8): useHistory (P6c) · useNavHistoryTracking (P7a)
                         · useNav (P7b) · useSearch (P7c) ·
-                        useBibleStudies (P7d — TDZ-blocker cleared)
+                        useBibleStudies (P7d — TDZ-blocker cleared) ·
+                        useJournalMutations (P7e) · useTapThrough (P7f) ·
+                        useReadProgress (P7g — added to useMarkAsRead.js
+                        as a second export)
 
    Remaining (rough order, bottom-up by dependency):
 

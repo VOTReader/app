@@ -7866,28 +7866,22 @@
       setStudyId,
       setStudyChapterId
     });
-    const { goToLetterFromMatthew, openInAppLetter } = useTapThrough({
-      screen,
-      bookId,
-      chapterNum,
-      letterId,
-      studyId,
-      studyChapterId,
-      pushFromLetter,
-      setScreen,
-      setLetterId,
-      setStudyId,
-      setStudyChapterId,
-      setFromMatthewCh,
-      setActiveReadKey,
-      setLastReadForVol
-    });
-    const [readItems, setReadItems] = useState(saved.readItems || {});
     const [gardenPage, setGardenPage] = tabField("gardenPage");
     const [gardenWarningOpen, setGardenWarningOpen] = useState(false);
     const { settings, setSettings, toggleSetting, updateSetting } = useSettings({
       savedSettings: saved.settings,
       theme
+    });
+    const {
+      readItems,
+      isRead,
+      markRead,
+      unmarkRead,
+      clearAllProgress,
+      clearReadForBook
+    } = useReadProgress({
+      savedReadItems: saved.readItems,
+      markAsReadEnabled: settings.markAsRead
     });
     useEffect(() => {
       if (!settings.tabsEnabled && tabsOverviewOpen) setTabsOverviewOpen(false);
@@ -7949,7 +7943,6 @@
       }
     };
     const [fromSearch, setFromSearch] = tabField("fromSearch");
-    const [fromMatthewCh, setFromMatthewCh] = tabField("fromMatthewCh");
     const [fromWtlb, setFromWtlb] = tabField("fromWtlb");
     const [navOrigin, setNavOrigin] = tabField("navOrigin");
     const { readHistory, addToHistory, clearHistory, pruneHistoryDay } = useHistory(settings.historyEnabled);
@@ -7977,6 +7970,23 @@
     const { activeReadKey, setActiveReadKey, cancelDwell } = useReadingDwell({
       dwellMs: settings.dwellMs,
       initialActiveReadKey: saved.activeReadKey || null
+    });
+    const [fromMatthewCh, setFromMatthewCh] = tabField("fromMatthewCh");
+    const { goToLetterFromMatthew, openInAppLetter } = useTapThrough({
+      screen,
+      bookId,
+      chapterNum,
+      letterId,
+      studyId,
+      studyChapterId,
+      pushFromLetter,
+      setScreen,
+      setLetterId,
+      setStudyId,
+      setStudyChapterId,
+      setFromMatthewCh,
+      setActiveReadKey,
+      setLastReadForVol
     });
     const {
       openNewTab,
@@ -8135,23 +8145,6 @@
       } else
         goHome();
     };
-    const VERSION_ID = "v1";
-    const getReadKey = (bid, cid) => `${VERSION_ID}:${bid}:${cid}`;
-    const isRead = (bid, cid) => !!readItems[getReadKey(bid, cid)];
-    const markRead = (bid, cid) => {
-      if (!settings.markAsRead) return;
-      const key = getReadKey(bid, cid);
-      if (!readItems[key]) setReadItems((prev) => ({ ...prev, [key]: true }));
-    };
-    const unmarkRead = (bid, cid) => {
-      const key = getReadKey(bid, cid);
-      setReadItems((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    };
-    const clearAllProgress = () => setReadItems({});
     const goToLastRead = () => {
       if (!activeReadKey) return;
       if (activeReadKey.startsWith("vol:")) {
@@ -8634,13 +8627,7 @@
         onSearch: goSearch,
         onHistory: goHistory,
         readItems,
-        onClearBook: (bid) => setReadItems((prev) => {
-          const next = { ...prev };
-          Object.keys(next).forEach((k) => {
-            if (k.startsWith(`${VERSION_ID}:${bid}:`)) delete next[k];
-          });
-          return next;
-        }),
+        onClearBook: clearReadForBook,
         onClearAll: clearAllProgress,
         onClearHistory: clearHistory,
         historyCount: readHistory.length,

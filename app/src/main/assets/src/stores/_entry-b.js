@@ -57,7 +57,7 @@ import { ExpandableText, JrnExpandable } from '../components/ExpandableText.jsx'
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 
 // ── Hooks ───────────────────────────────────────────────────────────────
-import { useMarkAsRead } from '../hooks/useMarkAsRead.js';
+import { useMarkAsRead, useReadProgress } from '../hooks/useMarkAsRead.js';
 import { _validateTabState, useSavedState } from '../hooks/use-saved-state.js';
 import { useRefMirror } from '../hooks/use-ref-mirror.js';
 import { useHistory } from '../hooks/use-history.js';
@@ -130,7 +130,7 @@ Object.assign(window, {
   ExpandableText, JrnExpandable,
   ErrorBoundary,
   // Hooks
-  useMarkAsRead,
+  useMarkAsRead, useReadProgress,
   _validateTabState, useSavedState,
   useRefMirror,
   useHistory,

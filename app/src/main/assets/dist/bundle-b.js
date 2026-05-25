@@ -2301,6 +2301,13 @@
     }
   };
 
+  // app/src/main/assets/src/hooks/use-ref-mirror.js
+  function useRefMirror(value) {
+    const r = React.useRef(value);
+    r.current = value;
+    return r;
+  }
+
   // app/src/main/assets/src/hooks/useMarkAsRead.js
   function useMarkAsRead(enabled, onMarkRead) {
     React.useEffect(() => {
@@ -2310,6 +2317,37 @@
         window.__onReadingComplete = null;
       };
     }, [enabled, onMarkRead]);
+  }
+  function useReadProgress({ savedReadItems, markAsReadEnabled }) {
+    const [readItems, setReadItems] = React.useState(savedReadItems || {});
+    const enabledRef = useRefMirror(markAsReadEnabled);
+    const VERSION_ID = "v1";
+    const getReadKey = (bid, cid) => `${VERSION_ID}:${bid}:${cid}`;
+    const isRead = (bid, cid) => !!readItems[getReadKey(bid, cid)];
+    const markRead = (bid, cid) => {
+      if (enabledRef.current === false) return;
+      const key = getReadKey(bid, cid);
+      if (!readItems[key]) setReadItems((prev) => ({ ...prev, [key]: true }));
+    };
+    const unmarkRead = (bid, cid) => {
+      const key = getReadKey(bid, cid);
+      setReadItems((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    };
+    const clearAllProgress = () => setReadItems({});
+    const clearReadForBook = (bid) => {
+      setReadItems((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((k) => {
+          if (k.startsWith(`${VERSION_ID}:${bid}:`)) delete next[k];
+        });
+        return next;
+      });
+    };
+    return { readItems, isRead, markRead, unmarkRead, clearAllProgress, clearReadForBook };
   }
 
   // app/src/main/assets/src/hooks/use-saved-state.js
@@ -2340,13 +2378,6 @@
         return {};
       }
     }, []);
-  }
-
-  // app/src/main/assets/src/hooks/use-ref-mirror.js
-  function useRefMirror(value) {
-    const r = React.useRef(value);
-    r.current = value;
-    return r;
   }
 
   // app/src/main/assets/src/hooks/use-history.js
@@ -7602,6 +7633,7 @@
     ErrorBoundary,
     // Hooks
     useMarkAsRead,
+    useReadProgress,
     _validateTabState,
     useSavedState,
     useRefMirror,

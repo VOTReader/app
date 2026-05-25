@@ -1,9 +1,27 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   useMarkAsRead — shared hook for the mark-as-read window bridge
+   useMarkAsRead + useReadProgress — mark-as-read domain
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Bundled into dist/bundle-b.js.
-   First custom hook extracted (the P6 warmup — proved the hook-extraction
-   pipeline on the smallest isolated hook before App() decomposition began).
+   Global-scope module. Bundled into dist/bundle-b.js. Two exports, same
+   domain, distinct responsibilities:
+
+     - useMarkAsRead(enabled, onMarkRead)   per-reading-view bridge.
+                                            Called from each of the 4
+                                            reading views (LetterView,
+                                            WtlbEntryView, BibleChapterView,
+                                            ChapterView). Wires the
+                                            window.__onReadingComplete
+                                            bridge so the view's dwell/
+                                            scroll trigger reaches App().
+                                            ORIGINAL hook (P6 warmup).
+
+     - useReadProgress({ savedReadItems,    App-level state container
+                         markAsReadEnabled }) for the per-collection read
+                                            cursor map. Owns readItems +
+                                            VERSION_ID + getReadKey +
+                                            isRead/markRead/unmarkRead +
+                                            clearReadForBook +
+                                            clearAllProgress. Called ONCE
+                                            from App(). Added P7g.
 
    OWNS:
      - the window.__onReadingComplete bridge effect — binds onMarkRead onto
@@ -54,4 +72,99 @@ export function useMarkAsRead(enabled, onMarkRead) {
     window.__onReadingComplete = onMarkRead;
     return () => { window.__onReadingComplete = null; };
   }, [enabled, onMarkRead]);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   useReadProgress — App-level per-collection read-cursor state (P7g)
+   ═══════════════════════════════════════════════════════════════════════
+   OWNS:
+     - readItems state (Record<string, true>, persisted via vot-state
+       through usePersistedState)
+     - VERSION_ID constant — currently "v1"; future format changes get
+       their own version
+     - getReadKey, isRead helpers (pure lookups)
+     - markRead, unmarkRead (state mutators; markRead respects the
+       markAsReadEnabled gate — when settings.markAsRead is false, we
+       never ADD new marks, but existing ones survive)
+     - clearAllProgress — wipe-all helper
+     - clearReadForBook(bid) — selective wipe scoped to a single bookId
+       (folded in from the inline `onClearBook` arrow at the consumer
+       site so VERSION_ID stays internal to the hook)
+
+   PARAMS:
+     savedReadItems     hydrate from useSavedState's restored payload
+     markAsReadEnabled  settings.markAsRead — the gate that controls
+                        whether new marks get ADDED. Mirrored via a ref
+                        so markRead's closure always sees the latest
+                        value without recreating the function each
+                        render.
+
+   RETURNS: { readItems, isRead, markRead, unmarkRead, clearAllProgress,
+              clearReadForBook }
+            (setReadItems intentionally NOT returned — encapsulated.
+             Consumers go through the named helpers or clearReadForBook.)
+
+   STORAGE: localStorage 'vot-state' (via usePersistedState; readItems
+            is one slot of the App-level saved state).
+
+   WINDOW: none.
+
+   KEY FORMAT: "v1:<bookOrVolumeId>:<chapterOrLetterId>"
+   ═══════════════════════════════════════════════════════════════════════ */
+
+import { useRefMirror } from './use-ref-mirror.js';
+
+/**
+ * App-level read-progress state. Owns readItems (the per-collection
+ * cursor map) + the mark/unmark/clear helpers. Returns readItems for
+ * consumers (sharedViewProps + the bookmarks sheet) but NOT setReadItems
+ * — mutations go through the named helpers.
+ *
+ * @param {{
+ *   savedReadItems: Record<string, true> | undefined,
+ *   markAsReadEnabled: boolean
+ * }} args
+ * @returns {{
+ *   readItems: Record<string, true>,
+ *   isRead: (bid: string, cid: string | number) => boolean,
+ *   markRead: (bid: string, cid: string | number) => void,
+ *   unmarkRead: (bid: string, cid: string | number) => void,
+ *   clearAllProgress: () => void,
+ *   clearReadForBook: (bid: string) => void
+ * }}
+ */
+export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
+  const [readItems, setReadItems] = React.useState(savedReadItems || {});
+  // Mirror the markAsRead gate so markRead's closure sees the latest
+  // value without recreating the function each render.
+  const enabledRef = useRefMirror(markAsReadEnabled);
+
+  const VERSION_ID = 'v1';
+  const getReadKey = (bid, cid) => `${VERSION_ID}:${bid}:${cid}`;
+  const isRead = (bid, cid) => !!readItems[getReadKey(bid, cid)];
+
+  const markRead = (bid, cid) => {
+    if (enabledRef.current === false) return;
+    const key = getReadKey(bid, cid);
+    if (!readItems[key]) setReadItems((prev) => ({ ...prev, [key]: true }));
+  };
+
+  const unmarkRead = (bid, cid) => {
+    const key = getReadKey(bid, cid);
+    setReadItems((prev) => { const next = { ...prev }; delete next[key]; return next; });
+  };
+
+  const clearAllProgress = () => setReadItems({});
+
+  // Folded in from the inline `onClearBook` arrow at the consumer site so
+  // VERSION_ID stays internal to the hook.
+  const clearReadForBook = (bid) => {
+    setReadItems((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => { if (k.startsWith(`${VERSION_ID}:${bid}:`)) delete next[k]; });
+      return next;
+    });
+  };
+
+  return { readItems, isRead, markRead, unmarkRead, clearAllProgress, clearReadForBook };
 }

@@ -275,17 +275,14 @@ function App() {
     setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
   });
 
-  /* Tap-through openers (P7f). goToLetterFromMatthew + openInAppLetter:
-     both push onto fromLetterStack (returned by useFromLetterStack just
-     above) and set the destination. */
-  const { goToLetterFromMatthew, openInAppLetter } = useTapThrough({
-    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
-    pushFromLetter,
-    setScreen, setLetterId, setStudyId, setStudyChapterId,
-    setFromMatthewCh, setActiveReadKey, setLastReadForVol,
-  });
+  /* useTapThrough() call → moved below, after useReadingDwell (which
+     returns setActiveReadKey, a useTapThrough PARAM). The fromMatthewCh
+     tabField is also moved with it for cleanliness. */
   /* navigateToLink deferred body → src/hooks/use-navigate-to-link.js (P6j) */
-  const [readItems, setReadItems] = useState(saved.readItems || {});
+  /* readItems / setReadItems / VERSION_ID / getReadKey / isRead / markRead /
+     unmarkRead / clearAllProgress / clearReadForBook → useReadProgress
+     (P7g, called below — needs settings.markAsRead as a PARAM, so the
+     call site is just after useSettings). */
   const [gardenPage, setGardenPage] = tabField('gardenPage');
   const [gardenWarningOpen, setGardenWarningOpen] = useState(false);
   /* useSettings — settings object + mutators + body-class/AndroidBridge
@@ -294,6 +291,20 @@ function App() {
     savedSettings: saved.settings,
     theme,
   });
+
+  /* Mark-as-read state + helpers → src/hooks/useMarkAsRead.js (P7g
+     `useReadProgress` export). Owns readItems + VERSION_ID +
+     getReadKey/isRead/markRead/unmarkRead/clearAllProgress/
+     clearReadForBook. Called here so settings.markAsRead is in scope
+     for the gate. */
+  const {
+    readItems, isRead, markRead, unmarkRead,
+    clearAllProgress, clearReadForBook,
+  } = useReadProgress({
+    savedReadItems: saved.readItems,
+    markAsReadEnabled: settings.markAsRead,
+  });
+
   // Close tabs overview when tabs get disabled (relies on `settings`)
   useEffect(() => {
     if (!settings.tabsEnabled && tabsOverviewOpen) setTabsOverviewOpen(false);
@@ -358,7 +369,7 @@ function App() {
   // searchQuery / searchOrigin / searchScope / searchContext tabFields →
   // owned by useSearch (P7c, called below).
   const [fromSearch, setFromSearch] = tabField('fromSearch');
-  const [fromMatthewCh, setFromMatthewCh] = tabField('fromMatthewCh');
+  /* fromMatthewCh tabField → hoisted above to useTapThrough's call site (P7f). */
   const [fromWtlb, setFromWtlb] = tabField('fromWtlb');
   const [navOrigin, setNavOrigin] = tabField('navOrigin');
 
@@ -392,6 +403,20 @@ function App() {
   const { activeReadKey, setActiveReadKey, cancelDwell } = useReadingDwell({
     dwellMs: settings.dwellMs,
     initialActiveReadKey: saved.activeReadKey || null,
+  });
+
+  /* Tap-through openers (P7f). goToLetterFromMatthew + openInAppLetter
+     both push onto fromLetterStack (from useFromLetterStack above) AND
+     consume setActiveReadKey (from useReadingDwell just above) — that's
+     why this call site sits HERE, not next to useFromLetterStack. The
+     fromMatthewCh tabField is hoisted with it so setFromMatthewCh is
+     in scope. */
+  const [fromMatthewCh, setFromMatthewCh] = tabField('fromMatthewCh');
+  const { goToLetterFromMatthew, openInAppLetter } = useTapThrough({
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    pushFromLetter,
+    setScreen, setLetterId, setStudyId, setStudyChapterId,
+    setFromMatthewCh, setActiveReadKey, setLastReadForVol,
   });
 
   /* useTabActions — tab open/close/switch operations (P6k Commit B).
@@ -512,24 +537,7 @@ function App() {
   /* addToHistory · clearHistory · pruneHistoryDay → extracted to src/hooks/use-history.js (P6c) */
   /* toggleSetting + updateSetting → src/hooks/use-settings.js (P6g) */
 
-  /* ── Mark as Read helpers ──
-     Key format: "versionId:bookOrVolumeId:chapterOrLetterId"
-     Version is hardcoded as "v1" for now; future versions get their own keys.
-     markAsRead setting = false → we never ADD new marks, but existing ones are kept.
-  ── */
-  const VERSION_ID = "v1";
-  const getReadKey = (bid, cid) => `${VERSION_ID}:${bid}:${cid}`;
-  const isRead = (bid, cid) => !!readItems[getReadKey(bid, cid)];
-  const markRead = (bid, cid) => {
-    if (!settings.markAsRead) return;
-    const key = getReadKey(bid, cid);
-    if (!readItems[key]) setReadItems((prev) => ({ ...prev, [key]: true }));
-  };
-  const unmarkRead = (bid, cid) => {
-    const key = getReadKey(bid, cid);
-    setReadItems((prev) => {const next = { ...prev };delete next[key];return next;});
-  };
-  const clearAllProgress = () => setReadItems({});
+  /* Mark-as-read helpers → useReadProgress (P7g, called above). */
 
   /* ── Go to last-read position (global reading dot) ── */
   const goToLastRead = () => {
@@ -1001,11 +1009,7 @@ function App() {
           onSearch={goSearch}
           onHistory={goHistory}
           readItems={readItems}
-          onClearBook={(bid) => setReadItems((prev) => {
-            const next = { ...prev };
-            Object.keys(next).forEach((k) => {if (k.startsWith(`${VERSION_ID}:${bid}:`)) delete next[k];});
-            return next;
-          })}
+          onClearBook={clearReadForBook}
           onClearAll={clearAllProgress}
           onClearHistory={clearHistory}
           historyCount={readHistory.length}
