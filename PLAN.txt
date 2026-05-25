@@ -66,6 +66,22 @@ POST-Q4 BACKLOG (priority order — top = next)
    during Q4/Q5 from JSDoc + small changes; 2,261 → 2,256 after the first
    extraction). Target: under 800 lines.
 
+   ── Structural measurement (taken 2026-05-24 post-P7a) ────────────────
+   App() body: lines 24–2253 (2,230 lines total inside the function).
+     - Logic block:     lines   24–1151  →  1,128 lines  (hooks + callbacks
+                                              + effects + nav-helper glue)
+     - JSX render tree: lines 1152–2253  →  1,103 lines  (55 conditional
+                                              `{screen === "X" && ...}` blocks)
+
+   The 50/50 split means hook + callback extraction CANNOT hit <800 alone.
+   Maximum-extraction-of-logic floor ≈ 1,103 (the render tree by itself).
+   Render-tree decomposition is required, in a separate phase with a
+   distinct risk profile.
+
+   ── Phase 1: logic extraction (active; P7a landed) ───────────────────
+   Goal: get App() to ~1,400–1,600 lines by pulling hooks + callbacks
+   out of the logic block.
+
    Workflow per extraction: P6 pattern + Q5 vitest validation.
      1. Identify OWNS/PARAMS/RETURNS boundary
      2. Extract to src/hooks/, JSDoc-type it, write vitest coverage
@@ -76,18 +92,75 @@ POST-Q4 BACKLOG (priority order — top = next)
    Landed:
      P7a — useNavHistoryTracking (2026-05-24): auto-track-history effect.
            Single 18-line useEffect moved to its own 115-line hook with
-           23 vitest tests covering all 4 branches + nav-change re-fire
-           contract + deps-array contract. Coverage ratchet held + bumped:
-           branches 11→13 (statements/functions/lines floors unchanged).
-           Net App() shrink: 5 lines (the architectural win is bigger —
-           the most debt-laden disable cite moved out, and the policy-
-           vs-state-API split is now explicit at module scope).
+           23 vitest tests. Coverage ratchet held + bumped: branches
+           11→13. Net App() shrink: 5 lines (architectural win is bigger
+           — the most debt-laden disable cite moved out).
 
-   Next candidates (rough order, bottom-up by dependency):
-     - Inline nav-helpers (goHome / goNavOrigin / goSearchOrigin / etc.)
-       → useNav? Higher leverage than a single effect (~150 lines).
-     - Render-tree segments → component files (defer until logic out).
-     - Remaining state-coordination glue → 1-2 small hooks.
+   Next Phase 1 candidates (rough order, bottom-up by dependency):
+     - Inline nav-helpers (goHome / goNavOrigin / goSearchOrigin /
+       goVolumesHome / goLibrary / goJournalViewer / etc.) → `useNav`.
+       ~150 lines — the single biggest Phase 1 reduction target.
+     - Remaining state-coordination glue → 1-2 small hooks (handleSelect,
+       handleSurprise, mark-as-read coordinators).
+     - The Bible Studies block (STUDIES, getStudyById, getStudyChapter,
+       selectStudy, selectStudyChapter, UNIFIED_CHAIN, chain helpers,
+       goToChainEntryFirst/Last) ≈ 100 lines → `useBibleStudies` or split.
+
+   Realistic Phase 1 floor: ~1,450–1,550 lines.
+
+   ── Phase 2: render-tree decomposition (PENDING, after Phase 1) ──────
+   Goal: get App() under 800 lines by pulling per-screen JSX into wrapper
+   components and collapsing the `{screen === "X" && ...}` dispatch into
+   a ScreenRouter.
+
+   Render-tree shape (measured 2026-05-24 post-P7a):
+     29 substantive screen blocks: 867 lines total. Top 5 hold ~447:
+       240 lines  garden-view              (lines 2013–2253)
+        87 lines  bible-study-chapter      (1742–1829, has IIFE)
+        42 lines  matthew-ch               (1581–1623, has IIFE)
+        40 lines  bible-ch                 (1679–1719)
+        37 lines  holy-days-index          (1947–1984)
+        31 lines  history                  (1336–1367)
+        30 lines  journal-viewer           (1419–1449)
+        25 lines  links-index              (1485–1510)
+        22 lines  notes-index              (1463–1485)
+        21 lines  settings                 (1268–1289)
+        20 lines  studies-home             (1623–1643)
+     26 trivial letter/index 4-line wrappers: ~104 lines (collapse all
+     at once via the ScreenRouter pattern).
+
+   Workflow per extraction (different risk profile from Phase 1):
+     1. Extract the screen block into ui/screens/XScreen.jsx (most
+        screens already have this file shape; this is moving the
+        last conditional-render wrapper into the screen file itself).
+     2. Update the App() conditional to a single `<XScreen … />` call
+        (or, eventually, collapse into ScreenRouter).
+     3. Run smoke walk (votSmoke or in-browser nav of the affected
+        screen) — NOT just vitest. Render extraction can break CSS
+        selectors that target `.app > .screen-container > .X` even
+        when component logic is preserved.
+     4. Visual diff: before/after screenshot of the screen. Layout
+        shifts from a changed component hierarchy are silent to tests.
+     5. ErrorBoundary placement: if a screen had an inline error
+        wrapper, the extraction must preserve it (or the boundary
+        moves with the component — verify on purpose-broken render).
+
+   Render-tree risks (call out so they don't surprise):
+     - CSS selectors that traverse the App-level wrapper (`.app > .x`)
+       break if the component hierarchy changes depth.
+     - `useEffect(..., [screen])` inside child components fires
+       differently from the App-level one (the parent's screen change
+       unmounts the child rather than re-running its effects).
+     - Sheet/portal placement: screens that render sheets via portals
+       still work after extraction, but sheets that READ closure values
+       from App() need explicit props.
+
+   Realistic Phase 2 reduction: ~700–800 lines (5–7 biggest screens
+   extracted + ScreenRouter for the 26 trivial dispatchers + ~100 lines
+   of boilerplate eliminated). Lands App() at ~700–900.
+
+   <800 IS achievable, but it requires BOTH phases. Do not promise
+   <800 from Phase 1 alone.
 
 2. useSyncExternalStore MIGRATION (eliminates Bin 4 hlTick cites)
    ─────────────────────────────────────────────────────────────

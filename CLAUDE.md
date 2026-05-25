@@ -57,19 +57,24 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 ### P7 — App() decomposition (IN PROGRESS, 2026-05-24)
 
-**Goal:** App.jsx under 800 lines. Currently 2,256 (was 2,261 before P7a).
+**Goal:** App.jsx under 800 lines. Currently **2,256** (was 2,261 before P7a).
 
-**P7a — useNavHistoryTracking extraction (LANDED 2026-05-24):**
-- The auto-track-history `useEffect` at app.jsx:800-817 moved to `src/hooks/use-nav-history-tracking.js` (115 lines, includes the OWNS/PARAMS/RETURNS header + JSDoc types). The hook is a "policy-when-to-call" layer that sits on top of useHistory's state-and-API layer; use-history.js's header has been updated to reference the new structural division.
-- The 4-helper disable cite (the most architecturally-debted post-Q3 disable in the file — it explicitly named useNavHistoryTracking as its extraction candidate) moved with the effect to the hook. Same Bin-4-style identity-churn rationale, but it now names PARAMS rather than App-local closure captures.
-- 23 new vitest tests in `use-nav-history-tracking.test.js` cover all 4 branches (matthew-ch / bible-ch / letter / study-chapter) × multiple guard conditions per branch, plus the nav-change re-fire contract + the deps-array contract (helper identity churn must NOT re-fire) + branch precedence.
-- **218 → 241 tests.** Coverage ratchet held + improved: statements 14.01→14.72, **branches 11.82→13.29** (gate bumped 11→13), functions 12.19→12.90, lines 15.09→15.78.
-- TDZ note: useNavHistoryTracking's call site lives BELOW `getStudyById`/`getStudyChapter` (defined as `const` arrow helpers ~90 lines down in App()), mirroring P6l's useAndroidBack arrangement. The breadcrumb at the original site references the move.
+**Structural measurement (post-P7a):** App() body is lines 24–2253.
+- **Logic block:** lines 24–1151 (**1,128 lines** — hooks + callbacks + effects + nav-helper glue).
+- **JSX render tree:** lines 1152–2253 (**1,103 lines** — 55 conditional `{screen === "X" && ...}` blocks).
 
-**Backlog for the phase (rough order — bottom-up by dependency):**
-- Inline nav-helpers (goHome/goNavOrigin/goSearchOrigin/etc.) → `useNav`
-- Render-tree segments → component files (deferred until logic is fully out)
-- Remaining state-coordination glue → 1-2 new hooks
+The 50/50 split means **hook extraction alone cannot hit <800.** The render tree by itself is 1,103 lines — that's the floor for any logic-only extraction. PLAN.txt §1 has the two-phase plan and Phase 2's risk profile (CSS selectors, layout shifts, ErrorBoundary placement — render decomposition needs visual smoke walks, not just vitest).
+
+**Phase 1 — logic extraction (active):** target ~1,400–1,600 lines.
+- **P7a (LANDED 2026-05-24, `d89775f`)** — useNavHistoryTracking. 18-line useEffect → 115-line hook + 23 vitest tests. The 4-helper disable cite (most architecturally-debted post-Q3 disable in the file, with the extraction candidate named in its own text) moved with the effect. TDZ note: call site lives below `getStudyById`/`getStudyChapter`, mirroring P6l's useAndroidBack. Tests 218→241, branches gate bumped 11→13.
+- **Next**: `useNav` for the inline nav-helpers (goHome/goNavOrigin/goSearchOrigin/goVolumesHome/etc., ~150 lines — the single biggest Phase 1 target).
+- **Then**: Bible Studies block (STUDIES/getStudyById/selectStudy/UNIFIED_CHAIN/chain helpers/goToChainEntryFirst/Last) → `useBibleStudies` or split, ~100 lines.
+- **Then**: remaining state-coordination glue (handleSelect, handleSurprise, mark-as-read coordinators).
+
+**Phase 2 — render-tree decomposition (PENDING, after Phase 1):** target <800.
+- 29 substantive screen blocks total 867 lines; top 5 (garden-view 240, bible-study-chapter 87, matthew-ch 42, bible-ch 40, holy-days-index 37) hold ~447. 26 trivial 4-line letter/index wrappers (~104 lines) collapse via a ScreenRouter pattern.
+- **Different risk profile** from Phase 1: render extraction can break CSS selectors targeting the App-level wrapper, shift `useEffect(..., [screen])` semantics, and move ErrorBoundary placement. Each extraction needs visual smoke walk + before/after screenshot, not just tests passing.
+- Realistic Phase 2 reduction: ~700–800 lines.
 
 **Post-decomp backlog:** useSyncExternalStore migration (eliminates 24 Bin 4 cites — has test coverage now per Q5.3), bundle-a.js lazy-load (post-Q6 UX), Q6 CSS hardening.
 
