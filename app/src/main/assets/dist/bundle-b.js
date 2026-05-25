@@ -4092,6 +4092,91 @@
     return { createAndEditJournal };
   }
 
+  // app/src/main/assets/src/hooks/use-tap-through.js
+  function useTapThrough({
+    screen,
+    bookId,
+    chapterNum,
+    letterId,
+    studyId,
+    studyChapterId,
+    pushFromLetter,
+    setScreen,
+    setLetterId,
+    setStudyId,
+    setStudyChapterId,
+    setFromMatthewCh,
+    setActiveReadKey,
+    setLastReadForVol
+  }) {
+    const goToLetterFromMatthew = (vol, letter, excerpt) => {
+      const dest = resolveVotLetter(vol, letter);
+      if (!dest) return;
+      pushFromLetter({
+        sourceScreen: "matthew-ch",
+        sourceBookId: "matthew",
+        sourceChapterNum: chapterNum,
+        sourceLetterId: null,
+        sourceStudyId: null,
+        sourceStudyChapterId: null,
+        sourceLetterTitle: `Matthew ${chapterNum}`,
+        sourceVolumeLabel: null
+      });
+      if (excerpt) {
+        window.__pendingHighlight = { excerpt, letterId: dest.id };
+      } else {
+        window.__pendingHighlight = null;
+      }
+      setFromMatthewCh({ chapterNum });
+      if (dest.isStudy) {
+        setStudyId(dest.studyId);
+        setStudyChapterId(dest.studyChapterId);
+        setActiveReadKey(dest.activeReadKey);
+      } else {
+        setLetterId(dest.id);
+        setActiveReadKey("vol:" + dest.volKey, () => setLastReadForVol(dest.volKey, dest.id));
+      }
+      setScreen(dest.screen);
+    };
+    const openInAppLetter = (target, meta) => {
+      if (!target || !target.letterTitle) return;
+      const dest = resolveVotLetter(target.collection, target.letterTitle);
+      if (!dest) return;
+      let destSnapshot = null;
+      if (dest.isStudy) {
+        destSnapshot = { screen: "bible-study-chapter", bookId: null, chapterNum: null, letterId: null, studyId: dest.studyId, studyChapterId: dest.studyChapterId };
+      } else {
+        destSnapshot = { screen: dest.screen, bookId: null, chapterNum: null, letterId: dest.id, studyId: null, studyChapterId: null };
+      }
+      pushFromLetter({
+        sourceScreen: screen,
+        sourceLetterId: letterId,
+        sourceBookId: bookId,
+        sourceChapterNum: chapterNum,
+        sourceStudyId: studyId,
+        sourceStudyChapterId: studyChapterId,
+        sourceLetterTitle: meta && meta.sourceLetterTitle ? meta.sourceLetterTitle : null,
+        sourceVolumeLabel: meta && meta.sourceVolumeLabel ? meta.sourceVolumeLabel : null,
+        destSnapshot
+      });
+      if (target.excerpt) {
+        window.__pendingHighlight = { excerpt: target.excerpt, letterId: dest.id };
+      } else {
+        window.__pendingHighlight = null;
+      }
+      if (dest.isStudy) {
+        setStudyId(dest.studyId);
+        setStudyChapterId(dest.studyChapterId);
+        setActiveReadKey(dest.activeReadKey);
+      } else {
+        setLetterId(dest.id);
+        setActiveReadKey("vol:" + dest.volKey, () => setLastReadForVol(dest.volKey, dest.id));
+      }
+      setScreen(dest.screen);
+    };
+    return { goToLetterFromMatthew, openInAppLetter };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -4700,7 +4785,7 @@
     preface.nextLetter = { id: letters[0].id, title: letters[0].title };
     letters[0].prevLetter = { id: preface.id, title: preface.title };
   }
-  function resolveVotLetter(vol, letter) {
+  function resolveVotLetter2(vol, letter) {
     if (!letter) return null;
     const key = (vol || "null") + "::" + letter;
     return VOT_LETTER_REGISTRY.get(key) || null;
@@ -7537,6 +7622,7 @@
     useSearch,
     useBibleStudies,
     useJournalMutations,
+    useTapThrough,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
@@ -7568,7 +7654,7 @@
     lookupVersesFromBooks,
     linkWtlbEntries,
     linkPreface,
-    resolveVotLetter,
+    resolveVotLetter: resolveVotLetter2,
     isHiddenManna,
     // Journal UI (sheets)
     JournalRecordingSheet: JournalRecordingSheet2,

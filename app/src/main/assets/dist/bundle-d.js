@@ -7845,35 +7845,6 @@
     const setLastReadForVol = (volId, id) => {
       setLastReadLetterMap((prev) => ({ ...prev, [volId]: id }));
     };
-    const goToLetterFromMatthew = (vol, letter2, excerpt) => {
-      const dest = resolveVotLetter(vol, letter2);
-      if (!dest) return;
-      pushFromLetter({
-        sourceScreen: "matthew-ch",
-        sourceBookId: "matthew",
-        sourceChapterNum: chapterNum,
-        sourceLetterId: null,
-        sourceStudyId: null,
-        sourceStudyChapterId: null,
-        sourceLetterTitle: `Matthew ${chapterNum}`,
-        sourceVolumeLabel: null
-      });
-      if (excerpt) {
-        window.__pendingHighlight = { excerpt, letterId: dest.id };
-      } else {
-        window.__pendingHighlight = null;
-      }
-      setFromMatthewCh({ chapterNum });
-      if (dest.isStudy) {
-        setStudyId(dest.studyId);
-        setStudyChapterId(dest.studyChapterId);
-        setActiveReadKey(dest.activeReadKey);
-      } else {
-        setLetterId(dest.id);
-        setActiveReadKey("vol:" + dest.volKey, () => setLastReadForVol(dest.volKey, dest.id));
-      }
-      setScreen(dest.screen);
-    };
     const {
       setFromLetterStack,
       pushFromLetter,
@@ -7895,42 +7866,22 @@
       setStudyId,
       setStudyChapterId
     });
-    const openInAppLetter = (target, meta) => {
-      if (!target || !target.letterTitle) return;
-      const dest = resolveVotLetter(target.collection, target.letterTitle);
-      if (!dest) return;
-      let destSnapshot = null;
-      if (dest.isStudy) {
-        destSnapshot = { screen: "bible-study-chapter", bookId: null, chapterNum: null, letterId: null, studyId: dest.studyId, studyChapterId: dest.studyChapterId };
-      } else {
-        destSnapshot = { screen: dest.screen, bookId: null, chapterNum: null, letterId: dest.id, studyId: null, studyChapterId: null };
-      }
-      pushFromLetter({
-        sourceScreen: screen,
-        sourceLetterId: letterId,
-        sourceBookId: bookId,
-        sourceChapterNum: chapterNum,
-        sourceStudyId: studyId,
-        sourceStudyChapterId: studyChapterId,
-        sourceLetterTitle: meta && meta.sourceLetterTitle ? meta.sourceLetterTitle : null,
-        sourceVolumeLabel: meta && meta.sourceVolumeLabel ? meta.sourceVolumeLabel : null,
-        destSnapshot
-      });
-      if (target.excerpt) {
-        window.__pendingHighlight = { excerpt: target.excerpt, letterId: dest.id };
-      } else {
-        window.__pendingHighlight = null;
-      }
-      if (dest.isStudy) {
-        setStudyId(dest.studyId);
-        setStudyChapterId(dest.studyChapterId);
-        setActiveReadKey(dest.activeReadKey);
-      } else {
-        setLetterId(dest.id);
-        setActiveReadKey("vol:" + dest.volKey, () => setLastReadForVol(dest.volKey, dest.id));
-      }
-      setScreen(dest.screen);
-    };
+    const { goToLetterFromMatthew, openInAppLetter } = useTapThrough({
+      screen,
+      bookId,
+      chapterNum,
+      letterId,
+      studyId,
+      studyChapterId,
+      pushFromLetter,
+      setScreen,
+      setLetterId,
+      setStudyId,
+      setStudyChapterId,
+      setFromMatthewCh,
+      setActiveReadKey,
+      setLastReadForVol
+    });
     const [readItems, setReadItems] = useState(saved.readItems || {});
     const [gardenPage, setGardenPage] = tabField("gardenPage");
     const [gardenWarningOpen, setGardenWarningOpen] = useState(false);

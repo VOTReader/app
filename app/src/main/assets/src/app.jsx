@@ -256,40 +256,10 @@ function App() {
   const setLastReadForVol = (volId, id) => {
     setLastReadLetterMap((prev) => ({ ...prev, [volId]: id }));
   };
-  const goToLetterFromMatthew = (vol, letter, excerpt) => {
-    const dest = resolveVotLetter(vol, letter);
-    if (!dest) return; // defensive: unknown letter → no-op (no blackscreen)
-    pushFromLetter({
-      sourceScreen: "matthew-ch",
-      sourceBookId: "matthew",
-      sourceChapterNum: chapterNum,
-      sourceLetterId: null,
-      sourceStudyId: null,
-      sourceStudyChapterId: null,
-      sourceLetterTitle: `Matthew ${chapterNum}`,
-      sourceVolumeLabel: null
-    });
-    if (excerpt) {
-      window.__pendingHighlight = { excerpt: excerpt, letterId: dest.id };
-    } else {
-      window.__pendingHighlight = null;
-    }
-    setFromMatthewCh({ chapterNum });
-    if (dest.isStudy) {
-      setStudyId(dest.studyId);
-      setStudyChapterId(dest.studyChapterId);
-      setActiveReadKey(dest.activeReadKey);
-    } else {
-      setLetterId(dest.id);
-      setActiveReadKey("vol:" + dest.volKey, () => setLastReadForVol(dest.volKey, dest.id));
-    }
-    setScreen(dest.screen);
-  };
+  /* goToLetterFromMatthew + openInAppLetter → src/hooks/use-tap-through.js (P7f).
+     The useTapThrough() call is below useFromLetterStack (which returns
+     pushFromLetter, a useTapThrough PARAM). */
 
-  /* In-app letter tap-through from a footnote (link / seeAlso).
-     Records the source letter + screen so Android back returns here.
-     Sets window.__pendingHighlight so the destination LetterView, on its
-     next mount/letter-change, wraps the excerpt with <mark.letter-highlight>. */
   /* useFromLetterStack — the multi-level tap-through back-stack:
      fromLetterStack (tabField) + pushFromLetter + tapThroughBack + the
      destSnapshot prune effect + the backHint computation + the
@@ -305,49 +275,15 @@ function App() {
     setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
   });
 
-  const openInAppLetter = (target, meta) => {
-    if (!target || !target.letterTitle) return;
-    const dest = resolveVotLetter(target.collection, target.letterTitle);
-    if (!dest) return;
-    // Push source onto the back-nav stack so multi-level tap-throughs
-    // unwind correctly (A → B → C → back → B → back → A). Source title +
-    // volume label (from meta) populate the back-hint pill on the dest.
-    //
-    // Also compute a destSnapshot — used by the prune effect + _destMatches
-    // to hide the back-pill the moment the user navigates away from the
-    // destination (next/prev chapter or letter, different book, etc.).
-    // ALL back pills in the app are now single-shot per user direction:
-    // the pill is a contextual breadcrumb for THIS landing, not a
-    // permanent fixture that survives onward navigation.
-    let destSnapshot = null;
-    if (dest.isStudy) {
-      destSnapshot = { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: dest.studyId, studyChapterId: dest.studyChapterId };
-    } else {
-      destSnapshot = { screen: dest.screen, bookId: null, chapterNum: null, letterId: dest.id, studyId: null, studyChapterId: null };
-    }
-    pushFromLetter({
-      sourceScreen: screen, sourceLetterId: letterId,
-      sourceBookId: bookId, sourceChapterNum: chapterNum,
-      sourceStudyId: studyId, sourceStudyChapterId: studyChapterId,
-      sourceLetterTitle: meta && meta.sourceLetterTitle ? meta.sourceLetterTitle : null,
-      sourceVolumeLabel: meta && meta.sourceVolumeLabel ? meta.sourceVolumeLabel : null,
-      destSnapshot: destSnapshot
-    });
-    if (target.excerpt) {
-      window.__pendingHighlight = { excerpt: target.excerpt, letterId: dest.id };
-    } else {
-      window.__pendingHighlight = null;
-    }
-    if (dest.isStudy) {
-      setStudyId(dest.studyId);
-      setStudyChapterId(dest.studyChapterId);
-      setActiveReadKey(dest.activeReadKey);
-    } else {
-      setLetterId(dest.id);
-      setActiveReadKey("vol:" + dest.volKey, () => setLastReadForVol(dest.volKey, dest.id));
-    }
-    setScreen(dest.screen);
-  };
+  /* Tap-through openers (P7f). goToLetterFromMatthew + openInAppLetter:
+     both push onto fromLetterStack (returned by useFromLetterStack just
+     above) and set the destination. */
+  const { goToLetterFromMatthew, openInAppLetter } = useTapThrough({
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    pushFromLetter,
+    setScreen, setLetterId, setStudyId, setStudyChapterId,
+    setFromMatthewCh, setActiveReadKey, setLastReadForVol,
+  });
   /* navigateToLink deferred body → src/hooks/use-navigate-to-link.js (P6j) */
   const [readItems, setReadItems] = useState(saved.readItems || {});
   const [gardenPage, setGardenPage] = tabField('gardenPage');
