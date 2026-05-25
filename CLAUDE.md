@@ -11,7 +11,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 ## Current state (2026-05-24)
 
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
-- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **1,816 lines** — Phase 1 closed + Phase 2 P8a/P8b landed. 26 hooks (15 P6 + 11 P7a-k). ROUTES dispatch table now holds 46 screens (26 trivial wrappers from P8a + 20 medium prop-thread screens from P8b). Only 7 inline screen blocks remain in App()'s render tree: matthew-ch + bible-study-index + bible-study-chapter + holy-days-entry + hm-letter (the 5 IIFE screens), plus holy-days-index (37-line substantive) and garden-view (240-line substantive).
+- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **1,815 lines** — Phase 1 closed + Phase 2 P8a/P8b/P8c landed. 26 hooks (15 P6 + 11 P7a-k). **All 53 screens dispatch from a single ROUTES lookup table** — zero inline `{screen === X && ...}` blocks remain. The IIFE patterns (matthew-ch + bible-study-index + bible-study-chapter + holy-days-entry + hm-letter) live as arrow-function bodies inside ROUTES entries; the 240-line "garden-view" turned out to be 9 lines (the earlier survey was pre-P7).
 - **130+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
   - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)

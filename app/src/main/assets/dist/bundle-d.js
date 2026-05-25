@@ -8806,6 +8806,209 @@
           hlTick,
           onLinkOpen: openLinkSidebar
         }
+      ),
+      // ── IIFE screens (P8c) — same dispatch shape; the `() => { ... }`
+      //    body holds the render-time-locals the old IIFE built (study
+      //    lookups, letterShim construction, prophecy-card handlers). ──
+      "matthew-ch": () => {
+        if (!chapter) return null;
+        const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
+        const atFirstCh = chapter.num === 1;
+        const atLastCh = chapter.num === mtLastNum;
+        const chainPrev = fromStudies && atFirstCh ? prevChainEntry("matthew-study") : null;
+        const chainNext = fromStudies && atLastCh ? nextChainEntry("matthew-study") : null;
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+          ChapterView,
+          {
+            book: MATTHEW,
+            chapter,
+            mode,
+            showStudy,
+            showEchoes: settings.showInlineEchoes !== false,
+            showChapterTitle: settings.showChapterTitle !== false,
+            titleFocusHidden,
+            setTitleFocusHidden,
+            onIndex: goMatthewIdx,
+            onNavigate: (num) => {
+              setSurpriseAnchor(null);
+              selectMatthewCh(num);
+            },
+            onMarkRead: () => markRead("matthew", chapterNum),
+            markAsReadEnabled: settings.markAsRead,
+            showProgressBar: settings.showProgressBar,
+            prevBoundary: chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null,
+            onPrevBoundary: chainPrev ? () => {
+              setFromStudies(true);
+              goToChainEntryLast(chainPrev.slug)();
+            } : null,
+            nextBoundary: chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null,
+            onNextBoundary: chainNext ? () => {
+              setFromStudies(true);
+              goToChainEntryFirst(chainNext.slug)();
+            } : null,
+            onSearch: goSearch,
+            onSettings: goSettings,
+            onHistory: goHistory,
+            theme,
+            onThemeChange: setTheme,
+            surpriseAnchor,
+            onVotLetterClick: goToLetterFromMatthew,
+            backHint,
+            onTapThroughBack: tapThroughBack,
+            hlTick,
+            onLinkOpen: openLinkSidebar
+          }
+        ), /* @__PURE__ */ React.createElement(ModeToggle, { mode, onChange: setMode, showStudy, onShowStudyChange: setShowStudy }));
+      },
+      "bible-study-index": () => {
+        if (!studyId) return null;
+        const study = getStudyById(studyId);
+        if (!study) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
+        return /* @__PURE__ */ React.createElement(
+          BibleStudyIndex,
+          {
+            study,
+            onSelect: (chId) => selectStudyChapter(studyId, chId),
+            onBack: goStudiesHome,
+            onSearch: goSearch,
+            onHistory: goHistory,
+            onSettings: goSettings,
+            currentChapter: settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null,
+            isRead: (chId) => isRead(studyReadKey(study.slug), chId),
+            markAsReadEnabled: settings.markAsRead,
+            theme,
+            onThemeChange: setTheme
+          }
+        );
+      },
+      "bible-study-chapter": () => {
+        if (!studyId || !studyChapterId) return null;
+        const study = getStudyById(studyId);
+        const ch = getStudyChapter(study, studyChapterId);
+        if (!study || !ch) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
+        const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
+        const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
+        const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
+        const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
+        const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
+        const pick = (chVal, studyVal, empty) => {
+          if (chVal === void 0 || chVal === null) return studyVal != null ? studyVal : empty;
+          if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
+          return chVal;
+        };
+        const letterShim = {
+          id: ch.id,
+          title: ch.title,
+          subtitle: ch.subtitle || null,
+          num: ch.num,
+          date: null,
+          from: null,
+          spoken: null,
+          forLine: null,
+          preamble: ch.part ? `Part ${ch.part}` : null,
+          blocks: ch.blocks || [],
+          sectionIntro: ch.sectionIntro || null,
+          footnotes: ch.footnotes || {},
+          nkjv: ch.nkjv || {},
+          prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
+          nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
+          relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
+          bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
+          videos: pick(ch.videos, study.videos, []),
+          audioUrl: pick(ch.audioUrl, study.audioUrl, null),
+          soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
+          videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
+          videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
+          videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
+          addendum: pick(ch.addendum, study.addendum, null)
+        };
+        const jumpToStudy = (targetSlug) => {
+          if (targetSlug === "matthew-study") {
+            setFromStudies(true);
+            setBookId("matthew");
+            setChapterNum(null);
+            setScreen("matthew-idx");
+            return;
+          }
+          const target = getStudyById(targetSlug);
+          if (!target || target.locked) return;
+          selectStudy(targetSlug);
+        };
+        const handleLetterClick = (lid, sc) => {
+          setFromStudies(true);
+          setLetterId(lid);
+          const _col = COL_BY_LETTER_SC.get(sc);
+          if (_col) setActiveReadKey(_col.readKey);
+          setScreen(sc);
+        };
+        return /* @__PURE__ */ React.createElement(
+          LetterView,
+          {
+            ...sharedViewProps,
+            letter: letterShim,
+            studyMode: true,
+            volumeLabel: study.title,
+            onHome: () => {
+              if (study.chapters.length > 1) {
+                setStudyChapterId(null);
+                setScreen("bible-study-index");
+              } else {
+                goStudiesHome();
+              }
+            },
+            onNavigate: (chId) => {
+              setSurpriseAnchor(null);
+              selectStudyChapter(studyId, chId);
+            },
+            onStudyNavigate: jumpToStudy,
+            onLetterClick: handleLetterClick,
+            onMarkRead: () => markRead(studyReadKey(study.slug), studyChapterId),
+            onUnmark: () => unmarkRead(studyReadKey(study.slug), studyChapterId),
+            isRead: (id) => isRead(studyReadKey(study.slug), id),
+            prevBoundary: prevEntry ? { short: studyShortTitle(prevEntry.title), title: studyShortTitle(prevEntry.title) } : null,
+            onPrevBoundary: prevEntry ? goToChainEntryLast(prevEntry.slug) : null,
+            nextBoundary: nextEntry ? { short: studyShortTitle(nextEntry.title), title: studyShortTitle(nextEntry.title) } : null,
+            onNextBoundary: nextEntry ? goToChainEntryFirst(nextEntry.slug) : null,
+            prophecyCardStatesRef,
+            saveProphecyCardStates
+          }
+        );
+      },
+      "holy-days-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, typeof HOLY_DAYS_META !== "undefined" && (HOLY_DAYS_META.audioPlaylist || HOLY_DAYS_META.videoPlaylist) && /* @__PURE__ */ React.createElement("div", { className: "hd-playlists" }, HOLY_DAYS_META.audioPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.audioPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("path", { d: "M9 18V5l12-2v13" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "18", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "16", r: "3" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Audio Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Listen on Bandcamp")), HOLY_DAYS_META.videoPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.videoPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polygon", { points: "23 7 16 12 23 17 23 7" }), /* @__PURE__ */ React.createElement("rect", { x: "1", y: "5", width: "15", height: "14", rx: "2", ry: "2" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Video Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Watch on YouTube"))), /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })), ...colIdxProps("holydays") })),
+      "holy-days-entry": () => {
+        if (!hdEntry) return null;
+        const bc = boundaryConfig("holydays", hdEntry);
+        if (hdEntry.type === "wtlb") {
+          return /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, entry: hdEntry, partLabel: "Regarding The Holy Days", onNavToChapter: _navToChapter, footnotesMode: true });
+        }
+        const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
+        return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, letter: letterShim, volumeLabel: "Regarding The Holy Days" });
+      },
+      "hm-letter": () => {
+        if (!hmEntry) return null;
+        const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
+        const goHomeFromHM = () => {
+          if (fromMatthewChRef.current) {
+            setFromMatthewCh(null);
+            setScreen("matthew-ch");
+          } else {
+            goHome();
+          }
+        };
+        return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("hm"), letter: letterShim, volumeLabel: "Hidden Manna", onHome: goHomeFromHM, onNavigate: (id) => {
+          setLetterId(id);
+        } });
+      },
+      "garden-view": () => /* @__PURE__ */ React.createElement(
+        GardenView,
+        {
+          page: gardenPage,
+          onPageChange: (p) => setGardenPage(p),
+          onBack: goVolumesHome,
+          theme,
+          onThemeChange: setTheme,
+          tier: settings.gardenTier || GARDEN_DEFAULT_TIER
+        }
       )
     };
     return /* @__PURE__ */ React.createElement(TabsContext.Provider, { value: tabsCtxValue }, null, settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && /* @__PURE__ */ React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /* @__PURE__ */ React.createElement("span", { className: "rdg-inner" })), showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
@@ -8926,195 +9129,7 @@
         }
       },
       "Disable Tabs"
-    )))), screen === "matthew-ch" && chapter && (() => {
-      const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
-      const atFirstCh = chapter.num === 1;
-      const atLastCh = chapter.num === mtLastNum;
-      const chainPrev = fromStudies && atFirstCh ? prevChainEntry("matthew-study") : null;
-      const chainNext = fromStudies && atLastCh ? nextChainEntry("matthew-study") : null;
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
-        ChapterView,
-        {
-          book: MATTHEW,
-          chapter,
-          mode,
-          showStudy,
-          showEchoes: settings.showInlineEchoes !== false,
-          showChapterTitle: settings.showChapterTitle !== false,
-          titleFocusHidden,
-          setTitleFocusHidden,
-          onIndex: goMatthewIdx,
-          onNavigate: (num) => {
-            setSurpriseAnchor(null);
-            selectMatthewCh(num);
-          },
-          onMarkRead: () => markRead("matthew", chapterNum),
-          markAsReadEnabled: settings.markAsRead,
-          showProgressBar: settings.showProgressBar,
-          prevBoundary: chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null,
-          onPrevBoundary: chainPrev ? () => {
-            setFromStudies(true);
-            goToChainEntryLast(chainPrev.slug)();
-          } : null,
-          nextBoundary: chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null,
-          onNextBoundary: chainNext ? () => {
-            setFromStudies(true);
-            goToChainEntryFirst(chainNext.slug)();
-          } : null,
-          onSearch: goSearch,
-          onSettings: goSettings,
-          onHistory: goHistory,
-          theme,
-          onThemeChange: setTheme,
-          surpriseAnchor,
-          onVotLetterClick: goToLetterFromMatthew,
-          backHint,
-          onTapThroughBack: tapThroughBack,
-          hlTick,
-          onLinkOpen: openLinkSidebar
-        }
-      ), /* @__PURE__ */ React.createElement(ModeToggle, { mode, onChange: setMode, showStudy, onShowStudyChange: setShowStudy }));
-    })(), screen === "bible-study-index" && studyId && (() => {
-      const study = getStudyById(studyId);
-      if (!study) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
-      return /* @__PURE__ */ React.createElement(
-        BibleStudyIndex,
-        {
-          study,
-          onSelect: (chId) => selectStudyChapter(studyId, chId),
-          onBack: goStudiesHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          currentChapter: settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null,
-          isRead: (chId) => isRead(studyReadKey(study.slug), chId),
-          markAsReadEnabled: settings.markAsRead,
-          theme,
-          onThemeChange: setTheme
-        }
-      );
-    })(), ROUTES[screen]?.() ?? null, screen === "bible-study-chapter" && studyId && studyChapterId && (() => {
-      const study = getStudyById(studyId);
-      const ch = getStudyChapter(study, studyChapterId);
-      if (!study || !ch) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
-      const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
-      const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
-      const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
-      const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
-      const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
-      const pick = (chVal, studyVal, empty) => {
-        if (chVal === void 0 || chVal === null) return studyVal != null ? studyVal : empty;
-        if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
-        return chVal;
-      };
-      const letterShim = {
-        id: ch.id,
-        title: ch.title,
-        subtitle: ch.subtitle || null,
-        num: ch.num,
-        date: null,
-        from: null,
-        spoken: null,
-        forLine: null,
-        preamble: ch.part ? `Part ${ch.part}` : null,
-        blocks: ch.blocks || [],
-        sectionIntro: ch.sectionIntro || null,
-        footnotes: ch.footnotes || {},
-        nkjv: ch.nkjv || {},
-        prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
-        nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
-        relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
-        bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
-        videos: pick(ch.videos, study.videos, []),
-        audioUrl: pick(ch.audioUrl, study.audioUrl, null),
-        soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
-        videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
-        videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
-        videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
-        addendum: pick(ch.addendum, study.addendum, null)
-      };
-      const jumpToStudy = (targetSlug) => {
-        if (targetSlug === "matthew-study") {
-          setFromStudies(true);
-          setBookId("matthew");
-          setChapterNum(null);
-          setScreen("matthew-idx");
-          return;
-        }
-        const target = getStudyById(targetSlug);
-        if (!target || target.locked) return;
-        selectStudy(targetSlug);
-      };
-      const handleLetterClick = (lid, sc) => {
-        setFromStudies(true);
-        setLetterId(lid);
-        const _col = COL_BY_LETTER_SC.get(sc);
-        if (_col) setActiveReadKey(_col.readKey);
-        setScreen(sc);
-      };
-      return /* @__PURE__ */ React.createElement(
-        LetterView,
-        {
-          ...sharedViewProps,
-          letter: letterShim,
-          studyMode: true,
-          volumeLabel: study.title,
-          onHome: () => {
-            if (study.chapters.length > 1) {
-              setStudyChapterId(null);
-              setScreen("bible-study-index");
-            } else {
-              goStudiesHome();
-            }
-          },
-          onNavigate: (chId) => {
-            setSurpriseAnchor(null);
-            selectStudyChapter(studyId, chId);
-          },
-          onStudyNavigate: jumpToStudy,
-          onLetterClick: handleLetterClick,
-          onMarkRead: () => markRead(studyReadKey(study.slug), studyChapterId),
-          onUnmark: () => unmarkRead(studyReadKey(study.slug), studyChapterId),
-          isRead: (id) => isRead(studyReadKey(study.slug), id),
-          prevBoundary: prevEntry ? { short: studyShortTitle(prevEntry.title), title: studyShortTitle(prevEntry.title) } : null,
-          onPrevBoundary: prevEntry ? goToChainEntryLast(prevEntry.slug) : null,
-          nextBoundary: nextEntry ? { short: studyShortTitle(nextEntry.title), title: studyShortTitle(nextEntry.title) } : null,
-          onNextBoundary: nextEntry ? goToChainEntryFirst(nextEntry.slug) : null,
-          prophecyCardStatesRef,
-          saveProphecyCardStates
-        }
-      );
-    })(), screen === "holy-days-index" && /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: goVolumesHome }, "\u2190 Volumes"), /* @__PURE__ */ React.createElement(HomeBtn, null), /* @__PURE__ */ React.createElement(NavButtons, { onSettings: goSettings, onHistory: goHistory, onSearch: goSearch, theme, onThemeChange: setTheme })) }, typeof HOLY_DAYS_META !== "undefined" && (HOLY_DAYS_META.audioPlaylist || HOLY_DAYS_META.videoPlaylist) && /* @__PURE__ */ React.createElement("div", { className: "hd-playlists" }, HOLY_DAYS_META.audioPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.audioPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("path", { d: "M9 18V5l12-2v13" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "18", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "16", r: "3" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Audio Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Listen on Bandcamp")), HOLY_DAYS_META.videoPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.videoPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polygon", { points: "23 7 16 12 23 17 23 7" }), /* @__PURE__ */ React.createElement("rect", { x: "1", y: "5", width: "15", height: "14", rx: "2", ry: "2" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Video Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Watch on YouTube"))), /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })), ...colIdxProps("holydays") })), screen === "holy-days-entry" && hdEntry && (() => {
-      const bc = boundaryConfig("holydays", hdEntry);
-      if (hdEntry.type === "wtlb") {
-        return /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, entry: hdEntry, partLabel: "Regarding The Holy Days", onNavToChapter: _navToChapter, footnotesMode: true });
-      }
-      const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
-      return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, letter: letterShim, volumeLabel: "Regarding The Holy Days" });
-    })(), screen === "hm-letter" && hmEntry && (() => {
-      const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
-      const goHomeFromHM = () => {
-        if (fromMatthewChRef.current) {
-          setFromMatthewCh(null);
-          setScreen("matthew-ch");
-        } else {
-          goHome();
-        }
-      };
-      return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("hm"), letter: letterShim, volumeLabel: "Hidden Manna", onHome: goHomeFromHM, onNavigate: (id) => {
-        setLetterId(id);
-      } });
-    })(), screen === "garden-view" && /* @__PURE__ */ React.createElement(
-      GardenView,
-      {
-        page: gardenPage,
-        onPageChange: (p) => setGardenPage(p),
-        onBack: goVolumesHome,
-        theme,
-        onThemeChange: setTheme,
-        tier: settings.gardenTier || GARDEN_DEFAULT_TIER
-      }
-    ), gardenWarningOpen && (() => {
+    )))), ROUTES[screen]?.() ?? null, gardenWarningOpen && (() => {
       const selectedTier = getGardenTier(settings.gardenTier);
       return /* @__PURE__ */ React.createElement("div", { className: "garden-warning-overlay", onClick: () => setGardenWarningOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "garden-warning-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "garden-warning-title" }, "Before You Begin"), /* @__PURE__ */ React.createElement("div", { className: "garden-warning-body" }, /* @__PURE__ */ React.createElement("em", null, "A Return to The Garden"), " contains ", /* @__PURE__ */ React.createElement("strong", null, "209 high-resolution photographs"), " totaling approximately ", /* @__PURE__ */ React.createElement("strong", null, selectedTier.size), " at the selected quality. Pages stream from the internet as you read and are cached on your device.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "For the best experience, connect to ", /* @__PURE__ */ React.createElement("strong", null, "Wi-Fi"), " before proceeding. Mobile data charges may apply otherwise.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "Please also ensure your device has sufficient ", /* @__PURE__ */ React.createElement("strong", null, "free storage"), " available to cache the full collection."), /* @__PURE__ */ React.createElement("div", { className: "garden-tier-selector" }, /* @__PURE__ */ React.createElement("div", { className: "garden-tier-label" }, "Image Quality"), /* @__PURE__ */ React.createElement("div", { className: "garden-tier-hint" }, "You can change this anytime from the Settings menu."), GARDEN_TIERS.map((t) => /* @__PURE__ */ React.createElement(
         "button",

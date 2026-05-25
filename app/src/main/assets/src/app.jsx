@@ -1228,6 +1228,226 @@ function App() {
         hlTick={hlTick} onLinkOpen={openLinkSidebar}
       />
     ),
+
+    // ── IIFE screens (P8c) — same dispatch shape; the `() => { ... }`
+    //    body holds the render-time-locals the old IIFE built (study
+    //    lookups, letterShim construction, prophecy-card handlers). ──
+    'matthew-ch': () => {
+      if (!chapter) return null;
+      // Chain-aware boundaries: when entered via Studies (fromStudies=true),
+      // Matthew participates in the unified heavy→light chain. Ch 1 prev →
+      // previous chain entry's last chapter; Ch 28 next → next chain entry's
+      // first chapter. Matthew's own ch N ↔ ch N±1 uses ChapterView's
+      // built-in prevCh/nextCh so the inner chapters feel normal.
+      const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
+      const atFirstCh = chapter.num === 1;
+      const atLastCh = chapter.num === mtLastNum;
+      const chainPrev = fromStudies && atFirstCh ? prevChainEntry('matthew-study') : null;
+      const chainNext = fromStudies && atLastCh ? nextChainEntry('matthew-study') : null;
+      return (
+        <>
+          <ChapterView
+            book={MATTHEW} chapter={chapter} mode={mode} showStudy={showStudy} showEchoes={settings.showInlineEchoes !== false}
+            showChapterTitle={settings.showChapterTitle !== false}
+            titleFocusHidden={titleFocusHidden}
+            setTitleFocusHidden={setTitleFocusHidden}
+            onIndex={goMatthewIdx}
+            onNavigate={(num) => { setSurpriseAnchor(null); selectMatthewCh(num); }}
+            onMarkRead={() => markRead('matthew', chapterNum)}
+            markAsReadEnabled={settings.markAsRead}
+            showProgressBar={settings.showProgressBar}
+            prevBoundary={chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null}
+            onPrevBoundary={chainPrev ? () => { setFromStudies(true); goToChainEntryLast(chainPrev.slug)(); } : null}
+            nextBoundary={chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null}
+            onNextBoundary={chainNext ? () => { setFromStudies(true); goToChainEntryFirst(chainNext.slug)(); } : null}
+            onSearch={goSearch}
+            onSettings={goSettings}
+            onHistory={goHistory}
+            theme={theme} onThemeChange={setTheme}
+            surpriseAnchor={surpriseAnchor}
+            onVotLetterClick={goToLetterFromMatthew}
+            backHint={backHint} onTapThroughBack={tapThroughBack}
+            hlTick={hlTick}
+            onLinkOpen={openLinkSidebar}
+          />
+          <ModeToggle mode={mode} onChange={setMode} showStudy={showStudy} onShowStudyChange={setShowStudy} />
+        </>
+      );
+    },
+
+    'bible-study-index': () => {
+      if (!studyId) return null;
+      const study = getStudyById(studyId);
+      if (!study) return studiesLoading ? <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading…</div> : null;
+      return (
+        <BibleStudyIndex
+          study={study}
+          onSelect={(chId) => selectStudyChapter(studyId, chId)}
+          onBack={goStudiesHome}
+          onSearch={goSearch}
+          onHistory={goHistory}
+          onSettings={goSettings}
+          currentChapter={settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null}
+          isRead={(chId) => isRead(studyReadKey(study.slug), chId)}
+          markAsReadEnabled={settings.markAsRead}
+          theme={theme} onThemeChange={setTheme}
+        />
+      );
+    },
+
+    'bible-study-chapter': () => {
+      if (!studyId || !studyChapterId) return null;
+      const study = getStudyById(studyId);
+      const ch = getStudyChapter(study, studyChapterId);
+      if (!study || !ch) return studiesLoading ? <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading…</div> : null;
+      const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
+      const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
+      const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
+      // Chain-aware boundary: crosses into the next/prev entry in the
+      // unified heavy→light chain, which includes the Matthew Study Bible.
+      const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
+      const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
+
+      // Build the letter-shaped object expected by LetterView.
+      // Resource fields (audio/video/relatedTopics/etc.) fall back from
+      // chapter → study, so the study can declare them once and every
+      // chapter inherits. Chapter-level values override when present.
+      const pick = (chVal, studyVal, empty) => {
+        if (chVal === undefined || chVal === null) return studyVal != null ? studyVal : empty;
+        if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
+        return chVal;
+      };
+      const letterShim = {
+        id: ch.id,
+        title: ch.title,
+        subtitle: ch.subtitle || null,
+        num: ch.num,
+        date: null, from: null, spoken: null, forLine: null,
+        preamble: ch.part ? `Part ${ch.part}` : null,
+        blocks: ch.blocks || [],
+        sectionIntro: ch.sectionIntro || null,
+        footnotes: ch.footnotes || {},
+        nkjv: ch.nkjv || {},
+        prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
+        nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
+        relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
+        bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
+        videos: pick(ch.videos, study.videos, []),
+        audioUrl: pick(ch.audioUrl, study.audioUrl, null),
+        soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
+        videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
+        videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
+        videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
+        addendum: pick(ch.addendum, study.addendum, null),
+      };
+
+      // onStudyNavigate: internal jump to another study. Saves current
+      // location so back returns here via existing fromSearch-style logic.
+      const jumpToStudy = (targetSlug) => {
+        if (targetSlug === 'matthew-study') {
+          setFromStudies(true);
+          setBookId('matthew'); setChapterNum(null); setScreen('matthew-idx');
+          return;
+        }
+        const target = getStudyById(targetSlug);
+        if (!target || target.locked) return;
+        selectStudy(targetSlug);
+      };
+      const handleLetterClick = (lid, sc) => {
+        setFromStudies(true);
+        setLetterId(lid);
+        const _col = COL_BY_LETTER_SC.get(sc);
+        if (_col) setActiveReadKey(_col.readKey);
+        setScreen(sc);
+      };
+      return (
+        <LetterView
+          {...sharedViewProps}
+          letter={letterShim}
+          studyMode={true}
+          volumeLabel={study.title}
+          onHome={() => { if (study.chapters.length > 1) { setStudyChapterId(null); setScreen('bible-study-index'); } else { goStudiesHome(); } }}
+          onNavigate={(chId) => { setSurpriseAnchor(null); selectStudyChapter(studyId, chId); }}
+          onStudyNavigate={jumpToStudy}
+          onLetterClick={handleLetterClick}
+          onMarkRead={() => markRead(studyReadKey(study.slug), studyChapterId)}
+          onUnmark={() => unmarkRead(studyReadKey(study.slug), studyChapterId)}
+          isRead={(id) => isRead(studyReadKey(study.slug), id)}
+          prevBoundary={prevEntry ? { short: studyShortTitle(prevEntry.title), title: studyShortTitle(prevEntry.title) } : null}
+          onPrevBoundary={prevEntry ? goToChainEntryLast(prevEntry.slug) : null}
+          nextBoundary={nextEntry ? { short: studyShortTitle(nextEntry.title), title: studyShortTitle(nextEntry.title) } : null}
+          onNextBoundary={nextEntry ? goToChainEntryFirst(nextEntry.slug) : null}
+          prophecyCardStatesRef={prophecyCardStatesRef}
+          saveProphecyCardStates={saveProphecyCardStates}
+        />
+      );
+    },
+
+    'holy-days-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        {typeof HOLY_DAYS_META !== 'undefined' && (HOLY_DAYS_META.audioPlaylist || HOLY_DAYS_META.videoPlaylist) && (
+          <div className="hd-playlists">
+            {HOLY_DAYS_META.audioPlaylist && (
+              <a className="hd-playlist-btn" href={HOLY_DAYS_META.audioPlaylist} target="_blank" rel="noopener noreferrer">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+                <span className="hd-playlist-label">Audio Playlist</span>
+                <span className="hd-playlist-sub">Listen on Bandcamp</span>
+              </a>
+            )}
+            {HOLY_DAYS_META.videoPlaylist && (
+              <a className="hd-playlist-btn" href={HOLY_DAYS_META.videoPlaylist} target="_blank" rel="noopener noreferrer">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                </svg>
+                <span className="hd-playlist-label">Video Playlist</span>
+                <span className="hd-playlist-sub">Watch on YouTube</span>
+              </a>
+            )}
+          </div>
+        )}
+        <VolumeLetterIndex volumeTitle="Regarding The Holy Days" eyebrow="The Appointed Times" letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} />
+      </ScreenLayout>
+    ),
+
+    'holy-days-entry': () => {
+      if (!hdEntry) return null;
+      const bc = boundaryConfig('holydays', hdEntry);
+      if (hdEntry.type === 'wtlb') {
+        return <WtlbEntryView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} entry={hdEntry} partLabel="Regarding The Holy Days" onNavToChapter={_navToChapter} footnotesMode={true} />;
+      }
+      const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
+      return <LetterView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} letter={letterShim} volumeLabel="Regarding The Holy Days" />;
+    },
+
+    'hm-letter': () => {
+      if (!hmEntry) return null;
+      const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
+      // Returning home from HM goes back to the Matthew chapter that led here.
+      const goHomeFromHM = () => {
+        if (fromMatthewChRef.current) {
+          setFromMatthewCh(null);
+          setScreen('matthew-ch');
+        } else {
+          goHome();
+        }
+      };
+      return <LetterView {...sharedViewProps} {...colReadNavProps('hm')} letter={letterShim} volumeLabel="Hidden Manna" onHome={goHomeFromHM} onNavigate={(id) => { setLetterId(id); }} />;
+    },
+
+    'garden-view': () => (
+      <GardenView
+        page={gardenPage}
+        onPageChange={(p) => setGardenPage(p)}
+        onBack={goVolumesHome}
+        theme={theme} onThemeChange={setTheme}
+        tier={settings.gardenTier || GARDEN_DEFAULT_TIER}
+      />
+    ),
   };
 
   return (
@@ -1346,67 +1566,6 @@ function App() {
         </div>
       )}
 
-      {screen === "matthew-ch" && chapter && (() => {
-        // Chain-aware boundaries: when entered via Studies (fromStudies=true),
-        // Matthew participates in the unified heavy→light chain. Ch 1 prev →
-        // previous chain entry's last chapter; Ch 28 next → next chain entry's
-        // first chapter. Matthew's own ch N ↔ ch N±1 uses ChapterView's
-        // built-in prevCh/nextCh so the inner chapters feel normal.
-        const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
-        const atFirstCh = chapter.num === 1;
-        const atLastCh = chapter.num === mtLastNum;
-        const chainPrev = fromStudies && atFirstCh ? prevChainEntry('matthew-study') : null;
-        const chainNext = fromStudies && atLastCh ? nextChainEntry('matthew-study') : null;
-        return (
-          <>
-            <ChapterView
-              book={MATTHEW} chapter={chapter} mode={mode} showStudy={showStudy} showEchoes={settings.showInlineEchoes !== false}
-              showChapterTitle={settings.showChapterTitle !== false}
-              titleFocusHidden={titleFocusHidden}
-              setTitleFocusHidden={setTitleFocusHidden}
-              onIndex={goMatthewIdx}
-              onNavigate={(num) => {setSurpriseAnchor(null);selectMatthewCh(num);}}
-              onMarkRead={() => markRead("matthew", chapterNum)}
-              markAsReadEnabled={settings.markAsRead}
-              showProgressBar={settings.showProgressBar}
-              prevBoundary={chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null}
-              onPrevBoundary={chainPrev ? () => {setFromStudies(true);goToChainEntryLast(chainPrev.slug)();} : null}
-              nextBoundary={chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null}
-              onNextBoundary={chainNext ? () => {setFromStudies(true);goToChainEntryFirst(chainNext.slug)();} : null}
-              onSearch={goSearch}
-              onSettings={goSettings}
-              onHistory={goHistory}
-              theme={theme} onThemeChange={setTheme}
-              surpriseAnchor={surpriseAnchor}
-              onVotLetterClick={goToLetterFromMatthew}
-              backHint={backHint} onTapThroughBack={tapThroughBack}
-              hlTick={hlTick}
-              onLinkOpen={openLinkSidebar}
-            />
-            <ModeToggle mode={mode} onChange={setMode} showStudy={showStudy} onShowStudyChange={setShowStudy} />
-          </>
-        );
-      })()}
-
-      {screen === "bible-study-index" && studyId && (() => {
-        const study = getStudyById(studyId);
-        if (!study) return studiesLoading ? <div className="sc-sheet-loading" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>Loading…</div> : null;
-        return (
-          <BibleStudyIndex
-            study={study}
-            onSelect={(chId) => selectStudyChapter(studyId, chId)}
-            onBack={goStudiesHome}
-            onSearch={goSearch}
-            onHistory={goHistory}
-            onSettings={goSettings}
-            currentChapter={settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null}
-            isRead={(chId) => isRead(studyReadKey(study.slug), chId)}
-            markAsReadEnabled={settings.markAsRead}
-            theme={theme} onThemeChange={setTheme}
-          />
-        );
-      })()}
-
       {/* P8a: 26 trivial wrappers (13 index + 10 letter + 3 entry) all
           dispatch through the ROUTES lookup declared just above the
           return statement. Replaces 26 sibling `{screen === X && ...}`
@@ -1416,169 +1575,9 @@ function App() {
       {ROUTES[screen]?.() ?? null}
 
 
-      {screen === "bible-study-chapter" && studyId && studyChapterId && (() => {
-        const study = getStudyById(studyId);
-        const ch = getStudyChapter(study, studyChapterId);
-        if (!study || !ch) return studiesLoading ? <div className="sc-sheet-loading" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>Loading…</div> : null;
-        const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
-        const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
-        const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
-        // Chain-aware boundary: crosses into the next/prev entry in the
-        // unified heavy→light chain, which includes the Matthew Study Bible.
-        const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
-        const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
-
-        // Build the letter-shaped object expected by LetterView.
-        // Resource fields (audio/video/relatedTopics/etc.) fall back from
-        // chapter → study, so the study can declare them once and every
-        // chapter inherits. Chapter-level values override when present.
-        const pick = (chVal, studyVal, empty) => {
-          if (chVal === undefined || chVal === null) return studyVal != null ? studyVal : empty;
-          if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
-          return chVal;
-        };
-        const letterShim = {
-          id: ch.id,
-          title: ch.title,
-          subtitle: ch.subtitle || null,
-          num: ch.num,
-          date: null, from: null, spoken: null, forLine: null,
-          preamble: ch.part ? `Part ${ch.part}` : null,
-          blocks: ch.blocks || [],
-          sectionIntro: ch.sectionIntro || null,
-          footnotes: ch.footnotes || {},
-          nkjv: ch.nkjv || {},
-          prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
-          nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
-          relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
-          bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
-          videos: pick(ch.videos, study.videos, []),
-          audioUrl: pick(ch.audioUrl, study.audioUrl, null),
-          soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
-          videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
-          videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
-          videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
-          addendum: pick(ch.addendum, study.addendum, null)
-        };
-
-        // onStudyNavigate: internal jump to another study. Saves current
-        // location so back returns here via existing fromSearch-style logic.
-        const jumpToStudy = (targetSlug) => {
-          if (targetSlug === 'matthew-study') {
-            setFromStudies(true);
-            setBookId('matthew');setChapterNum(null);setScreen('matthew-idx');
-            return;
-          }
-          const target = getStudyById(targetSlug);
-          if (!target || target.locked) return;
-          selectStudy(targetSlug);
-        };
-        const handleLetterClick = (lid, sc) => {
-          setFromStudies(true);
-          setLetterId(lid);
-          const _col = COL_BY_LETTER_SC.get(sc);
-          if (_col) setActiveReadKey(_col.readKey);
-          setScreen(sc);
-        };
-        return (
-          <LetterView
-            {...sharedViewProps}
-            letter={letterShim}
-            studyMode={true}
-            volumeLabel={study.title}
-            onHome={() => {if (study.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}}}
-            onNavigate={(chId) => {setSurpriseAnchor(null);selectStudyChapter(studyId, chId);}}
-            onStudyNavigate={jumpToStudy}
-            onLetterClick={handleLetterClick}
-            onMarkRead={() => markRead(studyReadKey(study.slug), studyChapterId)}
-            onUnmark={() => unmarkRead(studyReadKey(study.slug), studyChapterId)}
-            isRead={(id) => isRead(studyReadKey(study.slug), id)}
-            prevBoundary={prevEntry ? { short: studyShortTitle(prevEntry.title), title: studyShortTitle(prevEntry.title) } : null}
-            onPrevBoundary={prevEntry ? goToChainEntryLast(prevEntry.slug) : null}
-            nextBoundary={nextEntry ? { short: studyShortTitle(nextEntry.title), title: studyShortTitle(nextEntry.title) } : null}
-            onNextBoundary={nextEntry ? goToChainEntryFirst(nextEntry.slug) : null}
-            prophecyCardStatesRef={prophecyCardStatesRef}
-            saveProphecyCardStates={saveProphecyCardStates}
-          />
-        );
-      })()}
 
 
-      {screen === "holy-days-index" && (
-        <ScreenLayout navChildren={
-          <>
-            <button className="nav-home" onClick={goVolumesHome}>{"\u2190 Volumes"}</button>
-            <HomeBtn />
-            <NavButtons onSettings={goSettings} onHistory={goHistory} onSearch={goSearch} theme={theme} onThemeChange={setTheme} />
-          </>
-        }>
-          {typeof HOLY_DAYS_META !== 'undefined' && (HOLY_DAYS_META.audioPlaylist || HOLY_DAYS_META.videoPlaylist) && (
-            <div className="hd-playlists">
-              {HOLY_DAYS_META.audioPlaylist && (
-                <a className="hd-playlist-btn" href={HOLY_DAYS_META.audioPlaylist} target="_blank" rel="noopener noreferrer">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                  <span className="hd-playlist-label">Audio Playlist</span>
-                  <span className="hd-playlist-sub">Listen on Bandcamp</span>
-                </a>
-              )}
-              {HOLY_DAYS_META.videoPlaylist && (
-                <a className="hd-playlist-btn" href={HOLY_DAYS_META.videoPlaylist} target="_blank" rel="noopener noreferrer">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                  </svg>
-                  <span className="hd-playlist-label">Video Playlist</span>
-                  <span className="hd-playlist-sub">Watch on YouTube</span>
-                </a>
-              )}
-            </div>
-          )}
-          <VolumeLetterIndex volumeTitle="Regarding The Holy Days" eyebrow="The Appointed Times" letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} />
-        </ScreenLayout>
-      )}
 
-      {screen === "holy-days-entry" && hdEntry && (() => {
-        const bc = boundaryConfig('holydays', hdEntry);
-        if (hdEntry.type === 'wtlb') {
-          return (
-            <WtlbEntryView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} entry={hdEntry} partLabel="Regarding The Holy Days" onNavToChapter={_navToChapter} footnotesMode={true} />
-          );
-        }
-        const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
-        return (
-          <LetterView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} letter={letterShim} volumeLabel="Regarding The Holy Days" />
-        );
-      })()}
-
-      {screen === "hm-letter" && hmEntry && (() => {
-        const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
-        // Returning home from HM goes back to the Matthew chapter that led here.
-        const goHomeFromHM = () => {
-          if (fromMatthewChRef.current) {
-            setFromMatthewCh(null);
-            setScreen("matthew-ch");
-          } else {
-            goHome();
-          }
-        };
-        return (
-          <LetterView {...sharedViewProps} {...colReadNavProps('hm')} letter={letterShim} volumeLabel="Hidden Manna" onHome={goHomeFromHM} onNavigate={(id) => {setLetterId(id);}} />
-        );
-      })()}
-
-      {screen === "garden-view" && (
-        <GardenView
-          page={gardenPage}
-          onPageChange={(p) => setGardenPage(p)}
-          onBack={goVolumesHome}
-          theme={theme} onThemeChange={setTheme}
-          tier={settings.gardenTier || GARDEN_DEFAULT_TIER}
-        />
-      )}
 
       {gardenWarningOpen && (() => {
         const selectedTier = getGardenTier(settings.gardenTier);
