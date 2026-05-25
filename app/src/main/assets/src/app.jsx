@@ -552,19 +552,10 @@ function App() {
     setSurpriseAnchor, setJournalEntryId,
   });
 
-  const createAndEditJournal = () => {
-    if (typeof JournalStore === 'undefined') return;
-    const e = JournalStore.add();
-    if (typeof JournalStatsStore !== 'undefined') {
-      const newMilestones = JournalStatsStore.recordNewEntry(e.created);
-      if (newMilestones && newMilestones.length) {
-        newMilestones.forEach(m => jrnShowMilestoneToast(m));
-      }
-    }
-    setHlTick(t => t + 1);
-    setJournalEntryId(e.id);
-    setScreen("journal-editor");
-  };
+  /* createAndEditJournal → src/hooks/use-journal-mutations.js (P7e). */
+  const { createAndEditJournal } = useJournalMutations({
+    setHlTick, setJournalEntryId, setScreen,
+  });
   /* captureActiveTabThumbnail + scroll-stop + aspect-ratio + after-nav effects
      → extracted to src/hooks/use-thumbnails.js (P6d) */
 

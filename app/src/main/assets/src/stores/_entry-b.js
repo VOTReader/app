@@ -76,6 +76,7 @@ import { useNavHistoryTracking } from '../hooks/use-nav-history-tracking.js';
 import { useNav } from '../hooks/use-nav.js';
 import { useSearch } from '../hooks/use-search.js';
 import { useBibleStudies } from '../hooks/use-bible-studies.js';
+import { useJournalMutations } from '../hooks/use-journal-mutations.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -147,6 +148,7 @@ Object.assign(window, {
   useNav,
   useSearch,
   useBibleStudies,
+  useJournalMutations,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,

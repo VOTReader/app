@@ -1603,7 +1603,7 @@
     }
   );
   JournalStatsStore2.recomputeFromLoad();
-  function jrnShowMilestoneToast(milestone) {
+  function jrnShowMilestoneToast2(milestone) {
     if (!milestone) return;
     var toast = document.getElementById("jrn-milestone-toast");
     if (!toast) {
@@ -1616,9 +1616,9 @@
     toast.classList.add("show");
     clearTimeout(
       /** @type {any} */
-      jrnShowMilestoneToast._t
+      jrnShowMilestoneToast2._t
     );
-    jrnShowMilestoneToast._t = setTimeout(function() {
+    jrnShowMilestoneToast2._t = setTimeout(function() {
       toast.classList.remove("show");
     }, 3e3);
   }
@@ -4072,6 +4072,24 @@
       goToChainEntryFirst,
       goToChainEntryLast
     };
+  }
+
+  // app/src/main/assets/src/hooks/use-journal-mutations.js
+  function useJournalMutations({ setHlTick, setJournalEntryId, setScreen }) {
+    const createAndEditJournal = () => {
+      if (typeof JournalStore === "undefined") return;
+      const e = JournalStore.add();
+      if (typeof JournalStatsStore !== "undefined") {
+        const newMilestones = JournalStatsStore.recordNewEntry(e.created);
+        if (newMilestones && newMilestones.length) {
+          newMilestones.forEach((m) => jrnShowMilestoneToast(m));
+        }
+      }
+      setHlTick((t) => t + 1);
+      setJournalEntryId(e.id);
+      setScreen("journal-editor");
+    };
+    return { createAndEditJournal };
   }
 
   // app/src/main/assets/src/data/journal-helpers.js
@@ -7488,7 +7506,7 @@
     _jrnDaysBetween,
     MILESTONE_DEFS,
     JournalStatsStore: JournalStatsStore2,
-    jrnShowMilestoneToast,
+    jrnShowMilestoneToast: jrnShowMilestoneToast2,
     JournalIndexStore: JournalIndexStore2,
     jrnId,
     JournalStore: JournalStore2,
@@ -7518,6 +7536,7 @@
     useNav,
     useSearch,
     useBibleStudies,
+    useJournalMutations,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,

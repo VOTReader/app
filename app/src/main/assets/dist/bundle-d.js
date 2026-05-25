@@ -8160,19 +8160,11 @@
       setSurpriseAnchor,
       setJournalEntryId
     });
-    const createAndEditJournal = () => {
-      if (typeof JournalStore === "undefined") return;
-      const e = JournalStore.add();
-      if (typeof JournalStatsStore !== "undefined") {
-        const newMilestones = JournalStatsStore.recordNewEntry(e.created);
-        if (newMilestones && newMilestones.length) {
-          newMilestones.forEach((m) => jrnShowMilestoneToast(m));
-        }
-      }
-      setHlTick((t) => t + 1);
-      setJournalEntryId(e.id);
-      setScreen("journal-editor");
-    };
+    const { createAndEditJournal } = useJournalMutations({
+      setHlTick,
+      setJournalEntryId,
+      setScreen
+    });
     const goTabs = () => {
       if (!settings.tabsEnabled) return;
       flushScrollToActiveTab();
