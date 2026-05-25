@@ -22,7 +22,12 @@ const { useState, useEffect } = React;
 
 function App() {
   // screens: "home" | "scriptures-home" | "volumes-home" | "matthew-idx" | "matthew-ch" | "bible-idx" | "bible-ch" | "vot-index" | "vot-letter" | "search"
-  var sharedViewProps, _navToChapter, _idxNav;
+  /* sharedViewProps / _navToChapter / _idxNav → declared as const right
+     before return() (P8a). Previously assigned inline-via-`void(... = ...)`
+     mid-JSX; that pattern leaked render-time-only state into outer scope
+     and prevented ROUTES (the Phase 2 screen-router pilot) from
+     referencing them. Now they're plain consts at the top of the
+     render-prep block where ROUTES can use them. */
 
   /* ═══════════════════════════════════════════════════════════════════
      HOOK CALL-ORDER DAG (P6 decomposition) — 13 hooks, in call order.
@@ -743,6 +748,129 @@ function App() {
     };
   }
 
+  // ── Render-time helpers (P8a) ──────────────────────────────────────
+  // Previously assigned inline-via-void mid-JSX; now plain consts so
+  // ROUTES (below) can reference them.
+  const _idxNav = () => (
+    <>
+      <button className="nav-home" onClick={goVolumesHome}>{"← Volumes"}</button>
+      <HomeBtn />
+      <NavButtons onSettings={goSettings} onHistory={goHistory} onSearch={goSearch} theme={theme} onThemeChange={setTheme} />
+    </>
+  );
+  const sharedViewProps = {
+    onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
+    theme: theme, onThemeChange: setTheme, surpriseAnchor: surpriseAnchor,
+    onInAppLink: openInAppLetter, backHint: backHint, hlTick: hlTick,
+    onLinkOpen: openLinkSidebar,
+    onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
+    markAsReadEnabled: settings.markAsRead, showProgressBar: settings.showProgressBar,
+  };
+  const _navToChapter = (bid, ch) => { setFromWtlb(screen); setBookId(bid); setChapterNum(ch); setScreen("bible-ch"); };
+
+  // ── ROUTES — Phase 2 P8a pilot ─────────────────────────────────────
+  // Lookup table over the 26 trivial screen wrappers — 13 index screens
+  // (vot/wtlb/blessed) + 10 letter screens (vot-X-letter) + 3 entry
+  // screens (wtlb-X-entry, blessed-entry). Each entry returns the JSX
+  // fragment OR null if its data-guard fails. The render tree calls
+  // `{ROUTES[screen]?.() ?? null}` in a single position, replacing 26
+  // sibling `{screen === X && (...)}` blocks (~85 lines collapsed).
+  //
+  // Zero CSS/layout risk per the pilot principle: the wrapper divs
+  // stay identical, just rendered from a dispatch table instead of a
+  // switch chain. The expression slot in JSX renders ONE child (or
+  // null) at the same position the chain used to occupy.
+  //
+  // Substantive screens (matthew-ch IIFE, bible-study-chapter IIFE,
+  // garden-view, holy-days-index, etc.) stay inline below — they
+  // have render-time-derived locals (study lookups, prophecyCardStates,
+  // playlists) that don't fit a simple () → JSX shape.
+  const ROUTES = {
+    // ── Volume index screens (13) ──
+    'vot-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Volume Two" letters={LETTERS} {...colIdxProps('two')} />
+      </ScreenLayout>
+    ),
+    'vot-one-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Volume One" letters={LETTERS_V1} preface={LETTERS_V1_PREFACE} {...colIdxProps('one')} />
+      </ScreenLayout>
+    ),
+    'vot-three-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Volume Three" letters={LETTERS_V3} preface={LETTERS_V3_PREFACE} {...colIdxProps('three')} />
+      </ScreenLayout>
+    ),
+    'vot-four-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Volume Four" letters={LETTERS_V4} preface={LETTERS_V4_PREFACE} {...colIdxProps('four')} />
+      </ScreenLayout>
+    ),
+    'vot-five-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Volume Five" letters={LETTERS_V5} preface={LETTERS_V5_PREFACE} {...colIdxProps('five')} />
+      </ScreenLayout>
+    ),
+    'vot-six-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Volume Six" letters={LETTERS_V6} preface={LETTERS_V6_PREFACE} {...colIdxProps('six')} />
+      </ScreenLayout>
+    ),
+    'vot-seven-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Volume Seven" letters={LETTERS_V7} preface={LETTERS_V7_PREFACE} {...colIdxProps('seven')} />
+      </ScreenLayout>
+    ),
+    'vot-timothy-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Letters from Timothy" eyebrow="The Volumes of Truth" letters={LETTERS_TIMOTHY} preface={LETTERS_TIMOTHY_PREFACE} {...colIdxProps('timothy')} />
+      </ScreenLayout>
+    ),
+    'vot-flock-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Letters to The Lord's Little Flock" eyebrow="The Volumes of Truth" letters={LETTERS_FLOCK} preface={LETTERS_FLOCK_PREFACE} {...colIdxProps('flock')} />
+      </ScreenLayout>
+    ),
+    'vot-rebuke-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="The Lord's Rebuke" eyebrow="A Testament Against The World" letters={LETTERS_REBUKE} preface={LETTERS_REBUKE_PREFACE} {...colIdxProps('rebuke')} />
+      </ScreenLayout>
+    ),
+    'wtlb-one-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part One \xB7 Words of Wisdom"} letters={WTLB_ONE} columns={2} {...colIdxProps('wtlb1')} />
+      </ScreenLayout>
+    ),
+    'wtlb-two-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part Two \xB7 More Words of Wisdom"} letters={WTLB_TWO} columns={2} {...colIdxProps('wtlb2')} />
+      </ScreenLayout>
+    ),
+    'blessed-index': () => (
+      <ScreenLayout navChildren={_idxNav()}>
+        <VolumeLetterIndex volumeTitle="The Blessed" eyebrow="Blessings & Promises" letters={colLetterArr(COL_BY_KEY.get('blessed')).map((e) => ({ ...e, date: e.sourceLabel || '' }))} {...colIdxProps('blessed')} />
+      </ScreenLayout>
+    ),
+
+    // ── Letter screens (10) — data-guarded ──
+    'vot-one-letter':     () => letterV1       && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', letterV1)}     letter={letterV1}     volumeLabel="Volume One" />,
+    'vot-letter':         () => letter         && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', letter)}       letter={letter} />,
+    'vot-three-letter':   () => letterV3       && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', letterV3)}   letter={letterV3}     volumeLabel="Volume Three" />,
+    'vot-four-letter':    () => letterV4       && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', letterV4)}    letter={letterV4}     volumeLabel="Volume Four" />,
+    'vot-five-letter':    () => letterV5       && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', letterV5)}    letter={letterV5}     volumeLabel="Volume Five" />,
+    'vot-six-letter':     () => letterV6       && <LetterView {...sharedViewProps} {...colReadNavProps('six', true)}     {...boundaryConfig('six', letterV6)}     letter={letterV6}     volumeLabel="Volume Six" />,
+    'vot-seven-letter':   () => letterV7       && <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)}   {...boundaryConfig('seven', letterV7)}   letter={letterV7}     volumeLabel="Volume Seven" />,
+    'vot-timothy-letter': () => letterTimothy  && <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', letterTimothy)} letter={letterTimothy} volumeLabel="Letters from Timothy" />,
+    'vot-flock-letter':   () => letterFlock    && <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)}   {...boundaryConfig('flock', letterFlock)}   letter={letterFlock}   volumeLabel="Letters to The Lord's Little Flock" />,
+    'vot-rebuke-letter':  () => letterRebuke   && <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)}  {...boundaryConfig('rebuke', letterRebuke)} letter={letterRebuke}  volumeLabel="The Lord's Rebuke" />,
+
+    // ── WTLB / Blessed entry screens (3) — data-guarded ──
+    'wtlb-one-entry':     () => wtlb1Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', wtlb1Entry)}   entry={wtlb1Entry}   partLabel="Part One" onNavToChapter={_navToChapter} />,
+    'wtlb-two-entry':     () => wtlb2Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', wtlb2Entry)}   entry={wtlb2Entry}   partLabel="Part Two" onNavToChapter={_navToChapter} />,
+    'blessed-entry':      () => blessedEntry   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', blessedEntry)} entry={blessedEntry} partLabel="The Blessed" onNavToChapter={_navToChapter} />,
+  };
+
   return (
     <TabsContext.Provider value={tabsCtxValue}>
       {/* CSS is now a static app.css loaded via <link> in <head> — this slot
@@ -1298,36 +1426,14 @@ function App() {
         />
       )}
 
-      {void (_idxNav = function() { return (
-        <>
-          <button className="nav-home" onClick={goVolumesHome}>{"\u2190 Volumes"}</button>
-          <HomeBtn />
-          <NavButtons onSettings={goSettings} onHistory={goHistory} onSearch={goSearch} theme={theme} onThemeChange={setTheme} />
-        </>
-      ); })}
+      {/* P8a: 26 trivial wrappers (13 index + 10 letter + 3 entry) all
+          dispatch through the ROUTES lookup declared just above the
+          return statement. Replaces 26 sibling `{screen === X && ...}`
+          blocks (~85 lines collapsed). _idxNav / sharedViewProps /
+          _navToChapter \u2014 previously assigned via inline-void mid-JSX \u2014
+          are now consts at the top of the render-prep block. */}
+      {ROUTES[screen]?.() ?? null}
 
-      {screen === "vot-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Volume Two" letters={LETTERS} {...colIdxProps('two')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-one-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Volume One" letters={LETTERS_V1} preface={LETTERS_V1_PREFACE} {...colIdxProps('one')} />
-        </ScreenLayout>
-      )}
-
-      {/* ── Shared props passed to every LetterView and WtlbEntryView ── */}
-      {void (sharedViewProps = {
-        onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
-        theme: theme, onThemeChange: setTheme, surpriseAnchor: surpriseAnchor,
-        onInAppLink: openInAppLetter, backHint: backHint, hlTick: hlTick,
-        onLinkOpen: openLinkSidebar,
-        onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
-        markAsReadEnabled: settings.markAsRead, showProgressBar: settings.showProgressBar
-      })}
-      {void (_navToChapter = (bid, ch) => {setFromWtlb(screen);setBookId(bid);setChapterNum(ch);setScreen("bible-ch");})}
 
       {screen === "bible-study-chapter" && studyId && studyChapterId && (() => {
         const study = getStudyById(studyId);
@@ -1416,123 +1522,6 @@ function App() {
         );
       })()}
 
-      {screen === "vot-one-letter" && letterV1 && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('one', true)} {...boundaryConfig('one', letterV1)} letter={letterV1} volumeLabel="Volume One" />
-      )}
-
-      {screen === "vot-letter" && letter && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('two', true)} {...boundaryConfig('two', letter)} letter={letter} />
-      )}
-
-      {screen === "vot-three-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Volume Three" letters={LETTERS_V3} preface={LETTERS_V3_PREFACE} {...colIdxProps('three')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-three-letter" && letterV3 && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('three', true)} {...boundaryConfig('three', letterV3)} letter={letterV3} volumeLabel="Volume Three" />
-      )}
-
-      {screen === "vot-four-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Volume Four" letters={LETTERS_V4} preface={LETTERS_V4_PREFACE} {...colIdxProps('four')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-four-letter" && letterV4 && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('four', true)} {...boundaryConfig('four', letterV4)} letter={letterV4} volumeLabel="Volume Four" />
-      )}
-
-      {screen === "vot-five-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Volume Five" letters={LETTERS_V5} preface={LETTERS_V5_PREFACE} {...colIdxProps('five')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-five-letter" && letterV5 && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('five', true)} {...boundaryConfig('five', letterV5)} letter={letterV5} volumeLabel="Volume Five" />
-      )}
-
-      {screen === "vot-six-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Volume Six" letters={LETTERS_V6} preface={LETTERS_V6_PREFACE} {...colIdxProps('six')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-six-letter" && letterV6 && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('six', true)} {...boundaryConfig('six', letterV6)} letter={letterV6} volumeLabel="Volume Six" />
-      )}
-
-      {screen === "vot-seven-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Volume Seven" letters={LETTERS_V7} preface={LETTERS_V7_PREFACE} {...colIdxProps('seven')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-seven-letter" && letterV7 && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)} {...boundaryConfig('seven', letterV7)} letter={letterV7} volumeLabel="Volume Seven" />
-      )}
-
-      {screen === "vot-timothy-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Letters from Timothy" eyebrow="The Volumes of Truth" letters={LETTERS_TIMOTHY} preface={LETTERS_TIMOTHY_PREFACE} {...colIdxProps('timothy')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-timothy-letter" && letterTimothy && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', letterTimothy)} letter={letterTimothy} volumeLabel="Letters from Timothy" />
-      )}
-
-      {screen === "vot-flock-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Letters to The Lord's Little Flock" eyebrow="The Volumes of Truth" letters={LETTERS_FLOCK} preface={LETTERS_FLOCK_PREFACE} {...colIdxProps('flock')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-flock-letter" && letterFlock && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)} {...boundaryConfig('flock', letterFlock)} letter={letterFlock} volumeLabel="Letters to The Lord's Little Flock" />
-      )}
-
-      {screen === "vot-rebuke-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="The Lord's Rebuke" eyebrow="A Testament Against The World" letters={LETTERS_REBUKE} preface={LETTERS_REBUKE_PREFACE} {...colIdxProps('rebuke')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "vot-rebuke-letter" && letterRebuke && (
-        <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)} {...boundaryConfig('rebuke', letterRebuke)} letter={letterRebuke} volumeLabel="The Lord's Rebuke" />
-      )}
-
-      {screen === "wtlb-one-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part One \xB7 Words of Wisdom"} letters={WTLB_ONE} columns={2} {...colIdxProps('wtlb1')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "wtlb-one-entry" && wtlb1Entry && (
-        <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')} {...boundaryConfig('wtlb1', wtlb1Entry)} entry={wtlb1Entry} partLabel="Part One" onNavToChapter={_navToChapter} />
-      )}
-
-      {screen === "wtlb-two-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part Two \xB7 More Words of Wisdom"} letters={WTLB_TWO} columns={2} {...colIdxProps('wtlb2')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "wtlb-two-entry" && wtlb2Entry && (
-        <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')} {...boundaryConfig('wtlb2', wtlb2Entry)} entry={wtlb2Entry} partLabel="Part Two" onNavToChapter={_navToChapter} />
-      )}
-
-      {screen === "blessed-index" && (
-        <ScreenLayout navChildren={_idxNav()}>
-          <VolumeLetterIndex volumeTitle="The Blessed" eyebrow="Blessings & Promises" letters={colLetterArr(COL_BY_KEY.get('blessed')).map((e) => ({ ...e, date: e.sourceLabel || '' }))} {...colIdxProps('blessed')} />
-        </ScreenLayout>
-      )}
-
-      {screen === "blessed-entry" && blessedEntry && (
-        <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', blessedEntry)} entry={blessedEntry} partLabel="The Blessed" onNavToChapter={_navToChapter} />
-      )}
 
       {screen === "holy-days-index" && (
         <ScreenLayout navChildren={

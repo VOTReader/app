@@ -11,7 +11,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 ## Current state (2026-05-24)
 
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
-- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **1,846 lines** — Phase 1 CLOSED. 26 hooks extracted (15 from P6 + 11 from P7a-k). App()'s logic block is now pure composition + render-tree-adjacent wiring; the JSX render tree is the remaining target for Phase 2.
+- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **1,835 lines** — Phase 1 closed + Phase 2 pilot landed (P8a ScreenRouter). 26 hooks extracted (15 from P6 + 11 from P7a-k). 26 trivial screen wrappers collapsed into a ROUTES dispatch table; substantive screens (matthew-ch / bible-ch / bible-study-chapter / garden-view / holy-days-index / etc.) stay inline for now.
 - **130+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
   - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)
