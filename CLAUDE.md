@@ -8,16 +8,16 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 ---
 
-## Current state (2026-05-24)
+## Current state (2026-05-25)
 
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
-- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **1,815 lines** — Phase 1 closed + Phase 2 P8a/P8b/P8c landed. 26 hooks (15 P6 + 11 P7a-k). **All 53 screens dispatch from a single ROUTES lookup table** — zero inline `{screen === X && ...}` blocks remain. The IIFE patterns (matthew-ch + bible-study-index + bible-study-chapter + holy-days-entry + hm-letter) live as arrow-function bodies inside ROUTES entries; the 240-line "garden-view" turned out to be 9 lines (the earlier survey was pre-P7).
-- **130+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
+- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **797 lines — Phase 1 + Phase 2 CLOSED.** 26 hooks (15 P6 + 11 P7a-k). **All 53 screens dispatch from a single ROUTES table** that lives in its own file (`src/ui/screen-routes.jsx`) via a `buildScreenRoutes(deps)` factory. The 3 substantive inline blocks (matthew-ch, bible-study-chapter, holy-days-index playlist header) extracted to their own screen/component files. Welcome modal + tabs overview + disable-tabs prompt + garden warning live in `AppShellOverlays`; 12 annotation/link/journal/bookmark sheets live in `AppShellSheets`. App() now owns composition, not implementation.
+- **135+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
   - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)
   - `bundle-b.js` 367 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 37 files)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
-  - `bundle-d.js` 546 KB — screens + sheets + components + utils + late stores + App() itself (esbuild IIFE, 82 files)
+  - `bundle-d.js` 539 KB — screens + sheets + components + utils + late stores + screen-routes + App() (esbuild IIFE, 87 files)
 
 ### Q3 ESLint — CLOSED 2026-05-24
 
@@ -38,9 +38,9 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **Bundle-b grew** 302→320 KB from JSDoc comments preserved in dev build (esbuild strips comments in minified prod build).
 - **Gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
 
-### Post-Q4 — Q5 safety-net phase CLOSED, App() decomposition IN PROGRESS
+### Post-Q4 — Q5 safety-net phase CLOSED, App() decomposition CLOSED
 
-**Pinned sequence** (PLAN.txt + [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest ✅ → **App() decomposition (in progress — P7a landed)**.
+**Pinned sequence** (PLAN.txt + [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest ✅ → **App() decomposition (CLOSED 2026-05-25 with Phase 2)**.
 
 **Q5 safety-net phase totals (2026-05-24):**
 - **218 tests across 9 files**; 9 of 37 Q4-scope files have direct coverage.
@@ -84,10 +84,27 @@ The 50/50 split means **hook extraction alone cannot hit <800.** The render tree
 - **P7d (LANDED 2026-05-24)** — useBibleStudies. **The TDZ-blocker.** STUDIES + UNIFIED_CHAIN data + getStudyById/getStudyChapter/studyReadKey lookups + selectStudy (smart single-vs-multi router) + selectStudyChapter + prevChainEntry/nextChainEntry + goToChainEntryFirst/Last (with the matthew-study special-case for the Matthew Study Bible's bible-ch renderer). **Structural win:** call site moved HIGH UP (right after useNav), demonstrating that the TDZ blocker is gone — getStudyById/getStudyChapter are now hook returns instead of const arrows, so downstream hooks (useAndroidBack/useNavHistoryTracking/useSearch) are no longer forced to live below the Bible Studies block. (They haven't moved yet — that's a separate refactor; the freedom is the dividend that future extractions can spend.) 33 new vitest tests covering lookups + selectStudy's 3 routing branches (single/singlePage/multi) + UNIFIED_CHAIN composition (8 entries: 6 studies + Matthew, with locked/empty filtered) + chain prev/next boundaries + goToChainEntryFirst/Last for both Matthew + regular study branches. App() shrank 64 lines. Tests 331 → 364. Coverage ratchet: statements 21→23, branches 18→19, functions 18→21, lines 22→24. **Caught the `*/`-in-comment bug for the second time** (P7b had it too); captured as memory [[no-comment-terminator-in-text]] so the next session won't repeat.
 - **Next**: useReadingChainNav (boundary nav + bible book prev/next), useMarkAsRead-helpers, useReadingPositionNav, useTapThrough, useJournalMutations, useSurprise (handler dissolution), useAppShellEffects.
 
-**Phase 2 — render-tree decomposition (PENDING, after Phase 1):** target <800.
-- 29 substantive screen blocks total 867 lines; top 5 (garden-view 240, bible-study-chapter 87, matthew-ch 42, bible-ch 40, holy-days-index 37) hold ~447. 26 trivial 4-line letter/index wrappers (~104 lines) collapse via a ScreenRouter pattern.
-- **Different risk profile** from Phase 1: render extraction can break CSS selectors targeting the App-level wrapper, shift `useEffect(..., [screen])` semantics, and move ErrorBoundary placement. Each extraction needs visual smoke walk + before/after screenshot, not just tests passing.
-- Realistic Phase 2 reduction: ~700–800 lines.
+### Phase 2 — render-tree decomposition (CLOSED 2026-05-25)
+
+**Goal:** App.jsx under 800 lines. **Hit: 1,815 → 797 lines.**
+
+7 commits land the render-tree extraction:
+- **P9a** (`084b2fb`) — bible-study-chapter (88 lines → 30) → `BibleStudyChapterView.jsx`. The largest substantive ROUTES entry: letterShim builder + jumpToStudy/handleLetterClick + LetterView.
+- **P9b** (`92ec3c2`) — matthew-ch (43 → 19) → `MatthewChapterView.jsx`. Chain-aware boundary logic + ChapterView + ModeToggle.
+- **P9c** (`2b41f49`) — holy-days-index playlist conditional (31 → 6) → `HolyDaysPlaylistHeader.jsx`.
+- **P9d** (`4d38384`) — AppShellOverlays (137 lines moved). Welcome modal + tabs overview + TabActionSheet + disable-tabs prompt + garden warning, all in one shell component.
+- **P9e** (`40f76ce`) — AppShellSheets (186 lines moved). 12 annotation/link/journal/bookmark sheets and popovers.
+- **P9f** (`3eae5b4`) — `buildScreenRoutes` factory in `src/ui/screen-routes.jsx`. 560-line ROUTES table moves out; App() destructures ~90 closure deps into one explicit prop bundle (`props are explicit, not spread`). App.jsx: 1,412 → 888.
+- **P9g** (`5e1fda5`) — 5 prop-builder helpers (colIdxProps / colReadNavProps / _idxNav / sharedViewProps / _navToChapter) move INTO buildScreenRoutes (they're only used by ROUTES entries). Legacy single-line `/* X → src/hooks/Y */` breadcrumbs pruned per [[doc_pruning]]. App.jsx: 888 → 797.
+
+**Exit criteria — ALL HOLD:**
+- ✅ Every ROUTES entry with >20 lines of inline JSX extracted to its own component file
+- ✅ ROUTES itself lives in `src/ui/screen-routes.jsx`
+- ✅ Overlay UI extracted to `AppShellOverlays`
+- ✅ Sheet/popover layer extracted to `AppShellSheets`
+- ✅ App() under 800 lines (797)
+- ✅ All 5 pre-commit gates pass (check_balance + lint + typecheck + vitest 465 tests + build)
+- ✅ Visual smoke walk completed for every extracted screen
 
 **Post-decomp backlog:** useSyncExternalStore migration (eliminates 24 Bin 4 cites — has test coverage now per Q5.3), bundle-a.js lazy-load (post-Q6 UX), Q6 CSS hardening.
 
@@ -130,13 +147,14 @@ D:/VOTReader-studio/
 │   │   ├── app.css                    # static CSS (no template literal)
 │   │   ├── dist/                      # 4 bundles, regenerated by npm run build
 │   │   └── src/
-│   │       ├── app.jsx                # function App() — 1,846 lines (Phase 1 closed)
+│   │       ├── app.jsx                # function App() — 797 lines (Phase 1 + 2 closed)
 │   │       ├── data/                  # scripture-resolution.js + 29 raw corpus files
 │   │       ├── stores/                # 11 stores + _entry-b.js
 │   │       ├── renderer/              # annotation-engine, dom-links, dom-bookmarks, dom-journal-chip + _entry.js
 │   │       ├── ui/
-│   │       │   ├── screens/           # 19 screens
-│   │       │   ├── components/        # 23 shared components
+│   │       │   ├── screen-routes.jsx  # buildScreenRoutes factory — the 53-entry ROUTES table
+│   │       │   ├── screens/           # 21 screens (incl. MatthewChapterView, BibleStudyChapterView)
+│   │       │   ├── components/        # 25 shared components (incl. AppShellOverlays, AppShellSheets, HolyDaysPlaylistHeader)
 │   │       │   ├── sheets/            # 17 sheets/pickers
 │   │       │   └── _entry-d.js        # esbuild entry for bundle-d
 │   │       ├── utils/                 # 11 helper bundles

@@ -4,6 +4,32 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## P7 + P8 + P9 — App() decomposition (CLOSED 2026-05-25)
+
+App.jsx: **1,815 → 797 lines** across two phases.
+
+**Phase 1 — logic extraction (P7a-k, landed 2026-05-24)** — 11 hooks under src/hooks/: useNavHistoryTracking · useNav · useSearch · useBibleStudies (TDZ-blocker) · useJournalMutations · useTapThrough · useReadProgress · useReadingPositionNav · useReadingChainNav · useSurprise · useAppShellEffects. 465 vitest tests; line coverage broke 30%. Per [[concerns-not-lines]] the metric was concerns-remaining-inline, not host file size.
+
+**Phase 2 — render-tree decomposition (P8a-c + P9a-g, landed 2026-05-25)** —
+- **P8a (`c9b7be3`)** — ScreenRouter pilot: 26 trivial `{screen === X && <Y/>}` wrappers fold into a single ROUTES lookup table.
+- **P8b (`3a49d3a`)** — 20 medium prop-thread screens fold in (46 entries total).
+- **P8c (`cb6142f`)** — remaining 7 screens fold in (53 entries; zero inline `{screen === X && ...}` blocks left).
+- **P9a (`084b2fb`)** — `BibleStudyChapterView.jsx`. The largest substantive inline JSX (88 → 30 lines): letterShim builder + jumpToStudy/handleLetterClick + LetterView prop threading. 28 explicit props (no spread).
+- **P9b (`92ec3c2`)** — `MatthewChapterView.jsx`. Chain-aware boundary logic + ChapterView + ModeToggle (43 → 19 lines).
+- **P9c (`2b41f49`)** — `HolyDaysPlaylistHeader.jsx`. Audio/video playlist conditional JSX with inline SVG icons (31 → 6 lines).
+- **P9d (`4d38384`)** — `AppShellOverlays.jsx`. 4 overlays (welcome modal + tabs overview + TabActionSheet + disable-tabs prompt + garden warning) move out of App's return JSX into one shell component (137 lines).
+- **P9e (`40f76ce`)** — `AppShellSheets.jsx`. 12 annotation/link/journal/bookmark sheets and popovers (SelectionToolbar, AnnotationActionChip, LinkSidebar, LinkPicker, VersePickerScreen, LetterExcerptPickerScreen, NoteSheet, NotebookPickerSheet, MultiNotePopover, BookmarkPopover, JournalInboundSheet, BookmarkCreateSheet) move into one shell component (186 lines).
+- **P9f (`3eae5b4`)** — `buildScreenRoutes` factory in `src/ui/screen-routes.jsx`. The 560-line ROUTES table moves out; App() destructures ~90 closure deps into one explicit prop bundle and calls the factory once per render. Two bugs caught at extraction (missing `setStudyId` in history handler; `fromMatthewChRef`/`setFromMatthewCh` not in props for hm-letter). App.jsx: 1,412 → 888.
+- **P9g (`5e1fda5`)** — Move 5 prop-builder helpers (colReadNavProps, colIdxProps, _idxNav, sharedViewProps, _navToChapter) INTO buildScreenRoutes (they're only used by ROUTES entries; the factory's destructure already captures the primitives they need). Legacy single-line extraction breadcrumb comments pruned per [[doc_pruning]]. App.jsx: 888 → 797.
+
+**Phase 2 exit criteria — all hold:** every ROUTES entry >20 lines extracted to its own component file · ROUTES itself in its own file · overlay UI in AppShellOverlays · sheet/popover layer in AppShellSheets · App() under 800 lines · 5 pre-commit gates pass (check_balance + lint + typecheck + vitest 465 tests + build) · visual smoke walk completed for every extracted screen.
+
+**Visual smoke methodology (Phase 2):** each extraction verified via preview_start + DOM-driven navigation through the route + preview_snapshot/screenshot comparison. Caught the placement-and-prop-threading bugs early; no regressions reached commits.
+
+**Risk pattern observed:** the prompt's stated extraction priorities (e.g. "garden-view 240 lines") were stale; CLAUDE.md acknowledged this but the survey lived in the prompt. Audited current state of ROUTES before sequencing extractions, which surfaced that garden-view was already extracted (9-line wrapper) and 53→3 substantive blocks remained. [[expose-full-surface]] applied to the factory: hooks/components return their full computed surface; consumers destructure what they need.
+
+---
+
 ## Q4 — JSDoc / `tsc --checkJs` (CLOSED 2026-05-24)
 
 37 files typed: 11 utils + 11 stores (+ cached-store) + 15 hooks. Cross-bundle bare-name globals are ambient-declared as `any` in `tools/globals.generated.d.ts` (auto-generated alongside the ESLint globals file by `gen-eslint-globals.py`). App() and the `ui/` tree are deferred — that decomposition is its own phase (see PLAN.txt).

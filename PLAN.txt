@@ -3,7 +3,7 @@ VOTReader-studio — Strategic Working Memory
 ═══════════════════════════════════════════════════════════════════════════════
 
 Started: 2026-05-10
-Last pruned: 2026-05-24 (P7a landed; Q3 closed; May-10 research notes archived to HISTORY.md)
+Last pruned: 2026-05-25 (P7 Phase 1 + Phase 2 closed; App() 1,815 → 797 lines)
 Status: ACTIVE — kept slim as work progresses
 Companions: CLAUDE.md (live status), HISTORY.md (landed work), ARCHITECTURE.md (system ref)
 
@@ -38,10 +38,10 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q4 (JSDoc / tsc --checkJs)  ✅ DONE  — 37 files typed, CI gate zero-tolerance
   smoke-lite.js for CI        ✅ DONE  — Node CLI; globals + collections + cycles
   Q5 (Vitest)                 ✅ DONE  — 218 tests / 9 files; ratchet 1→14 stmts
-  App() decomposition (P7)    ✅ PHASE 1 DONE — P7a-k landed (11 hooks);
-                                          465 tests; App() 2,261 → 1,846;
-                                          12 of 12 concerns extracted.
-                                          Phase 2 (render-tree) pending.
+  App() decomposition (P7)    ✅ DONE  — Phase 1 (logic, P7a-k) + Phase 2
+                                          (render-tree, P9a-g). App() 1,815
+                                          → 797 lines. 465 vitest tests.
+                                          See CLAUDE.md "Phase 2" + HISTORY.md.
   Q6 (CSS hardening)          ⬜ PENDING
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -56,327 +56,24 @@ test coverage on the affected surface (memory [[refactor-after-tests]]).
                        runSmokeChecks for module-graph + globals assertions
   2. Q5 Vitest     ✅  218 tests / 9 files; coverage ratchet locked at the
                        Q5 baselines, bumped to 14/11/12/15 floors at Q5.9
-  3. App() decomp  🚧  P7a landed; see backlog item 3 below
+  3. App() decomp  ✅  Phase 1 (P7a-k) + Phase 2 (P9a-g) closed 2026-05-25.
+                       App() 1,815 → 797 lines.
 
 ───────────────────────────────────────────────────────────────────────────────
 POST-Q4 BACKLOG (priority order — top = next)
 ───────────────────────────────────────────────────────────────────────────────
 
-1. APP() DECOMPOSITION (P7 — ACTIVE)
-   ─────────────────────────────────
-   App() = 2,256 lines after P7a (was 2,191 at P6 close; grew to 2,261
-   during Q4/Q5 from JSDoc + small changes; 2,261 → 2,256 after the first
-   extraction). Target: under 800 lines.
-
-   ── Structural measurement (taken 2026-05-24 post-P7a) ────────────────
-   App() body: lines 24–2253 (2,230 lines total inside the function).
-     - Logic block:     lines   24–1151  →  1,128 lines  (hooks + callbacks
-                                              + effects + nav-helper glue)
-     - JSX render tree: lines 1152–2253  →  1,103 lines  (55 conditional
-                                              `{screen === "X" && ...}` blocks)
-
-   The 50/50 split means hook + callback extraction CANNOT hit <800 alone.
-   Maximum-extraction-of-logic floor ≈ 1,103 (the render tree by itself).
-   Render-tree decomposition is required, in a separate phase with a
-   distinct risk profile.
-
-   ── Phase 1: logic extraction (active; P7a+b+c+d landed) ────────────
-   Goal: ZERO inline concerns left in App()'s logic block. Everything
-   that remains is hook composition + render-tree-adjacent wiring.
-
-   ## METRIC: concerns extracted, NOT lines removed.
-   Memory [[concerns-not-lines]]: hook extraction relocates code, it
-   doesn't delete it. Call-site wiring (import + destructure + PARAMS
-   object + breadcrumb) typically adds back 10-30 lines per extraction,
-   nearly offsetting the body that moved out. P7a + P7b moved ~330
-   lines of logic into hooks and only dropped 7 lines from App() —
-   that's the expected arithmetic, NOT a failure. Phase 1's exit
-   criterion is the concerns checklist hitting zero. Line count at
-   that point is whatever the wiring takes (~1,400-1,600 estimate
-   stands as illustrative, not a target).
-
-   Workflow per extraction: P6 pattern + Q5 vitest validation.
-     1. Identify OWNS/PARAMS/RETURNS boundary
-     2. Extract to src/hooks/, JSDoc-type it, write vitest coverage
-     3. Wire into _entry-b.js, replace call site in App() with breadcrumb
-     4. All 5 pre-commit gates + smoke verify
-     5. Update CLAUDE.md "Current state" line count
-
-   Landed:
-     P7a — useNavHistoryTracking (2026-05-24): auto-track-history effect.
-           Single 18-line useEffect moved to its own 115-line hook with
-           23 vitest tests. Coverage ratchet held + bumped: branches
-           11→13. Net App() shrink: 5 lines (architectural win is bigger
-           — the most debt-laden disable cite moved out).
-
-     P7d — useBibleStudies (2026-05-24): the TDZ-blocker. STUDIES +
-           UNIFIED_CHAIN + getStudyById / getStudyChapter / studyReadKey /
-           selectStudy (smart single-vs-multi router) / selectStudyChapter /
-           chainIdx / prevChainEntry / nextChainEntry / goToChainEntryFirst /
-           goToChainEntryLast. Structural win: call site moved HIGH UP
-           (right after useNav), demonstrating the TDZ blocker is gone.
-           getStudyById / getStudyChapter are now hook RETURNS instead of
-           const arrows, freeing useAndroidBack / useNavHistoryTracking /
-           useSearch to move up at their convenience (deferred — separate
-           refactor). 33 new vitest tests covering lookups + selectStudy's
-           3 routing branches + UNIFIED_CHAIN composition (8 entries with
-           locked/empty filtered) + chain boundaries + goToChainEntry*
-           for both Matthew + regular study branches. App() shrank 64
-           lines. Tests 331 → 364. Coverage ratchet: stmts 21→23,
-           branches 18→19, fns 18→21, lines 22→24. The `*/`-in-comment
-           bug bit for the SECOND time during this extraction (P7b had it
-           too); captured as memory [[no-comment-terminator-in-text]].
-
-     P7c — useSearch (2026-05-24): full search domain — 4 search
-           tabFields (searchOrigin / searchScope / searchContext /
-           searchQuery), searchOriginRef, srchVolLookup / SRCH_VOL_MAP /
-           srchResolveLetterId helpers, goSearch (26-line context
-           computation), goSearchOrigin, handleSearchSelect (the 80-line
-           result dispatcher — biggest single member in the codebase),
-           handleSearchCommand, window.__goSearch bridge effect. Per
-           [[dont-group-by-shape]]: the search handlers (handleSearchSelect /
-           handleSearchCommand / srch*) landed in useSearch where they
-           belong, NOT in a "useHandlers" junk drawer. 56 new vitest
-           tests covering all 14 handleSearchSelect branches + 7
-           handleSearchCommand actions + 4 goSearch context variants +
-           the bridge identity-churn invariant. App() shrank 134 lines
-           (the outlier — handleSearchSelect alone was 80 lines).
-           Coverage ratchet bumped: stmts 17→21, branches 13→18,
-           functions 16→18, lines 17→22. Smoke caught a TDZ ReferenceError
-           (initial placement had useSearch's destructure below
-           useAndroidBack, which consumed goSearchOrigin); fix was a
-           single move-block edit. Verified end-to-end in preview:
-           search "Genesis 1" → click result → routed to bible-ch with
-           bookId=genesis, chapterNum=1, fromSearch=true.
-
-     P7b — useNav (2026-05-24): 20 simple nav-chrome helpers extracted
-           (goHome / goScripturesHome / goScriptureGenre / goVolumesHome
-           / 8 navOrigin-pattern: goSettings, goHistory, goAbout,
-           goLibrary, goJournalHub, goNotesIndex, goLinksIndex,
-           goBookmarksIndex, goHighlightsIndex / 2 journal nav:
-           goJournalViewer, goJournalEditor / 5 trivial switchers:
-           goColIdx, goMatthewIdx, goStudiesHome, goBibleIdx,
-           goToGardenFirst). Pilot principle applied
-           ([[low-risk-pilot-first]]): the 4 complex helpers (goTabs /
-           goNavOrigin / goSearch / goSearchOrigin) deliberately left
-           for P7c — they need refs + thumbnail-helper deps + the
-           26-line search-context computation + window.__goSearch
-           bridge effect. The 8 navOrigin-pattern setNavOrigin literals
-           deduplicate to one private `_captureOrigin()` inside the
-           hook. 34 new vitest tests. Coverage ratchet bumped:
-           stmts 14→17, fns 12→16, lines 15→17 (branches held at 13).
-           Net App() shrink: 2 lines (architectural win again bigger).
-
-   ## CONCERNS REMAINING IN App() (Phase 1 checklist, 9 left)
-
-   Extracted so far (10): useHistory (P6c) · useNavHistoryTracking (P7a)
-                         · useNav (P7b) · useSearch (P7c) ·
-                         useBibleStudies (P7d — TDZ-blocker cleared) ·
-                         useJournalMutations (P7e) · useTapThrough (P7f) ·
-                         useReadProgress (P7g — added to useMarkAsRead.js
-                         as a second export) · useReadingPositionNav (P7h) ·
-                         useReadingChainNav (P7i — broke 30% line coverage)
-
-   Remaining (rough order, bottom-up by dependency):
-
-     1. useNav follow-up (the 2 complex nav helpers P7b/P7c deferred).
-        goTabs + goNavOrigin only — goSearch + goSearchOrigin already
-        landed in useSearch (P7c, because they're search domain).
-        goTabs needs flushScrollToActiveTab + captureActiveTabThumbnail +
-        settings.tabsEnabled. goNavOrigin needs navOriginRef (currently
-        at app.jsx line ~442 — move into useNav). Small follow-up;
-        could ride along with another extraction.
-
-     2. useBibleStudies. ── PRIORITY: do this immediately after P7c. ──
-        STUDIES / getStudyById / getStudyChapter / studyReadKey /
-        selectStudy / selectStudyChapter / MATTHEW_CHAIN_ENTRY /
-        CHAIN_ORDER / UNIFIED_CHAIN / chainIdx / prevChainEntry /
-        nextChainEntry / goToChainEntryFirst / goToChainEntryLast.
-        App.jsx lines ~889-995.
-
-        WHY EARLY: this is a STRUCTURAL BLOCKER for everything after it.
-        Today, P7a (useNavHistoryTracking) and P7b/useAndroidBack call
-        sites are forced to live BELOW the const arrow definitions of
-        getStudyById/getStudyChapter (~line 890) because those helpers
-        are passed as PARAMS and would TDZ otherwise. Every future
-        extraction that uses these helpers inherits that same call-site-
-        ordering constraint. Move them into a hook (where they're
-        exported by name, not a TDZ'd const) and the ordering constraint
-        disappears for ALL subsequent extractions. Same rationale as
-        typing CachedStore before individual stores in Q4: clear the
-        structural constraint first, then the remaining work is all
-        independent. Don't defer this — it pays interest.
-
-     3. useReadingChainNav.
-        _first / _last / _firstPreface / _goFirst / _goLast /
-        boundaryConfig / bookIdx / prevBibleBook / nextBibleBook /
-        goNextBibleBook / goPrevBibleBook / chIsFirst / chIsLast /
-        bcv* boundary props / goToRevelationLast. Cross-volume +
-        cross-book boundary navigation. Tied to useBibleStudies (uses
-        STUDIES) — consider sequencing right after. App.jsx lines
-        ~1013-1116.
-
-     4. useMarkAsRead-helpers (rename existing useMarkAsRead → it owns
-        only the window bridge today).
-        VERSION_ID / getReadKey / isRead / markRead / unmarkRead /
-        clearAllProgress. Either fold into the existing useMarkAsRead
-        hook (rename to useMarkAsReadHelpers? or keep two hooks). 16
-        call sites across the render tree. App.jsx lines ~612-624.
-
-     5. useReadingPositionNav.
-        setLastReadForVol / saveProphecyCardStates /
-        prophecyCardStatesRef / selectMatthewCh / selectBibleCh /
-        goToLastRead. Reading-cursor coordination. goToLastRead has the
-        same TDZ issue as P7a (calls getStudyById/selectStudy from
-        Bible Studies block) — sequence after useBibleStudies.
-        App.jsx lines ~247-256, ~627-651, ~885, ~1007.
-
-     6. Dissolve REMAINING handlers into their domains. ── NOT a hook. ──
-        Per [[dont-group-by-shape]]. P7c already landed the search
-        handlers (handleSearchSelect + handleSearchCommand + srch* helpers)
-        in useSearch where they belong. Remaining handlers:
-
-          handleScriptureSelect → useReadingChainNav (bible nav domain
-                                — picks between matthew-ch / bible-ch /
-                                bible-idx based on book selection).
-          handleVolumeSelect  → useNav follow-up (volume nav — calls
-                                COL_BY_CARD lookup + setScreen). Tiny;
-                                could fold cleanly into useNav.
-          handleSelect        → useNav follow-up (home category dispatch
-                                — routes to goScripturesHome /
-                                goVolumesHome / goStudiesHome /
-                                goLibrary). Already lives in useNav's
-                                domain.
-          handleSurprise      → useSurprise (small dedicated hook —
-                                discovery domain, owns the random-pick
-                                logic across all collections). No
-                                existing home; small enough to justify
-                                its own focused hook. Worth doing soon
-                                — useSearch currently takes it as a
-                                cross-domain param, so a useSurprise
-                                extraction lets useSearch's call site
-                                move up alongside useNav (clears one
-                                more structural constraint).
-
-        App.jsx lines ~653-667 (Scripture/Volume), ~700-726 (Surprise),
-        ~849-855 (Select).
-
-     7. useTapThrough.
-        goToLetterFromMatthew / openInAppLetter. Inbound deep-link
-        openers from study/letter content. App.jsx lines ~259-298,
-        ~308-351.
-
-     8. useJournalMutations.
-        createAndEditJournal (and maybe future journal-mutation
-        helpers). Small (~13 lines) but a distinct concern.
-        App.jsx lines ~537-551.
-
-     9. useAppShellEffects (cluster of small useState + useEffect
-        clusters that don't fit anywhere else):
-          - theme + setTheme + theme-application useEffect (line ~147)
-          - showWelcome + dismissWelcome + welcome useEffect (line ~394)
-          - isOnline + the online useEffect (line ~398)
-          - settings-sync useEffects (lines ~362, ~369, ~377)
-          - __bumpHlTick window bridge (line ~138)
-        Each individually small (5-15 lines); group might fold into a
-        few small hooks rather than one big one. Lowest priority.
-
-   STAYS in App() (composition / wiring, not concerns):
-     - 12 existing hook CALLS (useSettings, useTabs, useThumbnails,
-       useReadingDwell, useFromLetterStack, useNavigateToLink,
-       useAndroidBack, useHistory, useNavHistoryTracking, useNav,
-       useScrollMemory, useSavedState) — App() is the composer
-     - 12 tabField destructures (just tabField call sites)
-     - Standalone useState declarations (theme, journalEntryId, etc.)
-       wire into hook params; they're AppShell state, not concerns
-     - ALL_BOOKS / book / chapter / window.__ALL_BOOKS (1-2 lines each)
-     - 16 _findLetter calls + _findLetter itself (data wiring used by
-       the render tree)
-     - tabsCtxValue React.useMemo (line 1118) — Context provider value
-     - colReadNavProps / colIdxProps helpers (lines 1127-1138) —
-       render-tree prop-derivation
-     - The render tree (Phase 2)
-
-   ──
-   Phase 1 done = checklist above hits 0. Track items removed per
-   commit; do NOT track App() line count as the success metric.
-   Estimated 8-12 more extraction commits to clear the list.
-
-   ── Phase 2: render-tree decomposition (PENDING, after Phase 1) ──────
-   Goal: get App() under 800 lines by pulling per-screen JSX into wrapper
-   components and collapsing the `{screen === "X" && ...}` dispatch into
-   a ScreenRouter.
-
-   Render-tree shape (measured 2026-05-24 post-P7a):
-     29 substantive screen blocks: 867 lines total. Top 5 hold ~447:
-       240 lines  garden-view              (lines 2013–2253)
-        87 lines  bible-study-chapter      (1742–1829, has IIFE)
-        42 lines  matthew-ch               (1581–1623, has IIFE)
-        40 lines  bible-ch                 (1679–1719)
-        37 lines  holy-days-index          (1947–1984)
-        31 lines  history                  (1336–1367)
-        30 lines  journal-viewer           (1419–1449)
-        25 lines  links-index              (1485–1510)
-        22 lines  notes-index              (1463–1485)
-        21 lines  settings                 (1268–1289)
-        20 lines  studies-home             (1623–1643)
-     26 trivial letter/index 4-line wrappers: ~104 lines (collapse all
-     at once via the ScreenRouter pattern).
-
-   Phase 2 sequencing — low-risk PILOT first, high-risk after:
-
-     P7-2a (FIRST):  ScreenRouter pattern over the 26 trivial 4-line
-                     letter/index wrappers. ~104 lines collapsed by a
-                     lookup table replacing the switch chain. Near-zero
-                     risk: the wrapper div stays identical (each entry
-                     was already `{screen === X && <XScreen … />}` — a
-                     dispatch table renders the same XScreen with the
-                     same props, just chosen by `screens[screen]`). No
-                     CSS selectors break, no ErrorBoundary moves, no
-                     effect-fire semantics change. The mechanical win
-                     proves the ScreenRouter shape works before any
-                     substantive screen extraction touches it.
-
-     P7-2b, 2c, …:   Substantive screen extractions in size-descending
-                     order: garden-view (240) → bible-study-chapter (87)
-                     → matthew-ch (42) → bible-ch (40) → holy-days-index
-                     (37). Each is its own commit. The risks below
-                     (CSS, useEffect, ErrorBoundary) apply ONLY to
-                     these — but they ride on the ScreenRouter pattern
-                     proven in 2a.
-
-   Workflow per substantive extraction (P7-2b onward, NOT 2a):
-     1. Extract the screen block into ui/screens/XScreen.jsx (most
-        screens already have this file shape; this is moving the
-        last conditional-render wrapper into the screen file itself).
-     2. Update the App() conditional to a single `<XScreen … />` call
-        (or, eventually, collapse into ScreenRouter).
-     3. Run smoke walk (votSmoke or in-browser nav of the affected
-        screen) — NOT just vitest. Render extraction can break CSS
-        selectors that target `.app > .screen-container > .X` even
-        when component logic is preserved.
-     4. Visual diff: before/after screenshot of the screen. Layout
-        shifts from a changed component hierarchy are silent to tests.
-     5. ErrorBoundary placement: if a screen had an inline error
-        wrapper, the extraction must preserve it (or the boundary
-        moves with the component — verify on purpose-broken render).
-
-   Render-tree risks (call out so they don't surprise):
-     - CSS selectors that traverse the App-level wrapper (`.app > .x`)
-       break if the component hierarchy changes depth.
-     - `useEffect(..., [screen])` inside child components fires
-       differently from the App-level one (the parent's screen change
-       unmounts the child rather than re-running its effects).
-     - Sheet/portal placement: screens that render sheets via portals
-       still work after extraction, but sheets that READ closure values
-       from App() need explicit props.
-
-   Realistic Phase 2 reduction: ~700–800 lines (5–7 biggest screens
-   extracted + ScreenRouter for the 26 trivial dispatchers + ~100 lines
-   of boilerplate eliminated). Lands App() at ~700–900.
-
-   <800 IS achievable, but it requires BOTH phases. Do not promise
-   <800 from Phase 1 alone.
+1. APP() DECOMPOSITION (P7) — CLOSED 2026-05-25
+   ─────────────────────────────────────────────
+   Phase 1 (logic, hook extraction) and Phase 2 (render-tree decomposition)
+   both landed. App.jsx: 1,815 → 797 lines. 26 hooks (15 P6 + 11 P7a-k).
+   53-entry ROUTES dispatch table now lives in src/ui/screen-routes.jsx
+   via buildScreenRoutes(deps) factory. 3 substantive ROUTES entries
+   (matthew-ch, bible-study-chapter, holy-days-index) extracted to their
+   own screen / component files. AppShellOverlays + AppShellSheets host
+   the 4 modal overlays and 12 sheets/popovers respectively. All 5
+   pre-commit gates pass; 465 vitest tests passing. Per-commit breakdown
+   in CLAUDE.md "Phase 2" section + git log (P7a-k, P8a-c, P9a-g).
 
 2. useSyncExternalStore MIGRATION (eliminates Bin 4 hlTick cites)
    ─────────────────────────────────────────────────────────────
