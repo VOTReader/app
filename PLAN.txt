@@ -79,8 +79,19 @@ POST-Q4 BACKLOG (priority order — top = next)
    distinct risk profile.
 
    ── Phase 1: logic extraction (active; P7a + P7b landed) ────────────
-   Goal: get App() to ~1,400–1,600 lines by pulling hooks + callbacks
-   out of the logic block.
+   Goal: ZERO inline concerns left in App()'s logic block. Everything
+   that remains is hook composition + render-tree-adjacent wiring.
+
+   ## METRIC: concerns extracted, NOT lines removed.
+   Memory [[concerns-not-lines]]: hook extraction relocates code, it
+   doesn't delete it. Call-site wiring (import + destructure + PARAMS
+   object + breadcrumb) typically adds back 10-30 lines per extraction,
+   nearly offsetting the body that moved out. P7a + P7b moved ~330
+   lines of logic into hooks and only dropped 7 lines from App() —
+   that's the expected arithmetic, NOT a failure. Phase 1's exit
+   criterion is the concerns checklist hitting zero. Line count at
+   that point is whatever the wiring takes (~1,400-1,600 estimate
+   stands as illustrative, not a target).
 
    Workflow per extraction: P6 pattern + Q5 vitest validation.
      1. Identify OWNS/PARAMS/RETURNS boundary
@@ -114,25 +125,101 @@ POST-Q4 BACKLOG (priority order — top = next)
            stmts 14→17, fns 12→16, lines 15→17 (branches held at 13).
            Net App() shrink: 2 lines (architectural win again bigger).
 
-   Next Phase 1 candidates (rough order, bottom-up by dependency):
-     - P7c — useComplexNav for the 4 deferred helpers from P7b (goTabs /
-       goNavOrigin / goSearch / goSearchOrigin). Needs navOriginRef +
-       searchOriginRef + flushScrollToActiveTab + captureActiveTab
-       Thumbnail + the window.__goSearch bridge effect. ~50-70 lines.
-     - Bible Studies block (STUDIES, getStudyById, getStudyChapter,
-       selectStudy, selectStudyChapter, UNIFIED_CHAIN, chain helpers,
-       goToChainEntryFirst/Last) ≈ 100 lines → `useBibleStudies` or
-       split.
-     - Boundary/reading-chain nav (_first/_last/_firstPreface,
-       _goFirst/_goLast, boundaryConfig, goNextBibleBook/
-       goPrevBibleBook) ≈ 100 lines → `useReadingChainNav`. Tied to
-       Bible Studies; consider sequencing together.
-     - Remaining state-coordination glue → 1-2 small hooks (handleSelect,
-       handleSurprise, handleScriptureSelect, handleVolumeSelect,
-       handleSearchSelect, handleSearchCommand, mark-as-read
-       coordinators).
+   ## CONCERNS REMAINING IN App() (Phase 1 checklist, 9 left)
 
-   Realistic Phase 1 floor: ~1,450–1,550 lines.
+   Extracted so far (3): useHistory (P6c) · useNavHistoryTracking (P7a)
+                        · useNav (P7b)
+
+   Remaining (rough order, bottom-up by dependency):
+
+     1. useComplexNav (P7c — next).
+        goTabs / goNavOrigin / goSearch / goSearchOrigin + the
+        window.__goSearch binding effect. The 4 nav-chrome helpers P7b
+        deferred. Needs navOriginRef + searchOriginRef +
+        flushScrollToActiveTab + captureActiveTabThumbnail +
+        settings.tabsEnabled. App.jsx lines ~554-606.
+
+     2. useBibleStudies.
+        STUDIES / getStudyById / getStudyChapter / studyReadKey /
+        selectStudy / selectStudyChapter / MATTHEW_CHAIN_ENTRY /
+        CHAIN_ORDER / UNIFIED_CHAIN / chainIdx / prevChainEntry /
+        nextChainEntry / goToChainEntryFirst / goToChainEntryLast.
+        Resolves the original TDZ issue from P7a/P7b call sites
+        (those have to live below this block today). App.jsx lines
+        ~889-995.
+
+     3. useReadingChainNav.
+        _first / _last / _firstPreface / _goFirst / _goLast /
+        boundaryConfig / bookIdx / prevBibleBook / nextBibleBook /
+        goNextBibleBook / goPrevBibleBook / chIsFirst / chIsLast /
+        bcv* boundary props / goToRevelationLast. Cross-volume +
+        cross-book boundary navigation. Tied to useBibleStudies (uses
+        STUDIES) — consider sequencing right after. App.jsx lines
+        ~1013-1116.
+
+     4. useMarkAsRead-helpers (rename existing useMarkAsRead → it owns
+        only the window bridge today).
+        VERSION_ID / getReadKey / isRead / markRead / unmarkRead /
+        clearAllProgress. Either fold into the existing useMarkAsRead
+        hook (rename to useMarkAsReadHelpers? or keep two hooks). 16
+        call sites across the render tree. App.jsx lines ~612-624.
+
+     5. useReadingPositionNav.
+        setLastReadForVol / saveProphecyCardStates /
+        prophecyCardStatesRef / selectMatthewCh / selectBibleCh /
+        goToLastRead. Reading-cursor coordination. goToLastRead has the
+        same TDZ issue as P7a (calls getStudyById/selectStudy from
+        Bible Studies block) — sequence after useBibleStudies.
+        App.jsx lines ~247-256, ~627-651, ~885, ~1007.
+
+     6. useHandlers (or useDispatchers).
+        handleScriptureSelect / handleVolumeSelect / handleSearchSelect /
+        handleSearchCommand / handleSelect / handleSurprise +
+        srchVolLookup / SRCH_VOL_MAP / srchResolveLetterId. App-shell
+        dispatch entry points from various pickers/cards. Largest
+        single concern (handleSearchSelect alone is ~80 lines).
+        App.jsx lines ~653-783, ~849-882.
+
+     7. useTapThrough.
+        goToLetterFromMatthew / openInAppLetter. Inbound deep-link
+        openers from study/letter content. App.jsx lines ~259-298,
+        ~308-351.
+
+     8. useJournalMutations.
+        createAndEditJournal (and maybe future journal-mutation
+        helpers). Small (~13 lines) but a distinct concern.
+        App.jsx lines ~537-551.
+
+     9. useAppShellEffects (cluster of small useState + useEffect
+        clusters that don't fit anywhere else):
+          - theme + setTheme + theme-application useEffect (line ~147)
+          - showWelcome + dismissWelcome + welcome useEffect (line ~394)
+          - isOnline + the online useEffect (line ~398)
+          - settings-sync useEffects (lines ~362, ~369, ~377)
+          - __bumpHlTick window bridge (line ~138)
+        Each individually small (5-15 lines); group might fold into a
+        few small hooks rather than one big one. Lowest priority.
+
+   STAYS in App() (composition / wiring, not concerns):
+     - 12 existing hook CALLS (useSettings, useTabs, useThumbnails,
+       useReadingDwell, useFromLetterStack, useNavigateToLink,
+       useAndroidBack, useHistory, useNavHistoryTracking, useNav,
+       useScrollMemory, useSavedState) — App() is the composer
+     - 12 tabField destructures (just tabField call sites)
+     - Standalone useState declarations (theme, journalEntryId, etc.)
+       wire into hook params; they're AppShell state, not concerns
+     - ALL_BOOKS / book / chapter / window.__ALL_BOOKS (1-2 lines each)
+     - 16 _findLetter calls + _findLetter itself (data wiring used by
+       the render tree)
+     - tabsCtxValue React.useMemo (line 1118) — Context provider value
+     - colReadNavProps / colIdxProps helpers (lines 1127-1138) —
+       render-tree prop-derivation
+     - The render tree (Phase 2)
+
+   ──
+   Phase 1 done = checklist above hits 0. Track items removed per
+   commit; do NOT track App() line count as the success metric.
+   Estimated 8-12 more extraction commits to clear the list.
 
    ── Phase 2: render-tree decomposition (PENDING, after Phase 1) ──────
    Goal: get App() under 800 lines by pulling per-screen JSX into wrapper
