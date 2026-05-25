@@ -2267,6 +2267,244 @@
     })());
   }
 
+  // app/src/main/assets/src/ui/components/AppShellSheets.jsx
+  function AppShellSheets2({
+    // Highlight tick — shared bus for re-rendering after annotation changes
+    hlTick,
+    setHlTick,
+    // Selection toolbar handlers
+    openLinkPicker,
+    openNoteSheet,
+    closeNoteSheet,
+    // Annotation action chip
+    annChip,
+    setAnnChip,
+    // Link sidebar
+    linkSidebarKey,
+    closeLinkSidebar,
+    navigateToLink,
+    // Link picker + refinement screens
+    linkPickerSource,
+    closeLinkPicker,
+    linkPickerMode,
+    linkPickerOnPickRef,
+    linkRefineRequest,
+    setLinkRefineRequest,
+    lastLinkCreated,
+    setLastLinkCreated,
+    // Note sheet + notebook picker + multi-note popover
+    noteSheetTarget,
+    setNoteSheetTarget,
+    notebookPickerTarget,
+    setNotebookPickerTarget,
+    multiNotePayload,
+    setMultiNotePayload,
+    // Bookmark popover + create sheet
+    bookmarkPopoverPayload,
+    setBookmarkPopoverPayload,
+    bookmarkCreatePending,
+    setBookmarkCreatePending,
+    // Journal inbound sheet
+    inboundJournalPayload,
+    setInboundJournalPayload,
+    goJournalViewer
+  }) {
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      SelectionToolbar,
+      {
+        hlTick,
+        setHlTick,
+        onLinkRequest: openLinkPicker,
+        onNoteRequest: openNoteSheet,
+        onBookmarkRequest: function(_bkm) {
+        }
+      }
+    ), annChip && /* @__PURE__ */ React.createElement(
+      AnnotationActionChip,
+      {
+        chip: annChip,
+        setHlTick,
+        onClose: () => setAnnChip(null),
+        onNoteRequest: openNoteSheet
+      }
+    ), linkSidebarKey && /* @__PURE__ */ React.createElement(
+      LinkSidebar,
+      {
+        hlKey: linkSidebarKey,
+        hlTick,
+        setHlTick,
+        onClose: closeLinkSidebar,
+        onNavigate: navigateToLink
+      }
+    ), linkPickerSource && !linkRefineRequest && /* @__PURE__ */ React.createElement(
+      LinkPicker,
+      {
+        sourceKey: linkPickerSource.key,
+        sourceLabel: linkPickerSource.label,
+        sourceStart: linkPickerSource.start,
+        sourceEnd: linkPickerSource.end,
+        sourceText: linkPickerSource.text,
+        hlTick,
+        setHlTick,
+        onClose: closeLinkPicker,
+        onRequestRefine: setLinkRefineRequest,
+        lastCreatedLink: lastLinkCreated,
+        onLinkCreated: setLastLinkCreated,
+        mode: linkPickerMode,
+        onPickTarget: linkPickerMode ? (target, item) => {
+          if (linkPickerOnPickRef.current) linkPickerOnPickRef.current(target, item);
+          closeLinkPicker();
+        } : null
+      }
+    ), linkRefineRequest && linkRefineRequest.kind === "verse" && linkPickerSource && /* @__PURE__ */ React.createElement(
+      VersePickerScreen,
+      {
+        refineRequest: linkRefineRequest,
+        sourceKey: linkPickerSource.key,
+        sourceLabel: linkPickerSource.label,
+        sourceStart: linkPickerSource.start,
+        sourceEnd: linkPickerSource.end,
+        sourceText: linkPickerSource.text,
+        setHlTick,
+        returnTargetInsteadOfLink: !!linkPickerMode,
+        onClose: (result) => {
+          if (linkPickerMode) {
+            if (result && linkPickerOnPickRef.current) linkPickerOnPickRef.current(result);
+            if (result) {
+              closeLinkPicker();
+            } else {
+              setLinkRefineRequest(null);
+            }
+            return;
+          }
+          setLinkRefineRequest(null);
+          if (result) setLastLinkCreated(result);
+        }
+      }
+    ), linkRefineRequest && linkRefineRequest.kind === "excerpt" && linkPickerSource && /* @__PURE__ */ React.createElement(
+      LetterExcerptPickerScreen,
+      {
+        refineRequest: linkRefineRequest,
+        sourceKey: linkPickerSource.key,
+        sourceLabel: linkPickerSource.label,
+        sourceStart: linkPickerSource.start,
+        sourceEnd: linkPickerSource.end,
+        sourceText: linkPickerSource.text,
+        setHlTick,
+        returnTargetInsteadOfLink: !!linkPickerMode,
+        onClose: (result) => {
+          if (linkPickerMode) {
+            if (result && linkPickerOnPickRef.current) linkPickerOnPickRef.current(result);
+            if (result) {
+              closeLinkPicker();
+            } else {
+              setLinkRefineRequest(null);
+            }
+            return;
+          }
+          setLinkRefineRequest(null);
+          if (result) setLastLinkCreated(result);
+        }
+      }
+    ), noteSheetTarget && /* @__PURE__ */ React.createElement(
+      NoteSheet,
+      {
+        key: noteSheetTarget.groupId + ":" + (noteSheetTarget.startInEditMode ? "edit" : "read"),
+        groupId: noteSheetTarget.groupId,
+        startInEditMode: noteSheetTarget.startInEditMode,
+        hlTick,
+        setHlTick,
+        onClose: closeNoteSheet,
+        onOpenNotebookPicker: (gid) => setNotebookPickerTarget(gid)
+      }
+    ), notebookPickerTarget && /* @__PURE__ */ React.createElement(
+      NotebookPickerSheet,
+      {
+        groupId: notebookPickerTarget,
+        hlTick,
+        setHlTick,
+        onClose: () => setNotebookPickerTarget(null)
+      }
+    ), multiNotePayload && /* @__PURE__ */ React.createElement(
+      MultiNotePopover,
+      {
+        payload: multiNotePayload,
+        onClose: () => setMultiNotePayload(null),
+        onPick: (gid) => {
+          setMultiNotePayload(null);
+          setNoteSheetTarget({ groupId: gid, startInEditMode: false });
+        }
+      }
+    ), bookmarkPopoverPayload && /* @__PURE__ */ React.createElement(
+      BookmarkPopover,
+      {
+        bkmIds: bookmarkPopoverPayload.bkmIds,
+        x: bookmarkPopoverPayload.x,
+        y: bookmarkPopoverPayload.y,
+        onNavigate: (bkm) => {
+          const endpoint = typeof _bookmarkSourceEndpoint === "function" ? _bookmarkSourceEndpoint(bkm.hlKey) : null;
+          setBookmarkPopoverPayload(null);
+          if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: "Bookmark" });
+        },
+        onDeleteDone: () => setHlTick((t) => t + 1),
+        onClose: () => setBookmarkPopoverPayload(null)
+      }
+    ), inboundJournalPayload && typeof JournalInboundSheet !== "undefined" && /* @__PURE__ */ React.createElement(
+      JournalInboundSheet,
+      {
+        refKey: inboundJournalPayload.refKey,
+        resourceLabel: inboundJournalPayload.label,
+        onClose: () => setInboundJournalPayload(null),
+        onOpenEntry: (entry) => {
+          setInboundJournalPayload(null);
+          if (entry && entry.id) goJournalViewer(entry.id);
+        }
+      }
+    ), bookmarkCreatePending && /* @__PURE__ */ React.createElement(
+      BookmarkCreateSheet,
+      {
+        pending: bookmarkCreatePending,
+        onCancel: () => setBookmarkCreatePending(null),
+        onConfirm: (bkm) => {
+          if (!bkm || !bkm.hlKey) {
+            setBookmarkCreatePending(null);
+            return;
+          }
+          if (bkm.editId) {
+            BookmarkStore.update(bkm.editId, { label: bkm.label, thought: bkm.thought || "" });
+          } else {
+            BookmarkStore.add({
+              id: typeof bkmId === "function" ? bkmId() : "bkm_" + Date.now(),
+              hlKey: bkm.hlKey,
+              label: bkm.label,
+              thought: bkm.thought || "",
+              created: Date.now(),
+              updated: Date.now()
+            });
+          }
+          setBookmarkCreatePending(null);
+          setHlTick((t) => t + 1);
+        },
+        onDelete: (editId) => {
+          if (editId && typeof BookmarkStore !== "undefined") BookmarkStore.remove(editId);
+          setBookmarkCreatePending(null);
+          setHlTick((t) => t + 1);
+        },
+        onOpen: (editId) => {
+          if (!editId) return;
+          const bkm = BookmarkStore.get(editId);
+          if (!bkm) {
+            setBookmarkCreatePending(null);
+            return;
+          }
+          const endpoint = typeof _bookmarkSourceEndpoint === "function" ? _bookmarkSourceEndpoint(bkm.hlKey) : null;
+          setBookmarkCreatePending(null);
+          if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: "Bookmark" });
+        }
+      }
+    ));
+  }
+
   // app/src/main/assets/src/ui/screens/LetterView.jsx
   function LetterView2({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, hlTick, onLinkOpen: _onLinkOpen }) {
     const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
@@ -9389,197 +9627,39 @@
         setScreen
       }
     ), ROUTES[screen]?.() ?? null, /* @__PURE__ */ React.createElement(
-      SelectionToolbar,
+      AppShellSheets,
       {
         hlTick,
         setHlTick,
-        onLinkRequest: openLinkPicker,
-        onNoteRequest: openNoteSheet,
-        onBookmarkRequest: function(_bkm) {
-        }
-      }
-    ), annChip && /* @__PURE__ */ React.createElement(
-      AnnotationActionChip,
-      {
-        chip: annChip,
-        setHlTick,
-        onClose: () => setAnnChip(null),
-        onNoteRequest: openNoteSheet
-      }
-    ), linkSidebarKey && /* @__PURE__ */ React.createElement(
-      LinkSidebar,
-      {
-        hlKey: linkSidebarKey,
-        hlTick,
-        setHlTick,
-        onClose: closeLinkSidebar,
-        onNavigate: navigateToLink
-      }
-    ), linkPickerSource && !linkRefineRequest && /* @__PURE__ */ React.createElement(
-      LinkPicker,
-      {
-        sourceKey: linkPickerSource.key,
-        sourceLabel: linkPickerSource.label,
-        sourceStart: linkPickerSource.start,
-        sourceEnd: linkPickerSource.end,
-        sourceText: linkPickerSource.text,
-        hlTick,
-        setHlTick,
-        onClose: closeLinkPicker,
-        onRequestRefine: setLinkRefineRequest,
-        lastCreatedLink: lastLinkCreated,
-        onLinkCreated: setLastLinkCreated,
-        mode: linkPickerMode,
-        onPickTarget: linkPickerMode ? (target, item) => {
-          if (linkPickerOnPickRef.current) linkPickerOnPickRef.current(target, item);
-          closeLinkPicker();
-        } : null
-      }
-    ), linkRefineRequest && linkRefineRequest.kind === "verse" && linkPickerSource && /* @__PURE__ */ React.createElement(
-      VersePickerScreen,
-      {
-        refineRequest: linkRefineRequest,
-        sourceKey: linkPickerSource.key,
-        sourceLabel: linkPickerSource.label,
-        sourceStart: linkPickerSource.start,
-        sourceEnd: linkPickerSource.end,
-        sourceText: linkPickerSource.text,
-        setHlTick,
-        returnTargetInsteadOfLink: !!linkPickerMode,
-        onClose: (result) => {
-          if (linkPickerMode) {
-            if (result && linkPickerOnPickRef.current) linkPickerOnPickRef.current(result);
-            if (result) {
-              closeLinkPicker();
-            } else {
-              setLinkRefineRequest(null);
-            }
-            return;
-          }
-          setLinkRefineRequest(null);
-          if (result) setLastLinkCreated(result);
-        }
-      }
-    ), linkRefineRequest && linkRefineRequest.kind === "excerpt" && linkPickerSource && /* @__PURE__ */ React.createElement(
-      LetterExcerptPickerScreen,
-      {
-        refineRequest: linkRefineRequest,
-        sourceKey: linkPickerSource.key,
-        sourceLabel: linkPickerSource.label,
-        sourceStart: linkPickerSource.start,
-        sourceEnd: linkPickerSource.end,
-        sourceText: linkPickerSource.text,
-        setHlTick,
-        returnTargetInsteadOfLink: !!linkPickerMode,
-        onClose: (result) => {
-          if (linkPickerMode) {
-            if (result && linkPickerOnPickRef.current) linkPickerOnPickRef.current(result);
-            if (result) {
-              closeLinkPicker();
-            } else {
-              setLinkRefineRequest(null);
-            }
-            return;
-          }
-          setLinkRefineRequest(null);
-          if (result) setLastLinkCreated(result);
-        }
-      }
-    ), noteSheetTarget && /* @__PURE__ */ React.createElement(
-      NoteSheet,
-      {
-        key: noteSheetTarget.groupId + ":" + (noteSheetTarget.startInEditMode ? "edit" : "read"),
-        groupId: noteSheetTarget.groupId,
-        startInEditMode: noteSheetTarget.startInEditMode,
-        hlTick,
-        setHlTick,
-        onClose: closeNoteSheet,
-        onOpenNotebookPicker: (gid) => setNotebookPickerTarget(gid)
-      }
-    ), notebookPickerTarget && /* @__PURE__ */ React.createElement(
-      NotebookPickerSheet,
-      {
-        groupId: notebookPickerTarget,
-        hlTick,
-        setHlTick,
-        onClose: () => setNotebookPickerTarget(null)
-      }
-    ), multiNotePayload && /* @__PURE__ */ React.createElement(
-      MultiNotePopover,
-      {
-        payload: multiNotePayload,
-        onClose: () => setMultiNotePayload(null),
-        onPick: (gid) => {
-          setMultiNotePayload(null);
-          setNoteSheetTarget({ groupId: gid, startInEditMode: false });
-        }
-      }
-    ), bookmarkPopoverPayload && /* @__PURE__ */ React.createElement(
-      BookmarkPopover,
-      {
-        bkmIds: bookmarkPopoverPayload.bkmIds,
-        x: bookmarkPopoverPayload.x,
-        y: bookmarkPopoverPayload.y,
-        onNavigate: (bkm) => {
-          const endpoint = typeof _bookmarkSourceEndpoint === "function" ? _bookmarkSourceEndpoint(bkm.hlKey) : null;
-          setBookmarkPopoverPayload(null);
-          if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: "Bookmark" });
-        },
-        onDeleteDone: () => setHlTick((t) => t + 1),
-        onClose: () => setBookmarkPopoverPayload(null)
-      }
-    ), inboundJournalPayload && typeof JournalInboundSheet !== "undefined" && /* @__PURE__ */ React.createElement(
-      JournalInboundSheet,
-      {
-        refKey: inboundJournalPayload.refKey,
-        resourceLabel: inboundJournalPayload.label,
-        onClose: () => setInboundJournalPayload(null),
-        onOpenEntry: (entry) => {
-          setInboundJournalPayload(null);
-          if (entry && entry.id) goJournalViewer(entry.id);
-        }
-      }
-    ), bookmarkCreatePending && /* @__PURE__ */ React.createElement(
-      BookmarkCreateSheet,
-      {
-        pending: bookmarkCreatePending,
-        onCancel: () => setBookmarkCreatePending(null),
-        onConfirm: (bkm) => {
-          if (!bkm || !bkm.hlKey) {
-            setBookmarkCreatePending(null);
-            return;
-          }
-          if (bkm.editId) {
-            BookmarkStore.update(bkm.editId, { label: bkm.label, thought: bkm.thought || "" });
-          } else {
-            BookmarkStore.add({
-              id: typeof bkmId === "function" ? bkmId() : "bkm_" + Date.now(),
-              hlKey: bkm.hlKey,
-              label: bkm.label,
-              thought: bkm.thought || "",
-              created: Date.now(),
-              updated: Date.now()
-            });
-          }
-          setBookmarkCreatePending(null);
-          setHlTick((t) => t + 1);
-        },
-        onDelete: (editId) => {
-          if (editId && typeof BookmarkStore !== "undefined") BookmarkStore.remove(editId);
-          setBookmarkCreatePending(null);
-          setHlTick((t) => t + 1);
-        },
-        onOpen: (editId) => {
-          if (!editId) return;
-          const bkm = BookmarkStore.get(editId);
-          if (!bkm) {
-            setBookmarkCreatePending(null);
-            return;
-          }
-          const endpoint = typeof _bookmarkSourceEndpoint === "function" ? _bookmarkSourceEndpoint(bkm.hlKey) : null;
-          setBookmarkCreatePending(null);
-          if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: "Bookmark" });
-        }
+        openLinkPicker,
+        openNoteSheet,
+        closeNoteSheet,
+        annChip,
+        setAnnChip,
+        linkSidebarKey,
+        closeLinkSidebar,
+        navigateToLink,
+        linkPickerSource,
+        closeLinkPicker,
+        linkPickerMode,
+        linkPickerOnPickRef,
+        linkRefineRequest,
+        setLinkRefineRequest,
+        lastLinkCreated,
+        setLastLinkCreated,
+        noteSheetTarget,
+        setNoteSheetTarget,
+        notebookPickerTarget,
+        setNotebookPickerTarget,
+        multiNotePayload,
+        setMultiNotePayload,
+        bookmarkPopoverPayload,
+        setBookmarkPopoverPayload,
+        bookmarkCreatePending,
+        setBookmarkCreatePending,
+        inboundJournalPayload,
+        setInboundJournalPayload,
+        goJournalViewer
       }
     ));
   }
@@ -9685,6 +9765,7 @@
     BookmarkIcon: BookmarkIcon2,
     HolyDaysPlaylistHeader: HolyDaysPlaylistHeader2,
     AppShellOverlays: AppShellOverlays2,
+    AppShellSheets: AppShellSheets2,
     // Screens
     LetterView: LetterView2,
     WtlbEntryView: WtlbEntryView2,

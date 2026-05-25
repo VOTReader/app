@@ -114,6 +114,7 @@ import { LinkIcon } from './components/LinkIcon.jsx';
 import { BookmarkIcon } from './components/BookmarkIcon.jsx';
 import { HolyDaysPlaylistHeader } from './components/HolyDaysPlaylistHeader.jsx';
 import { AppShellOverlays } from './components/AppShellOverlays.jsx';
+import { AppShellSheets } from './components/AppShellSheets.jsx';
 
 // ── Screens ─────────────────────────────────────────────────────────────
 import { LetterView } from './screens/LetterView.jsx';
@@ -211,7 +212,7 @@ Object.assign(window, {
   FootnoteListSection, StickyChapterNav, ClearProgressRow,
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, VolumeLetterIndex, HistoryEntryCard,
-  NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader, AppShellOverlays,
+  NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader, AppShellOverlays, AppShellSheets,
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
   LibraryScreen, NotesIndexScreen,
