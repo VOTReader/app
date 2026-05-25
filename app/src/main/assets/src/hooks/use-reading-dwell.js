@@ -71,6 +71,19 @@
    └───────────────────────────────────────────────────────────────────────┘
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Reading-dwell tracker. Owns the dwell-timer state machine + the
+ * setActiveReadKey / cancelDwell / commitDwellNow surface. The visibility
+ * change effect pauses the timer when the app backgrounds and resumes
+ * when it returns. window.__onDwellCommit bridges out to ScreenLayout.
+ *
+ * @param {{ dwellMs: number | null | undefined, initialActiveReadKey: string | null }} args
+ * @returns {{
+ *   activeReadKey: string | null,
+ *   setActiveReadKey: (key: string | null, commitFn?: (() => void) | null) => void,
+ *   cancelDwell: () => void
+ * }}
+ */
 export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   // ── State ──────────────────────────────────────────────────────────────
   const [activeReadKey, setActiveReadKeyRaw] = React.useState(initialActiveReadKey);

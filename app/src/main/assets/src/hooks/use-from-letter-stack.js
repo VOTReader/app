@@ -72,6 +72,37 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 
+/**
+ * Multi-level tap-through back-stack + "Back to …" pill handler. Pushes
+ * source contexts onto a per-tab stack (via tabField); the pill on the
+ * destination screen pops the top and restores its captured nav state.
+ * The prune effect enforces "top entry's destSnapshot matches current
+ * location" as an invariant intrinsic to fromLetterStack's meaning.
+ *
+ * @param {{
+ *   tabField: (key: string) => any[],
+ *   screen: string,
+ *   bookId: string | null,
+ *   chapterNum: number | null,
+ *   letterId: string | null,
+ *   studyId: string | null,
+ *   studyChapterId: string | null,
+ *   setScreen: (val: any) => void,
+ *   setBookId: (val: any) => void,
+ *   setChapterNum: (val: any) => void,
+ *   setLetterId: (val: any) => void,
+ *   setStudyId: (val: any) => void,
+ *   setStudyChapterId: (val: any) => void
+ * }} args
+ * @returns {{
+ *   fromLetterStack: any[],
+ *   setFromLetterStack: (val: any) => void,
+ *   pushFromLetter: (entry: any) => void,
+ *   tapThroughBack: () => void,
+ *   fromLetterRef: { current: any[] },
+ *   backHint: any
+ * }}
+ */
 export function useFromLetterStack({
   tabField,
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
@@ -123,6 +154,7 @@ export function useFromLetterStack({
     return true;
   };
 
+  // (See JSDoc above the export for hook contract.)
   // Prune stale tap-through entries. When the user navigates away from a
   // recorded destination (next chapter, different book, etc.), pop the entry
   // so the pill doesn't reappear if they happen to land back on the dest

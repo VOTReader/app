@@ -99,6 +99,21 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 
+/**
+ * Wire window.handleAndroidBack — the function Kotlin's MainActivity calls
+ * via evaluateJavascript() on every hardware-back / predictive-back
+ * gesture. The handler is wired ONCE at mount (the []-deps useEffect)
+ * and reads every nav value through useRefMirror refs so the closure is
+ * always call-time fresh. See the file header for the 13-rule routing
+ * table and the "stable-by-construction" audit on the nav-helper params.
+ *
+ * Pure side-effect hook — returns nothing. The PARAMS object is the
+ * widest in the project (see file header for per-key origins); see the
+ * Q3.3e-android-back commit for the disable-rationale audit.
+ *
+ * @param {Record<string, any>} args  the deliberately-wide param bag
+ * @returns {void}
+ */
 export function useAndroidBack({
   screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb,
   tabsOverviewOpen, journalEntryId, fromLetterRef,

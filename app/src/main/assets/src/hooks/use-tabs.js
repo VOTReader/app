@@ -88,6 +88,29 @@ export const DEFAULT_TAB = {
   scrollPositions: {} // per-screen scroll memory: { [screenName]: px }
 };
 
+/**
+ * Tab-state container hook (P6k-A). Owns the tabs[] array + activeTabIdx
+ * cursor + the tabField factory that returns the [value, setter] tuple
+ * for any tab-scoped key. Tab-state operations (open/close/switch) live
+ * in useTabActions (P6k-B); only the state primitives live here.
+ *
+ * tabField setter identity is a HARD INVARIANT — re-renders with stable
+ * setter identity across renders keep child components from cascading
+ * re-mounts. A probe effect verifies the contract on every render and
+ * console.errors if violated (smoke harness watches console.error).
+ *
+ * @param {{ saved: import('./use-saved-state.js').SavedState }} args
+ * @returns {{
+ *   DEFAULT_TAB: any,
+ *   tabField: (key: string) => any[],
+ *   activeTab: any,
+ *   tabs: any[],
+ *   activeTabIdx: number,
+ *   setTabs: (updater: any) => void,
+ *   setActiveTabIdx: (updater: any) => void,
+ *   updateActiveTab: (patchOrFn: any) => void
+ * }}
+ */
 export function useTabs({ saved }) {
   const [tabs, setTabs] = React.useState(() => {
     if (Array.isArray(saved.tabs) && saved.tabs.length > 0) {

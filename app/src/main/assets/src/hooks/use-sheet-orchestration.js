@@ -82,6 +82,29 @@
      auto-dismiss effect — owned by SelectionToolbar).
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Sheet/overlay state container + window-bridge wirings. Owns ~9 sheet
+ * state slots (annChip / linkSidebarKey / linkPickerSource /
+ * linkRefineRequest / lastLinkCreated / linkPickerMode / noteSheetTarget /
+ * notebookPickerTarget / multiNotePayload), every "open this sheet"
+ * window bridge (__openLinkSidebar / __openNoteSheet / etc), and the
+ * auto-dismiss effects that close sheets when nav state changes.
+ *
+ * The returned surface is wide on purpose — App() destructures every
+ * sheet state slot + setter so render-tree branches can wire components
+ * directly. (See file header for the full DOES NOT OWN / DOES OWN split.)
+ *
+ * @param {{
+ *   screen: string,
+ *   letterId: string | null,
+ *   bookId: string | null,
+ *   chapterNum: number | null,
+ *   studyId: string | null,
+ *   studyChapterId: string | null,
+ *   setHlTick: (updater: any) => void
+ * }} args
+ * @returns {any}
+ */
 export function useSheetOrchestration({
   screen, letterId, bookId, chapterNum, studyId, studyChapterId,
   setHlTick,

@@ -49,6 +49,27 @@
      bridges this hook owns or must clean up.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Settings object shape. Fields with stable defaults documented inline at
+ * the useState initializer. Loosely-typed because the settings surface
+ * grows over time and TS strictness would hurt more than it helps.
+ *
+ * @typedef {Record<string, any>} Settings
+ */
+
+/**
+ * Settings state container hook. Owns settings + 3 mutators plus the
+ * body-class + AndroidBridge mirroring effect. Persistence lives in
+ * usePersistedState (P6k+1).
+ *
+ * @param {{ savedSettings: Settings | null | undefined, theme: string }} args
+ * @returns {{
+ *   settings: Settings,
+ *   setSettings: (updater: Settings | ((prev: Settings) => Settings)) => void,
+ *   toggleSetting: (key: string) => void,
+ *   updateSetting: (key: string, val: any) => void
+ * }}
+ */
 export function useSettings({ savedSettings, theme }) {
   // ── State ──────────────────────────────────────────────────────────────
   const [settings, setSettings] = React.useState(() => {

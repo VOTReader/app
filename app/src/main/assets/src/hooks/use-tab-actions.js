@@ -58,6 +58,32 @@ import { DEFAULT_TAB } from './use-tabs.js';
 
 const MAX_TABS = 999;
 
+/**
+ * Tab operations (open/close/switch + close-other variants + the long-
+ * press action sheet + the "are-you-sure?" / clear-all stages). Splits
+ * from useTabs (P6k-A) which owns the state; this hook is the verbs.
+ * Runs AFTER useReadingDwell + useThumbnails because it needs
+ * cancelDwell + setTabThumbnails.
+ *
+ * @param {{ tabState: any, cancelDwell: () => void, setTabThumbnails: (val: any) => void }} args
+ * @returns {{
+ *   openNewTab: () => void,
+ *   switchToTab: (idx: number) => void,
+ *   closeTab: (idx: number) => void,
+ *   closeOtherTabs: (keepIdx: number) => void,
+ *   closeTabsToTheRight: (keepIdx: number) => void,
+ *   closeAllTabs: () => void,
+ *   deduplicateTabs: () => void,
+ *   tabActionIdx: number | null,
+ *   setTabActionIdx: (val: any) => void,
+ *   disableTabsPromptOpen: boolean,
+ *   setDisableTabsPromptOpen: (val: any) => void,
+ *   clearAllStage: number,
+ *   setClearAllStage: (val: any) => void,
+ *   lastTabCloseStrikes: { current: number },
+ *   MAX_TABS: number
+ * }}
+ */
 export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
   const { tabs, activeTabIdx, setTabs, setActiveTabIdx } = tabState;
 

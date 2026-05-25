@@ -68,6 +68,32 @@
      effect consumes. Plain assignments, not `window.__openX` handlers.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Cross-screen navigation handler. Returns a stable `navigateToLink`
+ * function (identity-fresh closure refreshed every render via ref) that
+ * routes a LinkPicker-resolved endpoint to the right screen and pushes
+ * the source context onto the from-letter stack so the back-pill works.
+ *
+ * @param {{
+ *   closeLinkSidebar: () => void,
+ *   pushFromLetter: (entry: any) => void,
+ *   screen: string,
+ *   bookId: string | null,
+ *   chapterNum: number | null,
+ *   letterId: string | null,
+ *   studyId: string | null,
+ *   studyChapterId: string | null,
+ *   setScreen: (val: any) => void,
+ *   setBookId: (val: any) => void,
+ *   setChapterNum: (val: any) => void,
+ *   setLetterId: (val: any) => void,
+ *   setStudyId: (val: any) => void,
+ *   setStudyChapterId: (val: any) => void,
+ *   setSurpriseAnchor: (val: any) => void,
+ *   setJournalEntryId: (val: any) => void
+ * }} args
+ * @returns {{ navigateToLink: (endpoint: any, meta?: any) => void }}
+ */
 export function useNavigateToLink({
   closeLinkSidebar, pushFromLetter,
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,

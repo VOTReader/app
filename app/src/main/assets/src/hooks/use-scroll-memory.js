@@ -74,6 +74,27 @@ function getScrollKey(scr, bid, cnum, lid, sid, scid) {
   return scr;
 }
 
+/**
+ * Per-tab scroll-position persistence. Saves the active tab's scroll
+ * percentage on scroll-stop / page-hide / pagehide; restores it on
+ * screen-key change. Returns flushScrollToActiveTab so callers can fire
+ * an immediate save (e.g. before a tab switch).
+ *
+ * @param {{
+ *   screen: string,
+ *   bookId: string | null,
+ *   chapterNum: number | null,
+ *   letterId: string | null,
+ *   studyId: string | null,
+ *   studyChapterId: string | null,
+ *   activeTab: any,
+ *   activeTabIdx: number,
+ *   updateActiveTab: (patchOrFn: any) => void,
+ *   surpriseAnchor: any,
+ *   tabsOverviewOpen: boolean
+ * }} args
+ * @returns {{ flushScrollToActiveTab: () => void }}
+ */
 export function useScrollMemory({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   activeTab,

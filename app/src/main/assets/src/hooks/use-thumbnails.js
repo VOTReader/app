@@ -56,6 +56,24 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 
+/**
+ * Per-tab thumbnail capture + IDB persistence + scroll-stop refresh.
+ * Owns the tabThumbnails state, the captureActiveTabThumbnail callback,
+ * the IDB load-on-mount effect, and the scroll-listener attach effect.
+ *
+ * @param {{
+ *   tabs: any[],
+ *   activeTabIdx: number,
+ *   activeTab: any,
+ *   tabsEnabled: boolean,
+ *   tabsOverviewOpen: boolean
+ * }} args
+ * @returns {{
+ *   tabThumbnails: Record<string, string>,
+ *   setTabThumbnails: (val: any) => void,
+ *   captureActiveTabThumbnail: () => void
+ * }}
+ */
 export function useThumbnails({
   tabs,
   activeTabIdx,
