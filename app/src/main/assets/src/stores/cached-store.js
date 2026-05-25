@@ -18,12 +18,23 @@
  * `this._load()` / `this._save()`. The `_` prefix is convention, not
  * access modifier; treat as the load-on-first-call lazy cache contract.
  *
+ * Mutation signaling: each store mutation should call `this._bump()` AFTER
+ * `this._save()`. `_bump` increments `_version` and notifies subscribers.
+ * `subscribe(cb)` + `getVersion()` together form the React 18 reactivity
+ * contract for `useSyncExternalStore`; this replaces the legacy hlTick
+ * cache-bust pattern (see ARCHITECTURE.md §"Annotation rendering").
+ *
  * @template T
  * @typedef {{
  *   _cache: T | null,
  *   _load(): T,
  *   _save(): void,
- *   raw(): T
+ *   raw(): T,
+ *   _version: number,
+ *   _listeners: Set<() => void> | null,
+ *   _bump(): void,
+ *   subscribe(callback: () => void): () => void,
+ *   getVersion(): number,
  * }} CachedStoreBase
  */
 
@@ -58,7 +69,40 @@ export function CachedStore(storageKey, defaultVal) {
     _save() {
       try { localStorage.setItem(storageKey, JSON.stringify(this._cache)); } catch (e) { console.warn('localStorage write failed for', storageKey, e); }
     },
-    raw() { return this._load(); }
+    raw() { return this._load(); },
+    /* ─── React 18 reactivity contract (subscribe + getSnapshot) ─── */
+    _version: 0,
+    _listeners: /** @type {Set<() => void> | null} */ (null),
+    /**
+     * Increment version + notify all subscribers. Each store mutation
+     * method should call this AFTER `this._save()`. Replaces the legacy
+     * hlTick cache-bust pattern: consumers use useSyncExternalStore +
+     * getVersion() to re-read after mutation.
+     */
+    _bump() {
+      this._version += 1;
+      if (this._listeners) {
+        for (const cb of this._listeners) {
+          try { cb(); } catch (e) { console.warn('store subscriber threw for', storageKey, e); }
+        }
+      }
+    },
+    /**
+     * Subscribe to mutation notifications. Returns an unsubscribe function.
+     * Designed for `React.useSyncExternalStore` — the callback fires
+     * whenever `_bump()` runs, prompting React to call `getVersion()`.
+     */
+    subscribe(callback) {
+      if (!this._listeners) this._listeners = new Set();
+      this._listeners.add(callback);
+      return () => { if (this._listeners) this._listeners.delete(callback); };
+    },
+    /**
+     * Current version counter. `React.useSyncExternalStore`'s second arg.
+     * Returns a number (stable Object.is equality) — React re-renders when
+     * the returned value changes, i.e. after each `_bump()`.
+     */
+    getVersion() { return this._version; }
   };
 }
 

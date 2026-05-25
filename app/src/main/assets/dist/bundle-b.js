@@ -370,6 +370,50 @@
       },
       raw() {
         return this._load();
+      },
+      /* ─── React 18 reactivity contract (subscribe + getSnapshot) ─── */
+      _version: 0,
+      _listeners: (
+        /** @type {Set<() => void> | null} */
+        null
+      ),
+      /**
+       * Increment version + notify all subscribers. Each store mutation
+       * method should call this AFTER `this._save()`. Replaces the legacy
+       * hlTick cache-bust pattern: consumers use useSyncExternalStore +
+       * getVersion() to re-read after mutation.
+       */
+      _bump() {
+        this._version += 1;
+        if (this._listeners) {
+          for (const cb of this._listeners) {
+            try {
+              cb();
+            } catch (e) {
+              console.warn("store subscriber threw for", storageKey, e);
+            }
+          }
+        }
+      },
+      /**
+       * Subscribe to mutation notifications. Returns an unsubscribe function.
+       * Designed for `React.useSyncExternalStore` — the callback fires
+       * whenever `_bump()` runs, prompting React to call `getVersion()`.
+       */
+      subscribe(callback) {
+        if (!this._listeners) this._listeners = /* @__PURE__ */ new Set();
+        this._listeners.add(callback);
+        return () => {
+          if (this._listeners) this._listeners.delete(callback);
+        };
+      },
+      /**
+       * Current version counter. `React.useSyncExternalStore`'s second arg.
+       * Returns a number (stable Object.is equality) — React re-renders when
+       * the returned value changes, i.e. after each `_bump()`.
+       */
+      getVersion() {
+        return this._version;
       }
     };
   }
