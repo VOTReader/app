@@ -1305,31 +1305,7 @@ function App() {
 
     'holy-days-index': () => (
       <ScreenLayout navChildren={_idxNav()}>
-        {typeof HOLY_DAYS_META !== 'undefined' && (HOLY_DAYS_META.audioPlaylist || HOLY_DAYS_META.videoPlaylist) && (
-          <div className="hd-playlists">
-            {HOLY_DAYS_META.audioPlaylist && (
-              <a className="hd-playlist-btn" href={HOLY_DAYS_META.audioPlaylist} target="_blank" rel="noopener noreferrer">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <path d="M9 18V5l12-2v13" />
-                  <circle cx="6" cy="18" r="3" />
-                  <circle cx="18" cy="16" r="3" />
-                </svg>
-                <span className="hd-playlist-label">Audio Playlist</span>
-                <span className="hd-playlist-sub">Listen on Bandcamp</span>
-              </a>
-            )}
-            {HOLY_DAYS_META.videoPlaylist && (
-              <a className="hd-playlist-btn" href={HOLY_DAYS_META.videoPlaylist} target="_blank" rel="noopener noreferrer">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <polygon points="23 7 16 12 23 17 23 7" />
-                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                </svg>
-                <span className="hd-playlist-label">Video Playlist</span>
-                <span className="hd-playlist-sub">Watch on YouTube</span>
-              </a>
-            )}
-          </div>
-        )}
+        <HolyDaysPlaylistHeader />
         <VolumeLetterIndex volumeTitle="Regarding The Holy Days" eyebrow="The Appointed Times" letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} />
       </ScreenLayout>
     ),
