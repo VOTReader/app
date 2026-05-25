@@ -38,8 +38,9 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q4 (JSDoc / tsc --checkJs)  ✅ DONE  — 37 files typed, CI gate zero-tolerance
   smoke-lite.js for CI        ✅ DONE  — Node CLI; globals + collections + cycles
   Q5 (Vitest)                 ✅ DONE  — 218 tests / 9 files; ratchet 1→14 stmts
-  App() decomposition (P7)    🚧 ACTIVE — P7a + P7b landed; 275 tests;
-                                          App() 2,261 → 2,254 lines
+  App() decomposition (P7)    🚧 ACTIVE — P7a + P7b + P7c landed; 331 tests;
+                                          App() 2,261 → 2,120 lines;
+                                          4 of 12 concerns extracted
   Q6 (CSS hardening)          ⬜ PENDING
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ POST-Q4 BACKLOG (priority order — top = next)
    Render-tree decomposition is required, in a separate phase with a
    distinct risk profile.
 
-   ── Phase 1: logic extraction (active; P7a + P7b landed) ────────────
+   ── Phase 1: logic extraction (active; P7a + P7b + P7c landed) ──────
    Goal: ZERO inline concerns left in App()'s logic block. Everything
    that remains is hook composition + render-tree-adjacent wiring.
 
@@ -107,6 +108,28 @@ POST-Q4 BACKLOG (priority order — top = next)
            11→13. Net App() shrink: 5 lines (architectural win is bigger
            — the most debt-laden disable cite moved out).
 
+     P7c — useSearch (2026-05-24): full search domain — 4 search
+           tabFields (searchOrigin / searchScope / searchContext /
+           searchQuery), searchOriginRef, srchVolLookup / SRCH_VOL_MAP /
+           srchResolveLetterId helpers, goSearch (26-line context
+           computation), goSearchOrigin, handleSearchSelect (the 80-line
+           result dispatcher — biggest single member in the codebase),
+           handleSearchCommand, window.__goSearch bridge effect. Per
+           [[dont-group-by-shape]]: the search handlers (handleSearchSelect /
+           handleSearchCommand / srch*) landed in useSearch where they
+           belong, NOT in a "useHandlers" junk drawer. 56 new vitest
+           tests covering all 14 handleSearchSelect branches + 7
+           handleSearchCommand actions + 4 goSearch context variants +
+           the bridge identity-churn invariant. App() shrank 134 lines
+           (the outlier — handleSearchSelect alone was 80 lines).
+           Coverage ratchet bumped: stmts 17→21, branches 13→18,
+           functions 16→18, lines 17→22. Smoke caught a TDZ ReferenceError
+           (initial placement had useSearch's destructure below
+           useAndroidBack, which consumed goSearchOrigin); fix was a
+           single move-block edit. Verified end-to-end in preview:
+           search "Genesis 1" → click result → routed to bible-ch with
+           bookId=genesis, chapterNum=1, fromSearch=true.
+
      P7b — useNav (2026-05-24): 20 simple nav-chrome helpers extracted
            (goHome / goScripturesHome / goScriptureGenre / goVolumesHome
            / 8 navOrigin-pattern: goSettings, goHistory, goAbout,
@@ -127,17 +150,18 @@ POST-Q4 BACKLOG (priority order — top = next)
 
    ## CONCERNS REMAINING IN App() (Phase 1 checklist, 9 left)
 
-   Extracted so far (3): useHistory (P6c) · useNavHistoryTracking (P7a)
-                        · useNav (P7b)
+   Extracted so far (4): useHistory (P6c) · useNavHistoryTracking (P7a)
+                        · useNav (P7b) · useSearch (P7c)
 
    Remaining (rough order, bottom-up by dependency):
 
-     1. useComplexNav (P7c — next).
-        goTabs / goNavOrigin / goSearch / goSearchOrigin + the
-        window.__goSearch binding effect. The 4 nav-chrome helpers P7b
-        deferred. Needs navOriginRef + searchOriginRef +
-        flushScrollToActiveTab + captureActiveTabThumbnail +
-        settings.tabsEnabled. App.jsx lines ~554-606.
+     1. useNav follow-up (the 2 complex nav helpers P7b/P7c deferred).
+        goTabs + goNavOrigin only — goSearch + goSearchOrigin already
+        landed in useSearch (P7c, because they're search domain).
+        goTabs needs flushScrollToActiveTab + captureActiveTabThumbnail +
+        settings.tabsEnabled. goNavOrigin needs navOriginRef (currently
+        at app.jsx line ~442 — move into useNav). Small follow-up;
+        could ride along with another extraction.
 
      2. useBibleStudies. ── PRIORITY: do this immediately after P7c. ──
         STUDIES / getStudyById / getStudyChapter / studyReadKey /
@@ -183,45 +207,35 @@ POST-Q4 BACKLOG (priority order — top = next)
         Bible Studies block) — sequence after useBibleStudies.
         App.jsx lines ~247-256, ~627-651, ~885, ~1007.
 
-     6. Dissolve handlers into their domains. ── NOT a single hook. ──
-        Per [[dont-group-by-shape]]: "useHandlers" is a junk drawer
-        grouping by syntactic shape (all are on*/handle* callbacks),
-        not by domain. Each handler routes to a different subsystem;
-        bundling them creates a 15-param monolith that does 5
-        unrelated things.
+     6. Dissolve REMAINING handlers into their domains. ── NOT a hook. ──
+        Per [[dont-group-by-shape]]. P7c already landed the search
+        handlers (handleSearchSelect + handleSearchCommand + srch* helpers)
+        in useSearch where they belong. Remaining handlers:
 
-        Distribute per-handler instead:
-          handleSearchSelect  → use(Complex)Nav (search domain — owns
-                                goSearch / searchOrigin / searchContext;
-                                handleSearchSelect is the consumer-side
-                                routing of a search result back to its
-                                source screen). Carries srchVolLookup /
-                                SRCH_VOL_MAP / srchResolveLetterId with
-                                it — they're search-internal helpers.
-          handleSearchCommand → use(Complex)Nav (same domain — handles
-                                clear/refresh/etc. for the search list).
           handleScriptureSelect → useReadingChainNav (bible nav domain
                                 — picks between matthew-ch / bible-ch /
                                 bible-idx based on book selection).
-          handleVolumeSelect  → useNav (volume nav — calls goColIdx
-                                indirectly via colReadKey + setScreen).
-                                Tiny; could fold cleanly into useNav.
-          handleSelect        → useNav (home category dispatch — routes
-                                to goScripturesHome / goVolumesHome /
-                                goStudiesHome / goLibrary). Already
-                                lives in useNav's domain.
+          handleVolumeSelect  → useNav follow-up (volume nav — calls
+                                COL_BY_CARD lookup + setScreen). Tiny;
+                                could fold cleanly into useNav.
+          handleSelect        → useNav follow-up (home category dispatch
+                                — routes to goScripturesHome /
+                                goVolumesHome / goStudiesHome /
+                                goLibrary). Already lives in useNav's
+                                domain.
           handleSurprise      → useSurprise (small dedicated hook —
                                 discovery domain, owns the random-pick
                                 logic across all collections). No
                                 existing home; small enough to justify
-                                its own focused hook.
+                                its own focused hook. Worth doing soon
+                                — useSearch currently takes it as a
+                                cross-domain param, so a useSurprise
+                                extraction lets useSearch's call site
+                                move up alongside useNav (clears one
+                                more structural constraint).
 
-        Sequence: handle each as a small add-on to its target hook
-        (P7c, useNav-followup, useReadingChainNav) or as the
-        standalone useSurprise commit. Do NOT create a "useHandlers"
-        hook even temporarily.
-
-        App.jsx lines ~653-783, ~849-882.
+        App.jsx lines ~653-667 (Scripture/Volume), ~700-726 (Surprise),
+        ~849-855 (Select).
 
      7. useTapThrough.
         goToLetterFromMatthew / openInAppLetter. Inbound deep-link

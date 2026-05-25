@@ -418,14 +418,12 @@ function App() {
       }
     } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
   };
-  // Tab-local search/nav breadcrumbs (each tab has its own search context)
-  const [searchQuery, setSearchQuery] = tabField('searchQuery');
+  // Tab-local search/nav breadcrumbs (each tab has its own search context).
+  // searchQuery / searchOrigin / searchScope / searchContext tabFields →
+  // owned by useSearch (P7c, called below).
   const [fromSearch, setFromSearch] = tabField('fromSearch');
   const [fromMatthewCh, setFromMatthewCh] = tabField('fromMatthewCh');
   const [fromWtlb, setFromWtlb] = tabField('fromWtlb');
-  const [searchOrigin, setSearchOrigin] = tabField('searchOrigin');
-  const [searchScope, setSearchScope] = tabField('searchScope');
-  const [searchContext, setSearchContext] = tabField('searchContext');
   const [navOrigin, setNavOrigin] = tabField('navOrigin');
 
   // App-global: read history shared across all tabs.
@@ -563,45 +561,8 @@ function App() {
     if (o) {setScreen(o.screen);if (o.bookId !== undefined) setBookId(o.bookId);if (o.chapterNum !== undefined) setChapterNum(o.chapterNum);if (o.letterId !== undefined) setLetterId(o.letterId);if (o.studyId !== undefined) setStudyId(o.studyId);if (o.studyChapterId !== undefined) setStudyChapterId(o.studyChapterId);} else
     goHome();
   };
-  const goSearch = () => {
-    setSearchOrigin({ screen, bookId, chapterNum, letterId });
-    // Compute the reading-position context so SearchScreen can offer an
-    // optional "In {Book/Volume}" scope chip. null = opened outside a
-    // reading screen (home/indexes/settings) → no chip shown.
-    // searchScope always starts null (global); user taps chip to apply.
-    let ctx = null;
-    if (screen === 'matthew-ch') {
-      ctx = { kind: 'book', bookId: 'matthew', label: 'Matthew' };
-    } else if (screen === 'bible-ch' && bookId) {
-      const bk = BOOKS[bookId];
-      ctx = { kind: 'book', bookId, label: bk ? bk.title : bookId };
-    } else {
-      const _scCol = COL_BY_LETTER_SC.get(screen);
-      if (_scCol) ctx = { kind: 'volume', volumeId: _scCol.searchVolId, label: _scCol.label };
-    }
-    setSearchContext(ctx);
-    setSearchScope(null);
-    // If a pending query was stashed by the SelectionToolbar's Search action,
-    // pre-fill the search input.
-    if (window.__pendingSearchQuery) {
-      setSearchQuery(window.__pendingSearchQuery);
-      window.__pendingSearchQuery = null;
-    }
-    setScreen("search");
-  };
-
-  // Expose goSearch globally so SelectionToolbar's Search action can route here
-  useEffect(() => {
-    window.__goSearch = goSearch;
-    return () => { window.__goSearch = null; };
-  });
-
+  /* goSearch / goSearchOrigin / window.__goSearch bridge → src/hooks/use-search.js (P7c). */
   /* addToHistory · clearHistory · pruneHistoryDay → extracted to src/hooks/use-history.js (P6c) */
-  const goSearchOrigin = () => {
-    const o = searchOriginRef.current;
-    if (o) {setSearchOrigin(null);setScreen(o.screen);if (o.bookId !== undefined) setBookId(o.bookId);if (o.chapterNum !== undefined) setChapterNum(o.chapterNum);if (o.letterId !== undefined) setLetterId(o.letterId);} else
-    goHome();
-  };
   /* toggleSetting + updateSetting → src/hooks/use-settings.js (P6g) */
 
   /* ── Mark as Read helpers ──
@@ -667,130 +628,13 @@ function App() {
   };
 
 
-  // Derive search-volume map from COLLECTIONS registry
-  const srchVolLookup = (searchVolId) => {
-    const col = COL_BY_SEARCH_ID.get(searchVolId);
-    if (!col) return null;
-    return { screen: col.letterScreen, lastReadFn: (id) => setLastReadForVol(col.volKey, id), activeKey: 'vol:' + col.volKey };
-  };
-  // Compat alias used by handleSearchSelect and handleSearchCommand
-  const SRCH_VOL_MAP = new Proxy({}, { get: (_, key) => srchVolLookup(key) });
+  /* srchVolLookup / SRCH_VOL_MAP / srchResolveLetterId → src/hooks/use-search.js (P7c). */
 
-  const srchResolveLetterId = (volumeId, letterNum, letterId) => {
-    if (letterId) return letterId;
-    if (letterNum == null) return null;
-    const col = COL_BY_SEARCH_ID.get(volumeId);
-    if (!col) return null;
-    const arr = colLetterArr(col);
-    for (let i = 0; i < arr.length; i++) if (arr[i] && arr[i].num === letterNum) return arr[i].id;
-    const pref = colPreface(col);
-    if (pref && (letterNum === 0 || arr.length === 0)) return pref.id;
-    return null;
-  };
-
-  const handleSearchSelect = (entry) => {
-    setFromSearch(true);
-    // Direct parsed reference (from __direct entries)
-    if (entry && entry.__direct && entry.ref) {
-      const r = entry.ref;
-      // Scriptures corpus → plain Matthew (bible-ch). Volumes/All → study.
-      const useStudyMatthew = entry.__corpus !== 'scriptures';
-      if (r.kind === 'ref-bible' || r.kind === 'named-passage') {
-        const matthewHit = r.bookId === 'matthew' || r.bookId === 'matthew-plain';
-        const effectiveBookId = matthewHit ?
-        useStudyMatthew ? 'matthew' : 'matthew-plain' :
-        r.bookId;
-        setBookId(effectiveBookId);
-        setChapterNum(r.chapter);
-        if (r.verseStart) {
-          const vs = [];
-          const vEnd = r.verseEnd || r.verseStart;
-          for (let v = r.verseStart; v <= vEnd; v++) vs.push(v);
-          setSurpriseAnchor({ type: 'verse', verses: vs });
-        } else {
-          setSurpriseAnchor(null);
-        }
-        setScreen(effectiveBookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
-        return;
-      }
-      if (r.kind === 'ref-letter') {
-        const vm = SRCH_VOL_MAP[r.volumeId];
-        if (!vm) return;
-        const lid = srchResolveLetterId(r.volumeId, r.letterNum, r.letterId);
-        if (!lid) return;
-        setLetterId(lid);
-        if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(lid));
-        else vm.lastReadFn(lid);
-        setScreen(vm.screen);
-        return;
-      }
-      if (r.kind === 'ref-book') {
-        const matthewHit = r.bookId === 'matthew' || r.bookId === 'matthew-plain';
-        const effectiveBookId = matthewHit ?
-        useStudyMatthew ? 'matthew' : 'matthew-plain' :
-        r.bookId;
-        setBookId(effectiveBookId);
-        setChapterNum(null);
-        setScreen(effectiveBookId === 'matthew' ? 'matthew-idx' : 'bible-idx');
-        return;
-      }
-      return;
-    }
-    // Result doc from Orama
-    const doc = entry && entry.doc;
-    if (!doc) return;
-    const k = doc.kind;
-    if (k === 'verse' || k === 'chapter-title' || k === 'heading' || k === 'study-note' || k === 'cross-ref') {
-      // doc.bookId is 'matthew' only in the Volumes engine (Study Bible);
-      // Scriptures engine emits 'matthew-plain'. Route accordingly.
-      setBookId(doc.bookId);
-      setChapterNum(doc.chapterNum);
-      if (doc.verseNum) {
-        setSurpriseAnchor({ type: 'verse', verses: [doc.verseNum] });
-      } else {
-        setSurpriseAnchor(null);
-      }
-      setScreen(doc.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
-      return;
-    }
-    if (k === 'letter' || k === 'letter-title' || k === 'footnote' || k === 'wtlb' || k === 'wtlb-title' || k === 'blessed' || k === 'blessed-title' || k === 'holy-day' || k === 'holy-day-title') {
-      const vm = SRCH_VOL_MAP[doc.volumeId];
-      if (!vm || !doc.letterId) return;
-      setLetterId(doc.letterId);
-      if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(doc.letterId));
-      else vm.lastReadFn(doc.letterId);
-      setScreen(vm.screen);
-      return;
-    }
-    if (k === 'bible-study') {
-      // Open the study at the given chapter
-      setStudyId(doc.letterId || null);
-      setStudyChapterId(doc.chapterNum || null);
-      setScreen('bible-study-chapter');
-      return;
-    }
-  };
-
-  // Handler for command-kind parses (dispatched from SearchScreen)
-  const handleSearchCommand = (action) => {
-    if (action === 'home') {setScreen('home');return;}
-    if (action === 'settings') {goSettings && goSettings();return;}
-    if (action === 'scriptures') {setScreen('scriptures-home');return;}
-    if (action === 'volumes') {setScreen('volumes-home');return;}
-    if (action === 'clear-query') {setSearchQuery('');return;}
-    if (action === 'rebuild-index') {
-      if (window.VotSearch) window.VotSearch.rebuild().catch(() => {});
-      return;
-    }
-    if (action === 'random') {
-      // trigger random scripture/letter — uses existing Surprise Me flow.
-      // (Was `if (typeof surpriseMe === 'function') surpriseMe();` — a typo;
-      //  the actual handler in App's closure is handleSurprise. The typeof
-      //  guard masked the dead reference; lint caught it.)
-      handleSurprise();
-      return;
-    }
-  };
+  /* handleSearchSelect (80-line result dispatcher) + handleSearchCommand
+     → src/hooks/use-search.js (P7c). Both are returned by useSearch
+     (called below, after handleSurprise — the search hook takes
+     handleSurprise as a param for its 'random' command, same TDZ
+     pattern as P7a's useNavHistoryTracking). */
 
   /* screenRef / bookIdRef / genreIdRef → created inside useAndroidBack (P6l) */
 
@@ -804,7 +648,7 @@ function App() {
   const fromMatthewChRef = useRefMirror(fromMatthewCh);  // also used in the render (~line 3001)
   /* fromLetterRef → returned by useFromLetterStack (P6i);
      fromSearchRef / fromStudiesRef / studyIdRef / fromWtlbRef → created inside useAndroidBack (P6l) */
-  const searchOriginRef = useRefMirror(searchOrigin);
+  /* searchOriginRef → owned by useSearch (P7c). */
 
   /* visibilitychange dwell-pause/resume effect → src/hooks/use-reading-dwell.js (P6f) */
 
@@ -880,6 +724,28 @@ function App() {
       setScreen(col.letterScreen);
     }
   };
+
+  /* Search domain — state + helpers + handlers + window.__goSearch bridge.
+     Sits BETWEEN handleSurprise (above) and useAndroidBack (below) by
+     necessity: handleSurprise is a useSearch param (the 'random' command
+     delegates to it for cross-domain handoff), and useAndroidBack consumes
+     goSearchOrigin from useSearch's return. The window where this call
+     fits is exactly one slot. Once handleSurprise extracts to useSurprise,
+     useSearch can move up to alongside useNav. */
+  const {
+    searchQuery, setSearchQuery,
+    searchScope, setSearchScope,
+    searchContext,
+    goSearch, goSearchOrigin,
+    handleSearchSelect, handleSearchCommand,
+  } = useSearch({
+    tabField,
+    screen, bookId, chapterNum, letterId,
+    setScreen, setBookId, setChapterNum, setLetterId,
+    setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch,
+    setActiveReadKey, setLastReadForVol,
+    handleSurprise, goSettings, goHome,
+  });
 
   /* ── Matthew ── */
   const selectMatthewCh = (num) => {setChapterNum(num);setScreen("matthew-ch");setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: num })));};

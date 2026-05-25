@@ -7997,13 +7997,9 @@
       } catch (_e) {
       }
     };
-    const [searchQuery, setSearchQuery] = tabField("searchQuery");
     const [fromSearch, setFromSearch] = tabField("fromSearch");
     const [fromMatthewCh, setFromMatthewCh] = tabField("fromMatthewCh");
     const [fromWtlb, setFromWtlb] = tabField("fromWtlb");
-    const [searchOrigin, setSearchOrigin] = tabField("searchOrigin");
-    const [searchScope, setSearchScope] = tabField("searchScope");
-    const [searchContext, setSearchContext] = tabField("searchContext");
     const [navOrigin, setNavOrigin] = tabField("navOrigin");
     const { readHistory, addToHistory, clearHistory, pruneHistoryDay } = useHistory(settings.historyEnabled);
     const { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail } = useThumbnails({
@@ -8175,43 +8171,6 @@
       } else
         goHome();
     };
-    const goSearch = () => {
-      setSearchOrigin({ screen, bookId, chapterNum, letterId });
-      let ctx = null;
-      if (screen === "matthew-ch") {
-        ctx = { kind: "book", bookId: "matthew", label: "Matthew" };
-      } else if (screen === "bible-ch" && bookId) {
-        const bk = BOOKS[bookId];
-        ctx = { kind: "book", bookId, label: bk ? bk.title : bookId };
-      } else {
-        const _scCol = COL_BY_LETTER_SC.get(screen);
-        if (_scCol) ctx = { kind: "volume", volumeId: _scCol.searchVolId, label: _scCol.label };
-      }
-      setSearchContext(ctx);
-      setSearchScope(null);
-      if (window.__pendingSearchQuery) {
-        setSearchQuery(window.__pendingSearchQuery);
-        window.__pendingSearchQuery = null;
-      }
-      setScreen("search");
-    };
-    useEffect(() => {
-      window.__goSearch = goSearch;
-      return () => {
-        window.__goSearch = null;
-      };
-    });
-    const goSearchOrigin = () => {
-      const o = searchOriginRef.current;
-      if (o) {
-        setSearchOrigin(null);
-        setScreen(o.screen);
-        if (o.bookId !== void 0) setBookId(o.bookId);
-        if (o.chapterNum !== void 0) setChapterNum(o.chapterNum);
-        if (o.letterId !== void 0) setLetterId(o.letterId);
-      } else
-        goHome();
-    };
     const VERSION_ID = "v1";
     const getReadKey = (bid, cid) => `${VERSION_ID}:${bid}:${cid}`;
     const isRead = (bid, cid) => !!readItems[getReadKey(bid, cid)];
@@ -8291,128 +8250,7 @@
           setGardenWarningOpen(true);
       }
     };
-    const srchVolLookup = (searchVolId) => {
-      const col = COL_BY_SEARCH_ID.get(searchVolId);
-      if (!col) return null;
-      return { screen: col.letterScreen, lastReadFn: (id) => setLastReadForVol(col.volKey, id), activeKey: "vol:" + col.volKey };
-    };
-    const SRCH_VOL_MAP = new Proxy({}, { get: (_, key) => srchVolLookup(key) });
-    const srchResolveLetterId = (volumeId, letterNum, letterId2) => {
-      if (letterId2) return letterId2;
-      if (letterNum == null) return null;
-      const col = COL_BY_SEARCH_ID.get(volumeId);
-      if (!col) return null;
-      const arr = colLetterArr(col);
-      for (let i = 0; i < arr.length; i++) if (arr[i] && arr[i].num === letterNum) return arr[i].id;
-      const pref = colPreface(col);
-      if (pref && (letterNum === 0 || arr.length === 0)) return pref.id;
-      return null;
-    };
-    const handleSearchSelect = (entry) => {
-      setFromSearch(true);
-      if (entry && entry.__direct && entry.ref) {
-        const r = entry.ref;
-        const useStudyMatthew = entry.__corpus !== "scriptures";
-        if (r.kind === "ref-bible" || r.kind === "named-passage") {
-          const matthewHit = r.bookId === "matthew" || r.bookId === "matthew-plain";
-          const effectiveBookId = matthewHit ? useStudyMatthew ? "matthew" : "matthew-plain" : r.bookId;
-          setBookId(effectiveBookId);
-          setChapterNum(r.chapter);
-          if (r.verseStart) {
-            const vs = [];
-            const vEnd = r.verseEnd || r.verseStart;
-            for (let v = r.verseStart; v <= vEnd; v++) vs.push(v);
-            setSurpriseAnchor({ type: "verse", verses: vs });
-          } else {
-            setSurpriseAnchor(null);
-          }
-          setScreen(effectiveBookId === "matthew" ? "matthew-ch" : "bible-ch");
-          return;
-        }
-        if (r.kind === "ref-letter") {
-          const vm = SRCH_VOL_MAP[r.volumeId];
-          if (!vm) return;
-          const lid = srchResolveLetterId(r.volumeId, r.letterNum, r.letterId);
-          if (!lid) return;
-          setLetterId(lid);
-          if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(lid));
-          else vm.lastReadFn(lid);
-          setScreen(vm.screen);
-          return;
-        }
-        if (r.kind === "ref-book") {
-          const matthewHit = r.bookId === "matthew" || r.bookId === "matthew-plain";
-          const effectiveBookId = matthewHit ? useStudyMatthew ? "matthew" : "matthew-plain" : r.bookId;
-          setBookId(effectiveBookId);
-          setChapterNum(null);
-          setScreen(effectiveBookId === "matthew" ? "matthew-idx" : "bible-idx");
-          return;
-        }
-        return;
-      }
-      const doc = entry && entry.doc;
-      if (!doc) return;
-      const k = doc.kind;
-      if (k === "verse" || k === "chapter-title" || k === "heading" || k === "study-note" || k === "cross-ref") {
-        setBookId(doc.bookId);
-        setChapterNum(doc.chapterNum);
-        if (doc.verseNum) {
-          setSurpriseAnchor({ type: "verse", verses: [doc.verseNum] });
-        } else {
-          setSurpriseAnchor(null);
-        }
-        setScreen(doc.bookId === "matthew" ? "matthew-ch" : "bible-ch");
-        return;
-      }
-      if (k === "letter" || k === "letter-title" || k === "footnote" || k === "wtlb" || k === "wtlb-title" || k === "blessed" || k === "blessed-title" || k === "holy-day" || k === "holy-day-title") {
-        const vm = SRCH_VOL_MAP[doc.volumeId];
-        if (!vm || !doc.letterId) return;
-        setLetterId(doc.letterId);
-        if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(doc.letterId));
-        else vm.lastReadFn(doc.letterId);
-        setScreen(vm.screen);
-        return;
-      }
-      if (k === "bible-study") {
-        setStudyId(doc.letterId || null);
-        setStudyChapterId(doc.chapterNum || null);
-        setScreen("bible-study-chapter");
-        return;
-      }
-    };
-    const handleSearchCommand = (action) => {
-      if (action === "home") {
-        setScreen("home");
-        return;
-      }
-      if (action === "settings") {
-        goSettings && goSettings();
-        return;
-      }
-      if (action === "scriptures") {
-        setScreen("scriptures-home");
-        return;
-      }
-      if (action === "volumes") {
-        setScreen("volumes-home");
-        return;
-      }
-      if (action === "clear-query") {
-        setSearchQuery("");
-        return;
-      }
-      if (action === "rebuild-index") {
-        if (window.VotSearch) window.VotSearch.rebuild().catch(() => {
-        });
-        return;
-      }
-      if (action === "random") {
-        handleSurprise();
-        return;
-      }
-    };
     const fromMatthewChRef = useRefMirror(fromMatthewCh);
-    const searchOriginRef = useRefMirror(searchOrigin);
     useEffect(() => {
       const t = setTimeout(() => {
         try {
@@ -8480,6 +8318,36 @@
         setScreen(col.letterScreen);
       }
     };
+    const {
+      searchQuery,
+      setSearchQuery,
+      searchScope,
+      setSearchScope,
+      searchContext,
+      goSearch,
+      goSearchOrigin,
+      handleSearchSelect,
+      handleSearchCommand
+    } = useSearch({
+      tabField,
+      screen,
+      bookId,
+      chapterNum,
+      letterId,
+      setScreen,
+      setBookId,
+      setChapterNum,
+      setLetterId,
+      setStudyId,
+      setStudyChapterId,
+      setSurpriseAnchor,
+      setFromSearch,
+      setActiveReadKey,
+      setLastReadForVol,
+      handleSurprise,
+      goSettings,
+      goHome
+    });
     const selectMatthewCh = (num) => {
       setChapterNum(num);
       setScreen("matthew-ch");

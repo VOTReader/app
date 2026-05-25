@@ -92,15 +92,27 @@ export default defineConfig({
       // only). Gate floors advance: statements 14→17, functions 12→16,
       // lines 15→17. Branches floor unchanged at 13.
       //
+      // P7c baseline (+ use-search, 331 tests — Phase 1 search-domain
+      // extraction):
+      //   statements 21.52 (590/2741) | branches 18.26 (377/2064)
+      //   functions  18.32 (96/524)   | lines    22.08 (441/1997)
+      // useSearch's handleSearchSelect is the heaviest single dispatcher
+      // in the codebase (~14 if/else-if branches across __direct refs
+      // + Orama doc kinds). The 56 new tests cover each branch + the
+      // 7 handleSearchCommand actions + goSearch's 4 context variants
+      // + the window.__goSearch bridge identity-churn invariant.
+      // Branches jump biggest (+4.61) as expected. Gate floors advance:
+      // statements 17→21, branches 13→18, functions 16→18, lines 17→22.
+      //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
-        statements: 17,
-        branches: 13,
-        functions: 16,
-        lines: 17,
+        statements: 21,
+        branches: 18,
+        functions: 18,
+        lines: 22,
       },
     },
   },

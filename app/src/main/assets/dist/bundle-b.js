@@ -3767,6 +3767,207 @@
     };
   }
 
+  // app/src/main/assets/src/hooks/use-search.js
+  function useSearch({
+    tabField,
+    screen,
+    bookId,
+    chapterNum,
+    letterId,
+    setScreen,
+    setBookId,
+    setChapterNum,
+    setLetterId,
+    setStudyId,
+    setStudyChapterId,
+    setSurpriseAnchor,
+    setFromSearch,
+    setActiveReadKey,
+    setLastReadForVol,
+    handleSurprise,
+    goSettings,
+    goHome
+  }) {
+    const [searchQuery, setSearchQuery] = tabField("searchQuery");
+    const [searchOrigin, setSearchOrigin] = tabField("searchOrigin");
+    const [searchScope, setSearchScope] = tabField("searchScope");
+    const [searchContext, setSearchContext] = tabField("searchContext");
+    const searchOriginRef = useRefMirror(searchOrigin);
+    const goSearch = () => {
+      setSearchOrigin({ screen, bookId, chapterNum, letterId });
+      let ctx = null;
+      if (screen === "matthew-ch") {
+        ctx = { kind: "book", bookId: "matthew", label: "Matthew" };
+      } else if (screen === "bible-ch" && bookId) {
+        const bk = BOOKS[bookId];
+        ctx = { kind: "book", bookId, label: bk ? bk.title : bookId };
+      } else {
+        const _scCol = COL_BY_LETTER_SC.get(screen);
+        if (_scCol) ctx = { kind: "volume", volumeId: _scCol.searchVolId, label: _scCol.label };
+      }
+      setSearchContext(ctx);
+      setSearchScope(null);
+      if (window.__pendingSearchQuery) {
+        setSearchQuery(window.__pendingSearchQuery);
+        window.__pendingSearchQuery = null;
+      }
+      setScreen("search");
+    };
+    React.useEffect(() => {
+      window.__goSearch = goSearch;
+      return () => {
+        window.__goSearch = null;
+      };
+    });
+    const goSearchOrigin = () => {
+      const o = searchOriginRef.current;
+      if (o) {
+        setSearchOrigin(null);
+        setScreen(o.screen);
+        if (o.bookId !== void 0) setBookId(o.bookId);
+        if (o.chapterNum !== void 0) setChapterNum(o.chapterNum);
+        if (o.letterId !== void 0) setLetterId(o.letterId);
+      } else {
+        goHome();
+      }
+    };
+    const srchVolLookup = (searchVolId) => {
+      const col = COL_BY_SEARCH_ID.get(searchVolId);
+      if (!col) return null;
+      return {
+        screen: col.letterScreen,
+        lastReadFn: (id) => setLastReadForVol(col.volKey, id),
+        activeKey: "vol:" + col.volKey
+      };
+    };
+    const SRCH_VOL_MAP = new Proxy({}, { get: (_, key) => srchVolLookup(key) });
+    const srchResolveLetterId = (volumeId, letterNum, lid) => {
+      if (lid) return lid;
+      if (letterNum == null) return null;
+      const col = COL_BY_SEARCH_ID.get(volumeId);
+      if (!col) return null;
+      const arr = colLetterArr(col);
+      for (let i = 0; i < arr.length; i++) if (arr[i] && arr[i].num === letterNum) return arr[i].id;
+      const pref = colPreface(col);
+      if (pref && (letterNum === 0 || arr.length === 0)) return pref.id;
+      return null;
+    };
+    const handleSearchSelect = (entry) => {
+      setFromSearch(true);
+      if (entry && entry.__direct && entry.ref) {
+        const r = entry.ref;
+        const useStudyMatthew = entry.__corpus !== "scriptures";
+        if (r.kind === "ref-bible" || r.kind === "named-passage") {
+          const matthewHit = r.bookId === "matthew" || r.bookId === "matthew-plain";
+          const effectiveBookId = matthewHit ? useStudyMatthew ? "matthew" : "matthew-plain" : r.bookId;
+          setBookId(effectiveBookId);
+          setChapterNum(r.chapter);
+          if (r.verseStart) {
+            const vs = [];
+            const vEnd = r.verseEnd || r.verseStart;
+            for (let v = r.verseStart; v <= vEnd; v++) vs.push(v);
+            setSurpriseAnchor({ type: "verse", verses: vs });
+          } else {
+            setSurpriseAnchor(null);
+          }
+          setScreen(effectiveBookId === "matthew" ? "matthew-ch" : "bible-ch");
+          return;
+        }
+        if (r.kind === "ref-letter") {
+          const vm = SRCH_VOL_MAP[r.volumeId];
+          if (!vm) return;
+          const lid = srchResolveLetterId(r.volumeId, r.letterNum, r.letterId);
+          if (!lid) return;
+          setLetterId(lid);
+          if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(lid));
+          else vm.lastReadFn(lid);
+          setScreen(vm.screen);
+          return;
+        }
+        if (r.kind === "ref-book") {
+          const matthewHit = r.bookId === "matthew" || r.bookId === "matthew-plain";
+          const effectiveBookId = matthewHit ? useStudyMatthew ? "matthew" : "matthew-plain" : r.bookId;
+          setBookId(effectiveBookId);
+          setChapterNum(null);
+          setScreen(effectiveBookId === "matthew" ? "matthew-idx" : "bible-idx");
+          return;
+        }
+        return;
+      }
+      const doc = entry && entry.doc;
+      if (!doc) return;
+      const k = doc.kind;
+      if (k === "verse" || k === "chapter-title" || k === "heading" || k === "study-note" || k === "cross-ref") {
+        setBookId(doc.bookId);
+        setChapterNum(doc.chapterNum);
+        if (doc.verseNum) {
+          setSurpriseAnchor({ type: "verse", verses: [doc.verseNum] });
+        } else {
+          setSurpriseAnchor(null);
+        }
+        setScreen(doc.bookId === "matthew" ? "matthew-ch" : "bible-ch");
+        return;
+      }
+      if (k === "letter" || k === "letter-title" || k === "footnote" || k === "wtlb" || k === "wtlb-title" || k === "blessed" || k === "blessed-title" || k === "holy-day" || k === "holy-day-title") {
+        const vm = SRCH_VOL_MAP[doc.volumeId];
+        if (!vm || !doc.letterId) return;
+        setLetterId(doc.letterId);
+        if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(doc.letterId));
+        else vm.lastReadFn(doc.letterId);
+        setScreen(vm.screen);
+        return;
+      }
+      if (k === "bible-study") {
+        setStudyId(doc.letterId || null);
+        setStudyChapterId(doc.chapterNum || null);
+        setScreen("bible-study-chapter");
+        return;
+      }
+    };
+    const handleSearchCommand = (action) => {
+      if (action === "home") {
+        setScreen("home");
+        return;
+      }
+      if (action === "settings") {
+        goSettings();
+        return;
+      }
+      if (action === "scriptures") {
+        setScreen("scriptures-home");
+        return;
+      }
+      if (action === "volumes") {
+        setScreen("volumes-home");
+        return;
+      }
+      if (action === "clear-query") {
+        setSearchQuery("");
+        return;
+      }
+      if (action === "rebuild-index") {
+        if (window.VotSearch) window.VotSearch.rebuild().catch(() => {
+        });
+        return;
+      }
+      if (action === "random") {
+        handleSurprise();
+        return;
+      }
+    };
+    return {
+      searchQuery,
+      setSearchQuery,
+      searchScope,
+      setSearchScope,
+      searchContext,
+      goSearch,
+      goSearchOrigin,
+      handleSearchSelect,
+      handleSearchCommand
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -4193,7 +4394,7 @@
   var COL_BY_CARD = new Map(COLLECTIONS2.filter((c) => c.cardId).map((c) => [c.cardId, c]));
   var COL_BY_LETTER_SC2 = new Map(COLLECTIONS2.map((c) => [c.letterScreen, c]));
   var COL_BY_INDEX_SC2 = new Map(COLLECTIONS2.filter((c) => c.indexScreen).map((c) => [c.indexScreen, c]));
-  var COL_BY_SEARCH_ID = new Map(COLLECTIONS2.filter((c) => c.searchVolId).map((c) => [c.searchVolId, c]));
+  var COL_BY_SEARCH_ID2 = new Map(COLLECTIONS2.filter((c) => c.searchVolId).map((c) => [c.searchVolId, c]));
   var COL_BY_READ_KEY = new Map(COLLECTIONS2.filter((c) => c.readKey).map((c) => [c.readKey, c]));
   var _NAV_ICONS = { one: "V1", two: "V2", three: "V3", four: "V4", five: "V5", six: "V6", seven: "V7", timothy: "LT", flock: "LF", rebuke: "LR", wtlb1: "W1", wtlb2: "W2", blessed: "TB", holydays: "HD", hm: "HM" };
   var COL_NAV_ICON = new Map(COLLECTIONS2.map((c) => [c.label, _NAV_ICONS[c.volKey] || "?"]));
@@ -4214,10 +4415,10 @@
   function colLetters(col) {
     return col && typeof window[col.globalName] !== "undefined" ? window[col.globalName] : null;
   }
-  function colPreface(col) {
+  function colPreface2(col) {
     return col && col.prefaceGlobal && typeof window[col.prefaceGlobal] !== "undefined" ? window[col.prefaceGlobal] : null;
   }
-  function colLetterArr(col) {
+  function colLetterArr2(col) {
     if (!col) return [];
     const arr = colLetters(col);
     return Array.isArray(arr) ? arr : [];
@@ -4300,7 +4501,7 @@
     if (!id) return null;
     const cols = kindHint ? COLLECTIONS2.filter((c) => c.kind === kindHint) : COLLECTIONS2;
     for (const col of cols) {
-      const pref = colPreface(col);
+      const pref = colPreface2(col);
       if (pref && pref.id === id) return { kind: col.kind, screen: col.letterScreen, collection: col.label, title: pref.title || id, entry: pref };
       const arr = colLetters(col);
       if (!Array.isArray(arr)) continue;
@@ -7209,6 +7410,7 @@
     useAndroidBack,
     useNavHistoryTracking,
     useNav,
+    useSearch,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
@@ -7216,7 +7418,7 @@
     COL_BY_CARD,
     COL_BY_LETTER_SC: COL_BY_LETTER_SC2,
     COL_BY_INDEX_SC: COL_BY_INDEX_SC2,
-    COL_BY_SEARCH_ID,
+    COL_BY_SEARCH_ID: COL_BY_SEARCH_ID2,
     COL_BY_READ_KEY,
     _NAV_ICONS,
     COL_NAV_ICON,
@@ -7226,8 +7428,8 @@
     _isWtlbFamily,
     _boundaryShort,
     colLetters,
-    colPreface,
-    colLetterArr,
+    colPreface: colPreface2,
+    colLetterArr: colLetterArr2,
     LETTER_SCREEN_SET: LETTER_SCREEN_SET2,
     _allBooks: _allBooks2,
     _matthew,
