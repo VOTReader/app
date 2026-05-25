@@ -1,8 +1,7 @@
-// @ts-nocheck -- Q4.1 placeholder; will be removed when this file gets proper JSDoc in Q4.2 (utils) or Q4.3 (stores).
 /* ═══════════════════════════════════════════════════════════════
    JOURNAL MEDIA STORE — IndexedDB wrapper for images + audio blobs
    ═══════════════════════════════════════════════════════════════
-   Global-scope module. Concatenates with index.html via <script src>.
+   Global-scope module. Bundled into bundle-b via _entry-b.js.
    No dependencies — uses only browser IndexedDB.
 
    Why IndexedDB: a single audio recording is ~200-400 KB and an image
@@ -26,15 +25,49 @@
    reads inside the same session don't create duplicate URLs. Caller
    should NOT revokeObjectURL on these — the cache handles cleanup
    on store delete.
+
+   Pattern note: this store does NOT extend CachedStore (it's IDB-backed,
+   not localStorage-backed), so the extendStore helper doesn't apply.
+   The IIFE that follows constructs the store directly with module-
+   private state in closure.
 ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * @typedef {{
+ *   id: string,
+ *   type: 'image' | 'audio',
+ *   blob: Blob,
+ *   mime?: string,
+ *   size?: number,
+ *   width?: number,
+ *   height?: number,
+ *   duration?: number,
+ *   created?: number
+ * }} MediaRecord
+ */
+
+/**
+ * Metadata-only shape returned by list() — same as MediaRecord minus the
+ * heavy `blob` field. Used by the journal hub to render media counts and
+ * thumbnails without loading every blob into memory.
+ *
+ * @typedef {Omit<MediaRecord, 'blob'>} MediaMetadata
+ */
 
 export var JournalMediaStore = (function() {
   var DB_NAME = 'vot-journal-media';
   var DB_VERSION = 1;
   var STORE = 'media';
+  /** @type {Promise<IDBDatabase> | null} */
   var _dbPromise = null;
+  /** @type {Record<string, string>} */
   var _urlCache = {};
 
+  /**
+   * Open (or reuse) the IDB connection. Rejects when IndexedDB is
+   * unavailable; resolves with the database otherwise.
+   * @returns {Promise<IDBDatabase>}
+   */
   function openDb() {
     if (_dbPromise) return _dbPromise;
     _dbPromise = new Promise(function(resolve, reject) {
@@ -44,29 +77,44 @@ export var JournalMediaStore = (function() {
       }
       var req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = function(e) {
-        var db = e.target.result;
+        var db = /** @type {IDBOpenDBRequest} */ (e.target).result;
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: 'id' });
         }
       };
-      req.onsuccess = function(e) { resolve(e.target.result); };
-      req.onerror = function(e) { reject(e.target.error); };
+      req.onsuccess = function(e) { resolve(/** @type {IDBOpenDBRequest} */ (e.target).result); };
+      req.onerror = function(e) { reject(/** @type {IDBOpenDBRequest} */ (e.target).error); };
     });
     return _dbPromise;
   }
 
+  /**
+   * Resolve to the IDB object store at the requested mode.
+   * @param {IDBTransactionMode} mode
+   * @returns {Promise<IDBObjectStore>}
+   */
   function tx(mode) {
     return openDb().then(function(db) {
       return db.transaction([STORE], mode).objectStore(STORE);
     });
   }
 
+  /**
+   * Generate a fresh media-record id (timestamp + random suffix).
+   * @returns {string}
+   */
   function mediaId() {
     return 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
   }
 
   return {
-    /* Insert a new media record. If `record.id` is absent, auto-generates one. */
+    /**
+     * Insert a media record. Auto-generates id/created/size/mime when
+     * absent. Pre-warms the URL cache on success so the next render is
+     * instant. Rejects when blob/type is missing.
+     * @param {MediaRecord} record
+     * @returns {Promise<string>}  the (possibly auto-generated) id
+     */
     put: function(record) {
       if (!record || !record.blob || !record.type) {
         return Promise.reject(new Error('Invalid media record: requires blob + type'));
@@ -79,26 +127,36 @@ export var JournalMediaStore = (function() {
         return new Promise(function(resolve, reject) {
           var req = store.put(record);
           req.onsuccess = function() {
-            // Pre-warm the URL cache so the next render is instant.
             try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
             resolve(record.id);
           };
-          req.onerror = function(e) { reject(e.target.error); };
+          req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
         });
       });
     },
 
+    /**
+     * Read one record by id (full record including blob). Resolves null
+     * when id is falsy or unknown.
+     * @param {string | null | undefined} id
+     * @returns {Promise<MediaRecord | null>}
+     */
     get: function(id) {
       if (!id) return Promise.resolve(null);
       return tx('readonly').then(function(store) {
         return new Promise(function(resolve, reject) {
           var req = store.get(id);
-          req.onsuccess = function(e) { resolve(e.target.result || null); };
-          req.onerror = function(e) { reject(e.target.error); };
+          req.onsuccess = function(e) { resolve(/** @type {IDBRequest} */ (e.target).result || null); };
+          req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
         });
       });
     },
 
+    /**
+     * Delete a record AND revoke its cached object URL. Idempotent.
+     * @param {string | null | undefined} id
+     * @returns {Promise<void>}
+     */
     delete: function(id) {
       if (!id) return Promise.resolve();
       if (_urlCache[id]) {
@@ -109,53 +167,69 @@ export var JournalMediaStore = (function() {
         return new Promise(function(resolve, reject) {
           var req = store.delete(id);
           req.onsuccess = function() { resolve(); };
-          req.onerror = function(e) { reject(e.target.error); };
+          req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
         });
       });
     },
 
+    /**
+     * Metadata for every record (no blobs). Cheap enough to call on
+     * hub renders; expensive blobs load lazily via objectUrl().
+     * @returns {Promise<MediaMetadata[]>}
+     */
     list: function() {
       return tx('readonly').then(function(store) {
         return new Promise(function(resolve, reject) {
+          /** @type {MediaMetadata[]} */
           var out = [];
           var req = store.openCursor();
           req.onsuccess = function(e) {
-            var cursor = e.target.result;
+            var cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
             if (cursor) {
               var v = cursor.value;
-              // Return metadata only — blob is heavy.
               out.push({ id: v.id, type: v.type, mime: v.mime, size: v.size, width: v.width, height: v.height, duration: v.duration, created: v.created });
               cursor.continue();
             } else {
               resolve(out);
             }
           };
-          req.onerror = function(e) { reject(e.target.error); };
+          req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
         });
       });
     },
 
+    /**
+     * Every id in the store. Uses openKeyCursor when available (cheaper
+     * — no value materialization).
+     * @returns {Promise<string[]>}
+     */
     allIds: function() {
       return tx('readonly').then(function(store) {
         return new Promise(function(resolve, reject) {
+          /** @type {string[]} */
           var out = [];
           var req = store.openKeyCursor ? store.openKeyCursor() : store.openCursor();
           req.onsuccess = function(e) {
-            var cursor = e.target.result;
+            var cursor = /** @type {IDBRequest<IDBCursor | null>} */ (e.target).result;
             if (cursor) {
-              out.push(cursor.key !== undefined ? cursor.key : cursor.value.id);
+              out.push(String(cursor.key !== undefined ? cursor.key : /** @type {any} */ (cursor).value.id));
               cursor.continue();
             } else {
               resolve(out);
             }
           };
-          req.onerror = function(e) { reject(e.target.error); };
+          req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
         });
       });
     },
 
-    /* Returns a cached object URL for the given media id, fetching from
-       IndexedDB on first call. Null if the record doesn't exist. */
+    /**
+     * Cached object URL for a media id. First call creates + caches the
+     * URL; subsequent calls return the cached value. Resolves null when
+     * id is unknown or createObjectURL throws.
+     * @param {string | null | undefined} id
+     * @returns {Promise<string | null>}
+     */
     objectUrl: function(id) {
       if (!id) return Promise.resolve(null);
       if (_urlCache[id]) return Promise.resolve(_urlCache[id]);
@@ -169,9 +243,15 @@ export var JournalMediaStore = (function() {
       });
     },
 
-    /* Remove every blob NOT referenced by `referencedIds`. Used by the
-       orphan cleanup pass on app start. */
+    /**
+     * Remove every blob NOT referenced by `referencedIds`. Returns the
+     * count of removed records (for diagnostic logging). Used by the
+     * orphan-cleanup pass on app start.
+     * @param {string[]} referencedIds
+     * @returns {Promise<number>}
+     */
     pruneOrphans: function(referencedIds) {
+      /** @type {Record<string, boolean>} */
       var set = {};
       (referencedIds || []).forEach(function(id) { set[id] = true; });
       var self = this;
@@ -181,18 +261,34 @@ export var JournalMediaStore = (function() {
       });
     },
 
-    /* Image compression helper. Pass a File or Blob; returns a compressed
-       Blob plus computed dimensions. Caller then `put`s the result.
-
-       EXIF: older Android WebViews do NOT auto-apply EXIF orientation to
-       <img>, so phone photos (orientation 6/8) would store sideways. When
-       createImageBitmap supports imageOrientation:'from-image' we use it so
-       the baked pixels are upright. Falls back to the <img> path otherwise. */
+    /**
+     * Compress an image File/Blob to a smaller JPEG suitable for storage.
+     * Returns the compressed blob + computed dimensions. Caller `put`s
+     * the result with type:'image'.
+     *
+     * EXIF: older Android WebViews do NOT auto-apply EXIF orientation
+     * to `<img>`, so phone photos (orientation 6/8) would store sideways.
+     * When createImageBitmap supports `imageOrientation:'from-image'`
+     * we use it so the baked pixels are upright. Falls back to the
+     * <img> path otherwise.
+     *
+     * @param {File | Blob} fileOrBlob
+     * @param {{ maxDim?: number, quality?: number }} [opts]
+     *   maxDim defaults to 1600; quality defaults to 0.8.
+     * @returns {Promise<{ blob: Blob, width: number, height: number }>}
+     */
     compressImage: function(fileOrBlob, opts) {
       opts = opts || {};
       var maxDim = opts.maxDim || 1600;
       var quality = opts.quality || 0.8;
 
+      /**
+       * @param {CanvasImageSource & {width: number, height: number}} source
+       * @param {number} w
+       * @param {number} h
+       * @param {(() => void) | null} [cleanup]
+       * @returns {Promise<{ blob: Blob, width: number, height: number }>}
+       */
       function encodeFrom(source, w, h, cleanup) {
         return new Promise(function(resolve, reject) {
           if (!w || !h) { cleanup && cleanup(); reject(new Error('Image has zero dimensions')); return; }
@@ -250,6 +346,7 @@ export var JournalMediaStore = (function() {
       }
       return imgPath();
 
+      /** @returns {Promise<{ blob: Blob, width: number, height: number }>} */
       function imgPath() {
         return new Promise(function(resolve, reject) {
           var url = URL.createObjectURL(fileOrBlob);
@@ -265,6 +362,7 @@ export var JournalMediaStore = (function() {
       }
     },
 
+    /** Exposed for callers that need to generate ids ahead of put(). */
     mediaId: mediaId
   };
 })();
