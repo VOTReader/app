@@ -3626,6 +3626,147 @@
     }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
   }
 
+  // app/src/main/assets/src/hooks/use-nav.js
+  function useNav({
+    screen,
+    bookId,
+    chapterNum,
+    letterId,
+    studyId,
+    studyChapterId,
+    setScreen,
+    setBookId,
+    setChapterNum,
+    setGenreId,
+    setNavOrigin,
+    setFromSearch,
+    setFromWtlb,
+    setFromLetterStack,
+    setJournalEntryId,
+    setGardenPage
+  }) {
+    const _captureOrigin = () => setNavOrigin({
+      screen,
+      bookId,
+      chapterNum,
+      letterId,
+      studyId,
+      studyChapterId
+    });
+    const goHome = () => {
+      setFromSearch(false);
+      setFromWtlb(null);
+      setFromLetterStack([]);
+      window.__pendingHighlight = null;
+      window.__pendingScrollHlKey = null;
+      setScreen("home");
+      setBookId(null);
+      setChapterNum(null);
+    };
+    const goScripturesHome = () => {
+      setScreen("scriptures-home");
+      setBookId(null);
+      setChapterNum(null);
+      setGenreId(null);
+    };
+    const goScriptureGenre = (gid) => {
+      setGenreId(gid);
+      setScreen("scripture-genre");
+    };
+    const goVolumesHome = () => {
+      setScreen("volumes-home");
+    };
+    const goSettings = () => {
+      _captureOrigin();
+      setScreen("settings");
+    };
+    const goHistory = () => {
+      _captureOrigin();
+      setScreen("history");
+    };
+    const goAbout = () => {
+      _captureOrigin();
+      setScreen("about");
+    };
+    const goLibrary = () => {
+      _captureOrigin();
+      setScreen("library");
+    };
+    const goJournalHub = () => {
+      _captureOrigin();
+      setScreen("journal-home");
+    };
+    const goNotesIndex = () => {
+      _captureOrigin();
+      setScreen("notes-index");
+    };
+    const goLinksIndex = () => {
+      _captureOrigin();
+      setScreen("links-index");
+    };
+    const goBookmarksIndex = () => {
+      _captureOrigin();
+      setScreen("bookmarks-index");
+    };
+    const goHighlightsIndex = () => {
+      _captureOrigin();
+      setScreen("highlights-index");
+    };
+    const goJournalViewer = (eid) => {
+      if (eid) {
+        setJournalEntryId(eid);
+        setScreen("journal-viewer");
+      }
+    };
+    const goJournalEditor = (eid) => {
+      if (eid) {
+        setJournalEntryId(eid);
+        setScreen("journal-editor");
+      }
+    };
+    const goColIdx = (volKey) => {
+      const c = COL_BY_KEY.get(volKey);
+      if (c && c.indexScreen) setScreen(c.indexScreen);
+    };
+    const goMatthewIdx = () => {
+      setChapterNum(null);
+      setScreen("matthew-idx");
+    };
+    const goStudiesHome = () => {
+      setScreen("studies-home");
+    };
+    const goBibleIdx = () => {
+      setChapterNum(null);
+      setScreen("bible-idx");
+    };
+    const goToGardenFirst = () => {
+      setGardenPage(1);
+      setScreen("garden-view");
+    };
+    return {
+      goHome,
+      goScripturesHome,
+      goScriptureGenre,
+      goVolumesHome,
+      goSettings,
+      goHistory,
+      goAbout,
+      goLibrary,
+      goJournalHub,
+      goJournalViewer,
+      goJournalEditor,
+      goNotesIndex,
+      goLinksIndex,
+      goBookmarksIndex,
+      goHighlightsIndex,
+      goColIdx,
+      goMatthewIdx,
+      goStudiesHome,
+      goBibleIdx,
+      goToGardenFirst
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -7067,6 +7208,7 @@
     usePersistedState,
     useAndroidBack,
     useNavHistoryTracking,
+    useNav,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,

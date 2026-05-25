@@ -38,8 +38,8 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q4 (JSDoc / tsc --checkJs)  ✅ DONE  — 37 files typed, CI gate zero-tolerance
   smoke-lite.js for CI        ✅ DONE  — Node CLI; globals + collections + cycles
   Q5 (Vitest)                 ✅ DONE  — 218 tests / 9 files; ratchet 1→14 stmts
-  App() decomposition (P7)    🚧 ACTIVE — P7a landed (useNavHistoryTracking);
-                                          241 tests; App() 2,261 → 2,256 lines
+  App() decomposition (P7)    🚧 ACTIVE — P7a + P7b landed; 275 tests;
+                                          App() 2,261 → 2,254 lines
   Q6 (CSS hardening)          ⬜ PENDING
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ POST-Q4 BACKLOG (priority order — top = next)
    Render-tree decomposition is required, in a separate phase with a
    distinct risk profile.
 
-   ── Phase 1: logic extraction (active; P7a landed) ───────────────────
+   ── Phase 1: logic extraction (active; P7a + P7b landed) ────────────
    Goal: get App() to ~1,400–1,600 lines by pulling hooks + callbacks
    out of the logic block.
 
@@ -96,15 +96,41 @@ POST-Q4 BACKLOG (priority order — top = next)
            11→13. Net App() shrink: 5 lines (architectural win is bigger
            — the most debt-laden disable cite moved out).
 
+     P7b — useNav (2026-05-24): 20 simple nav-chrome helpers extracted
+           (goHome / goScripturesHome / goScriptureGenre / goVolumesHome
+           / 8 navOrigin-pattern: goSettings, goHistory, goAbout,
+           goLibrary, goJournalHub, goNotesIndex, goLinksIndex,
+           goBookmarksIndex, goHighlightsIndex / 2 journal nav:
+           goJournalViewer, goJournalEditor / 5 trivial switchers:
+           goColIdx, goMatthewIdx, goStudiesHome, goBibleIdx,
+           goToGardenFirst). Pilot principle applied
+           ([[low-risk-pilot-first]]): the 4 complex helpers (goTabs /
+           goNavOrigin / goSearch / goSearchOrigin) deliberately left
+           for P7c — they need refs + thumbnail-helper deps + the
+           26-line search-context computation + window.__goSearch
+           bridge effect. The 8 navOrigin-pattern setNavOrigin literals
+           deduplicate to one private `_captureOrigin()` inside the
+           hook. 34 new vitest tests. Coverage ratchet bumped:
+           stmts 14→17, fns 12→16, lines 15→17 (branches held at 13).
+           Net App() shrink: 2 lines (architectural win again bigger).
+
    Next Phase 1 candidates (rough order, bottom-up by dependency):
-     - Inline nav-helpers (goHome / goNavOrigin / goSearchOrigin /
-       goVolumesHome / goLibrary / goJournalViewer / etc.) → `useNav`.
-       ~150 lines — the single biggest Phase 1 reduction target.
-     - Remaining state-coordination glue → 1-2 small hooks (handleSelect,
-       handleSurprise, mark-as-read coordinators).
-     - The Bible Studies block (STUDIES, getStudyById, getStudyChapter,
+     - P7c — useComplexNav for the 4 deferred helpers from P7b (goTabs /
+       goNavOrigin / goSearch / goSearchOrigin). Needs navOriginRef +
+       searchOriginRef + flushScrollToActiveTab + captureActiveTab
+       Thumbnail + the window.__goSearch bridge effect. ~50-70 lines.
+     - Bible Studies block (STUDIES, getStudyById, getStudyChapter,
        selectStudy, selectStudyChapter, UNIFIED_CHAIN, chain helpers,
-       goToChainEntryFirst/Last) ≈ 100 lines → `useBibleStudies` or split.
+       goToChainEntryFirst/Last) ≈ 100 lines → `useBibleStudies` or
+       split.
+     - Boundary/reading-chain nav (_first/_last/_firstPreface,
+       _goFirst/_goLast, boundaryConfig, goNextBibleBook/
+       goPrevBibleBook) ≈ 100 lines → `useReadingChainNav`. Tied to
+       Bible Studies; consider sequencing together.
+     - Remaining state-coordination glue → 1-2 small hooks (handleSelect,
+       handleSurprise, handleScriptureSelect, handleVolumeSelect,
+       handleSearchSelect, handleSearchCommand, mark-as-read
+       coordinators).
 
    Realistic Phase 1 floor: ~1,450–1,550 lines.
 
@@ -129,7 +155,29 @@ POST-Q4 BACKLOG (priority order — top = next)
      26 trivial letter/index 4-line wrappers: ~104 lines (collapse all
      at once via the ScreenRouter pattern).
 
-   Workflow per extraction (different risk profile from Phase 1):
+   Phase 2 sequencing — low-risk PILOT first, high-risk after:
+
+     P7-2a (FIRST):  ScreenRouter pattern over the 26 trivial 4-line
+                     letter/index wrappers. ~104 lines collapsed by a
+                     lookup table replacing the switch chain. Near-zero
+                     risk: the wrapper div stays identical (each entry
+                     was already `{screen === X && <XScreen … />}` — a
+                     dispatch table renders the same XScreen with the
+                     same props, just chosen by `screens[screen]`). No
+                     CSS selectors break, no ErrorBoundary moves, no
+                     effect-fire semantics change. The mechanical win
+                     proves the ScreenRouter shape works before any
+                     substantive screen extraction touches it.
+
+     P7-2b, 2c, …:   Substantive screen extractions in size-descending
+                     order: garden-view (240) → bible-study-chapter (87)
+                     → matthew-ch (42) → bible-ch (40) → holy-days-index
+                     (37). Each is its own commit. The risks below
+                     (CSS, useEffect, ErrorBoundary) apply ONLY to
+                     these — but they ride on the ScreenRouter pattern
+                     proven in 2a.
+
+   Workflow per substantive extraction (P7-2b onward, NOT 2a):
      1. Extract the screen block into ui/screens/XScreen.jsx (most
         screens already have this file shape; this is moving the
         last conditional-render wrapper into the screen file itself).

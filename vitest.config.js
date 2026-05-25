@@ -81,15 +81,26 @@ export default defineConfig({
       // dimensions held at the same integer floor (statements 14,
       // functions 12, lines 15) so they don't move yet.
       //
+      // P7b baseline (+ use-nav, 275 tests — Phase 1 simple-nav
+      // surface extraction):
+      //   statements 17.10 (442/2584) | branches 13.65 (264/1934)
+      //   functions  16.66 (85/510)   | lines    17.22 (323/1875)
+      // useNav is 20 distinct exported helpers — each adds a function
+      // and several statements. Functions jump (+3.76) and statements
+      // (+2.38) are proportional to the surface added; branches barely
+      // moves because the hook's branching is minimal (falsy guards
+      // only). Gate floors advance: statements 14→17, functions 12→16,
+      // lines 15→17. Branches floor unchanged at 13.
+      //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
-        statements: 14,
+        statements: 17,
         branches: 13,
-        functions: 12,
-        lines: 15,
+        functions: 16,
+        lines: 17,
       },
     },
   },

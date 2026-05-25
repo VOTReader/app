@@ -8085,46 +8085,46 @@
     const blessedEntry = _findLetter("blessed");
     const hdEntry = _findLetter("holydays");
     const hmEntry = _findLetter("hm");
-    const goHome = () => {
-      setFromSearch(false);
-      setFromWtlb(null);
-      setFromLetterStack([]);
-      window.__pendingHighlight = null;
-      window.__pendingScrollHlKey = null;
-      setScreen("home");
-      setBookId(null);
-      setChapterNum(null);
-    };
-    const goScripturesHome = () => {
-      setScreen("scriptures-home");
-      setBookId(null);
-      setChapterNum(null);
-      setGenreId(null);
-    };
-    const goScriptureGenre = (gid) => {
-      setGenreId(gid);
-      setScreen("scripture-genre");
-    };
-    const goVolumesHome = () => {
-      setScreen("volumes-home");
-    };
-    const goSettings = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("settings");
-    };
-    const goHistory = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("history");
-    };
-    const goAbout = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("about");
-    };
-    const goLibrary = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("library");
-    };
     const [journalEntryId, setJournalEntryId] = useState(null);
+    const {
+      goHome,
+      goScripturesHome,
+      goScriptureGenre,
+      goVolumesHome,
+      goSettings,
+      goHistory,
+      goAbout,
+      goLibrary,
+      goJournalHub,
+      goJournalViewer,
+      goJournalEditor,
+      goNotesIndex,
+      goLinksIndex,
+      goBookmarksIndex,
+      goHighlightsIndex,
+      goColIdx,
+      goMatthewIdx,
+      goStudiesHome,
+      goBibleIdx,
+      goToGardenFirst
+    } = useNav({
+      screen,
+      bookId,
+      chapterNum,
+      letterId,
+      studyId,
+      studyChapterId,
+      setScreen,
+      setBookId,
+      setChapterNum,
+      setGenreId,
+      setNavOrigin,
+      setFromSearch,
+      setFromWtlb,
+      setFromLetterStack,
+      setJournalEntryId,
+      setGardenPage
+    });
     const { navigateToLink } = useNavigateToLink({
       closeLinkSidebar,
       pushFromLetter,
@@ -8143,22 +8143,6 @@
       setSurpriseAnchor,
       setJournalEntryId
     });
-    const goJournalHub = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("journal-home");
-    };
-    const goJournalViewer = (eid) => {
-      if (eid) {
-        setJournalEntryId(eid);
-        setScreen("journal-viewer");
-      }
-    };
-    const goJournalEditor = (eid) => {
-      if (eid) {
-        setJournalEntryId(eid);
-        setScreen("journal-editor");
-      }
-    };
     const createAndEditJournal = () => {
       if (typeof JournalStore === "undefined") return;
       const e = JournalStore.add();
@@ -8171,22 +8155,6 @@
       setHlTick((t) => t + 1);
       setJournalEntryId(e.id);
       setScreen("journal-editor");
-    };
-    const goNotesIndex = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("notes-index");
-    };
-    const goLinksIndex = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("links-index");
-    };
-    const goBookmarksIndex = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("bookmarks-index");
-    };
-    const goHighlightsIndex = () => {
-      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-      setScreen("highlights-index");
     };
     const goTabs = () => {
       if (!settings.tabsEnabled) return;
@@ -8288,10 +8256,6 @@
           setScreen(activeReadKey === "matthew" ? "matthew-ch" : "bible-ch");
         }
       }
-    };
-    const goColIdx = (volKey) => {
-      const c = COL_BY_KEY.get(volKey);
-      if (c && c.indexScreen) setScreen(c.indexScreen);
     };
     const handleScriptureSelect = (id, clearGenre) => {
       if (clearGenre) setGenreId(null);
@@ -8521,17 +8485,10 @@
       setScreen("matthew-ch");
       setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: num })));
     };
-    const goMatthewIdx = () => {
-      setChapterNum(null);
-      setScreen("matthew-idx");
-    };
     const STUDIES = _studies();
     const getStudyById = (id) => STUDIES.find((s) => s.id === id) || null;
     const getStudyChapter = (study, chId) => study && study.chapters ? study.chapters.find((c) => c.id === chId) : null;
     const studyReadKey = (slug) => `bible-study-${slug}`;
-    const goStudiesHome = () => {
-      setScreen("studies-home");
-    };
     useAndroidBack({
       screen,
       bookId,
@@ -8660,10 +8617,6 @@
       setScreen("bible-ch");
       setActiveReadKey(bookId, () => setLastReadChapters((prev) => ({ ...prev, [bookId]: num })));
     };
-    const goBibleIdx = () => {
-      setChapterNum(null);
-      setScreen("bible-idx");
-    };
     const goToRevelationLast = () => {
       const rev = BOOKS.revelation;
       setBookId("revelation");
@@ -8702,10 +8655,6 @@
       _goFirst[col.volKey] = pref ? _firstPreface(pref, arr, col.volKey, col.letterScreen) : _first(arr, col.volKey, col.letterScreen);
       _goLast[col.volKey] = _last(arr, col.volKey, col.letterScreen);
     });
-    const goToGardenFirst = () => {
-      setGardenPage(1);
-      setScreen("garden-view");
-    };
     const boundaryConfig = (volKey, entry) => {
       const sourceCol = COL_BY_KEY.get(volKey);
       if (!sourceCol) return { prevBoundary: null, onPrevBoundary: null, nextBoundary: null, onNextBoundary: null };

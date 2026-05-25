@@ -507,21 +507,26 @@ function App() {
   const hdEntry = _findLetter('holydays');
   const hmEntry = _findLetter('hm');
 
-  /* ── Core navigation ── */
-  const goHome = () => {setFromSearch(false);setFromWtlb(null);setFromLetterStack([]);window.__pendingHighlight = null;window.__pendingScrollHlKey = null;setScreen("home");setBookId(null);setChapterNum(null);};
-  const goScripturesHome = () => {setScreen("scriptures-home");setBookId(null);setChapterNum(null);setGenreId(null);};
-  const goScriptureGenre = (gid) => {setGenreId(gid);setScreen("scripture-genre");};
-  const goVolumesHome = () => {setScreen("volumes-home");};
-  const goSettings = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("settings");};
-  const goHistory = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("history");};
-  const goAbout = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("about");};
-  const goLibrary = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("library");};
-  // ── Journal nav helpers ──
+  /* App-shell nav surface (20 helpers) → src/hooks/use-nav.js (P7b).
+     goTabs / goNavOrigin / goSearch / goSearchOrigin stay below (P7c). */
   const [journalEntryId, setJournalEntryId] = useState(null);
+  const {
+    goHome, goScripturesHome, goScriptureGenre, goVolumesHome,
+    goSettings, goHistory, goAbout, goLibrary,
+    goJournalHub, goJournalViewer, goJournalEditor,
+    goNotesIndex, goLinksIndex, goBookmarksIndex, goHighlightsIndex,
+    goColIdx, goMatthewIdx, goStudiesHome, goBibleIdx, goToGardenFirst,
+  } = useNav({
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    setScreen, setBookId, setChapterNum, setGenreId,
+    setNavOrigin, setFromSearch, setFromWtlb, setFromLetterStack,
+    setJournalEntryId, setGardenPage,
+  });
 
   /* useNavigateToLink — the cross-app deep-linking router. Placed here
-     because setJournalEntryId (just above) is one of its params; its
-     returned navigateToLink has no consumer before this point. P6j. */
+     because setJournalEntryId (declared above for useNav too) is one of
+     its params; its returned navigateToLink has no consumer before this
+     point. P6j. */
   const { navigateToLink } = useNavigateToLink({
     closeLinkSidebar, pushFromLetter,
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
@@ -529,9 +534,6 @@ function App() {
     setSurpriseAnchor, setJournalEntryId,
   });
 
-  const goJournalHub = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("journal-home");};
-  const goJournalViewer = (eid) => {if (eid) {setJournalEntryId(eid);setScreen("journal-viewer");}};
-  const goJournalEditor = (eid) => {if (eid) {setJournalEntryId(eid);setScreen("journal-editor");}};
   const createAndEditJournal = () => {
     if (typeof JournalStore === 'undefined') return;
     const e = JournalStore.add();
@@ -545,10 +547,6 @@ function App() {
     setJournalEntryId(e.id);
     setScreen("journal-editor");
   };
-  const goNotesIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("notes-index");};
-  const goLinksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("links-index");};
-  const goBookmarksIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("bookmarks-index");};
-  const goHighlightsIndex = () => {setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });setScreen("highlights-index");};
   /* captureActiveTabThumbnail + scroll-stop + aspect-ratio + after-nav effects
      → extracted to src/hooks/use-thumbnails.js (P6d) */
 
@@ -649,7 +647,7 @@ function App() {
     }
   };
 
-  const goColIdx = (volKey) => { const c = COL_BY_KEY.get(volKey); if (c && c.indexScreen) setScreen(c.indexScreen); };
+  /* goColIdx → src/hooks/use-nav.js (P7b). */
 
   /* ── Category → sub-section routing ── */
   const handleScriptureSelect = (id, clearGenre) => {
@@ -885,7 +883,7 @@ function App() {
 
   /* ── Matthew ── */
   const selectMatthewCh = (num) => {setChapterNum(num);setScreen("matthew-ch");setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: num })));};
-  const goMatthewIdx = () => {setChapterNum(null);setScreen("matthew-idx");};
+  /* goMatthewIdx → src/hooks/use-nav.js (P7b). */
 
   /* ── Bible Letter Studies ── */
   const STUDIES = _studies();
@@ -893,7 +891,7 @@ function App() {
   const getStudyChapter = (study, chId) => study && study.chapters ? study.chapters.find((c) => c.id === chId) : null;
   const studyReadKey = (slug) => `bible-study-${slug}`;
 
-  const goStudiesHome = () => {setScreen("studies-home");};
+  /* goStudiesHome → src/hooks/use-nav.js (P7b). */
 
   /* useAndroidBack — the window.handleAndroidBack routing handler + its 9
      call-time ref mirrors. Extracted to src/hooks/use-android-back.js
@@ -1007,7 +1005,7 @@ function App() {
 
   /* ── Ephesians / Hebrews ── */
   const selectBibleCh = (num) => {setChapterNum(num);setScreen("bible-ch");setActiveReadKey(bookId, () => setLastReadChapters((prev) => ({ ...prev, [bookId]: num })));};
-  const goBibleIdx = () => {setChapterNum(null);setScreen("bible-idx");};
+  /* goBibleIdx → src/hooks/use-nav.js (P7b). */
 
   /* ── Cross-volume boundary jumps ──
      Chain: Revelation → V1 → V2 → V3 → V4 → V5 → V6 → V7 → Rebuke → WTLB1 → WTLB2 → Flock → Timothy
@@ -1025,7 +1023,7 @@ function App() {
     _goFirst[col.volKey] = pref ? _firstPreface(pref, arr, col.volKey, col.letterScreen) : _first(arr, col.volKey, col.letterScreen);
     _goLast[col.volKey] = _last(arr, col.volKey, col.letterScreen);
   });
-  const goToGardenFirst = () => {setGardenPage(1);setScreen("garden-view");};
+  /* goToGardenFirst → src/hooks/use-nav.js (P7b). */
 
   /* boundaryConfig(volKey, entry) → { prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary }
      Derives reading-chain boundary cards from READING_CHAIN, skipping empty

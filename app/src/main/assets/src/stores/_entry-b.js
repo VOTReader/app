@@ -73,6 +73,7 @@ import { useTabActions } from '../hooks/use-tab-actions.js';
 import { usePersistedState } from '../hooks/use-persisted-state.js';
 import { useAndroidBack } from '../hooks/use-android-back.js';
 import { useNavHistoryTracking } from '../hooks/use-nav-history-tracking.js';
+import { useNav } from '../hooks/use-nav.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -141,6 +142,7 @@ Object.assign(window, {
   usePersistedState,
   useAndroidBack,
   useNavHistoryTracking,
+  useNav,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,
