@@ -128,6 +128,7 @@ import { SettingsScreen } from './screens/SettingsScreen.jsx';
 import { HomeScreen } from './screens/HomeScreen.jsx';
 import { SearchScreen } from './screens/SearchScreen.jsx';
 import { BibleStudyIndex } from './screens/BibleStudyIndex.jsx';
+import { BibleStudyChapterView } from './screens/BibleStudyChapterView.jsx';
 import { ChapterIndex } from './screens/ChapterIndex.jsx';
 import {
   GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
@@ -213,7 +214,7 @@ Object.assign(window, {
   LibraryScreen, NotesIndexScreen,
   VolumesHome, StudiesHome, HistoryScreen, AboutScreen,
   SettingsScreen, HomeScreen, SearchScreen,
-  BibleStudyIndex, ChapterIndex,
+  BibleStudyIndex, BibleStudyChapterView, ChapterIndex,
   GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
   ScriptureGenre, ScripturesHome,
   _linkEndpointCategory, _endpointResolves, _epSearchText,

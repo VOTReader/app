@@ -4579,6 +4579,137 @@
     ))));
   }
 
+  // app/src/main/assets/src/ui/screens/BibleStudyChapterView.jsx
+  function BibleStudyChapterView2({
+    // Identity
+    studyId,
+    studyChapterId,
+    // Study lookup + chain nav (from useBibleStudies + useReadingChainNav)
+    getStudyById,
+    getStudyChapter,
+    studiesLoading,
+    prevChainEntry,
+    nextChainEntry,
+    goToChainEntryFirst,
+    goToChainEntryLast,
+    // Tab-state setters (study + Matthew + letter handoff)
+    setStudyChapterId,
+    setScreen,
+    setBookId,
+    setChapterNum,
+    setFromStudies,
+    setLetterId,
+    setActiveReadKey,
+    setSurpriseAnchor,
+    // Read progress (from useReadProgress)
+    markRead,
+    unmarkRead,
+    isRead,
+    studyReadKey,
+    // Reading position (from useReadingPositionNav)
+    prophecyCardStatesRef,
+    saveProphecyCardStates,
+    // Study selection
+    selectStudy,
+    selectStudyChapter,
+    // Nav helpers
+    goStudiesHome,
+    // Common LetterView bundle (theme/search/history/settings/link/etc.)
+    sharedViewProps
+  }) {
+    if (!studyId || !studyChapterId) return null;
+    const study = getStudyById(studyId);
+    const ch = getStudyChapter(study, studyChapterId);
+    if (!study || !ch) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
+    const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
+    const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
+    const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
+    const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
+    const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
+    const pick = (chVal, studyVal, empty) => {
+      if (chVal === void 0 || chVal === null) return studyVal != null ? studyVal : empty;
+      if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
+      return chVal;
+    };
+    const letterShim = {
+      id: ch.id,
+      title: ch.title,
+      subtitle: ch.subtitle || null,
+      num: ch.num,
+      date: null,
+      from: null,
+      spoken: null,
+      forLine: null,
+      preamble: ch.part ? `Part ${ch.part}` : null,
+      blocks: ch.blocks || [],
+      sectionIntro: ch.sectionIntro || null,
+      footnotes: ch.footnotes || {},
+      nkjv: ch.nkjv || {},
+      prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
+      nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
+      relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
+      bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
+      videos: pick(ch.videos, study.videos, []),
+      audioUrl: pick(ch.audioUrl, study.audioUrl, null),
+      soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
+      videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
+      videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
+      videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
+      addendum: pick(ch.addendum, study.addendum, null)
+    };
+    const jumpToStudy = (targetSlug) => {
+      if (targetSlug === "matthew-study") {
+        setFromStudies(true);
+        setBookId("matthew");
+        setChapterNum(null);
+        setScreen("matthew-idx");
+        return;
+      }
+      const target = getStudyById(targetSlug);
+      if (!target || target.locked) return;
+      selectStudy(targetSlug);
+    };
+    const handleLetterClick = (lid, sc) => {
+      setFromStudies(true);
+      setLetterId(lid);
+      const _col = COL_BY_LETTER_SC.get(sc);
+      if (_col) setActiveReadKey(_col.readKey);
+      setScreen(sc);
+    };
+    return /* @__PURE__ */ React.createElement(
+      LetterView,
+      {
+        ...sharedViewProps,
+        letter: letterShim,
+        studyMode: true,
+        volumeLabel: study.title,
+        onHome: () => {
+          if (study.chapters.length > 1) {
+            setStudyChapterId(null);
+            setScreen("bible-study-index");
+          } else {
+            goStudiesHome();
+          }
+        },
+        onNavigate: (chId) => {
+          setSurpriseAnchor(null);
+          selectStudyChapter(studyId, chId);
+        },
+        onStudyNavigate: jumpToStudy,
+        onLetterClick: handleLetterClick,
+        onMarkRead: () => markRead(studyReadKey(study.slug), studyChapterId),
+        onUnmark: () => unmarkRead(studyReadKey(study.slug), studyChapterId),
+        isRead: (id) => isRead(studyReadKey(study.slug), id),
+        prevBoundary: prevEntry ? { short: studyShortTitle(prevEntry.title), title: studyShortTitle(prevEntry.title) } : null,
+        onPrevBoundary: prevEntry ? goToChainEntryLast(prevEntry.slug) : null,
+        nextBoundary: nextEntry ? { short: studyShortTitle(nextEntry.title), title: studyShortTitle(nextEntry.title) } : null,
+        onNextBoundary: nextEntry ? goToChainEntryFirst(nextEntry.slug) : null,
+        prophecyCardStatesRef,
+        saveProphecyCardStates
+      }
+    );
+  }
+
   // app/src/main/assets/src/ui/screens/ChapterIndex.jsx
   function ChapterIndex2({ book, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, markAsReadEnabled, restoredNames, showChapterTitle }) {
     const currentRef = React.useRef(null);
@@ -8881,99 +9012,38 @@
           }
         );
       },
-      "bible-study-chapter": () => {
-        if (!studyId || !studyChapterId) return null;
-        const study = getStudyById(studyId);
-        const ch = getStudyChapter(study, studyChapterId);
-        if (!study || !ch) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
-        const idx = study.chapters.findIndex((c) => c.id === studyChapterId);
-        const prevCh = idx > 0 ? study.chapters[idx - 1] : null;
-        const nextCh = idx < study.chapters.length - 1 ? study.chapters[idx + 1] : null;
-        const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
-        const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
-        const pick = (chVal, studyVal, empty) => {
-          if (chVal === void 0 || chVal === null) return studyVal != null ? studyVal : empty;
-          if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
-          return chVal;
-        };
-        const letterShim = {
-          id: ch.id,
-          title: ch.title,
-          subtitle: ch.subtitle || null,
-          num: ch.num,
-          date: null,
-          from: null,
-          spoken: null,
-          forLine: null,
-          preamble: ch.part ? `Part ${ch.part}` : null,
-          blocks: ch.blocks || [],
-          sectionIntro: ch.sectionIntro || null,
-          footnotes: ch.footnotes || {},
-          nkjv: ch.nkjv || {},
-          prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
-          nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
-          relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
-          bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
-          videos: pick(ch.videos, study.videos, []),
-          audioUrl: pick(ch.audioUrl, study.audioUrl, null),
-          soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
-          videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
-          videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
-          videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
-          addendum: pick(ch.addendum, study.addendum, null)
-        };
-        const jumpToStudy = (targetSlug) => {
-          if (targetSlug === "matthew-study") {
-            setFromStudies(true);
-            setBookId("matthew");
-            setChapterNum(null);
-            setScreen("matthew-idx");
-            return;
-          }
-          const target = getStudyById(targetSlug);
-          if (!target || target.locked) return;
-          selectStudy(targetSlug);
-        };
-        const handleLetterClick = (lid, sc) => {
-          setFromStudies(true);
-          setLetterId(lid);
-          const _col = COL_BY_LETTER_SC.get(sc);
-          if (_col) setActiveReadKey(_col.readKey);
-          setScreen(sc);
-        };
-        return /* @__PURE__ */ React.createElement(
-          LetterView,
-          {
-            ...sharedViewProps,
-            letter: letterShim,
-            studyMode: true,
-            volumeLabel: study.title,
-            onHome: () => {
-              if (study.chapters.length > 1) {
-                setStudyChapterId(null);
-                setScreen("bible-study-index");
-              } else {
-                goStudiesHome();
-              }
-            },
-            onNavigate: (chId) => {
-              setSurpriseAnchor(null);
-              selectStudyChapter(studyId, chId);
-            },
-            onStudyNavigate: jumpToStudy,
-            onLetterClick: handleLetterClick,
-            onMarkRead: () => markRead(studyReadKey(study.slug), studyChapterId),
-            onUnmark: () => unmarkRead(studyReadKey(study.slug), studyChapterId),
-            isRead: (id) => isRead(studyReadKey(study.slug), id),
-            prevBoundary: prevEntry ? { short: studyShortTitle(prevEntry.title), title: studyShortTitle(prevEntry.title) } : null,
-            onPrevBoundary: prevEntry ? goToChainEntryLast(prevEntry.slug) : null,
-            nextBoundary: nextEntry ? { short: studyShortTitle(nextEntry.title), title: studyShortTitle(nextEntry.title) } : null,
-            onNextBoundary: nextEntry ? goToChainEntryFirst(nextEntry.slug) : null,
-            prophecyCardStatesRef,
-            saveProphecyCardStates
-          }
-        );
-      },
+      "bible-study-chapter": () => /* @__PURE__ */ React.createElement(
+        BibleStudyChapterView,
+        {
+          studyId,
+          studyChapterId,
+          getStudyById,
+          getStudyChapter,
+          studiesLoading,
+          prevChainEntry,
+          nextChainEntry,
+          goToChainEntryFirst,
+          goToChainEntryLast,
+          setStudyChapterId,
+          setScreen,
+          setBookId,
+          setChapterNum,
+          setFromStudies,
+          setLetterId,
+          setActiveReadKey,
+          setSurpriseAnchor,
+          markRead,
+          unmarkRead,
+          isRead,
+          studyReadKey,
+          prophecyCardStatesRef,
+          saveProphecyCardStates,
+          selectStudy,
+          selectStudyChapter,
+          goStudiesHome,
+          sharedViewProps
+        }
+      ),
       "holy-days-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, typeof HOLY_DAYS_META !== "undefined" && (HOLY_DAYS_META.audioPlaylist || HOLY_DAYS_META.videoPlaylist) && /* @__PURE__ */ React.createElement("div", { className: "hd-playlists" }, HOLY_DAYS_META.audioPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.audioPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("path", { d: "M9 18V5l12-2v13" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "18", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "16", r: "3" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Audio Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Listen on Bandcamp")), HOLY_DAYS_META.videoPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.videoPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polygon", { points: "23 7 16 12 23 17 23 7" }), /* @__PURE__ */ React.createElement("rect", { x: "1", y: "5", width: "15", height: "14", rx: "2", ry: "2" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Video Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Watch on YouTube"))), /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })), ...colIdxProps("holydays") })),
       "holy-days-entry": () => {
         if (!hdEntry) return null;
@@ -9472,6 +9542,7 @@
     HomeScreen: HomeScreen2,
     SearchScreen: SearchScreen2,
     BibleStudyIndex: BibleStudyIndex2,
+    BibleStudyChapterView: BibleStudyChapterView2,
     ChapterIndex: ChapterIndex2,
     GARDEN_PRELOAD_AHEAD,
     GARDEN_CRAWL_DELAY,
