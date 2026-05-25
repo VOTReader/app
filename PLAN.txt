@@ -35,68 +35,99 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q2.7 (JSX conversion)       ✅ DONE  — every component is JSX
   Q3 (ESLint)                 ✅ DONE  — 0 errors / 0 warnings, CI `--max-warnings 0`
                                           locked, lint-staged in pre-commit
-  Q4 (JSDoc / tsc --checkJs)  ⬜ NEXT
-  Q5 (Vitest)                 ⬜ PENDING
+  Q4 (JSDoc / tsc --checkJs)  ✅ DONE  — 37 files typed, CI gate zero-tolerance
+  Smoke-lite.js for CI        ⬜ NEXT
+  Q5 (Vitest)                 ⬜ PENDING — targets the typed hooks + stores
+  App() decomposition         ⬜ PENDING — AFTER Q5 (see [[refactor-after-tests]])
   Q6 (CSS hardening)          ⬜ PENDING
 
 ───────────────────────────────────────────────────────────────────────────────
-Q4 SCOPE DECISION (pinned 2026-05-24)
+POST-Q4 SEQUENCING DECISION (pinned 2026-05-24, after Q4 close)
 ───────────────────────────────────────────────────────────────────────────────
 
-Q4 = JSDoc + `tsc --checkJs` strict-incremental, scoped to:
-  ✅ hooks/         (15 files — clean OWNS/PARAMS/RETURNS headers already)
-  ✅ stores/        (11 stores + _entry-b.js — defined interfaces)
-  ✅ utils/         (11 helper bundles — pure functions)
+The strict order that follows now governs the next 3 phases:
 
-EXPLICITLY DEFERRED from Q4:
-  ❌ app.jsx           — 2,191 lines, untypable at that size
-  ❌ ui/screens/       — components depend on App() shape
-  ❌ ui/sheets/        — same
-  ❌ ui/components/    — same
+  1. smoke-lite.js  (next)        — Node-runnable safety net for CI
+  2. Q5 Vitest                     — test the typed hooks + stores + utils
+  3. App() decomposition           — AFTER Q5, NOT before
 
-Rationale: App() at 2,191 lines is the bottleneck for both JSDoc types AND
-Vitest tests. The 15 hooks + 11 stores + utils have clean, narrow interfaces
-that type cleanly. App() does not. "Break up App()" is a phase between
-Q5 and Q6 (or interleaved), NOT a side quest inside Q4.
+Why this order: high-risk structural refactors come after test coverage on
+the affected surface, not before. Tests exist to catch regressions during
+refactoring; without coverage on the hooks/stores App() composes, a
+decomposition is a leap of faith — you won't know what broke until manual
+smoke fires in a browser. Build the safety net, then do the surgery.
 
-Q4 deliverables:
-  - `jsconfig.json` with `"checkJs": true, "strict": false` (start permissive)
-  - JSDoc on every export in hooks/ + stores/ + utils/
-  - CI step: `tsc --noEmit` enforced (fails on type errors)
-  - Pre-commit lint-staged extension to include `tsc` on staged files? — open question
+See memory [[refactor-after-tests]] for the durable principle.
 
-Q4 success criteria:
-  - All 37+ files in scope (15+11+11) pass strict `tsc --checkJs`
-  - CI typecheck step gates regressions (zero-tolerance from day one — see
-    lint-regression-gate principle)
-  - JSDoc renders correctly in any IDE that consumes it (VS Code / IntelliJ)
-  - Smoke PASS unchanged
+smoke-lite is the bridge between "smoke runs in a browser" and "CI can
+catch data/module regressions." Once it exists, vitest can IMPORT and
+EXTEND its checks rather than rebuilding them. That's why smoke-lite must
+be Node-runnable + importable — Python would break the vitest extension
+path.
 
 ───────────────────────────────────────────────────────────────────────────────
-POST-Q3 / POST-Q4 BACKLOG (priority order)
+POST-Q4 BACKLOG (priority order — top = next)
 ───────────────────────────────────────────────────────────────────────────────
 
-1. SMOKE-LITE.JS — Node-runnable subset of tools/smoke.js for CI
-   ─────────────────────────────────────────────────────────────
+1. SMOKE-LITE.JS — Node-runnable safety net for CI (NEXT)
+   ───────────────────────────────────────────────────────
    tools/smoke.js (34 KB, ~681 lines) is browser-only — runs via preview_eval,
    only when triggered. CI can't use it, so regressions slip until manual smoke.
 
-   Extract the non-DOM subset into Node:
+   Extract the non-DOM subset into a Node module (NOT Python — must be
+   importable by vitest in Q5):
      - Every .js in app/src/main/assets/src parses cleanly (overlaps CI syntax-check)
      - All COLLECTIONS entries resolve to non-empty letter arrays or a preface
-     - Module export validation — lexical-mirror writes 143 globals; verify
-       source-of-truth list matches what entry files export
+     - Module export validation — lexical-mirror writes 331 globals; verify
+       source-of-truth list matches what entry files export (the
+       gen-eslint-globals.py output, regenerated and diff-checked)
      - No circular imports in stores/_entry-b.js, renderer/_entry.js,
        ui/_entry-d.js (esbuild rejects strict cycles, but reorder regressions
        inside an entry file are not always caught)
 
-   Effort: ~half-day. Higher regression-coverage value than the entire Q3.3e
-   warning sweep combined.
+   Export shape: `runSmokeChecks() → { issues: [...], ok: boolean }`. CLI
+   wrapper exits nonzero if issues. CI step runs the CLI; vitest imports
+   `runSmokeChecks` and re-asserts.
 
-   Schedule: BEFORE Q5 (Vitest). smoke-lite is the safety net Q5's test
-   architecture rides on top of.
+   Effort: ~half-day.
 
-2. useNavHistoryTracking EXTRACTION (app.jsx:814)
+2. Q5 VITEST — tests on the typed Q4 surfaces
+   ──────────────────────────────────────────
+   The 11 typed stores + 15 typed hooks are the test targets. Each has a
+   clean input/output surface plus JSDoc contracts that tests validate.
+   Test pattern: per-store/per-hook .test.js file colocated with source;
+   vitest config aliases the bare-name globals (since stores/hooks reference
+   COLLECTIONS, BOOKS, etc. that cross the bundle boundary).
+
+   First targets (highest leverage):
+     - useRefMirror (10 lines, trivial smoke test for the infrastructure)
+     - useSavedState + _validateTabState (edge cases worth covering)
+     - CachedStore + at least one consumer (annotation-store) — validates the
+       extendStore pattern
+     - JournalIndexStore.rebuildForEntry (the cascade-and-add logic)
+
+   Esbuild 0.28 is already installed — vitest uses it as the transformer.
+   But modules use bare specifiers that resolve through esbuild entries.
+   Vitest needs `resolve.alias` config so module imports work in test runs.
+
+   See memory [[refactor-after-tests]] — Q5 is the prerequisite for App()
+   decomposition.
+
+3. APP() DECOMPOSITION (after Q5)
+   ──────────────────────────────
+   App() = 2,191 lines after P6's 15-hook extraction. Cannot meaningfully
+   type (Q4 scope deliberately excludes) or test (Q5 scope unclear without
+   decomp). Likely needs another wave of extraction:
+     - Render-tree segments → component files
+     - Remaining state-coordination glue → 1-2 new hooks
+     - Inline nav-helpers (goHome/goNavOrigin/goSearchOrigin/etc.) → useNav?
+   Target: get App() under 800 lines.
+
+   Schedule: AFTER Q5 — Q5's tests on the hooks/stores App() composes are
+   the safety net. Each extraction follows the P6 workflow (smoke gate,
+   OWNS/PARAMS/RETURNS header, line-count tracking).
+
+4. useNavHistoryTracking EXTRACTION (app.jsx:814)
    ──────────────────────────────────────────────
    The auto-track history effect that adds entries to readHistory on screen
    change. use-history.js header lines 13-14 explicitly documents this as
@@ -107,9 +138,10 @@ POST-Q3 / POST-Q4 BACKLOG (priority order)
    getStudyById})`. Drops Q3.3e-app-jsx's most architecturally-debted disable
    cite (the cite at app.jsx:816 explicitly names this as the candidate).
 
-   Schedule: P6m, post-Q4. App() shrinks 30-50 more lines.
+   Schedule: part of the App() decomposition phase (item 3 above). App()
+   shrinks 30-50 more lines.
 
-3. useSyncExternalStore MIGRATION (eliminates Bin 4 hlTick cites)
+5. useSyncExternalStore MIGRATION (eliminates Bin 4 hlTick cites)
    ─────────────────────────────────────────────────────────────
    Q3.3e added 24 disable cites for the canonical hlTick cache-bust pattern:
 
@@ -130,11 +162,11 @@ POST-Q3 / POST-Q4 BACKLOG (priority order)
 
    Scope: refactor — 6 stores + 16 consumer sites. Changes runtime re-render
    semantics (consumers re-render more precisely, not on any mutation).
-   NEEDS Q5 tests in place first.
+   NEEDS Q5 tests in place first (per [[refactor-after-tests]]).
 
-   Schedule: Q5 or Q6.
+   Schedule: post-Q5, possibly alongside the App() decomposition.
 
-4. BUNDLE-A.JS LAZY-LOAD (UX, post-Q6)
+6. BUNDLE-A.JS LAZY-LOAD (UX, post-Q6)
    ─────────────────────────────────────
    bundle-a.js is 11.7 MB loaded on every cold WebView boot. On mid-range
    Android, ~3-5 seconds of parse time before any UI paints.
@@ -151,21 +183,6 @@ POST-Q3 / POST-Q4 BACKLOG (priority order)
    Schedule: post-Q6, deliberately scheduled (not a polish item — a real
    architectural change with smoke regression risk).
 
-5. APP() DECOMPOSITION (between Q5 and Q6, OR interleaved with Q5)
-   ────────────────────────────────────────────────────────────────
-   App() = 2,191 lines after P6's 15-hook extraction. Cannot meaningfully
-   type (Q4 scope deliberately excludes) or test (Q5 scope unclear without
-   decomp). Likely needs another wave of extraction:
-     - Render-tree segments → component files
-     - Remaining state-coordination glue → 1-2 new hooks
-     - Inline nav-helpers (goHome/goNavOrigin/goSearchOrigin/etc.) → useNav?
-   Target: get App() under 800 lines. Each extraction follows the P6 workflow
-   (smoke gate, OWNS/PARAMS/RETURNS header, line-count tracking).
-
-   Schedule: after Q5 tests exist (need regression coverage for the
-   decomposition); could interleave with Q5 if smoke-lite + Vitest land
-   incrementally.
-
 ───────────────────────────────────────────────────────────────────────────────
 INFRA / TOOLING ITEMS (one-liners — open small, ship fast)
 ───────────────────────────────────────────────────────────────────────────────
@@ -180,8 +197,8 @@ INFRA / TOOLING ITEMS (one-liners — open small, ship fast)
   whitespace), add a second config entry. Low priority — auto-fix can hide
   intentional patterns.
 
-- `tsc --noEmit` IN CI: when Q4 lands, add as a CI step parallel to lint.
-  Same `--max-warnings 0`-style gate (typecheck failures fail CI).
+- `tsc --noEmit` IN CI ✅ DONE (Q4.1, `001747b`) — runs between lint and
+  build with zero-tolerance. Pre-commit Step 3 mirrors the gate.
 
 ───────────────────────────────────────────────────────────────────────────────
 USER POLICY REMINDERS (durable; mirror CLAUDE.md)
