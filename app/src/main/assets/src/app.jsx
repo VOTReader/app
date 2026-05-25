@@ -659,33 +659,12 @@ function App() {
     if (id === "library") goLibrary();
   };
 
-  /* ── Surprise Me (pure random) ── */
-  const handleSurprise = () => {
-    const pool = [
-    ...MATTHEW.chapters.map((ch) => ({ _k: "matthew", num: ch.num })),
-    ...BIBLE_BOOK_LIST.flatMap((b) => b.chapters.map((ch) => ({ _k: "bible", bookId: b.id, num: ch.num }))),
-    ..._studies().filter((s) => !s.locked && s.chapters && s.chapters.length > 0).flatMap((s) => s.chapters.map((ch) => ({ _k: "study", studyId: s.id, chId: ch.id })))
-    ];
-    for (const col of COLLECTIONS) {
-      if (!col.surpriseType) continue;
-      for (const l of colLetterArr(col)) pool.push({ _k: "col", volKey: col.volKey, id: l.id });
-    }
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    setSurpriseAnchor(null);
-    if (pick._k === "matthew") {
-      setBookId("matthew");setChapterNum(pick.num);setScreen("matthew-ch");
-    } else if (pick._k === "bible") {
-      setBookId(pick.bookId);setChapterNum(pick.num);setScreen("bible-ch");
-    } else if (pick._k === "study") {
-      selectStudyChapter(pick.studyId, pick.chId);
-    } else {
-      const col = COL_BY_KEY.get(pick.volKey);
-      if (!col) return;
-      setLetterId(pick.id);
-      setActiveReadKey("vol:" + col.volKey, () => setLastReadForVol(col.volKey, pick.id));
-      setScreen(col.letterScreen);
-    }
-  };
+  /* handleSurprise → src/hooks/use-surprise.js (P7j). */
+  const { handleSurprise } = useSurprise({
+    setSurpriseAnchor,
+    setBookId, setChapterNum, setScreen, setLetterId,
+    setActiveReadKey, setLastReadForVol, selectStudyChapter,
+  });
 
   /* Search domain — state + helpers + handlers + window.__goSearch bridge.
      Sits BETWEEN handleSurprise (above) and useAndroidBack (below) by

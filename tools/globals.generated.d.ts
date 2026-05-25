@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 340 distinct identifiers.
+// Total: 341 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -345,6 +345,7 @@ declare const useScrollMemory: any;
 declare const useSearch: any;
 declare const useSettings: any;
 declare const useSheetOrchestration: any;
+declare const useSurprise: any;
 declare const useTabActions: any;
 declare const useTabs: any;
 declare const useTapThrough: any;
