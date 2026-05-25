@@ -1229,51 +1229,27 @@ function App() {
       />
     ),
 
-    // ── IIFE screens (P8c) — same dispatch shape; the `() => { ... }`
-    //    body holds the render-time-locals the old IIFE built (study
-    //    lookups, letterShim construction, prophecy-card handlers). ──
-    'matthew-ch': () => {
-      if (!chapter) return null;
-      // Chain-aware boundaries: when entered via Studies (fromStudies=true),
-      // Matthew participates in the unified heavy→light chain. Ch 1 prev →
-      // previous chain entry's last chapter; Ch 28 next → next chain entry's
-      // first chapter. Matthew's own ch N ↔ ch N±1 uses ChapterView's
-      // built-in prevCh/nextCh so the inner chapters feel normal.
-      const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
-      const atFirstCh = chapter.num === 1;
-      const atLastCh = chapter.num === mtLastNum;
-      const chainPrev = fromStudies && atFirstCh ? prevChainEntry('matthew-study') : null;
-      const chainNext = fromStudies && atLastCh ? nextChainEntry('matthew-study') : null;
-      return (
-        <>
-          <ChapterView
-            book={MATTHEW} chapter={chapter} mode={mode} showStudy={showStudy} showEchoes={settings.showInlineEchoes !== false}
-            showChapterTitle={settings.showChapterTitle !== false}
-            titleFocusHidden={titleFocusHidden}
-            setTitleFocusHidden={setTitleFocusHidden}
-            onIndex={goMatthewIdx}
-            onNavigate={(num) => { setSurpriseAnchor(null); selectMatthewCh(num); }}
-            onMarkRead={() => markRead('matthew', chapterNum)}
-            markAsReadEnabled={settings.markAsRead}
-            showProgressBar={settings.showProgressBar}
-            prevBoundary={chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null}
-            onPrevBoundary={chainPrev ? () => { setFromStudies(true); goToChainEntryLast(chainPrev.slug)(); } : null}
-            nextBoundary={chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null}
-            onNextBoundary={chainNext ? () => { setFromStudies(true); goToChainEntryFirst(chainNext.slug)(); } : null}
-            onSearch={goSearch}
-            onSettings={goSettings}
-            onHistory={goHistory}
-            theme={theme} onThemeChange={setTheme}
-            surpriseAnchor={surpriseAnchor}
-            onVotLetterClick={goToLetterFromMatthew}
-            backHint={backHint} onTapThroughBack={tapThroughBack}
-            hlTick={hlTick}
-            onLinkOpen={openLinkSidebar}
-          />
-          <ModeToggle mode={mode} onChange={setMode} showStudy={showStudy} onShowStudyChange={setShowStudy} />
-        </>
-      );
-    },
+    // ── IIFE screens — render-time-derived locals (study lookups,
+    //    letter shims, chain-aware boundaries) extracted to their own
+    //    components in src/ui/screens/. ──
+    'matthew-ch': () => (
+      <MatthewChapterView
+        chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}
+        fromStudies={fromStudies} settings={settings}
+        titleFocusHidden={titleFocusHidden} setTitleFocusHidden={setTitleFocusHidden}
+        prevChainEntry={prevChainEntry} nextChainEntry={nextChainEntry}
+        goToChainEntryFirst={goToChainEntryFirst} goToChainEntryLast={goToChainEntryLast}
+        setSurpriseAnchor={setSurpriseAnchor} setFromStudies={setFromStudies}
+        setMode={setMode} setShowStudy={setShowStudy}
+        markRead={markRead}
+        selectMatthewCh={selectMatthewCh}
+        goMatthewIdx={goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
+        goToLetterFromMatthew={goToLetterFromMatthew}
+        theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
+        backHint={backHint} tapThroughBack={tapThroughBack}
+        hlTick={hlTick} openLinkSidebar={openLinkSidebar}
+      />
+    ),
 
     'bible-study-index': () => {
       if (!studyId) return null;

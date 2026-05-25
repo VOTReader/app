@@ -4710,6 +4710,98 @@
     );
   }
 
+  // app/src/main/assets/src/ui/screens/MatthewChapterView.jsx
+  function MatthewChapterView2({
+    // Identity
+    chapter,
+    chapterNum,
+    mode,
+    showStudy,
+    // Context
+    fromStudies,
+    settings,
+    // Focus-hidden state (passed through to ChapterView)
+    titleFocusHidden,
+    setTitleFocusHidden,
+    // Chain nav (from useReadingChainNav)
+    prevChainEntry,
+    nextChainEntry,
+    goToChainEntryFirst,
+    goToChainEntryLast,
+    // State setters
+    setSurpriseAnchor,
+    setFromStudies,
+    setMode,
+    setShowStudy,
+    // Read progress
+    markRead,
+    // Selection
+    selectMatthewCh,
+    // Nav helpers
+    goMatthewIdx,
+    goSearch,
+    goSettings,
+    goHistory,
+    goToLetterFromMatthew,
+    // Visual + linking
+    theme,
+    setTheme,
+    surpriseAnchor,
+    backHint,
+    tapThroughBack,
+    hlTick,
+    openLinkSidebar
+  }) {
+    if (!chapter) return null;
+    const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
+    const atFirstCh = chapter.num === 1;
+    const atLastCh = chapter.num === mtLastNum;
+    const chainPrev = fromStudies && atFirstCh ? prevChainEntry("matthew-study") : null;
+    const chainNext = fromStudies && atLastCh ? nextChainEntry("matthew-study") : null;
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      ChapterView,
+      {
+        book: MATTHEW,
+        chapter,
+        mode,
+        showStudy,
+        showEchoes: settings.showInlineEchoes !== false,
+        showChapterTitle: settings.showChapterTitle !== false,
+        titleFocusHidden,
+        setTitleFocusHidden,
+        onIndex: goMatthewIdx,
+        onNavigate: (num) => {
+          setSurpriseAnchor(null);
+          selectMatthewCh(num);
+        },
+        onMarkRead: () => markRead("matthew", chapterNum),
+        markAsReadEnabled: settings.markAsRead,
+        showProgressBar: settings.showProgressBar,
+        prevBoundary: chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null,
+        onPrevBoundary: chainPrev ? () => {
+          setFromStudies(true);
+          goToChainEntryLast(chainPrev.slug)();
+        } : null,
+        nextBoundary: chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null,
+        onNextBoundary: chainNext ? () => {
+          setFromStudies(true);
+          goToChainEntryFirst(chainNext.slug)();
+        } : null,
+        onSearch: goSearch,
+        onSettings: goSettings,
+        onHistory: goHistory,
+        theme,
+        onThemeChange: setTheme,
+        surpriseAnchor,
+        onVotLetterClick: goToLetterFromMatthew,
+        backHint,
+        onTapThroughBack: tapThroughBack,
+        hlTick,
+        onLinkOpen: openLinkSidebar
+      }
+    ), /* @__PURE__ */ React.createElement(ModeToggle, { mode, onChange: setMode, showStudy, onShowStudyChange: setShowStudy }));
+  }
+
   // app/src/main/assets/src/ui/screens/ChapterIndex.jsx
   function ChapterIndex2({ book, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, markAsReadEnabled, restoredNames, showChapterTitle }) {
     const currentRef = React.useRef(null);
@@ -8938,59 +9030,44 @@
           onLinkOpen: openLinkSidebar
         }
       ),
-      // ── IIFE screens (P8c) — same dispatch shape; the `() => { ... }`
-      //    body holds the render-time-locals the old IIFE built (study
-      //    lookups, letterShim construction, prophecy-card handlers). ──
-      "matthew-ch": () => {
-        if (!chapter) return null;
-        const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
-        const atFirstCh = chapter.num === 1;
-        const atLastCh = chapter.num === mtLastNum;
-        const chainPrev = fromStudies && atFirstCh ? prevChainEntry("matthew-study") : null;
-        const chainNext = fromStudies && atLastCh ? nextChainEntry("matthew-study") : null;
-        return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
-          ChapterView,
-          {
-            book: MATTHEW,
-            chapter,
-            mode,
-            showStudy,
-            showEchoes: settings.showInlineEchoes !== false,
-            showChapterTitle: settings.showChapterTitle !== false,
-            titleFocusHidden,
-            setTitleFocusHidden,
-            onIndex: goMatthewIdx,
-            onNavigate: (num) => {
-              setSurpriseAnchor(null);
-              selectMatthewCh(num);
-            },
-            onMarkRead: () => markRead("matthew", chapterNum),
-            markAsReadEnabled: settings.markAsRead,
-            showProgressBar: settings.showProgressBar,
-            prevBoundary: chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null,
-            onPrevBoundary: chainPrev ? () => {
-              setFromStudies(true);
-              goToChainEntryLast(chainPrev.slug)();
-            } : null,
-            nextBoundary: chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null,
-            onNextBoundary: chainNext ? () => {
-              setFromStudies(true);
-              goToChainEntryFirst(chainNext.slug)();
-            } : null,
-            onSearch: goSearch,
-            onSettings: goSettings,
-            onHistory: goHistory,
-            theme,
-            onThemeChange: setTheme,
-            surpriseAnchor,
-            onVotLetterClick: goToLetterFromMatthew,
-            backHint,
-            onTapThroughBack: tapThroughBack,
-            hlTick,
-            onLinkOpen: openLinkSidebar
-          }
-        ), /* @__PURE__ */ React.createElement(ModeToggle, { mode, onChange: setMode, showStudy, onShowStudyChange: setShowStudy }));
-      },
+      // ── IIFE screens — render-time-derived locals (study lookups,
+      //    letter shims, chain-aware boundaries) extracted to their own
+      //    components in src/ui/screens/. ──
+      "matthew-ch": () => /* @__PURE__ */ React.createElement(
+        MatthewChapterView,
+        {
+          chapter,
+          chapterNum,
+          mode,
+          showStudy,
+          fromStudies,
+          settings,
+          titleFocusHidden,
+          setTitleFocusHidden,
+          prevChainEntry,
+          nextChainEntry,
+          goToChainEntryFirst,
+          goToChainEntryLast,
+          setSurpriseAnchor,
+          setFromStudies,
+          setMode,
+          setShowStudy,
+          markRead,
+          selectMatthewCh,
+          goMatthewIdx,
+          goSearch,
+          goSettings,
+          goHistory,
+          goToLetterFromMatthew,
+          theme,
+          setTheme,
+          surpriseAnchor,
+          backHint,
+          tapThroughBack,
+          hlTick,
+          openLinkSidebar
+        }
+      ),
       "bible-study-index": () => {
         if (!studyId) return null;
         const study = getStudyById(studyId);
@@ -9543,6 +9620,7 @@
     SearchScreen: SearchScreen2,
     BibleStudyIndex: BibleStudyIndex2,
     BibleStudyChapterView: BibleStudyChapterView2,
+    MatthewChapterView: MatthewChapterView2,
     ChapterIndex: ChapterIndex2,
     GARDEN_PRELOAD_AHEAD,
     GARDEN_CRAWL_DELAY,
