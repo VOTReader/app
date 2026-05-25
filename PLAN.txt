@@ -3,7 +3,7 @@ VOTReader-studio — Strategic Working Memory
 ═══════════════════════════════════════════════════════════════════════════════
 
 Started: 2026-05-10
-Last pruned: 2026-05-24 (Q3 closed; May-10 research notes archived to HISTORY.md)
+Last pruned: 2026-05-24 (P7a landed; Q3 closed; May-10 research notes archived to HISTORY.md)
 Status: ACTIVE — kept slim as work progresses
 Companions: CLAUDE.md (live status), HISTORY.md (landed work), ARCHITECTURE.md (system ref)
 
@@ -36,112 +36,60 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q3 (ESLint)                 ✅ DONE  — 0 errors / 0 warnings, CI `--max-warnings 0`
                                           locked, lint-staged in pre-commit
   Q4 (JSDoc / tsc --checkJs)  ✅ DONE  — 37 files typed, CI gate zero-tolerance
-  Smoke-lite.js for CI        ⬜ NEXT
-  Q5 (Vitest)                 ⬜ PENDING — targets the typed hooks + stores
-  App() decomposition         ⬜ PENDING — AFTER Q5 (see [[refactor-after-tests]])
+  smoke-lite.js for CI        ✅ DONE  — Node CLI; globals + collections + cycles
+  Q5 (Vitest)                 ✅ DONE  — 218 tests / 9 files; ratchet 1→14 stmts
+  App() decomposition (P7)    🚧 ACTIVE — P7a landed (useNavHistoryTracking);
+                                          241 tests; App() 2,261 → 2,256 lines
   Q6 (CSS hardening)          ⬜ PENDING
 
 ───────────────────────────────────────────────────────────────────────────────
-POST-Q4 SEQUENCING DECISION (pinned 2026-05-24, after Q4 close)
+POST-Q4 SEQUENCING (executed 2026-05-24)
 ───────────────────────────────────────────────────────────────────────────────
 
-The strict order that follows now governs the next 3 phases:
+The pinned order (1) smoke-lite → (2) Q5 Vitest → (3) App() decomposition was
+executed in that order. Rationale: high-risk structural refactors come AFTER
+test coverage on the affected surface (memory [[refactor-after-tests]]).
 
-  1. smoke-lite.js  (next)        — Node-runnable safety net for CI
-  2. Q5 Vitest                     — test the typed hooks + stores + utils
-  3. App() decomposition           — AFTER Q5, NOT before
-
-Why this order: high-risk structural refactors come after test coverage on
-the affected surface, not before. Tests exist to catch regressions during
-refactoring; without coverage on the hooks/stores App() composes, a
-decomposition is a leap of faith — you won't know what broke until manual
-smoke fires in a browser. Build the safety net, then do the surgery.
-
-See memory [[refactor-after-tests]] for the durable principle.
-
-smoke-lite is the bridge between "smoke runs in a browser" and "CI can
-catch data/module regressions." Once it exists, vitest can IMPORT and
-EXTEND its checks rather than rebuilding them. That's why smoke-lite must
-be Node-runnable + importable — Python would break the vitest extension
-path.
+  1. smoke-lite.js ✅  Node-runnable safety net for CI; vitest imports
+                       runSmokeChecks for module-graph + globals assertions
+  2. Q5 Vitest     ✅  218 tests / 9 files; coverage ratchet locked at the
+                       Q5 baselines, bumped to 14/11/12/15 floors at Q5.9
+  3. App() decomp  🚧  P7a landed; see backlog item 3 below
 
 ───────────────────────────────────────────────────────────────────────────────
 POST-Q4 BACKLOG (priority order — top = next)
 ───────────────────────────────────────────────────────────────────────────────
 
-1. SMOKE-LITE.JS — Node-runnable safety net for CI (NEXT)
-   ───────────────────────────────────────────────────────
-   tools/smoke.js (34 KB, ~681 lines) is browser-only — runs via preview_eval,
-   only when triggered. CI can't use it, so regressions slip until manual smoke.
+1. APP() DECOMPOSITION (P7 — ACTIVE)
+   ─────────────────────────────────
+   App() = 2,256 lines after P7a (was 2,191 at P6 close; grew to 2,261
+   during Q4/Q5 from JSDoc + small changes; 2,261 → 2,256 after the first
+   extraction). Target: under 800 lines.
 
-   Extract the non-DOM subset into a Node module (NOT Python — must be
-   importable by vitest in Q5):
-     - Every .js in app/src/main/assets/src parses cleanly (overlaps CI syntax-check)
-     - All COLLECTIONS entries resolve to non-empty letter arrays or a preface
-     - Module export validation — lexical-mirror writes 331 globals; verify
-       source-of-truth list matches what entry files export (the
-       gen-eslint-globals.py output, regenerated and diff-checked)
-     - No circular imports in stores/_entry-b.js, renderer/_entry.js,
-       ui/_entry-d.js (esbuild rejects strict cycles, but reorder regressions
-       inside an entry file are not always caught)
+   Workflow per extraction: P6 pattern + Q5 vitest validation.
+     1. Identify OWNS/PARAMS/RETURNS boundary
+     2. Extract to src/hooks/, JSDoc-type it, write vitest coverage
+     3. Wire into _entry-b.js, replace call site in App() with breadcrumb
+     4. All 5 pre-commit gates + smoke verify
+     5. Update CLAUDE.md "Current state" line count
 
-   Export shape: `runSmokeChecks() → { issues: [...], ok: boolean }`. CLI
-   wrapper exits nonzero if issues. CI step runs the CLI; vitest imports
-   `runSmokeChecks` and re-asserts.
+   Landed:
+     P7a — useNavHistoryTracking (2026-05-24): auto-track-history effect.
+           Single 18-line useEffect moved to its own 115-line hook with
+           23 vitest tests covering all 4 branches + nav-change re-fire
+           contract + deps-array contract. Coverage ratchet held + bumped:
+           branches 11→13 (statements/functions/lines floors unchanged).
+           Net App() shrink: 5 lines (the architectural win is bigger —
+           the most debt-laden disable cite moved out, and the policy-
+           vs-state-API split is now explicit at module scope).
 
-   Effort: ~half-day.
+   Next candidates (rough order, bottom-up by dependency):
+     - Inline nav-helpers (goHome / goNavOrigin / goSearchOrigin / etc.)
+       → useNav? Higher leverage than a single effect (~150 lines).
+     - Render-tree segments → component files (defer until logic out).
+     - Remaining state-coordination glue → 1-2 small hooks.
 
-2. Q5 VITEST — tests on the typed Q4 surfaces
-   ──────────────────────────────────────────
-   The 11 typed stores + 15 typed hooks are the test targets. Each has a
-   clean input/output surface plus JSDoc contracts that tests validate.
-   Test pattern: per-store/per-hook .test.js file colocated with source;
-   vitest config aliases the bare-name globals (since stores/hooks reference
-   COLLECTIONS, BOOKS, etc. that cross the bundle boundary).
-
-   First targets (highest leverage):
-     - useRefMirror (10 lines, trivial smoke test for the infrastructure)
-     - useSavedState + _validateTabState (edge cases worth covering)
-     - CachedStore + at least one consumer (annotation-store) — validates the
-       extendStore pattern
-     - JournalIndexStore.rebuildForEntry (the cascade-and-add logic)
-
-   Esbuild 0.28 is already installed — vitest uses it as the transformer.
-   But modules use bare specifiers that resolve through esbuild entries.
-   Vitest needs `resolve.alias` config so module imports work in test runs.
-
-   See memory [[refactor-after-tests]] — Q5 is the prerequisite for App()
-   decomposition.
-
-3. APP() DECOMPOSITION (after Q5)
-   ──────────────────────────────
-   App() = 2,191 lines after P6's 15-hook extraction. Cannot meaningfully
-   type (Q4 scope deliberately excludes) or test (Q5 scope unclear without
-   decomp). Likely needs another wave of extraction:
-     - Render-tree segments → component files
-     - Remaining state-coordination glue → 1-2 new hooks
-     - Inline nav-helpers (goHome/goNavOrigin/goSearchOrigin/etc.) → useNav?
-   Target: get App() under 800 lines.
-
-   Schedule: AFTER Q5 — Q5's tests on the hooks/stores App() composes are
-   the safety net. Each extraction follows the P6 workflow (smoke gate,
-   OWNS/PARAMS/RETURNS header, line-count tracking).
-
-4. useNavHistoryTracking EXTRACTION (app.jsx:814)
-   ──────────────────────────────────────────────
-   The auto-track history effect that adds entries to readHistory on screen
-   change. use-history.js header lines 13-14 explicitly documents this as
-   a future extraction candidate that stayed in App() because of three
-   App()-local helper deps (_findLetter, getStudyById, addToHistory).
-
-   Signature: `useNavHistoryTracking({navState}, {addToHistory, _findLetter,
-   getStudyById})`. Drops Q3.3e-app-jsx's most architecturally-debted disable
-   cite (the cite at app.jsx:816 explicitly names this as the candidate).
-
-   Schedule: part of the App() decomposition phase (item 3 above). App()
-   shrinks 30-50 more lines.
-
-5. useSyncExternalStore MIGRATION (eliminates Bin 4 hlTick cites)
+2. useSyncExternalStore MIGRATION (eliminates Bin 4 hlTick cites)
    ─────────────────────────────────────────────────────────────
    Q3.3e added 24 disable cites for the canonical hlTick cache-bust pattern:
 
@@ -162,11 +110,12 @@ POST-Q4 BACKLOG (priority order — top = next)
 
    Scope: refactor — 6 stores + 16 consumer sites. Changes runtime re-render
    semantics (consumers re-render more precisely, not on any mutation).
-   NEEDS Q5 tests in place first (per [[refactor-after-tests]]).
+   Q5 tests are now in place (per [[refactor-after-tests]]) — unblocked.
 
-   Schedule: post-Q5, possibly alongside the App() decomposition.
+   Schedule: post-P7 (App() decomposition first), or alongside it if a
+   P7 hook extraction naturally touches one of the 16 consumer sites.
 
-6. BUNDLE-A.JS LAZY-LOAD (UX, post-Q6)
+3. BUNDLE-A.JS LAZY-LOAD (UX, post-Q6)
    ─────────────────────────────────────
    bundle-a.js is 11.7 MB loaded on every cold WebView boot. On mid-range
    Android, ~3-5 seconds of parse time before any UI paints.

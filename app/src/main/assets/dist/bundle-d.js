@@ -8447,26 +8447,6 @@
         return;
       }
     };
-    useEffect(() => {
-      if (screen === "matthew-ch" && chapterNum) {
-        const ch = MATTHEW.chapters.find((c) => c.num === chapterNum);
-        addToHistory({ type: "chapter", bookId: "matthew", bookTitle: "Matthew", chapterNum, chapterTitle: ch?.title || null });
-      } else if (screen === "bible-ch" && bookId && chapterNum) {
-        const book2 = BOOKS[bookId];
-        const ch = book2?.chapters.find((c) => c.num === chapterNum);
-        addToHistory({ type: "chapter", bookId, bookTitle: book2?.title || bookId, chapterNum, chapterTitle: ch?.title || null });
-      } else if (letterId) {
-        var _hcol = COL_BY_LETTER_SC.get(screen);
-        if (_hcol) {
-          var _he = _findLetter(_hcol.volKey);
-          if (_he) addToHistory({ type: "letter", letterId, letterTitle: _he.title, letterNum: _he.num || null, volumeScreen: _hcol.indexScreen });
-        }
-      } else if (screen === "bible-study-chapter" && studyId && studyChapterId) {
-        const study = getStudyById(studyId);
-        const ch = getStudyChapter(study, studyChapterId);
-        if (study && ch) addToHistory({ type: "study-chapter", studyId, studyChapterId, studyTitle: study.title, studySlug: study.slug, chapterTitle: ch.title, chapterNum: ch.num });
-      }
-    }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
     const fromMatthewChRef = useRefMirror(fromMatthewCh);
     const searchOriginRef = useRefMirror(searchOrigin);
     useEffect(() => {
@@ -8585,6 +8565,18 @@
       goVolumesHome,
       goJournalViewer,
       getStudyById
+    });
+    useNavHistoryTracking({
+      screen,
+      bookId,
+      chapterNum,
+      letterId,
+      studyId,
+      studyChapterId,
+      addToHistory,
+      _findLetter,
+      getStudyById,
+      getStudyChapter
     });
     const selectStudy = (id) => {
       const study = getStudyById(id);

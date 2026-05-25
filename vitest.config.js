@@ -71,13 +71,23 @@ export default defineConfig({
       // Next phase should be App() decomposition, not chasing the
       // remaining utility edge cases.
       //
+      // P7a baseline (+ use-nav-history-tracking, 241 tests — first
+      // App() decomposition extraction):
+      //   statements 14.72 (370/2512) | branches 13.29 (256/1926)
+      //   functions  12.90 (63/488)   | lines    15.78 (291/1843)
+      // The branches jump (+1.47) reflects the 23 new tests covering
+      // all 4 if/else-if branches × multiple guard conditions per
+      // branch. Branches gate floor advances 11 → 13; the other three
+      // dimensions held at the same integer floor (statements 14,
+      // functions 12, lines 15) so they don't move yet.
+      //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
         statements: 14,
-        branches: 11,
+        branches: 13,
         functions: 12,
         lines: 15,
       },

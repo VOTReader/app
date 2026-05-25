@@ -796,25 +796,12 @@ function App() {
 
   /* screenRef / bookIdRef / genreIdRef → created inside useAndroidBack (P6l) */
 
-  // Track history whenever a reading screen is entered
-  useEffect(() => {
-    if (screen === 'matthew-ch' && chapterNum) {
-      const ch = MATTHEW.chapters.find((c) => c.num === chapterNum);
-      addToHistory({ type: 'chapter', bookId: 'matthew', bookTitle: 'Matthew', chapterNum, chapterTitle: ch?.title || null });
-    } else if (screen === 'bible-ch' && bookId && chapterNum) {
-      const book = BOOKS[bookId];
-      const ch = book?.chapters.find((c) => c.num === chapterNum);
-      addToHistory({ type: 'chapter', bookId, bookTitle: book?.title || bookId, chapterNum, chapterTitle: ch?.title || null });
-    } else if (letterId) {
-      var _hcol = COL_BY_LETTER_SC.get(screen);
-      if (_hcol) { var _he = _findLetter(_hcol.volKey); if (_he) addToHistory({ type: 'letter', letterId, letterTitle: _he.title, letterNum: _he.num || null, volumeScreen: _hcol.indexScreen }); }
-    } else if (screen === 'bible-study-chapter' && studyId && studyChapterId) {
-      const study = getStudyById(studyId);
-      const ch = getStudyChapter(study, studyChapterId);
-      if (study && ch) addToHistory({ type: 'study-chapter', studyId, studyChapterId, studyTitle: study.title, studySlug: study.slug, chapterTitle: ch.title, chapterNum: ch.num });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- App()-local helpers with stable-by-behavior bodies: _findLetter reads COLLECTIONS data (module global), getStudyById reads BIBLE_STUDIES (module global), addToHistory reads enabledRef + readHistory state via closure (see use-history.js:13-14 — the hook's header explicitly documents this auto-track effect as a future extraction candidate that lives here because of App()-local helper deps). All three change identity every render but behave identically; adding them to deps would force an every-render fire and lose the nav-change intent. POST-Q3: candidate for `useNavHistoryTracking({navState}, {addToHistory, _findLetter, getStudyById})` extraction.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
+  /* useNavHistoryTracking(...) call → moved below, alongside useAndroidBack —
+     getStudyById / getStudyChapter are `const` arrow helpers defined in the
+     Bible Studies block (~90 lines down) and would be in TDZ here. Mirrors
+     the same "call must follow its const-helper deps" arrangement that
+     P6l uses for useAndroidBack. Extracted to src/hooks/use-nav-history-
+     tracking.js (P7a — first App() decomposition extraction). */
 
   const fromMatthewChRef = useRefMirror(fromMatthewCh);  // also used in the render (~line 3001)
   /* fromLetterRef → returned by useFromLetterStack (P6i);
@@ -923,6 +910,14 @@ function App() {
     cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
     goStudiesHome, goVolumesHome, goJournalViewer,
     getStudyById,
+  });
+
+  /* Auto-record reading history on nav change. Threads in the same
+     getStudyById / getStudyChapter consts as useAndroidBack — both calls
+     have to live below the Bible Studies block for the same TDZ reason. */
+  useNavHistoryTracking({
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    addToHistory, _findLetter, getStudyById, getStudyChapter,
   });
 
   const selectStudy = (id) => {

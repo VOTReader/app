@@ -10,12 +10,13 @@
      - pruneHistoryDay(y, m, d)  dedupes within one calendar day
 
    DOES NOT OWN:
-     - The auto-track useEffect that decides WHEN to call addToHistory
-       (it reads screen/bookId/chapterNum/letterId/studyId/studyChapterId
-       and App-local helpers _findLetter / getStudyById / getStudyChapter,
-       so it stays in App() right next to its triggers). The hook is a
-       state container + API; the effect is policy that lives at the
-       call site.
+     - The auto-track useEffect that decides WHEN to call addToHistory.
+       Originally lived in App() right next to its triggers; during the
+       App() decomposition (P7a, 2026-05-24) it was extracted to its own
+       hook: src/hooks/use-nav-history-tracking.js. The split is
+       deliberate — useHistory is the state-and-API layer; the trigger
+       policy (reads nav state + 3 App-local lookup helpers) sits on top
+       as a separate hook. App() now just threads both into place.
 
    PARAMS:
      historyEnabled — current value of settings.historyEnabled (useSettings).

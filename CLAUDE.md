@@ -11,11 +11,11 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 ## Current state (2026-05-24)
 
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
-- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). 2,191 lines after P6 hook extraction completed (15 hooks out — see HISTORY). App() is hook composition + render tree + nav-helper glue.
+- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). 2,256 lines after P7a — 16 hooks extracted (15 from P6 + useNavHistoryTracking from P7a, the first App() decomposition step). App() is hook composition + render tree + nav-helper glue.
 - **130+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
   - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)
-  - `bundle-b.js` 302 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 29 files)
+  - `bundle-b.js` 322 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 30 files)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
   - `bundle-d.js` 546 KB — screens + sheets + components + utils + late stores + App() itself (esbuild IIFE, 82 files)
 
@@ -38,9 +38,9 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **Bundle-b grew** 302→320 KB from JSDoc comments preserved in dev build (esbuild strips comments in minified prod build).
 - **Gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
 
-### Post-Q4 — Q5 safety-net phase CLOSED, App() decomposition NEXT
+### Post-Q4 — Q5 safety-net phase CLOSED, App() decomposition IN PROGRESS
 
-**Pinned sequence** (PLAN.txt + [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest ✅ → **App() decomposition (next)**.
+**Pinned sequence** (PLAN.txt + [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest ✅ → **App() decomposition (in progress — P7a landed)**.
 
 **Q5 safety-net phase totals (2026-05-24):**
 - **218 tests across 9 files**; 9 of 37 Q4-scope files have direct coverage.
@@ -55,8 +55,21 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 **Plateau signal recognized** ([[tests-diminishing-returns]]): pre-scripture-parse deltas were +1 per commit on average; the remaining un-tested Q4 surfaces (small utility helpers like book-category, hl-keys, search, tabs, dates, garden) are lower-leverage than App() decomposition. **The safety net is built; time to use it.**
 
-**Next phase — App() decomposition:**
-App.jsx is 2,191 lines. Test coverage exists on the hooks + stores it composes. Each extraction follows the P6 workflow (smoke gate, OWNS/PARAMS/RETURNS header, line-count tracking), but now with vitest coverage validating the extracted hook contracts. The first candidate is `useNavHistoryTracking` (app.jsx:814; use-history.js header documents the deferral). Target: App() under 800 lines.
+### P7 — App() decomposition (IN PROGRESS, 2026-05-24)
+
+**Goal:** App.jsx under 800 lines. Currently 2,256 (was 2,261 before P7a).
+
+**P7a — useNavHistoryTracking extraction (LANDED 2026-05-24):**
+- The auto-track-history `useEffect` at app.jsx:800-817 moved to `src/hooks/use-nav-history-tracking.js` (115 lines, includes the OWNS/PARAMS/RETURNS header + JSDoc types). The hook is a "policy-when-to-call" layer that sits on top of useHistory's state-and-API layer; use-history.js's header has been updated to reference the new structural division.
+- The 4-helper disable cite (the most architecturally-debted post-Q3 disable in the file — it explicitly named useNavHistoryTracking as its extraction candidate) moved with the effect to the hook. Same Bin-4-style identity-churn rationale, but it now names PARAMS rather than App-local closure captures.
+- 23 new vitest tests in `use-nav-history-tracking.test.js` cover all 4 branches (matthew-ch / bible-ch / letter / study-chapter) × multiple guard conditions per branch, plus the nav-change re-fire contract + the deps-array contract (helper identity churn must NOT re-fire) + branch precedence.
+- **218 → 241 tests.** Coverage ratchet held + improved: statements 14.01→14.72, **branches 11.82→13.29** (gate bumped 11→13), functions 12.19→12.90, lines 15.09→15.78.
+- TDZ note: useNavHistoryTracking's call site lives BELOW `getStudyById`/`getStudyChapter` (defined as `const` arrow helpers ~90 lines down in App()), mirroring P6l's useAndroidBack arrangement. The breadcrumb at the original site references the move.
+
+**Backlog for the phase (rough order — bottom-up by dependency):**
+- Inline nav-helpers (goHome/goNavOrigin/goSearchOrigin/etc.) → `useNav`
+- Render-tree segments → component files (deferred until logic is fully out)
+- Remaining state-coordination glue → 1-2 new hooks
 
 **Post-decomp backlog:** useSyncExternalStore migration (eliminates 24 Bin 4 cites — has test coverage now per Q5.3), bundle-a.js lazy-load (post-Q6 UX), Q6 CSS hardening.
 
@@ -99,7 +112,7 @@ D:/VOTReader-studio/
 │   │   ├── app.css                    # static CSS (no template literal)
 │   │   ├── dist/                      # 4 bundles, regenerated by npm run build
 │   │   └── src/
-│   │       ├── app.jsx                # function App() — 2,191 lines
+│   │       ├── app.jsx                # function App() — 2,256 lines
 │   │       ├── data/                  # scripture-resolution.js + 29 raw corpus files
 │   │       ├── stores/                # 11 stores + _entry-b.js
 │   │       ├── renderer/              # annotation-engine, dom-links, dom-bookmarks, dom-journal-chip + _entry.js
@@ -109,7 +122,7 @@ D:/VOTReader-studio/
 │   │       │   ├── sheets/            # 17 sheets/pickers
 │   │       │   └── _entry-d.js        # esbuild entry for bundle-d
 │   │       ├── utils/                 # 11 helper bundles
-│   │       ├── hooks/                 # 15 App() hooks (extracted in P6)
+│   │       ├── hooks/                 # 16 App() hooks (P6 + P7a)
 │   │       ├── components/            # ExpandableText, ErrorBoundary
 │   │       └── styles/                # journal-styles
 │   └── java/com/votreader/sacredui/MainActivity.kt   # WebView shell + native bridges
