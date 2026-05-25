@@ -1567,43 +1567,9 @@
     .search-input::placeholder { color:var(--cream-muted); opacity:0.6; }
     body.light .search-input { background:rgba(0,0,0,0.04); }
     /* .search-screen — no styles needed */
-    .search-toggle-row { display:flex; align-items:center; justify-content:flex-end; padding:0.6rem 1.2rem; border-bottom:1px solid var(--gold-border); background:var(--bg2); }
-    .search-toggle-label { display:flex; align-items:center; gap:0.65rem; cursor:pointer; user-select:none; }
-    .search-toggle-text { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); }
-    .search-toggle { position:relative; width:36px; height:20px; background:var(--gold-border); border-radius:10px; transition:background 0.2s; flex-shrink:0; cursor:pointer; }
-    .search-toggle::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:#fff; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
-    .search-toggle.on { background:var(--gold-dim); }
-    .search-toggle.on::after { transform:translateX(16px); }
-    .search-hint { padding:3rem 1.5rem; text-align:center; font-family:'EB Garamond',serif; font-size:1.05rem; color:var(--cream-muted); font-style:italic; }
     .search-no-results { padding:3rem 1.5rem; text-align:center; font-family:'EB Garamond',serif; font-size:1.05rem; color:var(--cream-muted); }
-    .search-count { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); padding:0.65rem 1.2rem; border-bottom:1px solid var(--gold-border); }
-    .search-result-item { display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid var(--gold-border); cursor:pointer; padding:0.9rem 1.2rem; transition:background 0.15s; }
-    .search-result-item:active { background:var(--gold-faint); }
-    .search-result-ref { font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }
-    .search-result-tag { font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); border:1px solid var(--gold-border); border-radius:3px; padding:0.1rem 0.4rem; }
-    .search-result-text { font-family:'EB Garamond',serif; font-size:0.95rem; line-height:1.5; color:var(--cream-muted); }
     .search-highlight { background:rgba(200,164,86,0.25); color:var(--cream); border-radius:2px; }
     body.light .search-highlight { background:rgba(122,92,16,0.2); }
-    .search-result-direct { background:var(--gold-faint); border-bottom-color:rgba(200,164,86,0.3); }
-    .search-result-direct:active { background:rgba(200,164,86,0.15); }
-    .search-result-direct .search-result-ref { color:var(--gold-bright); }
-    .search-result-direct-sub { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); margin-top:0.25rem; }
-    .search-result-overflow { background:rgba(200,164,86,0.04); }
-    .search-result-overflow .search-result-ref { color:var(--gold-dim); }
-    .search-tips-btn { background:none; border:none; cursor:pointer; font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); padding:0.5rem 1.2rem; display:block; width:100%; text-align:left; border-bottom:1px solid var(--gold-border); transition:color 0.18s; }
-    @media (hover: hover) { .search-tips-btn:hover { color:var(--gold); } }
-    .search-tips-panel { padding:1rem 1.2rem 1.4rem; border-bottom:1px solid var(--gold-border); background:var(--bg); }
-    .search-tips-heading { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin:0.9rem 0 0.35rem; }
-    .search-tips-heading:first-child { margin-top:0; }
-    .search-tips-row { display:flex; gap:0.8rem; align-items:baseline; padding:0.18rem 0; }
-    .search-tips-code { font-family:'Cinzel',serif; font-size:0.7rem; color:var(--gold-bright); background:rgba(200,164,86,0.1); border:1px solid var(--gold-border); border-radius:4px; padding:0.1rem 0.4rem; white-space:nowrap; flex-shrink:0; }
-    .search-tips-desc { font-family:'EB Garamond',serif; font-size:0.9rem; color:var(--cream-dim); line-height:1.4; }
-    .search-tips-table { width:100%; border-collapse:collapse; margin-top:0.25rem; }
-    .search-tips-table td { font-family:'EB Garamond',serif; font-size:0.88rem; color:var(--cream-dim); padding:0.15rem 0; }
-    .search-tips-table td:first-child { font-family:'Cinzel',serif; font-size:0.68rem; color:var(--gold-bright); white-space:nowrap; padding-right:1rem; }
-    .search-scope-chip { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 1.2rem; background:rgba(200,164,86,0.08); border-bottom:1px solid var(--gold-border); font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.12em; color:var(--gold); }
-    .search-scope-clear { background:none; border:1px solid var(--gold-border); border-radius:20px; padding:0.15rem 0.6rem; font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.1em; color:var(--gold-dim); cursor:pointer; margin-left:auto; transition:color 0.18s; }
-    @media (hover: hover) { .search-scope-clear:hover { color:var(--gold); } }
 
     /* Corpus segmented toggle */
     .srch-corpus-row { display:flex; gap:0.35rem; padding:0.6rem 1.2rem; border-bottom:1px solid var(--gold-border); background:var(--bg2); }
@@ -1612,11 +1578,6 @@
     .srch-corpus-btn:active { background:rgba(200,164,86,0.15); }
 
     /* ── SEARCH v2 (Orama) ── */
-    .srch-status-bar { display:flex; align-items:center; justify-content:space-between; padding:0.45rem 1rem; background:var(--bg2); border-bottom:1px solid var(--gold-border); font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); }
-    .srch-status-bar .srch-status-dot { width:8px; height:8px; border-radius:50%; background:var(--gold-dim); margin-right:0.5rem; display:inline-block; vertical-align:middle; }
-    .srch-status-bar.ready .srch-status-dot { background:var(--gold-bright); box-shadow:0 0 6px var(--gold-glow); }
-    .srch-status-bar.building .srch-status-dot { background:var(--gold); animation:srch-pulse 1s ease-in-out infinite; }
-    @keyframes srch-pulse { 0%,100% { opacity:0.3; } 50% { opacity:1; } }
 
     .srch-scope-chip { display:flex; align-items:center; gap:0.5rem; width:100%; padding:0.55rem 0.9rem; background:var(--bg2); border:none; border-bottom:1px solid var(--gold-border); color:var(--gold-dim); font-family:'Cinzel',serif; font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer; transition:color 0.2s, background 0.2s; text-align:left; }
     .srch-scope-chip:hover { color:var(--gold); }
@@ -1624,16 +1585,7 @@
     .srch-scope-chip-icon { font-size:0.9rem; }
     .srch-scope-chip-x { margin-left:auto; opacity:0.7; }
 
-    .srch-chip-row { display:flex; gap:0.4rem; padding:0.5rem 0.8rem; overflow-x:auto; -webkit-overflow-scrolling:touch; background:var(--bg); border-bottom:1px solid var(--gold-border); scrollbar-width:none; }
-    .srch-chip-row::-webkit-scrollbar { display:none; }
-    .srch-chip { flex-shrink:0; background:transparent; border:1px solid var(--gold-border); color:var(--cream-muted); font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; padding:0.32rem 0.7rem; border-radius:20px; cursor:pointer; transition:all 0.18s; white-space:nowrap; }
-    .srch-chip:active { background:var(--gold-faint); }
-    .srch-chip.on { background:var(--gold); color:var(--bg); border-color:var(--gold); }
-    .srch-chip.on-dim { background:var(--gold-faint); color:var(--gold); border-color:var(--gold-dim); }
 
-    .srch-facet-bar { display:flex; flex-wrap:wrap; gap:0.35rem; padding:0.45rem 0.8rem; background:var(--bg2); border-bottom:1px solid var(--gold-border); }
-    .srch-facet { flex:0 0 auto; }
-    .srch-facet-label { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); margin-right:0.3rem; align-self:center; }
 
     .srch-suggest { position:relative; z-index:10; background:var(--bg2); border-bottom:1px solid var(--gold); max-height:60vh; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,0.35); }
     .srch-suggest-item { display:flex; align-items:center; gap:0.6rem; padding:0.5rem 1rem; cursor:pointer; border-bottom:1px solid rgba(200,164,86,0.08); width:100%; text-align:left; background:none; border-left:none; border-right:none; border-top:none; color:inherit; }
