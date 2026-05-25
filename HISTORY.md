@@ -4,6 +4,24 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## Q4 — JSDoc / `tsc --checkJs` (CLOSED 2026-05-24)
+
+37 files typed: 11 utils + 11 stores (+ cached-store) + 15 hooks. Cross-bundle bare-name globals are ambient-declared as `any` in `tools/globals.generated.d.ts` (auto-generated alongside the ESLint globals file by `gen-eslint-globals.py`). App() and the `ui/` tree are deferred — that decomposition is its own phase (see PLAN.txt).
+
+- **Q4.1 infrastructure** (`001747b`) — `tsconfig.json` flipped to `checkJs: true` + `strict: false` (permissive start); include narrowed to utils/stores/hooks; `_entry-b.js` excluded (bundler entry drags everything via imports). `@types/react ^19` + `@types/react-dom ^19` installed. `tools/gen-eslint-globals.py` extended to emit a parallel `tools/globals.generated.d.ts` — 331 `declare const X: any;` declarations + a `Window` index signature. CachedStore typed as the Q4 type root with a `CachedStoreBase<T>` generic typedef. CI `npm run typecheck` step zero-tolerance; pre-commit Step 3 runs full-project tsc (~3.5s) on any source-file stage. 11 stores + nav-index carry `@ts-nocheck` placeholders to be lifted in Q4.2/Q4.3.
+- **Q4.2 utils** (3 commits — `8f8190d` + `83ec36b` + `46beecc`) — 11/11 utils with full JSDoc. NavItem / VerseRange / GardenTier / TabState / NoteShape typedefs introduced. The structural narrowing issue in nav-index.js's `base` literal (lines 358-364) resolved with a narrow `/** @type {any} */` cast on the local var, documented inline.
+- **Q4.3 stores** (6 commits — `b349b02` + `a069466` + `1ac9a91` + `5a07653` + the journal-light pair + `7330105`) — 11/11 stores typed. Introduced `extendStore(base, methods)` helper in `cached-store.js` — wraps `Object.assign` with `ThisType<B & M>` so `this` inside the methods literal correctly resolves to BOTH the CachedStore base AND the sibling methods. Without that, plain `Object.assign` loses the base type through TS's narrow inference of object-literal methods. JournalMediaStore is the one outlier (IIFE / closure-state pattern, not CachedStore-based) — direct method JSDocs on the IIFE return object.
+- **Q4.4 hooks** (3 commits — `e525e89` + intermediate + `0ae3d45`) — 15/15 hooks with `@param` + `@returns` annotations. Each hook's existing OWNS/PARAMS/RETURNS prose header from P6 stays in place; JSDoc adds the formal types the IDE consumes. `tabField` typed as `(key: string) => any[]` (heterogeneous tuple; TS doesn't auto-narrow array literals).
+- **Q4 phase exit checks passed:**
+  - 37/37 in-scope files clean under `tsc --noEmit`
+  - `npm run lint -- --max-warnings 0` still exits 0
+  - CI typecheck step is the regression gate; pre-commit Step 3 prevents commits from landing dirty
+- **Bundle-b growth:** 302.1 KB → 320.1 KB (+18 KB) from JSDoc comments preserved in dev build. Esbuild keeps comments in unminified bundles; production minified build would strip them. Worth the cost for the typing.
+
+**Post-Q4 follow-ups (logged in PLAN.txt):** useNavHistoryTracking extraction (app.jsx:814), useSyncExternalStore migration (eliminates Bin 4 hlTick cites), smoke-lite.js for CI, bundle-a.js lazy-load, App() decomposition. The decomposition unblocks typing app.jsx + ui/ in a future Q.
+
+---
+
 ## Q2.7 + Q3 (2026-05-24, origin/main past `e162877`)
 
 - **Q2.7-1 (`c1e3da1`) + Q2.7-1a (`9aa8571`)** — `function App()` extracted from inline index.html → `app/src/main/assets/src/app.js` (verbatim move, then sloppy-self-assign cleanup). App() is now bundled into bundle-d via `_entry-d.js`. Window scoping verified clean (lexical-env globals like `useState`, `BIBLE_BOOK_LIST`, `TabsContext` resolve correctly through bundle-d IIFE's scope chain — no `window.*` shims required).

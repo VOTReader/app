@@ -29,16 +29,16 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
   - Bin 3 — disable + mount-only or setter-stability cite (`[]`-deps intent; useState setters passed through hook returns)
   - Bin 4 — disable + cache-bust / identity-churn cite (hlTick bump signal, commitDwellNow per-render rebinding)
 
-### Q4 — JSDoc / `tsc --checkJs` (IN PROGRESS, 2026-05-24)
+### Q4 — JSDoc / `tsc --checkJs` (CLOSED 2026-05-24)
 
-**Scope pinned:** hooks + stores + utils ONLY. App() and the ui/ tree are deferred until App() decomposition lands as its own phase. Rationale: App() at 2,191 lines is the bottleneck for both types AND tests; the 15 hooks + 11 stores + 11 utils have clean interfaces that type cleanly.
+37 files typed across utils (11) + stores (11) + hooks (15). App() and the ui/ tree intentionally deferred — that's the App() decomposition phase. See HISTORY.md for the per-commit breakdown.
 
-- **Q4.1 infrastructure DONE** (`001747b`): `tsconfig.json` flipped to `checkJs: true` + `strict: false`; include narrowed to `utils/stores/hooks` only; `_entry-b.js` excluded (bundler entry drags everything); `@types/react` installed; `tools/gen-eslint-globals.py` extended to emit a parallel `tools/globals.generated.d.ts` (331 ambient `declare const X: any;` + Window index signature — cross-bundle is untyped by design). CachedStore typed as the Q4 type root with `CachedStoreBase<T>` generic typedef. CI `npm run typecheck` step zero-tolerance; pre-commit Step 3 runs full-project tsc (~3.5s) on any source-file stage.
-- **Q4.2 utils DONE** (3 commits — `8f8190d` + `83ec36b` + `46beecc`): 11/11 utils with full JSDoc. Trivial leaves (book-category, dates, garden, hl-keys, search, tabs, render-text), medium (note-source, scripture-parse, highlight.jsx), and the larger nav-index.js (lifted its @ts-nocheck via a narrow `/** @type {any} */` cast at the union-narrowing site). NavItem/VerseRange/GardenTier/TabState/NoteShape typedefs introduced; cross-bundle bare-names resolve through `globals.generated.d.ts`.
-- **Q4.3 stores DONE** (6 commits — `b349b02` + `a069466` + `1ac9a91` + `5a07653` + `7330105` + the journal-light pair): 11/11 stores typed. Pattern established via new `extendStore(base, methods)` helper in cached-store.js — wraps `Object.assign` with `ThisType<B & M>` so `this` inside the methods literal correctly resolves to BOTH CachedStore base AND the sibling methods. Lifts every `@ts-nocheck` from Q4.1 cleanly. JournalMediaStore is the one outlier (IIFE/closure-state pattern, not CachedStore-based).
-- **Q4.4 hooks IN PROGRESS** — 15 files; P6 OWNS/PARAMS/RETURNS headers already document the surface, conversion to formal JSDoc should be mechanical.
+- **Infrastructure** (`001747b`): `tsconfig.json` `checkJs: true` + `strict: false`; include narrowed to utils/stores/hooks; `_entry-b.js` excluded. `@types/react` + `@types/react-dom` installed. `tools/gen-eslint-globals.py` extended to emit a parallel `tools/globals.generated.d.ts` (331 `declare const X: any;` + Window index signature — cross-bundle is untyped by design). `CachedStoreBase<T>` typedef as the store-layer type root.
+- **Pattern** (`b349b02`): `extendStore(base, methods)` helper wraps `Object.assign` with `ThisType<B & M>` so `this` inside store-method literals resolves to BOTH the CachedStore base AND the sibling methods. Lifts every `@ts-nocheck` cleanly.
+- **Bundle-b grew** 302→320 KB from JSDoc comments preserved in dev build (esbuild strips comments in minified prod build).
+- **Gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
 
-**Q4 gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
+**Post-Q4 backlog** (PLAN.txt POST-Q3/Q4): useNavHistoryTracking extraction (app.jsx:814), useSyncExternalStore migration, smoke-lite.js for CI, bundle-a.js lazy-load, **App() decomposition** (unblocks typing the ui/ tree).
 
 ### Roadmap
 
