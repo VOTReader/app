@@ -41,6 +41,24 @@
    WINDOW: none.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Composition-level localStorage WRITE sink for `vot-state`. Persists
+ * the 8-value union whenever any of them changes. Owns no state — pure
+ * sink, deliberately provenance-agnostic. The matching READ side lives
+ * in useSavedState (P6a).
+ *
+ * @param {{
+ *   tabs: any[],
+ *   activeTabIdx: number,
+ *   theme: string,
+ *   lastReadChapters: any,
+ *   lastReadLetterMap: any,
+ *   activeReadKey: string | null,
+ *   settings: any,
+ *   readItems: any
+ * }} args
+ * @returns {void}
+ */
 export function usePersistedState({
   tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap,
   activeReadKey, settings, readItems,

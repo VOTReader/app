@@ -46,6 +46,37 @@
      - same single-pass evaluation (useMemo([]) → once per mount)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * The persisted state shape (subset that the validator touches). Many
+ * other fields are read by useSavedState's caller — they pass through
+ * unchanged.
+ *
+ * @typedef {{
+ *   screen?: string,
+ *   chapterNum?: number | null,
+ *   letterId?: string | null,
+ *   studyId?: string | null,
+ *   studyChapterId?: string | null,
+ *   bookId?: string,
+ *   genreId?: string,
+ *   gardenPage?: number | null,
+ *   tabs?: any[],
+ *   [key: string]: any
+ * }} SavedState
+ */
+
+/**
+ * Coerce a stale screen value back to a safe default. 13 rules — each
+ * rule rewrites a screen string that can't be honored without supporting
+ * state (e.g. matthew-ch without a chapterNum) back to 'home' or the
+ * appropriate index. Mutates `s` in place AND returns it for chaining.
+ *
+ * Applied to both the top-level legacy state object AND each tab in
+ * s.tabs[], so the same rules govern multi-tab layouts.
+ *
+ * @param {SavedState} s
+ * @returns {SavedState}
+ */
 export function _validateTabState(s) {
   if ((s.screen === "matthew-ch" || s.screen === "bible-ch") && s.chapterNum == null) s.screen = "home";
   if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-letter$/.test(s.screen) && !s.letterId) s.screen = "home";
@@ -65,6 +96,17 @@ export function _validateTabState(s) {
   return s;
 }
 
+/**
+ * Read + validate localStorage['vot-state'] exactly once on mount.
+ * Returns the parsed object (with stale screens coerced via
+ * _validateTabState) or {} when JSON.parse throws. Caller distributes
+ * the fields to the appropriate subsystems (useTabs / useSettings /
+ * useReadingDwell / App-local useState).
+ *
+ * usePersistedState (P6k+1) owns the matching WRITE side.
+ *
+ * @returns {SavedState}
+ */
 export function useSavedState() {
   return React.useMemo(() => {
     try {

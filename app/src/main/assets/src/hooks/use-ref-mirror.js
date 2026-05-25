@@ -33,6 +33,21 @@
    eventual P7 fix a one-place edit instead of 15.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Mirror a state value into a useRef whose `.current` always equals the
+ * latest value. Used to bridge React state into imperative handlers
+ * (window bridges, the Android-back router, scroll listeners, nav refs)
+ * that need a synchronous read window — closures alone would freeze the
+ * value at handler-attach time.
+ *
+ * Identical semantics to the inline `const xRef = useRef(x); xRef.current = x`
+ * pattern. The sync mutation runs DURING render (a deliberate side-effect-
+ * in-render that PLAN.txt §P7 flags for a future useLayoutEffect pass).
+ *
+ * @template T
+ * @param {T} value
+ * @returns {{ current: T }}
+ */
 export function useRefMirror(value) {
   const r = React.useRef(value);
   r.current = value;

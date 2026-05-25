@@ -34,6 +34,20 @@
        `enabled` / `onMarkRead` change).
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Wire the `window.__onReadingComplete` bridge for one of the 4 reading
+ * views (LetterView, WtlbEntryView, BibleChapterView, ChapterView). When
+ * `enabled` is true, sets the bridge to `onMarkRead`; cleanup clears the
+ * bridge on unmount or when either param changes.
+ *
+ * The decision of WHEN reading is "complete" lives in the reading view's
+ * dwell/scroll logic — this hook only owns the bridge wiring, not the
+ * "fire mark-read" trigger.
+ *
+ * @param {boolean} enabled    true iff THIS consumer is the active reading view
+ * @param {() => void} onMarkRead  callback to invoke on completion
+ * @returns {void}
+ */
 export function useMarkAsRead(enabled, onMarkRead) {
   React.useEffect(() => {
     if (!enabled) return;

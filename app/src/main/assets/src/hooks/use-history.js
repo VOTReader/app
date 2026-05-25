@@ -44,6 +44,40 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 
+/**
+ * One reading-history entry. The `key` field is computed at add() time
+ * and used by pruneHistoryDay for per-calendar-day dedup. `ts` is the
+ * visit timestamp. Other fields are type-specific:
+ *   - 'chapter' / 'study-chapter' carry bookId/chapterNum/... title fields
+ *   - 'letter' carries letterId/letterTitle/letterNum/volumeScreen
+ *
+ * @typedef {{
+ *   type: 'chapter' | 'letter' | 'study-chapter',
+ *   key?: string,
+ *   ts?: number,
+ *   [k: string]: any
+ * }} HistoryEntry
+ */
+
+/**
+ * App-global reading-history hook. Owns the state container + 3 mutators
+ * (addToHistory / clearHistory / pruneHistoryDay) and the localStorage
+ * persistence. Does NOT own the "when to record" decision — that lives
+ * in the App()-local auto-track useEffect that calls addToHistory based
+ * on nav state.
+ *
+ * historyEnabled is mirrored via useRefMirror so addToHistory's closure
+ * always sees the latest setting without recreating the function each
+ * render.
+ *
+ * @param {boolean} historyEnabled
+ * @returns {{
+ *   readHistory: HistoryEntry[],
+ *   addToHistory: (entry: HistoryEntry) => void,
+ *   clearHistory: () => void,
+ *   pruneHistoryDay: (year: number, month: number, day: number) => void
+ * }}
+ */
 export function useHistory(historyEnabled) {
   const [readHistory, setReadHistory] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('vot-history') || '[]'); }
