@@ -27,6 +27,22 @@
         --tap-ref-active: var(--gold-bright);
         --link-blue:   #6cb4dc;
         --accent-pink: #f48fb1;
+        /* ── Annotation palette (10 colors) ── Used by .hl-{color},
+           .hl-note.is-active.hl-{color}, .hl-note-icon.hl-{color} svg,
+           .ann-chip-color-btn[data-color], .sel-color-btn[data-color],
+           and .sel-color-underline[data-color]. The same hex values
+           are also constructed at runtime by annotation-engine.js
+           (palette source). teal == cyan back-compat alias. */
+        --hl-yellow:   #ffd700;
+        --hl-green:    #76ff03;
+        --hl-pink:     #ff4081;
+        --hl-red:      #f44336;
+        --hl-orange:   #ff9100;
+        --hl-blue:     #2196f3;
+        --hl-purple:   #ba68c8;
+        --hl-teal:     #00bcd4;
+        --hl-brown:    #8d6e63;
+        --hl-gray:     #9e9e9e;
       }
       /* ── LIGHT THEME OVERRIDES ── */
       body.light {
@@ -2058,17 +2074,17 @@
       text-underline-offset: 3px;
       text-decoration-skip-ink: none;
     }
-    .hl-underline.hl-yellow  { text-decoration-color: #ffd700; }
-    .hl-underline.hl-green   { text-decoration-color: #76ff03; }
-    .hl-underline.hl-pink    { text-decoration-color: #ff4081; }
-    .hl-underline.hl-red     { text-decoration-color: #f44336; }
-    .hl-underline.hl-orange  { text-decoration-color: #ff9100; }
-    .hl-underline.hl-blue    { text-decoration-color: #2196f3; }
-    .hl-underline.hl-purple  { text-decoration-color: #ba68c8; }
-    .hl-underline.hl-teal    { text-decoration-color: #00bcd4; }
-    .hl-underline.hl-brown   { text-decoration-color: #8d6e63; }
-    .hl-underline.hl-gray    { text-decoration-color: #9e9e9e; }
-    .hl-underline.hl-cyan    { text-decoration-color: #00bcd4; }
+    .hl-underline.hl-yellow  { text-decoration-color: var(--hl-yellow); }
+    .hl-underline.hl-green   { text-decoration-color: var(--hl-green); }
+    .hl-underline.hl-pink    { text-decoration-color: var(--hl-pink); }
+    .hl-underline.hl-red     { text-decoration-color: var(--hl-red); }
+    .hl-underline.hl-orange  { text-decoration-color: var(--hl-orange); }
+    .hl-underline.hl-blue    { text-decoration-color: var(--hl-blue); }
+    .hl-underline.hl-purple  { text-decoration-color: var(--hl-purple); }
+    .hl-underline.hl-teal    { text-decoration-color: var(--hl-teal); }
+    .hl-underline.hl-brown   { text-decoration-color: var(--hl-brown); }
+    .hl-underline.hl-gray    { text-decoration-color: var(--hl-gray); }
+    .hl-underline.hl-cyan    { text-decoration-color: var(--hl-teal); }
     .verse-text { position: relative; }
 
     /* ══════════════════════════════════════════════════════════════
@@ -2112,17 +2128,17 @@
     }
     /* Per-color rules — longhand-only, !important to win over the shorthand
        expansion that would otherwise set text-decoration-color: currentColor. */
-    .hl-note.is-active.hl-yellow { text-decoration-color: #ffd700 !important; }
-    .hl-note.is-active.hl-green  { text-decoration-color: #76ff03 !important; }
-    .hl-note.is-active.hl-pink   { text-decoration-color: #ff4081 !important; }
-    .hl-note.is-active.hl-red    { text-decoration-color: #f44336 !important; }
-    .hl-note.is-active.hl-orange { text-decoration-color: #ff9100 !important; }
-    .hl-note.is-active.hl-blue   { text-decoration-color: #2196f3 !important; }
-    .hl-note.is-active.hl-purple { text-decoration-color: #ba68c8 !important; }
-    .hl-note.is-active.hl-teal   { text-decoration-color: #00bcd4 !important; }
-    .hl-note.is-active.hl-brown  { text-decoration-color: #8d6e63 !important; }
-    .hl-note.is-active.hl-gray   { text-decoration-color: #9e9e9e !important; }
-    .hl-note.is-active.hl-cyan   { text-decoration-color: #00bcd4 !important; }
+    .hl-note.is-active.hl-yellow { text-decoration-color: var(--hl-yellow) !important; }
+    .hl-note.is-active.hl-green  { text-decoration-color: var(--hl-green) !important; }
+    .hl-note.is-active.hl-pink   { text-decoration-color: var(--hl-pink) !important; }
+    .hl-note.is-active.hl-red    { text-decoration-color: var(--hl-red) !important; }
+    .hl-note.is-active.hl-orange { text-decoration-color: var(--hl-orange) !important; }
+    .hl-note.is-active.hl-blue   { text-decoration-color: var(--hl-blue) !important; }
+    .hl-note.is-active.hl-purple { text-decoration-color: var(--hl-purple) !important; }
+    .hl-note.is-active.hl-teal   { text-decoration-color: var(--hl-teal) !important; }
+    .hl-note.is-active.hl-brown  { text-decoration-color: var(--hl-brown) !important; }
+    .hl-note.is-active.hl-gray   { text-decoration-color: var(--hl-gray) !important; }
+    .hl-note.is-active.hl-cyan   { text-decoration-color: var(--hl-teal) !important; }
     /* Trailing note icon — appears once per note group, after the
        last segment. Inline-block so it sits on the baseline; small
        enough not to disrupt line-height. */
@@ -2157,16 +2173,16 @@
     /* Per-color icon stroke. Yellow notes keep the default gold (var(--gold))
        since gold reads as "yellow" in this app's palette. Picking any other
        color from the menu updates the inline icon to match. */
-    .hl-note-icon.hl-green  svg { stroke: #76ff03; }
-    .hl-note-icon.hl-pink   svg { stroke: #ff4081; }
-    .hl-note-icon.hl-red    svg { stroke: #f44336; }
-    .hl-note-icon.hl-orange svg { stroke: #ff9100; }
-    .hl-note-icon.hl-blue   svg { stroke: #2196f3; }
-    .hl-note-icon.hl-purple svg { stroke: #ba68c8; }
-    .hl-note-icon.hl-teal   svg { stroke: #00bcd4; }
-    .hl-note-icon.hl-brown  svg { stroke: #8d6e63; }
-    .hl-note-icon.hl-gray   svg { stroke: #9e9e9e; }
-    .hl-note-icon.hl-cyan   svg { stroke: #00bcd4; }
+    .hl-note-icon.hl-green  svg { stroke: var(--hl-green); }
+    .hl-note-icon.hl-pink   svg { stroke: var(--hl-pink); }
+    .hl-note-icon.hl-red    svg { stroke: var(--hl-red); }
+    .hl-note-icon.hl-orange svg { stroke: var(--hl-orange); }
+    .hl-note-icon.hl-blue   svg { stroke: var(--hl-blue); }
+    .hl-note-icon.hl-purple svg { stroke: var(--hl-purple); }
+    .hl-note-icon.hl-teal   svg { stroke: var(--hl-teal); }
+    .hl-note-icon.hl-brown  svg { stroke: var(--hl-brown); }
+    .hl-note-icon.hl-gray   svg { stroke: var(--hl-gray); }
+    .hl-note-icon.hl-cyan   svg { stroke: var(--hl-teal); }
 
     /* ══════════════════════════════════════════════════════════════
        ANNOTATION ACTION CHIP — replaces hl-remove-menu.
@@ -2247,16 +2263,16 @@
     }
     .ann-chip-color-btn:active { transform: scale(0.88); }
     .ann-chip-color-btn.active { border-color: var(--cream); box-shadow: 0 0 0 2px var(--gold) inset; }
-    .ann-chip-color-btn[data-color="yellow"] { background: #ffd700; }
-    .ann-chip-color-btn[data-color="green"]  { background: #76ff03; }
-    .ann-chip-color-btn[data-color="pink"]   { background: #ff4081; }
-    .ann-chip-color-btn[data-color="red"]    { background: #f44336; }
-    .ann-chip-color-btn[data-color="orange"] { background: #ff9100; }
-    .ann-chip-color-btn[data-color="blue"]   { background: #2196f3; }
-    .ann-chip-color-btn[data-color="purple"] { background: #ba68c8; }
-    .ann-chip-color-btn[data-color="teal"]   { background: #00bcd4; }
-    .ann-chip-color-btn[data-color="brown"]  { background: #8d6e63; }
-    .ann-chip-color-btn[data-color="gray"]   { background: #9e9e9e; }
+    .ann-chip-color-btn[data-color="yellow"] { background: var(--hl-yellow); }
+    .ann-chip-color-btn[data-color="green"]  { background: var(--hl-green); }
+    .ann-chip-color-btn[data-color="pink"]   { background: var(--hl-pink); }
+    .ann-chip-color-btn[data-color="red"]    { background: var(--hl-red); }
+    .ann-chip-color-btn[data-color="orange"] { background: var(--hl-orange); }
+    .ann-chip-color-btn[data-color="blue"]   { background: var(--hl-blue); }
+    .ann-chip-color-btn[data-color="purple"] { background: var(--hl-purple); }
+    .ann-chip-color-btn[data-color="teal"]   { background: var(--hl-teal); }
+    .ann-chip-color-btn[data-color="brown"]  { background: var(--hl-brown); }
+    .ann-chip-color-btn[data-color="gray"]   { background: var(--hl-gray); }
     .ann-chip-back {
       background: none; border: none;
       padding: 6px 4px;
@@ -2328,31 +2344,31 @@
     }
     .sel-color-btn:active { transform: scale(0.88); }
     .sel-color-btn.active { border-color: var(--cream); box-shadow: 0 0 0 2px var(--gold) inset; }
-    .sel-color-btn[data-color="yellow"] { background: #ffd700; }
-    .sel-color-btn[data-color="green"]  { background: #76ff03; }
-    .sel-color-btn[data-color="pink"]   { background: #ff4081; }
-    .sel-color-btn[data-color="red"]    { background: #f44336; }
-    .sel-color-btn[data-color="orange"] { background: #ff9100; }
-    .sel-color-btn[data-color="blue"]   { background: #2196f3; }
-    .sel-color-btn[data-color="purple"] { background: #ba68c8; }
-    .sel-color-btn[data-color="teal"]   { background: #00bcd4; }
-    .sel-color-btn[data-color="brown"]  { background: #8d6e63; }
-    .sel-color-btn[data-color="gray"]   { background: #9e9e9e; }
+    .sel-color-btn[data-color="yellow"] { background: var(--hl-yellow); }
+    .sel-color-btn[data-color="green"]  { background: var(--hl-green); }
+    .sel-color-btn[data-color="pink"]   { background: var(--hl-pink); }
+    .sel-color-btn[data-color="red"]    { background: var(--hl-red); }
+    .sel-color-btn[data-color="orange"] { background: var(--hl-orange); }
+    .sel-color-btn[data-color="blue"]   { background: var(--hl-blue); }
+    .sel-color-btn[data-color="purple"] { background: var(--hl-purple); }
+    .sel-color-btn[data-color="teal"]   { background: var(--hl-teal); }
+    .sel-color-btn[data-color="brown"]  { background: var(--hl-brown); }
+    .sel-color-btn[data-color="gray"]   { background: var(--hl-gray); }
     /* Underline-style colors: show as ring instead of solid fill */
     .sel-color-btn.sel-color-underline {
       background: transparent !important;
       border-style: solid; border-width: 3px;
     }
-    .sel-color-btn.sel-color-underline[data-color="yellow"] { border-color: #ffd700; }
-    .sel-color-btn.sel-color-underline[data-color="green"]  { border-color: #76ff03; }
-    .sel-color-btn.sel-color-underline[data-color="pink"]   { border-color: #ff4081; }
-    .sel-color-btn.sel-color-underline[data-color="red"]    { border-color: #f44336; }
-    .sel-color-btn.sel-color-underline[data-color="orange"] { border-color: #ff9100; }
-    .sel-color-btn.sel-color-underline[data-color="blue"]   { border-color: #2196f3; }
-    .sel-color-btn.sel-color-underline[data-color="purple"] { border-color: #ba68c8; }
-    .sel-color-btn.sel-color-underline[data-color="teal"]   { border-color: #00bcd4; }
-    .sel-color-btn.sel-color-underline[data-color="brown"]  { border-color: #8d6e63; }
-    .sel-color-btn.sel-color-underline[data-color="gray"]   { border-color: #9e9e9e; }
+    .sel-color-btn.sel-color-underline[data-color="yellow"] { border-color: var(--hl-yellow); }
+    .sel-color-btn.sel-color-underline[data-color="green"]  { border-color: var(--hl-green); }
+    .sel-color-btn.sel-color-underline[data-color="pink"]   { border-color: var(--hl-pink); }
+    .sel-color-btn.sel-color-underline[data-color="red"]    { border-color: var(--hl-red); }
+    .sel-color-btn.sel-color-underline[data-color="orange"] { border-color: var(--hl-orange); }
+    .sel-color-btn.sel-color-underline[data-color="blue"]   { border-color: var(--hl-blue); }
+    .sel-color-btn.sel-color-underline[data-color="purple"] { border-color: var(--hl-purple); }
+    .sel-color-btn.sel-color-underline[data-color="teal"]   { border-color: var(--hl-teal); }
+    .sel-color-btn.sel-color-underline[data-color="brown"]  { border-color: var(--hl-brown); }
+    .sel-color-btn.sel-color-underline[data-color="gray"]   { border-color: var(--hl-gray); }
     /* Clear/remove circle (X) at end of color row */
     .sel-color-clear {
       background: transparent; color: var(--cream-dim);
@@ -2682,7 +2698,7 @@
       flex-shrink: 0;
     }
     body.light .navpick-row-icon { background: rgba(0,0,0,0.05); }
-    .navpick-row-icon-bible-chapter   { color: #8d6e63; }
+    .navpick-row-icon-bible-chapter   { color: var(--hl-brown); }
     .navpick-row-icon-letter          { color: #d4a960; }
     .navpick-row-icon-wtlb-entry      { color: #b39ddb; }
     .navpick-row-icon-blessed-entry   { color: var(--accent-pink); }
