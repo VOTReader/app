@@ -2508,11 +2508,13 @@
   // app/src/main/assets/src/ui/screen-routes.jsx
   function buildScreenRoutes2({
     // ── State + setters (tab-field-backed) ──
+    screen,
     setScreen,
     bookId,
     setBookId,
     chapterNum,
     setChapterNum,
+    letterId,
     setLetterId,
     studyId,
     setStudyId,
@@ -2545,6 +2547,7 @@
     setActiveReadKey,
     lastReadChapters,
     setLastReadChapters,
+    lastReadLetterMap,
     setLastReadForVol,
     readItems,
     readHistory,
@@ -2594,6 +2597,7 @@
     goJournalViewer,
     goJournalEditor,
     goSearchOrigin,
+    goColIdx,
     // ── Selection / handlers ──
     handleSelect,
     handleSurprise,
@@ -2625,6 +2629,7 @@
     journalEntryId,
     createAndEditJournal,
     // ── Tap through / linking / overlays ──
+    openInAppLetter,
     openLinkSidebar,
     navigateToLink,
     backHint,
@@ -2646,17 +2651,65 @@
     // ── Matthew-Hidden-Manna tap-through tracking (for hm-letter back nav) ──
     fromMatthewChRef,
     setFromMatthewCh,
-    // ── App-local helpers (close over App state) ──
-    colIdxProps,
-    colReadNavProps,
+    // ── App-state needed by built-in helpers (sharedViewProps / _navToChapter) ──
+    setFromWtlb,
+    // ── Boundary computation (from useReadingChainNav; sees per-volume context) ──
     boundaryConfig,
-    _idxNav,
-    sharedViewProps,
-    _navToChapter,
     // ── Garden ──
     gardenPage,
     setGardenPage
   }) {
+    const colReadNavProps = (volKey, clearSurprise) => {
+      const rk = COL_BY_KEY.get(volKey).readKey;
+      return {
+        onMarkRead: () => markRead(rk, letterId),
+        onUnmark: () => unmarkRead(rk, letterId),
+        isRead: (id) => isRead(rk, id),
+        onNavigate: (id) => {
+          if (clearSurprise) setSurpriseAnchor(null);
+          setLetterId(id);
+          setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id));
+        },
+        onHome: () => goColIdx(volKey)
+      };
+    };
+    const colIdxProps = (volKey) => {
+      const col = COL_BY_KEY.get(volKey);
+      const nav = (id) => {
+        setLetterId(id);
+        setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id));
+        setScreen(col.letterScreen);
+      };
+      return {
+        onSelect: nav,
+        onSelectPreface: col.prefaceGlobal ? nav : void 0,
+        currentLetter: settings.showReadingDot && activeReadKey === "vol:" + volKey ? lastReadLetterMap[volKey] || null : null,
+        isRead: (id) => isRead(col.readKey, id),
+        markAsReadEnabled: settings.markAsRead
+      };
+    };
+    const _idxNav = () => /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: goVolumesHome }, "\u2190 Volumes"), /* @__PURE__ */ React.createElement(HomeBtn, null), /* @__PURE__ */ React.createElement(NavButtons, { onSettings: goSettings, onHistory: goHistory, onSearch: goSearch, theme, onThemeChange: setTheme }));
+    const sharedViewProps = {
+      onSearch: goSearch,
+      onSettings: goSettings,
+      onHistory: goHistory,
+      theme,
+      onThemeChange: setTheme,
+      surpriseAnchor,
+      onInAppLink: openInAppLetter,
+      backHint,
+      hlTick,
+      onLinkOpen: openLinkSidebar,
+      onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
+      markAsReadEnabled: settings.markAsRead,
+      showProgressBar: settings.showProgressBar
+    };
+    const _navToChapter = (bid, ch) => {
+      setFromWtlb(screen);
+      setBookId(bid);
+      setChapterNum(ch);
+      setScreen("bible-ch");
+    };
     return {
       // ── Volume index screens (13) ──
       "vot-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Two", letters: LETTERS, ...colIdxProps("two") })),
@@ -9696,63 +9749,14 @@
       isOnTabsScreen: tabsOverviewOpen
       // eslint-disable-next-line react-hooks/exhaustive-deps -- goTabs is an App()-local nav helper (line 554) whose body only calls state setters + reads stable values; adding it to deps would force this useMemo to rebuild on every parent render (since goTabs identity changes per render), defeating the memoization. The TabsContext consumers only need a fresh value when the LISTED deps change.
     }), [settings.tabsEnabled, tabs.length, activeTabIdx, tabsOverviewOpen]);
-    function colReadNavProps(volKey, clearSurprise) {
-      var rk = COL_BY_KEY.get(volKey).readKey;
-      return {
-        onMarkRead: () => markRead(rk, letterId),
-        onUnmark: () => unmarkRead(rk, letterId),
-        isRead: (id) => isRead(rk, id),
-        onNavigate: (id) => {
-          if (clearSurprise) setSurpriseAnchor(null);
-          setLetterId(id);
-          setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id));
-        },
-        onHome: () => goColIdx(volKey)
-      };
-    }
-    function colIdxProps(volKey) {
-      var col = COL_BY_KEY.get(volKey);
-      var nav = (id) => {
-        setLetterId(id);
-        setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id));
-        setScreen(col.letterScreen);
-      };
-      return {
-        onSelect: nav,
-        onSelectPreface: col.prefaceGlobal ? nav : void 0,
-        currentLetter: settings.showReadingDot && activeReadKey === "vol:" + volKey ? lastReadLetterMap[volKey] || null : null,
-        isRead: (id) => isRead(col.readKey, id),
-        markAsReadEnabled: settings.markAsRead
-      };
-    }
-    const _idxNav = () => /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: goVolumesHome }, "\u2190 Volumes"), /* @__PURE__ */ React.createElement(HomeBtn, null), /* @__PURE__ */ React.createElement(NavButtons, { onSettings: goSettings, onHistory: goHistory, onSearch: goSearch, theme, onThemeChange: setTheme }));
-    const sharedViewProps = {
-      onSearch: goSearch,
-      onSettings: goSettings,
-      onHistory: goHistory,
-      theme,
-      onThemeChange: setTheme,
-      surpriseAnchor,
-      onInAppLink: openInAppLetter,
-      backHint,
-      hlTick,
-      onLinkOpen: openLinkSidebar,
-      onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
-      markAsReadEnabled: settings.markAsRead,
-      showProgressBar: settings.showProgressBar
-    };
-    const _navToChapter = (bid, ch) => {
-      setFromWtlb(screen);
-      setBookId(bid);
-      setChapterNum(ch);
-      setScreen("bible-ch");
-    };
     const ROUTES = buildScreenRoutes({
+      screen,
       setScreen,
       bookId,
       setBookId,
       chapterNum,
       setChapterNum,
+      letterId,
       setLetterId,
       studyId,
       setStudyId,
@@ -9783,6 +9787,7 @@
       setActiveReadKey,
       lastReadChapters,
       setLastReadChapters,
+      lastReadLetterMap,
       setLastReadForVol,
       readItems,
       readHistory,
@@ -9830,6 +9835,7 @@
       goJournalViewer,
       goJournalEditor,
       goSearchOrigin,
+      goColIdx,
       handleSelect,
       handleSurprise,
       handleScriptureSelect,
@@ -9856,6 +9862,7 @@
       searchContext,
       journalEntryId,
       createAndEditJournal,
+      openInAppLetter,
       openLinkSidebar,
       navigateToLink,
       backHint,
@@ -9874,12 +9881,8 @@
       saveProphecyCardStates,
       fromMatthewChRef,
       setFromMatthewCh,
-      colIdxProps,
-      colReadNavProps,
+      setFromWtlb,
       boundaryConfig,
-      _idxNav,
-      sharedViewProps,
-      _navToChapter,
       gardenPage,
       setGardenPage
     });

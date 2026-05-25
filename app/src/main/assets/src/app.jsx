@@ -59,7 +59,6 @@ function App() {
      The other 2 of the 15 P6 hooks are not in this sequence: useMarkAsRead
      is called by the 4 reading views; useRefMirror is called inline ~15×.
      ═══════════════════════════════════════════════════════════════════ */
-  /* useSavedState + _validateTabState → extracted to src/hooks/use-saved-state.js (P6a) */
   const saved = useSavedState();
 
   /* ═══════════════════════════════════════════════════════════════
@@ -126,7 +125,6 @@ function App() {
     screen, letterId, bookId, chapterNum, studyId, studyChapterId,
     setHlTick,
   });
-  /* sheet slots → src/hooks/use-sheet-orchestration.js (P6h) */
 
   /* navigateToLink — the cross-app deep-linking router (the _navToLinkRef
      three-part deferred-body pattern) → src/hooks/use-navigate-to-link.js
@@ -231,7 +229,6 @@ function App() {
   const [tabsOverviewOpen, setTabsOverviewOpen] = useState(false);
   /* tabActionIdx / disableTabsPromptOpen / clearAllStage / lastTabCloseStrikes
      → src/hooks/use-tab-actions.js (P6k Commit B) */
-  /* Thumbnail state + IDB load + GC → extracted to src/hooks/use-thumbnails.js (P6d) */
   // (Effect closing overview when tabs are disabled lives further down —
   // it needs `settings`, which is declared after this block.)
   const [lastReadChapters, setLastReadChapters] = useState(saved.lastReadChapters || {});
@@ -242,11 +239,9 @@ function App() {
     return map;
   });
   // Single global "you are here" dot — tracks the ONE most recently read book/volume
-  /* Dwell-timer state + commitDwellNow → src/hooks/use-reading-dwell.js (P6f) */
   /* prophecyCardStatesRef + saveProphecyCardStates + setLastReadForVol +
      selectMatthewCh/BibleCh + goToLastRead → src/hooks/use-reading-position-nav.js
      (P7h, called below — needs setActiveReadKey from useReadingDwell). */
-  /* cancelDwell + scheduleDwell + pauseDwell + setActiveReadKey + __onDwellCommit effect → src/hooks/use-reading-dwell.js (P6f) */
   /* goToLetterFromMatthew + openInAppLetter → src/hooks/use-tap-through.js (P7f).
      The useTapThrough() call is below useFromLetterStack (which returns
      pushFromLetter, a useTapThrough PARAM). */
@@ -269,7 +264,6 @@ function App() {
   /* useTapThrough() call → moved below, after useReadingDwell (which
      returns setActiveReadKey, a useTapThrough PARAM). The fromMatthewCh
      tabField is also moved with it for cleanliness. */
-  /* navigateToLink deferred body → src/hooks/use-navigate-to-link.js (P6j) */
   /* readItems / setReadItems / VERSION_ID / getReadKey / isRead / markRead /
      unmarkRead / clearAllProgress / clearReadForBook → useReadProgress
      (P7g, called below — needs settings.markAsRead as a PARAM, so the
@@ -335,7 +329,6 @@ function App() {
   // searchQuery / searchOrigin / searchScope / searchContext tabFields →
   // owned by useSearch (P7c, called below).
   const [fromSearch, setFromSearch] = tabField('fromSearch');
-  /* fromMatthewCh tabField → hoisted above to useTapThrough's call site (P7f). */
   const [fromWtlb, setFromWtlb] = tabField('fromWtlb');
   const [navOrigin, setNavOrigin] = tabField('navOrigin');
 
@@ -357,7 +350,6 @@ function App() {
     tabsOverviewOpen,
   });
   const navOriginRef = useRefMirror(navOrigin);
-  /* tabsOverviewOpenRef → created inside useAndroidBack (P6l) */
 
   /* useScrollMemory — per-tab/per-screen scroll position capture +
      restore. Extracted to src/hooks/use-scroll-memory.js (P6e). */
@@ -507,7 +499,6 @@ function App() {
     setSurpriseAnchor, setJournalEntryId,
   });
 
-  /* createAndEditJournal → src/hooks/use-journal-mutations.js (P7e). */
   const { createAndEditJournal } = useJournalMutations({
     setHlTick, setJournalEntryId, setScreen,
   });
@@ -529,9 +520,6 @@ function App() {
     setActiveReadKey, setLastReadForVol, goToGardenFirst,
   });
 
-  /* captureActiveTabThumbnail + scroll-stop + aspect-ratio + after-nav effects
-     → extracted to src/hooks/use-thumbnails.js (P6d) */
-
   // Tabs overview — overlay; back closes it without touching per-tab screen.
   const goTabs = () => {
     if (!settings.tabsEnabled) return;
@@ -545,14 +533,6 @@ function App() {
     if (o) {setScreen(o.screen);if (o.bookId !== undefined) setBookId(o.bookId);if (o.chapterNum !== undefined) setChapterNum(o.chapterNum);if (o.letterId !== undefined) setLetterId(o.letterId);if (o.studyId !== undefined) setStudyId(o.studyId);if (o.studyChapterId !== undefined) setStudyChapterId(o.studyChapterId);} else
     goHome();
   };
-  /* goSearch / goSearchOrigin / window.__goSearch bridge → src/hooks/use-search.js (P7c). */
-  /* addToHistory · clearHistory · pruneHistoryDay → extracted to src/hooks/use-history.js (P6c) */
-  /* toggleSetting + updateSetting → src/hooks/use-settings.js (P6g) */
-
-  /* Mark-as-read helpers → useReadProgress (P7g, called above). */
-  /* goToLastRead → src/hooks/use-reading-position-nav.js (P7h, called above). */
-
-  /* goColIdx → src/hooks/use-nav.js (P7b). */
 
   /* ── Category → sub-section routing ── */
   const handleScriptureSelect = (id, clearGenre) => {
@@ -571,16 +551,11 @@ function App() {
     }
   };
 
-
-  /* srchVolLookup / SRCH_VOL_MAP / srchResolveLetterId → src/hooks/use-search.js (P7c). */
-
   /* handleSearchSelect (80-line result dispatcher) + handleSearchCommand
      → src/hooks/use-search.js (P7c). Both are returned by useSearch
      (called below, after handleSurprise — the search hook takes
      handleSurprise as a param for its 'random' command, same TDZ
      pattern as P7a's useNavHistoryTracking). */
-
-  /* screenRef / bookIdRef / genreIdRef → created inside useAndroidBack (P6l) */
 
   /* useNavHistoryTracking(...) call → moved below, alongside useAndroidBack —
      getStudyById / getStudyChapter are `const` arrow helpers defined in the
@@ -590,11 +565,6 @@ function App() {
      tracking.js (P7a — first App() decomposition extraction). */
 
   const fromMatthewChRef = useRefMirror(fromMatthewCh);  // also used in the render (~line 3001)
-  /* fromLetterRef → returned by useFromLetterStack (P6i);
-     fromSearchRef / fromStudiesRef / studyIdRef / fromWtlbRef → created inside useAndroidBack (P6l) */
-  /* searchOriginRef → owned by useSearch (P7c). */
-
-  /* visibilitychange dwell-pause/resume effect → src/hooks/use-reading-dwell.js (P6f) */
 
   // One-time journal media orphan sweep. JournalStore.remove() deliberately
   // does NOT delete media blobs (an embed in another entry may still
@@ -628,10 +598,6 @@ function App() {
     return () => {if (window.__goHome) delete window.__goHome;};
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: window.__goHome wired once + cleaned up at unmount. setFromSearch/setFromWtlb/setFromLetterStack/setScreen/setBookId/setChapterNum are all useState setters from useTabs/useFromLetterStack (identity-stable per React invariant).
   }, []);
-
-  /* useAndroidBack(...) call → moved below, after goStudiesHome — that
-     nav helper is one of the hook's params and is defined further down,
-     so the call must follow it to avoid a TDZ ReferenceError. P6l. */
 
   /* ── Home category selector ── */
   const handleSelect = (id) => {
@@ -671,12 +637,6 @@ function App() {
   });
 
   /* ── Matthew ── */
-  /* selectMatthewCh → src/hooks/use-reading-position-nav.js (P7h). */
-  /* goMatthewIdx → src/hooks/use-nav.js (P7b). */
-
-  /* STUDIES / getStudyById / getStudyChapter / studyReadKey → src/hooks/use-bible-studies.js (P7d). */
-
-  /* goStudiesHome → src/hooks/use-nav.js (P7b). */
 
   /* useAndroidBack — the window.handleAndroidBack routing handler + its 9
      call-time ref mirrors. Extracted to src/hooks/use-android-back.js
@@ -703,18 +663,7 @@ function App() {
     addToHistory, _findLetter, getStudyById, getStudyChapter,
   });
 
-  /* selectStudy / selectStudyChapter / MATTHEW_CHAIN_ENTRY / CHAIN_ORDER /
-     UNIFIED_CHAIN / chainIdx / prevChainEntry / nextChainEntry /
-     goToChainEntryFirst / goToChainEntryLast → src/hooks/use-bible-studies.js
-     (P7d). All destructured from the useBibleStudies call ~225 lines above. */
-
   /* ── Ephesians / Hebrews ── */
-  /* selectBibleCh → src/hooks/use-reading-position-nav.js (P7h). */
-  /* goBibleIdx → src/hooks/use-nav.js (P7b). */
-
-  /* Cross-volume boundary jumps + within-Bible book prev/next +
-     boundaryConfig + bcv* computed boundary render props →
-     src/hooks/use-reading-chain-nav.js (P7i, called above). */
 
   const tabsCtxValue = React.useMemo(() => ({
     enabled: !!settings.tabsEnabled,
@@ -725,57 +674,18 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- goTabs is an App()-local nav helper (line 554) whose body only calls state setters + reads stable values; adding it to deps would force this useMemo to rebuild on every parent render (since goTabs identity changes per render), defeating the memoization. The TabsContext consumers only need a fresh value when the LISTED deps change.
   }), [settings.tabsEnabled, tabs.length, activeTabIdx, tabsOverviewOpen]);
 
-  function colReadNavProps(volKey, clearSurprise) {
-    var rk = COL_BY_KEY.get(volKey).readKey;
-    return {
-      onMarkRead: () => markRead(rk, letterId),
-      onUnmark: () => unmarkRead(rk, letterId),
-      isRead: (id) => isRead(rk, id),
-      onNavigate: (id) => { if (clearSurprise) setSurpriseAnchor(null); setLetterId(id); setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id)); },
-      onHome: () => goColIdx(volKey)
-    };
-  }
-
-  function colIdxProps(volKey) {
-    var col = COL_BY_KEY.get(volKey);
-    var nav = (id) => { setLetterId(id); setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id)); setScreen(col.letterScreen); };
-    return {
-      onSelect: nav,
-      onSelectPreface: col.prefaceGlobal ? nav : undefined,
-      currentLetter: settings.showReadingDot && activeReadKey === ("vol:" + volKey) ? lastReadLetterMap[volKey] || null : null,
-      isRead: (id) => isRead(col.readKey, id),
-      markAsReadEnabled: settings.markAsRead
-    };
-  }
-
-  // ── Render-time helpers (P8a) ──────────────────────────────────────
-  // Previously assigned inline-via-void mid-JSX; now plain consts so
-  // ROUTES (below) can reference them.
-  const _idxNav = () => (
-    <>
-      <button className="nav-home" onClick={goVolumesHome}>{"← Volumes"}</button>
-      <HomeBtn />
-      <NavButtons onSettings={goSettings} onHistory={goHistory} onSearch={goSearch} theme={theme} onThemeChange={setTheme} />
-    </>
-  );
-  const sharedViewProps = {
-    onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
-    theme: theme, onThemeChange: setTheme, surpriseAnchor: surpriseAnchor,
-    onInAppLink: openInAppLetter, backHint: backHint, hlTick: hlTick,
-    onLinkOpen: openLinkSidebar,
-    onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
-    markAsReadEnabled: settings.markAsRead, showProgressBar: settings.showProgressBar,
-  };
-  const _navToChapter = (bid, ch) => { setFromWtlb(screen); setBookId(bid); setChapterNum(ch); setScreen("bible-ch"); };
-
   // ── ROUTES — built by src/ui/screen-routes.jsx ──────────────────────
   // The 53-entry dispatch table that decides which screen renders.
   // Factory function takes every App() closure dep as an explicit prop
   // (no spread). Called once per render — cheap object-literal build.
+  // The 5 prop-builder helpers (colIdxProps/colReadNavProps/_idxNav/
+  // sharedViewProps/_navToChapter) live INSIDE buildScreenRoutes since
+  // they're only used by ROUTES entries; the factory's destructure
+  // already captures every primitive they need.
   const ROUTES = buildScreenRoutes({
-    setScreen,
+    screen, setScreen,
     bookId, setBookId, chapterNum, setChapterNum,
-    setLetterId,
+    letterId, setLetterId,
     studyId, setStudyId, studyChapterId, setStudyChapterId,
     fromStudies, setFromStudies,
     mode, setMode, showStudy, setShowStudy,
@@ -787,7 +697,7 @@ function App() {
     headingsFocusHidden, setHeadingsFocusHidden,
     activeReadKey, setActiveReadKey,
     lastReadChapters, setLastReadChapters,
-    setLastReadForVol,
+    lastReadLetterMap, setLastReadForVol,
     readItems, readHistory,
     markRead, unmarkRead, isRead, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
     letter, letterV1, letterV3, letterV4, letterV5, letterV6, letterV7,
@@ -800,7 +710,7 @@ function App() {
     goStudiesHome,
     goNotesIndex, goLinksIndex, goBookmarksIndex, goJournalHub, goHighlightsIndex,
     goJournalViewer, goJournalEditor,
-    goSearchOrigin,
+    goSearchOrigin, goColIdx,
     handleSelect, handleSurprise, handleScriptureSelect, handleVolumeSelect,
     handleSearchSelect, handleSearchCommand,
     selectMatthewCh, selectBibleCh, selectStudy, selectStudyChapter,
@@ -809,7 +719,7 @@ function App() {
     studiesLoading, UNIFIED_CHAIN,
     searchQuery, setSearchQuery, searchScope, setSearchScope, searchContext,
     journalEntryId, createAndEditJournal,
-    openLinkSidebar, navigateToLink,
+    openInAppLetter, openLinkSidebar, navigateToLink,
     backHint, tapThroughBack, goToLetterFromMatthew,
     setNavOrigin, setNoteSheetTarget,
     setShowWelcome,
@@ -817,8 +727,8 @@ function App() {
     bcvPrevBoundaryTitle, bcvNextBoundaryTitle,
     prophecyCardStatesRef, saveProphecyCardStates,
     fromMatthewChRef, setFromMatthewCh,
-    colIdxProps, colReadNavProps, boundaryConfig,
-    _idxNav, sharedViewProps, _navToChapter,
+    setFromWtlb,
+    boundaryConfig,
     gardenPage, setGardenPage,
   });
 
@@ -858,7 +768,6 @@ function App() {
       {/* Per-screen render slot \u2014 dispatch table built right above the
           return; renders the active screen (or null if no route matches). */}
       {ROUTES[screen]?.() ?? null}
-
 
       {/* ── 12 annotation / link / journal / bookmark sheets and popovers
               (always mounted; each is internally gated on its own state

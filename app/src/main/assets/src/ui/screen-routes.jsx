@@ -27,9 +27,9 @@
 
 export function buildScreenRoutes({
   // ── State + setters (tab-field-backed) ──
-  setScreen,
+  screen, setScreen,
   bookId, setBookId, chapterNum, setChapterNum,
-  setLetterId,
+  letterId, setLetterId,
   studyId, setStudyId, studyChapterId, setStudyChapterId,
   fromStudies, setFromStudies,
   mode, setMode, showStudy, setShowStudy,
@@ -43,7 +43,7 @@ export function buildScreenRoutes({
   // ── Read progress + history ──
   activeReadKey, setActiveReadKey,
   lastReadChapters, setLastReadChapters,
-  setLastReadForVol,
+  lastReadLetterMap, setLastReadForVol,
   readItems, readHistory,
   markRead, unmarkRead, isRead, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
   // ── Data resolved from screen state ──
@@ -58,7 +58,7 @@ export function buildScreenRoutes({
   goStudiesHome,
   goNotesIndex, goLinksIndex, goBookmarksIndex, goJournalHub, goHighlightsIndex,
   goJournalViewer, goJournalEditor,
-  goSearchOrigin,
+  goSearchOrigin, goColIdx,
   // ── Selection / handlers ──
   handleSelect, handleSurprise, handleScriptureSelect, handleVolumeSelect,
   handleSearchSelect, handleSearchCommand,
@@ -72,7 +72,7 @@ export function buildScreenRoutes({
   // ── Journal ──
   journalEntryId, createAndEditJournal,
   // ── Tap through / linking / overlays ──
-  openLinkSidebar, navigateToLink,
+  openInAppLetter, openLinkSidebar, navigateToLink,
   backHint, tapThroughBack, goToLetterFromMatthew,
   setNavOrigin, setNoteSheetTarget,
   setShowWelcome,
@@ -83,12 +83,58 @@ export function buildScreenRoutes({
   prophecyCardStatesRef, saveProphecyCardStates,
   // ── Matthew-Hidden-Manna tap-through tracking (for hm-letter back nav) ──
   fromMatthewChRef, setFromMatthewCh,
-  // ── App-local helpers (close over App state) ──
-  colIdxProps, colReadNavProps, boundaryConfig,
-  _idxNav, sharedViewProps, _navToChapter,
+  // ── App-state needed by built-in helpers (sharedViewProps / _navToChapter) ──
+  setFromWtlb,
+  // ── Boundary computation (from useReadingChainNav; sees per-volume context) ──
+  boundaryConfig,
   // ── Garden ──
   gardenPage, setGardenPage,
 }) {
+  /* ─────────────────────────────────────────────────────────────────────
+     Built-in prop-builder helpers. Previously defined inside App() and
+     threaded as 5 props (colIdxProps, colReadNavProps, _idxNav,
+     sharedViewProps, _navToChapter). Each is a closure over App-state,
+     which the factory's own params already capture — so the natural
+     home is inside the factory, not in App() proper.
+     ─────────────────────────────────────────────────────────────────── */
+  const colReadNavProps = (volKey, clearSurprise) => {
+    const rk = COL_BY_KEY.get(volKey).readKey;
+    return {
+      onMarkRead: () => markRead(rk, letterId),
+      onUnmark: () => unmarkRead(rk, letterId),
+      isRead: (id) => isRead(rk, id),
+      onNavigate: (id) => { if (clearSurprise) setSurpriseAnchor(null); setLetterId(id); setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id)); },
+      onHome: () => goColIdx(volKey),
+    };
+  };
+  const colIdxProps = (volKey) => {
+    const col = COL_BY_KEY.get(volKey);
+    const nav = (id) => { setLetterId(id); setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id)); setScreen(col.letterScreen); };
+    return {
+      onSelect: nav,
+      onSelectPreface: col.prefaceGlobal ? nav : undefined,
+      currentLetter: settings.showReadingDot && activeReadKey === ('vol:' + volKey) ? lastReadLetterMap[volKey] || null : null,
+      isRead: (id) => isRead(col.readKey, id),
+      markAsReadEnabled: settings.markAsRead,
+    };
+  };
+  const _idxNav = () => (
+    <>
+      <button className="nav-home" onClick={goVolumesHome}>{"← Volumes"}</button>
+      <HomeBtn />
+      <NavButtons onSettings={goSettings} onHistory={goHistory} onSearch={goSearch} theme={theme} onThemeChange={setTheme} />
+    </>
+  );
+  const sharedViewProps = {
+    onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
+    theme, onThemeChange: setTheme, surpriseAnchor,
+    onInAppLink: openInAppLetter, backHint, hlTick,
+    onLinkOpen: openLinkSidebar,
+    onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
+    markAsReadEnabled: settings.markAsRead, showProgressBar: settings.showProgressBar,
+  };
+  const _navToChapter = (bid, ch) => { setFromWtlb(screen); setBookId(bid); setChapterNum(ch); setScreen('bible-ch'); };
+
   return {
     // ── Volume index screens (13) ──
     'vot-index': () => (
