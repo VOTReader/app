@@ -1358,164 +1358,31 @@ function App() {
         </button>
       )}
 
-      {showWelcome && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          backgroundImage: 'url("splash.jpg")',
-          backgroundColor: '#0a0e1a',
-          backgroundSize: 'contain', backgroundPosition: 'center center',
-          backgroundRepeat: 'no-repeat',
-          display: 'flex', flexDirection: 'column'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={dismissWelcome}
-              style={{
-                margin: 'calc(var(--inset-top, 0px) + 1rem) 1rem 0 0',
-                background: 'rgba(0,0,0,0.55)', border: '1.5px solid rgba(255,255,255,0.35)',
-                borderRadius: '50%', width: '2.4rem', height: '2.4rem',
-                color: '#fff', fontSize: '1.2rem', lineHeight: 1,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-              {"\u2715"}
-            </button>
-          </div>
+      {/* All 4 ephemeral overlays (welcome modal, tabs overview +
+          TabActionSheet, disable-tabs prompt, garden warning) \u2014 see
+          AppShellOverlays.jsx. Renders in the same DOM order as
+          before, so z-index stacking and click-through behavior are
+          preserved. */}
+      <AppShellOverlays
+        showWelcome={showWelcome} isOnline={isOnline} dismissWelcome={dismissWelcome}
+        settings={settings} updateSetting={updateSetting}
+        tabsOverviewOpen={tabsOverviewOpen} setTabsOverviewOpen={setTabsOverviewOpen}
+        tabs={tabs} activeTabIdx={activeTabIdx} tabThumbnails={tabThumbnails} MAX_TABS={MAX_TABS}
+        switchToTab={switchToTab} closeTab={closeTab} openNewTab={openNewTab}
+        closeOtherTabs={closeOtherTabs} closeTabsToTheRight={closeTabsToTheRight}
+        closeAllTabs={closeAllTabs} deduplicateTabs={deduplicateTabs}
+        tabActionIdx={tabActionIdx} setTabActionIdx={setTabActionIdx}
+        clearAllStage={clearAllStage} setClearAllStage={setClearAllStage}
+        lastTabCloseStrikesRef={lastTabCloseStrikes}
+        disableTabsPromptOpen={disableTabsPromptOpen} setDisableTabsPromptOpen={setDisableTabsPromptOpen}
+        gardenWarningOpen={gardenWarningOpen} setGardenWarningOpen={setGardenWarningOpen}
+        setSettings={setSettings} setScreen={setScreen}
+      />
 
-          {isOnline && (
-            <a
-              href="https://www.thevolumesoftruth.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                position: 'absolute', left: '50%', top: '37%', transform: 'translateX(-50%)',
-                width: '60%', maxWidth: '400px', height: '8%',
-                zIndex: 1, borderBottom: '1.5px solid #6cacf0'
-              }}
-            />
-          )}
-        </div>
-      )}
-
-      {settings.tabsEnabled && tabsOverviewOpen && (
-        <div className="tabs-overview-layer">
-          <ScreenLayout navChildren={
-            <>
-              <button className="nav-home" onClick={() => setTabsOverviewOpen(false)}>{"\u2190 Back"}</button>
-              <HomeBtn />
-            </>
-          }>
-            <TabsOverview
-              tabs={tabs}
-              activeTabIdx={activeTabIdx}
-              onSelect={(i) => {lastTabCloseStrikes.current = 0;switchToTab(i);setTabsOverviewOpen(false);}}
-              onClose={(i) => closeTab(i)}
-              onNewTab={() => {lastTabCloseStrikes.current = 0;openNewTab();setTabsOverviewOpen(false);}}
-              onLongPress={(i) => setTabActionIdx(i)}
-              onClearAll={(signal) => {
-                // -1 = tap-anywhere-else reset; otherwise advance the stage
-                if (signal === -1) {setClearAllStage(0);return;}
-                if (clearAllStage === 0) setClearAllStage(1);else
-                if (clearAllStage === 1) setClearAllStage(2);else
-                {closeAllTabs();setClearAllStage(0);lastTabCloseStrikes.current = 0;}
-              }}
-              clearAllStage={clearAllStage}
-              onDedupe={() => deduplicateTabs()}
-              MAX_TABS={MAX_TABS}
-              thumbnails={tabThumbnails}
-            />
-          </ScreenLayout>
-        </div>
-      )}
-      {tabActionIdx != null && (
-        <TabActionSheet
-          idx={tabActionIdx}
-          total={tabs.length}
-          onCloseOthers={() => {closeOtherTabs(tabActionIdx);lastTabCloseStrikes.current = 0;}}
-          onCloseToRight={() => {closeTabsToTheRight(tabActionIdx);lastTabCloseStrikes.current = 0;}}
-          onDismiss={() => setTabActionIdx(null)}
-        />
-      )}
-
-      {disableTabsPromptOpen && (
-        <div className="disable-tabs-overlay" onClick={() => setDisableTabsPromptOpen(false)}>
-          <div className="disable-tabs-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="disable-tabs-eyebrow">You keep closing your last tab</div>
-            <h2 className="disable-tabs-title">Disable tabs?</h2>
-            <div className="disable-tabs-body">{"Tabs let you juggle multiple reading places \u2014 a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button. You can re-enable tabs anytime in Settings \u2014 your open tabs will be waiting."}</div>
-            <div className="disable-tabs-actions">
-              <button
-                className="disable-tabs-btn secondary"
-                onClick={() => setDisableTabsPromptOpen(false)}>
-                Keep Tabs On
-              </button>
-              <button
-                className="disable-tabs-btn primary"
-                onClick={() => {
-                  updateSetting("tabsEnabled", false);
-                  setDisableTabsPromptOpen(false);
-                  setTabsOverviewOpen(false);
-                }}>
-                Disable Tabs
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* P8a: 26 trivial wrappers (13 index + 10 letter + 3 entry) all
-          dispatch through the ROUTES lookup declared just above the
-          return statement. Replaces 26 sibling `{screen === X && ...}`
-          blocks (~85 lines collapsed). _idxNav / sharedViewProps /
-          _navToChapter \u2014 previously assigned via inline-void mid-JSX \u2014
-          are now consts at the top of the render-prep block. */}
+      {/* Per-screen render slot \u2014 dispatch table built right above the
+          return; renders the active screen (or null if no route matches). */}
       {ROUTES[screen]?.() ?? null}
 
-
-
-
-
-
-      {gardenWarningOpen && (() => {
-        const selectedTier = getGardenTier(settings.gardenTier);
-        return (
-          <div className="garden-warning-overlay" onClick={() => setGardenWarningOpen(false)}>
-            <div className="garden-warning-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="garden-warning-title">Before You Begin</div>
-              <div className="garden-warning-body">
-                <em>A Return to The Garden</em> contains <strong>209 high-resolution photographs</strong> totaling approximately <strong>{selectedTier.size}</strong> at the selected quality. Pages stream from the internet as you read and are cached on your device.
-                <br /><br />For the best experience, connect to <strong>Wi-Fi</strong> before proceeding. Mobile data charges may apply otherwise.
-                <br /><br />Please also ensure your device has sufficient <strong>free storage</strong> available to cache the full collection.
-              </div>
-              <div className="garden-tier-selector">
-                <div className="garden-tier-label">Image Quality</div>
-                <div className="garden-tier-hint">You can change this anytime from the Settings menu.</div>
-                {GARDEN_TIERS.map((t) => (
-                  <button
-                    key={t.id}
-                    className={`garden-tier-option${settings.gardenTier === t.id ? " selected" : ""}`}
-                    onClick={() => setSettings((s) => ({ ...s, gardenTier: t.id }))}>
-                    <div className="garden-tier-option-main">
-                      <span className="garden-tier-option-name">{t.label}</span>
-                      <span className="garden-tier-option-size">{t.size}</span>
-                    </div>
-                    <div className="garden-tier-option-desc">{t.res}{" \xB7 "}{t.desc}</div>
-                  </button>
-                ))}
-              </div>
-              <div className="garden-warning-actions">
-                <button className="garden-warning-btn garden-warning-btn-cancel"
-                  onClick={() => setGardenWarningOpen(false)}>Go Back</button>
-                <button className="garden-warning-btn garden-warning-btn-proceed"
-                  onClick={() => {
-                    try {localStorage.setItem('vot-garden-warning-acked', '1');} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
-                    setGardenWarningOpen(false);
-                    setScreen("garden-view");
-                  }}>Proceed</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ── Highlight & Link overlays (always mounted) ── */}
       <SelectionToolbar

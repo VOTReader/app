@@ -2077,6 +2077,196 @@
     return /* @__PURE__ */ React.createElement("div", { className: "hd-playlists" }, HOLY_DAYS_META.audioPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.audioPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("path", { d: "M9 18V5l12-2v13" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "18", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "16", r: "3" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Audio Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Listen on Bandcamp")), HOLY_DAYS_META.videoPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.videoPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polygon", { points: "23 7 16 12 23 17 23 7" }), /* @__PURE__ */ React.createElement("rect", { x: "1", y: "5", width: "15", height: "14", rx: "2", ry: "2" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Video Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Watch on YouTube")));
   }
 
+  // app/src/main/assets/src/ui/components/AppShellOverlays.jsx
+  function AppShellOverlays2({
+    // Welcome modal
+    showWelcome,
+    isOnline,
+    dismissWelcome,
+    // Tabs overview + TabActionSheet
+    settings,
+    updateSetting,
+    tabsOverviewOpen,
+    setTabsOverviewOpen,
+    tabs,
+    activeTabIdx,
+    tabThumbnails,
+    MAX_TABS,
+    switchToTab,
+    closeTab,
+    openNewTab,
+    closeOtherTabs,
+    closeTabsToTheRight,
+    closeAllTabs,
+    deduplicateTabs,
+    tabActionIdx,
+    setTabActionIdx,
+    clearAllStage,
+    setClearAllStage,
+    lastTabCloseStrikesRef,
+    // Disable-tabs prompt
+    disableTabsPromptOpen,
+    setDisableTabsPromptOpen,
+    // Garden warning
+    gardenWarningOpen,
+    setGardenWarningOpen,
+    setSettings,
+    setScreen
+  }) {
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 9999,
+      backgroundImage: 'url("splash.jpg")',
+      backgroundColor: "#0a0e1a",
+      backgroundSize: "contain",
+      backgroundPosition: "center center",
+      backgroundRepeat: "no-repeat",
+      display: "flex",
+      flexDirection: "column"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: dismissWelcome,
+        style: {
+          margin: "calc(var(--inset-top, 0px) + 1rem) 1rem 0 0",
+          background: "rgba(0,0,0,0.55)",
+          border: "1.5px solid rgba(255,255,255,0.35)",
+          borderRadius: "50%",
+          width: "2.4rem",
+          height: "2.4rem",
+          color: "#fff",
+          fontSize: "1.2rem",
+          lineHeight: 1,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      },
+      "\u2715"
+    )), isOnline && /* @__PURE__ */ React.createElement(
+      "a",
+      {
+        href: "https://www.thevolumesoftruth.com",
+        target: "_blank",
+        rel: "noopener noreferrer",
+        style: {
+          position: "absolute",
+          left: "50%",
+          top: "37%",
+          transform: "translateX(-50%)",
+          width: "60%",
+          maxWidth: "400px",
+          height: "8%",
+          zIndex: 1,
+          borderBottom: "1.5px solid #6cacf0"
+        }
+      }
+    )), settings.tabsEnabled && tabsOverviewOpen && /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-layer" }, /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: () => setTabsOverviewOpen(false) }, "\u2190 Back"), /* @__PURE__ */ React.createElement(HomeBtn, null)) }, /* @__PURE__ */ React.createElement(
+      TabsOverview,
+      {
+        tabs,
+        activeTabIdx,
+        onSelect: (i) => {
+          lastTabCloseStrikesRef.current = 0;
+          switchToTab(i);
+          setTabsOverviewOpen(false);
+        },
+        onClose: (i) => closeTab(i),
+        onNewTab: () => {
+          lastTabCloseStrikesRef.current = 0;
+          openNewTab();
+          setTabsOverviewOpen(false);
+        },
+        onLongPress: (i) => setTabActionIdx(i),
+        onClearAll: (signal) => {
+          if (signal === -1) {
+            setClearAllStage(0);
+            return;
+          }
+          if (clearAllStage === 0) setClearAllStage(1);
+          else if (clearAllStage === 1) setClearAllStage(2);
+          else {
+            closeAllTabs();
+            setClearAllStage(0);
+            lastTabCloseStrikesRef.current = 0;
+          }
+        },
+        clearAllStage,
+        onDedupe: () => deduplicateTabs(),
+        MAX_TABS,
+        thumbnails: tabThumbnails
+      }
+    ))), tabActionIdx != null && /* @__PURE__ */ React.createElement(
+      TabActionSheet,
+      {
+        idx: tabActionIdx,
+        total: tabs.length,
+        onCloseOthers: () => {
+          closeOtherTabs(tabActionIdx);
+          lastTabCloseStrikesRef.current = 0;
+        },
+        onCloseToRight: () => {
+          closeTabsToTheRight(tabActionIdx);
+          lastTabCloseStrikesRef.current = 0;
+        },
+        onDismiss: () => setTabActionIdx(null)
+      }
+    ), disableTabsPromptOpen && /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-overlay", onClick: () => setDisableTabsPromptOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-dialog", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-eyebrow" }, "You keep closing your last tab"), /* @__PURE__ */ React.createElement("h2", { className: "disable-tabs-title" }, "Disable tabs?"), /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-body" }, "Tabs let you juggle multiple reading places \u2014 a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button. You can re-enable tabs anytime in Settings \u2014 your open tabs will be waiting."), /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-actions" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "disable-tabs-btn secondary",
+        onClick: () => setDisableTabsPromptOpen(false)
+      },
+      "Keep Tabs On"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "disable-tabs-btn primary",
+        onClick: () => {
+          updateSetting("tabsEnabled", false);
+          setDisableTabsPromptOpen(false);
+          setTabsOverviewOpen(false);
+        }
+      },
+      "Disable Tabs"
+    )))), gardenWarningOpen && (() => {
+      const selectedTier = getGardenTier(settings.gardenTier);
+      return /* @__PURE__ */ React.createElement("div", { className: "garden-warning-overlay", onClick: () => setGardenWarningOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "garden-warning-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "garden-warning-title" }, "Before You Begin"), /* @__PURE__ */ React.createElement("div", { className: "garden-warning-body" }, /* @__PURE__ */ React.createElement("em", null, "A Return to The Garden"), " contains ", /* @__PURE__ */ React.createElement("strong", null, "209 high-resolution photographs"), " totaling approximately ", /* @__PURE__ */ React.createElement("strong", null, selectedTier.size), " at the selected quality. Pages stream from the internet as you read and are cached on your device.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "For the best experience, connect to ", /* @__PURE__ */ React.createElement("strong", null, "Wi-Fi"), " before proceeding. Mobile data charges may apply otherwise.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "Please also ensure your device has sufficient ", /* @__PURE__ */ React.createElement("strong", null, "free storage"), " available to cache the full collection."), /* @__PURE__ */ React.createElement("div", { className: "garden-tier-selector" }, /* @__PURE__ */ React.createElement("div", { className: "garden-tier-label" }, "Image Quality"), /* @__PURE__ */ React.createElement("div", { className: "garden-tier-hint" }, "You can change this anytime from the Settings menu."), GARDEN_TIERS.map((t) => /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: t.id,
+          className: `garden-tier-option${settings.gardenTier === t.id ? " selected" : ""}`,
+          onClick: () => setSettings((s) => ({ ...s, gardenTier: t.id }))
+        },
+        /* @__PURE__ */ React.createElement("div", { className: "garden-tier-option-main" }, /* @__PURE__ */ React.createElement("span", { className: "garden-tier-option-name" }, t.label), /* @__PURE__ */ React.createElement("span", { className: "garden-tier-option-size" }, t.size)),
+        /* @__PURE__ */ React.createElement("div", { className: "garden-tier-option-desc" }, t.res, " \xB7 ", t.desc)
+      ))), /* @__PURE__ */ React.createElement("div", { className: "garden-warning-actions" }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "garden-warning-btn garden-warning-btn-cancel",
+          onClick: () => setGardenWarningOpen(false)
+        },
+        "Go Back"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "garden-warning-btn garden-warning-btn-proceed",
+          onClick: () => {
+            try {
+              localStorage.setItem("vot-garden-warning-acked", "1");
+            } catch (_e) {
+            }
+            setGardenWarningOpen(false);
+            setScreen("garden-view");
+          }
+        },
+        "Proceed"
+      ))));
+    })());
+  }
+
   // app/src/main/assets/src/ui/screens/LetterView.jsx
   function LetterView2({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, hlTick, onLinkOpen: _onLinkOpen }) {
     const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
@@ -9165,158 +9355,40 @@
         }
       )
     };
-    return /* @__PURE__ */ React.createElement(TabsContext.Provider, { value: tabsCtxValue }, null, settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && /* @__PURE__ */ React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /* @__PURE__ */ React.createElement("span", { className: "rdg-inner" })), showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
-      position: "fixed",
-      inset: 0,
-      zIndex: 9999,
-      backgroundImage: 'url("splash.jpg")',
-      backgroundColor: "#0a0e1a",
-      backgroundSize: "contain",
-      backgroundPosition: "center center",
-      backgroundRepeat: "no-repeat",
-      display: "flex",
-      flexDirection: "column"
-    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement(
-      "button",
+    return /* @__PURE__ */ React.createElement(TabsContext.Provider, { value: tabsCtxValue }, null, settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && /* @__PURE__ */ React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /* @__PURE__ */ React.createElement("span", { className: "rdg-inner" })), /* @__PURE__ */ React.createElement(
+      AppShellOverlays,
       {
-        onClick: dismissWelcome,
-        style: {
-          margin: "calc(var(--inset-top, 0px) + 1rem) 1rem 0 0",
-          background: "rgba(0,0,0,0.55)",
-          border: "1.5px solid rgba(255,255,255,0.35)",
-          borderRadius: "50%",
-          width: "2.4rem",
-          height: "2.4rem",
-          color: "#fff",
-          fontSize: "1.2rem",
-          lineHeight: 1,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }
-      },
-      "\u2715"
-    )), isOnline && /* @__PURE__ */ React.createElement(
-      "a",
-      {
-        href: "https://www.thevolumesoftruth.com",
-        target: "_blank",
-        rel: "noopener noreferrer",
-        style: {
-          position: "absolute",
-          left: "50%",
-          top: "37%",
-          transform: "translateX(-50%)",
-          width: "60%",
-          maxWidth: "400px",
-          height: "8%",
-          zIndex: 1,
-          borderBottom: "1.5px solid #6cacf0"
-        }
-      }
-    )), settings.tabsEnabled && tabsOverviewOpen && /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-layer" }, /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: () => setTabsOverviewOpen(false) }, "\u2190 Back"), /* @__PURE__ */ React.createElement(HomeBtn, null)) }, /* @__PURE__ */ React.createElement(
-      TabsOverview,
-      {
+        showWelcome,
+        isOnline,
+        dismissWelcome,
+        settings,
+        updateSetting,
+        tabsOverviewOpen,
+        setTabsOverviewOpen,
         tabs,
         activeTabIdx,
-        onSelect: (i) => {
-          lastTabCloseStrikes.current = 0;
-          switchToTab(i);
-          setTabsOverviewOpen(false);
-        },
-        onClose: (i) => closeTab(i),
-        onNewTab: () => {
-          lastTabCloseStrikes.current = 0;
-          openNewTab();
-          setTabsOverviewOpen(false);
-        },
-        onLongPress: (i) => setTabActionIdx(i),
-        onClearAll: (signal) => {
-          if (signal === -1) {
-            setClearAllStage(0);
-            return;
-          }
-          if (clearAllStage === 0) setClearAllStage(1);
-          else if (clearAllStage === 1) setClearAllStage(2);
-          else {
-            closeAllTabs();
-            setClearAllStage(0);
-            lastTabCloseStrikes.current = 0;
-          }
-        },
-        clearAllStage,
-        onDedupe: () => deduplicateTabs(),
+        tabThumbnails,
         MAX_TABS,
-        thumbnails: tabThumbnails
+        switchToTab,
+        closeTab,
+        openNewTab,
+        closeOtherTabs,
+        closeTabsToTheRight,
+        closeAllTabs,
+        deduplicateTabs,
+        tabActionIdx,
+        setTabActionIdx,
+        clearAllStage,
+        setClearAllStage,
+        lastTabCloseStrikesRef: lastTabCloseStrikes,
+        disableTabsPromptOpen,
+        setDisableTabsPromptOpen,
+        gardenWarningOpen,
+        setGardenWarningOpen,
+        setSettings,
+        setScreen
       }
-    ))), tabActionIdx != null && /* @__PURE__ */ React.createElement(
-      TabActionSheet,
-      {
-        idx: tabActionIdx,
-        total: tabs.length,
-        onCloseOthers: () => {
-          closeOtherTabs(tabActionIdx);
-          lastTabCloseStrikes.current = 0;
-        },
-        onCloseToRight: () => {
-          closeTabsToTheRight(tabActionIdx);
-          lastTabCloseStrikes.current = 0;
-        },
-        onDismiss: () => setTabActionIdx(null)
-      }
-    ), disableTabsPromptOpen && /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-overlay", onClick: () => setDisableTabsPromptOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-dialog", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-eyebrow" }, "You keep closing your last tab"), /* @__PURE__ */ React.createElement("h2", { className: "disable-tabs-title" }, "Disable tabs?"), /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-body" }, "Tabs let you juggle multiple reading places \u2014 a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button. You can re-enable tabs anytime in Settings \u2014 your open tabs will be waiting."), /* @__PURE__ */ React.createElement("div", { className: "disable-tabs-actions" }, /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "disable-tabs-btn secondary",
-        onClick: () => setDisableTabsPromptOpen(false)
-      },
-      "Keep Tabs On"
-    ), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "disable-tabs-btn primary",
-        onClick: () => {
-          updateSetting("tabsEnabled", false);
-          setDisableTabsPromptOpen(false);
-          setTabsOverviewOpen(false);
-        }
-      },
-      "Disable Tabs"
-    )))), ROUTES[screen]?.() ?? null, gardenWarningOpen && (() => {
-      const selectedTier = getGardenTier(settings.gardenTier);
-      return /* @__PURE__ */ React.createElement("div", { className: "garden-warning-overlay", onClick: () => setGardenWarningOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "garden-warning-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "garden-warning-title" }, "Before You Begin"), /* @__PURE__ */ React.createElement("div", { className: "garden-warning-body" }, /* @__PURE__ */ React.createElement("em", null, "A Return to The Garden"), " contains ", /* @__PURE__ */ React.createElement("strong", null, "209 high-resolution photographs"), " totaling approximately ", /* @__PURE__ */ React.createElement("strong", null, selectedTier.size), " at the selected quality. Pages stream from the internet as you read and are cached on your device.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "For the best experience, connect to ", /* @__PURE__ */ React.createElement("strong", null, "Wi-Fi"), " before proceeding. Mobile data charges may apply otherwise.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "Please also ensure your device has sufficient ", /* @__PURE__ */ React.createElement("strong", null, "free storage"), " available to cache the full collection."), /* @__PURE__ */ React.createElement("div", { className: "garden-tier-selector" }, /* @__PURE__ */ React.createElement("div", { className: "garden-tier-label" }, "Image Quality"), /* @__PURE__ */ React.createElement("div", { className: "garden-tier-hint" }, "You can change this anytime from the Settings menu."), GARDEN_TIERS.map((t) => /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          key: t.id,
-          className: `garden-tier-option${settings.gardenTier === t.id ? " selected" : ""}`,
-          onClick: () => setSettings((s) => ({ ...s, gardenTier: t.id }))
-        },
-        /* @__PURE__ */ React.createElement("div", { className: "garden-tier-option-main" }, /* @__PURE__ */ React.createElement("span", { className: "garden-tier-option-name" }, t.label), /* @__PURE__ */ React.createElement("span", { className: "garden-tier-option-size" }, t.size)),
-        /* @__PURE__ */ React.createElement("div", { className: "garden-tier-option-desc" }, t.res, " \xB7 ", t.desc)
-      ))), /* @__PURE__ */ React.createElement("div", { className: "garden-warning-actions" }, /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "garden-warning-btn garden-warning-btn-cancel",
-          onClick: () => setGardenWarningOpen(false)
-        },
-        "Go Back"
-      ), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "garden-warning-btn garden-warning-btn-proceed",
-          onClick: () => {
-            try {
-              localStorage.setItem("vot-garden-warning-acked", "1");
-            } catch (_e) {
-            }
-            setGardenWarningOpen(false);
-            setScreen("garden-view");
-          }
-        },
-        "Proceed"
-      ))));
-    })(), /* @__PURE__ */ React.createElement(
+    ), ROUTES[screen]?.() ?? null, /* @__PURE__ */ React.createElement(
       SelectionToolbar,
       {
         hlTick,
@@ -9612,6 +9684,7 @@
     LinkIcon: LinkIcon2,
     BookmarkIcon: BookmarkIcon2,
     HolyDaysPlaylistHeader: HolyDaysPlaylistHeader2,
+    AppShellOverlays: AppShellOverlays2,
     // Screens
     LetterView: LetterView2,
     WtlbEntryView: WtlbEntryView2,
