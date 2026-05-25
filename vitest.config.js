@@ -53,8 +53,10 @@ export default defineConfig({
       // Q5.5 baseline (+ journal-index-store, 132 tests):
       //   statements 6.78 | branches 7.44 | functions 5.78 | lines 6.56
       // Q5.6 baseline (+ useSavedState hook + field preservation, 143 tests):
-      //   statements 7.10 (177/2491) | branches 7.65 (145/1894)
-      //   functions  6.19 (30/484)   | lines    6.94 (127/1828)
+      //   statements 7.10 | branches 7.65 | functions 6.19 | lines 6.94
+      // Q5.7 baseline (+ note-store, 166 tests):
+      //   statements 8.71 (217/2491) | branches 8.71 (165/1894)
+      //   functions  8.88 (43/484)   | lines    8.75 (160/1828)
       //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
@@ -64,10 +66,10 @@ export default defineConfig({
       // whether a test was removed, a file was added without coverage, or
       // the previous threshold was set wrong.
       thresholds: {
-        statements: 7,
-        branches: 7,
-        functions: 6,
-        lines: 6,
+        statements: 8,
+        branches: 8,
+        functions: 8,
+        lines: 8,
       },
     },
   },
