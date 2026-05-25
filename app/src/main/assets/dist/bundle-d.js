@@ -7684,7 +7684,7 @@
   }
 
   // app/src/main/assets/src/app.jsx
-  var { useState, useEffect, useCallback } = React;
+  var { useState, useEffect } = React;
   function App() {
     var sharedViewProps, _navToChapter, _idxNav;
     const saved = useSavedState();
@@ -7828,23 +7828,6 @@
       if (saved.lastReadLetterV1 && !map.one) map.one = saved.lastReadLetterV1;
       return map;
     });
-    const prophecyCardStatesRef = React.useRef(() => {
-      try {
-        return JSON.parse(localStorage.getItem("vot-prophecy-cards") || "{}");
-      } catch (_e) {
-        return {};
-      }
-    });
-    if (typeof prophecyCardStatesRef.current === "function") prophecyCardStatesRef.current = prophecyCardStatesRef.current();
-    const saveProphecyCardStates = useCallback(() => {
-      try {
-        localStorage.setItem("vot-prophecy-cards", JSON.stringify(prophecyCardStatesRef.current));
-      } catch (_e) {
-      }
-    }, []);
-    const setLastReadForVol = (volId, id) => {
-      setLastReadLetterMap((prev) => ({ ...prev, [volId]: id }));
-    };
     const {
       setFromLetterStack,
       pushFromLetter,
@@ -7971,6 +7954,50 @@
       dwellMs: settings.dwellMs,
       initialActiveReadKey: saved.activeReadKey || null
     });
+    const {
+      getStudyById,
+      getStudyChapter,
+      studyReadKey,
+      selectStudy,
+      selectStudyChapter,
+      UNIFIED_CHAIN,
+      prevChainEntry,
+      nextChainEntry,
+      goToChainEntryFirst,
+      goToChainEntryLast
+    } = useBibleStudies({
+      setScreen,
+      setBookId,
+      setChapterNum,
+      setStudyId,
+      setStudyChapterId,
+      setActiveReadKey,
+      setLastReadChapters,
+      setFromStudies
+    });
+    const {
+      prophecyCardStatesRef,
+      saveProphecyCardStates,
+      setLastReadForVol,
+      selectMatthewCh,
+      selectBibleCh,
+      goToLastRead
+    } = useReadingPositionNav({
+      bookId,
+      activeReadKey,
+      lastReadLetterMap,
+      lastReadChapters,
+      setLetterId,
+      setBookId,
+      setChapterNum,
+      setScreen,
+      setActiveReadKey,
+      setLastReadLetterMap,
+      setLastReadChapters,
+      getStudyById,
+      selectStudy,
+      selectStudyChapter
+    });
     const [fromMatthewCh, setFromMatthewCh] = tabField("fromMatthewCh");
     const { goToLetterFromMatthew, openInAppLetter } = useTapThrough({
       screen,
@@ -8082,27 +8109,6 @@
       setJournalEntryId,
       setGardenPage
     });
-    const {
-      getStudyById,
-      getStudyChapter,
-      studyReadKey,
-      selectStudy,
-      selectStudyChapter,
-      UNIFIED_CHAIN,
-      prevChainEntry,
-      nextChainEntry,
-      goToChainEntryFirst,
-      goToChainEntryLast
-    } = useBibleStudies({
-      setScreen,
-      setBookId,
-      setChapterNum,
-      setStudyId,
-      setStudyChapterId,
-      setActiveReadKey,
-      setLastReadChapters,
-      setFromStudies
-    });
     const { navigateToLink } = useNavigateToLink({
       closeLinkSidebar,
       pushFromLetter,
@@ -8144,34 +8150,6 @@
         if (o.studyChapterId !== void 0) setStudyChapterId(o.studyChapterId);
       } else
         goHome();
-    };
-    const goToLastRead = () => {
-      if (!activeReadKey) return;
-      if (activeReadKey.startsWith("vol:")) {
-        const volKey = activeReadKey.slice(4);
-        const col = COL_BY_KEY.get(volKey);
-        const lid = lastReadLetterMap[volKey] || null;
-        if (lid && col) {
-          setLetterId(lid);
-          setScreen(col.letterScreen);
-        }
-      } else if (activeReadKey.startsWith("bible-study-")) {
-        const slug = activeReadKey.slice("bible-study-".length);
-        const chId = lastReadChapters[activeReadKey];
-        const study = getStudyById(slug);
-        if (study && chId) {
-          selectStudyChapter(slug, chId);
-        } else if (study) {
-          selectStudy(slug);
-        }
-      } else {
-        const ch = lastReadChapters[activeReadKey];
-        if (ch) {
-          setBookId(activeReadKey);
-          setChapterNum(ch);
-          setScreen(activeReadKey === "matthew" ? "matthew-ch" : "bible-ch");
-        }
-      }
     };
     const handleScriptureSelect = (id, clearGenre) => {
       if (clearGenre) setGenreId(null);
@@ -8305,11 +8283,6 @@
       goSettings,
       goHome
     });
-    const selectMatthewCh = (num) => {
-      setChapterNum(num);
-      setScreen("matthew-ch");
-      setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: num })));
-    };
     useAndroidBack({
       screen,
       bookId,
@@ -8356,11 +8329,6 @@
       getStudyById,
       getStudyChapter
     });
-    const selectBibleCh = (num) => {
-      setChapterNum(num);
-      setScreen("bible-ch");
-      setActiveReadKey(bookId, () => setLastReadChapters((prev) => ({ ...prev, [bookId]: num })));
-    };
     const goToRevelationLast = () => {
       const rev = BOOKS.revelation;
       setBookId("revelation");

@@ -18,7 +18,7 @@
    The destructure below mirrors index.html inline #1 — kept here for
    clarity so this file reads as self-contained.
    ═══════════════════════════════════════════════════════════════════════ */
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect } = React;
 
 function App() {
   // screens: "home" | "scriptures-home" | "volumes-home" | "matthew-idx" | "matthew-ch" | "bible-idx" | "bible-ch" | "vot-index" | "vot-letter" | "search"
@@ -242,20 +242,10 @@ function App() {
   });
   // Single global "you are here" dot — tracks the ONE most recently read book/volume
   /* Dwell-timer state + commitDwellNow → src/hooks/use-reading-dwell.js (P6f) */
-  // Prophecy card expand/collapse state — persisted to localStorage
-  // Key format: "chapterId:blockIndex:cardType" → boolean
-  const prophecyCardStatesRef = React.useRef(() => {
-    try {return JSON.parse(localStorage.getItem("vot-prophecy-cards") || "{}");} catch (_e) {return {};}
-  });
-  // Lazy-init: if it's still the initializer function, call it
-  if (typeof prophecyCardStatesRef.current === "function") prophecyCardStatesRef.current = prophecyCardStatesRef.current();
-  const saveProphecyCardStates = useCallback(() => {
-    try {localStorage.setItem("vot-prophecy-cards", JSON.stringify(prophecyCardStatesRef.current));} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
-  }, []);
+  /* prophecyCardStatesRef + saveProphecyCardStates + setLastReadForVol +
+     selectMatthewCh/BibleCh + goToLastRead → src/hooks/use-reading-position-nav.js
+     (P7h, called below — needs setActiveReadKey from useReadingDwell). */
   /* cancelDwell + scheduleDwell + pauseDwell + setActiveReadKey + __onDwellCommit effect → src/hooks/use-reading-dwell.js (P6f) */
-  const setLastReadForVol = (volId, id) => {
-    setLastReadLetterMap((prev) => ({ ...prev, [volId]: id }));
-  };
   /* goToLetterFromMatthew + openInAppLetter → src/hooks/use-tap-through.js (P7f).
      The useTapThrough() call is below useFromLetterStack (which returns
      pushFromLetter, a useTapThrough PARAM). */
@@ -405,12 +395,51 @@ function App() {
     initialActiveReadKey: saved.activeReadKey || null,
   });
 
+  /* Bible Studies domain — STUDIES + UNIFIED_CHAIN + lookups + study
+     nav. Called HERE (right after useReadingDwell, so setActiveReadKey
+     is in scope) so its returned getStudyById / selectStudy /
+     selectStudyChapter are available as PARAMS for useReadingPositionNav
+     (just below — goToLastRead uses them for the 'bible-study-' branch).
+     Moved here from "right after useNav" in P7h to clear the TDZ for
+     useReadingPositionNav. */
+  const {
+    getStudyById, getStudyChapter, studyReadKey,
+    selectStudy, selectStudyChapter,
+    UNIFIED_CHAIN, prevChainEntry, nextChainEntry,
+    goToChainEntryFirst, goToChainEntryLast,
+  } = useBibleStudies({
+    setScreen, setBookId, setChapterNum,
+    setStudyId, setStudyChapterId,
+    setActiveReadKey, setLastReadChapters, setFromStudies,
+  });
+
+  /* Reading-cursor coordination (P7h). Owns setLastReadForVol +
+     selectMatthewCh/BibleCh + goToLastRead + prophecyCardStatesRef +
+     saveProphecyCardStates. Called HERE (between useBibleStudies and
+     useTapThrough) because:
+       - needs setActiveReadKey from useReadingDwell + getStudyById /
+         selectStudy / selectStudyChapter from useBibleStudies (above)
+       - returns setLastReadForVol which useTapThrough (just below)
+         consumes as a PARAM. */
+  const {
+    prophecyCardStatesRef, saveProphecyCardStates,
+    setLastReadForVol,
+    selectMatthewCh, selectBibleCh,
+    goToLastRead,
+  } = useReadingPositionNav({
+    bookId,
+    activeReadKey, lastReadLetterMap, lastReadChapters,
+    setLetterId, setBookId, setChapterNum, setScreen,
+    setActiveReadKey,
+    setLastReadLetterMap, setLastReadChapters,
+    getStudyById, selectStudy, selectStudyChapter,
+  });
+
   /* Tap-through openers (P7f). goToLetterFromMatthew + openInAppLetter
      both push onto fromLetterStack (from useFromLetterStack above) AND
-     consume setActiveReadKey (from useReadingDwell just above) — that's
-     why this call site sits HERE, not next to useFromLetterStack. The
-     fromMatthewCh tabField is hoisted with it so setFromMatthewCh is
-     in scope. */
+     consume setActiveReadKey (from useReadingDwell) + setLastReadForVol
+     (from useReadingPositionNav just above). The fromMatthewCh tabField
+     is hoisted with it so setFromMatthewCh is in scope. */
   const [fromMatthewCh, setFromMatthewCh] = tabField('fromMatthewCh');
   const { goToLetterFromMatthew, openInAppLetter } = useTapThrough({
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
@@ -482,25 +511,8 @@ function App() {
     setJournalEntryId, setGardenPage,
   });
 
-  /* Bible Studies domain — STUDIES + UNIFIED_CHAIN + lookups + study
-     nav. Called HIGH UP (right after useNav) because P7d cleared the
-     TDZ blocker that previously forced this block to live ~line 754.
-     useAndroidBack / useNavHistoryTracking / useSearch downstream
-     consumers now read getStudyById / getStudyChapter / etc. as hook
-     RETURNS (no longer const arrows) → their call-site placements
-     became free as a result. (They haven't moved yet; that's deferred
-     to keep P7d focused on the extraction itself.) See use-bible-studies.js
-     header for the full TDZ-blocker rationale. */
-  const {
-    getStudyById, getStudyChapter, studyReadKey,
-    selectStudy, selectStudyChapter,
-    UNIFIED_CHAIN, prevChainEntry, nextChainEntry,
-    goToChainEntryFirst, goToChainEntryLast,
-  } = useBibleStudies({
-    setScreen, setBookId, setChapterNum,
-    setStudyId, setStudyChapterId,
-    setActiveReadKey, setLastReadChapters, setFromStudies,
-  });
+  /* useBibleStudies() call → moved UP to right after useReadingDwell
+     (P7h) so its returns are in scope for useReadingPositionNav. */
 
   /* useNavigateToLink — the cross-app deep-linking router. Placed here
      because setJournalEntryId (declared above for useNav too) is one of
@@ -538,30 +550,7 @@ function App() {
   /* toggleSetting + updateSetting → src/hooks/use-settings.js (P6g) */
 
   /* Mark-as-read helpers → useReadProgress (P7g, called above). */
-
-  /* ── Go to last-read position (global reading dot) ── */
-  const goToLastRead = () => {
-    if (!activeReadKey) return;
-    if (activeReadKey.startsWith("vol:")) {
-      const volKey = activeReadKey.slice(4);
-      const col = COL_BY_KEY.get(volKey);
-      const lid = lastReadLetterMap[volKey] || null;
-      if (lid && col) {setLetterId(lid);setScreen(col.letterScreen);}
-    } else if (activeReadKey.startsWith("bible-study-")) {
-      // Resume inside a Bible Letter Study
-      const slug = activeReadKey.slice("bible-study-".length);
-      const chId = lastReadChapters[activeReadKey];
-      const study = getStudyById(slug);
-      if (study && chId) {
-        selectStudyChapter(slug, chId);
-      } else if (study) {
-        selectStudy(slug);
-      }
-    } else {
-      const ch = lastReadChapters[activeReadKey];
-      if (ch) {setBookId(activeReadKey);setChapterNum(ch);setScreen(activeReadKey === 'matthew' ? 'matthew-ch' : 'bible-ch');}
-    }
-  };
+  /* goToLastRead → src/hooks/use-reading-position-nav.js (P7h, called above). */
 
   /* goColIdx → src/hooks/use-nav.js (P7b). */
 
@@ -703,7 +692,7 @@ function App() {
   });
 
   /* ── Matthew ── */
-  const selectMatthewCh = (num) => {setChapterNum(num);setScreen("matthew-ch");setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: num })));};
+  /* selectMatthewCh → src/hooks/use-reading-position-nav.js (P7h). */
   /* goMatthewIdx → src/hooks/use-nav.js (P7b). */
 
   /* STUDIES / getStudyById / getStudyChapter / studyReadKey → src/hooks/use-bible-studies.js (P7d). */
@@ -741,7 +730,7 @@ function App() {
      (P7d). All destructured from the useBibleStudies call ~225 lines above. */
 
   /* ── Ephesians / Hebrews ── */
-  const selectBibleCh = (num) => {setChapterNum(num);setScreen("bible-ch");setActiveReadKey(bookId, () => setLastReadChapters((prev) => ({ ...prev, [bookId]: num })));};
+  /* selectBibleCh → src/hooks/use-reading-position-nav.js (P7h). */
   /* goBibleIdx → src/hooks/use-nav.js (P7b). */
 
   /* ── Cross-volume boundary jumps ──

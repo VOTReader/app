@@ -4208,6 +4208,90 @@
     return { goToLetterFromMatthew, openInAppLetter };
   }
 
+  // app/src/main/assets/src/hooks/use-reading-position-nav.js
+  function useReadingPositionNav({
+    bookId,
+    activeReadKey,
+    lastReadLetterMap,
+    lastReadChapters,
+    setLetterId,
+    setBookId,
+    setChapterNum,
+    setScreen,
+    setActiveReadKey,
+    setLastReadLetterMap,
+    setLastReadChapters,
+    getStudyById,
+    selectStudy,
+    selectStudyChapter
+  }) {
+    const prophecyCardStatesRef = React.useRef(() => {
+      try {
+        return JSON.parse(localStorage.getItem("vot-prophecy-cards") || "{}");
+      } catch (_e) {
+        return {};
+      }
+    });
+    if (typeof prophecyCardStatesRef.current === "function") {
+      prophecyCardStatesRef.current = prophecyCardStatesRef.current();
+    }
+    const saveProphecyCardStates = React.useCallback(() => {
+      try {
+        localStorage.setItem("vot-prophecy-cards", JSON.stringify(prophecyCardStatesRef.current));
+      } catch (_e) {
+      }
+    }, []);
+    const setLastReadForVol = (volKey, id) => {
+      setLastReadLetterMap((prev) => ({ ...prev, [volKey]: id }));
+    };
+    const selectMatthewCh = (num) => {
+      setChapterNum(num);
+      setScreen("matthew-ch");
+      setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: num })));
+    };
+    const selectBibleCh = (num) => {
+      setChapterNum(num);
+      setScreen("bible-ch");
+      setActiveReadKey(bookId, () => setLastReadChapters((prev) => ({ ...prev, [bookId]: num })));
+    };
+    const goToLastRead = () => {
+      if (!activeReadKey) return;
+      if (activeReadKey.startsWith("vol:")) {
+        const volKey = activeReadKey.slice(4);
+        const col = COL_BY_KEY.get(volKey);
+        const lid = lastReadLetterMap[volKey] || null;
+        if (lid && col) {
+          setLetterId(lid);
+          setScreen(col.letterScreen);
+        }
+      } else if (activeReadKey.startsWith("bible-study-")) {
+        const slug = activeReadKey.slice("bible-study-".length);
+        const chId = lastReadChapters[activeReadKey];
+        const study = getStudyById(slug);
+        if (study && chId) {
+          selectStudyChapter(slug, chId);
+        } else if (study) {
+          selectStudy(slug);
+        }
+      } else {
+        const ch = lastReadChapters[activeReadKey];
+        if (ch) {
+          setBookId(activeReadKey);
+          setChapterNum(ch);
+          setScreen(activeReadKey === "matthew" ? "matthew-ch" : "bible-ch");
+        }
+      }
+    };
+    return {
+      prophecyCardStatesRef,
+      saveProphecyCardStates,
+      setLastReadForVol,
+      selectMatthewCh,
+      selectBibleCh,
+      goToLastRead
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -7655,6 +7739,7 @@
     useBibleStudies,
     useJournalMutations,
     useTapThrough,
+    useReadingPositionNav,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
