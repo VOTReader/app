@@ -2505,6 +2505,745 @@
     ));
   }
 
+  // app/src/main/assets/src/ui/screen-routes.jsx
+  function buildScreenRoutes2({
+    // ── State + setters (tab-field-backed) ──
+    setScreen,
+    bookId,
+    setBookId,
+    chapterNum,
+    setChapterNum,
+    setLetterId,
+    studyId,
+    setStudyId,
+    studyChapterId,
+    setStudyChapterId,
+    fromStudies,
+    setFromStudies,
+    mode,
+    setMode,
+    showStudy,
+    setShowStudy,
+    genreId,
+    surpriseAnchor,
+    setSurpriseAnchor,
+    // ── Theme + settings + display ──
+    theme,
+    setTheme,
+    settings,
+    setSettings,
+    toggleSetting,
+    updateSetting,
+    hlTick,
+    setHlTick,
+    titleFocusHidden,
+    setTitleFocusHidden,
+    headingsFocusHidden,
+    setHeadingsFocusHidden,
+    // ── Read progress + history ──
+    activeReadKey,
+    setActiveReadKey,
+    lastReadChapters,
+    setLastReadChapters,
+    setLastReadForVol,
+    readItems,
+    readHistory,
+    markRead,
+    unmarkRead,
+    isRead,
+    clearReadForBook,
+    clearAllProgress,
+    clearHistory,
+    pruneHistoryDay,
+    // ── Data resolved from screen state ──
+    letter,
+    letterV1,
+    letterV3,
+    letterV4,
+    letterV5,
+    letterV6,
+    letterV7,
+    letterTimothy,
+    letterFlock,
+    letterRebuke,
+    wtlb1Entry,
+    wtlb2Entry,
+    blessedEntry,
+    hdEntry,
+    hmEntry,
+    book,
+    chapter,
+    // ── Nav helpers ──
+    goHome,
+    goNavOrigin,
+    goSearch,
+    goHistory,
+    goSettings,
+    goAbout,
+    goVolumesHome,
+    goScripturesHome,
+    goScriptureGenre,
+    goBibleIdx,
+    goMatthewIdx,
+    goStudiesHome,
+    goNotesIndex,
+    goLinksIndex,
+    goBookmarksIndex,
+    goJournalHub,
+    goHighlightsIndex,
+    goJournalViewer,
+    goJournalEditor,
+    goSearchOrigin,
+    // ── Selection / handlers ──
+    handleSelect,
+    handleSurprise,
+    handleScriptureSelect,
+    handleVolumeSelect,
+    handleSearchSelect,
+    handleSearchCommand,
+    selectMatthewCh,
+    selectBibleCh,
+    selectStudy,
+    selectStudyChapter,
+    // ── Bible Studies + chain nav ──
+    getStudyById,
+    getStudyChapter,
+    studyReadKey,
+    prevChainEntry,
+    nextChainEntry,
+    goToChainEntryFirst,
+    goToChainEntryLast,
+    studiesLoading,
+    UNIFIED_CHAIN,
+    // ── Search ──
+    searchQuery,
+    setSearchQuery,
+    searchScope,
+    setSearchScope,
+    searchContext,
+    // ── Journal ──
+    journalEntryId,
+    createAndEditJournal,
+    // ── Tap through / linking / overlays ──
+    openLinkSidebar,
+    navigateToLink,
+    backHint,
+    tapThroughBack,
+    goToLetterFromMatthew,
+    setNavOrigin,
+    setNoteSheetTarget,
+    setShowWelcome,
+    // ── Bible chapter boundary props (from useReadingChainNav) ──
+    bcvPrevBook,
+    bcvNextBook,
+    bcvOnPrevBook,
+    bcvOnNextBook,
+    bcvPrevBoundaryTitle,
+    bcvNextBoundaryTitle,
+    // ── Reading position ──
+    prophecyCardStatesRef,
+    saveProphecyCardStates,
+    // ── Matthew-Hidden-Manna tap-through tracking (for hm-letter back nav) ──
+    fromMatthewChRef,
+    setFromMatthewCh,
+    // ── App-local helpers (close over App state) ──
+    colIdxProps,
+    colReadNavProps,
+    boundaryConfig,
+    _idxNav,
+    sharedViewProps,
+    _navToChapter,
+    // ── Garden ──
+    gardenPage,
+    setGardenPage
+  }) {
+    return {
+      // ── Volume index screens (13) ──
+      "vot-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Two", letters: LETTERS, ...colIdxProps("two") })),
+      "vot-one-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume One", letters: LETTERS_V1, preface: LETTERS_V1_PREFACE, ...colIdxProps("one") })),
+      "vot-three-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Three", letters: LETTERS_V3, preface: LETTERS_V3_PREFACE, ...colIdxProps("three") })),
+      "vot-four-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Four", letters: LETTERS_V4, preface: LETTERS_V4_PREFACE, ...colIdxProps("four") })),
+      "vot-five-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Five", letters: LETTERS_V5, preface: LETTERS_V5_PREFACE, ...colIdxProps("five") })),
+      "vot-six-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Six", letters: LETTERS_V6, preface: LETTERS_V6_PREFACE, ...colIdxProps("six") })),
+      "vot-seven-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Seven", letters: LETTERS_V7, preface: LETTERS_V7_PREFACE, ...colIdxProps("seven") })),
+      "vot-timothy-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters from Timothy", eyebrow: "The Volumes of Truth", letters: LETTERS_TIMOTHY, preface: LETTERS_TIMOTHY_PREFACE, ...colIdxProps("timothy") })),
+      "vot-flock-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters to The Lord's Little Flock", eyebrow: "The Volumes of Truth", letters: LETTERS_FLOCK, preface: LETTERS_FLOCK_PREFACE, ...colIdxProps("flock") })),
+      "vot-rebuke-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Lord's Rebuke", eyebrow: "A Testament Against The World", letters: LETTERS_REBUKE, preface: LETTERS_REBUKE_PREFACE, ...colIdxProps("rebuke") })),
+      "wtlb-one-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part One \xB7 Words of Wisdom", letters: WTLB_ONE, columns: 2, ...colIdxProps("wtlb1") })),
+      "wtlb-two-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part Two \xB7 More Words of Wisdom", letters: WTLB_TWO, columns: 2, ...colIdxProps("wtlb2") })),
+      "blessed-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Blessed", eyebrow: "Blessings & Promises", letters: colLetterArr(COL_BY_KEY.get("blessed")).map((e) => ({ ...e, date: e.sourceLabel || "" })), ...colIdxProps("blessed") })),
+      // ── Letter screens (10) — data-guarded ──
+      "vot-one-letter": () => letterV1 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("one", true), ...boundaryConfig("one", letterV1), letter: letterV1, volumeLabel: "Volume One" }),
+      "vot-letter": () => letter && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("two", true), ...boundaryConfig("two", letter), letter }),
+      "vot-three-letter": () => letterV3 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("three", true), ...boundaryConfig("three", letterV3), letter: letterV3, volumeLabel: "Volume Three" }),
+      "vot-four-letter": () => letterV4 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("four", true), ...boundaryConfig("four", letterV4), letter: letterV4, volumeLabel: "Volume Four" }),
+      "vot-five-letter": () => letterV5 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("five", true), ...boundaryConfig("five", letterV5), letter: letterV5, volumeLabel: "Volume Five" }),
+      "vot-six-letter": () => letterV6 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("six", true), ...boundaryConfig("six", letterV6), letter: letterV6, volumeLabel: "Volume Six" }),
+      "vot-seven-letter": () => letterV7 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("seven", true), ...boundaryConfig("seven", letterV7), letter: letterV7, volumeLabel: "Volume Seven" }),
+      "vot-timothy-letter": () => letterTimothy && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("timothy", true), ...boundaryConfig("timothy", letterTimothy), letter: letterTimothy, volumeLabel: "Letters from Timothy" }),
+      "vot-flock-letter": () => letterFlock && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("flock", true), ...boundaryConfig("flock", letterFlock), letter: letterFlock, volumeLabel: "Letters to The Lord's Little Flock" }),
+      "vot-rebuke-letter": () => letterRebuke && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("rebuke", true), ...boundaryConfig("rebuke", letterRebuke), letter: letterRebuke, volumeLabel: "The Lord's Rebuke" }),
+      // ── WTLB / Blessed entry screens (3) — data-guarded ──
+      "wtlb-one-entry": () => wtlb1Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb1"), ...boundaryConfig("wtlb1", wtlb1Entry), entry: wtlb1Entry, partLabel: "Part One", onNavToChapter: _navToChapter }),
+      "wtlb-two-entry": () => wtlb2Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb2"), ...boundaryConfig("wtlb2", wtlb2Entry), entry: wtlb2Entry, partLabel: "Part Two", onNavToChapter: _navToChapter }),
+      "blessed-entry": () => blessedEntry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("blessed"), ...boundaryConfig("blessed", blessedEntry), entry: blessedEntry, partLabel: "The Blessed", onNavToChapter: _navToChapter }),
+      // ── AppShell / settings / search / home / library (P8b — 20 medium
+      //    prop-threading screens folded in; same pattern as P8a). ──
+      "settings": () => /* @__PURE__ */ React.createElement(
+        SettingsScreen,
+        {
+          settings,
+          onToggle: toggleSetting,
+          onSetting: updateSetting,
+          onBack: goNavOrigin,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          readItems,
+          onClearBook: clearReadForBook,
+          onClearAll: clearAllProgress,
+          onClearHistory: clearHistory,
+          historyCount: readHistory.length,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "search": () => /* @__PURE__ */ React.createElement(
+        SearchScreen,
+        {
+          query: searchQuery,
+          onQueryChange: setSearchQuery,
+          settings,
+          onSettingsChange: (key, val) => setSettings((prev) => ({ ...prev, [key]: val })),
+          onSelect: handleSearchSelect,
+          onCommand: handleSearchCommand,
+          onBack: goSearchOrigin,
+          searchScope,
+          searchContext,
+          onToggleScope: () => setSearchScope((prev) => prev ? null : searchContext)
+        }
+      ),
+      "home": () => /* @__PURE__ */ React.createElement(
+        HomeScreen,
+        {
+          onSelect: handleSelect,
+          onSurprise: handleSurprise,
+          showSurprise: settings.showSurpriseButton,
+          onSettings: goSettings,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          onInfo: () => setShowWelcome(true),
+          onAbout: goAbout,
+          history: readHistory,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "about": () => /* @__PURE__ */ React.createElement(
+        AboutScreen,
+        {
+          onContinue: () => {
+            try {
+              localStorage.setItem("vot-about-seen", "1");
+            } catch (_e) {
+            }
+            goNavOrigin();
+          },
+          onBack: () => {
+            try {
+              localStorage.setItem("vot-about-seen", "1");
+            } catch (_e) {
+            }
+            goNavOrigin();
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "history": () => /* @__PURE__ */ React.createElement(
+        HistoryScreen,
+        {
+          history: readHistory,
+          onBack: goNavOrigin,
+          onSelect: (entry) => {
+            if (entry.type === "study-chapter") {
+              const study = getStudyById(entry.studyId);
+              if (!study) return;
+              setStudyId(entry.studyId);
+              setStudyChapterId(entry.studyChapterId);
+              setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
+              setScreen("bible-study-chapter");
+            } else if (entry.type === "letter") {
+              setLetterId(entry.letterId);
+              var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get("one") : COL_BY_KEY.get("two"));
+              setActiveReadKey("vol:" + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
+              setScreen(_hc.letterScreen);
+            } else {
+              setBookId(entry.bookId);
+              setChapterNum(entry.chapterNum);
+              setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
+              setScreen(entry.bookId === "matthew" ? "matthew-ch" : "bible-ch");
+            }
+          },
+          onSearch: goSearch,
+          onSettings: goSettings,
+          onHistory: goHistory,
+          onPruneDay: pruneHistoryDay,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "library": () => /* @__PURE__ */ React.createElement(
+        LibraryScreen,
+        {
+          onBack: goHome,
+          onOpenNotes: goNotesIndex,
+          onOpenLinks: goLinksIndex,
+          onOpenBookmarks: goBookmarksIndex,
+          onOpenJournal: goJournalHub,
+          onOpenHighlights: goHighlightsIndex,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "highlights-index": () => typeof HighlightsScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+        HighlightsScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onNavigateToSource: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "highlights-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Highlights" });
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "journal-home": () => typeof JournalHubScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+        JournalHubScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onOpenEntry: (eid) => goJournalViewer(eid),
+          onEditEntry: (eid) => goJournalEditor(eid),
+          onCreateEntry: createAndEditJournal,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "journal-viewer": () => typeof JournalViewerScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+        JournalViewerScreen,
+        {
+          onSettings: goSettings,
+          entryId: journalEntryId,
+          onBack: () => setScreen("journal-home"),
+          onHome: goHome,
+          onEdit: () => setScreen("journal-editor"),
+          onNavigateToLink: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "journal-viewer" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Journal" });
+            }
+          },
+          onOpenJournalEntry: (eid) => goJournalViewer(eid),
+          onOpenNotebook: (nbId) => {
+            window.__notesReturnCtx = { tab: "notebooks", drilledNbId: nbId };
+            setNavOrigin({ screen: "journal-viewer" });
+            setScreen("notes-index");
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "journal-editor": () => typeof JournalEditorScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+        JournalEditorScreen,
+        {
+          onSettings: goSettings,
+          entryId: journalEntryId,
+          onBack: () => goJournalViewer(journalEntryId),
+          onHome: goHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "notes-index": () => /* @__PURE__ */ React.createElement(
+        NotesIndexScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onOpenNote: (gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false }),
+          onNavigateToSource: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "notes-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Notes" });
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "links-index": () => /* @__PURE__ */ React.createElement(
+        LinksScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onNavigateToSource: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "links-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Links" });
+            }
+          },
+          onNavigateToTarget: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "links-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Links" });
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "bookmarks-index": () => /* @__PURE__ */ React.createElement(
+        BookmarksScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onNavigateToSource: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "bookmarks-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Bookmarks" });
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "scriptures-home": () => /* @__PURE__ */ React.createElement(
+        ScripturesHome,
+        {
+          onSelect: handleScriptureSelect,
+          onGenre: goScriptureGenre,
+          onBack: goHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          onMatthewStudy: () => {
+            setBookId("matthew");
+            setChapterNum(null);
+            setScreen("matthew-idx");
+          },
+          theme,
+          onThemeChange: setTheme,
+          layout: settings.scriptureLayout
+        }
+      ),
+      "scripture-genre": () => genreId && /* @__PURE__ */ React.createElement(
+        ScriptureGenre,
+        {
+          genreId,
+          onSelect: handleScriptureSelect,
+          onBack: goScripturesHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "volumes-home": () => /* @__PURE__ */ React.createElement(
+        VolumesHome,
+        {
+          onSelect: handleVolumeSelect,
+          onBack: goHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "matthew-idx": () => /* @__PURE__ */ React.createElement(
+        ChapterIndex,
+        {
+          book: MATTHEW,
+          onSelect: selectMatthewCh,
+          onBack: () => {
+            if (fromStudies) {
+              setFromStudies(false);
+              goStudiesHome();
+            } else {
+              goHome();
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          currentChapter: settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null,
+          isRead: (num) => isRead("matthew", num),
+          markAsReadEnabled: settings.markAsRead,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "studies-home": () => /* @__PURE__ */ React.createElement(
+        StudiesHome,
+        {
+          studies: UNIFIED_CHAIN,
+          studiesLoading,
+          onSelectStudy: (slug) => {
+            if (slug === "matthew-study") {
+              setFromStudies(true);
+              setBookId("matthew");
+              setChapterNum(null);
+              setScreen("matthew-idx");
+            } else {
+              selectStudy(slug);
+            }
+          },
+          onBack: goHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "bible-idx": () => book && /* @__PURE__ */ React.createElement(
+        ChapterIndex,
+        {
+          book,
+          onSelect: selectBibleCh,
+          onBack: genreId ? () => setScreen("scripture-genre") : goScripturesHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          currentChapter: settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null,
+          isRead: (num) => isRead(bookId, num),
+          markAsReadEnabled: settings.markAsRead,
+          restoredNames: settings.restoredNames,
+          showChapterTitle: settings.showChapterTitle !== false,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "bible-ch": () => book && chapter && /* @__PURE__ */ React.createElement(
+        BibleChapterView,
+        {
+          book,
+          chapter,
+          onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
+          onNavigate: (num) => {
+            setSurpriseAnchor(null);
+            selectBibleCh(num);
+          },
+          onMarkRead: () => markRead(bookId, chapterNum),
+          markAsReadEnabled: settings.markAsRead,
+          showProgressBar: settings.showProgressBar,
+          translation: settings.translation,
+          restoredNames: settings.restoredNames,
+          showChapterTitle: settings.showChapterTitle !== false,
+          showSectionHeadings: settings.showSectionHeadings !== false,
+          titleFocusHidden,
+          setTitleFocusHidden,
+          headingsFocusHidden,
+          setHeadingsFocusHidden,
+          prevBook: bcvPrevBook,
+          nextBook: bcvNextBook,
+          onPrevBook: bcvOnPrevBook,
+          onNextBook: bcvOnNextBook,
+          prevBoundaryTitle: bcvPrevBoundaryTitle,
+          nextBoundaryTitle: bcvNextBoundaryTitle,
+          onSearch: goSearch,
+          onSettings: goSettings,
+          onHistory: goHistory,
+          theme,
+          onThemeChange: setTheme,
+          surpriseAnchor,
+          backHint,
+          onTapThroughBack: tapThroughBack,
+          hlTick,
+          onLinkOpen: openLinkSidebar
+        }
+      ),
+      // ── IIFE screens — render-time-derived locals (study lookups,
+      //    letter shims, chain-aware boundaries) extracted to their own
+      //    components in src/ui/screens/. ──
+      "matthew-ch": () => /* @__PURE__ */ React.createElement(
+        MatthewChapterView,
+        {
+          chapter,
+          chapterNum,
+          mode,
+          showStudy,
+          fromStudies,
+          settings,
+          titleFocusHidden,
+          setTitleFocusHidden,
+          prevChainEntry,
+          nextChainEntry,
+          goToChainEntryFirst,
+          goToChainEntryLast,
+          setSurpriseAnchor,
+          setFromStudies,
+          setMode,
+          setShowStudy,
+          markRead,
+          selectMatthewCh,
+          goMatthewIdx,
+          goSearch,
+          goSettings,
+          goHistory,
+          goToLetterFromMatthew,
+          theme,
+          setTheme,
+          surpriseAnchor,
+          backHint,
+          tapThroughBack,
+          hlTick,
+          openLinkSidebar
+        }
+      ),
+      "bible-study-index": () => {
+        if (!studyId) return null;
+        const study = getStudyById(studyId);
+        if (!study) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
+        return /* @__PURE__ */ React.createElement(
+          BibleStudyIndex,
+          {
+            study,
+            onSelect: (chId) => selectStudyChapter(studyId, chId),
+            onBack: goStudiesHome,
+            onSearch: goSearch,
+            onHistory: goHistory,
+            onSettings: goSettings,
+            currentChapter: settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null,
+            isRead: (chId) => isRead(studyReadKey(study.slug), chId),
+            markAsReadEnabled: settings.markAsRead,
+            theme,
+            onThemeChange: setTheme
+          }
+        );
+      },
+      "bible-study-chapter": () => /* @__PURE__ */ React.createElement(
+        BibleStudyChapterView,
+        {
+          studyId,
+          studyChapterId,
+          getStudyById,
+          getStudyChapter,
+          studiesLoading,
+          prevChainEntry,
+          nextChainEntry,
+          goToChainEntryFirst,
+          goToChainEntryLast,
+          setStudyChapterId,
+          setScreen,
+          setBookId,
+          setChapterNum,
+          setFromStudies,
+          setLetterId,
+          setActiveReadKey,
+          setSurpriseAnchor,
+          markRead,
+          unmarkRead,
+          isRead,
+          studyReadKey,
+          prophecyCardStatesRef,
+          saveProphecyCardStates,
+          selectStudy,
+          selectStudyChapter,
+          goStudiesHome,
+          sharedViewProps
+        }
+      ),
+      "holy-days-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(HolyDaysPlaylistHeader, null), /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })), ...colIdxProps("holydays") })),
+      "holy-days-entry": () => {
+        if (!hdEntry) return null;
+        const bc = boundaryConfig("holydays", hdEntry);
+        if (hdEntry.type === "wtlb") {
+          return /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, entry: hdEntry, partLabel: "Regarding The Holy Days", onNavToChapter: _navToChapter, footnotesMode: true });
+        }
+        const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
+        return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, letter: letterShim, volumeLabel: "Regarding The Holy Days" });
+      },
+      "hm-letter": () => {
+        if (!hmEntry) return null;
+        const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
+        const goHomeFromHM = () => {
+          if (fromMatthewChRef.current) {
+            setFromMatthewCh(null);
+            setScreen("matthew-ch");
+          } else {
+            goHome();
+          }
+        };
+        return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("hm"), letter: letterShim, volumeLabel: "Hidden Manna", onHome: goHomeFromHM, onNavigate: (id) => {
+          setLetterId(id);
+        } });
+      },
+      "garden-view": () => /* @__PURE__ */ React.createElement(
+        GardenView,
+        {
+          page: gardenPage,
+          onPageChange: (p) => setGardenPage(p),
+          onBack: goVolumesHome,
+          theme,
+          onThemeChange: setTheme,
+          tier: settings.gardenTier || GARDEN_DEFAULT_TIER
+        }
+      )
+    };
+  }
+
   // app/src/main/assets/src/ui/screens/LetterView.jsx
   function LetterView2({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, hlTick, onLinkOpen: _onLinkOpen }) {
     const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
@@ -9008,591 +9747,142 @@
       setChapterNum(ch);
       setScreen("bible-ch");
     };
-    const ROUTES = {
-      // ── Volume index screens (13) ──
-      "vot-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Two", letters: LETTERS, ...colIdxProps("two") })),
-      "vot-one-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume One", letters: LETTERS_V1, preface: LETTERS_V1_PREFACE, ...colIdxProps("one") })),
-      "vot-three-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Three", letters: LETTERS_V3, preface: LETTERS_V3_PREFACE, ...colIdxProps("three") })),
-      "vot-four-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Four", letters: LETTERS_V4, preface: LETTERS_V4_PREFACE, ...colIdxProps("four") })),
-      "vot-five-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Five", letters: LETTERS_V5, preface: LETTERS_V5_PREFACE, ...colIdxProps("five") })),
-      "vot-six-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Six", letters: LETTERS_V6, preface: LETTERS_V6_PREFACE, ...colIdxProps("six") })),
-      "vot-seven-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Seven", letters: LETTERS_V7, preface: LETTERS_V7_PREFACE, ...colIdxProps("seven") })),
-      "vot-timothy-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters from Timothy", eyebrow: "The Volumes of Truth", letters: LETTERS_TIMOTHY, preface: LETTERS_TIMOTHY_PREFACE, ...colIdxProps("timothy") })),
-      "vot-flock-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters to The Lord's Little Flock", eyebrow: "The Volumes of Truth", letters: LETTERS_FLOCK, preface: LETTERS_FLOCK_PREFACE, ...colIdxProps("flock") })),
-      "vot-rebuke-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Lord's Rebuke", eyebrow: "A Testament Against The World", letters: LETTERS_REBUKE, preface: LETTERS_REBUKE_PREFACE, ...colIdxProps("rebuke") })),
-      "wtlb-one-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part One \xB7 Words of Wisdom", letters: WTLB_ONE, columns: 2, ...colIdxProps("wtlb1") })),
-      "wtlb-two-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part Two \xB7 More Words of Wisdom", letters: WTLB_TWO, columns: 2, ...colIdxProps("wtlb2") })),
-      "blessed-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Blessed", eyebrow: "Blessings & Promises", letters: colLetterArr(COL_BY_KEY.get("blessed")).map((e) => ({ ...e, date: e.sourceLabel || "" })), ...colIdxProps("blessed") })),
-      // ── Letter screens (10) — data-guarded ──
-      "vot-one-letter": () => letterV1 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("one", true), ...boundaryConfig("one", letterV1), letter: letterV1, volumeLabel: "Volume One" }),
-      "vot-letter": () => letter && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("two", true), ...boundaryConfig("two", letter), letter }),
-      "vot-three-letter": () => letterV3 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("three", true), ...boundaryConfig("three", letterV3), letter: letterV3, volumeLabel: "Volume Three" }),
-      "vot-four-letter": () => letterV4 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("four", true), ...boundaryConfig("four", letterV4), letter: letterV4, volumeLabel: "Volume Four" }),
-      "vot-five-letter": () => letterV5 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("five", true), ...boundaryConfig("five", letterV5), letter: letterV5, volumeLabel: "Volume Five" }),
-      "vot-six-letter": () => letterV6 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("six", true), ...boundaryConfig("six", letterV6), letter: letterV6, volumeLabel: "Volume Six" }),
-      "vot-seven-letter": () => letterV7 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("seven", true), ...boundaryConfig("seven", letterV7), letter: letterV7, volumeLabel: "Volume Seven" }),
-      "vot-timothy-letter": () => letterTimothy && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("timothy", true), ...boundaryConfig("timothy", letterTimothy), letter: letterTimothy, volumeLabel: "Letters from Timothy" }),
-      "vot-flock-letter": () => letterFlock && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("flock", true), ...boundaryConfig("flock", letterFlock), letter: letterFlock, volumeLabel: "Letters to The Lord's Little Flock" }),
-      "vot-rebuke-letter": () => letterRebuke && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("rebuke", true), ...boundaryConfig("rebuke", letterRebuke), letter: letterRebuke, volumeLabel: "The Lord's Rebuke" }),
-      // ── WTLB / Blessed entry screens (3) — data-guarded ──
-      "wtlb-one-entry": () => wtlb1Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb1"), ...boundaryConfig("wtlb1", wtlb1Entry), entry: wtlb1Entry, partLabel: "Part One", onNavToChapter: _navToChapter }),
-      "wtlb-two-entry": () => wtlb2Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb2"), ...boundaryConfig("wtlb2", wtlb2Entry), entry: wtlb2Entry, partLabel: "Part Two", onNavToChapter: _navToChapter }),
-      "blessed-entry": () => blessedEntry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("blessed"), ...boundaryConfig("blessed", blessedEntry), entry: blessedEntry, partLabel: "The Blessed", onNavToChapter: _navToChapter }),
-      // ── AppShell / settings / search / home / library (P8b — 20 medium
-      //    prop-threading screens folded in; same pattern as P8a). ──
-      "settings": () => /* @__PURE__ */ React.createElement(
-        SettingsScreen,
-        {
-          settings,
-          onToggle: toggleSetting,
-          onSetting: updateSetting,
-          onBack: goNavOrigin,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          readItems,
-          onClearBook: clearReadForBook,
-          onClearAll: clearAllProgress,
-          onClearHistory: clearHistory,
-          historyCount: readHistory.length,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "search": () => /* @__PURE__ */ React.createElement(
-        SearchScreen,
-        {
-          query: searchQuery,
-          onQueryChange: setSearchQuery,
-          settings,
-          onSettingsChange: (key, val) => setSettings((prev) => ({ ...prev, [key]: val })),
-          onSelect: handleSearchSelect,
-          onCommand: handleSearchCommand,
-          onBack: goSearchOrigin,
-          searchScope,
-          searchContext,
-          onToggleScope: () => setSearchScope((prev) => prev ? null : searchContext)
-        }
-      ),
-      "home": () => /* @__PURE__ */ React.createElement(
-        HomeScreen,
-        {
-          onSelect: handleSelect,
-          onSurprise: handleSurprise,
-          showSurprise: settings.showSurpriseButton,
-          onSettings: goSettings,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          onInfo: () => setShowWelcome(true),
-          onAbout: goAbout,
-          history: readHistory,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "about": () => /* @__PURE__ */ React.createElement(
-        AboutScreen,
-        {
-          onContinue: () => {
-            try {
-              localStorage.setItem("vot-about-seen", "1");
-            } catch (_e) {
-            }
-            goNavOrigin();
-          },
-          onBack: () => {
-            try {
-              localStorage.setItem("vot-about-seen", "1");
-            } catch (_e) {
-            }
-            goNavOrigin();
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "history": () => /* @__PURE__ */ React.createElement(
-        HistoryScreen,
-        {
-          history: readHistory,
-          onBack: goNavOrigin,
-          onSelect: (entry) => {
-            if (entry.type === "study-chapter") {
-              const study = getStudyById(entry.studyId);
-              if (!study) return;
-              setStudyId(entry.studyId);
-              setStudyChapterId(entry.studyChapterId);
-              setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
-              setScreen("bible-study-chapter");
-            } else if (entry.type === "letter") {
-              setLetterId(entry.letterId);
-              var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get("one") : COL_BY_KEY.get("two"));
-              setActiveReadKey("vol:" + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
-              setScreen(_hc.letterScreen);
-            } else {
-              setBookId(entry.bookId);
-              setChapterNum(entry.chapterNum);
-              setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
-              setScreen(entry.bookId === "matthew" ? "matthew-ch" : "bible-ch");
-            }
-          },
-          onSearch: goSearch,
-          onSettings: goSettings,
-          onHistory: goHistory,
-          onPruneDay: pruneHistoryDay,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "library": () => /* @__PURE__ */ React.createElement(
-        LibraryScreen,
-        {
-          onBack: goHome,
-          onOpenNotes: goNotesIndex,
-          onOpenLinks: goLinksIndex,
-          onOpenBookmarks: goBookmarksIndex,
-          onOpenJournal: goJournalHub,
-          onOpenHighlights: goHighlightsIndex,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "highlights-index": () => typeof HighlightsScreen !== "undefined" && /* @__PURE__ */ React.createElement(
-        HighlightsScreen,
-        {
-          onSettings: goSettings,
-          onBack: () => setScreen("library"),
-          onHome: goHome,
-          onNavigateToSource: (endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: "highlights-index" });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Highlights" });
-            }
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "journal-home": () => typeof JournalHubScreen !== "undefined" && /* @__PURE__ */ React.createElement(
-        JournalHubScreen,
-        {
-          onSettings: goSettings,
-          onBack: () => setScreen("library"),
-          onHome: goHome,
-          onOpenEntry: (eid) => goJournalViewer(eid),
-          onEditEntry: (eid) => goJournalEditor(eid),
-          onCreateEntry: createAndEditJournal,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "journal-viewer": () => typeof JournalViewerScreen !== "undefined" && /* @__PURE__ */ React.createElement(
-        JournalViewerScreen,
-        {
-          onSettings: goSettings,
-          entryId: journalEntryId,
-          onBack: () => setScreen("journal-home"),
-          onHome: goHome,
-          onEdit: () => setScreen("journal-editor"),
-          onNavigateToLink: (endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: "journal-viewer" });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Journal" });
-            }
-          },
-          onOpenJournalEntry: (eid) => goJournalViewer(eid),
-          onOpenNotebook: (nbId) => {
-            window.__notesReturnCtx = { tab: "notebooks", drilledNbId: nbId };
-            setNavOrigin({ screen: "journal-viewer" });
-            setScreen("notes-index");
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "journal-editor": () => typeof JournalEditorScreen !== "undefined" && /* @__PURE__ */ React.createElement(
-        JournalEditorScreen,
-        {
-          onSettings: goSettings,
-          entryId: journalEntryId,
-          onBack: () => goJournalViewer(journalEntryId),
-          onHome: goHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "notes-index": () => /* @__PURE__ */ React.createElement(
-        NotesIndexScreen,
-        {
-          onSettings: goSettings,
-          onBack: () => setScreen("library"),
-          onHome: goHome,
-          onOpenNote: (gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false }),
-          onNavigateToSource: (endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: "notes-index" });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Notes" });
-            }
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "links-index": () => /* @__PURE__ */ React.createElement(
-        LinksScreen,
-        {
-          onSettings: goSettings,
-          onBack: () => setScreen("library"),
-          onHome: goHome,
-          onNavigateToSource: (endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: "links-index" });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Links" });
-            }
-          },
-          onNavigateToTarget: (endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: "links-index" });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Links" });
-            }
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "bookmarks-index": () => /* @__PURE__ */ React.createElement(
-        BookmarksScreen,
-        {
-          onSettings: goSettings,
-          onBack: () => setScreen("library"),
-          onHome: goHome,
-          onNavigateToSource: (endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: "bookmarks-index" });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Bookmarks" });
-            }
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "scriptures-home": () => /* @__PURE__ */ React.createElement(
-        ScripturesHome,
-        {
-          onSelect: handleScriptureSelect,
-          onGenre: goScriptureGenre,
-          onBack: goHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          onMatthewStudy: () => {
-            setBookId("matthew");
-            setChapterNum(null);
-            setScreen("matthew-idx");
-          },
-          theme,
-          onThemeChange: setTheme,
-          layout: settings.scriptureLayout
-        }
-      ),
-      "scripture-genre": () => genreId && /* @__PURE__ */ React.createElement(
-        ScriptureGenre,
-        {
-          genreId,
-          onSelect: handleScriptureSelect,
-          onBack: goScripturesHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "volumes-home": () => /* @__PURE__ */ React.createElement(
-        VolumesHome,
-        {
-          onSelect: handleVolumeSelect,
-          onBack: goHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "matthew-idx": () => /* @__PURE__ */ React.createElement(
-        ChapterIndex,
-        {
-          book: MATTHEW,
-          onSelect: selectMatthewCh,
-          onBack: () => {
-            if (fromStudies) {
-              setFromStudies(false);
-              goStudiesHome();
-            } else {
-              goHome();
-            }
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          currentChapter: settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null,
-          isRead: (num) => isRead("matthew", num),
-          markAsReadEnabled: settings.markAsRead,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "studies-home": () => /* @__PURE__ */ React.createElement(
-        StudiesHome,
-        {
-          studies: UNIFIED_CHAIN,
-          studiesLoading,
-          onSelectStudy: (slug) => {
-            if (slug === "matthew-study") {
-              setFromStudies(true);
-              setBookId("matthew");
-              setChapterNum(null);
-              setScreen("matthew-idx");
-            } else {
-              selectStudy(slug);
-            }
-          },
-          onBack: goHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "bible-idx": () => book && /* @__PURE__ */ React.createElement(
-        ChapterIndex,
-        {
-          book,
-          onSelect: selectBibleCh,
-          onBack: genreId ? () => setScreen("scripture-genre") : goScripturesHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          currentChapter: settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null,
-          isRead: (num) => isRead(bookId, num),
-          markAsReadEnabled: settings.markAsRead,
-          restoredNames: settings.restoredNames,
-          showChapterTitle: settings.showChapterTitle !== false,
-          theme,
-          onThemeChange: setTheme
-        }
-      ),
-      "bible-ch": () => book && chapter && /* @__PURE__ */ React.createElement(
-        BibleChapterView,
-        {
-          book,
-          chapter,
-          onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
-          onNavigate: (num) => {
-            setSurpriseAnchor(null);
-            selectBibleCh(num);
-          },
-          onMarkRead: () => markRead(bookId, chapterNum),
-          markAsReadEnabled: settings.markAsRead,
-          showProgressBar: settings.showProgressBar,
-          translation: settings.translation,
-          restoredNames: settings.restoredNames,
-          showChapterTitle: settings.showChapterTitle !== false,
-          showSectionHeadings: settings.showSectionHeadings !== false,
-          titleFocusHidden,
-          setTitleFocusHidden,
-          headingsFocusHidden,
-          setHeadingsFocusHidden,
-          prevBook: bcvPrevBook,
-          nextBook: bcvNextBook,
-          onPrevBook: bcvOnPrevBook,
-          onNextBook: bcvOnNextBook,
-          prevBoundaryTitle: bcvPrevBoundaryTitle,
-          nextBoundaryTitle: bcvNextBoundaryTitle,
-          onSearch: goSearch,
-          onSettings: goSettings,
-          onHistory: goHistory,
-          theme,
-          onThemeChange: setTheme,
-          surpriseAnchor,
-          backHint,
-          onTapThroughBack: tapThroughBack,
-          hlTick,
-          onLinkOpen: openLinkSidebar
-        }
-      ),
-      // ── IIFE screens — render-time-derived locals (study lookups,
-      //    letter shims, chain-aware boundaries) extracted to their own
-      //    components in src/ui/screens/. ──
-      "matthew-ch": () => /* @__PURE__ */ React.createElement(
-        MatthewChapterView,
-        {
-          chapter,
-          chapterNum,
-          mode,
-          showStudy,
-          fromStudies,
-          settings,
-          titleFocusHidden,
-          setTitleFocusHidden,
-          prevChainEntry,
-          nextChainEntry,
-          goToChainEntryFirst,
-          goToChainEntryLast,
-          setSurpriseAnchor,
-          setFromStudies,
-          setMode,
-          setShowStudy,
-          markRead,
-          selectMatthewCh,
-          goMatthewIdx,
-          goSearch,
-          goSettings,
-          goHistory,
-          goToLetterFromMatthew,
-          theme,
-          setTheme,
-          surpriseAnchor,
-          backHint,
-          tapThroughBack,
-          hlTick,
-          openLinkSidebar
-        }
-      ),
-      "bible-study-index": () => {
-        if (!studyId) return null;
-        const study = getStudyById(studyId);
-        if (!study) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
-        return /* @__PURE__ */ React.createElement(
-          BibleStudyIndex,
-          {
-            study,
-            onSelect: (chId) => selectStudyChapter(studyId, chId),
-            onBack: goStudiesHome,
-            onSearch: goSearch,
-            onHistory: goHistory,
-            onSettings: goSettings,
-            currentChapter: settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null,
-            isRead: (chId) => isRead(studyReadKey(study.slug), chId),
-            markAsReadEnabled: settings.markAsRead,
-            theme,
-            onThemeChange: setTheme
-          }
-        );
-      },
-      "bible-study-chapter": () => /* @__PURE__ */ React.createElement(
-        BibleStudyChapterView,
-        {
-          studyId,
-          studyChapterId,
-          getStudyById,
-          getStudyChapter,
-          studiesLoading,
-          prevChainEntry,
-          nextChainEntry,
-          goToChainEntryFirst,
-          goToChainEntryLast,
-          setStudyChapterId,
-          setScreen,
-          setBookId,
-          setChapterNum,
-          setFromStudies,
-          setLetterId,
-          setActiveReadKey,
-          setSurpriseAnchor,
-          markRead,
-          unmarkRead,
-          isRead,
-          studyReadKey,
-          prophecyCardStatesRef,
-          saveProphecyCardStates,
-          selectStudy,
-          selectStudyChapter,
-          goStudiesHome,
-          sharedViewProps
-        }
-      ),
-      "holy-days-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(HolyDaysPlaylistHeader, null), /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })), ...colIdxProps("holydays") })),
-      "holy-days-entry": () => {
-        if (!hdEntry) return null;
-        const bc = boundaryConfig("holydays", hdEntry);
-        if (hdEntry.type === "wtlb") {
-          return /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, entry: hdEntry, partLabel: "Regarding The Holy Days", onNavToChapter: _navToChapter, footnotesMode: true });
-        }
-        const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
-        return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("holydays"), ...bc, letter: letterShim, volumeLabel: "Regarding The Holy Days" });
-      },
-      "hm-letter": () => {
-        if (!hmEntry) return null;
-        const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
-        const goHomeFromHM = () => {
-          if (fromMatthewChRef.current) {
-            setFromMatthewCh(null);
-            setScreen("matthew-ch");
-          } else {
-            goHome();
-          }
-        };
-        return /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("hm"), letter: letterShim, volumeLabel: "Hidden Manna", onHome: goHomeFromHM, onNavigate: (id) => {
-          setLetterId(id);
-        } });
-      },
-      "garden-view": () => /* @__PURE__ */ React.createElement(
-        GardenView,
-        {
-          page: gardenPage,
-          onPageChange: (p) => setGardenPage(p),
-          onBack: goVolumesHome,
-          theme,
-          onThemeChange: setTheme,
-          tier: settings.gardenTier || GARDEN_DEFAULT_TIER
-        }
-      )
-    };
+    const ROUTES = buildScreenRoutes({
+      setScreen,
+      bookId,
+      setBookId,
+      chapterNum,
+      setChapterNum,
+      setLetterId,
+      studyId,
+      setStudyId,
+      studyChapterId,
+      setStudyChapterId,
+      fromStudies,
+      setFromStudies,
+      mode,
+      setMode,
+      showStudy,
+      setShowStudy,
+      genreId,
+      surpriseAnchor,
+      setSurpriseAnchor,
+      theme,
+      setTheme,
+      settings,
+      setSettings,
+      toggleSetting,
+      updateSetting,
+      hlTick,
+      setHlTick,
+      titleFocusHidden,
+      setTitleFocusHidden,
+      headingsFocusHidden,
+      setHeadingsFocusHidden,
+      activeReadKey,
+      setActiveReadKey,
+      lastReadChapters,
+      setLastReadChapters,
+      setLastReadForVol,
+      readItems,
+      readHistory,
+      markRead,
+      unmarkRead,
+      isRead,
+      clearReadForBook,
+      clearAllProgress,
+      clearHistory,
+      pruneHistoryDay,
+      letter,
+      letterV1,
+      letterV3,
+      letterV4,
+      letterV5,
+      letterV6,
+      letterV7,
+      letterTimothy,
+      letterFlock,
+      letterRebuke,
+      wtlb1Entry,
+      wtlb2Entry,
+      blessedEntry,
+      hdEntry,
+      hmEntry,
+      book,
+      chapter,
+      goHome,
+      goNavOrigin,
+      goSearch,
+      goHistory,
+      goSettings,
+      goAbout,
+      goVolumesHome,
+      goScripturesHome,
+      goScriptureGenre,
+      goBibleIdx,
+      goMatthewIdx,
+      goStudiesHome,
+      goNotesIndex,
+      goLinksIndex,
+      goBookmarksIndex,
+      goJournalHub,
+      goHighlightsIndex,
+      goJournalViewer,
+      goJournalEditor,
+      goSearchOrigin,
+      handleSelect,
+      handleSurprise,
+      handleScriptureSelect,
+      handleVolumeSelect,
+      handleSearchSelect,
+      handleSearchCommand,
+      selectMatthewCh,
+      selectBibleCh,
+      selectStudy,
+      selectStudyChapter,
+      getStudyById,
+      getStudyChapter,
+      studyReadKey,
+      prevChainEntry,
+      nextChainEntry,
+      goToChainEntryFirst,
+      goToChainEntryLast,
+      studiesLoading,
+      UNIFIED_CHAIN,
+      searchQuery,
+      setSearchQuery,
+      searchScope,
+      setSearchScope,
+      searchContext,
+      journalEntryId,
+      createAndEditJournal,
+      openLinkSidebar,
+      navigateToLink,
+      backHint,
+      tapThroughBack,
+      goToLetterFromMatthew,
+      setNavOrigin,
+      setNoteSheetTarget,
+      setShowWelcome,
+      bcvPrevBook,
+      bcvNextBook,
+      bcvOnPrevBook,
+      bcvOnNextBook,
+      bcvPrevBoundaryTitle,
+      bcvNextBoundaryTitle,
+      prophecyCardStatesRef,
+      saveProphecyCardStates,
+      fromMatthewChRef,
+      setFromMatthewCh,
+      colIdxProps,
+      colReadNavProps,
+      boundaryConfig,
+      _idxNav,
+      sharedViewProps,
+      _navToChapter,
+      gardenPage,
+      setGardenPage
+    });
     return /* @__PURE__ */ React.createElement(TabsContext.Provider, { value: tabsCtxValue }, null, settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && /* @__PURE__ */ React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /* @__PURE__ */ React.createElement("span", { className: "rdg-inner" })), /* @__PURE__ */ React.createElement(
       AppShellOverlays,
       {
@@ -9766,6 +10056,7 @@
     HolyDaysPlaylistHeader: HolyDaysPlaylistHeader2,
     AppShellOverlays: AppShellOverlays2,
     AppShellSheets: AppShellSheets2,
+    buildScreenRoutes: buildScreenRoutes2,
     // Screens
     LetterView: LetterView2,
     WtlbEntryView: WtlbEntryView2,

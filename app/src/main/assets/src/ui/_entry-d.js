@@ -115,6 +115,7 @@ import { BookmarkIcon } from './components/BookmarkIcon.jsx';
 import { HolyDaysPlaylistHeader } from './components/HolyDaysPlaylistHeader.jsx';
 import { AppShellOverlays } from './components/AppShellOverlays.jsx';
 import { AppShellSheets } from './components/AppShellSheets.jsx';
+import { buildScreenRoutes } from './screen-routes.jsx';
 
 // ── Screens ─────────────────────────────────────────────────────────────
 import { LetterView } from './screens/LetterView.jsx';
@@ -213,6 +214,7 @@ Object.assign(window, {
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, VolumeLetterIndex, HistoryEntryCard,
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader, AppShellOverlays, AppShellSheets,
+  buildScreenRoutes,
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
   LibraryScreen, NotesIndexScreen,
