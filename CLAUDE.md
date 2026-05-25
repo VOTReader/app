@@ -38,13 +38,17 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **Bundle-b grew** 302→320 KB from JSDoc comments preserved in dev build (esbuild strips comments in minified prod build).
 - **Gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
 
-### Post-Q4 — smoke-lite landed; Q5 vitest is NEXT
+### Post-Q4 — smoke-lite ✅, Q5.1 ✅, Q5.2 NEXT (_validateTabState first real test)
 
-**Pinned sequence** (PLAN.txt + memory [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest → App() decomposition. App() decomp comes AFTER tests, not before — without coverage on the hooks/stores App() composes, decomposition is a leap of faith.
+**Pinned sequence** (PLAN.txt + memory [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest → App() decomposition. App() decomp comes AFTER tests, not before.
 
-- **smoke-lite DONE** (`102b883`): `tools/smoke-lite.js` exports `runSmokeChecks() → { issues, ok }` plus 3 per-check functions individually (so Q5 vitest can import + extend). Three checks: globals-mirror (regen + git-diff), COLLECTIONS → data-file linkage, module-graph cycle detection. CI step lives between typecheck and build; npm script `npm run smoke-lite` is the local invocation. Negative test verified: caught a deliberately-broken globalName reference with exit 1.
-- **Q5 vitest NEXT**: targets the typed Q4 surfaces (11 stores + 15 hooks + utils). First targets: useRefMirror (trivial smoke), useSavedState + _validateTabState (edge cases), CachedStore + annotation-store (validates the extendStore pattern), JournalIndexStore.rebuildForEntry (cascade logic). Vitest will `import { runSmokeChecks } from '../tools/smoke-lite.js'` for the shared structural checks.
-- **Post-Q5 backlog**: App() decomposition (includes useNavHistoryTracking extraction at app.jsx:814), useSyncExternalStore migration (eliminates Bin 4 hlTick cites — needs tests first per the principle), bundle-a.js lazy-load (post-Q6 UX win).
+- **smoke-lite** (`102b883`): `tools/smoke-lite.js`. Three structural checks (globals mirror, COLLECTIONS linkage, module-graph cycles); zero-tolerance CI gate.
+- **Q5.1 vitest infrastructure** (`742f657`): vitest ^4 + jsdom ^29 + react/react-dom ^19 + @testing-library/react ^16. `vitest.config.js` (jsdom env) + `vitest.setup.js` (globalThis.React + 19 window.__* stubs mechanically extracted from hooks). One harness smoke test (`use-ref-mirror.test.js`) — 2 assertions, 2.27s. CI step between smoke-lite and build; pre-commit Step 4 on src_changed. Test infrastructure proven end-to-end before real coverage starts.
+- **Q5.2 NEXT — _validateTabState first real test:** 13-rule screen-coercion table; pure function, zero deps. Test per rule. Lock initial coverage gate in same commit (per [[lint-regression-gate]]).
+- **Q5.3 hlTick regression test** (after Q5.2): validates the 24 Bin 4 cache-bust suppresses are real (per [[test-the-suppresses]]) — if test shows stale reads with hlTick omitted from deps, those suppresses hide a real bug.
+- **Post-Q5 backlog**: App() decomposition (includes useNavHistoryTracking extraction), useSyncExternalStore migration (needs tests first), bundle-a.js lazy-load.
+
+**Pre-commit gates now run 5 steps** on src changes: check_balance → lint-staged → typecheck → vitest → build. Total ~5-6s on src-touching commits.
 
 ### Roadmap
 
