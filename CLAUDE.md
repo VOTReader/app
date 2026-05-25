@@ -11,7 +11,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 ## Current state (2026-05-24)
 
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
-- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). 1,890 lines after the P7h+i pair — 24 hooks extracted (15 from P6 + 9 from P7a-i). App() is hook composition + render tree + nav-helper glue.
+- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **1,846 lines** — Phase 1 CLOSED. 26 hooks extracted (15 from P6 + 11 from P7a-k). App()'s logic block is now pure composition + render-tree-adjacent wiring; the JSX render tree is the remaining target for Phase 2.
 - **130+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
   - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)
@@ -65,7 +65,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 The 50/50 split means **hook extraction alone cannot hit <800.** The render tree by itself is 1,103 lines — that's the floor for any logic-only extraction. PLAN.txt §1 has the two-phase plan and Phase 2's risk profile (CSS selectors, layout shifts, ErrorBoundary placement — render decomposition needs visual smoke walks, not just vitest).
 
-**Phase 1 — logic extraction (active).** Goal: **zero inline concerns remaining in App()'s logic block.** Per [[concerns-not-lines]] / PLAN.txt §1, track concerns extracted (not lines removed) — hook extraction relocates code rather than deleting it, so call-site wiring eats most of the per-extraction line savings (P7i was an exception — a 110-line concern with narrow consumer surface produced a 86-line drop). PLAN.txt §1 has the full concerns checklist. Extracted so far: **10 of 12 concerns** (useHistory + useNavHistoryTracking + useNav + useSearch + useBibleStudies + useJournalMutations + useTapThrough + useReadProgress + useReadingPositionNav + useReadingChainNav). Remaining 2: useSurprise (handler dissolution — also lets useSearch's call site move up) + useAppShellEffects. One session to close Phase 1.
+**Phase 1 — logic extraction CLOSED (2026-05-25).** Goal hit: **zero inline concerns remaining in App()'s logic block**, all extracted to 11 hooks under src/hooks/. Per [[concerns-not-lines]] the metric was concerns-not-lines; App.jsx still has 1,846 lines (1,103 of which are the JSX render tree — Phase 2's target). The 11 P7 hooks: useNavHistoryTracking + useNav + useSearch + useBibleStudies + useJournalMutations + useTapThrough + useReadProgress + useReadingPositionNav + useReadingChainNav + useSurprise + useAppShellEffects. 465 vitest tests; coverage broke 30% lines. P7k closing commit landed all four AppShell concerns (`__bumpHlTick` bridge + welcome modal + isOnline ping + dismissWelcome routing).
 - **P7a (LANDED 2026-05-24, `d89775f`)** — useNavHistoryTracking. 18-line useEffect → 115-line hook + 23 vitest tests. The 4-helper disable cite (most architecturally-debted post-Q3 disable in the file, with the extraction candidate named in its own text) moved with the effect. TDZ note: call site lives below `getStudyById`/`getStudyChapter`, mirroring P6l's useAndroidBack. Tests 218→241, branches gate bumped 11→13.
 - **P7b (LANDED 2026-05-24, `ee6339e`)** — useNav. 20 simple nav-chrome helpers extracted (4 simple switchers + 8 navOrigin-pattern + 2 journal-nav + 5 trivial switchers + goScriptureGenre). 8 duplicated `setNavOrigin({...})` literals dedupe to one private `_captureOrigin()`. 34 new vitest tests; tests 241→275; statements gate 14→17, functions 12→16, lines 15→17.
 - **P7c (LANDED 2026-05-24)** — useSearch. Full search domain extracted: 4 search tabFields (searchOrigin/searchScope/searchContext/searchQuery), searchOriginRef, srchVolLookup/SRCH_VOL_MAP/srchResolveLetterId helpers, goSearch (26-line context computation), goSearchOrigin, handleSearchSelect (80-line dispatcher), handleSearchCommand, window.__goSearch bridge effect. **Per the dissolution principle ([[dont-group-by-shape]]):** the search-domain handlers (handleSearchSelect, handleSearchCommand, srch*) landed in useSearch where they belong, NOT in a "useHandlers" junk drawer. App.jsx dropped 134 lines (largest single P7 extraction so far — handleSearchSelect alone was 80 lines). 56 new vitest tests covering all 14 handleSearchSelect branches + 7 handleSearchCommand actions + 4 goSearch context variants + the window.__goSearch identity-churn invariant. Tests 275→331; all 4 gates ratchet: statements 17→21, branches 13→18, functions 16→18, lines 17→22. TDZ note: useSearch's call site sits BETWEEN handleSurprise (above) and useAndroidBack (below) by necessity — handleSurprise is a useSearch param (cross-domain 'random' handoff) and useAndroidBack consumes goSearchOrigin from useSearch's return. Caught the wrong initial placement in smoke verification (TDZ ReferenceError); fix was a single move-block edit.
@@ -130,7 +130,7 @@ D:/VOTReader-studio/
 │   │   ├── app.css                    # static CSS (no template literal)
 │   │   ├── dist/                      # 4 bundles, regenerated by npm run build
 │   │   └── src/
-│   │       ├── app.jsx                # function App() — 1,890 lines
+│   │       ├── app.jsx                # function App() — 1,846 lines (Phase 1 closed)
 │   │       ├── data/                  # scripture-resolution.js + 29 raw corpus files
 │   │       ├── stores/                # 11 stores + _entry-b.js
 │   │       ├── renderer/              # annotation-engine, dom-links, dom-bookmarks, dom-journal-chip + _entry.js
@@ -140,7 +140,7 @@ D:/VOTReader-studio/
 │   │       │   ├── sheets/            # 17 sheets/pickers
 │   │       │   └── _entry-d.js        # esbuild entry for bundle-d
 │   │       ├── utils/                 # 11 helper bundles
-│   │       ├── hooks/                 # 24 App() hooks (P6 + P7a–i)
+│   │       ├── hooks/                 # 26 App() hooks (P6 + P7a–k; Phase 1 closed)
 │   │       ├── components/            # ExpandableText, ErrorBoundary
 │   │       └── styles/                # journal-styles
 │   └── java/com/votreader/sacredui/MainActivity.kt   # WebView shell + native bridges

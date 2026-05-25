@@ -131,11 +131,7 @@ function App() {
 
   /* bridge effects (__openLinkSidebar, __showAnnChip, __showMultiNote,
      __openBookmarkPopover) → src/hooks/use-sheet-orchestration.js (P6h) */
-  // Lightweight escape hatch for inline components (e.g. the chapter
-  // bookmark button in NavButtons) to trigger a hlTick bump without prop-
-  // drilling. Used after store writes that aren't otherwise tied to React
-  // state — so the apply-DOM effect re-runs and inline icons refresh.
-  useEffect(() => { window.__bumpHlTick = () => setHlTick(t => t + 1); return () => { delete window.__bumpHlTick; }; }, []);
+  /* __bumpHlTick bridge → src/hooks/use-app-shell-effects.js (P7k, called below). */
   // Track soft-keyboard height via the visualViewport API and expose it
   // to CSS as `--keyboard-height`. Overlays that own inputs/textareas
   // (BookmarkCreateSheet, LinkPicker, NoteSheet) use this variable as
@@ -328,33 +324,8 @@ function App() {
   // Per-tab focus-mode overrides. Each tab has independent state.
   const [titleFocusHidden, setTitleFocusHidden] = tabField('titleFocusHidden');
   const [headingsFocusHidden, setHeadingsFocusHidden] = tabField('headingsFocusHidden');
-  const [showWelcome, setShowWelcome] = useState(() => {
-    try {return !localStorage.getItem('vot-welcomed');} catch (_e) {return true;}
-  });
-  const [isOnline, setIsOnline] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    const check = () => {
-      fetch('https://www.thevolumesoftruth.com/favicon.ico', { mode: 'no-cors', cache: 'no-store' }).
-      then(() => {if (!cancelled) setIsOnline(true);}).
-      catch(() => {if (!cancelled) setIsOnline(false);});
-    };
-    check();
-    return () => {cancelled = true;};
-  }, [showWelcome]);
-  const dismissWelcome = () => {
-    try {localStorage.setItem('vot-welcomed', '1');} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
-    setShowWelcome(false);
-    // First-time users see the About intro right after the splash. After
-    // CONTINUE marks `vot-about-seen`, this path becomes a no-op and the
-    // splash just dismisses straight to home on subsequent uses.
-    try {
-      if (!localStorage.getItem('vot-about-seen')) {
-        setNavOrigin({ screen: 'home', bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
-        setScreen('about');
-      }
-    } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
-  };
+  /* showWelcome / isOnline / dismissWelcome → src/hooks/use-app-shell-effects.js
+     (P7k, called below — needs setNavOrigin which is the next tabField). */
   // Tab-local search/nav breadcrumbs (each tab has its own search context).
   // searchQuery / searchOrigin / searchScope / searchContext tabFields →
   // owned by useSearch (P7c, called below).
@@ -362,6 +333,12 @@ function App() {
   /* fromMatthewCh tabField → hoisted above to useTapThrough's call site (P7f). */
   const [fromWtlb, setFromWtlb] = tabField('fromWtlb');
   const [navOrigin, setNavOrigin] = tabField('navOrigin');
+
+  /* AppShell-level leftover effects + small state (P7k — closes Phase 1).
+     __bumpHlTick window bridge + showWelcome/isOnline/dismissWelcome. */
+  const { showWelcome, setShowWelcome, isOnline, dismissWelcome } = useAppShellEffects({
+    setHlTick, setNavOrigin, setScreen,
+  });
 
   // App-global: read history shared across all tabs.
   // State + mutators extracted to useHistory(); auto-track effect stays

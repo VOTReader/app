@@ -7745,12 +7745,6 @@
       setHlTick
     });
     useEffect(() => {
-      window.__bumpHlTick = () => setHlTick((t) => t + 1);
-      return () => {
-        delete window.__bumpHlTick;
-      };
-    }, []);
-    useEffect(() => {
       if (!window.visualViewport) return;
       const vv = window.visualViewport;
       const root = document.documentElement;
@@ -7889,45 +7883,14 @@
     }, [tabsOverviewOpen]);
     const [titleFocusHidden, setTitleFocusHidden] = tabField("titleFocusHidden");
     const [headingsFocusHidden, setHeadingsFocusHidden] = tabField("headingsFocusHidden");
-    const [showWelcome, setShowWelcome] = useState(() => {
-      try {
-        return !localStorage.getItem("vot-welcomed");
-      } catch (_e) {
-        return true;
-      }
-    });
-    const [isOnline, setIsOnline] = useState(false);
-    useEffect(() => {
-      let cancelled = false;
-      const check = () => {
-        fetch("https://www.thevolumesoftruth.com/favicon.ico", { mode: "no-cors", cache: "no-store" }).then(() => {
-          if (!cancelled) setIsOnline(true);
-        }).catch(() => {
-          if (!cancelled) setIsOnline(false);
-        });
-      };
-      check();
-      return () => {
-        cancelled = true;
-      };
-    }, [showWelcome]);
-    const dismissWelcome = () => {
-      try {
-        localStorage.setItem("vot-welcomed", "1");
-      } catch (_e) {
-      }
-      setShowWelcome(false);
-      try {
-        if (!localStorage.getItem("vot-about-seen")) {
-          setNavOrigin({ screen: "home", bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
-          setScreen("about");
-        }
-      } catch (_e) {
-      }
-    };
     const [fromSearch, setFromSearch] = tabField("fromSearch");
     const [fromWtlb, setFromWtlb] = tabField("fromWtlb");
     const [navOrigin, setNavOrigin] = tabField("navOrigin");
+    const { showWelcome, setShowWelcome, isOnline, dismissWelcome } = useAppShellEffects({
+      setHlTick,
+      setNavOrigin,
+      setScreen
+    });
     const { readHistory, addToHistory, clearHistory, pruneHistoryDay } = useHistory(settings.historyEnabled);
     const { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail } = useThumbnails({
       tabs,

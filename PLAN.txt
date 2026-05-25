@@ -38,9 +38,10 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q4 (JSDoc / tsc --checkJs)  ✅ DONE  — 37 files typed, CI gate zero-tolerance
   smoke-lite.js for CI        ✅ DONE  — Node CLI; globals + collections + cycles
   Q5 (Vitest)                 ✅ DONE  — 218 tests / 9 files; ratchet 1→14 stmts
-  App() decomposition (P7)    🚧 ACTIVE — P7a-i landed; 452 tests;
-                                          App() 2,261 → 1,890 lines;
-                                          10 of 12 concerns extracted
+  App() decomposition (P7)    ✅ PHASE 1 DONE — P7a-k landed (11 hooks);
+                                          465 tests; App() 2,261 → 1,846;
+                                          12 of 12 concerns extracted.
+                                          Phase 2 (render-tree) pending.
   Q6 (CSS hardening)          ⬜ PENDING
 
 ───────────────────────────────────────────────────────────────────────────────

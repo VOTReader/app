@@ -4469,6 +4469,53 @@
     return { handleSurprise };
   }
 
+  // app/src/main/assets/src/hooks/use-app-shell-effects.js
+  function useAppShellEffects({ setHlTick, setNavOrigin, setScreen }) {
+    React.useEffect(() => {
+      window.__bumpHlTick = () => setHlTick((t) => t + 1);
+      return () => {
+        delete window.__bumpHlTick;
+      };
+    }, []);
+    const [showWelcome, setShowWelcome] = React.useState(() => {
+      try {
+        return !localStorage.getItem("vot-welcomed");
+      } catch (_e) {
+        return true;
+      }
+    });
+    const [isOnline, setIsOnline] = React.useState(false);
+    React.useEffect(() => {
+      let cancelled = false;
+      const check = () => {
+        fetch("https://www.thevolumesoftruth.com/favicon.ico", { mode: "no-cors", cache: "no-store" }).then(() => {
+          if (!cancelled) setIsOnline(true);
+        }).catch(() => {
+          if (!cancelled) setIsOnline(false);
+        });
+      };
+      check();
+      return () => {
+        cancelled = true;
+      };
+    }, [showWelcome]);
+    const dismissWelcome = () => {
+      try {
+        localStorage.setItem("vot-welcomed", "1");
+      } catch (_e) {
+      }
+      setShowWelcome(false);
+      try {
+        if (!localStorage.getItem("vot-about-seen")) {
+          setNavOrigin({ screen: "home", bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
+          setScreen("about");
+        }
+      } catch (_e) {
+      }
+    };
+    return { showWelcome, setShowWelcome, isOnline, dismissWelcome };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -7919,6 +7966,7 @@
     useReadingPositionNav,
     useReadingChainNav,
     useSurprise,
+    useAppShellEffects,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
