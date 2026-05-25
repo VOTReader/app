@@ -43,6 +43,12 @@
         --hl-teal:     #00bcd4;
         --hl-brown:    #8d6e63;
         --hl-gray:     #9e9e9e;
+        /* ── Semantic accent tokens ── */
+        --danger:           #ef9a9a;   /* destructive action text/icon color */
+        --settings-warning: #d18f2e;   /* warning amber (Clear Progress) */
+        --settings-danger:  #c0392b;   /* danger deep red (Clear All) */
+        --input-text:       var(--cream);  /* light mode override below */
+        --white:            #ffffff;       /* pure white (theme-agnostic) */
       }
       /* ── LIGHT THEME OVERRIDES ── */
       body.light {
@@ -65,6 +71,7 @@
         --tap-ref-active: var(--gold);
         --link-blue:   #4a90b8;
         --accent-pink: #c2185b;
+        --input-text:  #2a2520;   /* near-black with brown tint, softer than #000 */
       }
       body.light .top-nav { background: rgba(247,242,232,0.95); }
       /* Push the right-cluster (Settings → History → Theme → Search) to the right edge.
@@ -1275,7 +1282,7 @@
     .garden-back-btn svg { width:1.4rem; height:1.4rem; }
     .garden-page-counter { background:none; border:none; font-family:var(--font-cinzel); font-size:0.8rem; color:rgba(255,255,255,0.7); letter-spacing:0.05em; cursor:pointer; padding:0.2rem 0.5rem; }
     .garden-jump-form { display:flex; align-items:center; gap:0.3rem; }
-    .garden-jump-input { width:3rem; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); border-radius:4px; color:#fff; font-family:var(--font-cinzel); font-size:0.8rem; text-align:center; padding:0.2rem 0.3rem; outline:none; -moz-appearance:textfield; }
+    .garden-jump-input { width:3rem; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); border-radius:4px; color:var(--white); font-family:var(--font-cinzel); font-size:0.8rem; text-align:center; padding:0.2rem 0.3rem; outline:none; -moz-appearance:textfield; }
     .garden-jump-input::-webkit-inner-spin-button, .garden-jump-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
     .garden-jump-hint { font-family:var(--font-cinzel); font-size:0.8rem; color:rgba(255,255,255,0.5); }
     .garden-bottom-bar { position:absolute; bottom:0; left:0; right:0; z-index:10; display:flex; align-items:center; justify-content:center; gap:3rem; padding:0.8rem 1rem 1rem; background:linear-gradient(to top,rgba(0,0,0,0.5),transparent); }
@@ -1367,7 +1374,7 @@
     .settings-toggle input { opacity:0; width:0; height:0; position:absolute; }
     .settings-toggle-track { position:absolute; inset:0; border-radius:13px; background:var(--cream-muted); opacity:0.35; transition:all 0.25s ease; cursor:pointer; }
     .settings-toggle input:checked ~ .settings-toggle-track { background:var(--gold); opacity:1; }
-    .settings-toggle-thumb { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform 0.25s ease; pointer-events:none; box-shadow:0 1px 4px rgba(0,0,0,0.35); }
+    .settings-toggle-thumb { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--white); transition:transform 0.25s ease; pointer-events:none; box-shadow:0 1px 4px rgba(0,0,0,0.35); }
     .settings-toggle input:checked ~ .settings-toggle-thumb { transform:translateX(18px); }
     /* ── ABOUT SCREEN ── */
     .about-screen { min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1.25rem 4rem; }
@@ -1485,9 +1492,9 @@
     .settings-clear-btn { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); background:transparent; border:1px solid var(--gold-border); border-radius:4px; padding:0.4rem 0.75rem; cursor:pointer; transition:all var(--transition); white-space:nowrap; }
     @media (hover: hover) { .settings-clear-btn:hover { color:var(--gold); border-color:var(--gold-dim); } }
     .settings-clear-btn:disabled { opacity:0.3; cursor:default; pointer-events:none; }
-    .settings-clear-btn.warning { color:#d18f2e; border-color:#d18f2e; font-size:0.55rem; }
+    .settings-clear-btn.warning { color:var(--settings-warning); border-color:var(--settings-warning); font-size:0.55rem; }
     @media (hover: hover) { .settings-clear-btn.warning:hover { background:rgba(209,143,46,0.1); } }
-    .settings-clear-btn.danger { color:#c0392b; border-color:#c0392b; font-size:0.55rem; }
+    .settings-clear-btn.danger { color:var(--settings-danger); border-color:var(--settings-danger); font-size:0.55rem; }
     @media (hover: hover) { .settings-clear-btn.danger:hover { background:rgba(192,57,43,0.08); } }
     /* ── Mark Complete button ── */
     .mark-complete-row { display:flex; justify-content:center; margin:1.5rem 0 0.5rem; }
@@ -1923,7 +1930,7 @@
     body.light .tab-card-eyebrow { color:rgba(122,92,16,0.85); text-shadow:0 1px 2px rgba(247,242,232,0.8); }
     .tab-card-title {
       font-family:'Cinzel Decorative',serif; font-size:0.98rem;
-      color:#fff; line-height:1.18;
+      color:var(--white); line-height:1.18;
       margin-bottom:0.22rem;
       text-shadow:0 1px 3px rgba(0,0,0,0.65);
       display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
@@ -2219,7 +2226,7 @@
     .ann-chip-btn + .ann-chip-btn { border-left: 1px solid rgba(224,201,127,0.12); }
     .ann-chip-btn:active { background: rgba(224,201,127,0.10); color: var(--gold); }
     .ann-chip-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-    .ann-chip-btn.danger { color: #ef9a9a; }
+    .ann-chip-btn.danger { color: var(--danger); }
     .ann-chip-btn.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
     /* Confirm strip — replaces the chip in place. */
     .ann-chip-confirm {
@@ -2243,7 +2250,7 @@
     }
     .ann-chip-confirm-cancel { color: var(--cream-muted); }
     .ann-chip-confirm-cancel:active { background: rgba(224,201,127,0.10); color: var(--cream); }
-    .ann-chip-confirm-yes { color: #ef9a9a; border-color: rgba(239,154,154,0.35); }
+    .ann-chip-confirm-yes { color: var(--danger); border-color: rgba(239,154,154,0.35); }
     .ann-chip-confirm-yes:active { background: rgba(244,143,177,0.18); color: var(--accent-pink); }
     /* Color row inside the chip (replaces buttons when 🎨 is tapped). */
     .ann-chip-colors {
@@ -2663,7 +2670,7 @@
       font-family: 'EB Garamond', serif; font-size: 0.98rem;
       outline: none; transition: border-color 0.15s, background 0.15s;
     }
-    body.light .navpick-search-input { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }
+    body.light .navpick-search-input { background: var(--bg); color: var(--input-text); border-color: var(--gold-border); }
     .navpick-search-input::placeholder { color: var(--cream-muted); }
     .navpick-search-input:focus { border-color: var(--gold); background: rgba(70,62,48,0.85); }
     .navpick-body {
@@ -2822,7 +2829,7 @@
     }
     body.light .picker-verses ::selection,
     body.light .picker-body-letter ::selection {
-      background: rgba(64,153,198,0.42); color: #2a2520;
+      background: rgba(64,153,198,0.42); color: var(--input-text);
     }
     /* Legacy whole-verse tap-select styling retained for any consumer that
        still emits .picker-verse rows. */
@@ -2879,7 +2886,7 @@
       background: rgba(31,121,165,0.55); color: var(--cream);
     }
     body.light .picker-body-letter ::selection {
-      background: rgba(64,153,198,0.42); color: #2a2520;
+      background: rgba(64,153,198,0.42); color: var(--input-text);
     }
 
     /* ── NOTE SHEET (for highlight notes) ─────────────────────────── */
@@ -2973,7 +2980,7 @@
       outline: none; transition: border-color 0.15s;
       box-sizing: border-box;
     }
-    body.light .note-sheet-textarea { background: #f7f2e8; color: #2a2520; }
+    body.light .note-sheet-textarea { background: var(--bg); color: var(--input-text); }
     .note-sheet-textarea:focus { border-color: var(--gold); }
     .note-sheet-footer {
       display: flex; gap: 10px; margin-top: 12px;
@@ -3026,7 +3033,7 @@
     }
     .note-sheet-menu-item + .note-sheet-menu-item { border-top: 1px solid rgba(224,201,127,0.10); }
     .note-sheet-menu-item:active { background: rgba(224,201,127,0.08); color: var(--gold); }
-    .note-sheet-menu-item.danger { color: #ef9a9a; }
+    .note-sheet-menu-item.danger { color: var(--danger); }
     .note-sheet-menu-item.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
     .note-sheet-menu-item.disabled { color: var(--cream-muted); opacity: 0.5; cursor: not-allowed; }
     .note-sheet-menu-item.disabled:active { background: none; color: var(--cream-muted); }
@@ -3256,7 +3263,7 @@
       font-family: 'EB Garamond', serif; font-size: 0.94rem;
       outline: none; width: 100%; box-sizing: border-box;
     }
-    body.light .nb-card-create-input { background: #f7f2e8; color: #2a2520; }
+    body.light .nb-card-create-input { background: var(--bg); color: var(--input-text); }
     .nb-card-create-input:focus { border-color: var(--gold); }
     .nb-card-create-actions { display: flex; gap: 6px; }
     .nb-card-create-actions button { flex: 1; }
@@ -3292,7 +3299,7 @@
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
     .nb-drilled-action:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
-    .nb-drilled-action.danger { color: #ef9a9a; border-color: rgba(239,154,154,0.35); }
+    .nb-drilled-action.danger { color: var(--danger); border-color: rgba(239,154,154,0.35); }
     .nb-drilled-action.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
     /* Inline rename input in drilled header */
     .nb-drilled-rename {
@@ -3304,7 +3311,7 @@
       letter-spacing: 0.06em;
       outline: none;
     }
-    body.light .nb-drilled-rename { background: #f7f2e8; color: #2a2520; }
+    body.light .nb-drilled-rename { background: var(--bg); color: var(--input-text); }
 
     .notes-index-header {
       display: flex; align-items: baseline; justify-content: space-between;
@@ -3330,10 +3337,10 @@
       box-sizing: border-box;
       margin-bottom: 0.85rem;
     }
-    body.light .notes-index-search { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }
+    body.light .notes-index-search { background: var(--bg); color: var(--input-text); border-color: var(--gold-border); }
     .notes-index-search::placeholder { color: var(--cream-muted); }
     .notes-index-search:focus { border-color: var(--gold); background: rgba(70,62,48,0.85); }
-    body.light .notes-index-search:focus { background: #fff; }
+    body.light .notes-index-search:focus { background: var(--white); }
     .notes-index-controls {
       display: flex; flex-wrap: wrap; gap: 0.45rem;
       margin-bottom: 1rem;
@@ -3514,7 +3521,7 @@
       font-family: 'EB Garamond', serif; font-size: 0.96rem;
       outline: none;
     }
-    body.light .nb-picker-new-input { background: #f7f2e8; color: #2a2520; }
+    body.light .nb-picker-new-input { background: var(--bg); color: var(--input-text); }
     .nb-picker-new-input:focus { border-color: var(--gold); }
     .nb-picker-new-btn {
       padding: 10px 14px; border-radius: 8px;
@@ -3739,7 +3746,7 @@
       margin: 0.85rem 0 0;
     }
     .links-broken-icon {
-      flex-shrink: 0; color: #ef9a9a; margin-top: 1px;
+      flex-shrink: 0; color: var(--danger); margin-top: 1px;
     }
     .links-broken-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
     .links-broken-text {
@@ -3787,8 +3794,8 @@
     .link-action-btn:active { background: var(--gold-faint); color: var(--gold); }
     @media (hover: hover) { .link-action-btn:hover { background: var(--gold-faint); color: var(--gold); } }
     .link-action-btn svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--gold-dim); }
-    .link-action-btn-danger { color: #ef9a9a; }
-    .link-action-btn-danger svg { color: #ef9a9a; }
+    .link-action-btn-danger { color: var(--danger); }
+    .link-action-btn-danger svg { color: var(--danger); }
     .link-action-btn-danger:active { background: rgba(244,143,177,0.12); color: var(--accent-pink); }
     @media (hover: hover) { .link-action-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); } }
 
@@ -3880,7 +3887,7 @@
       background: var(--gold-faint); border-color: var(--gold); color: var(--gold);
     }
     .bkm-create-edit-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-    .bkm-create-edit-btn-danger { color: #ef9a9a; }
+    .bkm-create-edit-btn-danger { color: var(--danger); }
     .bkm-create-edit-btn-danger:hover, .bkm-create-edit-btn-danger:active {
       background: rgba(244,143,177,0.12); border-color: var(--accent-pink);
       color: var(--accent-pink);
@@ -4057,7 +4064,7 @@
       transition: background 0.12s, color 0.12s;
     }
     .bkm-popover-btn:active, .bkm-popover-btn:hover { background: var(--gold-faint); color: var(--gold); }
-    .bkm-popover-btn-danger { color: #ef9a9a; }
+    .bkm-popover-btn-danger { color: var(--danger); }
     .bkm-popover-btn-danger:active, .bkm-popover-btn-danger:hover { background: rgba(244,143,177,0.12); color: var(--accent-pink); }
     .bkm-popover-btn-primary { color: var(--gold); }
     /* Relative date below the bookmark label, subtle Cinzel caps. */
