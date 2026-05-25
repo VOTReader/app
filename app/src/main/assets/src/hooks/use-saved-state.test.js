@@ -20,8 +20,9 @@
    shadow this rule's input.
 */
 
-import { describe, it, expect } from 'vitest';
-import { _validateTabState } from './use-saved-state.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { _validateTabState, useSavedState } from './use-saved-state.js';
 
 /** Run _validateTabState on a fresh copy of the input and return the result. */
 function validate(/** @type {Record<string, any>} */ input) {
@@ -247,6 +248,191 @@ describe('_validateTabState — 13 coercion rules', () => {
       // future screens added at the producer side before this function
       // is updated. (Tests guard the "default = passthrough" invariant.)
       expect(validate({ screen: 'some-new-screen' }).screen).toBe('some-new-screen');
+    });
+  });
+
+  // ── Q5.6: FIELD PRESERVATION (silent write-loss guard) ───────────
+  // The validator only touches `screen`. Every other field — bookId,
+  // letterId, studyId, chapterNum, custom future fields — must survive
+  // unchanged. A bug here is a silent data-loss: the user's saved
+  // reading position dropped because the validator over-mutated.
+  describe('field preservation when screen is coerced (silent write-loss guard)', () => {
+    it('preserves bookId/letterId/chapterNum/etc when coercing matthew-ch → home', () => {
+      // matthew-ch without chapterNum coerces to home. But the LETTER/
+      // STUDY fields should still survive — they may be relevant to
+      // future navigation. The validator must NOT drop them.
+      const input = {
+        screen: 'matthew-ch',
+        chapterNum: null,
+        bookId: 'matthew',
+        letterId: 'the-wide-path',
+        studyId: 'matthew-study',
+        studyChapterId: 'mt-22',
+        genreId: 'gospels',
+      };
+      const out = _validateTabState({ ...input });
+
+      expect(out.screen).toBe('home');  // coerced
+      expect(out.bookId).toBe('matthew');
+      expect(out.letterId).toBe('the-wide-path');
+      expect(out.studyId).toBe('matthew-study');
+      expect(out.studyChapterId).toBe('mt-22');
+      expect(out.genreId).toBe('gospels');
+    });
+
+    it('preserves unknown / custom fields (forward-compat)', () => {
+      // The validator must not strip fields it doesn't recognize.
+      // A producer that adds a new persisted field shouldn't lose it
+      // just because the validator hasn't been updated yet.
+      const input = /** @type {any} */ ({
+        screen: 'search',  // → home
+        customFutureField: 'preserve me',
+        nestedObject: { value: 42 },
+        anArray: [1, 2, 3],
+      });
+      const out = _validateTabState(input);
+
+      expect(out.screen).toBe('home');
+      expect(out.customFutureField).toBe('preserve me');
+      expect(out.nestedObject).toEqual({ value: 42 });
+      expect(out.anArray).toEqual([1, 2, 3]);
+    });
+
+    it('preserves tabs[] array when coercing top-level screen', () => {
+      // useSavedState calls _validateTabState ONCE on the top-level
+      // state, then loops s.tabs.forEach(_validateTabState) for each
+      // tab. This test checks the top-level call doesn't disturb tabs[].
+      const input = {
+        screen: 'search',
+        tabs: [
+          { screen: 'home' },
+          { screen: 'matthew-ch', chapterNum: 5, bookId: 'matthew' },
+        ],
+      };
+      const out = _validateTabState({ ...input });
+
+      expect(out.screen).toBe('home');
+      expect(out.tabs).toEqual(input.tabs);  // tabs untouched
+    });
+  });
+
+  // ── Q5.6: tabs[] processing (per-tab validation) ─────────────────
+  describe('per-tab validation — every entry in s.tabs[] gets the same rules', () => {
+    it('a tab with stale screen + no chapterNum is independently coerced', () => {
+      // _validateTabState ITSELF doesn't recurse into tabs[] — that's
+      // useSavedState's job (calls forEach). But the validator must
+      // work correctly when called per-tab.
+      const tab = { screen: 'bible-ch' };  // missing chapterNum
+      const out = _validateTabState({ ...tab });
+      expect(out.screen).toBe('home');
+    });
+
+    it('two tabs in the same array get independently validated', () => {
+      const tabs = [
+        { screen: 'matthew-ch', chapterNum: 1 },           // valid
+        { screen: 'bible-ch' },                            // stale (no chapterNum)
+        { screen: 'vot-one-index' },                       // always coerces
+        { screen: 'journal-viewer', letterId: 'irrelevant' }, // always coerces
+      ];
+
+      const out = tabs.map(t => _validateTabState({ ...t }));
+
+      expect(out[0].screen).toBe('matthew-ch');   // passed
+      expect(out[1].screen).toBe('home');         // coerced
+      expect(out[2].screen).toBe('volumes-home'); // coerced
+      expect(out[3].screen).toBe('journal-home'); // coerced
+    });
+  });
+
+  // ── Q5.6: useSavedState (the actual hook) ────────────────────────
+  describe('useSavedState — load + validate localStorage[vot-state]', () => {
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it('returns the parsed + validated state from localStorage on mount', () => {
+      const persisted = {
+        screen: 'home',
+        theme: 'dark',
+        tabs: [{ screen: 'home' }],
+        settings: { keepScreenOn: true },
+      };
+      localStorage.setItem('vot-state', JSON.stringify(persisted));
+
+      const { result } = renderHook(() => useSavedState());
+
+      expect(result.current.screen).toBe('home');
+      expect(result.current.theme).toBe('dark');
+      expect(result.current.settings).toEqual({ keepScreenOn: true });
+      expect(result.current.tabs).toEqual([{ screen: 'home' }]);
+    });
+
+    it('coerces stale screens at BOTH top-level AND inside tabs[]', () => {
+      // The critical silent-loss case: a tab persisted with screen:
+      // 'search' (unrestoreable) should be coerced to 'home', but
+      // its OTHER fields must survive.
+      const persisted = {
+        screen: 'search',  // top-level stale
+        bookId: 'genesis',
+        tabs: [
+          { screen: 'matthew-ch', chapterNum: 1 },                       // valid
+          { screen: 'search', bookId: 'preserve-me' },                   // stale → home
+          { screen: 'journal-viewer', letterId: 'preserve-me-too' },     // stale → journal-home
+        ],
+      };
+      localStorage.setItem('vot-state', JSON.stringify(persisted));
+
+      const { result } = renderHook(() => useSavedState());
+
+      // Top-level coerced.
+      expect(result.current.screen).toBe('home');
+      expect(result.current.bookId).toBe('genesis');  // preserved
+
+      // Per-tab coerced.
+      expect(result.current.tabs[0].screen).toBe('matthew-ch');
+      expect(result.current.tabs[1].screen).toBe('home');
+      expect(result.current.tabs[1].bookId).toBe('preserve-me');     // preserved
+      expect(result.current.tabs[2].screen).toBe('journal-home');
+      expect(result.current.tabs[2].letterId).toBe('preserve-me-too'); // preserved
+    });
+
+    it('returns {} when localStorage is empty', () => {
+      const { result } = renderHook(() => useSavedState());
+      // _validateTabState gets called on {} — every rule checks
+      // s.screen against specific strings, so undefined screen passes
+      // all rules through unchanged.
+      expect(result.current).toEqual({});
+    });
+
+    it('returns {} when localStorage[vot-state] is malformed JSON', () => {
+      localStorage.setItem('vot-state', '{not valid json{{');
+
+      const { result } = renderHook(() => useSavedState());
+
+      expect(result.current).toEqual({});
+    });
+
+    it('does NOT throw when tabs is not an array (e.g. legacy data)', () => {
+      localStorage.setItem('vot-state', JSON.stringify({
+        screen: 'home',
+        tabs: 'not-an-array',  // legacy data shape
+      }));
+
+      // The hook's `if (Array.isArray(s.tabs)) s.tabs.forEach(...)`
+      // guard is what makes this safe — verify it works.
+      expect(() => renderHook(() => useSavedState())).not.toThrow();
+    });
+
+    it('memoizes — calling useSavedState twice in one render returns the same object', () => {
+      localStorage.setItem('vot-state', JSON.stringify({ screen: 'home' }));
+
+      const { result, rerender } = renderHook(() => useSavedState());
+      const firstResult = result.current;
+
+      rerender();
+
+      // useMemo with [] deps — same object reference across renders.
+      expect(result.current).toBe(firstResult);
     });
   });
 });
