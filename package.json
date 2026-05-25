@@ -14,10 +14,13 @@
     "lint:globals": "python tools/gen-eslint-globals.py",
     "lint": "npm run lint:globals && eslint app/src/main/assets/src",
     "lint:fix": "npm run lint:globals && eslint app/src/main/assets/src --fix",
-    "smoke-lite": "node tools/smoke-lite.js"
+    "smoke-lite": "node tools/smoke-lite.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "esbuild": "^0.28.0",
@@ -25,8 +28,12 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.6.0",
+    "jsdom": "^29.1.1",
     "lint-staged": "^17.0.5",
-    "typescript": "^6.0.3"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
   },
   "lint-staged": {
     "app/src/main/assets/src/**/*.{js,jsx}": "eslint --max-warnings 0"

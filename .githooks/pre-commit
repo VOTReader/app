@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-commit hook — four pre-flight checks gated on what's staged:
+# pre-commit hook — five pre-flight checks gated on what's staged:
 #
 #   1. check_balance.py     when corpus data files change
 #      Catches black-screen failure modes that brace-balance alone
@@ -19,7 +19,14 @@
 #      project on any source change. Zero-tolerance: any type error
 #      fails the commit.
 #
-#   4. python tools/build.py  when any bundle-source file changes
+#   4. vitest run (Q5.1)     when any .js/.jsx source file changes
+#      `npm run test` runs the full vitest suite once. ~2.3s for
+#      the initial harness; will grow as Q5.2+ lands real tests.
+#      jsdom environment; React-as-global + window.__* stubs in
+#      vitest.setup.js. Zero-tolerance: any failing test fails the
+#      commit.
+#
+#   5. python tools/build.py  when any bundle-source file changes
 #      Rebuilds dist/bundle-{a,b,c,d}.js and stages the regenerated
 #      output so the commit lands with bundles in sync with source.
 #      Replaces the "remember to run the build" trap — the hook does
@@ -30,7 +37,7 @@
 #   git config core.hooksPath .githooks
 # (See CLAUDE.md for the one-line setup.)
 #
-# All four checks are skipped automatically when no relevant file is
+# All five checks are skipped automatically when no relevant file is
 # staged, so commits to CLAUDE.md / PLAN.txt / gradle files / etc. run
 # without any delay.
 
@@ -120,9 +127,27 @@ if [ -n "$src_changed" ]; then
   fi
   echo "[pre-commit] Typecheck OK."
   echo ""
+
+  # ─── Step 4: vitest run (Q5.1) ────────────────────────────────────
+  # Source files changed → run the full vitest suite. Fast for now
+  # (~2.3s); grows as Q5.2+ adds real tests. Zero-tolerance.
+  echo "[pre-commit] Source files staged — running vitest..."
+  npm run test
+  status=$?
+  if [ $status -ne 0 ]; then
+    echo ""
+    echo "---------------------------------------------------------------"
+    echo "Tests FAILED — see vitest output above."
+    echo "Fix the failing tests, re-stage the file(s), then retry."
+    echo "Emergency bypass (not recommended): git commit --no-verify"
+    echo "---------------------------------------------------------------"
+    exit 1
+  fi
+  echo "[pre-commit] Tests OK."
+  echo ""
 fi
 
-# ─── Step 4: bundle rebuild ─────────────────────────────────────────
+# ─── Step 5: bundle rebuild ─────────────────────────────────────────
 # Any change to a bundled source file means dist/bundle-*.js is stale.
 # Rebuild + stage the regenerated bundles so the commit lands with
 # bundles in sync. Source files for the 4 clusters:

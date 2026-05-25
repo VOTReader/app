@@ -60,9 +60,15 @@ jobs:
         # in a browser" and "CI catches data/module regressions." Three
         # checks: globals mirror (gen-eslint-globals diff-check),
         # COLLECTIONS → data-file linkage, module-graph cycle detection.
-        # Bundle build still has to land before this step? No — smoke-lite
-        # is pure source-tree analysis, runs independently of bundles.
         run: npm run smoke-lite
+
+      - name: Test (vitest run, Q5 — typed hooks/stores/utils)
+        # `npm run test` runs vitest once (no watch). jsdom environment;
+        # the setup file (vitest.setup.js) provides React-as-global and
+        # stubs every window.__* runtime bridge so hooks don't throw
+        # on first bridge access. Zero-tolerance: any failing test
+        # fails CI.
+        run: npm run test
 
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build
