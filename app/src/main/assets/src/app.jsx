@@ -529,6 +529,24 @@ function App() {
   const { createAndEditJournal } = useJournalMutations({
     setHlTick, setJournalEntryId, setScreen,
   });
+
+  /* Reading-chain boundary navigation (P7i). Cross-volume chain
+     (Revelation → V1 → ... → Garden) + within-Bible book prev/next.
+     The Revelation → Volume One bridge is the load-bearing intersection
+     (Bible side's `next from Rev last` → chain side's `Volume One first`).
+     All deps in scope by here: book/chapter (above), setActiveReadKey
+     (useReadingDwell), setLastReadForVol (useReadingPositionNav),
+     goToGardenFirst (useNav). */
+  const {
+    boundaryConfig,
+    bcvPrevBook, bcvOnPrevBook, bcvPrevBoundaryTitle,
+    bcvNextBook, bcvOnNextBook, bcvNextBoundaryTitle,
+  } = useReadingChainNav({
+    book, chapter, bookId,
+    setBookId, setChapterNum, setScreen, setLetterId,
+    setActiveReadKey, setLastReadForVol, goToGardenFirst,
+  });
+
   /* captureActiveTabThumbnail + scroll-stop + aspect-ratio + after-nav effects
      → extracted to src/hooks/use-thumbnails.js (P6d) */
 
@@ -733,113 +751,9 @@ function App() {
   /* selectBibleCh → src/hooks/use-reading-position-nav.js (P7h). */
   /* goBibleIdx → src/hooks/use-nav.js (P7b). */
 
-  /* ── Cross-volume boundary jumps ──
-     Chain: Revelation → V1 → V2 → V3 → V4 → V5 → V6 → V7 → Rebuke → WTLB1 → WTLB2 → Flock → Timothy
-  ── */
-  const goToRevelationLast = () => {const rev = BOOKS.revelation;setBookId("revelation");setChapterNum(rev.chapters[rev.chapters.length - 1].num);setScreen("bible-ch");};
-  // First/last helpers
-  const _first = (arr, volKey, scr) => () => {if (arr.length > 0) {const id = arr[0].id;setLetterId(id);setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));setScreen(scr);}};
-  const _last = (arr, volKey, scr) => () => {if (arr.length > 0) {const id = arr[arr.length - 1].id;setLetterId(id);setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));setScreen(scr);}};
-  const _firstPreface = (preface, arr, volKey, scr) => () => {const id = preface ? preface.id : arr.length > 0 ? arr[0].id : null;if (id) {setLetterId(id);setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id));setScreen(scr);}};
-  var _goFirst = {}, _goLast = {};
-  COLLECTIONS.forEach(function(col) {
-    if (!col.letterScreen) return;
-    var arr = colLetterArr(col);
-    var pref = colPreface(col);
-    _goFirst[col.volKey] = pref ? _firstPreface(pref, arr, col.volKey, col.letterScreen) : _first(arr, col.volKey, col.letterScreen);
-    _goLast[col.volKey] = _last(arr, col.volKey, col.letterScreen);
-  });
-  /* goToGardenFirst → src/hooks/use-nav.js (P7b). */
-
-  /* boundaryConfig(volKey, entry) → { prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary }
-     Derives reading-chain boundary cards from READING_CHAIN, skipping empty
-     collections, with special endpoints (Revelation before V1, Garden after
-     HolyDays). Returns null boundaries when the entry has an internal sibling
-     in the same collection. */
-  const boundaryConfig = (volKey, entry) => {
-    const sourceCol = COL_BY_KEY.get(volKey);
-    if (!sourceCol) return { prevBoundary: null, onPrevBoundary: null, nextBoundary: null, onNextBoundary: null };
-    const hasPrev = !!(entry && (entry.prevLetter || entry.prevEntry));
-    const hasNext = !!(entry && (entry.nextLetter || entry.nextEntry));
-    const idx = READING_CHAIN.indexOf(volKey);
-    let prevBoundary = null, onPrevBoundary = null, nextBoundary = null, onNextBoundary = null;
-
-    if (!hasPrev) {
-      if (volKey === 'one') {
-        // Special: Revelation precedes Volume One
-        prevBoundary = { short: "Revelation", title: `Revelation · Chapter ${BOOKS.revelation.chapters[BOOKS.revelation.chapters.length - 1].num}` };
-        onPrevBoundary = goToRevelationLast;
-      } else if (idx > 0) {
-        // Walk back through chain skipping empties
-        for (let i = idx - 1; i >= 0; i--) {
-          const pCol = COL_BY_KEY.get(READING_CHAIN[i]);
-          const pArr = colLetterArr(pCol);
-          if (pArr.length === 0) continue;
-          prevBoundary = { short: _boundaryShort(sourceCol, pCol), title: pArr[pArr.length - 1].title || pCol.short };
-          onPrevBoundary = _goLast[pCol.volKey];
-          break;
-        }
-      }
-    }
-
-    if (!hasNext) {
-      if (volKey === 'holydays') {
-        // Special: Garden follows Holy Days
-        nextBoundary = { short: "A Return to the Garden", title: "A Return to the Garden" };
-        onNextBoundary = goToGardenFirst;
-      } else if (idx >= 0 && idx < READING_CHAIN.length - 1) {
-        for (let i = idx + 1; i < READING_CHAIN.length; i++) {
-          const nCol = COL_BY_KEY.get(READING_CHAIN[i]);
-          const nArr = colLetterArr(nCol);
-          if (nArr.length === 0) continue;
-          const pref = colPreface(nCol);
-          nextBoundary = { short: _boundaryShort(sourceCol, nCol), title: (pref ? pref.title : nArr[0].title) || nCol.short };
-          onNextBoundary = _goFirst[nCol.volKey];
-          break;
-        }
-      }
-    }
-    return { prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary };
-  };
-
-  /* ── Eph ↔ Heb internal cross-book ── */
-  const bookIdx = book ? BIBLE_BOOK_LIST.findIndex((b) => b.id === bookId) : -1;
-  const prevBibleBook = bookIdx > 0 ? BIBLE_BOOK_LIST[bookIdx - 1] : null;
-  const nextBibleBook = bookIdx >= 0 && bookIdx < BIBLE_BOOK_LIST.length - 1 ? BIBLE_BOOK_LIST[bookIdx + 1] : null;
-  const goNextBibleBook = () => {
-    if (!nextBibleBook) return;
-    setBookId(nextBibleBook.id);
-    setChapterNum(nextBibleBook.chapters[0].num);
-    setScreen("bible-ch");
-  };
-  const goPrevBibleBook = () => {
-    if (!prevBibleBook) return;
-    setBookId(prevBibleBook.id);
-    setChapterNum(prevBibleBook.chapters[prevBibleBook.chapters.length - 1].num);
-    setScreen("bible-ch");
-  };
-
-  /* ── Computed BibleChapterView boundary props ── */
-  const chIsFirst = chapter && !book?.chapters.find((c) => c.num === chapter.num - 1);
-  const chIsLast = chapter && !book?.chapters.find((c) => c.num === chapter.num + 1);
-
-  // Prev: first chapters → previous book in BIBLE_BOOK_LIST
-  const bcvPrevBook = chIsFirst ? prevBibleBook : null;
-  const bcvOnPrevBook = goPrevBibleBook;
-  const bcvPrevBoundaryTitle = null;
-
-  // Next: revelation last → Volume One; other last → next book
-  const bcvNextBook = chIsLast ?
-  bookId === "revelation" ?
-  { title: "Volume One", chapters: [{ num: 1 }] } :
-  nextBibleBook :
-  null;
-  const bcvOnNextBook = chIsLast && bookId === "revelation" ?
-  _goFirst.one :
-  goNextBibleBook;
-  const bcvNextBoundaryTitle = chIsLast && bookId === "revelation" ?
-  "Volume One · Letter 1" :
-  null;
+  /* Cross-volume boundary jumps + within-Bible book prev/next +
+     boundaryConfig + bcv* computed boundary render props →
+     src/hooks/use-reading-chain-nav.js (P7i, called above). */
 
   const tabsCtxValue = React.useMemo(() => ({
     enabled: !!settings.tabsEnabled,

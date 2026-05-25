@@ -114,22 +114,26 @@ export default defineConfig({
       // 8 of 12 concerns):
       //   statements 25.80 (750/2906) | branches 21.51 (463/2152)
       //   functions  24.16 (138/571)  | lines    26.39 (558/2114)
-      // Three small extractions batched in one session: useJournalMutations
-      // (8 tests, 13-line concern), useTapThrough (13 tests, 72-line
-      // concern), useReadProgress (17 tests, 18-line concern + readItems
-      // state move). Functions ratchets biggest (+2.57) — each new
-      // exported helper adds a function. Gate floors advance:
-      // statements 23→25, branches 19→21, functions 21→24, lines 24→26.
+      //
+      // P7h+i batch baseline (+ use-reading-position-nav + use-reading-
+      // chain-nav, 452 tests — Phase 1 reading-nav pair, 10 of 12 concerns):
+      //   statements 29.47 (902/3060) | branches 24.57 (554/2254)
+      //   functions  27.78 (167/601)  | lines    30.44 (681/2237)
+      // useReadingChainNav is the largest concern remaining (~110 lines)
+      // and the most branchy (boundaryConfig's chain-walk loops, the
+      // Revelation↔Volume-One bridge). 50 new tests total (22 P7h + 28
+      // P7i). Lines breaks 30%. Gate floors advance: statements 25→29,
+      // branches 21→24, functions 24→27, lines 26→30.
       //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
-        statements: 25,
-        branches: 21,
-        functions: 24,
-        lines: 26,
+        statements: 29,
+        branches: 24,
+        functions: 27,
+        lines: 30,
       },
     },
   },

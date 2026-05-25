@@ -11,11 +11,11 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 ## Current state (2026-05-24)
 
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
-- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). 1,987 lines after the P7e+f+g batch — 22 hooks extracted (15 from P6 + 7 from P7a-g). App() is hook composition + render tree + nav-helper glue.
+- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). 1,890 lines after the P7h+i pair — 24 hooks extracted (15 from P6 + 9 from P7a-i). App() is hook composition + render tree + nav-helper glue.
 - **130+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
   - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)
-  - `bundle-b.js` 358 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 35 files)
+  - `bundle-b.js` 367 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 37 files)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
   - `bundle-d.js` 546 KB — screens + sheets + components + utils + late stores + App() itself (esbuild IIFE, 82 files)
 
@@ -65,10 +65,15 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 The 50/50 split means **hook extraction alone cannot hit <800.** The render tree by itself is 1,103 lines — that's the floor for any logic-only extraction. PLAN.txt §1 has the two-phase plan and Phase 2's risk profile (CSS selectors, layout shifts, ErrorBoundary placement — render decomposition needs visual smoke walks, not just vitest).
 
-**Phase 1 — logic extraction (active).** Goal: **zero inline concerns remaining in App()'s logic block.** Per [[concerns-not-lines]] / PLAN.txt §1, track concerns extracted (not lines removed) — hook extraction relocates code rather than deleting it, so call-site wiring eats most of the per-extraction line savings. PLAN.txt §1 has the full concerns checklist. Extracted so far: **8 of 12 concerns** (useHistory + useNavHistoryTracking + useNav + useSearch + useBibleStudies + useJournalMutations + useTapThrough + useReadProgress). The TDZ-blocker cleared in P7d let P7e+f+g batch in one session. Remaining: useReadingChainNav + useReadingPositionNav + useSurprise (handler dissolution) + useAppShellEffects.
+**Phase 1 — logic extraction (active).** Goal: **zero inline concerns remaining in App()'s logic block.** Per [[concerns-not-lines]] / PLAN.txt §1, track concerns extracted (not lines removed) — hook extraction relocates code rather than deleting it, so call-site wiring eats most of the per-extraction line savings (P7i was an exception — a 110-line concern with narrow consumer surface produced a 86-line drop). PLAN.txt §1 has the full concerns checklist. Extracted so far: **10 of 12 concerns** (useHistory + useNavHistoryTracking + useNav + useSearch + useBibleStudies + useJournalMutations + useTapThrough + useReadProgress + useReadingPositionNav + useReadingChainNav). Remaining 2: useSurprise (handler dissolution — also lets useSearch's call site move up) + useAppShellEffects. One session to close Phase 1.
 - **P7a (LANDED 2026-05-24, `d89775f`)** — useNavHistoryTracking. 18-line useEffect → 115-line hook + 23 vitest tests. The 4-helper disable cite (most architecturally-debted post-Q3 disable in the file, with the extraction candidate named in its own text) moved with the effect. TDZ note: call site lives below `getStudyById`/`getStudyChapter`, mirroring P6l's useAndroidBack. Tests 218→241, branches gate bumped 11→13.
 - **P7b (LANDED 2026-05-24, `ee6339e`)** — useNav. 20 simple nav-chrome helpers extracted (4 simple switchers + 8 navOrigin-pattern + 2 journal-nav + 5 trivial switchers + goScriptureGenre). 8 duplicated `setNavOrigin({...})` literals dedupe to one private `_captureOrigin()`. 34 new vitest tests; tests 241→275; statements gate 14→17, functions 12→16, lines 15→17.
 - **P7c (LANDED 2026-05-24)** — useSearch. Full search domain extracted: 4 search tabFields (searchOrigin/searchScope/searchContext/searchQuery), searchOriginRef, srchVolLookup/SRCH_VOL_MAP/srchResolveLetterId helpers, goSearch (26-line context computation), goSearchOrigin, handleSearchSelect (80-line dispatcher), handleSearchCommand, window.__goSearch bridge effect. **Per the dissolution principle ([[dont-group-by-shape]]):** the search-domain handlers (handleSearchSelect, handleSearchCommand, srch*) landed in useSearch where they belong, NOT in a "useHandlers" junk drawer. App.jsx dropped 134 lines (largest single P7 extraction so far — handleSearchSelect alone was 80 lines). 56 new vitest tests covering all 14 handleSearchSelect branches + 7 handleSearchCommand actions + 4 goSearch context variants + the window.__goSearch identity-churn invariant. Tests 275→331; all 4 gates ratchet: statements 17→21, branches 13→18, functions 16→18, lines 17→22. TDZ note: useSearch's call site sits BETWEEN handleSurprise (above) and useAndroidBack (below) by necessity — handleSurprise is a useSearch param (cross-domain 'random' handoff) and useAndroidBack consumes goSearchOrigin from useSearch's return. Caught the wrong initial placement in smoke verification (TDZ ReferenceError); fix was a single move-block edit.
+- **P7h+i pair (LANDED 2026-05-24)** — the reading-navigation pair.
+  - **P7h — useReadingPositionNav**: setLastReadForVol + selectMatthewCh/BibleCh + goToLastRead + prophecyCardStatesRef + saveProphecyCardStates. ~50 lines moved. 22 tests. Call site sits BETWEEN useBibleStudies and useTapThrough (downstream of getStudyById/selectStudy from useBibleStudies). Sequencing change: useBibleStudies moved UP from its P7d placement to right after useReadingDwell, spending the TDZ dividend for the first time.
+  - **P7i — useReadingChainNav**: the cross-volume chain (Revelation → V1 → ... → Garden) + within-Bible book prev/next. boundaryConfig + _first/_last/_firstPreface + _goFirst/_goLast maps + bookIdx/prev/nextBibleBook + goNext/PrevBibleBook + chIsFirst/Last + bcv* boundary render props + goToRevelationLast. ~110 lines moved. 28 tests (boundary branch dispatch + chain-walk skipping empties + the load-bearing Revelation→Volume-One bridge + null-guards). The hook EXPOSES the full computed surface (boundaryConfig + bcv* + 8 helpers) but App() destructures only what it consumes — clean contract for future render-tree consumers without a surface change.
+  - Tests 402 → 452 (+50). Coverage gates jump biggest yet: statements 25→29, branches 21→24, functions 24→27, lines 26→30 (broke 30%).
+  - App() 1,987 → **1,890** (−97). P7i alone shaved 86 lines.
 - **P7e+f+g batch (LANDED 2026-05-24)** — 3 small extractions in one session, demonstrating the TDZ dividend (every extraction post-P7d is independent, so small ones can batch).
   - **P7e — useJournalMutations**: createAndEditJournal (1 fn). 8 tests.
   - **P7f — useTapThrough**: goToLetterFromMatthew + openInAppLetter (~72 lines, push onto fromLetterStack + set destination). 13 tests.
@@ -125,7 +130,7 @@ D:/VOTReader-studio/
 │   │   ├── app.css                    # static CSS (no template literal)
 │   │   ├── dist/                      # 4 bundles, regenerated by npm run build
 │   │   └── src/
-│   │       ├── app.jsx                # function App() — 1,987 lines
+│   │       ├── app.jsx                # function App() — 1,890 lines
 │   │       ├── data/                  # scripture-resolution.js + 29 raw corpus files
 │   │       ├── stores/                # 11 stores + _entry-b.js
 │   │       ├── renderer/              # annotation-engine, dom-links, dom-bookmarks, dom-journal-chip + _entry.js
@@ -135,7 +140,7 @@ D:/VOTReader-studio/
 │   │       │   ├── sheets/            # 17 sheets/pickers
 │   │       │   └── _entry-d.js        # esbuild entry for bundle-d
 │   │       ├── utils/                 # 11 helper bundles
-│   │       ├── hooks/                 # 22 App() hooks (P6 + P7a–g)
+│   │       ├── hooks/                 # 24 App() hooks (P6 + P7a–i)
 │   │       ├── components/            # ExpandableText, ErrorBoundary
 │   │       └── styles/                # journal-styles
 │   └── java/com/votreader/sacredui/MainActivity.kt   # WebView shell + native bridges

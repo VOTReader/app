@@ -4292,6 +4292,139 @@
     };
   }
 
+  // app/src/main/assets/src/hooks/use-reading-chain-nav.js
+  function useReadingChainNav({
+    book,
+    chapter,
+    bookId,
+    setBookId,
+    setChapterNum,
+    setScreen,
+    setLetterId,
+    setActiveReadKey,
+    setLastReadForVol,
+    goToGardenFirst
+  }) {
+    const goToRevelationLast = () => {
+      const rev = BOOKS.revelation;
+      setBookId("revelation");
+      setChapterNum(rev.chapters[rev.chapters.length - 1].num);
+      setScreen("bible-ch");
+    };
+    const _first = (arr, volKey, scr) => () => {
+      if (arr.length > 0) {
+        const id = arr[0].id;
+        setLetterId(id);
+        setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id));
+        setScreen(scr);
+      }
+    };
+    const _last = (arr, volKey, scr) => () => {
+      if (arr.length > 0) {
+        const id = arr[arr.length - 1].id;
+        setLetterId(id);
+        setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id));
+        setScreen(scr);
+      }
+    };
+    const _firstPreface = (preface, arr, volKey, scr) => () => {
+      const id = preface ? preface.id : arr.length > 0 ? arr[0].id : null;
+      if (id) {
+        setLetterId(id);
+        setActiveReadKey("vol:" + volKey, () => setLastReadForVol(volKey, id));
+        setScreen(scr);
+      }
+    };
+    var _goFirst = {}, _goLast = {};
+    COLLECTIONS.forEach(function(col) {
+      if (!col.letterScreen) return;
+      var arr = colLetterArr(col);
+      var pref = colPreface(col);
+      _goFirst[col.volKey] = pref ? _firstPreface(pref, arr, col.volKey, col.letterScreen) : _first(arr, col.volKey, col.letterScreen);
+      _goLast[col.volKey] = _last(arr, col.volKey, col.letterScreen);
+    });
+    const boundaryConfig = (volKey, entry) => {
+      const sourceCol = COL_BY_KEY.get(volKey);
+      if (!sourceCol) return { prevBoundary: null, onPrevBoundary: null, nextBoundary: null, onNextBoundary: null };
+      const hasPrev = !!(entry && (entry.prevLetter || entry.prevEntry));
+      const hasNext = !!(entry && (entry.nextLetter || entry.nextEntry));
+      const idx = READING_CHAIN.indexOf(volKey);
+      let prevBoundary = null, onPrevBoundary = null, nextBoundary = null, onNextBoundary = null;
+      if (!hasPrev) {
+        if (volKey === "one") {
+          prevBoundary = { short: "Revelation", title: `Revelation \xB7 Chapter ${BOOKS.revelation.chapters[BOOKS.revelation.chapters.length - 1].num}` };
+          onPrevBoundary = goToRevelationLast;
+        } else if (idx > 0) {
+          for (let i = idx - 1; i >= 0; i--) {
+            const pCol = COL_BY_KEY.get(READING_CHAIN[i]);
+            const pArr = colLetterArr(pCol);
+            if (pArr.length === 0) continue;
+            prevBoundary = { short: _boundaryShort(sourceCol, pCol), title: pArr[pArr.length - 1].title || pCol.short };
+            onPrevBoundary = _goLast[pCol.volKey];
+            break;
+          }
+        }
+      }
+      if (!hasNext) {
+        if (volKey === "holydays") {
+          nextBoundary = { short: "A Return to the Garden", title: "A Return to the Garden" };
+          onNextBoundary = goToGardenFirst;
+        } else if (idx >= 0 && idx < READING_CHAIN.length - 1) {
+          for (let i = idx + 1; i < READING_CHAIN.length; i++) {
+            const nCol = COL_BY_KEY.get(READING_CHAIN[i]);
+            const nArr = colLetterArr(nCol);
+            if (nArr.length === 0) continue;
+            const pref = colPreface(nCol);
+            nextBoundary = { short: _boundaryShort(sourceCol, nCol), title: (pref ? pref.title : nArr[0].title) || nCol.short };
+            onNextBoundary = _goFirst[nCol.volKey];
+            break;
+          }
+        }
+      }
+      return { prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary };
+    };
+    const bookIdx = book ? BIBLE_BOOK_LIST.findIndex((b) => b.id === bookId) : -1;
+    const prevBibleBook = bookIdx > 0 ? BIBLE_BOOK_LIST[bookIdx - 1] : null;
+    const nextBibleBook = bookIdx >= 0 && bookIdx < BIBLE_BOOK_LIST.length - 1 ? BIBLE_BOOK_LIST[bookIdx + 1] : null;
+    const goNextBibleBook = () => {
+      if (!nextBibleBook) return;
+      setBookId(nextBibleBook.id);
+      setChapterNum(nextBibleBook.chapters[0].num);
+      setScreen("bible-ch");
+    };
+    const goPrevBibleBook = () => {
+      if (!prevBibleBook) return;
+      setBookId(prevBibleBook.id);
+      setChapterNum(prevBibleBook.chapters[prevBibleBook.chapters.length - 1].num);
+      setScreen("bible-ch");
+    };
+    const chIsFirst = chapter && !book?.chapters.find((c) => c.num === chapter.num - 1);
+    const chIsLast = chapter && !book?.chapters.find((c) => c.num === chapter.num + 1);
+    const bcvPrevBook = chIsFirst ? prevBibleBook : null;
+    const bcvOnPrevBook = goPrevBibleBook;
+    const bcvPrevBoundaryTitle = null;
+    const bcvNextBook = chIsLast ? bookId === "revelation" ? { title: "Volume One", chapters: [{ num: 1 }] } : nextBibleBook : null;
+    const bcvOnNextBook = chIsLast && bookId === "revelation" ? _goFirst.one : goNextBibleBook;
+    const bcvNextBoundaryTitle = chIsLast && bookId === "revelation" ? "Volume One \xB7 Letter 1" : null;
+    return {
+      goToRevelationLast,
+      boundaryConfig,
+      bookIdx,
+      prevBibleBook,
+      nextBibleBook,
+      goNextBibleBook,
+      goPrevBibleBook,
+      chIsFirst,
+      chIsLast,
+      bcvPrevBook,
+      bcvOnPrevBook,
+      bcvPrevBoundaryTitle,
+      bcvNextBook,
+      bcvOnNextBook,
+      bcvNextBoundaryTitle
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -4728,11 +4861,11 @@
     c.short = _BOUNDARY_SHORT[c.volKey] || c.label;
     c.shortFromOutside = _BOUNDARY_SHORT_OUTSIDE[c.volKey] || null;
   });
-  var READING_CHAIN = ["one", "two", "three", "four", "five", "six", "seven", "rebuke", "wtlb1", "wtlb2", "blessed", "flock", "timothy", "holydays"];
+  var READING_CHAIN2 = ["one", "two", "three", "four", "five", "six", "seven", "rebuke", "wtlb1", "wtlb2", "blessed", "flock", "timothy", "holydays"];
   function _isWtlbFamily(col) {
     return !!col && (col.kind === "wtlb" || col.kind === "blessed");
   }
-  function _boundaryShort(sourceCol, targetCol) {
+  function _boundaryShort2(sourceCol, targetCol) {
     if (targetCol.shortFromOutside && _isWtlbFamily(sourceCol) !== _isWtlbFamily(targetCol)) return targetCol.shortFromOutside;
     return targetCol.short;
   }
@@ -7740,6 +7873,7 @@
     useJournalMutations,
     useTapThrough,
     useReadingPositionNav,
+    useReadingChainNav,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
@@ -7753,9 +7887,9 @@
     COL_NAV_ICON,
     _BOUNDARY_SHORT,
     _BOUNDARY_SHORT_OUTSIDE,
-    READING_CHAIN,
+    READING_CHAIN: READING_CHAIN2,
     _isWtlbFamily,
-    _boundaryShort,
+    _boundaryShort: _boundaryShort2,
     colLetters,
     colPreface: colPreface2,
     colLetterArr: colLetterArr2,

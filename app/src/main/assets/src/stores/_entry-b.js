@@ -79,6 +79,7 @@ import { useBibleStudies } from '../hooks/use-bible-studies.js';
 import { useJournalMutations } from '../hooks/use-journal-mutations.js';
 import { useTapThrough } from '../hooks/use-tap-through.js';
 import { useReadingPositionNav } from '../hooks/use-reading-position-nav.js';
+import { useReadingChainNav } from '../hooks/use-reading-chain-nav.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -153,6 +154,7 @@ Object.assign(window, {
   useJournalMutations,
   useTapThrough,
   useReadingPositionNav,
+  useReadingChainNav,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,
