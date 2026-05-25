@@ -2133,19 +2133,22 @@
       text-underline-offset: 3px;
       text-decoration-skip-ink: none;
     }
-    /* Per-color rules — longhand-only, !important to win over the shorthand
-       expansion that would otherwise set text-decoration-color: currentColor. */
-    .hl-note.is-active.hl-yellow { text-decoration-color: var(--hl-yellow) !important; }
-    .hl-note.is-active.hl-green  { text-decoration-color: var(--hl-green) !important; }
-    .hl-note.is-active.hl-pink   { text-decoration-color: var(--hl-pink) !important; }
-    .hl-note.is-active.hl-red    { text-decoration-color: var(--hl-red) !important; }
-    .hl-note.is-active.hl-orange { text-decoration-color: var(--hl-orange) !important; }
-    .hl-note.is-active.hl-blue   { text-decoration-color: var(--hl-blue) !important; }
-    .hl-note.is-active.hl-purple { text-decoration-color: var(--hl-purple) !important; }
-    .hl-note.is-active.hl-teal   { text-decoration-color: var(--hl-teal) !important; }
-    .hl-note.is-active.hl-brown  { text-decoration-color: var(--hl-brown) !important; }
-    .hl-note.is-active.hl-gray   { text-decoration-color: var(--hl-gray) !important; }
-    .hl-note.is-active.hl-cyan   { text-decoration-color: var(--hl-teal) !important; }
+    /* Per-color rules — longhand-only. !important is NOT needed: the base
+       .hl-note.is-active rule uses longhands (line/style/thickness) not the
+       text-decoration shorthand, so there's no implicit currentColor
+       expansion to override. Per-color specificity (3 classes) beats the
+       base (2 classes) on its own. Empirically verified Q6.8. */
+    .hl-note.is-active.hl-yellow { text-decoration-color: var(--hl-yellow); }
+    .hl-note.is-active.hl-green  { text-decoration-color: var(--hl-green); }
+    .hl-note.is-active.hl-pink   { text-decoration-color: var(--hl-pink); }
+    .hl-note.is-active.hl-red    { text-decoration-color: var(--hl-red); }
+    .hl-note.is-active.hl-orange { text-decoration-color: var(--hl-orange); }
+    .hl-note.is-active.hl-blue   { text-decoration-color: var(--hl-blue); }
+    .hl-note.is-active.hl-purple { text-decoration-color: var(--hl-purple); }
+    .hl-note.is-active.hl-teal   { text-decoration-color: var(--hl-teal); }
+    .hl-note.is-active.hl-brown  { text-decoration-color: var(--hl-brown); }
+    .hl-note.is-active.hl-gray   { text-decoration-color: var(--hl-gray); }
+    .hl-note.is-active.hl-cyan   { text-decoration-color: var(--hl-teal); }
     /* Trailing note icon — appears once per note group, after the
        last segment. Inline-block so it sits on the baseline; small
        enough not to disrupt line-height. */
