@@ -521,6 +521,26 @@ function App() {
     setJournalEntryId, setGardenPage,
   });
 
+  /* Bible Studies domain — STUDIES + UNIFIED_CHAIN + lookups + study
+     nav. Called HIGH UP (right after useNav) because P7d cleared the
+     TDZ blocker that previously forced this block to live ~line 754.
+     useAndroidBack / useNavHistoryTracking / useSearch downstream
+     consumers now read getStudyById / getStudyChapter / etc. as hook
+     RETURNS (no longer const arrows) → their call-site placements
+     became free as a result. (They haven't moved yet; that's deferred
+     to keep P7d focused on the extraction itself.) See use-bible-studies.js
+     header for the full TDZ-blocker rationale. */
+  const {
+    getStudyById, getStudyChapter, studyReadKey,
+    selectStudy, selectStudyChapter,
+    UNIFIED_CHAIN, prevChainEntry, nextChainEntry,
+    goToChainEntryFirst, goToChainEntryLast,
+  } = useBibleStudies({
+    setScreen, setBookId, setChapterNum,
+    setStudyId, setStudyChapterId,
+    setActiveReadKey, setLastReadChapters, setFromStudies,
+  });
+
   /* useNavigateToLink — the cross-app deep-linking router. Placed here
      because setJournalEntryId (declared above for useNav too) is one of
      its params; its returned navigateToLink has no consumer before this
@@ -751,11 +771,7 @@ function App() {
   const selectMatthewCh = (num) => {setChapterNum(num);setScreen("matthew-ch");setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: num })));};
   /* goMatthewIdx → src/hooks/use-nav.js (P7b). */
 
-  /* ── Bible Letter Studies ── */
-  const STUDIES = _studies();
-  const getStudyById = (id) => STUDIES.find((s) => s.id === id) || null;
-  const getStudyChapter = (study, chId) => study && study.chapters ? study.chapters.find((c) => c.id === chId) : null;
-  const studyReadKey = (slug) => `bible-study-${slug}`;
+  /* STUDIES / getStudyById / getStudyChapter / studyReadKey → src/hooks/use-bible-studies.js (P7d). */
 
   /* goStudiesHome → src/hooks/use-nav.js (P7b). */
 
@@ -784,90 +800,10 @@ function App() {
     addToHistory, _findLetter, getStudyById, getStudyChapter,
   });
 
-  const selectStudy = (id) => {
-    const study = getStudyById(id);
-    if (!study || study.locked || !study.chapters?.length) return;
-    setStudyId(id);
-    if (study.chapters.length === 1 || study.singlePage) {
-      const ch = study.chapters[0];
-      setStudyChapterId(ch.id);
-      setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: ch.id })));
-      setScreen("bible-study-chapter");
-    } else {
-      setStudyChapterId(null);
-      setActiveReadKey(studyReadKey(study.slug));
-      setScreen("bible-study-index");
-    }
-  };
-  const selectStudyChapter = (sid, chId) => {
-    const study = getStudyById(sid);
-    if (!study) return;
-    setStudyId(sid);
-    setStudyChapterId(chId);
-    setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: chId })));
-    setScreen("bible-study-chapter");
-  };
-
-  // ─── UNIFIED STUDY CHAIN ──────────────────────────────────────────
-  // Includes the 7 Bible Letter Studies AND the Matthew Study Bible as a
-  // virtual entry, ordered heavy → light by content weight. Matthew is
-  // ~389 KB so it lands at position 2 (after More Than a Man). Cross-chain
-  // prev/next, StudiesHome rendering, and matthew-ch boundary nav all
-  // consume this one list so everything stays in sync.
-  const MATTHEW_CHAIN_ENTRY = {
-    id: 'matthew-study', slug: 'matthew-study',
-    title: 'The Volumes of Truth New Testament Study Bible - The Book of Matthew',
-    isMatthewStudy: true,
-    chapters: (_matthew() || {}).chapters || []
-  };
-  const CHAIN_ORDER = [
-  'more-than-a-man',
-  'matthew-study',
-  'purity',
-  'state-of-the-dead',
-  'grace-and-the-law',
-  'lamb-of-god',
-  'trinity-exposed',
-  'odds-chart'];
-
-  const UNIFIED_CHAIN = CHAIN_ORDER.
-  map((slug) => slug === 'matthew-study' ? MATTHEW_CHAIN_ENTRY : STUDIES.find((s) => s.id === slug)).
-  filter((e) => e && (e.isMatthewStudy || !e.locked && e.chapters && e.chapters.length > 0));
-
-  const chainIdx = (slug) => UNIFIED_CHAIN.findIndex((e) => e.slug === slug);
-  const prevChainEntry = (slug) => {const i = chainIdx(slug);return i > 0 ? UNIFIED_CHAIN[i - 1] : null;};
-  const nextChainEntry = (slug) => {const i = chainIdx(slug);return i >= 0 && i < UNIFIED_CHAIN.length - 1 ? UNIFIED_CHAIN[i + 1] : null;};
-
-  // Navigate to the first/last chapter of a chain entry (either a Bible
-  // Letter Study OR the Matthew Study Bible).
-  const goToChainEntryFirst = (slug) => () => {
-    if (slug === 'matthew-study') {
-      setFromStudies(true);
-      setBookId('matthew');setChapterNum(1);setScreen('matthew-ch');
-      setActiveReadKey('matthew', () => setLastReadChapters((prev) => ({ ...prev, matthew: 1 })));
-      return;
-    }
-    const s = getStudyById(slug);
-    if (!s || !s.chapters?.length) return;
-    selectStudyChapter(slug, s.chapters[0].id);
-  };
-  const goToChainEntryLast = (slug) => () => {
-    if (slug === 'matthew-study') {
-      setFromStudies(true);
-      const lastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
-      setBookId('matthew');setChapterNum(lastNum);setScreen('matthew-ch');
-      setActiveReadKey('matthew', () => setLastReadChapters((prev) => ({ ...prev, matthew: lastNum })));
-      return;
-    }
-    const s = getStudyById(slug);
-    if (!s || !s.chapters?.length) return;
-    selectStudyChapter(slug, s.chapters[s.chapters.length - 1].id);
-  };
-
-  // (Pre-Q3.3f-dead: 4 legacy aliases — goToStudyFirstChapter,
-  //  goToStudyLastChapter, goToMatthewStudyFromStudies, goToMatthewStudyFirstCh
-  //  — lived here "retained so older call sites keep working." Lint confirmed
-  //  no caller exists. Removed.)
+  /* selectStudy / selectStudyChapter / MATTHEW_CHAIN_ENTRY / CHAIN_ORDER /
+     UNIFIED_CHAIN / chainIdx / prevChainEntry / nextChainEntry /
+     goToChainEntryFirst / goToChainEntryLast → src/hooks/use-bible-studies.js
+     (P7d). All destructured from the useBibleStudies call ~225 lines above. */
 
   /* ── Ephesians / Hebrews ── */
   const selectBibleCh = (num) => {setChapterNum(num);setScreen("bible-ch");setActiveReadKey(bookId, () => setLastReadChapters((prev) => ({ ...prev, [bookId]: num })));};

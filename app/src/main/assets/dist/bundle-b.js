@@ -3968,6 +3968,112 @@
     };
   }
 
+  // app/src/main/assets/src/hooks/use-bible-studies.js
+  function useBibleStudies({
+    setScreen,
+    setBookId,
+    setChapterNum,
+    setStudyId,
+    setStudyChapterId,
+    setActiveReadKey,
+    setLastReadChapters,
+    setFromStudies
+  }) {
+    const STUDIES = _studies();
+    const studyReadKey = (slug) => `bible-study-${slug}`;
+    const getStudyById = (id) => STUDIES.find((s) => s.id === id) || null;
+    const getStudyChapter = (study, chId) => study && study.chapters ? study.chapters.find((c) => c.id === chId) : null;
+    const selectStudy = (id) => {
+      const study = getStudyById(id);
+      if (!study || study.locked || !study.chapters?.length) return;
+      setStudyId(id);
+      if (study.chapters.length === 1 || study.singlePage) {
+        const ch = study.chapters[0];
+        setStudyChapterId(ch.id);
+        setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: ch.id })));
+        setScreen("bible-study-chapter");
+      } else {
+        setStudyChapterId(null);
+        setActiveReadKey(studyReadKey(study.slug));
+        setScreen("bible-study-index");
+      }
+    };
+    const selectStudyChapter = (sid, chId) => {
+      const study = getStudyById(sid);
+      if (!study) return;
+      setStudyId(sid);
+      setStudyChapterId(chId);
+      setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: chId })));
+      setScreen("bible-study-chapter");
+    };
+    const MATTHEW_CHAIN_ENTRY = {
+      id: "matthew-study",
+      slug: "matthew-study",
+      title: "The Volumes of Truth New Testament Study Bible - The Book of Matthew",
+      isMatthewStudy: true,
+      chapters: (_matthew() || {}).chapters || []
+    };
+    const CHAIN_ORDER = [
+      "more-than-a-man",
+      "matthew-study",
+      "purity",
+      "state-of-the-dead",
+      "grace-and-the-law",
+      "lamb-of-god",
+      "trinity-exposed",
+      "odds-chart"
+    ];
+    const UNIFIED_CHAIN = CHAIN_ORDER.map((slug) => slug === "matthew-study" ? MATTHEW_CHAIN_ENTRY : STUDIES.find((s) => s.id === slug)).filter((e) => e && (e.isMatthewStudy || !e.locked && e.chapters && e.chapters.length > 0));
+    const chainIdx = (slug) => UNIFIED_CHAIN.findIndex((e) => e.slug === slug);
+    const prevChainEntry = (slug) => {
+      const i = chainIdx(slug);
+      return i > 0 ? UNIFIED_CHAIN[i - 1] : null;
+    };
+    const nextChainEntry = (slug) => {
+      const i = chainIdx(slug);
+      return i >= 0 && i < UNIFIED_CHAIN.length - 1 ? UNIFIED_CHAIN[i + 1] : null;
+    };
+    const goToChainEntryFirst = (slug) => () => {
+      if (slug === "matthew-study") {
+        setFromStudies(true);
+        setBookId("matthew");
+        setChapterNum(1);
+        setScreen("matthew-ch");
+        setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: 1 })));
+        return;
+      }
+      const s = getStudyById(slug);
+      if (!s || !s.chapters?.length) return;
+      selectStudyChapter(slug, s.chapters[0].id);
+    };
+    const goToChainEntryLast = (slug) => () => {
+      if (slug === "matthew-study") {
+        setFromStudies(true);
+        const lastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
+        setBookId("matthew");
+        setChapterNum(lastNum);
+        setScreen("matthew-ch");
+        setActiveReadKey("matthew", () => setLastReadChapters((prev) => ({ ...prev, matthew: lastNum })));
+        return;
+      }
+      const s = getStudyById(slug);
+      if (!s || !s.chapters?.length) return;
+      selectStudyChapter(slug, s.chapters[s.chapters.length - 1].id);
+    };
+    return {
+      getStudyById,
+      getStudyChapter,
+      studyReadKey,
+      selectStudy,
+      selectStudyChapter,
+      UNIFIED_CHAIN,
+      prevChainEntry,
+      nextChainEntry,
+      goToChainEntryFirst,
+      goToChainEntryLast
+    };
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -4427,10 +4533,10 @@
   function _allBooks2() {
     return window.__ALL_BOOKS || (typeof BOOKS !== "undefined" ? BOOKS : {});
   }
-  function _matthew() {
+  function _matthew2() {
     return typeof window !== "undefined" && window.MATTHEW || (typeof MATTHEW !== "undefined" ? MATTHEW : null);
   }
-  function _studies() {
+  function _studies2() {
     return typeof BIBLE_STUDIES !== "undefined" ? BIBLE_STUDIES : [];
   }
   function parseRefStr(str) {
@@ -4485,7 +4591,7 @@
       return v ? v.text : endpoint.preview || "";
     }
     if (endpoint.type === "study") {
-      const M = _matthew();
+      const M = _matthew2();
       if (!M) return endpoint.preview || "";
       const ch = M.chapters && M.chapters.find((c) => c.num === endpoint.chapter);
       if (!ch) return endpoint.preview || "";
@@ -4519,7 +4625,7 @@
       }
     }
     if (kindHint && kindHint !== "letter") return null;
-    var _bs = _studies();
+    var _bs = _studies2();
     if (_bs.length > 0) {
       for (const study of _bs) {
         if (!study || !Array.isArray(study.chapters)) continue;
@@ -7411,6 +7517,7 @@
     useNavHistoryTracking,
     useNav,
     useSearch,
+    useBibleStudies,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
@@ -7432,8 +7539,8 @@
     colLetterArr: colLetterArr2,
     LETTER_SCREEN_SET: LETTER_SCREEN_SET2,
     _allBooks: _allBooks2,
-    _matthew,
-    _studies,
+    _matthew: _matthew2,
+    _studies: _studies2,
     parseRefStr,
     findBook,
     parseScriptureRef,

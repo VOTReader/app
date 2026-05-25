@@ -104,15 +104,27 @@ export default defineConfig({
       // Branches jump biggest (+4.61) as expected. Gate floors advance:
       // statements 17→21, branches 13→18, functions 16→18, lines 17→22.
       //
+      // P7d baseline (+ use-bible-studies, 364 tests — Phase 1
+      // TDZ-blocker extraction, 5 of 12 concerns):
+      //   statements 23.63 (667/2822) | branches 19.95 (421/2110)
+      //   functions  21.59 (119/551)  | lines    24.06 (493/2049)
+      // useBibleStudies adds 10 helpers (lookups + selectStudy +
+      // selectStudyChapter + UNIFIED_CHAIN + prev/nextChainEntry +
+      // goToChainEntryFirst/Last). 33 new tests covering all branches
+      // including the matthew-study special-case in chain navigation.
+      // Functions ratchet biggest (+3.27) — each new exported helper
+      // adds a function. Gate floors advance: statements 21→23,
+      // branches 18→19, functions 18→21, lines 22→24.
+      //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
-        statements: 21,
-        branches: 18,
-        functions: 18,
-        lines: 22,
+        statements: 23,
+        branches: 19,
+        functions: 21,
+        lines: 24,
       },
     },
   },

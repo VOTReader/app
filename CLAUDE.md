@@ -11,11 +11,11 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 ## Current state (2026-05-24)
 
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
-- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). 2,120 lines after P7c — 18 hooks extracted (15 from P6 + useNavHistoryTracking from P7a + useNav from P7b + useSearch from P7c). App() is hook composition + render tree + nav-helper glue.
+- **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). 2,056 lines after P7d — 19 hooks extracted (15 from P6 + useNavHistoryTracking P7a + useNav P7b + useSearch P7c + useBibleStudies P7d). App() is hook composition + render tree + nav-helper glue.
 - **130+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
   - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)
-  - `bundle-b.js` 339 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 32 files)
+  - `bundle-b.js` 347 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 33 files)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
   - `bundle-d.js` 546 KB — screens + sheets + components + utils + late stores + App() itself (esbuild IIFE, 82 files)
 
@@ -65,12 +65,12 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 The 50/50 split means **hook extraction alone cannot hit <800.** The render tree by itself is 1,103 lines — that's the floor for any logic-only extraction. PLAN.txt §1 has the two-phase plan and Phase 2's risk profile (CSS selectors, layout shifts, ErrorBoundary placement — render decomposition needs visual smoke walks, not just vitest).
 
-**Phase 1 — logic extraction (active).** Goal: **zero inline concerns remaining in App()'s logic block.** Per [[concerns-not-lines]] / PLAN.txt §1, track concerns extracted (not lines removed) — hook extraction relocates code rather than deleting it, so call-site wiring eats most of the per-extraction line savings (P7a+P7b moved ~330 lines but App() only shrank 7). P7c was the outlier where the math worked in our favor: handleSearchSelect's 80-line dispatcher dominated the move, so App() did drop ~134 lines this time. PLAN.txt §1 has the full concerns checklist. Extracted so far: **4 of 12 concerns** (useHistory + useNavHistoryTracking + useNav + useSearch).
+**Phase 1 — logic extraction (active).** Goal: **zero inline concerns remaining in App()'s logic block.** Per [[concerns-not-lines]] / PLAN.txt §1, track concerns extracted (not lines removed) — hook extraction relocates code rather than deleting it, so call-site wiring eats most of the per-extraction line savings. PLAN.txt §1 has the full concerns checklist. Extracted so far: **5 of 12 concerns** (useHistory + useNavHistoryTracking + useNav + useSearch + useBibleStudies). The biggest structural debt — getStudyById/getStudyChapter forcing 3 downstream hooks to live below the Bible Studies block — is now cleared.
 - **P7a (LANDED 2026-05-24, `d89775f`)** — useNavHistoryTracking. 18-line useEffect → 115-line hook + 23 vitest tests. The 4-helper disable cite (most architecturally-debted post-Q3 disable in the file, with the extraction candidate named in its own text) moved with the effect. TDZ note: call site lives below `getStudyById`/`getStudyChapter`, mirroring P6l's useAndroidBack. Tests 218→241, branches gate bumped 11→13.
 - **P7b (LANDED 2026-05-24, `ee6339e`)** — useNav. 20 simple nav-chrome helpers extracted (4 simple switchers + 8 navOrigin-pattern + 2 journal-nav + 5 trivial switchers + goScriptureGenre). 8 duplicated `setNavOrigin({...})` literals dedupe to one private `_captureOrigin()`. 34 new vitest tests; tests 241→275; statements gate 14→17, functions 12→16, lines 15→17.
 - **P7c (LANDED 2026-05-24)** — useSearch. Full search domain extracted: 4 search tabFields (searchOrigin/searchScope/searchContext/searchQuery), searchOriginRef, srchVolLookup/SRCH_VOL_MAP/srchResolveLetterId helpers, goSearch (26-line context computation), goSearchOrigin, handleSearchSelect (80-line dispatcher), handleSearchCommand, window.__goSearch bridge effect. **Per the dissolution principle ([[dont-group-by-shape]]):** the search-domain handlers (handleSearchSelect, handleSearchCommand, srch*) landed in useSearch where they belong, NOT in a "useHandlers" junk drawer. App.jsx dropped 134 lines (largest single P7 extraction so far — handleSearchSelect alone was 80 lines). 56 new vitest tests covering all 14 handleSearchSelect branches + 7 handleSearchCommand actions + 4 goSearch context variants + the window.__goSearch identity-churn invariant. Tests 275→331; all 4 gates ratchet: statements 17→21, branches 13→18, functions 16→18, lines 17→22. TDZ note: useSearch's call site sits BETWEEN handleSurprise (above) and useAndroidBack (below) by necessity — handleSurprise is a useSearch param (cross-domain 'random' handoff) and useAndroidBack consumes goSearchOrigin from useSearch's return. Caught the wrong initial placement in smoke verification (TDZ ReferenceError); fix was a single move-block edit.
-- **Next (P7d)**: useBibleStudies. **PRIORITY: this is a TDZ-blocker.** Once getStudyById/getStudyChapter are hook exports (not const arrows), every downstream P7 extraction parallelizes — the call-site-ordering constraint that's already forced 3 hook calls below the Bible Studies block disappears. Same rationale as typing CachedStore before individual stores in Q4.
-- **Then**: useReadingChainNav (boundary nav + bible book prev/next), useMarkAsRead-helpers, useReadingPositionNav, useTapThrough, useJournalMutations, useSurprise (handler dissolution), useAppShellEffects.
+- **P7d (LANDED 2026-05-24)** — useBibleStudies. **The TDZ-blocker.** STUDIES + UNIFIED_CHAIN data + getStudyById/getStudyChapter/studyReadKey lookups + selectStudy (smart single-vs-multi router) + selectStudyChapter + prevChainEntry/nextChainEntry + goToChainEntryFirst/Last (with the matthew-study special-case for the Matthew Study Bible's bible-ch renderer). **Structural win:** call site moved HIGH UP (right after useNav), demonstrating that the TDZ blocker is gone — getStudyById/getStudyChapter are now hook returns instead of const arrows, so downstream hooks (useAndroidBack/useNavHistoryTracking/useSearch) are no longer forced to live below the Bible Studies block. (They haven't moved yet — that's a separate refactor; the freedom is the dividend that future extractions can spend.) 33 new vitest tests covering lookups + selectStudy's 3 routing branches (single/singlePage/multi) + UNIFIED_CHAIN composition (8 entries: 6 studies + Matthew, with locked/empty filtered) + chain prev/next boundaries + goToChainEntryFirst/Last for both Matthew + regular study branches. App() shrank 64 lines. Tests 331 → 364. Coverage ratchet: statements 21→23, branches 18→19, functions 18→21, lines 22→24. **Caught the `*/`-in-comment bug for the second time** (P7b had it too); captured as memory [[no-comment-terminator-in-text]] so the next session won't repeat.
+- **Next**: useReadingChainNav (boundary nav + bible book prev/next), useMarkAsRead-helpers, useReadingPositionNav, useTapThrough, useJournalMutations, useSurprise (handler dissolution), useAppShellEffects.
 
 **Phase 2 — render-tree decomposition (PENDING, after Phase 1):** target <800.
 - 29 substantive screen blocks total 867 lines; top 5 (garden-view 240, bible-study-chapter 87, matthew-ch 42, bible-ch 40, holy-days-index 37) hold ~447. 26 trivial 4-line letter/index wrappers (~104 lines) collapse via a ScreenRouter pattern.
@@ -118,7 +118,7 @@ D:/VOTReader-studio/
 │   │   ├── app.css                    # static CSS (no template literal)
 │   │   ├── dist/                      # 4 bundles, regenerated by npm run build
 │   │   └── src/
-│   │       ├── app.jsx                # function App() — 2,120 lines
+│   │       ├── app.jsx                # function App() — 2,056 lines
 │   │       ├── data/                  # scripture-resolution.js + 29 raw corpus files
 │   │       ├── stores/                # 11 stores + _entry-b.js
 │   │       ├── renderer/              # annotation-engine, dom-links, dom-bookmarks, dom-journal-chip + _entry.js
@@ -128,7 +128,7 @@ D:/VOTReader-studio/
 │   │       │   ├── sheets/            # 17 sheets/pickers
 │   │       │   └── _entry-d.js        # esbuild entry for bundle-d
 │   │       ├── utils/                 # 11 helper bundles
-│   │       ├── hooks/                 # 18 App() hooks (P6 + P7a + P7b + P7c)
+│   │       ├── hooks/                 # 19 App() hooks (P6 + P7a + P7b + P7c + P7d)
 │   │       ├── components/            # ExpandableText, ErrorBoundary
 │   │       └── styles/                # journal-styles
 │   └── java/com/votreader/sacredui/MainActivity.kt   # WebView shell + native bridges

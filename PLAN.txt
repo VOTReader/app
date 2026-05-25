@@ -38,9 +38,9 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q4 (JSDoc / tsc --checkJs)  ✅ DONE  — 37 files typed, CI gate zero-tolerance
   smoke-lite.js for CI        ✅ DONE  — Node CLI; globals + collections + cycles
   Q5 (Vitest)                 ✅ DONE  — 218 tests / 9 files; ratchet 1→14 stmts
-  App() decomposition (P7)    🚧 ACTIVE — P7a + P7b + P7c landed; 331 tests;
-                                          App() 2,261 → 2,120 lines;
-                                          4 of 12 concerns extracted
+  App() decomposition (P7)    🚧 ACTIVE — P7a+b+c+d landed; 364 tests;
+                                          App() 2,261 → 2,056 lines;
+                                          5 of 12 concerns extracted
   Q6 (CSS hardening)          ⬜ PENDING
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ POST-Q4 BACKLOG (priority order — top = next)
    Render-tree decomposition is required, in a separate phase with a
    distinct risk profile.
 
-   ── Phase 1: logic extraction (active; P7a + P7b + P7c landed) ──────
+   ── Phase 1: logic extraction (active; P7a+b+c+d landed) ────────────
    Goal: ZERO inline concerns left in App()'s logic block. Everything
    that remains is hook composition + render-tree-adjacent wiring.
 
@@ -107,6 +107,24 @@ POST-Q4 BACKLOG (priority order — top = next)
            23 vitest tests. Coverage ratchet held + bumped: branches
            11→13. Net App() shrink: 5 lines (architectural win is bigger
            — the most debt-laden disable cite moved out).
+
+     P7d — useBibleStudies (2026-05-24): the TDZ-blocker. STUDIES +
+           UNIFIED_CHAIN + getStudyById / getStudyChapter / studyReadKey /
+           selectStudy (smart single-vs-multi router) / selectStudyChapter /
+           chainIdx / prevChainEntry / nextChainEntry / goToChainEntryFirst /
+           goToChainEntryLast. Structural win: call site moved HIGH UP
+           (right after useNav), demonstrating the TDZ blocker is gone.
+           getStudyById / getStudyChapter are now hook RETURNS instead of
+           const arrows, freeing useAndroidBack / useNavHistoryTracking /
+           useSearch to move up at their convenience (deferred — separate
+           refactor). 33 new vitest tests covering lookups + selectStudy's
+           3 routing branches + UNIFIED_CHAIN composition (8 entries with
+           locked/empty filtered) + chain boundaries + goToChainEntry*
+           for both Matthew + regular study branches. App() shrank 64
+           lines. Tests 331 → 364. Coverage ratchet: stmts 21→23,
+           branches 18→19, fns 18→21, lines 22→24. The `*/`-in-comment
+           bug bit for the SECOND time during this extraction (P7b had it
+           too); captured as memory [[no-comment-terminator-in-text]].
 
      P7c — useSearch (2026-05-24): full search domain — 4 search
            tabFields (searchOrigin / searchScope / searchContext /
@@ -150,8 +168,9 @@ POST-Q4 BACKLOG (priority order — top = next)
 
    ## CONCERNS REMAINING IN App() (Phase 1 checklist, 9 left)
 
-   Extracted so far (4): useHistory (P6c) · useNavHistoryTracking (P7a)
-                        · useNav (P7b) · useSearch (P7c)
+   Extracted so far (5): useHistory (P6c) · useNavHistoryTracking (P7a)
+                        · useNav (P7b) · useSearch (P7c) ·
+                        useBibleStudies (P7d — TDZ-blocker cleared)
 
    Remaining (rough order, bottom-up by dependency):
 
