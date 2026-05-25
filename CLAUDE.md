@@ -38,11 +38,17 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **Bundle-b grew** 302→320 KB from JSDoc comments preserved in dev build (esbuild strips comments in minified prod build).
 - **Gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
 
-**Post-Q4 backlog** (PLAN.txt POST-Q3/Q4): useNavHistoryTracking extraction (app.jsx:814), useSyncExternalStore migration, smoke-lite.js for CI, bundle-a.js lazy-load, **App() decomposition** (unblocks typing the ui/ tree).
+### Post-Q4 — smoke-lite landed; Q5 vitest is NEXT
+
+**Pinned sequence** (PLAN.txt + memory [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest → App() decomposition. App() decomp comes AFTER tests, not before — without coverage on the hooks/stores App() composes, decomposition is a leap of faith.
+
+- **smoke-lite DONE** (`102b883`): `tools/smoke-lite.js` exports `runSmokeChecks() → { issues, ok }` plus 3 per-check functions individually (so Q5 vitest can import + extend). Three checks: globals-mirror (regen + git-diff), COLLECTIONS → data-file linkage, module-graph cycle detection. CI step lives between typecheck and build; npm script `npm run smoke-lite` is the local invocation. Negative test verified: caught a deliberately-broken globalName reference with exit 1.
+- **Q5 vitest NEXT**: targets the typed Q4 surfaces (11 stores + 15 hooks + utils). First targets: useRefMirror (trivial smoke), useSavedState + _validateTabState (edge cases), CachedStore + annotation-store (validates the extendStore pattern), JournalIndexStore.rebuildForEntry (cascade logic). Vitest will `import { runSmokeChecks } from '../tools/smoke-lite.js'` for the shared structural checks.
+- **Post-Q5 backlog**: App() decomposition (includes useNavHistoryTracking extraction at app.jsx:814), useSyncExternalStore migration (eliminates Bin 4 hlTick cites — needs tests first per the principle), bundle-a.js lazy-load (post-Q6 UX win).
 
 ### Roadmap
 
-**`PLAN.txt`** (repo root) is the strategic working memory — slim, post-Q3 pruned. HISTORY.md has the landed-work chapter. CLAUDE.md is the 30-second briefing. Q4 sequencing + post-Q4 backlog (smoke-lite, useNavHistoryTracking, useSyncExternalStore migration, bundle-a.js lazy-load, App() decomposition) lives in PLAN.txt.
+**`PLAN.txt`** (repo root) is the strategic working memory — slim, current-state. HISTORY.md has the landed-work chapter. CLAUDE.md is the 30-second briefing.
 
 ---
 
