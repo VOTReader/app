@@ -38,22 +38,27 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **Bundle-b grew** 302→320 KB from JSDoc comments preserved in dev build (esbuild strips comments in minified prod build).
 - **Gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
 
-### Post-Q4 — Q5 in progress (Q5.1/Q5.2/Q5.3 ✅, App() decomposition next)
+### Post-Q4 — Q5 safety-net phase CLOSED, App() decomposition NEXT
 
-**Pinned sequence** (PLAN.txt + memory [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest ✅ (3 tests landed) → App() decomposition.
+**Pinned sequence** (PLAN.txt + [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest ✅ → **App() decomposition (next)**.
 
-- **smoke-lite** (`102b883`): `tools/smoke-lite.js`. Three structural checks (globals mirror, COLLECTIONS linkage, module-graph cycles); zero-tolerance CI gate.
-- **Q5.1 infrastructure** (`742f657`): vitest ^4 + jsdom + react/react-dom ^19 + @testing-library/react ^16. `vitest.config.js` + `vitest.setup.js` (globalThis.React + 19 window.__* stubs mechanically extracted). Harness smoke test on `useRefMirror`. CI step + pre-commit Step 4.
-- **Q5.2 _validateTabState** (`a69b739`): table-driven 86-test suite covering all 13 screen-coercion rules + 21 pass-throughs + 3 mutation-contract tests. Coverage gate LOCKED at baseline per [[lint-regression-gate]].
-- **Q5.3 hlTick cache-bust regression** (`ee073f9`): empirically validates the **24 Bin 4 suppresses are real** per [[test-the-suppresses]]. Test B asserts that without hlTick in deps, consumers see STALE store data after mutation. The 24 cites guard real refresh behavior.
-- **Q5.4 LinkStore migration** (`a5fce71`): 17 tests covering the legacy `{a,b}` → `{source,target}` migration's silent data-loss risk. Field-for-field endpoint preservation, half-migrated healing, malformed dropping, mixed-batch handling, idempotent re-load.
-- **Q5.5 JournalIndexStore cascade** (`02eca54`): 25 tests for the prune-one-too-many silent corruption — when entry A's rebuild fires, entry B's shared-refKey references must survive. Covered: rebuildForEntry, removeEntry, refsForEntry reverse lookup, multi-entry crosstalk.
-- **Q5.6 useSavedState round-trip** (`f3a56c4`): 11 added tests — field preservation when screen coerces (silent write-loss guard), per-tab `_validateTabState` independence, useSavedState hook covering empty/malformed/non-array fallbacks + useMemo identity.
-- **Current test totals:** **143 tests** across 5 files; 7 of 37 Q4-scope files have direct or transitive coverage. Coverage gate ratchet at every commit: statements 1→7, branches 2→7, functions 0.4→6, lines 0.9→6.
-- **Q5 remaining backlog:** more hook tests (useHistory, useReadingDwell, useFromLetterStack), more store tests (NoteStore + cascade, NotebookStore + JournalStore cascade pair), more util tests (scripture-parse parseRefRange edge cases, hl-keys). Ratchet thresholds with each commit.
-- **Post-Q5 backlog**: App() decomposition (after Q5 lands enough coverage on hooks+stores), useSyncExternalStore migration, bundle-a.js lazy-load.
+**Q5 safety-net phase totals (2026-05-24):**
+- **218 tests across 9 files**; 9 of 37 Q4-scope files have direct coverage.
+- Coverage ratchet over the phase: statements **1→14**, branches **2→11**, functions **0.4→12**, lines **0.9→15**.
+- **Pre-commit gates** (run on src changes, ~5-6s): check_balance → lint-staged → typecheck → vitest → build. CI adds smoke-lite + the gated `test:coverage` variant.
 
-**Pre-commit gates run 5 steps** on src changes: check_balance → lint-staged → typecheck → vitest → build. Total ~5-6s. CI runs the same + smoke-lite + the gated `test:coverage` variant (zero-tolerance on thresholds).
+**Q5 commit chain:**
+- Infrastructure: smoke-lite (`102b883`), Q5.1 (`742f657`).
+- First real test + gate lock: Q5.2 _validateTabState (`a69b739`, 86 tests, 13-rule coverage table).
+- Suppress validation: Q5.3 hlTick cache-bust (`ee073f9`) — empirically proved the 24 Bin 4 suppresses guard real refresh behavior (test B asserts stale reads without hlTick in deps).
+- Silent-corruption guards: Q5.4 LinkStore migration (`a5fce71`), Q5.5 JournalIndexStore cascade (`02eca54`), Q5.6 useSavedState round-trip (`f3a56c4`), Q5.7 NoteStore cascade (`a3466c1`), Q5.8 useHistory gate (`a9e43c2`), Q5.9 scripture-parse (`41b19ba`).
+
+**Plateau signal recognized** ([[tests-diminishing-returns]]): pre-scripture-parse deltas were +1 per commit on average; the remaining un-tested Q4 surfaces (small utility helpers like book-category, hl-keys, search, tabs, dates, garden) are lower-leverage than App() decomposition. **The safety net is built; time to use it.**
+
+**Next phase — App() decomposition:**
+App.jsx is 2,191 lines. Test coverage exists on the hooks + stores it composes. Each extraction follows the P6 workflow (smoke gate, OWNS/PARAMS/RETURNS header, line-count tracking), but now with vitest coverage validating the extracted hook contracts. The first candidate is `useNavHistoryTracking` (app.jsx:814; use-history.js header documents the deferral). Target: App() under 800 lines.
+
+**Post-decomp backlog:** useSyncExternalStore migration (eliminates 24 Bin 4 cites — has test coverage now per Q5.3), bundle-a.js lazy-load (post-Q6 UX), Q6 CSS hardening.
 
 ### Roadmap
 
