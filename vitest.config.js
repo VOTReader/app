@@ -46,9 +46,11 @@ export default defineConfig({
       //
       // Q5.2 baseline (use-ref-mirror + use-saved-state, 86 tests):
       //   statements 1.2 | branches 2.69 | functions 0.41 | lines 0.92
-      // Q5.3 baseline (+ annotation-store, 90 tests, 4 files covered):
-      //   statements 2.32 (58/2491) | branches 3.32 (63/1894)
-      //   functions  1.85 (9/484)   | lines    2.18 (40/1828)
+      // Q5.3 baseline (+ annotation-store, 90 tests):
+      //   statements 2.32 | branches 3.32 | functions 1.85 | lines 2.18
+      // Q5.4 baseline (+ link-store, 107 tests):
+      //   statements 4.13 (103/2491) | branches 5.43 (103/1894)
+      //   functions  3.92 (19/484)   | lines    3.82 (70/1828)
       //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
@@ -58,10 +60,10 @@ export default defineConfig({
       // whether a test was removed, a file was added without coverage, or
       // the previous threshold was set wrong.
       thresholds: {
-        statements: 2,
-        branches: 3,
-        functions: 1,
-        lines: 2,
+        statements: 4,
+        branches: 5,
+        functions: 3,
+        lines: 3,
       },
     },
   },
