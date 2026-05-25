@@ -57,21 +57,29 @@ export default defineConfig({
       // Q5.7 baseline (+ note-store, 166 tests):
       //   statements 8.71 | branches 8.71 | functions 8.88 | lines 8.75
       // Q5.8 baseline (+ use-history, 184 tests):
-      //   statements 9.99 (249/2491) | branches 9.34 (177/1894)
-      //   functions  10.33 (50/484)  | lines    10.33 (189/1828)
+      //   statements 9.99 | branches 9.34 | functions 10.33 | lines 10.33
+      // Q5.9 baseline (+ scripture-parse, 218 tests):
+      //   statements 14.01 (349/2491) | branches 11.82 (224/1894)
+      //   functions  12.19 (59/484)   | lines    15.09 (276/1828)
+      //
+      // The disproportionate jump (statements +4, lines +5) reflects
+      // scripture-parse's dense regex branching — splitIntoVerses's
+      // multi-strategy chain exercises many code paths per test. NOT
+      // a signal that more tests would produce similar jumps; per
+      // [[tests-diminishing-returns]], the silent-corruption surfaces
+      // (stores, validators, store-mutation hooks) are now covered.
+      // Next phase should be App() decomposition, not chasing the
+      // remaining utility edge cases.
       //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
-      // A failure here means "this commit reduced coverage" — investigate
-      // whether a test was removed, a file was added without coverage, or
-      // the previous threshold was set wrong.
       thresholds: {
-        statements: 9,
-        branches: 9,
-        functions: 10,
-        lines: 10,
+        statements: 14,
+        branches: 11,
+        functions: 12,
+        lines: 15,
       },
     },
   },
