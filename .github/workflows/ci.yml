@@ -52,9 +52,17 @@ jobs:
       - name: Typecheck (tsc --noEmit, Q4 scope)
         # `npm run typecheck` runs `tsc --noEmit` against tsconfig.json's
         # narrowed scope (utils + stores + hooks). Zero-tolerance from
-        # day one — any type error fails CI. Q4.2/Q4.3/Q4.4 will lift
-        # @ts-nocheck placeholders as each file gets proper JSDoc.
+        # day one — any type error fails CI.
         run: npm run typecheck
+
+      - name: Smoke-lite (Node-runnable structural checks)
+        # `node tools/smoke-lite.js` — the bridge between "smoke runs
+        # in a browser" and "CI catches data/module regressions." Three
+        # checks: globals mirror (gen-eslint-globals diff-check),
+        # COLLECTIONS → data-file linkage, module-graph cycle detection.
+        # Bundle build still has to land before this step? No — smoke-lite
+        # is pure source-tree analysis, runs independently of bundles.
+        run: npm run smoke-lite
 
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build

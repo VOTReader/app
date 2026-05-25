@@ -13,7 +13,8 @@
     "jsx-progress": "python tools/jsx-progress.py",
     "lint:globals": "python tools/gen-eslint-globals.py",
     "lint": "npm run lint:globals && eslint app/src/main/assets/src",
-    "lint:fix": "npm run lint:globals && eslint app/src/main/assets/src --fix"
+    "lint:fix": "npm run lint:globals && eslint app/src/main/assets/src --fix",
+    "smoke-lite": "node tools/smoke-lite.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
