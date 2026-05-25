@@ -44,9 +44,11 @@ export default defineConfig({
       // honest number — and locking at exactly here means every new commit
       // either maintains or ratchets UPWARD. Never lower these.
       //
-      // Q5.2 baseline (use-ref-mirror + use-saved-state, 86 tests, 37 Q4 files):
-      //   statements 1.2 (30/2491) | branches 2.69 (51/1894)
-      //   functions  0.41 (2/484)  | lines    0.92 (17/1828)
+      // Q5.2 baseline (use-ref-mirror + use-saved-state, 86 tests):
+      //   statements 1.2 | branches 2.69 | functions 0.41 | lines 0.92
+      // Q5.3 baseline (+ annotation-store, 90 tests, 4 files covered):
+      //   statements 2.32 (58/2491) | branches 3.32 (63/1894)
+      //   functions  1.85 (9/484)   | lines    2.18 (40/1828)
       //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
@@ -56,10 +58,10 @@ export default defineConfig({
       // whether a test was removed, a file was added without coverage, or
       // the previous threshold was set wrong.
       thresholds: {
-        statements: 1,
-        branches: 2,
-        functions: 0.4,
-        lines: 0.9,
+        statements: 2,
+        branches: 3,
+        functions: 1,
+        lines: 2,
       },
     },
   },
