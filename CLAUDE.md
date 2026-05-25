@@ -38,17 +38,19 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **Bundle-b grew** 302→320 KB from JSDoc comments preserved in dev build (esbuild strips comments in minified prod build).
 - **Gates live:** `npm run typecheck` runs in CI between lint and build AND in pre-commit Step 3. Zero-tolerance from day one (per [[lint-regression-gate]]); any type error fails the commit.
 
-### Post-Q4 — smoke-lite ✅, Q5.1 ✅, Q5.2 NEXT (_validateTabState first real test)
+### Post-Q4 — Q5 in progress (Q5.1/Q5.2/Q5.3 ✅, App() decomposition next)
 
-**Pinned sequence** (PLAN.txt + memory [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest → App() decomposition. App() decomp comes AFTER tests, not before.
+**Pinned sequence** (PLAN.txt + memory [[refactor-after-tests]]): smoke-lite ✅ → Q5 vitest ✅ (3 tests landed) → App() decomposition.
 
 - **smoke-lite** (`102b883`): `tools/smoke-lite.js`. Three structural checks (globals mirror, COLLECTIONS linkage, module-graph cycles); zero-tolerance CI gate.
-- **Q5.1 vitest infrastructure** (`742f657`): vitest ^4 + jsdom ^29 + react/react-dom ^19 + @testing-library/react ^16. `vitest.config.js` (jsdom env) + `vitest.setup.js` (globalThis.React + 19 window.__* stubs mechanically extracted from hooks). One harness smoke test (`use-ref-mirror.test.js`) — 2 assertions, 2.27s. CI step between smoke-lite and build; pre-commit Step 4 on src_changed. Test infrastructure proven end-to-end before real coverage starts.
-- **Q5.2 NEXT — _validateTabState first real test:** 13-rule screen-coercion table; pure function, zero deps. Test per rule. Lock initial coverage gate in same commit (per [[lint-regression-gate]]).
-- **Q5.3 hlTick regression test** (after Q5.2): validates the 24 Bin 4 cache-bust suppresses are real (per [[test-the-suppresses]]) — if test shows stale reads with hlTick omitted from deps, those suppresses hide a real bug.
-- **Post-Q5 backlog**: App() decomposition (includes useNavHistoryTracking extraction), useSyncExternalStore migration (needs tests first), bundle-a.js lazy-load.
+- **Q5.1 infrastructure** (`742f657`): vitest ^4 + jsdom + react/react-dom ^19 + @testing-library/react ^16. `vitest.config.js` + `vitest.setup.js` (globalThis.React + 19 window.__* stubs mechanically extracted). Harness smoke test on `useRefMirror`. CI step + pre-commit Step 4.
+- **Q5.2 _validateTabState** (`a69b739`): table-driven 86-test suite covering all 13 screen-coercion rules + 21 pass-throughs + 3 mutation-contract tests. Coverage gate LOCKED at baseline per [[lint-regression-gate]].
+- **Q5.3 hlTick cache-bust regression** (`ee073f9`): empirically validates the **24 Bin 4 suppresses are real** per [[test-the-suppresses]]. Test B asserts that without hlTick in deps, consumers see STALE store data after mutation. The suppress category is honest; the 24 cites guard real refresh behavior. Coverage gate ratcheted upward in same commit (statements 1→2, branches 2→3, functions 0.4→1, lines 0.9→2).
+- **Current test totals:** 90 tests across 3 files; 4 of 37 Q4-scope files now have direct coverage.
+- **Q5 remaining backlog:** more hook tests (useSavedState read path, useHistory, useReadingDwell), more store tests (LinkStore migration, JournalIndexStore cascade), more util tests (scripture-parse, hl-keys). Ratchet thresholds with each commit.
+- **Post-Q5 backlog**: App() decomposition (after Q5 lands enough coverage on hooks+stores), useSyncExternalStore migration, bundle-a.js lazy-load.
 
-**Pre-commit gates now run 5 steps** on src changes: check_balance → lint-staged → typecheck → vitest → build. Total ~5-6s on src-touching commits.
+**Pre-commit gates run 5 steps** on src changes: check_balance → lint-staged → typecheck → vitest → build. Total ~5-6s. CI runs the same + smoke-lite + the gated `test:coverage` variant (zero-tolerance on thresholds).
 
 ### Roadmap
 
