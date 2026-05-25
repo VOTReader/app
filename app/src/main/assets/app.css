@@ -1059,10 +1059,7 @@
     /* SacredUI hero — pull the brand mark up toward the top of the viewport
        and give the three section tiles more breathing room */
     .home-screen-app { justify-content:flex-start; padding-top:1.6rem; }
-    .home-screen-app .home-app-name { margin-bottom:0.45rem; padding-top:0; }
     .home-screen-app .home-sub { margin-bottom:2rem; }
-    .home-screen-app .home-cards { gap:1.6rem; }
-    .home-app-name { font-family:'Cinzel Decorative',serif; font-size:1.05rem; letter-spacing:0.32em; text-transform:uppercase; color:var(--gold-bright); text-align:center; margin-bottom:1.6rem; padding-top:0.5rem; }
     .home-eyebrow { font-family:'Cinzel',serif; font-size:0.72rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.75rem; }
     .home-title { font-family:'Cinzel Decorative',serif; font-size:2rem; color:var(--cream); text-align:center; margin-bottom:0.4rem; line-height:1.2; }
     .home-sub { font-size:1.05rem; color:var(--cream-muted); text-align:center; font-style:italic; margin-bottom:2rem; }
@@ -1097,20 +1094,6 @@
     .home-ornament-line { flex:1; height:1px; background:linear-gradient(to right,transparent,var(--gold-border),transparent); }
     .home-ornament-line.r { background:linear-gradient(to left,transparent,var(--gold-border),transparent); }
     .home-ornament-diamond { width:8px; height:8px; background:var(--gold-dim); transform:rotate(45deg); flex-shrink:0; }
-    .home-section { width:100%; max-width:520px; margin-bottom:2rem; }
-    .home-section-label { font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
-    .home-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
-    .home-cards { display:flex; flex-direction:column; gap:0.75rem; }
-    .home-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; padding:1.2rem 1.5rem; cursor:pointer; text-align:left; transition:all var(--transition); }
-    @media (hover: hover) { .home-card:hover { border-color:var(--gold); background:var(--gold-faint); } }
-    .home-card.featured { border-color:rgba(200,164,86,0.4); background:linear-gradient(135deg,var(--bg2) 0%,rgba(200,164,86,0.04) 100%); }
-    .home-card-eyebrow { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.3rem; }
-    .home-card-title { font-family:'Cinzel',serif; font-size:1.2rem; color:var(--gold); margin-bottom:0.15rem; letter-spacing:0.05em; }
-    .home-card-sub { font-size:0.92rem; color:var(--cream-muted); font-style:italic; margin-bottom:0.5rem; }
-    .home-card-detail { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
-    .home-card-badge { display:inline-block; margin-top:0.4rem; font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); background:rgba(200,164,86,0.12); border:1px solid rgba(200,164,86,0.3); border-radius:3px; padding:0.12rem 0.45rem; }
-    .home-card.locked { opacity:0.38; pointer-events:none; }
-    .home-coming-soon { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); opacity:0.5; padding:0.6rem 0; }
 
     /* ── HOME SCREEN — AMBIENT MINIMAL ── */
     .home-screen-app {
@@ -1392,9 +1375,6 @@
     .genre-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; padding:1.5rem 1.5rem 3rem; }
     .genre-screen .home-ornament { margin-bottom:1.5rem; }
     /* Larger book cards for small groups */
-    .home-card.genre-book-lg { padding:1.6rem 1.5rem; }
-    .home-card.genre-book-lg .home-card-title { font-size:1.4rem; margin-bottom:0.25rem; }
-    .home-card.genre-book-lg .home-card-detail { font-size:0.65rem; }
       /* Floating Surprise Me FAB (bottom-right) — intensity/interval synced with .reading-dot-global */
       @keyframes surprise-breathe {
         0%, 100% { transform:scale(1);    opacity:0.7; filter:drop-shadow(0 0 2px rgba(200,164,86,0.25)); }
