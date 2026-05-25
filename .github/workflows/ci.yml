@@ -62,13 +62,14 @@ jobs:
         # COLLECTIONS → data-file linkage, module-graph cycle detection.
         run: npm run smoke-lite
 
-      - name: Test (vitest run, Q5 — typed hooks/stores/utils)
-        # `npm run test` runs vitest once (no watch). jsdom environment;
-        # the setup file (vitest.setup.js) provides React-as-global and
-        # stubs every window.__* runtime bridge so hooks don't throw
-        # on first bridge access. Zero-tolerance: any failing test
-        # fails CI.
-        run: npm run test
+      - name: Test (vitest run --coverage, Q5 — typed hooks/stores/utils)
+        # `npm run test:coverage` runs vitest with v8 coverage + the
+        # coverage thresholds in vitest.config.js. Zero-tolerance: any
+        # failing test OR any coverage % below the locked baseline fails
+        # CI. Thresholds ratchet UPWARD only — see vitest.config.js
+        # comments for the rule. Pre-commit uses the no-coverage `test`
+        # script to keep the commit prompt fast (~2s vs ~3s with coverage).
+        run: npm run test:coverage
 
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build
