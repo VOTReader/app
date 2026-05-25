@@ -869,6 +869,365 @@ function App() {
     'wtlb-one-entry':     () => wtlb1Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', wtlb1Entry)}   entry={wtlb1Entry}   partLabel="Part One" onNavToChapter={_navToChapter} />,
     'wtlb-two-entry':     () => wtlb2Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', wtlb2Entry)}   entry={wtlb2Entry}   partLabel="Part Two" onNavToChapter={_navToChapter} />,
     'blessed-entry':      () => blessedEntry   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', blessedEntry)} entry={blessedEntry} partLabel="The Blessed" onNavToChapter={_navToChapter} />,
+
+    // ── AppShell / settings / search / home / library (P8b — 20 medium
+    //    prop-threading screens folded in; same pattern as P8a). ──
+    'settings': () => (
+      <SettingsScreen
+        settings={settings}
+        onToggle={toggleSetting}
+        onSetting={updateSetting}
+        onBack={goNavOrigin}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        readItems={readItems}
+        onClearBook={clearReadForBook}
+        onClearAll={clearAllProgress}
+        onClearHistory={clearHistory}
+        historyCount={readHistory.length}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'search': () => (
+      <SearchScreen
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        settings={settings}
+        onSettingsChange={(key, val) => setSettings((prev) => ({ ...prev, [key]: val }))}
+        onSelect={handleSearchSelect}
+        onCommand={handleSearchCommand}
+        onBack={goSearchOrigin}
+        searchScope={searchScope}
+        searchContext={searchContext}
+        onToggleScope={() => setSearchScope((prev) => prev ? null : searchContext)}
+      />
+    ),
+    'home': () => (
+      <HomeScreen
+        onSelect={handleSelect}
+        onSurprise={handleSurprise}
+        showSurprise={settings.showSurpriseButton}
+        onSettings={goSettings}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        historyEnabled={settings.historyEnabled !== false}
+        onInfo={() => setShowWelcome(true)}
+        onAbout={goAbout}
+        history={readHistory}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'about': () => (
+      <AboutScreen
+        onContinue={() => {
+          try { localStorage.setItem('vot-about-seen', '1'); } catch (_e) { /* localStorage access — non-fatal */ }
+          goNavOrigin();
+        }}
+        onBack={() => {
+          try { localStorage.setItem('vot-about-seen', '1'); } catch (_e) { /* localStorage access — non-fatal */ }
+          goNavOrigin();
+        }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'history': () => (
+      <HistoryScreen
+        history={readHistory}
+        onBack={goNavOrigin}
+        onSelect={(entry) => {
+          if (entry.type === 'study-chapter') {
+            const study = getStudyById(entry.studyId);
+            if (!study) return;
+            setStudyId(entry.studyId);
+            setStudyChapterId(entry.studyChapterId);
+            setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
+            setScreen('bible-study-chapter');
+          } else if (entry.type === 'letter') {
+            setLetterId(entry.letterId);
+            var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get('one') : COL_BY_KEY.get('two'));
+            setActiveReadKey('vol:' + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
+            setScreen(_hc.letterScreen);
+          } else {
+            setBookId(entry.bookId);setChapterNum(entry.chapterNum);
+            setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
+            setScreen(entry.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
+          }
+        }}
+        onSearch={goSearch}
+        onSettings={goSettings}
+        onHistory={goHistory}
+        onPruneDay={pruneHistoryDay}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'library': () => (
+      <LibraryScreen
+        onBack={goHome}
+        onOpenNotes={goNotesIndex}
+        onOpenLinks={goLinksIndex}
+        onOpenBookmarks={goBookmarksIndex}
+        onOpenJournal={goJournalHub}
+        onOpenHighlights={goHighlightsIndex}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        historyEnabled={settings.historyEnabled !== false}
+        hlTick={hlTick}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'highlights-index': () => typeof HighlightsScreen !== 'undefined' && (
+      <HighlightsScreen
+        onSettings={goSettings}
+        onBack={() => setScreen('library')}
+        onHome={goHome}
+        onNavigateToSource={(endpoint, meta) => {
+          if (endpoint) {
+            setNavOrigin({ screen: 'highlights-index' });
+            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Highlights' });
+          }
+        }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        historyEnabled={settings.historyEnabled !== false}
+        hlTick={hlTick} setHlTick={setHlTick}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'journal-home': () => typeof JournalHubScreen !== 'undefined' && (
+      <JournalHubScreen
+        onSettings={goSettings}
+        onBack={() => setScreen('library')}
+        onHome={goHome}
+        onOpenEntry={(eid) => goJournalViewer(eid)}
+        onEditEntry={(eid) => goJournalEditor(eid)}
+        onCreateEntry={createAndEditJournal}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        historyEnabled={settings.historyEnabled !== false}
+        hlTick={hlTick} setHlTick={setHlTick}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'journal-viewer': () => typeof JournalViewerScreen !== 'undefined' && (
+      <JournalViewerScreen
+        onSettings={goSettings}
+        entryId={journalEntryId}
+        onBack={() => setScreen('journal-home')}
+        onHome={goHome}
+        onEdit={() => setScreen('journal-editor')}
+        onNavigateToLink={(endpoint, meta) => {
+          if (endpoint) {
+            setNavOrigin({ screen: 'journal-viewer' });
+            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Journal' });
+          }
+        }}
+        onOpenJournalEntry={(eid) => goJournalViewer(eid)}
+        onOpenNotebook={(nbId) => {
+          // Drop the user straight into that notebook's screen in the Notes
+          // hub. __notesReturnCtx is consumed by NotesIndexScreen on mount
+          // to pre-drill the right notebook (same channel the back-pill uses).
+          window.__notesReturnCtx = { tab: 'notebooks', drilledNbId: nbId };
+          setNavOrigin({ screen: 'journal-viewer' });
+          setScreen('notes-index');
+        }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        historyEnabled={settings.historyEnabled !== false}
+        hlTick={hlTick} setHlTick={setHlTick}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'journal-editor': () => typeof JournalEditorScreen !== 'undefined' && (
+      <JournalEditorScreen
+        onSettings={goSettings}
+        entryId={journalEntryId}
+        onBack={() => goJournalViewer(journalEntryId)}
+        onHome={goHome}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        historyEnabled={settings.historyEnabled !== false}
+        hlTick={hlTick} setHlTick={setHlTick}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'notes-index': () => (
+      <NotesIndexScreen
+        onSettings={goSettings}
+        onBack={() => setScreen('library')}
+        onHome={goHome}
+        onOpenNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false })}
+        onNavigateToSource={(endpoint, meta) => {
+          if (endpoint) {
+            setNavOrigin({ screen: 'notes-index' });
+            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Notes' });
+          }
+        }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        historyEnabled={settings.historyEnabled !== false}
+        hlTick={hlTick} setHlTick={setHlTick}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'links-index': () => (
+      <LinksScreen
+        onSettings={goSettings}
+        onBack={() => setScreen('library')}
+        onHome={goHome}
+        onNavigateToSource={(endpoint, meta) => {
+          if (endpoint) {
+            setNavOrigin({ screen: 'links-index' });
+            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
+          }
+        }}
+        onNavigateToTarget={(endpoint, meta) => {
+          if (endpoint) {
+            setNavOrigin({ screen: 'links-index' });
+            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
+          }
+        }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        historyEnabled={settings.historyEnabled !== false}
+        hlTick={hlTick} setHlTick={setHlTick}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'bookmarks-index': () => (
+      <BookmarksScreen
+        onSettings={goSettings}
+        onBack={() => setScreen('library')}
+        onHome={goHome}
+        onNavigateToSource={(endpoint, meta) => {
+          if (endpoint) {
+            setNavOrigin({ screen: 'bookmarks-index' });
+            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Bookmarks' });
+          }
+        }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        historyEnabled={settings.historyEnabled !== false}
+        hlTick={hlTick} setHlTick={setHlTick}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'scriptures-home': () => (
+      <ScripturesHome
+        onSelect={handleScriptureSelect}
+        onGenre={goScriptureGenre}
+        onBack={goHome}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        onMatthewStudy={() => { setBookId('matthew'); setChapterNum(null); setScreen('matthew-idx'); }}
+        theme={theme} onThemeChange={setTheme}
+        layout={settings.scriptureLayout}
+      />
+    ),
+    'scripture-genre': () => genreId && (
+      <ScriptureGenre
+        genreId={genreId}
+        onSelect={handleScriptureSelect}
+        onBack={goScripturesHome}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'volumes-home': () => (
+      <VolumesHome
+        onSelect={handleVolumeSelect}
+        onBack={goHome}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'matthew-idx': () => (
+      <ChapterIndex
+        book={MATTHEW}
+        onSelect={selectMatthewCh}
+        onBack={() => { if (fromStudies) { setFromStudies(false); goStudiesHome(); } else { goHome(); } }}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        currentChapter={settings.showReadingDot && activeReadKey === 'matthew' ? lastReadChapters['matthew'] || null : null}
+        isRead={(num) => isRead('matthew', num)}
+        markAsReadEnabled={settings.markAsRead}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'studies-home': () => (
+      <StudiesHome
+        studies={UNIFIED_CHAIN}
+        studiesLoading={studiesLoading}
+        onSelectStudy={(slug) => {
+          if (slug === 'matthew-study') {
+            setFromStudies(true);
+            setBookId('matthew'); setChapterNum(null); setScreen('matthew-idx');
+          } else {
+            selectStudy(slug);
+          }
+        }}
+        onBack={goHome}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'bible-idx': () => book && (
+      <ChapterIndex
+        book={book}
+        onSelect={selectBibleCh}
+        onBack={genreId ? () => setScreen('scripture-genre') : goScripturesHome}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        currentChapter={settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null}
+        isRead={(num) => isRead(bookId, num)}
+        markAsReadEnabled={settings.markAsRead}
+        restoredNames={settings.restoredNames}
+        showChapterTitle={settings.showChapterTitle !== false}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'bible-ch': () => book && chapter && (
+      <BibleChapterView
+        book={book} chapter={chapter}
+        onIndex={book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
+        onNavigate={(num) => { setSurpriseAnchor(null); selectBibleCh(num); }}
+        onMarkRead={() => markRead(bookId, chapterNum)}
+        markAsReadEnabled={settings.markAsRead}
+        showProgressBar={settings.showProgressBar}
+        translation={settings.translation}
+        restoredNames={settings.restoredNames}
+        showChapterTitle={settings.showChapterTitle !== false}
+        showSectionHeadings={settings.showSectionHeadings !== false}
+        titleFocusHidden={titleFocusHidden}
+        setTitleFocusHidden={setTitleFocusHidden}
+        headingsFocusHidden={headingsFocusHidden}
+        setHeadingsFocusHidden={setHeadingsFocusHidden}
+        prevBook={bcvPrevBook}
+        nextBook={bcvNextBook}
+        onPrevBook={bcvOnPrevBook}
+        onNextBook={bcvOnNextBook}
+        prevBoundaryTitle={bcvPrevBoundaryTitle}
+        nextBoundaryTitle={bcvNextBoundaryTitle}
+        onSearch={goSearch}
+        onSettings={goSettings}
+        onHistory={goHistory}
+        theme={theme} onThemeChange={setTheme}
+        surpriseAnchor={surpriseAnchor}
+        backHint={backHint} onTapThroughBack={tapThroughBack}
+        hlTick={hlTick} onLinkOpen={openLinkSidebar}
+      />
+    ),
   };
 
   return (
@@ -987,315 +1346,6 @@ function App() {
         </div>
       )}
 
-      {screen === "settings" && (
-        <SettingsScreen
-          settings={settings}
-          onToggle={toggleSetting}
-          onSetting={updateSetting}
-          onBack={goNavOrigin}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          readItems={readItems}
-          onClearBook={clearReadForBook}
-          onClearAll={clearAllProgress}
-          onClearHistory={clearHistory}
-          historyCount={readHistory.length}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "search" && (
-        <SearchScreen
-          query={searchQuery}
-          onQueryChange={setSearchQuery}
-          settings={settings}
-          onSettingsChange={(key, val) => setSettings((prev) => ({ ...prev, [key]: val }))}
-          onSelect={handleSearchSelect}
-          onCommand={handleSearchCommand}
-          onBack={goSearchOrigin}
-          searchScope={searchScope}
-          searchContext={searchContext}
-          onToggleScope={() => setSearchScope((prev) => prev ? null : searchContext)}
-        />
-      )}
-
-      {screen === "home" && (
-        <HomeScreen
-          onSelect={handleSelect}
-          onSurprise={handleSurprise}
-          showSurprise={settings.showSurpriseButton}
-          onSettings={goSettings}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          historyEnabled={settings.historyEnabled !== false}
-          onInfo={() => setShowWelcome(true)}
-          onAbout={goAbout}
-          history={readHistory}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "about" && (
-        <AboutScreen
-          onContinue={() => {
-            try { localStorage.setItem('vot-about-seen', '1'); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
-            goNavOrigin();
-          }}
-          onBack={() => {
-            try { localStorage.setItem('vot-about-seen', '1'); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
-            goNavOrigin();
-          }}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "history" && (
-        <HistoryScreen
-          history={readHistory}
-          onBack={goNavOrigin}
-          onSelect={(entry) => {
-            if (entry.type === 'study-chapter') {
-              const study = getStudyById(entry.studyId);
-              if (!study) return;
-              setStudyId(entry.studyId);
-              setStudyChapterId(entry.studyChapterId);
-              setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
-              setScreen('bible-study-chapter');
-            } else if (entry.type === 'letter') {
-              setLetterId(entry.letterId);
-              var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get('one') : COL_BY_KEY.get('two'));
-              setActiveReadKey('vol:' + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
-              setScreen(_hc.letterScreen);
-            } else {
-              setBookId(entry.bookId);setChapterNum(entry.chapterNum);
-              setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
-              setScreen(entry.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
-            }
-          }}
-          onSearch={goSearch}
-          onSettings={goSettings}
-          onHistory={goHistory}
-          onPruneDay={pruneHistoryDay}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "library" && (
-        <LibraryScreen
-          onBack={goHome}
-          onOpenNotes={goNotesIndex}
-          onOpenLinks={goLinksIndex}
-          onOpenBookmarks={goBookmarksIndex}
-          onOpenJournal={goJournalHub}
-          onOpenHighlights={goHighlightsIndex}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          onSettings={goSettings}
-          historyEnabled={settings.historyEnabled !== false}
-          hlTick={hlTick}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "highlights-index" && typeof HighlightsScreen !== 'undefined' && (
-        <HighlightsScreen
-          onSettings={goSettings}
-          onBack={() => setScreen('library')}
-          onHome={goHome}
-          onNavigateToSource={(endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: 'highlights-index' });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Highlights' });
-            }
-          }}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          historyEnabled={settings.historyEnabled !== false}
-          hlTick={hlTick} setHlTick={setHlTick}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "journal-home" && typeof JournalHubScreen !== 'undefined' && (
-        <JournalHubScreen
-          onSettings={goSettings}
-          onBack={() => setScreen('library')}
-          onHome={goHome}
-          onOpenEntry={(eid) => goJournalViewer(eid)}
-          onEditEntry={(eid) => goJournalEditor(eid)}
-          onCreateEntry={createAndEditJournal}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          historyEnabled={settings.historyEnabled !== false}
-          hlTick={hlTick} setHlTick={setHlTick}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "journal-viewer" && typeof JournalViewerScreen !== 'undefined' && (
-        <JournalViewerScreen
-          onSettings={goSettings}
-          entryId={journalEntryId}
-          onBack={() => setScreen('journal-home')}
-          onHome={goHome}
-          onEdit={() => setScreen('journal-editor')}
-          onNavigateToLink={(endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: 'journal-viewer' });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Journal' });
-            }
-          }}
-          onOpenJournalEntry={(eid) => goJournalViewer(eid)}
-          onOpenNotebook={(nbId) => {
-            // Drop the user straight into that notebook's screen in the Notes
-            // hub. __notesReturnCtx is consumed by NotesIndexScreen on mount
-            // to pre-drill the right notebook (same channel the back-pill uses).
-            window.__notesReturnCtx = { tab: 'notebooks', drilledNbId: nbId };
-            setNavOrigin({ screen: 'journal-viewer' });
-            setScreen('notes-index');
-          }}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          historyEnabled={settings.historyEnabled !== false}
-          hlTick={hlTick} setHlTick={setHlTick}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "journal-editor" && typeof JournalEditorScreen !== 'undefined' && (
-        <JournalEditorScreen
-          onSettings={goSettings}
-          entryId={journalEntryId}
-          onBack={() => goJournalViewer(journalEntryId)}
-          onHome={goHome}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          historyEnabled={settings.historyEnabled !== false}
-          hlTick={hlTick} setHlTick={setHlTick}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "notes-index" && (
-        <NotesIndexScreen
-          onSettings={goSettings}
-          onBack={() => setScreen('library')}
-          onHome={goHome}
-          onOpenNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false })}
-          onNavigateToSource={(endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: 'notes-index' });
-              // The back-pill renderer prepends "Back to " itself, so we just
-              // pass the notebook/list name (e.g. "Uncategorized", "My Notes").
-              navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Notes' });
-            }
-          }}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          historyEnabled={settings.historyEnabled !== false}
-          hlTick={hlTick} setHlTick={setHlTick}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "links-index" && (
-        <LinksScreen
-          onSettings={goSettings}
-          onBack={() => setScreen('library')}
-          onHome={goHome}
-          onNavigateToSource={(endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: 'links-index' });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
-            }
-          }}
-          onNavigateToTarget={(endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: 'links-index' });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
-            }
-          }}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          historyEnabled={settings.historyEnabled !== false}
-          hlTick={hlTick} setHlTick={setHlTick}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "bookmarks-index" && (
-        <BookmarksScreen
-          onSettings={goSettings}
-          onBack={() => setScreen('library')}
-          onHome={goHome}
-          onNavigateToSource={(endpoint, meta) => {
-            if (endpoint) {
-              setNavOrigin({ screen: 'bookmarks-index' });
-              navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Bookmarks' });
-            }
-          }}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          historyEnabled={settings.historyEnabled !== false}
-          hlTick={hlTick} setHlTick={setHlTick}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "scriptures-home" && (
-        <ScripturesHome
-          onSelect={handleScriptureSelect}
-          onGenre={goScriptureGenre}
-          onBack={goHome}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          onSettings={goSettings}
-          onMatthewStudy={() => {setBookId("matthew");setChapterNum(null);setScreen("matthew-idx");}}
-          theme={theme} onThemeChange={setTheme}
-          layout={settings.scriptureLayout}
-        />
-      )}
-
-      {screen === "scripture-genre" && genreId && (
-        <ScriptureGenre
-          genreId={genreId}
-          onSelect={handleScriptureSelect}
-          onBack={goScripturesHome}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          onSettings={goSettings}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "volumes-home" && (
-        <VolumesHome
-          onSelect={handleVolumeSelect}
-          onBack={goHome}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          onSettings={goSettings}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "matthew-idx" && (
-        <ChapterIndex
-          book={MATTHEW}
-          onSelect={selectMatthewCh}
-          onBack={() => {if (fromStudies) {setFromStudies(false);goStudiesHome();} else {goHome();}}}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          onSettings={goSettings}
-          currentChapter={settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null}
-          isRead={(num) => isRead("matthew", num)}
-          markAsReadEnabled={settings.markAsRead}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
       {screen === "matthew-ch" && chapter && (() => {
         // Chain-aware boundaries: when entered via Studies (fromStudies=true),
         // Matthew participates in the unified heavy→light chain. Ch 1 prev →
@@ -1338,26 +1388,6 @@ function App() {
         );
       })()}
 
-      {screen === "studies-home" && (
-        <StudiesHome
-          studies={UNIFIED_CHAIN}
-          studiesLoading={studiesLoading}
-          onSelectStudy={(slug) => {
-            if (slug === 'matthew-study') {
-              setFromStudies(true);
-              setBookId("matthew");setChapterNum(null);setScreen("matthew-idx");
-            } else {
-              selectStudy(slug);
-            }
-          }}
-          onBack={goHome}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          onSettings={goSettings}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
       {screen === "bible-study-index" && studyId && (() => {
         const study = getStudyById(studyId);
         if (!study) return studiesLoading ? <div className="sc-sheet-loading" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>Loading…</div> : null;
@@ -1376,55 +1406,6 @@ function App() {
           />
         );
       })()}
-
-      {screen === "bible-idx" && book && (
-        <ChapterIndex
-          book={book}
-          onSelect={selectBibleCh}
-          onBack={genreId ? () => setScreen("scripture-genre") : goScripturesHome}
-          onSearch={goSearch}
-          onHistory={goHistory}
-          onSettings={goSettings}
-          currentChapter={settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null}
-          isRead={(num) => isRead(bookId, num)}
-          markAsReadEnabled={settings.markAsRead}
-          restoredNames={settings.restoredNames}
-          showChapterTitle={settings.showChapterTitle !== false}
-          theme={theme} onThemeChange={setTheme}
-        />
-      )}
-
-      {screen === "bible-ch" && book && chapter && (
-        <BibleChapterView
-          book={book} chapter={chapter}
-          onIndex={book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx}
-          onNavigate={(num) => {setSurpriseAnchor(null);selectBibleCh(num);}}
-          onMarkRead={() => markRead(bookId, chapterNum)}
-          markAsReadEnabled={settings.markAsRead}
-          showProgressBar={settings.showProgressBar}
-          translation={settings.translation}
-          restoredNames={settings.restoredNames}
-          showChapterTitle={settings.showChapterTitle !== false}
-          showSectionHeadings={settings.showSectionHeadings !== false}
-          titleFocusHidden={titleFocusHidden}
-          setTitleFocusHidden={setTitleFocusHidden}
-          headingsFocusHidden={headingsFocusHidden}
-          setHeadingsFocusHidden={setHeadingsFocusHidden}
-          prevBook={bcvPrevBook}
-          nextBook={bcvNextBook}
-          onPrevBook={bcvOnPrevBook}
-          onNextBook={bcvOnNextBook}
-          prevBoundaryTitle={bcvPrevBoundaryTitle}
-          nextBoundaryTitle={bcvNextBoundaryTitle}
-          onSearch={goSearch}
-          onSettings={goSettings}
-          onHistory={goHistory}
-          theme={theme} onThemeChange={setTheme}
-          surpriseAnchor={surpriseAnchor}
-          backHint={backHint} onTapThroughBack={tapThroughBack}
-          hlTick={hlTick} onLinkOpen={openLinkSidebar}
-        />
-      )}
 
       {/* P8a: 26 trivial wrappers (13 index + 10 letter + 3 entry) all
           dispatch through the ROUTES lookup declared just above the

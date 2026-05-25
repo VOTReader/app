@@ -8379,7 +8379,434 @@
       // ── WTLB / Blessed entry screens (3) — data-guarded ──
       "wtlb-one-entry": () => wtlb1Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb1"), ...boundaryConfig("wtlb1", wtlb1Entry), entry: wtlb1Entry, partLabel: "Part One", onNavToChapter: _navToChapter }),
       "wtlb-two-entry": () => wtlb2Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb2"), ...boundaryConfig("wtlb2", wtlb2Entry), entry: wtlb2Entry, partLabel: "Part Two", onNavToChapter: _navToChapter }),
-      "blessed-entry": () => blessedEntry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("blessed"), ...boundaryConfig("blessed", blessedEntry), entry: blessedEntry, partLabel: "The Blessed", onNavToChapter: _navToChapter })
+      "blessed-entry": () => blessedEntry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("blessed"), ...boundaryConfig("blessed", blessedEntry), entry: blessedEntry, partLabel: "The Blessed", onNavToChapter: _navToChapter }),
+      // ── AppShell / settings / search / home / library (P8b — 20 medium
+      //    prop-threading screens folded in; same pattern as P8a). ──
+      "settings": () => /* @__PURE__ */ React.createElement(
+        SettingsScreen,
+        {
+          settings,
+          onToggle: toggleSetting,
+          onSetting: updateSetting,
+          onBack: goNavOrigin,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          readItems,
+          onClearBook: clearReadForBook,
+          onClearAll: clearAllProgress,
+          onClearHistory: clearHistory,
+          historyCount: readHistory.length,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "search": () => /* @__PURE__ */ React.createElement(
+        SearchScreen,
+        {
+          query: searchQuery,
+          onQueryChange: setSearchQuery,
+          settings,
+          onSettingsChange: (key, val) => setSettings((prev) => ({ ...prev, [key]: val })),
+          onSelect: handleSearchSelect,
+          onCommand: handleSearchCommand,
+          onBack: goSearchOrigin,
+          searchScope,
+          searchContext,
+          onToggleScope: () => setSearchScope((prev) => prev ? null : searchContext)
+        }
+      ),
+      "home": () => /* @__PURE__ */ React.createElement(
+        HomeScreen,
+        {
+          onSelect: handleSelect,
+          onSurprise: handleSurprise,
+          showSurprise: settings.showSurpriseButton,
+          onSettings: goSettings,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          onInfo: () => setShowWelcome(true),
+          onAbout: goAbout,
+          history: readHistory,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "about": () => /* @__PURE__ */ React.createElement(
+        AboutScreen,
+        {
+          onContinue: () => {
+            try {
+              localStorage.setItem("vot-about-seen", "1");
+            } catch (_e) {
+            }
+            goNavOrigin();
+          },
+          onBack: () => {
+            try {
+              localStorage.setItem("vot-about-seen", "1");
+            } catch (_e) {
+            }
+            goNavOrigin();
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "history": () => /* @__PURE__ */ React.createElement(
+        HistoryScreen,
+        {
+          history: readHistory,
+          onBack: goNavOrigin,
+          onSelect: (entry) => {
+            if (entry.type === "study-chapter") {
+              const study = getStudyById(entry.studyId);
+              if (!study) return;
+              setStudyId(entry.studyId);
+              setStudyChapterId(entry.studyChapterId);
+              setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
+              setScreen("bible-study-chapter");
+            } else if (entry.type === "letter") {
+              setLetterId(entry.letterId);
+              var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get("one") : COL_BY_KEY.get("two"));
+              setActiveReadKey("vol:" + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
+              setScreen(_hc.letterScreen);
+            } else {
+              setBookId(entry.bookId);
+              setChapterNum(entry.chapterNum);
+              setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
+              setScreen(entry.bookId === "matthew" ? "matthew-ch" : "bible-ch");
+            }
+          },
+          onSearch: goSearch,
+          onSettings: goSettings,
+          onHistory: goHistory,
+          onPruneDay: pruneHistoryDay,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "library": () => /* @__PURE__ */ React.createElement(
+        LibraryScreen,
+        {
+          onBack: goHome,
+          onOpenNotes: goNotesIndex,
+          onOpenLinks: goLinksIndex,
+          onOpenBookmarks: goBookmarksIndex,
+          onOpenJournal: goJournalHub,
+          onOpenHighlights: goHighlightsIndex,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "highlights-index": () => typeof HighlightsScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+        HighlightsScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onNavigateToSource: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "highlights-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Highlights" });
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "journal-home": () => typeof JournalHubScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+        JournalHubScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onOpenEntry: (eid) => goJournalViewer(eid),
+          onEditEntry: (eid) => goJournalEditor(eid),
+          onCreateEntry: createAndEditJournal,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "journal-viewer": () => typeof JournalViewerScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+        JournalViewerScreen,
+        {
+          onSettings: goSettings,
+          entryId: journalEntryId,
+          onBack: () => setScreen("journal-home"),
+          onHome: goHome,
+          onEdit: () => setScreen("journal-editor"),
+          onNavigateToLink: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "journal-viewer" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Journal" });
+            }
+          },
+          onOpenJournalEntry: (eid) => goJournalViewer(eid),
+          onOpenNotebook: (nbId) => {
+            window.__notesReturnCtx = { tab: "notebooks", drilledNbId: nbId };
+            setNavOrigin({ screen: "journal-viewer" });
+            setScreen("notes-index");
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "journal-editor": () => typeof JournalEditorScreen !== "undefined" && /* @__PURE__ */ React.createElement(
+        JournalEditorScreen,
+        {
+          onSettings: goSettings,
+          entryId: journalEntryId,
+          onBack: () => goJournalViewer(journalEntryId),
+          onHome: goHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "notes-index": () => /* @__PURE__ */ React.createElement(
+        NotesIndexScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onOpenNote: (gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false }),
+          onNavigateToSource: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "notes-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Notes" });
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "links-index": () => /* @__PURE__ */ React.createElement(
+        LinksScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onNavigateToSource: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "links-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Links" });
+            }
+          },
+          onNavigateToTarget: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "links-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Links" });
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "bookmarks-index": () => /* @__PURE__ */ React.createElement(
+        BookmarksScreen,
+        {
+          onSettings: goSettings,
+          onBack: () => setScreen("library"),
+          onHome: goHome,
+          onNavigateToSource: (endpoint, meta) => {
+            if (endpoint) {
+              setNavOrigin({ screen: "bookmarks-index" });
+              navigateToLink(endpoint, meta || { sourceLetterTitle: "My Bookmarks" });
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          historyEnabled: settings.historyEnabled !== false,
+          hlTick,
+          setHlTick,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "scriptures-home": () => /* @__PURE__ */ React.createElement(
+        ScripturesHome,
+        {
+          onSelect: handleScriptureSelect,
+          onGenre: goScriptureGenre,
+          onBack: goHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          onMatthewStudy: () => {
+            setBookId("matthew");
+            setChapterNum(null);
+            setScreen("matthew-idx");
+          },
+          theme,
+          onThemeChange: setTheme,
+          layout: settings.scriptureLayout
+        }
+      ),
+      "scripture-genre": () => genreId && /* @__PURE__ */ React.createElement(
+        ScriptureGenre,
+        {
+          genreId,
+          onSelect: handleScriptureSelect,
+          onBack: goScripturesHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "volumes-home": () => /* @__PURE__ */ React.createElement(
+        VolumesHome,
+        {
+          onSelect: handleVolumeSelect,
+          onBack: goHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "matthew-idx": () => /* @__PURE__ */ React.createElement(
+        ChapterIndex,
+        {
+          book: MATTHEW,
+          onSelect: selectMatthewCh,
+          onBack: () => {
+            if (fromStudies) {
+              setFromStudies(false);
+              goStudiesHome();
+            } else {
+              goHome();
+            }
+          },
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          currentChapter: settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null,
+          isRead: (num) => isRead("matthew", num),
+          markAsReadEnabled: settings.markAsRead,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "studies-home": () => /* @__PURE__ */ React.createElement(
+        StudiesHome,
+        {
+          studies: UNIFIED_CHAIN,
+          studiesLoading,
+          onSelectStudy: (slug) => {
+            if (slug === "matthew-study") {
+              setFromStudies(true);
+              setBookId("matthew");
+              setChapterNum(null);
+              setScreen("matthew-idx");
+            } else {
+              selectStudy(slug);
+            }
+          },
+          onBack: goHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "bible-idx": () => book && /* @__PURE__ */ React.createElement(
+        ChapterIndex,
+        {
+          book,
+          onSelect: selectBibleCh,
+          onBack: genreId ? () => setScreen("scripture-genre") : goScripturesHome,
+          onSearch: goSearch,
+          onHistory: goHistory,
+          onSettings: goSettings,
+          currentChapter: settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null,
+          isRead: (num) => isRead(bookId, num),
+          markAsReadEnabled: settings.markAsRead,
+          restoredNames: settings.restoredNames,
+          showChapterTitle: settings.showChapterTitle !== false,
+          theme,
+          onThemeChange: setTheme
+        }
+      ),
+      "bible-ch": () => book && chapter && /* @__PURE__ */ React.createElement(
+        BibleChapterView,
+        {
+          book,
+          chapter,
+          onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
+          onNavigate: (num) => {
+            setSurpriseAnchor(null);
+            selectBibleCh(num);
+          },
+          onMarkRead: () => markRead(bookId, chapterNum),
+          markAsReadEnabled: settings.markAsRead,
+          showProgressBar: settings.showProgressBar,
+          translation: settings.translation,
+          restoredNames: settings.restoredNames,
+          showChapterTitle: settings.showChapterTitle !== false,
+          showSectionHeadings: settings.showSectionHeadings !== false,
+          titleFocusHidden,
+          setTitleFocusHidden,
+          headingsFocusHidden,
+          setHeadingsFocusHidden,
+          prevBook: bcvPrevBook,
+          nextBook: bcvNextBook,
+          onPrevBook: bcvOnPrevBook,
+          onNextBook: bcvOnNextBook,
+          prevBoundaryTitle: bcvPrevBoundaryTitle,
+          nextBoundaryTitle: bcvNextBoundaryTitle,
+          onSearch: goSearch,
+          onSettings: goSettings,
+          onHistory: goHistory,
+          theme,
+          onThemeChange: setTheme,
+          surpriseAnchor,
+          backHint,
+          onTapThroughBack: tapThroughBack,
+          hlTick,
+          onLinkOpen: openLinkSidebar
+        }
+      )
     };
     return /* @__PURE__ */ React.createElement(TabsContext.Provider, { value: tabsCtxValue }, null, settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && /* @__PURE__ */ React.createElement("button", { className: "reading-dot-global", onClick: goToLastRead, title: "Resume reading" }, /* @__PURE__ */ React.createElement("span", { className: "rdg-inner" })), showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
       position: "fixed",
@@ -8499,335 +8926,7 @@
         }
       },
       "Disable Tabs"
-    )))), screen === "settings" && /* @__PURE__ */ React.createElement(
-      SettingsScreen,
-      {
-        settings,
-        onToggle: toggleSetting,
-        onSetting: updateSetting,
-        onBack: goNavOrigin,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        readItems,
-        onClearBook: clearReadForBook,
-        onClearAll: clearAllProgress,
-        onClearHistory: clearHistory,
-        historyCount: readHistory.length,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "search" && /* @__PURE__ */ React.createElement(
-      SearchScreen,
-      {
-        query: searchQuery,
-        onQueryChange: setSearchQuery,
-        settings,
-        onSettingsChange: (key, val) => setSettings((prev) => ({ ...prev, [key]: val })),
-        onSelect: handleSearchSelect,
-        onCommand: handleSearchCommand,
-        onBack: goSearchOrigin,
-        searchScope,
-        searchContext,
-        onToggleScope: () => setSearchScope((prev) => prev ? null : searchContext)
-      }
-    ), screen === "home" && /* @__PURE__ */ React.createElement(
-      HomeScreen,
-      {
-        onSelect: handleSelect,
-        onSurprise: handleSurprise,
-        showSurprise: settings.showSurpriseButton,
-        onSettings: goSettings,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        historyEnabled: settings.historyEnabled !== false,
-        onInfo: () => setShowWelcome(true),
-        onAbout: goAbout,
-        history: readHistory,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "about" && /* @__PURE__ */ React.createElement(
-      AboutScreen,
-      {
-        onContinue: () => {
-          try {
-            localStorage.setItem("vot-about-seen", "1");
-          } catch (_e) {
-          }
-          goNavOrigin();
-        },
-        onBack: () => {
-          try {
-            localStorage.setItem("vot-about-seen", "1");
-          } catch (_e) {
-          }
-          goNavOrigin();
-        },
-        onSearch: goSearch,
-        onHistory: goHistory,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "history" && /* @__PURE__ */ React.createElement(
-      HistoryScreen,
-      {
-        history: readHistory,
-        onBack: goNavOrigin,
-        onSelect: (entry) => {
-          if (entry.type === "study-chapter") {
-            const study = getStudyById(entry.studyId);
-            if (!study) return;
-            setStudyId(entry.studyId);
-            setStudyChapterId(entry.studyChapterId);
-            setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
-            setScreen("bible-study-chapter");
-          } else if (entry.type === "letter") {
-            setLetterId(entry.letterId);
-            var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get("one") : COL_BY_KEY.get("two"));
-            setActiveReadKey("vol:" + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
-            setScreen(_hc.letterScreen);
-          } else {
-            setBookId(entry.bookId);
-            setChapterNum(entry.chapterNum);
-            setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
-            setScreen(entry.bookId === "matthew" ? "matthew-ch" : "bible-ch");
-          }
-        },
-        onSearch: goSearch,
-        onSettings: goSettings,
-        onHistory: goHistory,
-        onPruneDay: pruneHistoryDay,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "library" && /* @__PURE__ */ React.createElement(
-      LibraryScreen,
-      {
-        onBack: goHome,
-        onOpenNotes: goNotesIndex,
-        onOpenLinks: goLinksIndex,
-        onOpenBookmarks: goBookmarksIndex,
-        onOpenJournal: goJournalHub,
-        onOpenHighlights: goHighlightsIndex,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        onSettings: goSettings,
-        historyEnabled: settings.historyEnabled !== false,
-        hlTick,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "highlights-index" && typeof HighlightsScreen !== "undefined" && /* @__PURE__ */ React.createElement(
-      HighlightsScreen,
-      {
-        onSettings: goSettings,
-        onBack: () => setScreen("library"),
-        onHome: goHome,
-        onNavigateToSource: (endpoint, meta) => {
-          if (endpoint) {
-            setNavOrigin({ screen: "highlights-index" });
-            navigateToLink(endpoint, meta || { sourceLetterTitle: "My Highlights" });
-          }
-        },
-        onSearch: goSearch,
-        onHistory: goHistory,
-        historyEnabled: settings.historyEnabled !== false,
-        hlTick,
-        setHlTick,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "journal-home" && typeof JournalHubScreen !== "undefined" && /* @__PURE__ */ React.createElement(
-      JournalHubScreen,
-      {
-        onSettings: goSettings,
-        onBack: () => setScreen("library"),
-        onHome: goHome,
-        onOpenEntry: (eid) => goJournalViewer(eid),
-        onEditEntry: (eid) => goJournalEditor(eid),
-        onCreateEntry: createAndEditJournal,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        historyEnabled: settings.historyEnabled !== false,
-        hlTick,
-        setHlTick,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "journal-viewer" && typeof JournalViewerScreen !== "undefined" && /* @__PURE__ */ React.createElement(
-      JournalViewerScreen,
-      {
-        onSettings: goSettings,
-        entryId: journalEntryId,
-        onBack: () => setScreen("journal-home"),
-        onHome: goHome,
-        onEdit: () => setScreen("journal-editor"),
-        onNavigateToLink: (endpoint, meta) => {
-          if (endpoint) {
-            setNavOrigin({ screen: "journal-viewer" });
-            navigateToLink(endpoint, meta || { sourceLetterTitle: "My Journal" });
-          }
-        },
-        onOpenJournalEntry: (eid) => goJournalViewer(eid),
-        onOpenNotebook: (nbId) => {
-          window.__notesReturnCtx = { tab: "notebooks", drilledNbId: nbId };
-          setNavOrigin({ screen: "journal-viewer" });
-          setScreen("notes-index");
-        },
-        onSearch: goSearch,
-        onHistory: goHistory,
-        historyEnabled: settings.historyEnabled !== false,
-        hlTick,
-        setHlTick,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "journal-editor" && typeof JournalEditorScreen !== "undefined" && /* @__PURE__ */ React.createElement(
-      JournalEditorScreen,
-      {
-        onSettings: goSettings,
-        entryId: journalEntryId,
-        onBack: () => goJournalViewer(journalEntryId),
-        onHome: goHome,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        historyEnabled: settings.historyEnabled !== false,
-        hlTick,
-        setHlTick,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "notes-index" && /* @__PURE__ */ React.createElement(
-      NotesIndexScreen,
-      {
-        onSettings: goSettings,
-        onBack: () => setScreen("library"),
-        onHome: goHome,
-        onOpenNote: (gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false }),
-        onNavigateToSource: (endpoint, meta) => {
-          if (endpoint) {
-            setNavOrigin({ screen: "notes-index" });
-            navigateToLink(endpoint, meta || { sourceLetterTitle: "My Notes" });
-          }
-        },
-        onSearch: goSearch,
-        onHistory: goHistory,
-        historyEnabled: settings.historyEnabled !== false,
-        hlTick,
-        setHlTick,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "links-index" && /* @__PURE__ */ React.createElement(
-      LinksScreen,
-      {
-        onSettings: goSettings,
-        onBack: () => setScreen("library"),
-        onHome: goHome,
-        onNavigateToSource: (endpoint, meta) => {
-          if (endpoint) {
-            setNavOrigin({ screen: "links-index" });
-            navigateToLink(endpoint, meta || { sourceLetterTitle: "My Links" });
-          }
-        },
-        onNavigateToTarget: (endpoint, meta) => {
-          if (endpoint) {
-            setNavOrigin({ screen: "links-index" });
-            navigateToLink(endpoint, meta || { sourceLetterTitle: "My Links" });
-          }
-        },
-        onSearch: goSearch,
-        onHistory: goHistory,
-        historyEnabled: settings.historyEnabled !== false,
-        hlTick,
-        setHlTick,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "bookmarks-index" && /* @__PURE__ */ React.createElement(
-      BookmarksScreen,
-      {
-        onSettings: goSettings,
-        onBack: () => setScreen("library"),
-        onHome: goHome,
-        onNavigateToSource: (endpoint, meta) => {
-          if (endpoint) {
-            setNavOrigin({ screen: "bookmarks-index" });
-            navigateToLink(endpoint, meta || { sourceLetterTitle: "My Bookmarks" });
-          }
-        },
-        onSearch: goSearch,
-        onHistory: goHistory,
-        historyEnabled: settings.historyEnabled !== false,
-        hlTick,
-        setHlTick,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "scriptures-home" && /* @__PURE__ */ React.createElement(
-      ScripturesHome,
-      {
-        onSelect: handleScriptureSelect,
-        onGenre: goScriptureGenre,
-        onBack: goHome,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        onSettings: goSettings,
-        onMatthewStudy: () => {
-          setBookId("matthew");
-          setChapterNum(null);
-          setScreen("matthew-idx");
-        },
-        theme,
-        onThemeChange: setTheme,
-        layout: settings.scriptureLayout
-      }
-    ), screen === "scripture-genre" && genreId && /* @__PURE__ */ React.createElement(
-      ScriptureGenre,
-      {
-        genreId,
-        onSelect: handleScriptureSelect,
-        onBack: goScripturesHome,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        onSettings: goSettings,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "volumes-home" && /* @__PURE__ */ React.createElement(
-      VolumesHome,
-      {
-        onSelect: handleVolumeSelect,
-        onBack: goHome,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        onSettings: goSettings,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "matthew-idx" && /* @__PURE__ */ React.createElement(
-      ChapterIndex,
-      {
-        book: MATTHEW,
-        onSelect: selectMatthewCh,
-        onBack: () => {
-          if (fromStudies) {
-            setFromStudies(false);
-            goStudiesHome();
-          } else {
-            goHome();
-          }
-        },
-        onSearch: goSearch,
-        onHistory: goHistory,
-        onSettings: goSettings,
-        currentChapter: settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null,
-        isRead: (num) => isRead("matthew", num),
-        markAsReadEnabled: settings.markAsRead,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "matthew-ch" && chapter && (() => {
+    )))), screen === "matthew-ch" && chapter && (() => {
       const mtLastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
       const atFirstCh = chapter.num === 1;
       const atLastCh = chapter.num === mtLastNum;
@@ -8875,29 +8974,7 @@
           onLinkOpen: openLinkSidebar
         }
       ), /* @__PURE__ */ React.createElement(ModeToggle, { mode, onChange: setMode, showStudy, onShowStudyChange: setShowStudy }));
-    })(), screen === "studies-home" && /* @__PURE__ */ React.createElement(
-      StudiesHome,
-      {
-        studies: UNIFIED_CHAIN,
-        studiesLoading,
-        onSelectStudy: (slug) => {
-          if (slug === "matthew-study") {
-            setFromStudies(true);
-            setBookId("matthew");
-            setChapterNum(null);
-            setScreen("matthew-idx");
-          } else {
-            selectStudy(slug);
-          }
-        },
-        onBack: goHome,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        onSettings: goSettings,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "bible-study-index" && studyId && (() => {
+    })(), screen === "bible-study-index" && studyId && (() => {
       const study = getStudyById(studyId);
       if (!study) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
       return /* @__PURE__ */ React.createElement(
@@ -8916,62 +8993,7 @@
           onThemeChange: setTheme
         }
       );
-    })(), screen === "bible-idx" && book && /* @__PURE__ */ React.createElement(
-      ChapterIndex,
-      {
-        book,
-        onSelect: selectBibleCh,
-        onBack: genreId ? () => setScreen("scripture-genre") : goScripturesHome,
-        onSearch: goSearch,
-        onHistory: goHistory,
-        onSettings: goSettings,
-        currentChapter: settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null,
-        isRead: (num) => isRead(bookId, num),
-        markAsReadEnabled: settings.markAsRead,
-        restoredNames: settings.restoredNames,
-        showChapterTitle: settings.showChapterTitle !== false,
-        theme,
-        onThemeChange: setTheme
-      }
-    ), screen === "bible-ch" && book && chapter && /* @__PURE__ */ React.createElement(
-      BibleChapterView,
-      {
-        book,
-        chapter,
-        onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
-        onNavigate: (num) => {
-          setSurpriseAnchor(null);
-          selectBibleCh(num);
-        },
-        onMarkRead: () => markRead(bookId, chapterNum),
-        markAsReadEnabled: settings.markAsRead,
-        showProgressBar: settings.showProgressBar,
-        translation: settings.translation,
-        restoredNames: settings.restoredNames,
-        showChapterTitle: settings.showChapterTitle !== false,
-        showSectionHeadings: settings.showSectionHeadings !== false,
-        titleFocusHidden,
-        setTitleFocusHidden,
-        headingsFocusHidden,
-        setHeadingsFocusHidden,
-        prevBook: bcvPrevBook,
-        nextBook: bcvNextBook,
-        onPrevBook: bcvOnPrevBook,
-        onNextBook: bcvOnNextBook,
-        prevBoundaryTitle: bcvPrevBoundaryTitle,
-        nextBoundaryTitle: bcvNextBoundaryTitle,
-        onSearch: goSearch,
-        onSettings: goSettings,
-        onHistory: goHistory,
-        theme,
-        onThemeChange: setTheme,
-        surpriseAnchor,
-        backHint,
-        onTapThroughBack: tapThroughBack,
-        hlTick,
-        onLinkOpen: openLinkSidebar
-      }
-    ), ROUTES[screen]?.() ?? null, screen === "bible-study-chapter" && studyId && studyChapterId && (() => {
+    })(), ROUTES[screen]?.() ?? null, screen === "bible-study-chapter" && studyId && studyChapterId && (() => {
       const study = getStudyById(studyId);
       const ch = getStudyChapter(study, studyChapterId);
       if (!study || !ch) return studiesLoading ? /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026") : null;
