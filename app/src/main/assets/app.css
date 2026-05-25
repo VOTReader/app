@@ -153,7 +153,6 @@
       }
       @media (hover: hover) { .nav-btn:hover:not(:disabled) { color: var(--gold); border-color: var(--gold); background: var(--gold-faint); } }
       .nav-btn:disabled { opacity: 0.22; cursor: default; }
-      .nav-btn-text { display: inline-block; max-width: 28vw; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; white-space: nowrap; }
       /* ── Minimal arrow-only prev/next — clean circular chrome for chapter/letter nav ── */
       .nav-arrow-btn {
         display: inline-flex; align-items: center; justify-content: center;
@@ -770,19 +769,6 @@
        Sized to match the verse-sup style so it reads as a proper footnote
        marker, not a tiny afterthought. Larger tap target via padding +
        min-width; visual glow on active for feedback. */
-    .study-fn-link {
-      display:inline-block;
-      font-size:0.85em; font-weight:600;
-      color:var(--gold); text-decoration:none;
-      vertical-align:super;
-      margin:0 0.12em; padding:0 0.12em;
-      min-width:0.7em; line-height:1;
-      border-radius:2px;
-      transition:color 0.15s ease, background 0.15s ease;
-      -webkit-tap-highlight-color:transparent;
-    }
-    .study-fn-link:active { color:var(--gold-bright); background:rgba(200,164,86,0.18); }
-    @media (hover: hover) { .study-fn-link:hover { color:var(--gold-bright); background:rgba(200,164,86,0.10); } }
     /* ── MOBILE FOOTNOTE SHEET ── */
     .fn-sheet-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:200; backdrop-filter:blur(3px); }
     .fn-sheet-backdrop.open { display:block; }
@@ -953,20 +939,6 @@
         box-shadow: 0 0 10px rgba(var(--hl-peak-r), var(--hl-peak-g), var(--hl-peak-b), var(--hl-glow-a));
       }
     }
-    .letter-highlight-block {
-      --hl-r: 200; --hl-g: 164; --hl-b: 86;
-      --hl-peak-r: 255; --hl-peak-g: 235; --hl-peak-b: 180;
-      --hl-base-a: 0.15; --hl-peak-a: 0.30; --hl-glow-a: 0.20;
-      border-radius: 6px;
-      padding: 0.2rem 0.4rem;
-      animation: letter-highlight-pulse 8.4s ease infinite;
-      background: rgba(var(--hl-r), var(--hl-g), var(--hl-b), var(--hl-base-a));
-    }
-    body.light .letter-highlight-block {
-      --hl-r: 168; --hl-g: 126; --hl-b: 40;
-      --hl-peak-r: 255; --hl-peak-g: 230; --hl-peak-b: 150;
-      --hl-base-a: 0.12; --hl-peak-a: 0.25; --hl-glow-a: 0.18;
-    }
     .sc-sheet-tag { font-family:'Cinzel',serif; font-size:0.65rem; letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.35rem; display:block; }
     .sc-sheet-cite { font-family:'Cinzel',serif; font-size:1.1rem; color:var(--gold-bright); margin-bottom:0.85rem; display:block; }
     .sc-sheet-verse { font-size:1.05rem; line-height:1.85; color:var(--cream-dim); font-style:italic; }
@@ -976,7 +948,6 @@
     .footnote-list-verse .sc-sheet-compound { gap:0.75rem; }
     .footnote-list-verse .sc-sheet-compound-label { font-size:0.58rem; }
     .sc-sheet-loading { color:var(--gold-dim); font-size:0.9rem; font-style:italic; animation:pulse 1.4s ease infinite; }
-    .sc-sheet-error { color:#b85c58; font-size:0.9rem; font-style:italic; }
     .scripture-ref-chevron { margin-left:auto; padding-left:0.5rem; color:var(--gold-dim); font-size:1rem; flex-shrink:0; align-self:center; }
     .scripture-ref-note { cursor:default; }
     @media (hover: hover) { .scripture-ref-note:hover, .scripture-ref-note:focus-visible { background:var(--study-note) !important; border-color:var(--study-border) !important; outline:none; } }
@@ -1271,20 +1242,10 @@
     @media (hover: hover) { .genre-tile:hover { border-color:var(--gold); background:var(--gold-faint); } }
     .genre-tile.locked { opacity:0.38; pointer-events:none; }
     .genre-tile-title { font-family:'Cinzel',serif; font-size:0.88rem; color:var(--gold); letter-spacing:0.04em; line-height:1.3; }
-    .genre-tile-detail { font-family:'Cinzel',serif; font-size:0.52rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-top:0.25rem; }
     .genre-tile-badge { display:inline-block; margin-top:0.3rem; font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); background:rgba(200,164,86,0.12); border:1px solid rgba(200,164,86,0.3); border-radius:3px; padding:0.1rem 0.4rem; }
-    .genre-tile-preview { font-family:'EB Garamond',serif; font-size:0.78rem; color:var(--cream-dim); margin-top:0.35rem; line-height:1.35; font-style:italic; }
     .genre-tile-sub { font-family:'EB Garamond',serif; font-size:0.78rem; color:var(--cream-dim); margin-top:0.15rem; font-style:italic; }
-    .genre-tile-external { text-decoration:none; }
-    .genre-tile-external .ext-arrow { display:inline-block; margin-left:0.3rem; font-size:0.85em; color:var(--gold-dim); }
     .studies-empty { font-family:'EB Garamond',serif; font-style:italic; color:var(--cream-dim); padding:1.2rem 0.5rem; text-align:center; }
     /* Studies home — stacked full-width tiles */
-    .studies-stack { display:flex; flex-direction:column; gap:0.85rem; width:100%; max-width:640px; margin:0 auto; padding:0 0.3rem; }
-    .study-stack-tile { text-align:left; padding:1.1rem 1.2rem; text-decoration:none; }
-    .study-stack-tile .genre-tile-title { font-size:0.95rem; letter-spacing:0.08em; }
-    .study-stack-tile .genre-tile-sub { font-size:0.78rem; }
-    .study-stack-capstone { border-color:var(--gold-dim); background:linear-gradient(180deg, rgba(200,164,86,0.08), transparent); }
-    .study-stack-external { border-style:dashed; }
     .genre-full-width { grid-column:1 / -1; margin-left:10%; margin-right:10%; }
     .genre-full-width .genre-tile-title { font-size:1.05rem; }
 
@@ -1335,8 +1296,6 @@
     .genre-col { display:flex; flex-direction:column; gap:0.6rem; }
     .genre-col-stretch .genre-tile { flex:1; }
     /* Genre sub-screen: compact hero, top-aligned */
-    .genre-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; padding:1.5rem 1.5rem 3rem; }
-    .genre-screen .home-ornament { margin-bottom:1.5rem; }
     /* Larger book cards for small groups */
       /* Floating Surprise Me FAB (bottom-right) — intensity/interval synced with .reading-dot-global */
       @keyframes surprise-breathe {
@@ -1394,8 +1353,6 @@
     .settings-toggle input:checked ~ .settings-toggle-track { background:var(--gold); opacity:1; }
     .settings-toggle-thumb { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform 0.25s ease; pointer-events:none; box-shadow:0 1px 4px rgba(0,0,0,0.35); }
     .settings-toggle input:checked ~ .settings-toggle-thumb { transform:translateX(18px); }
-    .settings-select { appearance:none; -webkit-appearance:none; background:var(--bg); border:1px solid var(--gold-border); border-radius:6px; color:var(--gold); font-family:'Cinzel',serif; font-size:0.72rem; letter-spacing:0.08em; padding:0.45rem 2rem 0.45rem 0.7rem; cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c8a456' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 0.6rem center; }
-    body.light .settings-select { background-color:var(--bg); background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a5c10' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
     /* ── ABOUT SCREEN ── */
     .about-screen { min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1.25rem 4rem; }
     .about-card { width:100%; max-width:560px; background:var(--bg2); border:1px solid var(--gold-border); border-radius:14px; padding:2rem 1.6rem 2.2rem; text-align:center; }
@@ -1509,8 +1466,6 @@
     .settings-gear-btn svg { width:20px; height:20px; }
     /* ── Mark as Read ── */
     .read-check { font-size:0.75rem; color:var(--gold); opacity:0.7; flex-shrink:0; align-self:center; margin-left:0.5rem; }
-    .settings-clear-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.75rem 1.2rem; background:var(--bg2); border:1px solid var(--gold-border); border-top:none; border-radius:0 0 10px 10px; margin-top:-0.6rem; }
-    .settings-clear-count { font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); }
     .settings-clear-btn { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); background:transparent; border:1px solid var(--gold-border); border-radius:4px; padding:0.4rem 0.75rem; cursor:pointer; transition:all var(--transition); white-space:nowrap; }
     @media (hover: hover) { .settings-clear-btn:hover { color:var(--gold); border-color:var(--gold-dim); } }
     .settings-clear-btn:disabled { opacity:0.3; cursor:default; pointer-events:none; }
@@ -1680,7 +1635,6 @@
     .chapter-card-label { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
     .chapter-card-title { font-family:'EB Garamond',serif; font-size:1rem; color:var(--cream); line-height:1.3; font-style:italic; }
     .chapter-card-title.untitled { font-style:normal; color:var(--cream-muted); font-size:0.88rem; }
-    .chapter-card-sub { font-family:'EB Garamond',serif; font-size:0.82rem; color:var(--cream-dim); font-style:italic; line-height:1.35; margin-top:0.2rem; }
     .chapter-card-btn.is-locked { opacity:0.45; cursor:default; }
     .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
     /* ── Part group cards (3-part study hierarchy) ── */
@@ -1699,14 +1653,11 @@
     .part-chevron.is-open { transform:rotate(90deg); }
     /* Expanded chapter list: flush-indented, no decorative vertical rule. */
     .part-chapters { padding:0.5rem 0 0.2rem 0; margin:0.35rem 0 0.15rem 0; display:flex; flex-direction:column; gap:0.5rem; }
-    .preface-card { border-style:dashed; }
     .study-external-card { border-style:dashed; border-color:var(--gold-border); text-decoration:none; }
     .study-external-card .chapter-card-num { font-size:1.2rem; color:var(--gold-dim); }
     @keyframes dot-pulse { 0%,100% { box-shadow:0 0 6px var(--gold-glow); opacity:0.7; } 50% { box-shadow:0 0 18px var(--gold), 0 0 30px var(--gold-dim); opacity:1; } }
-    .chapter-card-dot { width:7px; height:7px; border-radius:50%; background:var(--gold); box-shadow:0 0 7px var(--gold-glow); flex-shrink:0; margin-left:auto; animation: dot-pulse 2.5s ease-in-out infinite; }
     .reading-dot-global { position:fixed; top:calc(var(--inset-top, 0px) + 5rem); right:0.6rem; z-index:200; width:28px; height:28px; border-radius:50%; background:none; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0; }
     .reading-dot-global .rdg-inner { width:10px; height:10px; border-radius:50%; background:var(--gold); animation: dot-pulse 2.8s ease-in-out infinite; }
-    .history-screen { /* inherits .vol-index width (680px) */ }
     .history-empty {
       text-align:center; color:var(--cream-dim);
       font-family:'EB Garamond',serif; padding:3.5rem 1.5rem 4rem;
@@ -1811,7 +1762,6 @@
     .history-dedupe-btn.is-pending {
       color:var(--gold-bright); border-color:var(--gold); background:var(--gold-faint);
     }
-    .history-date-header { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); padding:1.1rem 1.2rem 0.4rem; }
     .verse-sup { color:var(--gold); font-size:0.65em; margin-right:0.15em; font-family:'Cinzel',serif; }
     .fn-link { color:var(--gold); text-decoration:underline; }
     .inline-scrip-ref { color:var(--tap-ref); font-style:italic; text-decoration:none; border-bottom:1px dotted var(--tap-ref-sub); cursor:pointer; padding-bottom:0.02em; }
@@ -2598,23 +2548,6 @@
     .link-card-show-more:active { color: var(--gold); }
 
     /* ── HIGHLIGHT REMOVE CONTEXT MENU ───────────────────────────── */
-    .hl-remove-menu {
-      background: var(--bg3); border: 1px solid var(--gold-border);
-      border-radius: 8px; overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.55);
-      min-width: 162px;
-    }
-    .hl-remove-menu-btn {
-      display: block; width: 100%; padding: 11px 16px;
-      background: none; border: none; text-align: left;
-      font-family: 'Cinzel', serif; font-size: 0.68rem;
-      letter-spacing: 0.07em; text-transform: uppercase;
-      color: var(--cream-dim); cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .hl-remove-menu-btn + .hl-remove-menu-btn { border-top: 1px solid rgba(224,201,127,0.1); }
-    .hl-remove-menu-btn:active { background: rgba(224,201,127,0.08); color: var(--gold); }
-    .hl-remove-menu-btn.danger { color: #ef9a9a; }
 
     /* ── LINK PICKER SHEET (create new link) ─────────────────────── */
     .link-picker-overlay {
@@ -2845,11 +2778,6 @@
     .picker-empty {
       text-align: center; padding: 48px 24px;
       color: var(--cream-muted); font-family: 'EB Garamond', serif;
-    }
-    .picker-chapter-title {
-      font-family: 'Cinzel', serif; font-size: 1.4rem;
-      color: var(--gold); text-align: center;
-      margin: 8px 0 22px;
     }
     .picker-verses {
       font-family: 'EB Garamond', serif; font-size: 1.05rem;
@@ -3395,22 +3323,6 @@
       margin-bottom: 1rem;
       align-items: center;
     }
-    .notes-index-chip {
-      background: transparent;
-      border: 1px solid var(--gold-border);
-      color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: 0.58rem;
-      letter-spacing: 0.10em; text-transform: uppercase;
-      padding: 6px 11px; border-radius: 999px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, border-color 0.12s, color 0.12s;
-    }
-    .notes-index-chip:active { transform: scale(0.94); }
-    .notes-index-chip.active {
-      background: var(--gold-faint);
-      border-color: var(--gold);
-      color: var(--gold);
-    }
     .notes-index-sort {
       margin-left: auto;
       display: flex; align-items: center; gap: 0.4rem;
@@ -3529,29 +3441,6 @@
     }
 
     /* ── Sort menu popover (anchored under the sort button) ── */
-    .notes-sort-menu {
-      position: fixed;
-      background: var(--bg3);
-      border: 1px solid var(--gold-border);
-      border-radius: 8px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.55);
-      overflow: hidden;
-      z-index: 3100;
-      min-width: 140px;
-    }
-    body.light .notes-sort-menu { box-shadow: 0 6px 18px rgba(0,0,0,0.18); }
-    .notes-sort-menu-item {
-      display: block; width: 100%;
-      background: transparent; border: none;
-      padding: 10px 14px; text-align: left;
-      font-family: 'Cinzel', serif; font-size: 0.62rem;
-      letter-spacing: 0.10em; text-transform: uppercase;
-      color: var(--cream-dim);
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .notes-sort-menu-item + .notes-sort-menu-item { border-top: 1px solid rgba(232,192,80,0.08); }
-    .notes-sort-menu-item.active { color: var(--gold); background: var(--gold-faint); }
-    .notes-sort-menu-item:active { background: var(--gold-faint); }
 
     /* ── Notebook picker bottom sheet ── */
     .nb-picker-overlay {
@@ -4092,12 +3981,6 @@
     }
     /* Tiny "· More" / "· Less" affordance at the end of a collapsible
        thought line. Cinzel caps so it reads as UI rather than content. */
-    .bkm-row-thought-toggle {
-      font-family: 'Cinzel', serif; font-style: normal;
-      font-size: 0.55rem; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--gold-dim);
-      white-space: nowrap;
-    }
     .bkm-row-edit-input {
       width: 100%; background: var(--bg3);
       border: 1px solid var(--gold-border); border-radius: 6px;
