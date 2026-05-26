@@ -36,10 +36,14 @@ REPO  = os.path.dirname(_HERE)
 ROOT  = os.path.join(REPO, 'app', 'src', 'main', 'assets')
 DIST  = os.path.join(ROOT, 'dist')
 
-# Cluster A — vendor + raw corpus + search engine
+# Cluster A — vendor + (most) corpus + search engine (CRITICAL PATH).
+# books.js (NKJV, 6.9 MB = 60% of pre-split bundle-a) is intentionally
+# EXCLUDED — it lives in bundle-a-bible.js, loaded lazily via
+# window.__loadBibleCorpus() on first Bible-bound navigation.
+# See BUNDLE-LAZY-LOAD-PLAN.md (Q8.0) for the design rationale.
 A = [
     'react.min.js', 'react-dom.min.js', 'html2canvas.min.js',
-    'src/data/books.js', 'src/data/books-restored.js',
+    'src/data/books-restored.js',
     'src/data/matthew.js', 'src/data/matthew-plain.js', 'src/data/matthew-nkjv.js',
     'src/data/volume-one.js', 'src/data/volume-two.js', 'src/data/volume-three.js',
     'src/data/volume-four.js', 'src/data/volume-five.js', 'src/data/volume-six.js',
@@ -48,6 +52,16 @@ A = [
     'src/data/wtlb-one.js', 'src/data/wtlb-two.js', 'src/data/wtlb-scriptures.js',
     'src/data/the-blessed.js', 'src/data/holy-days.js', 'src/data/hidden-manna.js',
     'flexsearch.min.js', 'search-data.js', 'search.js',
+]
+
+# Cluster A-bible — the 66-book NKJV corpus. Loaded ON DEMAND via
+# window.__loadBibleCorpus() (see index.html ~line 67). Until this
+# bundle loads, `BOOKS` is undefined; consumers (ScripturesHome,
+# Bible-bound nav handlers, BibleChapterView, useReadingChainNav,
+# useSurprise's Bible branch) either show skeleton state or await
+# __loadBibleCorpus() before rendering / navigating.
+A_BIBLE = [
+    'src/data/books.js',
 ]
 
 # Cluster B — stores + components + hooks + journal subsystem + scripture-resolution
@@ -101,9 +115,10 @@ def bundle(name, files):
 
 
 def main():
-    print('Building 1 classic-script bundle --> ' + DIST)
+    print('Building 2 classic-script bundles --> ' + DIST)
     print('  (clusters B, C, D are bundled by esbuild; run `npm run build` for the full chain)')
     bundle('a', A)
+    bundle('a-bible', A_BIBLE)
     print('Done. (bundle-b.js, bundle-c.js, bundle-d.js belong to esbuild now.)')
 
 

@@ -531,23 +531,32 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'bible-idx': () => book && (
-      <ChapterIndex
-        book={book}
-        onSelect={selectBibleCh}
-        onBack={genreId ? () => setScreen('scripture-genre') : goScripturesHome}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        currentChapter={settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null}
-        isRead={(num) => isRead(bookId, num)}
-        markAsReadEnabled={settings.markAsRead}
-        restoredNames={settings.restoredNames}
-        showChapterTitle={settings.showChapterTitle !== false}
-        theme={theme} onThemeChange={setTheme}
-      />
-    ),
-    'bible-ch': () => book && chapter && (
+    'bible-idx': () => {
+      if (book) return (
+        <ChapterIndex
+          book={book}
+          onSelect={selectBibleCh}
+          onBack={genreId ? () => setScreen('scripture-genre') : goScripturesHome}
+          onSearch={goSearch}
+          onHistory={goHistory}
+          onSettings={goSettings}
+          currentChapter={settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null}
+          isRead={(num) => isRead(bookId, num)}
+          markAsReadEnabled={settings.markAsRead}
+          restoredNames={settings.restoredNames}
+          showChapterTitle={settings.showChapterTitle !== false}
+          theme={theme} onThemeChange={setTheme}
+        />
+      );
+      // Q8: BOOKS not loaded yet — trigger lazy-load + show loading state.
+      if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
+        if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
+        return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading Bible…</div>;
+      }
+      return null;
+    },
+    'bible-ch': () => {
+      if (book && chapter) return (
       <BibleChapterView
         book={book} chapter={chapter}
         onIndex={book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
@@ -577,7 +586,14 @@ export function buildScreenRoutes({
         backHint={backHint} onTapThroughBack={tapThroughBack}
         hlTick={hlTick} onLinkOpen={openLinkSidebar}
       />
-    ),
+      );
+      // Q8: BOOKS not loaded yet — trigger lazy-load + show loading state.
+      if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
+        if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
+        return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading Bible…</div>;
+      }
+      return null;
+    },
 
     // ── IIFE screens — render-time-derived locals (study lookups,
     //    letter shims, chain-aware boundaries) extracted to their own

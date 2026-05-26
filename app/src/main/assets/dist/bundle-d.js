@@ -81,7 +81,7 @@
   // app/src/main/assets/src/utils/tabs.js
   function describeTab2(tab) {
     const s = tab.screen || "home";
-    const resolveBook = (id) => id ? id === "matthew" ? MATTHEW : id === "matthew-plain" ? MATTHEW_PLAIN : BOOKS[id] : null;
+    const resolveBook = (id) => id ? id === "matthew" ? MATTHEW : id === "matthew-plain" ? MATTHEW_PLAIN : typeof BOOKS !== "undefined" ? BOOKS[id] : null : null;
     const book = resolveBook(tab.bookId);
     if (s === "matthew-ch" || s === "bible-ch") {
       const title = book ? `${book.title} \xB7 Ch. ${tab.chapterNum ?? "?"}` : "Reading";
@@ -3111,63 +3111,77 @@
           onThemeChange: setTheme
         }
       ),
-      "bible-idx": () => book && /* @__PURE__ */ React.createElement(
-        ChapterIndex,
-        {
-          book,
-          onSelect: selectBibleCh,
-          onBack: genreId ? () => setScreen("scripture-genre") : goScripturesHome,
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          currentChapter: settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null,
-          isRead: (num) => isRead(bookId, num),
-          markAsReadEnabled: settings.markAsRead,
-          restoredNames: settings.restoredNames,
-          showChapterTitle: settings.showChapterTitle !== false,
-          theme,
-          onThemeChange: setTheme
+      "bible-idx": () => {
+        if (book) return /* @__PURE__ */ React.createElement(
+          ChapterIndex,
+          {
+            book,
+            onSelect: selectBibleCh,
+            onBack: genreId ? () => setScreen("scripture-genre") : goScripturesHome,
+            onSearch: goSearch,
+            onHistory: goHistory,
+            onSettings: goSettings,
+            currentChapter: settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null,
+            isRead: (num) => isRead(bookId, num),
+            markAsReadEnabled: settings.markAsRead,
+            restoredNames: settings.restoredNames,
+            showChapterTitle: settings.showChapterTitle !== false,
+            theme,
+            onThemeChange: setTheme
+          }
+        );
+        if (bookId && typeof window.__bibleCorpus !== "undefined" && !window.__bibleCorpus.loaded) {
+          if (typeof window.__loadBibleCorpus === "function") window.__loadBibleCorpus();
+          return /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading Bible\u2026");
         }
-      ),
-      "bible-ch": () => book && chapter && /* @__PURE__ */ React.createElement(
-        BibleChapterView,
-        {
-          book,
-          chapter,
-          onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
-          onNavigate: (num) => {
-            setSurpriseAnchor(null);
-            selectBibleCh(num);
-          },
-          onMarkRead: () => markRead(bookId, chapterNum),
-          markAsReadEnabled: settings.markAsRead,
-          showProgressBar: settings.showProgressBar,
-          translation: settings.translation,
-          restoredNames: settings.restoredNames,
-          showChapterTitle: settings.showChapterTitle !== false,
-          showSectionHeadings: settings.showSectionHeadings !== false,
-          titleFocusHidden,
-          setTitleFocusHidden,
-          headingsFocusHidden,
-          setHeadingsFocusHidden,
-          prevBook: bcvPrevBook,
-          nextBook: bcvNextBook,
-          onPrevBook: bcvOnPrevBook,
-          onNextBook: bcvOnNextBook,
-          prevBoundaryTitle: bcvPrevBoundaryTitle,
-          nextBoundaryTitle: bcvNextBoundaryTitle,
-          onSearch: goSearch,
-          onSettings: goSettings,
-          onHistory: goHistory,
-          theme,
-          onThemeChange: setTheme,
-          surpriseAnchor,
-          backHint,
-          onTapThroughBack: tapThroughBack,
-          hlTick,
-          onLinkOpen: openLinkSidebar
+        return null;
+      },
+      "bible-ch": () => {
+        if (book && chapter) return /* @__PURE__ */ React.createElement(
+          BibleChapterView,
+          {
+            book,
+            chapter,
+            onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
+            onNavigate: (num) => {
+              setSurpriseAnchor(null);
+              selectBibleCh(num);
+            },
+            onMarkRead: () => markRead(bookId, chapterNum),
+            markAsReadEnabled: settings.markAsRead,
+            showProgressBar: settings.showProgressBar,
+            translation: settings.translation,
+            restoredNames: settings.restoredNames,
+            showChapterTitle: settings.showChapterTitle !== false,
+            showSectionHeadings: settings.showSectionHeadings !== false,
+            titleFocusHidden,
+            setTitleFocusHidden,
+            headingsFocusHidden,
+            setHeadingsFocusHidden,
+            prevBook: bcvPrevBook,
+            nextBook: bcvNextBook,
+            onPrevBook: bcvOnPrevBook,
+            onNextBook: bcvOnNextBook,
+            prevBoundaryTitle: bcvPrevBoundaryTitle,
+            nextBoundaryTitle: bcvNextBoundaryTitle,
+            onSearch: goSearch,
+            onSettings: goSettings,
+            onHistory: goHistory,
+            theme,
+            onThemeChange: setTheme,
+            surpriseAnchor,
+            backHint,
+            onTapThroughBack: tapThroughBack,
+            hlTick,
+            onLinkOpen: openLinkSidebar
+          }
+        );
+        if (bookId && typeof window.__bibleCorpus !== "undefined" && !window.__bibleCorpus.loaded) {
+          if (typeof window.__loadBibleCorpus === "function") window.__loadBibleCorpus();
+          return /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading Bible\u2026");
         }
-      ),
+        return null;
+      },
       // ── IIFE screens — render-time-derived locals (study lookups,
       //    letter shims, chain-aware boundaries) extracted to their own
       //    components in src/ui/screens/. ──
@@ -6239,13 +6253,35 @@
 
   // app/src/main/assets/src/ui/screens/ScripturesHome.jsx
   function ScripturesHome2({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.subscribe(cb) : () => {
+      }, []),
+      () => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.getVersion() : 0
+    );
+    React.useEffect(() => {
+      if (typeof window.__loadBibleCorpus === "function") {
+        window.__loadBibleCorpus().catch((e) => console.warn("Bible corpus pre-load failed", e));
+      }
+    }, []);
+    const bibleLoaded = typeof window.__bibleCorpus !== "undefined" && window.__bibleCorpus.loaded;
     const handleTile = (group) => {
+      if (!bibleLoaded && typeof window.__loadBibleCorpus === "function") {
+        window.__loadBibleCorpus().then(() => {
+          if (group.single) onSelect(group.books[0].id, true);
+          else onGenre(group.id);
+        });
+        return;
+      }
       if (group.single) {
         onSelect(group.books[0].id, true);
       } else
         onGenre(group.id);
     };
     const handleBook = (id) => {
+      if (!bibleLoaded && typeof window.__loadBibleCorpus === "function") {
+        window.__loadBibleCorpus().then(() => onSelect(id));
+        return;
+      }
       onSelect(id);
     };
     const allGenres = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt];
@@ -6253,12 +6289,12 @@
     const navBar = /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: onBack }, "\u2190 Home"), /* @__PURE__ */ React.createElement(NavButtons, { onSettings, onHistory, onSearch, theme, onThemeChange }));
     const hero = /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "home-eyebrow" }, "New King James Version"), /* @__PURE__ */ React.createElement("h1", { className: "home-title" }, "The Scriptures of Truth"), /* @__PURE__ */ React.createElement("div", { className: "home-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "home-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "home-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "home-ornament-line r" })));
     if (layout === "genre" || !layout) return /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: navBar }, /* @__PURE__ */ React.createElement("div", { className: "home-screen scriptures-landing" }, hero, /* @__PURE__ */ React.createElement("div", { className: "genre-columns" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col genre-col-stretch" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col-label" }, "Old Testament"), SCRIPTURE_GENRES.ot.map((g) => {
-      const totalCh = g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0);
+      const totalCh = bibleLoaded ? g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0) : "\u2014";
       const bookCount = g.books.length;
       const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
       return /* @__PURE__ */ React.createElement("button", { key: g.id, className: "genre-tile", onClick: () => handleTile(g) }, /* @__PURE__ */ React.createElement("div", { className: "genre-tile-title" }, g.label), /* @__PURE__ */ React.createElement("div", { className: "genre-tile-sub" }, bookLabel, " \xB7 ", totalCh, " Chapters"));
     })), /* @__PURE__ */ React.createElement("div", { className: "genre-col genre-col-stretch" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col-label" }, "New Testament"), SCRIPTURE_GENRES.nt.map((g) => {
-      const totalCh = g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0);
+      const totalCh = bibleLoaded ? g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0) : "\u2014";
       const bookCount = g.books.length;
       const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
       return /* @__PURE__ */ React.createElement("button", { key: g.id, className: "genre-tile", onClick: () => handleTile(g) }, /* @__PURE__ */ React.createElement("div", { className: "genre-tile-title" }, g.label), /* @__PURE__ */ React.createElement("div", { className: "genre-tile-sub" }, bookLabel, " \xB7 ", totalCh, " Chapters"));
@@ -9525,7 +9561,12 @@
       settings,
       readItems
     });
-    const ALL_BOOKS = { matthew: MATTHEW, ...BOOKS };
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.subscribe(cb) : () => {
+      }, []),
+      () => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.getVersion() : 0
+    );
+    const ALL_BOOKS = { matthew: MATTHEW, ...typeof BOOKS !== "undefined" ? BOOKS : {} };
     window.__ALL_BOOKS = ALL_BOOKS;
     const book = bookId ? ALL_BOOKS[bookId] : null;
     const chapter = book && chapterNum != null ? book.chapters.find((c) => c.num === chapterNum) : null;

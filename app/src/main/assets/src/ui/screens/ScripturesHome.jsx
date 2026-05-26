@@ -3,11 +3,43 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout }) {
+  // Q8: pre-trigger the Bible corpus load when this screen mounts so the
+  // user's likely next action (tap a genre tile or book) doesn't pay the
+  // full ~7 MB download wait. The subscription re-renders this component
+  // when BOOKS becomes defined, replacing skeleton "—" counts with real
+  // chapter totals. Idempotent — second mount returns the cached Promise.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.subscribe(cb) : () => {}), []),
+    () => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.getVersion() : 0)
+  );
+  React.useEffect(() => {
+    if (typeof window.__loadBibleCorpus === 'function') {
+      window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load failed', e));
+    }
+  }, []);
+  const bibleLoaded = typeof window.__bibleCorpus !== 'undefined' && window.__bibleCorpus.loaded;
+
   const handleTile = (group) => {
+    // Block book-navigation tiles (single-book) until BOOKS is loaded —
+    // setScreen('bible-ch') would render a blank chapter view otherwise.
+    if (!bibleLoaded && typeof window.__loadBibleCorpus === 'function') {
+      window.__loadBibleCorpus().then(() => {
+        if (group.single) onSelect(group.books[0].id, true);
+        else onGenre(group.id);
+      });
+      return;
+    }
     if (group.single) {onSelect(group.books[0].id, true);} else
     onGenre(group.id);
   };
-  const handleBook = (id) => {onSelect(id);};
+  const handleBook = (id) => {
+    if (!bibleLoaded && typeof window.__loadBibleCorpus === 'function') {
+      window.__loadBibleCorpus().then(() => onSelect(id));
+      return;
+    }
+    onSelect(id);
+  };
+
   const allGenres = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt];
   const allBooks = allGenres.flatMap((g) => g.books);
 
@@ -39,7 +71,9 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
           <div className="genre-col genre-col-stretch">
             <div className="genre-col-label">Old Testament</div>
             {SCRIPTURE_GENRES.ot.map((g) => {
-              const totalCh = g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0);
+              const totalCh = bibleLoaded
+                ? g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0)
+                : '—';
               const bookCount = g.books.length;
               const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
               return (
@@ -53,7 +87,9 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
           <div className="genre-col genre-col-stretch">
             <div className="genre-col-label">New Testament</div>
             {SCRIPTURE_GENRES.nt.map((g) => {
-              const totalCh = g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0);
+              const totalCh = bibleLoaded
+                ? g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0)
+                : '—';
               const bookCount = g.books.length;
               const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
               return (

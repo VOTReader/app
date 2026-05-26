@@ -62,9 +62,54 @@
 <body>
   <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");}catch(e){}</script>
   <div id="root"></div>
-  <!-- Cluster A: vendor + raw corpus + search engine (27 files, ~11.7 MB).
-       Concatenated by tools/build.py — DO NOT edit dist/bundle-a.js by hand. -->
+  <!-- Cluster A: vendor + (most) corpus + search engine (26 files, ~4.6 MB).
+       Concatenated by tools/build.py — DO NOT edit dist/bundle-a.js by hand.
+       books.js (6.9 MB NKJV Bible) was SPLIT OUT into bundle-a-bible.js (Q8),
+       loaded lazily via window.__loadBibleCorpus() on first Bible-bound
+       navigation. See BUNDLE-LAZY-LOAD-PLAN.md for the design rationale. -->
   <script src="dist/bundle-a.js"></script>
+
+  <!-- Lazy Bible-corpus loader. Idempotent — subsequent calls return the
+       cached Promise. The on-load callback runs __finishBibleInit() (defined
+       in the inline #3 block below) to wire MATTHEW_PLAIN into BOOKS and
+       build BIBLE_BOOK_LIST + OT_BOOK_IDS — those were eager in the
+       pre-Q8 inline #3 block but now defer until BOOKS is defined. -->
+  <script>
+  (function() {
+    var corpus = window.__bibleCorpus = {
+      loaded: false,
+      _promise: null,
+      _listeners: new Set(),
+      subscribe: function(cb) { this._listeners.add(cb); var self = this; return function() { self._listeners.delete(cb); }; },
+      getVersion: function() { return this.loaded ? 1 : 0; },
+      _notify: function() { this.loaded = true; this._listeners.forEach(function(cb) { try { cb(); } catch (e) { console.warn('bible-corpus subscriber threw', e); } }); }
+    };
+    window.__loadBibleCorpus = function() {
+      if (corpus._promise) return corpus._promise;
+      corpus._promise = new Promise(function(resolve, reject) {
+        var script = document.createElement('script');
+        script.src = 'dist/bundle-a-bible.js';
+        script.async = false;
+        script.onload = function() {
+          try {
+            if (typeof window.__finishBibleInit === 'function') window.__finishBibleInit();
+            corpus._notify();
+            resolve();
+          } catch (e) { reject(e); }
+        };
+        script.onerror = function(e) {
+          // Failed to load (network error / missing file). Reset the promise
+          // so a later retry can succeed; reject this Promise so the caller
+          // can show an error state.
+          corpus._promise = null;
+          reject(new Error('Failed to load bundle-a-bible.js'));
+        };
+        document.head.appendChild(script);
+      });
+      return corpus._promise;
+    };
+  })();
+  </script>
 
   <!-- The ~4.4k-line CSS now lives in app.css, loaded via <link rel="stylesheet"> in <head>. This eliminates the
        const CSS template-literal black-screen footgun (a stray backtick in a CSS comment used to
@@ -815,8 +860,45 @@ const ARROW_LAYOUT_OPTIONS = [
    Book order: Matthew → Mark → Luke → John → Acts → Romans → … → Jude → Revelation → Volume Two
    Cross-type boundaries flow seamlessly between viewers
 ═══════════════════════════════════════════════════════════════ */
-// Add plain NKJV Matthew to BOOKS
-BOOKS["matthew-plain"] = MATTHEW_PLAIN;
+// Q8: BOOKS lives in bundle-a-bible.js (lazy-loaded). When this inline
+// block runs, BOOKS may be undefined. Move all BOOKS-touching init into
+// __finishBibleInit(), called by __loadBibleCorpus()'s onload handler.
+// Pre-declare the consumer-visible globals as mutable (BIBLE_BOOK_LIST /
+// OT_BOOK_IDS) so reads return empty rather than throwing pre-load.
+var BIBLE_BOOK_LIST = [];
+var OT_BOOK_IDS = new Set();
+window.__finishBibleInit = function() {
+  if (typeof BOOKS === 'undefined' || !BOOKS) return;
+  // Add plain NKJV Matthew to BOOKS
+  BOOKS["matthew-plain"] = MATTHEW_PLAIN;
+  // Rebuild BIBLE_BOOK_LIST in canonical Bible order.
+  BIBLE_BOOK_LIST.length = 0;
+  BIBLE_BOOK_LIST.push(
+    // Old Testament
+    BOOKS.genesis, BOOKS.exodus, BOOKS.leviticus, BOOKS.numbers, BOOKS.deuteronomy,
+    BOOKS.joshua, BOOKS.judges, BOOKS.ruth,
+    BOOKS["1samuel"], BOOKS["2samuel"], BOOKS["1kings"], BOOKS["2kings"],
+    BOOKS["1chronicles"], BOOKS["2chronicles"],
+    BOOKS.ezra, BOOKS.nehemiah, BOOKS.esther,
+    BOOKS.job, BOOKS.psalms, BOOKS.proverbs, BOOKS.ecclesiastes, BOOKS.songofsolomon,
+    BOOKS.isaiah, BOOKS.jeremiah, BOOKS.lamentations, BOOKS.ezekiel, BOOKS.daniel,
+    BOOKS.hosea, BOOKS.joel, BOOKS.amos, BOOKS.obadiah, BOOKS.jonah,
+    BOOKS.micah, BOOKS.nahum, BOOKS.habakkuk, BOOKS.zephaniah,
+    BOOKS.haggai, BOOKS.zechariah, BOOKS.malachi,
+    // New Testament
+    BOOKS["matthew-plain"], BOOKS.mark, BOOKS.luke, BOOKS.john, BOOKS.acts,
+    BOOKS.romans, BOOKS["1corinthians"], BOOKS["2corinthians"], BOOKS.galatians,
+    BOOKS.ephesians, BOOKS.philippians, BOOKS.colossians,
+    BOOKS["1thessalonians"], BOOKS["2thessalonians"],
+    BOOKS["1timothy"], BOOKS["2timothy"], BOOKS.titus, BOOKS.philemon,
+    BOOKS.hebrews,
+    BOOKS.james, BOOKS["1peter"], BOOKS["2peter"],
+    BOOKS["1john"], BOOKS["2john"], BOOKS["3john"], BOOKS.jude,
+    BOOKS.revelation
+  );
+  OT_BOOK_IDS.clear();
+  BIBLE_BOOK_LIST.slice(0, 39).forEach(function(b) { if (b && b.id) OT_BOOK_IDS.add(b.id); });
+};
 
 // Link WTLB entries with prev/next
 /* linkWtlbEntries --> extracted to src/data/letter-linking.js */
@@ -836,31 +918,8 @@ COLLECTIONS.forEach(function(col) {
   if (pref) linkPreface(pref, arr);
 });
 
-const BIBLE_BOOK_LIST = [
-// Old Testament
-BOOKS.genesis, BOOKS.exodus, BOOKS.leviticus, BOOKS.numbers, BOOKS.deuteronomy,
-BOOKS.joshua, BOOKS.judges, BOOKS.ruth,
-BOOKS["1samuel"], BOOKS["2samuel"], BOOKS["1kings"], BOOKS["2kings"],
-BOOKS["1chronicles"], BOOKS["2chronicles"],
-BOOKS.ezra, BOOKS.nehemiah, BOOKS.esther,
-BOOKS.job, BOOKS.psalms, BOOKS.proverbs, BOOKS.ecclesiastes, BOOKS.songofsolomon,
-BOOKS.isaiah, BOOKS.jeremiah, BOOKS.lamentations, BOOKS.ezekiel, BOOKS.daniel,
-BOOKS.hosea, BOOKS.joel, BOOKS.amos, BOOKS.obadiah, BOOKS.jonah,
-BOOKS.micah, BOOKS.nahum, BOOKS.habakkuk, BOOKS.zephaniah,
-BOOKS.haggai, BOOKS.zechariah, BOOKS.malachi,
-// New Testament
-BOOKS["matthew-plain"], BOOKS.mark, BOOKS.luke, BOOKS.john, BOOKS.acts,
-BOOKS.romans, BOOKS["1corinthians"], BOOKS["2corinthians"], BOOKS.galatians,
-BOOKS.ephesians, BOOKS.philippians, BOOKS.colossians,
-BOOKS["1thessalonians"], BOOKS["2thessalonians"],
-BOOKS["1timothy"], BOOKS["2timothy"], BOOKS.titus, BOOKS.philemon,
-BOOKS.hebrews,
-BOOKS.james, BOOKS["1peter"], BOOKS["2peter"],
-BOOKS["1john"], BOOKS["2john"], BOOKS["3john"], BOOKS.jude,
-BOOKS.revelation];
-
-
-const OT_BOOK_IDS = new Set(BIBLE_BOOK_LIST.slice(0, 39).map((b) => b.id));
+// BIBLE_BOOK_LIST + OT_BOOK_IDS are populated by __finishBibleInit()
+// which runs when bundle-a-bible.js loads (see __loadBibleCorpus above).
 
 /* ═══════════════════════════════════════════════════════════════
    VOT LETTER REGISTRY

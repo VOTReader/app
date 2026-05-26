@@ -99,7 +99,14 @@ export function useNavHistoryTracking({
       const ch = MATTHEW.chapters.find((c) => c.num === chapterNum);
       addToHistory({ type: 'chapter', bookId: 'matthew', bookTitle: 'Matthew', chapterNum, chapterTitle: ch?.title || null });
     } else if (screen === 'bible-ch' && bookId && chapterNum) {
-      const book = BOOKS[bookId];
+      // Q8: BOOKS is lazy-loaded; if the user lands directly on bible-ch via
+      // saved tab state, this effect fires BEFORE the corpus loads. Use
+      // window.BOOKS rather than the bare identifier — esbuild's IIFE
+      // captures `BOOKS` as a free identifier and bare reference throws
+      // a ReferenceError before our typeof guard can short-circuit.
+      const _BOOKS = (typeof window !== 'undefined') ? window.BOOKS : undefined;
+      if (!_BOOKS) return;
+      const book = _BOOKS[bookId];
       const ch = book?.chapters.find((c) => c.num === chapterNum);
       addToHistory({ type: 'chapter', bookId, bookTitle: book?.title || bookId, chapterNum, chapterTitle: ch?.title || null });
     } else if (letterId) {

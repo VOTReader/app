@@ -39,7 +39,9 @@
 export function describeTab(tab) {
   // Returns { title, subtitle } for the card. Falls back gracefully.
   const s = tab.screen || 'home';
-  const resolveBook = (id) => id ? id === 'matthew' ? MATTHEW : id === 'matthew-plain' ? MATTHEW_PLAIN : BOOKS[id] : null;
+  // Q8: BOOKS is lazy-loaded; tolerate undefined (tab restored before
+  // bundle-a-bible.js finishes loading → returns null → 'Reading' label).
+  const resolveBook = (id) => id ? id === 'matthew' ? MATTHEW : id === 'matthew-plain' ? MATTHEW_PLAIN : (typeof BOOKS !== 'undefined' ? BOOKS[id] : null) : null;
   const book = resolveBook(tab.bookId);
 
   // Scripture flow
