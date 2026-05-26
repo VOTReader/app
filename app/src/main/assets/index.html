@@ -26,13 +26,16 @@
   " />
   <title>VOTReader</title>
   <style>
-    @font-face { font-family: 'Cinzel'; font-weight: 400; font-style: normal; src: url('fonts/Cinzel-Regular.otf') format('opentype'); font-display: swap; }
-    @font-face { font-family: 'Cinzel'; font-weight: 600; font-style: normal; src: url('fonts/Cinzel-Bold.otf') format('opentype'); font-display: swap; }
-    @font-face { font-family: 'Cinzel'; font-weight: 700; font-style: normal; src: url('fonts/Cinzel-Bold.otf') format('opentype'); font-display: swap; }
+    /* Self-hosted OFL fonts. WOFF2 from fontsource (NDISCOVER/Cinzel ships
+       both Cinzel + Cinzel Decorative; octaviopardo/EBGaramond12 ships the
+       variable axis). Full license terms in fonts/OFL-Cinzel.txt and fonts/
+       OFL-EBGaramond.txt. ~140 KB total — sized to cache as PWA shell (W3). */
+    @font-face { font-family: 'Cinzel'; font-weight: 400; font-style: normal; src: url('fonts/cinzel-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+    @font-face { font-family: 'Cinzel'; font-weight: 600 700; font-style: normal; src: url('fonts/cinzel-latin-700-normal.woff2') format('woff2'); font-display: swap; }
     @font-face { font-family: 'Cinzel Decorative'; font-weight: 400; font-style: normal; src: url('fonts/cinzel-decorative-latin-400-normal.woff2') format('woff2'); font-display: swap; }
     @font-face { font-family: 'Cinzel Decorative'; font-weight: 700; font-style: normal; src: url('fonts/cinzel-decorative-latin-700-normal.woff2') format('woff2'); font-display: swap; }
-    @font-face { font-family: 'EB Garamond'; font-weight: 400 500; font-style: normal; src: url('fonts/EBGaramond-VariableFont_wght.ttf') format('truetype'); font-display: swap; }
-    @font-face { font-family: 'EB Garamond'; font-weight: 400 500; font-style: italic; src: url('fonts/EBGaramond-Italic-VariableFont_wght.ttf') format('truetype'); font-display: swap; }
+    @font-face { font-family: 'EB Garamond'; font-weight: 400 500; font-style: normal; src: url('fonts/eb-garamond-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+    @font-face { font-family: 'EB Garamond'; font-weight: 400 500; font-style: italic; src: url('fonts/eb-garamond-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
   </style>
   <link rel="stylesheet" href="app.css" />
   <script>
