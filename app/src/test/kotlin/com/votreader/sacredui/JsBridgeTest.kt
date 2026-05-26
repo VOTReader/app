@@ -256,6 +256,42 @@ class JsBridgeTest {
         }
     }
 
+    // ─── JsEvent typed overload ──────────────────────────────────────
+
+    @Test
+    fun `JsEvent fn names match their JS-side window callbacks`() {
+        // If a callback is renamed on one side but not the other, the
+        // bridge breaks silently. These pins catch the mismatch.
+        assertEquals("__onImportFile", JsEvent.ImportFile.fn)
+        assertEquals("__onMicPermissionResult", JsEvent.MicPermissionResult.fn)
+        assertEquals("__onNativeRecordingComplete", JsEvent.NativeRecordingComplete.fn)
+    }
+
+    @Test
+    fun `callOptional typed JsEvent delegates to string overload`() {
+        // Each JsEvent routes through callOptional(event.fn, ...) which
+        // passes FN_NAME and reaches webView.post (our throwing stub).
+        // IllegalStateException = require passed + reached WebView.
+        for (event in listOf(
+            JsEvent.ImportFile,
+            JsEvent.MicPermissionResult,
+            JsEvent.NativeRecordingComplete
+        )) {
+            assertThrows<IllegalStateException>("${event.fn} should pass through") {
+                bridge.callOptional(event)
+            }
+        }
+    }
+
+    @Test
+    fun `callOptional typed JsEvent passes args through`() {
+        // Verify the vararg spread works -- the typed overload must
+        // forward args to the string overload without dropping them.
+        assertThrows<IllegalStateException> {
+            bridge.callOptional(JsEvent.NativeRecordingComplete, "base64data", 1500L, "audio/mp4")
+        }
+    }
+
     @Test
     fun `escapeArg unsupported type throws IllegalArgumentException`() {
         // Any Kotlin type that isn't one of the explicit branches is a

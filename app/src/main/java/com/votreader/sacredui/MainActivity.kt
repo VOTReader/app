@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri == null) {
                 // User cancelled the picker
-                bridge.callOptional("__onImportFile", null)
+                bridge.callOptional(JsEvent.ImportFile, null)
                 return@registerForActivityResult
             }
             // Size cap + read + base64 all live in StorageManager;
@@ -135,8 +135,8 @@ class MainActivity : AppCompatActivity() {
             // whole class of failures, so keeping them indistinguishable
             // matches the existing UX contract.
             when (val r = vm.storage.readUriAsBase64(uri)) {
-                is StorageManager.Result.Success -> bridge.callOptional("__onImportFile", r.value)
-                is StorageManager.Result.Failure -> bridge.callOptional("__onImportFile", null)
+                is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ImportFile, r.value)
+                is StorageManager.Result.Failure -> bridge.callOptional(JsEvent.ImportFile, null)
             }
         }
 
@@ -190,10 +190,10 @@ class MainActivity : AppCompatActivity() {
                 // Same 250 ms grace period as micPermissionLauncher — lets the OS
                 // release its AudioRecord session before JS calls getUserMedia().
                 webView.postDelayed({
-                    bridge.callOptional("__onMicPermissionResult", true)
+                    bridge.callOptional(JsEvent.MicPermissionResult, true)
                 }, 250L)
             } else {
-                bridge.callOptional("__onMicPermissionResult", false)
+                bridge.callOptional(JsEvent.MicPermissionResult, false)
             }
         }
 
@@ -600,7 +600,7 @@ class MainActivity : AppCompatActivity() {
     // mime is always audio/mp4 (AAC in MPEG-4). The bridge marshals the call
     // onto the WebView's thread; nativeRecordStop runs on a binder thread.
     private fun postNativeComplete(base64: String?, durationMs: Long) {
-        bridge.callOptional("__onNativeRecordingComplete", base64, durationMs, "audio/mp4")
+        bridge.callOptional(JsEvent.NativeRecordingComplete, base64, durationMs, "audio/mp4")
     }
 
     /**
@@ -780,13 +780,13 @@ class MainActivity : AppCompatActivity() {
                     this@MainActivity, Manifest.permission.RECORD_AUDIO
                 ) == PackageManager.PERMISSION_GRANTED
                 if (granted) {
-                    bridge.callOptional("__onMicPermissionResult", true)
+                    bridge.callOptional(JsEvent.MicPermissionResult, true)
                 } else {
                     try {
                         micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     } catch (e: Exception) {
                         Timber.w(e, "requestMicPermission launch failed")
-                        bridge.callOptional("__onMicPermissionResult", false)
+                        bridge.callOptional(JsEvent.MicPermissionResult, false)
                     }
                 }
             }

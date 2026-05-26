@@ -48,6 +48,16 @@ class JsBridge(private val webViewProvider: () -> WebView) {
     }
 
     /**
+     * Type-safe overload — accepts a [JsEvent] instead of a raw string.
+     * Delegates to the string-based [callOptional], so the FN_NAME regex
+     * check still fires (defense-in-depth; the sealed class already
+     * guarantees a valid identifier, but the guard costs nothing).
+     */
+    fun callOptional(event: JsEvent, vararg args: Any?) {
+        callOptional(event.fn, *args)
+    }
+
+    /**
      * Evaluate an arbitrary JS expression and forward the (JSON-encoded)
      * result to [callback]. Use for the rare synchronous-return path
      * (e.g. handleAndroidBack returning "true"/"false"). [js] is taken as
