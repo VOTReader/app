@@ -336,29 +336,63 @@ window.AndroidBridge directly after W1.2.
   detection-variable names (`_abc`, `_ab`, `_ab2`, `AB`, raw `isAndroid`
   locals). Sequence by risk ascending (per [[low-risk-pilot-first]]):
 
-    Tier A — pilot the pattern on single-call mechanical sites:
-      use-thumbnails.js       — takeScreenshot
-      use-settings.js         — setLightStatusBar, setKeepScreenOn
+  THREE-STEP PATTERN per call site (per [[guard-removal-includes-fallback]]):
+    1. Replace the call: `window.AndroidBridge.foo()` → `PlatformBridge.foo()`
+    2. Remove the `if (window.AndroidBridge)` guard / detection variable
+       entirely — PlatformBridge always exists.
+    3. EVALUATE the else / catch / default branch:
+         - If useful (e.g. html2canvas as a screenshot fallback): FOLD
+           into PlatformBridge's web impl. The bridge takes ownership.
+         - If dead code now (the abstraction handles it): DELETE.
 
-    Tier B — small file, moderate reference count:
+  Bundle-size watch (per [[bundle-size-as-regression-signal]]): W1.1
+  added +3 KB to bundle-b (platform-bridge.js). After W1.2 closes,
+  bundle-b should be ≤ pre-W1.1 baseline (~351 KB). If positive, some
+  detection / guard / fallback survived somewhere. Track delta per tier.
+
+    Tier A — pilot the three-step pattern on a single mechanical site:
+      use-thumbnails.js       — takeScreenshot
+        Has an html2canvas fallback at lines 166-204 — folds INTO the
+        bridge's web impl. ALSO surfaces a W1.1 design issue: the
+        bridge's takeScreenshot signature is sync-returning-string, but
+        html2canvas is genuinely async. Bridge becomes ()=>Promise<string>
+        on BOTH platforms (Android wraps sync in Promise.resolve, web
+        returns html2canvas's Promise). Standard JS interop shape.
+
+    Tier B — small files, moderate reference counts:
+      use-settings.js         — setLightStatusBar, setKeepScreenOn
       SettingsScreen.jsx      — openFilePicker, saveToDownloads,
-                                 getCrashLog
+                                 getCrashLog (depends on W1.3 file-I/O
+                                 web impl landing first)
       GardenView.jsx          — setZoomEnabled, resetZoom,
                                  setImmersiveMode
 
     Tier C — high reference count + audio domain (riskiest):
       JournalRecordingSheet.jsx — 10+ refs spanning requestMicPermission,
                                   startAudioSession, endAudioSession,
-                                  all 6 nativeRecord*, plus inline
-                                  detection variables. Likely splits
+                                  all 6 nativeRecord*, plus 5 different
+                                  detection-variable names. Consolidation
+                                  goal: ZERO local platform-detection
+                                  variables — JournalRecordingSheet becomes
+                                  a pure UI component that calls
+                                  PlatformBridge methods and doesn't know
+                                  what platform it's on. Likely splits
                                   into A/V/storage sub-commits.
 
-  Each tier: replace AndroidBridge access + remove the detection
-  variable + smoke walk via votSmoke() + commit. Post-migration grep
-  should return zero results for `window.AndroidBridge` outside
-  platform-bridge.js (use `grep -rn "window.AndroidBridge"
-  app/src/main/assets/src --include="*.jsx" --include="*.js"
-  | grep -v platform-bridge.js` — empty output is the exit gate).
+  PER-TIER VERIFICATION (per [[preview-eval-replaces-device]]):
+  After each tier lands and BEFORE reporting it done:
+    - preview_eval that PlatformBridge.<method>() returns expected values
+    - preview_console_logs error → empty
+    - preview_snapshot of the consuming screen → identical to pre-migration
+    - bundle-b size recorded; net delta tracked vs. pre-W1.1 baseline
+
+  Post-migration grep gates (BOTH must return empty for W1.2 to close):
+    grep -rn "window.AndroidBridge" app/src/main/assets/src
+      --include="*.jsx" --include="*.js" | grep -v platform-bridge.js
+    grep -rn "isAndroid" app/src/main/assets/src
+      --include="*.jsx" --include="*.js" | grep -v platform-bridge
+
+  (The second grep catches the surviving local detection variables.)
 
   haptic — not yet wired in JS, see [[haptic-bridge-ready]]. Out of W1.2
   scope; lands when JS-side haptic call sites get added (separate task).
@@ -479,6 +513,12 @@ window.AndroidBridge directly after W1.2.
     [ ] All 20 methods have web equivalents (or justified no-ops)
     [ ] All call-site files migrated; grep for `window.AndroidBridge`
         outside platform-bridge.js returns ZERO matches
+    [ ] Grep for `error:web-impl-pending` returns ZERO matches (all
+        W1.1 placeholders filled with real web impls)
+    [ ] Grep for `isAndroid` in consumer files (outside platform-bridge.js)
+        returns ZERO — no local platform-detection variables survived
+    [ ] Bundle-b net delta ≤ 0 vs. pre-W1.1 baseline (~351 KB).
+        If positive, consolidation is incomplete somewhere
     [ ] File import/export works on desktop Chrome (user-gesture path)
     [ ] Audio recording works on desktop Chrome (mime: webm/opus or ogg/opus)
     [ ] Back navigation via Escape key gated on fullscreen + sheet state
