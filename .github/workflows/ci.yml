@@ -9,7 +9,11 @@ name: CI
 #          as lint (any type error fails CI). Cross-bundle bare-name globals are
 #          ambient-declared as `any` in tools/globals.generated.d.ts; not-yet-typed
 #          stores/utils carry @ts-nocheck placeholders (lifted as Q4.2/Q4.3 land).
-# Tests (Q5) and CSS hardening (Q6) land later. See PLAN.txt.
+#   NK1  — Kotlin unit-test gate: `./gradlew :app:testDebugUnitTest` runs the
+#          JUnit 5 + Robolectric suite (junit-vintage bridges JUnit 4 / JUnit 5
+#          on the same platform). Zero-tolerance — any failing Kotlin test fails
+#          CI. AGP 9.2.1 requires JDK 17+; we run JDK 21 to match the local
+#          toolchain pinned in gradle/gradle-daemon-jvm.properties.
 
 on:
   push:
@@ -91,3 +95,35 @@ jobs:
           # node --check would reject the syntax outright. -r skips the
           # esbuild run on a tree that has no .jsx files yet.
           find app/src/main/assets/src -name '*.jsx' -print0 | xargs -0 -r -n1 npx esbuild --outfile=/dev/null --log-level=warning
+
+  kotlin-tests:
+    name: Kotlin unit tests (NK1)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (matches gradle/gradle-daemon-jvm.properties)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # Cache the Gradle daemon's caches + wrapper download so subsequent
+      # CI runs don't re-download AGP 9.2.1 + Robolectric every time.
+      - name: Set up Gradle (with build cache)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run :app:testDebugUnitTest (JUnit 5 + Robolectric)
+        # Zero-tolerance gate. Any failing Kotlin test fails CI, mirroring
+        # the JS-side vitest discipline. NK1 lands the smoke harness;
+        # NK2-NK5 fill it with real test cases.
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-test-report
+          path: app/build/reports/tests/testDebugUnitTest/
+          retention-days: 14
