@@ -13,16 +13,20 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Base64
+import android.view.Gravity
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -76,6 +80,12 @@ class MainActivity : AppCompatActivity() {
     // false after onPageFinished + a short delay to let React mount, so the
     // cold-boot transition is splash → first frame with no black flash.
     @Volatile private var splashHolding = true
+    // Renderer-crash recovery state — counts onRenderProcessGone within a
+    // 60-second window. After 2 crashes we stop auto-reloading and show a
+    // static "tap to reload" view so we don't infinite-loop on content that
+    // reproducibly crashes Chromium.
+    private var renderRecoveryCount = 0
+    private var firstRecoveryMs = 0L
     // Launcher for the import file picker; registered in onCreate before the
     // WebView is created so it is ready before any JS calls openFilePicker().
     private lateinit var filePickerLauncher: ActivityResultLauncher<String>
@@ -216,12 +226,59 @@ class MainActivity : AppCompatActivity() {
             WebView.setWebContentsDebuggingEnabled(true)
         }
 
-        webView = WebView(this)
-        setContentView(webView)
-
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
 
-        webView.settings.apply {
+        webView = createConfiguredWebView()
+        setContentView(webView)
+
+        if (savedInstanceState != null) {
+            webView.restoreState(savedInstanceState)
+        } else {
+            // Fresh cold start (not a config-change restore). All UI assets
+            // are bundled in the APK and served locally by WebViewAssetLoader,
+            // so HTTP-caching the `src/*.js` module files buys nothing but
+            // costs correctness: after an APK update the WebView would keep
+            // serving the OLD cached module (the recurring "I don't see my
+            // change" bug). Clear the resource cache here so every launch
+            // loads the freshly-bundled JS. This clears the file/resource
+            // cache ONLY — localStorage / DOM storage (where all journal,
+            // notes, bookmarks, links data live) is untouched.
+            webView.clearCache(true)
+            webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
+        }
+
+        onBackPressedDispatcher.addCallback(this) {
+            // All in-app navigation is JS-driven, so webView.canGoBack() is
+            // always false (single URL, no history stack). Route the
+            // hardware back press through window.handleAndroidBack() — the
+            // JS handler returns "true" when it consumed the press (closed
+            // a sheet, popped fromLetterStack, navigated to a parent
+            // screen) and "false" when there's nothing to pop. On "false"
+            // we finish() so the user actually exits, instead of being
+            // stuck on the home screen.
+            webView.evaluateJavascript(
+                "(typeof window.handleAndroidBack === 'function') ? window.handleAndroidBack() : 'false'"
+            ) { result ->
+                if (result != "\"true\"") finish()
+            }
+        }
+    }
+
+    /**
+     * Build and wire up the WebView used as the app's root view. Extracted
+     * from onCreate so onRenderProcessGone can rebuild a fresh WebView when
+     * the renderer process dies — every listener, client, and JS bridge is
+     * established here, so the new instance is fully equivalent to the
+     * original from the moment it leaves this method.
+     *
+     * The inset listener + requestApplyInsets are also wired here because
+     * they attach to a specific WebView; the back-press dispatcher stays in
+     * onCreate (Activity-scoped, reads the [webView] field at fire time).
+     */
+    private fun createConfiguredWebView(): WebView {
+        val wv = WebView(this)
+
+        wv.settings.apply {
             @Suppress("SetJavaScriptEnabled")
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -248,11 +305,11 @@ class MainActivity : AppCompatActivity() {
             .addPathHandler("/assets/", AssetsPathHandler(this))
             .build()
 
-        webView.addJavascriptInterface(AppInterface(), "AndroidBridge")
+        wv.addJavascriptInterface(AppInterface(), "AndroidBridge")
         // Route JS console output to Logcat so production crashes / [object CSS]
         // React-warning class failures / WebView errors are visible via
         // `adb logcat -s WebViewJS`. Previously discarded silently.
-        webView.webChromeClient = object : WebChromeClient() {
+        wv.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
                 val src = msg.sourceId() ?: ""
                 val line = msg.lineNumber()
@@ -347,7 +404,7 @@ class MainActivity : AppCompatActivity() {
                 if (pendingMicPermission === request) pendingMicPermission = null
             }
         }
-        webView.webViewClient = object : WebViewClientCompat() {
+        wv.webViewClient = object : WebViewClientCompat() {
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest
@@ -391,9 +448,57 @@ class MainActivity : AppCompatActivity() {
                 super.onScaleChanged(view, oldScale, newScale)
                 currentScale = newScale
             }
+
+            /**
+             * Recover from a Chromium renderer process death (OOM, sandbox
+             * crash, force-kill). Without this override, the system kills
+             * the Activity and the user sees a white screen. We rebuild the
+             * WebView via [createConfiguredWebView] and reload index.html.
+             *
+             * If the same content crashes the renderer 3 times in 60 s we
+             * stop auto-recovering and show a tap-to-reload view, otherwise
+             * a reliably-crashing page would create an infinite loop.
+             */
+            override fun onRenderProcessGone(
+                view: WebView,
+                detail: RenderProcessGoneDetail?
+            ): Boolean {
+                val crashed = detail?.didCrash() ?: false
+                Timber.w("WebView renderer died (crashed=%b). Recovering.", crashed)
+
+                val now = System.currentTimeMillis()
+                if (firstRecoveryMs == 0L || now - firstRecoveryMs > 60_000L) {
+                    renderRecoveryCount = 0
+                    firstRecoveryMs = now
+                }
+                renderRecoveryCount++
+
+                // Resolve any in-flight WebView resource requests bound to
+                // the dying instance — same cleanup as onDestroy. The
+                // PermissionRequest / file-chooser callback would otherwise
+                // leak and the JS getUserMedia promise would hang.
+                pendingMicPermission?.let { try { it.deny() } catch (_: Exception) {} }
+                pendingMicPermission = null
+                fileChooserCallback?.let { try { it.onReceiveValue(null) } catch (_: Exception) {} }
+                fileChooserCallback = null
+
+                (view.parent as? ViewGroup)?.removeView(view)
+                view.destroy()
+
+                if (renderRecoveryCount > 2) {
+                    Timber.e("Renderer crashed %d times in 60s. Showing retry view.", renderRecoveryCount)
+                    showRendererCrashRetryView()
+                    return true
+                }
+
+                webView = createConfiguredWebView()
+                setContentView(webView)
+                webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
+                return true
+            }
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { _, insets ->
+        ViewCompat.setOnApplyWindowInsetsListener(wv) { _, insets ->
             // Include IME (soft-keyboard) in the bottom inset so floating
             // UI like the surprise FAB or NoteSheet anchor moves above the
             // keyboard instead of being hidden behind it.
@@ -407,39 +512,33 @@ class MainActivity : AppCompatActivity() {
             injectInsets()
             WindowInsetsCompat.CONSUMED
         }
-        ViewCompat.requestApplyInsets(webView)
+        ViewCompat.requestApplyInsets(wv)
 
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState)
-        } else {
-            // Fresh cold start (not a config-change restore). All UI assets
-            // are bundled in the APK and served locally by WebViewAssetLoader,
-            // so HTTP-caching the `src/*.js` module files buys nothing but
-            // costs correctness: after an APK update the WebView would keep
-            // serving the OLD cached module (the recurring "I don't see my
-            // change" bug). Clear the resource cache here so every launch
-            // loads the freshly-bundled JS. This clears the file/resource
-            // cache ONLY — localStorage / DOM storage (where all journal,
-            // notes, bookmarks, links data live) is untouched.
-            webView.clearCache(true)
-            webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
-        }
+        return wv
+    }
 
-        onBackPressedDispatcher.addCallback(this) {
-            // All in-app navigation is JS-driven, so webView.canGoBack() is
-            // always false (single URL, no history stack). Route the
-            // hardware back press through window.handleAndroidBack() — the
-            // JS handler returns "true" when it consumed the press (closed
-            // a sheet, popped fromLetterStack, navigated to a parent
-            // screen) and "false" when there's nothing to pop. On "false"
-            // we finish() so the user actually exits, instead of being
-            // stuck on the home screen.
-            webView.evaluateJavascript(
-                "(typeof window.handleAndroidBack === 'function') ? window.handleAndroidBack() : 'false'"
-            ) { result ->
-                if (result != "\"true\"") finish()
+    /**
+     * Fallback shown when the renderer has crashed repeatedly in a short
+     * window — see [onRenderProcessGone]. A tap resets the counter and
+     * rebuilds a fresh WebView; if the underlying issue resolves itself
+     * (transient OOM, sandbox flake) the user is back in. If it doesn't,
+     * the cycle just repeats once more and lands back here.
+     */
+    private fun showRendererCrashRetryView() {
+        val tv = TextView(this).apply {
+            text = "The page stopped responding. Tap to reload."
+            gravity = Gravity.CENTER
+            textSize = 18f
+            setPadding(48, 48, 48, 48)
+            setOnClickListener {
+                renderRecoveryCount = 0
+                firstRecoveryMs = 0L
+                webView = createConfiguredWebView()
+                setContentView(webView)
+                webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
             }
         }
+        setContentView(tv)
     }
 
     private fun injectInsets() {
