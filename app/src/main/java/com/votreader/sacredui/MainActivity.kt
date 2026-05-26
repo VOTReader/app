@@ -50,10 +50,14 @@ import androidx.webkit.WebViewClientCompat
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Locale
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlin.math.max
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 class MainActivity : AppCompatActivity() {
@@ -598,6 +602,98 @@ class MainActivity : AppCompatActivity() {
         bridge.callOptional("__onNativeRecordingComplete", base64, durationMs, "audio/mp4")
     }
 
+    /**
+     * Hop to Dispatchers.Main, capture the WebView via [capturePixelCopy],
+     * crop / scale / JPEG-encode the result, and return the data URI. The
+     * @JavascriptInterface entry point wraps this in runBlocking +
+     * withTimeoutOrNull so JS still sees a synchronous String return.
+     *
+     * The zoom-reset dance preserves the legacy behavior: thumbnails are
+     * always at 1x for consistent visual appearance, even when the user
+     * has pinched-zoomed the live view.
+     */
+    private suspend fun captureScreenshotSuspend(
+        topCropDp: Int,
+        maxDim: Int,
+        jpegQuality: Int
+    ): String = withContext(Dispatchers.Main) {
+        val w = webView.width
+        val h = webView.height
+        if (w <= 0 || h <= 0) return@withContext ""
+
+        val originalScale = currentScale
+        val needsZoomReset = originalScale > 0f && abs(originalScale - 1f) > 0.005f
+        if (needsZoomReset) webView.zoomBy(1f / originalScale)
+
+        try {
+            val density = resources.displayMetrics.density
+            val topCropPx = (topCropDp * density).toInt().coerceIn(0, h - 1)
+            val croppedH = h - topCropPx
+            if (croppedH <= 0) return@withContext ""
+
+            val location = IntArray(2).also { webView.getLocationInWindow(it) }
+            val srcRect = Rect(
+                location[0], location[1],
+                location[0] + w, location[1] + h
+            )
+            val full = createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val ok = capturePixelCopy(srcRect, full)
+            if (!ok) {
+                full.recycle()
+                return@withContext ""
+            }
+
+            val cropped = Bitmap.createBitmap(full, 0, topCropPx, w, croppedH)
+            full.recycle()
+            val longest = max(cropped.width, cropped.height)
+            val scale = if (longest > maxDim) maxDim.toFloat() / longest else 1f
+            val scaled = if (scale < 1f) {
+                val sw = (cropped.width * scale).toInt().coerceAtLeast(1)
+                val sh = (cropped.height * scale).toInt().coerceAtLeast(1)
+                cropped.scale(sw, sh, filter = true).also { cropped.recycle() }
+            } else cropped
+            val stream = ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
+            scaled.recycle()
+            "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+        } catch (e: Exception) {
+            Timber.w(e, "Screenshot capture failed")
+            ""
+        } finally {
+            if (needsZoomReset) webView.zoomBy(originalScale)
+        }
+    }
+
+    /**
+     * Wrap PixelCopy.request in a suspend function. The continuation
+     * resumes with `true` on PixelCopy.SUCCESS, `false` otherwise.
+     *
+     * invokeOnCancellation recycles [dest] if the coroutine is cancelled
+     * before PixelCopy completes (e.g. withTimeoutOrNull fires) -- without
+     * it, an interrupted capture leaks width * height * 4 bytes.
+     */
+    private suspend fun capturePixelCopy(srcRect: Rect, dest: Bitmap): Boolean =
+        suspendCancellableCoroutine { cont ->
+            cont.invokeOnCancellation {
+                try { dest.recycle() } catch (_: Exception) {}
+            }
+            try {
+                PixelCopy.request(
+                    window, srcRect, dest,
+                    { pixelResult ->
+                        if (!cont.isActive) return@request
+                        if (pixelResult != PixelCopy.SUCCESS) {
+                            Timber.w("PixelCopy failed with code %d", pixelResult)
+                        }
+                        cont.resume(pixelResult == PixelCopy.SUCCESS)
+                    },
+                    Handler(Looper.getMainLooper())
+                )
+            } catch (e: IllegalArgumentException) {
+                if (cont.isActive) cont.resume(false)
+            }
+        }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         webView.saveState(outState)
@@ -897,82 +993,16 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun takeScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String {
-            val latch = CountDownLatch(1)
-            var result = ""
-            runOnUiThread {
-                val w = webView.width
-                val h = webView.height
-                if (w <= 0 || h <= 0) {
-                    latch.countDown()
-                    return@runOnUiThread
-                }
-
-                val originalScale = currentScale
-                val needsZoomReset = originalScale > 0f && abs(originalScale - 1f) > 0.005f
-                if (needsZoomReset) webView.zoomBy(1f / originalScale)
-
-                val density = resources.displayMetrics.density
-                val topCropPx = (topCropDp * density).toInt().coerceIn(0, h - 1)
-                val croppedH = h - topCropPx
-                if (croppedH <= 0) {
-                    if (needsZoomReset) webView.zoomBy(originalScale)
-                    latch.countDown()
-                    return@runOnUiThread
-                }
-
-                // Locate the WebView in window coordinates -- PixelCopy.request
-                // captures from a Window source, so we tell it which rect of
-                // the window holds our content.
-                val location = IntArray(2).also { webView.getLocationInWindow(it) }
-                val srcRect = Rect(
-                    location[0], location[1],
-                    location[0] + w, location[1] + h
-                )
-                val full = createBitmap(w, h, Bitmap.Config.ARGB_8888)
-
-                // PixelCopy captures the *actually rendered* surface (incl.
-                // hardware-accelerated layers), unlike webView.draw(Canvas)
-                // which misses some content types. The callback fires on the
-                // main thread; we schedule the runOnUiThread block to RETURN
-                // after kicking off the request, then the binder thread's
-                // latch.await blocks until the callback finishes processing
-                // and counts down. No deadlock: the main thread is free to
-                // run the PixelCopy callback because nobody holds it.
-                PixelCopy.request(
-                    window, srcRect, full,
-                    { pixelResult ->
-                        try {
-                            if (pixelResult != PixelCopy.SUCCESS) {
-                                Timber.w("PixelCopy failed with code %d", pixelResult)
-                                full.recycle()
-                                return@request
-                            }
-                            val cropped = Bitmap.createBitmap(full, 0, topCropPx, w, croppedH)
-                            full.recycle()
-                            val longest = max(cropped.width, cropped.height)
-                            val scale = if (longest > maxDim) maxDim.toFloat() / longest else 1f
-                            val scaled = if (scale < 1f) {
-                                val sw = (cropped.width * scale).toInt().coerceAtLeast(1)
-                                val sh = (cropped.height * scale).toInt().coerceAtLeast(1)
-                                cropped.scale(sw, sh, filter = true).also { cropped.recycle() }
-                            } else cropped
-                            val stream = ByteArrayOutputStream()
-                            scaled.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
-                            scaled.recycle()
-                            result = "data:image/jpeg;base64," +
-                                Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-                        } catch (e: Exception) {
-                            Timber.w(e, "Screenshot post-processing failed")
-                        } finally {
-                            if (needsZoomReset) webView.zoomBy(originalScale)
-                            latch.countDown()
-                        }
-                    },
-                    Handler(Looper.getMainLooper())
-                )
+            // The JS-facing API is synchronous (returns the base64 directly),
+            // so we runBlocking on this binder thread until the coroutine
+            // resolves. Inside, the work hops to Dispatchers.Main for the
+            // WebView reads + PixelCopy request; the 2-second timeout is the
+            // same cap the CountDownLatch version enforced.
+            return runBlocking {
+                withTimeoutOrNull(2_000L) {
+                    captureScreenshotSuspend(topCropDp, maxDim, jpegQuality)
+                } ?: ""
             }
-            latch.await(2L, TimeUnit.SECONDS)
-            return result
         }
 
         /** Open the system JSON file picker. When the user picks a file (or
