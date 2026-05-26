@@ -1,26 +1,23 @@
 package com.votreader.sacredui
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.media.AudioManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.util.Base64
 import android.view.Gravity
 import android.view.PixelCopy
 import android.view.ViewGroup
+import android.view.Window
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
-import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.ValueCallback
@@ -44,7 +41,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 import androidx.webkit.WebViewClientCompat
@@ -60,7 +56,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), BridgeHost {
 
     // State that survives configuration changes lives in [MainViewModel]
     // -- recorder + temp file, audio session, scale, insets, splash hold,
@@ -101,6 +97,38 @@ class MainActivity : AppCompatActivity() {
     // the WebView instance picks up automatically -- no re-instantiation
     // of the bridge required.
     private val bridge: JsBridge = JsBridge { webView }
+
+    // The JS-facing surface (window.AndroidBridge from the WebView side).
+    // Constructor-injected with `this` as the BridgeHost so the class is
+    // unit-testable without an Activity. See AppInterface.kt + BridgeHost.kt.
+    private val appInterface: AppInterface by lazy { AppInterface(this, bridge, vm) }
+
+    // ─── BridgeHost implementation ──────────────────────────────────────
+    // Exposes the Activity surface AppInterface needs (window, context,
+    // current WebView, AudioManager, launchers, screenshot capture).
+    override val activityContext: Context get() = this
+    override val activityWindow: Window get() = window
+    override val activeWebView: WebView get() = webView
+    override val audioSystemService: AudioManager? get() = audioManager
+    override fun postToUi(action: () -> Unit) = runOnUiThread(action)
+    override fun launchFilePicker() {
+        filePickerLauncher.launch("application/json")
+    }
+    override fun launchMicPermissionRequest() {
+        micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
+    override fun captureScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String {
+        // The JS-facing API is synchronous (returns the base64 directly),
+        // so we runBlocking on this binder thread until the coroutine
+        // resolves. Inside, the work hops to Dispatchers.Main for the
+        // WebView reads + PixelCopy request; the 2-second timeout is the
+        // same cap the CountDownLatch version enforced.
+        return runBlocking {
+            withTimeoutOrNull(2_000L) {
+                captureScreenshotSuspend(topCropDp, maxDim, jpegQuality)
+            } ?: ""
+        }
+    }
 
     companion object {
         // Allowlist for shouldOverrideUrlLoading — anything not in this list
@@ -291,7 +319,7 @@ class MainActivity : AppCompatActivity() {
             .addPathHandler("/assets/", AssetsPathHandler(this))
             .build()
 
-        wv.addJavascriptInterface(AppInterface(), "AndroidBridge")
+        wv.addJavascriptInterface(appInterface, "AndroidBridge")
         // Route JS console output to Logcat so production crashes / [object CSS]
         // React-warning class failures / WebView errors are visible via
         // `adb logcat -s WebViewJS`. Previously discarded silently.
@@ -600,13 +628,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    // Deliver a finished native recording to JS. base64 is null on failure;
-    // mime is always audio/mp4 (AAC in MPEG-4). The bridge marshals the call
-    // onto the WebView's thread; nativeRecordStop runs on a binder thread.
-    private fun postNativeComplete(base64: String?, durationMs: Long) {
-        bridge.callOptional(JsEvent.NativeRecordingComplete, base64, durationMs, "audio/mp4")
-    }
-
     /**
      * Hop to Dispatchers.Main, capture the WebView via [capturePixelCopy],
      * crop / scale / JPEG-encode the result, and return the data URI. The
@@ -749,266 +770,4 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    inner class AppInterface {
-
-        @JavascriptInterface
-        fun setLightStatusBar(light: Boolean) {
-            runOnUiThread {
-                WindowInsetsControllerCompat(window, window.decorView)
-                    .isAppearanceLightStatusBars = light
-            }
-        }
-
-        @JavascriptInterface
-        fun setKeepScreenOn(enabled: Boolean) {
-            runOnUiThread {
-                vm.keepScreenOnEnabled = enabled
-                if (enabled) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                } else {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                }
-            }
-        }
-
-        // Called by the JS voice recorder BEFORE getUserMedia. If RECORD_AUDIO
-        // is already granted we tell JS immediately; otherwise we show the OS
-        // permission dialog and report the result via micPrepLauncher's
-        // callback (window.__onMicPermissionResult). Proactively settling the
-        // OS permission means the subsequent WebView onPermissionRequest can
-        // grant synchronously — no grant-after-dialog race / hang.
-        @JavascriptInterface
-        fun requestMicPermission() {
-            runOnUiThread {
-                val granted = ContextCompat.checkSelfPermission(
-                    this@MainActivity, Manifest.permission.RECORD_AUDIO
-                ) == PackageManager.PERMISSION_GRANTED
-                if (granted) {
-                    bridge.callOptional(JsEvent.MicPermissionResult, true)
-                } else {
-                    try {
-                        micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    } catch (e: Exception) {
-                        Timber.w(e, "requestMicPermission launch failed")
-                        bridge.callOptional(JsEvent.MicPermissionResult, false)
-                    }
-                }
-            }
-        }
-
-        // Called by the JS recorder right after getUserMedia resolves. Switching
-        // to MODE_IN_COMMUNICATION keeps the mic AudioRecord session stable on
-        // Android 8+ — without it, Pixel/Samsung devices intermittently drop the
-        // capture (AAUDIO_ERROR_DISCONNECTED) or never acquire it (NotReadableError).
-        @JavascriptInterface
-        fun startAudioSession() {
-            runOnUiThread {
-                val am = audioManager ?: return@runOnUiThread
-                vm.previousAudioMode = am.mode
-                try {
-                    am.mode = AudioManager.MODE_IN_COMMUNICATION
-                } catch (e: Exception) {
-                    Timber.w(e, "startAudioSession setMode failed")
-                }
-            }
-        }
-
-        // Called by the JS recorder when recording stops (entering preview) and
-        // again from cleanup(). Restores the prior audio mode so preview/saved
-        // playback routes to the speaker normally, not the earpiece. Idempotent.
-        @JavascriptInterface
-        fun endAudioSession() {
-            runOnUiThread {
-                val am = audioManager ?: return@runOnUiThread
-                try {
-                    am.mode = vm.previousAudioMode
-                } catch (e: Exception) {
-                    Timber.w(e, "endAudioSession restoreMode failed")
-                }
-            }
-        }
-
-        // ─── Native voice recording (Android-reliable path) ──────────────
-        // The JS recorder uses these instead of getUserMedia/MediaRecorder
-        // when window.AndroidBridge.nativeRecordStart exists. Records AAC
-        // into an MPEG-4 (.m4a) temp file in cacheDir -- playable by an
-        // HTML <audio> element and storable as a Blob, so the existing
-        // preview/IndexedDB pipeline is unchanged. RECORD_AUDIO is ensured
-        // by requestMicPermission before JS calls these.
-        //
-        // The MediaRecorder lifecycle + threading + temp-file management
-        // all live in [NativeAudioRecorder]; these @JavascriptInterface
-        // methods are thin delegates whose only job is to translate
-        // Result<T> into the "ok" / "error:<reason>" string the JS side
-        // already expects. The string shape stays identical so the JS
-        // contract is preserved bit-for-bit.
-
-        /** Start recording. Returns "ok" or "error:<reason>" synchronously. */
-        @JavascriptInterface
-        fun nativeRecordStart(): String = when (val r = vm.audioRecorder.start()) {
-            is NativeAudioRecorder.Result.Success -> "ok"
-            is NativeAudioRecorder.Result.Failure -> "error:${r.reason}"
-        }
-
-        @JavascriptInterface
-        fun nativeRecordPause(): String = when (val r = vm.audioRecorder.pause()) {
-            is NativeAudioRecorder.Result.Success -> "ok"
-            is NativeAudioRecorder.Result.Failure -> "error:${r.reason}"
-        }
-
-        @JavascriptInterface
-        fun nativeRecordResume(): String = when (val r = vm.audioRecorder.resume()) {
-            is NativeAudioRecorder.Result.Success -> "ok"
-            is NativeAudioRecorder.Result.Failure -> "error:${r.reason}"
-        }
-
-        /** Peak amplitude since the last call (0..32767). Drives the waveform. */
-        @JavascriptInterface
-        fun nativeRecordAmplitude(): Int = vm.audioRecorder.amplitude()
-
-        /** Stop, then deliver the audio to JS via
-         *  window.__onNativeRecordingComplete(base64, durationMs, mime).
-         *  base64 is null on failure. The read/encode runs on this binder
-         *  thread (already off the UI thread) then posts to the WebView. */
-        @JavascriptInterface
-        fun nativeRecordStop() {
-            when (val r = vm.audioRecorder.stop()) {
-                is NativeAudioRecorder.Result.Success ->
-                    postNativeComplete(r.value.base64, r.value.durationMs)
-                is NativeAudioRecorder.Result.Failure ->
-                    postNativeComplete(null, 0L)
-            }
-        }
-
-        /** Abort recording and delete the temp file with no JS callback. */
-        @JavascriptInterface
-        fun nativeRecordCancel() {
-            vm.audioRecorder.cancel()
-        }
-
-        @JavascriptInterface
-        fun setZoomEnabled(enabled: Boolean) {
-            runOnUiThread {
-                if (!enabled) {
-                    val current = vm.currentScale
-                    if (current > 0f && (current != 1f)) webView.zoomBy(1f / current)
-                }
-                webView.settings.setSupportZoom(enabled)
-                webView.settings.builtInZoomControls = enabled
-                webView.settings.displayZoomControls = false
-            }
-        }
-
-        @JavascriptInterface
-        fun resetZoom() {
-            runOnUiThread {
-                val current = vm.currentScale
-                if (current > 0f && (current != 1f)) webView.zoomBy(1f / current)
-            }
-        }
-
-        @JavascriptInterface
-        @Suppress("unused")
-        fun getZoomScale(): Float = vm.currentScale
-
-        @JavascriptInterface
-        fun takeScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String {
-            // The JS-facing API is synchronous (returns the base64 directly),
-            // so we runBlocking on this binder thread until the coroutine
-            // resolves. Inside, the work hops to Dispatchers.Main for the
-            // WebView reads + PixelCopy request; the 2-second timeout is the
-            // same cap the CountDownLatch version enforced.
-            return runBlocking {
-                withTimeoutOrNull(2_000L) {
-                    captureScreenshotSuspend(topCropDp, maxDim, jpegQuality)
-                } ?: ""
-            }
-        }
-
-        /** Open the system JSON file picker. When the user picks a file (or
-         *  cancels), the file content is base64-encoded and delivered back to
-         *  JS as window.__onImportFile(b64) — or null on cancel/error. */
-        @JavascriptInterface
-        fun openFilePicker() {
-            runOnUiThread {
-                filePickerLauncher.launch("application/json")
-            }
-        }
-
-        /** Write [content] (UTF-8 text) to the Downloads folder as [filename].
-         *  Returns "ok" on success or "error:<reason>" on failure. Requires
-         *  Android 10+ (API 29) for the MediaStore Downloads collection; on
-         *  older devices returns "error:requires_android_10". */
-        @JavascriptInterface
-        fun saveToDownloads(filename: String, content: String): String {
-            return when (val r = vm.storage.writeJsonToDownloads(filename, content)) {
-                is StorageManager.Result.Success -> "ok"
-                is StorageManager.Result.Failure -> "error:${r.reason}"
-            }
-        }
-
-        /**
-         * Return the BoundedLogTree's JSON-array snapshot, used by the
-         * JS-side Export to include a diagnostic tail in the user's
-         * "Your Data" export. Returns "[]" on debug builds (the
-         * DebugTree is planted instead of BoundedLogTree, so there's no
-         * captured buffer to read). The contract from JS's perspective
-         * is "always a valid JSON array string", which both branches
-         * honour.
-         */
-        @JavascriptInterface
-        fun getCrashLog(): String {
-            return VOTReaderApp.releaseTree?.toJson() ?: "[]"
-        }
-
-        @JavascriptInterface
-        fun setImmersiveMode(immersive: Boolean) {
-            runOnUiThread {
-                val controller = WindowInsetsControllerCompat(window, window.decorView)
-                if (immersive) {
-                    controller.hide(WindowInsetsCompat.Type.systemBars())
-                    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                } else {
-                    controller.show(WindowInsetsCompat.Type.systemBars())
-                }
-            }
-        }
-
-        /**
-         * Fire a short haptic vibration so WebView interactions feel native.
-         * Styles: 0 = tick (light), 1 = click (medium), 2 = heavy click,
-         * 3 = double click. On API 29+ uses predefined platform effects;
-         * on API 26-28 falls back to duration/amplitude one-shots.
-         * Safe to call from the binder thread (Vibrator is thread-safe).
-         */
-        @JavascriptInterface
-        fun haptic(style: Int) {
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                getSystemService(VIBRATOR_SERVICE) as Vibrator
-            }
-            val effect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                VibrationEffect.createPredefined(
-                    when (style) {
-                        1 -> VibrationEffect.EFFECT_CLICK
-                        2 -> VibrationEffect.EFFECT_HEAVY_CLICK
-                        3 -> VibrationEffect.EFFECT_DOUBLE_CLICK
-                        else -> VibrationEffect.EFFECT_TICK
-                    }
-                )
-            } else {
-                VibrationEffect.createOneShot(
-                    when (style) { 1 -> 20L; 2 -> 30L; 3 -> 40L; else -> 10L },
-                    when (style) { 1 -> 128; 2 -> 200; 3 -> 255; else -> 80 }
-                )
-            }
-            try {
-                vibrator.vibrate(effect)
-            } catch (e: Exception) {
-                Timber.w(e, "haptic(%d) failed", style)
-            }
-        }
-    }
 }
