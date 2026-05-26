@@ -5,16 +5,19 @@ import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas
+import android.graphics.Rect
 import android.media.AudioManager
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Base64
 import android.view.Gravity
+import android.view.PixelCopy
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
@@ -897,20 +900,53 @@ class MainActivity : AppCompatActivity() {
             val latch = CountDownLatch(1)
             var result = ""
             runOnUiThread {
-                try {
-                    val w = webView.width
-                    val h = webView.height
-                    if (w > 0 && h > 0) {
-                        val originalScale = currentScale
-                        val needsZoomReset = originalScale > 0f && abs(originalScale - 1f) > 0.005f
-                        if (needsZoomReset) webView.zoomBy(1f / originalScale)
+                val w = webView.width
+                val h = webView.height
+                if (w <= 0 || h <= 0) {
+                    latch.countDown()
+                    return@runOnUiThread
+                }
 
-                        val density = resources.displayMetrics.density
-                        val topCropPx = (topCropDp * density).toInt().coerceIn(0, h - 1)
-                        val croppedH = h - topCropPx
-                        if (croppedH > 0) {
-                            val full = createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                            webView.draw(Canvas(full))
+                val originalScale = currentScale
+                val needsZoomReset = originalScale > 0f && abs(originalScale - 1f) > 0.005f
+                if (needsZoomReset) webView.zoomBy(1f / originalScale)
+
+                val density = resources.displayMetrics.density
+                val topCropPx = (topCropDp * density).toInt().coerceIn(0, h - 1)
+                val croppedH = h - topCropPx
+                if (croppedH <= 0) {
+                    if (needsZoomReset) webView.zoomBy(originalScale)
+                    latch.countDown()
+                    return@runOnUiThread
+                }
+
+                // Locate the WebView in window coordinates -- PixelCopy.request
+                // captures from a Window source, so we tell it which rect of
+                // the window holds our content.
+                val location = IntArray(2).also { webView.getLocationInWindow(it) }
+                val srcRect = Rect(
+                    location[0], location[1],
+                    location[0] + w, location[1] + h
+                )
+                val full = createBitmap(w, h, Bitmap.Config.ARGB_8888)
+
+                // PixelCopy captures the *actually rendered* surface (incl.
+                // hardware-accelerated layers), unlike webView.draw(Canvas)
+                // which misses some content types. The callback fires on the
+                // main thread; we schedule the runOnUiThread block to RETURN
+                // after kicking off the request, then the binder thread's
+                // latch.await blocks until the callback finishes processing
+                // and counts down. No deadlock: the main thread is free to
+                // run the PixelCopy callback because nobody holds it.
+                PixelCopy.request(
+                    window, srcRect, full,
+                    { pixelResult ->
+                        try {
+                            if (pixelResult != PixelCopy.SUCCESS) {
+                                Timber.w("PixelCopy failed with code %d", pixelResult)
+                                full.recycle()
+                                return@request
+                            }
                             val cropped = Bitmap.createBitmap(full, 0, topCropPx, w, croppedH)
                             full.recycle()
                             val longest = max(cropped.width, cropped.height)
@@ -923,13 +959,17 @@ class MainActivity : AppCompatActivity() {
                             val stream = ByteArrayOutputStream()
                             scaled.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
                             scaled.recycle()
-                            result = "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                            result = "data:image/jpeg;base64," +
+                                Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                        } catch (e: Exception) {
+                            Timber.w(e, "Screenshot post-processing failed")
+                        } finally {
+                            if (needsZoomReset) webView.zoomBy(originalScale)
+                            latch.countDown()
                         }
-
-                        if (needsZoomReset) webView.zoomBy(originalScale)
-                    }
-                } catch (_: Exception) {}
-                latch.countDown()
+                    },
+                    Handler(Looper.getMainLooper())
+                )
             }
             latch.await(2L, TimeUnit.SECONDS)
             return result
