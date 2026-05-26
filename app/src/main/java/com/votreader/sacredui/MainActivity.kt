@@ -42,6 +42,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
@@ -534,6 +535,54 @@ class MainActivity : AppCompatActivity() {
             WindowInsetsCompat.CONSUMED
         }
         ViewCompat.requestApplyInsets(wv)
+
+        // Per-frame IME slide tracking. Without this callback, the inset
+        // listener above only fires at the START and END of the keyboard
+        // animation, so bottom-anchored UI "jumps" into place instead of
+        // sliding with the keyboard. WindowInsetsAnimationCompat dispatches
+        // onProgress at ~60Hz with interpolated insets, and we write the
+        // bottom inset straight into --inset-bottom every frame so the CSS
+        // tracks the keyboard smoothly. onEnd asks for one final dispatch
+        // through the normal listener so the resting state is pixel-perfect.
+        ViewCompat.setWindowInsetsAnimationCallback(
+            wv,
+            object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                override fun onProgress(
+                    insets: WindowInsetsCompat,
+                    runningAnimations: MutableList<WindowInsetsAnimationCompat>
+                ): WindowInsetsCompat {
+                    val bars = insets.getInsets(
+                        WindowInsetsCompat.Type.systemBars()
+                            or WindowInsetsCompat.Type.displayCutout()
+                            or WindowInsetsCompat.Type.ime()
+                    )
+                    val density = resources.displayMetrics.density
+                    val topDp = String.format(Locale.US, "%.2f", bars.top / density)
+                    val bottomDp = String.format(Locale.US, "%.2f", bars.bottom / density)
+
+                    // Intentional N1.5 exception: bypasses JsBridge because
+                    // this fires ~60x/sec during IME animations and the
+                    // per-frame overhead of escapeArg + joinToString +
+                    // webView.post would burn budget for no safety win --
+                    // the only interpolated values are %.2f-formatted
+                    // numbers, which can't contain quote/backslash/newline.
+                    webView.evaluateJavascript(
+                        "(function(){var r=document.documentElement&&document.documentElement.style;" +
+                            "if(r){r.setProperty('--inset-top','${topDp}px');" +
+                            "r.setProperty('--inset-bottom','${bottomDp}px')}})()",
+                        null
+                    )
+                    return insets
+                }
+
+                override fun onEnd(animation: WindowInsetsAnimationCompat) {
+                    // Final pixel-perfect state -- routes through the normal
+                    // inset listener (above), which updates savedTopInset /
+                    // savedBottomInset for any future injectInsets() callers.
+                    ViewCompat.requestApplyInsets(wv)
+                }
+            }
+        )
 
         return wv
     }
