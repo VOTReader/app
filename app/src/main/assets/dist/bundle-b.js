@@ -5765,76 +5765,29 @@
     var _previewPlaying = useState(false);
     var previewPlaying = _previewPlaying[0];
     var setPreviewPlaying = _previewPlaying[1];
-    var mediaRecorderRef = useRef(null);
-    var streamRef = useRef(null);
-    var chunksRef = useRef([]);
+    var tickRef = useRef(0);
+    var ampRef = useRef(0);
+    var samplesAccumRef = useRef([]);
     var startTimeRef = useRef(0);
     var accumulatedMsRef = useRef(0);
-    var rafRef = useRef(0);
-    var tickRef = useRef(0);
-    var audioCtxRef = useRef(null);
-    var analyserRef = useRef(null);
-    var samplesAccumRef = useRef([]);
     var previewBlobRef = useRef(null);
     var previewDurationRef = useRef(0);
     var previewUrlRef = useRef(null);
     var previewAudioRef = useRef(null);
     var pendingSaveRef = useRef(false);
-    var nativeRef = useRef(false);
-    var nativeStateRef = useRef("inactive");
-    var ampRef = useRef(0);
     function cleanup() {
-      var _abc = typeof window !== "undefined" ? window.AndroidBridge : null;
-      if (_abc && typeof _abc.endAudioSession === "function") {
-        try {
-          _abc.endAudioSession();
-        } catch (_e) {
-        }
-      }
-      if (nativeRef.current && _abc && typeof _abc.nativeRecordCancel === "function") {
-        try {
-          _abc.nativeRecordCancel();
-        } catch (_e) {
-        }
-      }
-      nativeStateRef.current = "inactive";
+      PlatformBridge.endAudioSession();
+      PlatformBridge.nativeRecordCancel();
       try {
         if (ampRef.current) clearInterval(ampRef.current);
-      } catch (_e) {
-      }
-      ampRef.current = 0;
-      try {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
       } catch (_e) {
       }
       try {
         if (tickRef.current) clearInterval(tickRef.current);
       } catch (_e) {
       }
-      rafRef.current = 0;
+      ampRef.current = 0;
       tickRef.current = 0;
-      try {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          mediaRecorderRef.current.stop();
-        }
-      } catch (_e) {
-      }
-      if (streamRef.current) {
-        try {
-          streamRef.current.getTracks().forEach(function(t) {
-            t.stop();
-          });
-        } catch (_e) {
-        }
-        streamRef.current = null;
-      }
-      if (audioCtxRef.current) {
-        try {
-          audioCtxRef.current.close();
-        } catch (_e) {
-        }
-        audioCtxRef.current = null;
-      }
       if (previewUrlRef.current) {
         try {
           URL.revokeObjectURL(previewUrlRef.current);
@@ -5845,276 +5798,19 @@
     }
     useEffect(function() {
       var cancelled = false;
-      var settled = false;
-      var watchdog = 0;
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError("Recording is not supported in this browser.");
-        setStage("error");
-        return cleanup;
-      }
-      if (typeof MediaRecorder === "undefined") {
-        setError("MediaRecorder is not supported in this browser.");
-        setStage("error");
-        return cleanup;
-      }
-      function beginCapture() {
-        if (cancelled || settled) return;
-        var retryCount = 0;
-        var MAX_RETRIES = 3;
-        function doAttempt() {
-          if (watchdog) {
-            clearTimeout(watchdog);
-            watchdog = 0;
-          }
-          watchdog = setTimeout(function() {
-            if (cancelled || settled) return;
-            settled = true;
-            setError("Microphone request timed out. If a permission prompt appeared, try again; otherwise enable mic access in settings.");
-            setStage("error");
-          }, 2e4);
-          navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-            settled = true;
-            if (watchdog) {
-              clearTimeout(watchdog);
-              watchdog = 0;
-            }
-            if (cancelled) {
-              stream.getTracks().forEach(function(t) {
-                t.stop();
-              });
-              return;
-            }
-            streamRef.current = stream;
-            var _ab = typeof window !== "undefined" ? window.AndroidBridge : null;
-            if (_ab && typeof _ab.startAudioSession === "function") {
-              try {
-                _ab.startAudioSession();
-              } catch (_e) {
-              }
-            }
-            var mime = "";
-            var candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
-            for (var i = 0; i < candidates.length; i++) {
-              if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(candidates[i])) {
-                mime = candidates[i];
-                break;
-              }
-            }
-            var rec;
-            try {
-              rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-            } catch (ctorErr) {
-              try {
-                stream.getTracks().forEach(function(t) {
-                  t.stop();
-                });
-              } catch (_e) {
-              }
-              streamRef.current = null;
-              console.warn("MediaRecorder construction failed", ctorErr);
-              setError("Audio recording is not supported on this device.");
-              setStage("error");
-              return;
-            }
-            mediaRecorderRef.current = rec;
-            chunksRef.current = [];
-            samplesAccumRef.current = [];
-            rec.ondataavailable = function(e) {
-              if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-            };
-            rec.onstop = function() {
-              var _ab2 = typeof window !== "undefined" ? window.AndroidBridge : null;
-              if (_ab2 && typeof _ab2.endAudioSession === "function") {
-                try {
-                  _ab2.endAudioSession();
-                } catch (_e) {
-                }
-              }
-              var type = rec.mimeType || "audio/webm";
-              var blob = new Blob(chunksRef.current, { type });
-              previewBlobRef.current = blob;
-              if (streamRef.current) {
-                try {
-                  streamRef.current.getTracks().forEach(function(t) {
-                    t.stop();
-                  });
-                } catch (_e) {
-                }
-                streamRef.current = null;
-              }
-              if (audioCtxRef.current) {
-                try {
-                  audioCtxRef.current.close();
-                } catch (_e) {
-                }
-                audioCtxRef.current = null;
-              }
-              analyserRef.current = null;
-              try {
-                previewUrlRef.current = URL.createObjectURL(blob);
-              } catch (_e) {
-              }
-              setWaveFinal(samplesAccumRef.current.slice());
-              if (pendingSaveRef.current) {
-                pendingSaveRef.current = false;
-                persistRecording();
-              }
-            };
-            rec.start(250);
-            startTimeRef.current = Date.now();
-            accumulatedMsRef.current = 0;
-            setStage("recording");
-            tickRef.current = setInterval(function() {
-              if (rec.state === "recording") {
-                var sinceResume = Date.now() - startTimeRef.current;
-                var totalMs = accumulatedMsRef.current + sinceResume;
-                var s = Math.floor(totalMs / 1e3);
-                setSeconds(s);
-                if (s >= 300) {
-                  previewDurationRef.current = s;
-                  try {
-                    rec.stop();
-                  } catch (_e) {
-                  }
-                  if (tickRef.current) {
-                    clearInterval(tickRef.current);
-                    tickRef.current = 0;
-                  }
-                  if (rafRef.current) {
-                    cancelAnimationFrame(rafRef.current);
-                    rafRef.current = 0;
-                  }
-                  setSeconds(s);
-                  setStage("preview");
-                }
-              }
-            }, 200);
-            var isAndroid2 = !!(typeof window !== "undefined" && window.AndroidBridge);
-            if (!isAndroid2) {
-              try {
-                var AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (AudioCtx) {
-                  var ctx = new AudioCtx();
-                  audioCtxRef.current = ctx;
-                  var source = ctx.createMediaStreamSource(stream);
-                  var analyser = ctx.createAnalyser();
-                  analyser.fftSize = 256;
-                  source.connect(analyser);
-                  analyserRef.current = analyser;
-                  var buf = new Uint8Array(analyser.frequencyBinCount);
-                  var lastSample = 0;
-                  var loop = function() {
-                    if (!analyserRef.current) return;
-                    analyser.getByteTimeDomainData(buf);
-                    var sum = 0;
-                    for (var i2 = 0; i2 < buf.length; i2++) {
-                      var v = (buf[i2] - 128) / 128;
-                      sum += v * v;
-                    }
-                    var rms = Math.sqrt(sum / buf.length);
-                    var now = performance.now();
-                    if (now - lastSample > 80) {
-                      lastSample = now;
-                      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-                        var lvl = Math.min(1, rms * 8);
-                        samplesAccumRef.current.push(lvl);
-                        var live = samplesAccumRef.current.slice(-48);
-                        setWaveLive(live);
-                      }
-                    }
-                    rafRef.current = requestAnimationFrame(loop);
-                  };
-                  loop();
-                }
-              } catch (_e) {
-              }
-            }
-          }).catch(function(err) {
-            if (watchdog) {
-              clearTimeout(watchdog);
-              watchdog = 0;
-            }
-            if (cancelled) return;
-            var name = err && err.name;
-            var retriable = name === "NotReadableError" || name === "TrackStartError" || name === "AbortError";
-            if (retriable && retryCount < MAX_RETRIES && !cancelled) {
-              retryCount++;
-              console.warn("JRN: mic unavailable (" + name + "), retry " + retryCount + "/" + MAX_RETRIES + " in " + retryCount * 400 + " ms");
-              setTimeout(function() {
-                if (!cancelled) doAttempt();
-              }, retryCount * 400);
-              return;
-            }
-            settled = true;
-            console.warn("getUserMedia rejected", err);
-            setError(
-              name === "NotAllowedError" || name === "SecurityError" ? "Microphone permission denied. Enable mic access in settings to record." : name === "NotFoundError" || name === "DevicesNotFoundError" ? "No microphone was found on this device." : name === "NotReadableError" || name === "TrackStartError" ? "Could not open the microphone. Close any app currently recording audio, then try again." : "Could not access microphone."
-            );
-            setStage("error");
-          });
-        }
-        doAttempt();
-      }
-      function beginNativeCapture() {
-        if (cancelled || settled) return;
-        settled = true;
-        var AB2 = window.AndroidBridge;
-        nativeRef.current = true;
-        var res;
-        try {
-          res = AB2.nativeRecordStart();
-        } catch (_e) {
-          res = "error:exception";
-        }
-        if (res !== "ok") {
-          nativeRef.current = false;
-          setError(
-            res === "error:permission" ? "Microphone permission denied. Enable mic access for this app in Android Settings \u2192 Apps, then try again." : "Could not start the recorder. Please try again."
-          );
-          setStage("error");
-          return;
-        }
-        nativeStateRef.current = "recording";
-        chunksRef.current = [];
-        samplesAccumRef.current = [];
-        startTimeRef.current = Date.now();
-        accumulatedMsRef.current = 0;
-        setStage("recording");
-        tickRef.current = setInterval(function() {
-          if (nativeStateRef.current === "recording") {
-            var sinceResume = Date.now() - startTimeRef.current;
-            var s = Math.floor((accumulatedMsRef.current + sinceResume) / 1e3);
-            setSeconds(s);
-            if (s >= 300) {
-              previewDurationRef.current = s;
-              stopRecording();
-            }
-          }
-        }, 200);
-        ampRef.current = setInterval(function() {
-          if (nativeStateRef.current !== "recording") return;
-          var amp = 0;
-          try {
-            amp = AB2.nativeRecordAmplitude() || 0;
-          } catch (_e) {
-          }
-          var lvl = Math.min(1, Math.sqrt(amp / 32767) * 1.8);
-          samplesAccumRef.current.push(lvl);
-          setWaveLive(samplesAccumRef.current.slice(-48));
-        }, 80);
-      }
+      var permDecided = false;
+      var permTimer = 0;
       window.__onNativeRecordingComplete = function(b64, durMs, mime) {
         if (cancelled) return;
-        nativeStateRef.current = "inactive";
         try {
           if (ampRef.current) clearInterval(ampRef.current);
         } catch (_e) {
         }
-        ampRef.current = 0;
         try {
           if (tickRef.current) clearInterval(tickRef.current);
         } catch (_e) {
         }
+        ampRef.current = 0;
         tickRef.current = 0;
         if (!b64) {
           setError("Nothing was recorded. Try again and speak after the timer starts.");
@@ -6125,7 +5821,7 @@
           var bin = atob(b64);
           var arr = new Uint8Array(bin.length);
           for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-          var blob = new Blob([arr], { type: mime || "audio/mp4" });
+          var blob = new Blob([arr], { type: mime || "audio/webm" });
           previewBlobRef.current = blob;
           try {
             previewUrlRef.current = URL.createObjectURL(blob);
@@ -6142,72 +5838,95 @@
             setStage("preview");
           }
         } catch (e) {
-          console.warn("native recording decode failed", e);
+          console.warn("recording decode failed", e);
           setError("Could not process the recording. Please try again.");
           setStage("error");
         }
       };
       function startCapture() {
-        var _ab = typeof window !== "undefined" ? window.AndroidBridge : null;
-        if (_ab && typeof _ab.nativeRecordStart === "function") {
-          beginNativeCapture();
-        } else {
-          beginCapture();
-        }
-      }
-      var permTimer = 0;
-      var AB = typeof window !== "undefined" ? window.AndroidBridge : null;
-      if (AB && typeof AB.requestMicPermission === "function") {
-        var permDecided = false;
-        window.__onMicPermissionResult = function(granted) {
-          if (permDecided || cancelled) return;
-          permDecided = true;
-          if (permTimer) {
-            clearTimeout(permTimer);
-            permTimer = 0;
-          }
-          try {
-            delete window.__onMicPermissionResult;
-          } catch (_e) {
-            window.__onMicPermissionResult = void 0;
-          }
-          if (granted) {
-            startCapture();
-          } else {
-            settled = true;
-            setError("Microphone permission denied. Enable mic access for this app in Android Settings \u2192 Apps, then try again.");
-            setStage("error");
-          }
-        };
-        permTimer = setTimeout(function() {
-          if (permDecided || cancelled) return;
-          permDecided = true;
-          try {
-            delete window.__onMicPermissionResult;
-          } catch (_e) {
-            window.__onMicPermissionResult = void 0;
-          }
-          startCapture();
-        }, 15e3);
+        if (cancelled) return;
+        var res;
         try {
-          AB.requestMicPermission();
+          res = PlatformBridge.nativeRecordStart();
         } catch (_e) {
-          permDecided = true;
-          if (permTimer) {
-            clearTimeout(permTimer);
-            permTimer = 0;
-          }
-          startCapture();
+          res = "error:exception";
         }
-      } else {
-        startCapture();
+        if (res !== "ok") {
+          setError(
+            res === "error:unsupported-codec" ? "Recording is not supported in this browser." : res === "error:no-stream" ? "Microphone access was not granted." : res === "error:permission" ? "Microphone permission denied. Enable mic access for this app, then try again." : "Could not start the recorder. Please try again."
+          );
+          setStage("error");
+          return;
+        }
+        PlatformBridge.startAudioSession();
+        samplesAccumRef.current = [];
+        startTimeRef.current = Date.now();
+        accumulatedMsRef.current = 0;
+        setStage("recording");
+        tickRef.current = setInterval(function() {
+          var sinceResume = Date.now() - startTimeRef.current;
+          var totalMs = accumulatedMsRef.current + sinceResume;
+          var s = Math.floor(totalMs / 1e3);
+          setSeconds(s);
+          if (s >= 300) {
+            previewDurationRef.current = s;
+            stopRecording();
+          }
+        }, 200);
+        ampRef.current = setInterval(function() {
+          var amp = 0;
+          try {
+            amp = PlatformBridge.nativeRecordAmplitude() || 0;
+          } catch (_e) {
+          }
+          var lvl = Math.min(1, Math.sqrt(amp / 32767) * 1.8);
+          samplesAccumRef.current.push(lvl);
+          setWaveLive(samplesAccumRef.current.slice(-48));
+        }, 80);
+      }
+      window.__onMicPermissionResult = function(granted) {
+        if (permDecided || cancelled) return;
+        permDecided = true;
+        if (permTimer) {
+          clearTimeout(permTimer);
+          permTimer = 0;
+        }
+        try {
+          delete window.__onMicPermissionResult;
+        } catch (_e) {
+          window.__onMicPermissionResult = void 0;
+        }
+        if (granted) {
+          startCapture();
+        } else {
+          setError("Microphone permission denied. Enable mic access for this app, then try again.");
+          setStage("error");
+        }
+      };
+      permTimer = setTimeout(function() {
+        if (permDecided || cancelled) return;
+        permDecided = true;
+        try {
+          delete window.__onMicPermissionResult;
+        } catch (_e) {
+          window.__onMicPermissionResult = void 0;
+        }
+        setError("Microphone request timed out. If a permission prompt appeared, please try again.");
+        setStage("error");
+      }, 2e4);
+      try {
+        PlatformBridge.requestMicPermission();
+      } catch (_e) {
+        permDecided = true;
+        if (permTimer) {
+          clearTimeout(permTimer);
+          permTimer = 0;
+        }
+        setError("Could not request microphone access.");
+        setStage("error");
       }
       return function() {
         cancelled = true;
-        if (watchdog) {
-          clearTimeout(watchdog);
-          watchdog = 0;
-        }
         if (permTimer) {
           clearTimeout(permTimer);
           permTimer = 0;
@@ -6226,93 +5945,32 @@
       };
     }, []);
     function pauseRecording() {
-      if (nativeRef.current) {
-        if (nativeStateRef.current !== "recording") return;
-        var _ab = window.AndroidBridge;
-        try {
-          if (_ab) _ab.nativeRecordPause();
-        } catch (_e) {
-          return;
-        }
-        accumulatedMsRef.current += Date.now() - startTimeRef.current;
-        nativeStateRef.current = "paused";
-        setStage("paused");
-        return;
-      }
-      var rec = mediaRecorderRef.current;
-      if (!rec || rec.state !== "recording") return;
-      try {
-        rec.pause();
-      } catch (_e) {
-        return;
-      }
+      if (stage !== "recording") return;
+      var res = PlatformBridge.nativeRecordPause();
+      if (res !== "ok") return;
       accumulatedMsRef.current += Date.now() - startTimeRef.current;
       setStage("paused");
     }
     function resumeRecording() {
-      if (nativeRef.current) {
-        if (nativeStateRef.current !== "paused") return;
-        var _ab = window.AndroidBridge;
-        try {
-          if (_ab) _ab.nativeRecordResume();
-        } catch (_e) {
-          return;
-        }
-        startTimeRef.current = Date.now();
-        nativeStateRef.current = "recording";
-        setStage("recording");
-        return;
-      }
-      var rec = mediaRecorderRef.current;
-      if (!rec || rec.state !== "paused") return;
-      try {
-        rec.resume();
-      } catch (_e) {
-        return;
-      }
+      if (stage !== "paused") return;
+      var res = PlatformBridge.nativeRecordResume();
+      if (res !== "ok") return;
       startTimeRef.current = Date.now();
       setStage("recording");
     }
     function stopRecording() {
-      if (nativeRef.current) {
-        var totalMs = accumulatedMsRef.current;
-        if (nativeStateRef.current === "recording") totalMs += Date.now() - startTimeRef.current;
-        previewDurationRef.current = Math.max(1, Math.floor(totalMs / 1e3));
-        nativeStateRef.current = "inactive";
-        if (tickRef.current) {
-          clearInterval(tickRef.current);
-          tickRef.current = 0;
-        }
-        if (ampRef.current) {
-          clearInterval(ampRef.current);
-          ampRef.current = 0;
-        }
-        var _ab = window.AndroidBridge;
-        try {
-          if (_ab) _ab.nativeRecordStop();
-        } catch (_e) {
-        }
-        setStage("preview");
-        return;
-      }
-      var rec = mediaRecorderRef.current;
-      if (rec && rec.state !== "inactive") {
-        var totalMs2 = accumulatedMsRef.current;
-        if (rec.state === "recording") totalMs2 += Date.now() - startTimeRef.current;
-        previewDurationRef.current = Math.max(1, Math.floor(totalMs2 / 1e3));
-        try {
-          rec.stop();
-        } catch (_e) {
-        }
-      }
+      var totalMs = accumulatedMsRef.current;
+      if (stage === "recording") totalMs += Date.now() - startTimeRef.current;
+      previewDurationRef.current = Math.max(1, Math.floor(totalMs / 1e3));
       if (tickRef.current) {
         clearInterval(tickRef.current);
         tickRef.current = 0;
       }
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = 0;
+      if (ampRef.current) {
+        clearInterval(ampRef.current);
+        ampRef.current = 0;
       }
+      PlatformBridge.nativeRecordStop();
       setStage("preview");
     }
     function discard() {
@@ -6348,13 +6006,9 @@
     }
     function save() {
       if (!previewBlobRef.current) {
-        var rec = mediaRecorderRef.current;
-        if (rec && rec.state !== "inactive") {
+        if (stage === "recording" || stage === "paused") {
           pendingSaveRef.current = true;
-          try {
-            rec.stop();
-          } catch (_e) {
-          }
+          stopRecording();
           return;
         }
         pendingSaveRef.current = true;
