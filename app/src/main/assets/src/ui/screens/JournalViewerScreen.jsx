@@ -359,74 +359,69 @@ export function JournalAudioBlock(props) {
     );
   }
 
-  var deleteUI = null;
-  if (editable) {
-    if (confirming) {
-      deleteUI = (
-        <div className="jrn-aud-delete-confirm" onClick={function(e) { e.stopPropagation(); }}>
-          <span className="jrn-aud-delete-q">Delete?</span>
-          <button
-            className="jrn-aud-delete-cancel"
-            onClick={function(e) { e.stopPropagation(); props.onCancelDelete && props.onCancelDelete(); }}
-            aria-label="Cancel"
-          >×</button>
-          <button
-            className="jrn-aud-delete-yes"
-            onClick={function(e) { e.stopPropagation(); props.onConfirmDelete && props.onConfirmDelete(); }}
-            aria-label="Confirm delete"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </button>
-        </div>
-      );
-    } else {
-      deleteUI = (
-        <button
-          className="jrn-aud-delete"
-          title="Delete"
-          aria-label="Delete"
-          onClick={function(e) { e.stopPropagation(); props.onRequestDelete && props.onRequestDelete(); }}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-            <path d="M10 11v6M14 11v6" />
-          </svg>
-        </button>
-      );
-    }
-  }
+  // Editable mode: a single × icon button at the right of the block; tap
+  // it to flip the parent's `confirming` prop on, which collapses the
+  // whole block to a ConfirmStrip banner (rendered below in the return).
+  var deleteUI = editable && !confirming ? (
+    <button
+      className="jrn-aud-delete"
+      title="Delete"
+      aria-label="Delete"
+      onClick={function(e) { e.stopPropagation(); props.onRequestDelete && props.onRequestDelete(); }}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+        <path d="M10 11v6M14 11v6" />
+      </svg>
+    </button>
+  ) : null;
 
   var dur = duration || 0;
   var timeStr = JournalHelpers.formatDuration(curTime || 0) + ' / ' + JournalHelpers.formatDuration(dur);
 
+  // When the user has tapped delete, the whole audio block collapses to a
+  // ConfirmStrip banner so the standardized Cancel / Yes, remove buttons
+  // are unambiguous. The <audio> element below the conditional STAYS
+  // rendered so playback state (currentTime, paused/playing) survives a
+  // Cancel — only the visible chrome changes.
   return (
     <div className={'jrn-embed-audio' + (editable ? ' is-editable' : '')}>
-      <button className="jrn-aud-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          {playing
-            ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
-            : <path d="M6 3v18l16-9z" />}
-        </svg>
-      </button>
-      <div className="jrn-aud-body">
-        <div
-          className="jrn-aud-waveform"
-          onClick={seekFromEvent}
-          role="slider"
-          aria-label="Seek"
-          style={{ cursor: 'pointer' }}
-        >
-          {bars}
-        </div>
-        <div className="jrn-aud-meta">
-          <span>{caption || 'Voice memo'}</span>
-          <span>{timeStr}</span>
-        </div>
-      </div>
-      {deleteUI}
+      {editable && confirming ? (
+        <ConfirmStrip
+          className="jrn-aud-confirm"
+          question="Remove this voice memo?"
+          yesLabel="Yes, remove"
+          onCancel={props.onCancelDelete}
+          onConfirm={props.onConfirmDelete}
+        />
+      ) : (
+        <>
+          <button className="jrn-aud-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              {playing
+                ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+                : <path d="M6 3v18l16-9z" />}
+            </svg>
+          </button>
+          <div className="jrn-aud-body">
+            <div
+              className="jrn-aud-waveform"
+              onClick={seekFromEvent}
+              role="slider"
+              aria-label="Seek"
+              style={{ cursor: 'pointer' }}
+            >
+              {bars}
+            </div>
+            <div className="jrn-aud-meta">
+              <span>{caption || 'Voice memo'}</span>
+              <span>{timeStr}</span>
+            </div>
+          </div>
+          {deleteUI}
+        </>
+      )}
       {src && (
         <audio
           ref={audioRef}

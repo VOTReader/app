@@ -232,13 +232,13 @@
   R('.jrn-aud-delete { background: none; border: none; color: var(--gold-dim); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.12s, color 0.12s; }');
   R('.jrn-aud-delete svg { width: 16px; height: 16px; }');
   R('.jrn-aud-delete:hover { background: rgba(199, 92, 74, 0.15); color: #c75c4a; }');
-  R('.jrn-aud-delete-confirm { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 4px 6px; background: rgba(199, 92, 74, 0.1); border: 1px solid rgba(199, 92, 74, 0.3); border-radius: 8px; }');
-  R('.jrn-aud-delete-q { font-family: var(--font-cinzel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #c75c4a; padding: 0 4px; }');
-  R('.jrn-aud-delete-cancel { background: none; border: none; color: var(--gold-dim); width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; }');
-  R('.jrn-aud-delete-cancel:hover { background: var(--bg3); color: var(--cream); }');
-  R('.jrn-aud-delete-yes { background: #c75c4a; border: none; color: white; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }');
-  R('.jrn-aud-delete-yes svg { width: 13px; height: 13px; }');
-  R('.jrn-aud-delete-yes:hover { background: #b04d3d; }');
+  // When the user taps × on an audio block, the standardized ConfirmStrip
+  // (.ann-chip-confirm base) replaces the play+body+× row. The parent
+  // .jrn-embed-audio already supplies padding + border + bg, so the
+  // strip's own padding + min-width are zeroed here and the question
+  // text takes the warm-red contextual tint matching .jrn-block-confirm.
+  R('.jrn-aud-confirm { padding: 0; min-width: 0; flex: 1; }');
+  R('.jrn-aud-confirm .ann-chip-confirm-q { color: #c75c4a; }');
 
   // Viewer
   R('.jrn-viewer { display: flex; flex-direction: column; flex: 1; padding-bottom: 60px; }');

@@ -177,13 +177,8 @@
     R(".jrn-aud-delete { background: none; border: none; color: var(--gold-dim); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.12s, color 0.12s; }");
     R(".jrn-aud-delete svg { width: 16px; height: 16px; }");
     R(".jrn-aud-delete:hover { background: rgba(199, 92, 74, 0.15); color: #c75c4a; }");
-    R(".jrn-aud-delete-confirm { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 4px 6px; background: rgba(199, 92, 74, 0.1); border: 1px solid rgba(199, 92, 74, 0.3); border-radius: 8px; }");
-    R(".jrn-aud-delete-q { font-family: var(--font-cinzel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #c75c4a; padding: 0 4px; }");
-    R(".jrn-aud-delete-cancel { background: none; border: none; color: var(--gold-dim); width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; }");
-    R(".jrn-aud-delete-cancel:hover { background: var(--bg3); color: var(--cream); }");
-    R(".jrn-aud-delete-yes { background: #c75c4a; border: none; color: white; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }");
-    R(".jrn-aud-delete-yes svg { width: 13px; height: 13px; }");
-    R(".jrn-aud-delete-yes:hover { background: #b04d3d; }");
+    R(".jrn-aud-confirm { padding: 0; min-width: 0; flex: 1; }");
+    R(".jrn-aud-confirm .ann-chip-confirm-q { color: #c75c4a; }");
     R(".jrn-viewer { display: flex; flex-direction: column; flex: 1; padding-bottom: 60px; }");
     R(".jrn-viewer-meta { padding: 22px 22px 12px; }");
     R(".jrn-viewer-title { font-family: var(--font-cinzel); font-size: 24px; font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }");
@@ -7148,53 +7143,31 @@
         )
       );
     }
-    var deleteUI = null;
-    if (editable) {
-      if (confirming) {
-        deleteUI = /* @__PURE__ */ React.createElement("div", { className: "jrn-aud-delete-confirm", onClick: function(e) {
+    var deleteUI = editable && !confirming ? /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "jrn-aud-delete",
+        title: "Delete",
+        "aria-label": "Delete",
+        onClick: function(e) {
           e.stopPropagation();
-        } }, /* @__PURE__ */ React.createElement("span", { className: "jrn-aud-delete-q" }, "Delete?"), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: "jrn-aud-delete-cancel",
-            onClick: function(e) {
-              e.stopPropagation();
-              props.onCancelDelete && props.onCancelDelete();
-            },
-            "aria-label": "Cancel"
-          },
-          "\xD7"
-        ), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: "jrn-aud-delete-yes",
-            onClick: function(e) {
-              e.stopPropagation();
-              props.onConfirmDelete && props.onConfirmDelete();
-            },
-            "aria-label": "Confirm delete"
-          },
-          /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))
-        ));
-      } else {
-        deleteUI = /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: "jrn-aud-delete",
-            title: "Delete",
-            "aria-label": "Delete",
-            onClick: function(e) {
-              e.stopPropagation();
-              props.onRequestDelete && props.onRequestDelete();
-            }
-          },
-          /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6M14 11v6" }))
-        );
-      }
-    }
+          props.onRequestDelete && props.onRequestDelete();
+        }
+      },
+      /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6M14 11v6" }))
+    ) : null;
     var dur = duration || 0;
     var timeStr = JournalHelpers.formatDuration(curTime || 0) + " / " + JournalHelpers.formatDuration(dur);
-    return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-audio" + (editable ? " is-editable" : "") }, /* @__PURE__ */ React.createElement("button", { className: "jrn-aud-play", onClick: toggle, "aria-label": playing ? "Pause" : "Play" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, playing ? /* @__PURE__ */ React.createElement("path", { d: "M6 4h4v16H6zM14 4h4v16h-4z" }) : /* @__PURE__ */ React.createElement("path", { d: "M6 3v18l16-9z" }))), /* @__PURE__ */ React.createElement("div", { className: "jrn-aud-body" }, /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-audio" + (editable ? " is-editable" : "") }, editable && confirming ? /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        className: "jrn-aud-confirm",
+        question: "Remove this voice memo?",
+        yesLabel: "Yes, remove",
+        onCancel: props.onCancelDelete,
+        onConfirm: props.onConfirmDelete
+      }
+    ) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "jrn-aud-play", onClick: toggle, "aria-label": playing ? "Pause" : "Play" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, playing ? /* @__PURE__ */ React.createElement("path", { d: "M6 4h4v16H6zM14 4h4v16h-4z" }) : /* @__PURE__ */ React.createElement("path", { d: "M6 3v18l16-9z" }))), /* @__PURE__ */ React.createElement("div", { className: "jrn-aud-body" }, /* @__PURE__ */ React.createElement(
       "div",
       {
         className: "jrn-aud-waveform",
@@ -7204,7 +7177,7 @@
         style: { cursor: "pointer" }
       },
       bars
-    ), /* @__PURE__ */ React.createElement("div", { className: "jrn-aud-meta" }, /* @__PURE__ */ React.createElement("span", null, caption || "Voice memo"), /* @__PURE__ */ React.createElement("span", null, timeStr))), deleteUI, src && /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("div", { className: "jrn-aud-meta" }, /* @__PURE__ */ React.createElement("span", null, caption || "Voice memo"), /* @__PURE__ */ React.createElement("span", null, timeStr))), deleteUI), src && /* @__PURE__ */ React.createElement(
       "audio",
       {
         ref: audioRef,
