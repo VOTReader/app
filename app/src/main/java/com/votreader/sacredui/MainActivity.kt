@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.media.AudioManager
-import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -50,7 +49,6 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 import androidx.webkit.WebViewClientCompat
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.math.abs
@@ -844,90 +842,42 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ─── Native voice recording (Android-reliable path) ──────────────
-        // The JS recorder uses these instead of getUserMedia/MediaRecorder when
-        // window.AndroidBridge.nativeRecordStart exists. Records AAC into an
-        // MPEG-4 (.m4a) temp file in cacheDir — playable by an HTML <audio>
-        // element and storable as a Blob, so the existing preview/IndexedDB
-        // pipeline is unchanged. RECORD_AUDIO is ensured by requestMicPermission
-        // before JS calls these.
+        // The JS recorder uses these instead of getUserMedia/MediaRecorder
+        // when window.AndroidBridge.nativeRecordStart exists. Records AAC
+        // into an MPEG-4 (.m4a) temp file in cacheDir -- playable by an
+        // HTML <audio> element and storable as a Blob, so the existing
+        // preview/IndexedDB pipeline is unchanged. RECORD_AUDIO is ensured
+        // by requestMicPermission before JS calls these.
+        //
+        // The MediaRecorder lifecycle + threading + temp-file management
+        // all live in [NativeAudioRecorder]; these @JavascriptInterface
+        // methods are thin delegates whose only job is to translate
+        // Result<T> into the "ok" / "error:<reason>" string the JS side
+        // already expects. The string shape stays identical so the JS
+        // contract is preserved bit-for-bit.
 
         /** Start recording. Returns "ok" or "error:<reason>" synchronously. */
         @JavascriptInterface
-        fun nativeRecordStart(): String {
-            synchronized(vm.recLock) {
-                if (ContextCompat.checkSelfPermission(
-                        this@MainActivity, Manifest.permission.RECORD_AUDIO
-                    ) != PackageManager.PERMISSION_GRANTED) {
-                    return "error:permission"
-                }
-                try { vm.nativeRecorder?.release() } catch (_: Exception) {}
-                vm.nativeRecorder = null
-                vm.nativeRecordFile?.let { try { it.delete() } catch (_: Exception) {} }
-                vm.nativeRecordFile = null
-                return try {
-                    val f = File.createTempFile("votrec_", ".m4a", cacheDir)
-                    val mr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        MediaRecorder(this@MainActivity)
-                    } else {
-                        @Suppress("DEPRECATION") MediaRecorder()
-                    }
-                    mr.setAudioSource(MediaRecorder.AudioSource.MIC)
-                    mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                    mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                    mr.setAudioEncodingBitRate(96000)
-                    mr.setAudioSamplingRate(44100)
-                    mr.setOutputFile(f.absolutePath)
-                    mr.prepare()
-                    mr.start()
-                    vm.nativeRecorder = mr
-                    vm.nativeRecordFile = f
-                    vm.nativeRecordStartMs = System.currentTimeMillis()
-                    vm.nativeRecordPausedAccumMs = 0L
-                    vm.nativeRecordPauseStartMs = 0L
-                    "ok"
-                } catch (e: Exception) {
-                    Timber.w(e, "nativeRecordStart failed")
-                    try { vm.nativeRecorder?.release() } catch (_: Exception) {}
-                    vm.nativeRecorder = null
-                    vm.nativeRecordFile?.let { try { it.delete() } catch (_: Exception) {} }
-                    vm.nativeRecordFile = null
-                    "error:" + (e.message ?: "start_failed")
-                }
-            }
+        fun nativeRecordStart(): String = when (val r = vm.audioRecorder.start()) {
+            is NativeAudioRecorder.Result.Success -> "ok"
+            is NativeAudioRecorder.Result.Failure -> "error:${r.reason}"
         }
 
         @JavascriptInterface
-        fun nativeRecordPause(): String {
-            synchronized(vm.recLock) {
-                return try {
-                    vm.nativeRecorder?.pause()
-                    vm.nativeRecordPauseStartMs = System.currentTimeMillis()
-                    "ok"
-                } catch (e: Exception) { "error:" + (e.message ?: "pause_failed") }
-            }
+        fun nativeRecordPause(): String = when (val r = vm.audioRecorder.pause()) {
+            is NativeAudioRecorder.Result.Success -> "ok"
+            is NativeAudioRecorder.Result.Failure -> "error:${r.reason}"
         }
 
         @JavascriptInterface
-        fun nativeRecordResume(): String {
-            synchronized(vm.recLock) {
-                return try {
-                    vm.nativeRecorder?.resume()
-                    if (vm.nativeRecordPauseStartMs > 0L) {
-                        vm.nativeRecordPausedAccumMs += System.currentTimeMillis() - vm.nativeRecordPauseStartMs
-                        vm.nativeRecordPauseStartMs = 0L
-                    }
-                    "ok"
-                } catch (e: Exception) { "error:" + (e.message ?: "resume_failed") }
-            }
+        fun nativeRecordResume(): String = when (val r = vm.audioRecorder.resume()) {
+            is NativeAudioRecorder.Result.Success -> "ok"
+            is NativeAudioRecorder.Result.Failure -> "error:${r.reason}"
         }
 
         /** Peak amplitude since the last call (0..32767). Drives the waveform. */
         @JavascriptInterface
-        fun nativeRecordAmplitude(): Int {
-            synchronized(vm.recLock) {
-                return try { vm.nativeRecorder?.maxAmplitude ?: 0 } catch (e: Exception) { 0 }
-            }
-        }
+        fun nativeRecordAmplitude(): Int = vm.audioRecorder.amplitude()
 
         /** Stop, then deliver the audio to JS via
          *  window.__onNativeRecordingComplete(base64, durationMs, mime).
@@ -935,60 +885,18 @@ class MainActivity : AppCompatActivity() {
          *  thread (already off the UI thread) then posts to the WebView. */
         @JavascriptInterface
         fun nativeRecordStop() {
-            synchronized(vm.recLock) {
-                val mr = vm.nativeRecorder
-                val f = vm.nativeRecordFile
-                vm.nativeRecorder = null
-                if (mr == null || f == null) {
-                    vm.nativeRecordFile = null
+            when (val r = vm.audioRecorder.stop()) {
+                is NativeAudioRecorder.Result.Success ->
+                    postNativeComplete(r.value.base64, r.value.durationMs)
+                is NativeAudioRecorder.Result.Failure ->
                     postNativeComplete(null, 0L)
-                    return
-                }
-                var durMs = System.currentTimeMillis() - vm.nativeRecordStartMs - vm.nativeRecordPausedAccumMs
-                if (vm.nativeRecordPauseStartMs > 0L) {
-                    durMs -= System.currentTimeMillis() - vm.nativeRecordPauseStartMs
-                }
-                try {
-                    mr.stop()
-                } catch (e: Exception) {
-                    // stop() throws if stopped too fast (no valid frames written).
-                    Timber.w(e, "nativeRecordStop stop() failed")
-                    try { mr.release() } catch (_: Exception) {}
-                    try { f.delete() } catch (_: Exception) {}
-                    vm.nativeRecordFile = null
-                    postNativeComplete(null, 0L)
-                    return
-                }
-                try { mr.release() } catch (_: Exception) {}
-                try {
-                    val bytes = f.readBytes()
-                    val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                    try { f.delete() } catch (_: Exception) {}
-                    vm.nativeRecordFile = null
-                    postNativeComplete(b64, if (durMs < 0L) 0L else durMs)
-                } catch (e: Exception) {
-                    Timber.w(e, "nativeRecordStop read failed")
-                    try { f.delete() } catch (_: Exception) {}
-                    vm.nativeRecordFile = null
-                    postNativeComplete(null, 0L)
-                }
             }
         }
 
         /** Abort recording and delete the temp file with no JS callback. */
         @JavascriptInterface
         fun nativeRecordCancel() {
-            synchronized(vm.recLock) {
-                val mr = vm.nativeRecorder
-                val f = vm.nativeRecordFile
-                vm.nativeRecorder = null
-                vm.nativeRecordFile = null
-                if (mr != null) {
-                    try { mr.stop() } catch (_: Exception) {}
-                    try { mr.release() } catch (_: Exception) {}
-                }
-                f?.let { try { it.delete() } catch (_: Exception) {} }
-            }
+            vm.audioRecorder.cancel()
         }
 
         @JavascriptInterface

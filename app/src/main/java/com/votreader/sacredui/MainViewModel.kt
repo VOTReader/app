@@ -1,15 +1,13 @@
 package com.votreader.sacredui
 
+import android.app.Application
 import android.media.AudioManager
-import android.media.MediaRecorder
-import androidx.lifecycle.ViewModel
-import java.io.File
-import timber.log.Timber
+import androidx.lifecycle.AndroidViewModel
 
 /**
  * Holds the per-Activity state that survives configuration changes -- the
- * recorder, the audio session mode, the cached insets, the renderer
- * recovery counter. MainActivity's manifest already declares
+ * native audio recorder, the audio session mode, the cached insets, the
+ * renderer recovery counter. MainActivity's manifest already declares
  * configChanges for orientation/uiMode/screenSize/etc., so the Activity
  * does not actually rebuild on rotation -- but moving state here gives
  * us:
@@ -26,8 +24,12 @@ import timber.log.Timber
  * Process death still loses everything -- ViewModel does not survive an
  * abrupt OS kill, but neither does the rest of the in-memory state, so
  * this is acceptance, not regression.
+ *
+ * AndroidViewModel (rather than plain ViewModel) so we can hand the
+ * Application context to [NativeAudioRecorder] -- it needs it for the
+ * Android 12+ MediaRecorder(context) constructor and for cacheDir lookup.
  */
-class MainViewModel : ViewModel() {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ---- UI / chrome state ----
     var savedTopInset: Int = 0
@@ -40,13 +42,8 @@ class MainViewModel : ViewModel() {
     // ---- Audio session ----
     var previousAudioMode: Int = AudioManager.MODE_NORMAL
 
-    // ---- Native recorder state (guarded by recLock) ----
-    val recLock = Any()
-    var nativeRecorder: MediaRecorder? = null
-    var nativeRecordFile: File? = null
-    var nativeRecordStartMs: Long = 0L
-    var nativeRecordPausedAccumMs: Long = 0L
-    var nativeRecordPauseStartMs: Long = 0L
+    // ---- Native recorder. Owns its own lock + recorder + temp-file state. ----
+    val audioRecorder: NativeAudioRecorder = NativeAudioRecorder(application)
 
     // ---- Renderer-crash recovery (60-second sliding window) ----
     var renderRecoveryCount: Int = 0
@@ -54,25 +51,13 @@ class MainViewModel : ViewModel() {
 
     /**
      * Fires when the ViewModelStore is cleared -- i.e. the Activity is
-     * finishing (not just config-changing). Releases the recorder and
-     * deletes the orphan temp file. Runs in one place instead of being
-     * duplicated across [MainActivity.onDestroy] and other lifecycle
-     * paths, so the cleanup invariant is harder to break in future.
+     * finishing (not just config-changing). Releases the recorder so a
+     * mid-recording app exit doesn't leak the mic session or orphan a
+     * cacheDir temp file. The recorder handles the synchronization
+     * internally, so this is a single delegated call.
      */
     override fun onCleared() {
         super.onCleared()
-        synchronized(recLock) {
-            nativeRecorder?.let {
-                try { it.stop() } catch (_: Exception) {}
-                try { it.release() } catch (e: Exception) {
-                    Timber.w(e, "Recorder release on ViewModel clear failed")
-                }
-            }
-            nativeRecorder = null
-            nativeRecordFile?.let {
-                try { it.delete() } catch (_: Exception) {}
-            }
-            nativeRecordFile = null
-        }
+        audioRecorder.release()
     }
 }
