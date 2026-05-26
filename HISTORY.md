@@ -4,6 +4,161 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## Q6 — CSS hardening (CLOSED 2026-05-25)
+
+Mechanical execution against the 772-line `css-audit.txt` work order.
+**app.css: 4,410 → 4,125 lines (−285, ~6.5%).** Three categories in
+priority order: dead rules (zero risk), hex→vars (mechanical), `!important`
+removal (specificity investigation).
+
+### Phase 1: dead-rule sweeps (5 commits, 285 lines deleted)
+
+- **Q6.1 (`6a10aa4`)** — BOOK SELECTOR block (62 lines). Entire dead
+  component family — `.book-selector` / `-eyebrow` / `-title` /
+  `-ornament` + `.book-card` / `-eyebrow` / `-title` / `-sub` / `-detail` /
+  `-badge` + `:hover` / `.featured` / `.vot-edition` + `@media`
+  variant. Superseded by `.chapter-card-*` layout.
+- **Q6.2 (`d6b1eb2`)** — old HOME-card block (20 lines). `.home-card` /
+  `.home-section` / `.home-cards` / `.home-coming-soon` /
+  `.home-app-name` + variants. Superseded by AMBIENT MINIMAL home
+  redesign (`.home-nav-item` / `.home-nav-list` are live).
+- **Q6.3 (`e3304c0`)** — LETTER LIST block (38 lines). `.letter-list-btn`
+  / `.letter-list-num` / `-title` / `-date` + `.is-current` compounds +
+  `.letter-list-current-dot` + `.read-check` compound (live `.read-check`
+  base rule retained). Superseded by `.chapter-card-*` layout.
+- **Q6.4 (`68884bf`)** — old SEARCH v1 + srch facet/chip/status blocks
+  (48 lines). The pre-Orama `.search-*` family + the Orama UI's removed
+  status-bar / chip / facet sub-features (`.srch-status-bar*` /
+  `.srch-chip*` / `.srch-facet*` + `@keyframes srch-pulse`). Live
+  `.search-input` / `.search-no-results` / `.search-highlight` /
+  `.srch-corpus-row` / `.srch-corpus-btn` / `.srch-scope-chip` /
+  `.srch-suggest` all retained.
+- **Q6.5 (`16ad441`)** — final dead-rule sweep (117 lines): notes
+  sort-menu + hl-remove-menu blocks + 20+ scattered single dead rules
+  (`.study-fn-link`, `.letter-highlight-block`, `.sc-sheet-error`,
+  `.chapter-card-dot`, `.chapter-card-sub`, `.preface-card`,
+  `.nav-btn-text`, `.picker-chapter-title`, `.studies-stack` family,
+  `.genre-tile-detail/-external/-preview`, `.genre-screen`,
+  `.bkm-row-thought-toggle`, `.settings-select`, `.settings-clear-row`,
+  `.history-screen` empty rule, `.history-date-header`,
+  `.notes-index-chip`).
+
+### Phase 2: hex → CSS vars (2 commits, 93 raw-hex usages consolidated)
+
+- **Q6.6 (`90149b0`)** — 10-color annotation palette. 62 raw hex usages
+  collapse to 10 `--hl-*` token definitions in `:root` (yellow, green,
+  pink, red, orange, blue, purple, teal, brown, gray). `--hl-cyan`
+  back-compat aliased to `--hl-teal`. Six sub-systems swapped:
+  `.hl-underline.hl-{X}`, `.hl-note.is-active.hl-{X}`,
+  `.hl-note-icon.hl-{X} svg`, `.ann-chip-color-btn[data-color]`,
+  `.sel-color-btn[data-color]`, `.sel-color-btn.sel-color-underline[data-color]`.
+  Bonus: `.navpick-row-icon-bible-chapter` brown alias also swapped.
+- **Q6.7 (`dca481e`)** — 5 more multi-use hex tokens. `--danger`
+  (#ef9a9a × 9), `--settings-warning` (#d18f2e × 2),
+  `--settings-danger` (#c0392b × 2), `--input-text` (cream in dark
+  mode, #2a2520 in light — 8 light-mode uses), `--white`
+  (#ffffff × 4). `#f7f2e8` swapped to `var(--bg)` × 6 (already equal
+  to light-mode `--bg`).
+
+### Phase 3: `!important` investigation (1 commit, 11 removed of 36)
+
+- **Q6.8 (`832a95a`)** — Category A `.hl-note.is-active.hl-{color}`
+  text-decoration-color (11 decls). Empirical investigation found the
+  audit's "shorthand expansion" reasoning didn't match: the base
+  `.hl-note.is-active` rule uses LONGHANDS
+  (text-decoration-line/style/thickness `!important`), NOT the
+  text-decoration shorthand. So there's no implicit
+  `text-decoration-color: currentColor` expansion to override. The
+  per-color rule's 3-class specificity beats the 2-class base on its
+  own. Probed via `document.styleSheets.deleteRule` + live-patch +
+  computed-style assertion across all 11 colors in BOTH dark and light
+  mode.
+- **Q6.9 (no commit)** — Cat B/C/D/E/F (25 remaining decls):
+  KEPT. Light-mode palette specificity (`body.light .hl-yellow` =
+  0,0,2,1) exceeds `.hl-note:not(.is-active)` (0,0,2,0), so
+  `!important` is genuinely load-bearing for the palette-strip
+  guards. The audit's `:where()`/`@layer` cleanup is a redesign,
+  out of scope for this hardening phase.
+
+`!important` count: **36 → 25.**
+
+---
+
+## Q7 — useSyncExternalStore migration (CLOSED 2026-05-25)
+
+**Goal:** replace the legacy `hlTick` cache-bust pattern (24 Bin 4
+`eslint-disable react-hooks/exhaustive-deps` cites) with the React 18
+`useSyncExternalStore` contract. Per [[test-the-suppresses]] the Q5.3
+test had proven the cite was justified BEFORE migration; now it's not
+needed at all.
+
+- **Q7.1 (`0eb9fce`)** — CachedStore base. Added `subscribe(cb) →
+  unsubscribe`, `getVersion()`, `_bump()`, `_version`, `_listeners` to
+  the base class — every store inherits via `extendStore()`. 9 new
+  test cases in `cached-store.test.js` prove the contract (initial
+  version, increment on bump, subscriber notification, multiple
+  subscribers, unsubscribe stops notifications, one-throws-doesn't-block-others,
+  idempotence, subscribe-before-bump, stable getVersion).
+- **Q7.2 (`9d5dd0c`)** — AnnotationStore + NoteStore _bump. 3 consumers
+  migrated (HighlightableText, NoteSheet × 2). Q5.3 test extended
+  with sections E + F (useSyncExternalStore pattern + every mutation
+  method bumps).
+- **Q7.3 (`e996e37`)** — BookmarkStore + JournalStore + LinkStore _bump.
+  4 consumers migrated (BookmarkIcon, ChapterBookmarkBtn,
+  BookmarksScreen, LibraryScreen). LibraryScreen subscribes to ALL 5
+  stores so the 5-tile dashboard is fully reactive in one place.
+- **Q7.4 (`6a1a0c0`)** — NotebookStore + JournalIndexStore _bump. 10
+  consumers migrated: NotesIndexScreen, NotebookManagerSheet,
+  NotebookPickerSheet, LinkSidebar, LinkIcon, LinksScreen,
+  HighlightsScreen, JournalHubScreen, JournalViewerScreen, JournalChip.
+
+**Stores with `_bump`:** AnnotationStore, NoteStore, BookmarkStore,
+JournalStore, LinkStore, NotebookStore, JournalIndexStore (7 total).
+
+**Bin 4 production-code disables removed:** 23 (all of them).
+The 24th lives in `annotation-store.test.js` and documents the OLD
+hlTick pattern WITH proof it was justified BEFORE migration — kept as
+a historical regression marker per [[test-the-suppresses]].
+
+**Tests:** 465 → 476 (+11 across Q7.1's cached-store + Q7.2's
+annotation-store sections E/F).
+
+**setHlTick / hlTick prop threading:** still threaded through some
+non-migrated callbacks where post-mutation `setHlTick(t => t + 1)` is
+now a no-op (no consumer reads `hlTick`). Follow-up can rip the
+App-state + prop bind entirely; left as-is this session to bound the
+blast radius.
+
+---
+
+## Q8.0 — Bundle-a.js lazy-load (ANALYSIS ONLY, DEFERRED)
+
+`f7dff63` lands the analysis + implementation strategy doc at
+`BUNDLE-LAZY-LOAD-PLAN.md`. The work is deferred to its own sprint —
+the smoke matrix is ~30 screens (every BOOKS access site needs a
+guard or await, including the first-paint Scriptures tile counts on
+the home screen), which is a phase not a commit.
+
+Key findings:
+- `books.js` (NKJV) is 6.9 MB = 60% of the 11.3 MB cold-boot bundle.
+  Single highest-leverage UX target.
+- BOOKS is read by ~12 source sites (ScripturesHome, SettingsScreen,
+  useAndroidBack, useBibleStudies, useNavigateToLink, useSearch,
+  useSurprise, useNavHistoryTracking, MatthewChapterView,
+  handleScriptureSelect, ...).
+- search-data.js is 42 KB of named-passages / synonyms / stop-words —
+  NO verse text. Search references resolve without BOOKS; only
+  clicking a Bible result needs the corpus.
+
+Recommended implementation (strategy B2 in the plan doc): build
+pipeline emits `bundle-a-bible.js` separately; `window.__loadBibleCorpus()`
+helper injects it on first call; ScripturesHome / Settings show
+skeleton counts until BOOKS resolves; Bible-bound nav handlers await
+the loader. Cold-boot drops from 11.3 MB → 3.8 MB parse + ~2 sec
+saved on mid-range Android.
+
+---
+
 ## P7 + P8 + P9 — App() decomposition (CLOSED 2026-05-25)
 
 App.jsx: **1,815 → 797 lines** across two phases.

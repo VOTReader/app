@@ -3,7 +3,7 @@ VOTReader-studio — Strategic Working Memory
 ═══════════════════════════════════════════════════════════════════════════════
 
 Started: 2026-05-10
-Last pruned: 2026-05-25 (P7 Phase 1 + Phase 2 closed; App() 1,815 → 797 lines)
+Last pruned: 2026-05-25 (Q6 + Q7 closed; bundle-a lazy-load deferred with plan)
 Status: ACTIVE — kept slim as work progresses
 Companions: CLAUDE.md (live status), HISTORY.md (landed work), ARCHITECTURE.md (system ref)
 
@@ -40,9 +40,16 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q5 (Vitest)                 ✅ DONE  — 218 tests / 9 files; ratchet 1→14 stmts
   App() decomposition (P7)    ✅ DONE  — Phase 1 (logic, P7a-k) + Phase 2
                                           (render-tree, P9a-g). App() 1,815
-                                          → 797 lines. 465 vitest tests.
-                                          See CLAUDE.md "Phase 2" + HISTORY.md.
-  Q6 (CSS hardening)          ⬜ PENDING
+                                          → 797 lines.
+  Q6 (CSS hardening)          ✅ DONE  — app.css 4,410 → 4,125. 93 hex → vars.
+                                          Cat A !important removed (11 of 36).
+                                          See CLAUDE.md "Q6".
+  Q7 (useSyncExternalStore)   ✅ DONE  — 23/24 Bin 4 hlTick disables removed.
+                                          7 stores + 14 consumers migrated.
+                                          476 vitest tests. See CLAUDE.md "Q7".
+  Bundle-a.js lazy-load       📋 PLANNED — analysis + strategy doc at
+                                          BUNDLE-LAZY-LOAD-PLAN.md (Q8.0).
+                                          Deferred to its own sprint.
 
 ───────────────────────────────────────────────────────────────────────────────
 POST-Q4 SEQUENCING (executed 2026-05-24)
@@ -75,48 +82,26 @@ POST-Q4 BACKLOG (priority order — top = next)
    pre-commit gates pass; 465 vitest tests passing. Per-commit breakdown
    in CLAUDE.md "Phase 2" section + git log (P7a-k, P8a-c, P9a-g).
 
-2. useSyncExternalStore MIGRATION (eliminates Bin 4 hlTick cites)
-   ─────────────────────────────────────────────────────────────
-   Q3.3e added 24 disable cites for the canonical hlTick cache-bust pattern:
+2. BUNDLE-A.JS LAZY-LOAD (UX, the remaining UX win)
+   ─────────────────────────────────────────────────
+   bundle-a.js is 11.7 MB on every cold WebView boot. books.js (NKJV) alone
+   is 6.9 MB = 60% of the cost. Mid-range Android: ~3-5s parse before any
+   UI paints.
 
-       const x = React.useMemo(() => SomeStore.get(hlKey), [hlKey, hlTick]);
+   Analysis + implementation strategy: BUNDLE-LAZY-LOAD-PLAN.md (Q8.0,
+   commit f7dff63). The plan doc has the full design — sufficient detail
+   that a follow-up session can pick up cleanly.
 
-   hlTick is a bump-counter that increments on store mutations, signaling
-   memos to re-read. ESLint flags it "unnecessary" because it can't see
-   through the store-read boundary. Removing it breaks highlight/bookmark/
-   note refresh.
+   Why deferred from this session: BOOKS is read at first paint by
+   ScripturesHome (tile counts) + Settings (translation list) + 8 hooks.
+   A clean lazy-load needs either guards-at-every-access-site or a
+   skeleton-state design that fills in once the corpus loads. The smoke
+   matrix is ~30 screens; rushing it would ship subtle regressions or
+   miss the actual UX win.
 
-   React 18's useSyncExternalStore replaces this idiomatically:
-
-       const x = React.useSyncExternalStore(store.subscribe, () => store.get(hlKey));
-
-   Each store grows `subscribe(cb) → unsubscribe` + `getSnapshot()`. Consumers
-   replace tick-counter useMemo with useSyncExternalStore. No false-positive
-   lint. Concurrent-renderer-safe.
-
-   Scope: refactor — 6 stores + 16 consumer sites. Changes runtime re-render
-   semantics (consumers re-render more precisely, not on any mutation).
-   Q5 tests are now in place (per [[refactor-after-tests]]) — unblocked.
-
-   Schedule: post-P7 (App() decomposition first), or alongside it if a
-   P7 hook extraction naturally touches one of the 16 consumer sites.
-
-3. BUNDLE-A.JS LAZY-LOAD (UX, post-Q6)
-   ─────────────────────────────────────
-   bundle-a.js is 11.7 MB loaded on every cold WebView boot. On mid-range
-   Android, ~3-5 seconds of parse time before any UI paints.
-
-   Split into:
-     - bundle-a-core.js (~2 MB): vendor + search engine + small registries
-     - bundle-a-corpus-{volKey}.js (lazy): each Volume/WTLB/etc.
-
-   Load on-demand when user opens a collection. The single biggest UX win
-   available. Significant refactor — needs COLLECTIONS registry to gate
-   corpus loading + a fetch-and-await wrapper that doesn't break the
-   synchronous `colLetterArr` contract.
-
-   Schedule: post-Q6, deliberately scheduled (not a polish item — a real
-   architectural change with smoke regression risk).
+   Exit criteria: bundle-a.js < 4 MB, cold-boot to first paint < 2 sec on
+   mid-range Android, every BOOKS access site guarded or awaited, full
+   smoke walk passing identically.
 
 ───────────────────────────────────────────────────────────────────────────────
 INFRA / TOOLING ITEMS (one-liners — open small, ship fast)

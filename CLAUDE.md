@@ -12,12 +12,16 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
 - **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **797 lines — Phase 1 + Phase 2 CLOSED.** 26 hooks (15 P6 + 11 P7a-k). **All 53 screens dispatch from a single ROUTES table** that lives in its own file (`src/ui/screen-routes.jsx`) via a `buildScreenRoutes(deps)` factory. The 3 substantive inline blocks (matthew-ch, bible-study-chapter, holy-days-index playlist header) extracted to their own screen/component files. Welcome modal + tabs overview + disable-tabs prompt + garden warning live in `AppShellOverlays`; 12 annotation/link/journal/bookmark sheets live in `AppShellSheets`. App() now owns composition, not implementation.
+- **Q6 CSS hardening CLOSED.** app.css 4,410 → 4,125 (−285 dead). 93 raw-hex usages consolidated to vars (`--hl-{yellow|green|pink|...}` palette + `--danger` + `--settings-warning/danger` + `--input-text` + `--white`). `!important` count 36 → 25 (Cat A removed; B-F load-bearing).
+- **Q7 useSyncExternalStore migration CLOSED.** 23 of 24 Bin 4 `hlTick` cache-bust eslint-disables removed (24th is in `annotation-store.test.js` documenting the old pattern). 7 stores now expose `subscribe / getVersion / _bump`; 14 consumers migrated.
+- **Bundle-a.js lazy-load:** prerequisite analysis only. See `BUNDLE-LAZY-LOAD-PLAN.md`. Deferred to its own sprint.
 - **135+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
-  - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script)
-  - `bundle-b.js` 367 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 37 files)
+  - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script; lazy-split planned)
+  - `bundle-b.js` 351 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 38 files incl. cached-store.test.js excluded from prod)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
-  - `bundle-d.js` 539 KB — screens + sheets + components + utils + late stores + screen-routes + App() (esbuild IIFE, 87 files)
+  - `bundle-d.js` 540 KB — screens + sheets + components + utils + late stores + screen-routes + App() (esbuild IIFE, 87 files)
+- **476 vitest tests** across 20 files (+9 cached-store + 2 annotation-store from Q7).
 
 ### Q3 ESLint — CLOSED 2026-05-24
 
@@ -106,7 +110,91 @@ The 50/50 split means **hook extraction alone cannot hit <800.** The render tree
 - ✅ All 5 pre-commit gates pass (check_balance + lint + typecheck + vitest 465 tests + build)
 - ✅ Visual smoke walk completed for every extracted screen
 
-**Post-decomp backlog:** useSyncExternalStore migration (eliminates 24 Bin 4 cites — has test coverage now per Q5.3), bundle-a.js lazy-load (post-Q6 UX), Q6 CSS hardening.
+### Q6 — CSS hardening (CLOSED 2026-05-25)
+
+Mechanical execution against the 772-line `css-audit.txt`. app.css:
+**4,410 → 4,125 lines (−285, ~6.5%)**.
+
+- **Q6.1-Q6.5** — dead-rule sweeps (285 lines deleted across 5 commits):
+  BOOK SELECTOR block (62), old HOME-card (20), LETTER LIST (38), old
+  SEARCH v1 + srch facet/chip (48), notes-sort-menu + hl-remove-menu +
+  scattered (117). Each verified zero-references via word-boundary
+  grep + visual smoke walk.
+- **Q6.6** — 10-color annotation palette → `--hl-*` CSS vars. 62 raw
+  hex usages collapse to 10 var definitions in `:root`. Plus the
+  intentional `.navpick-row-icon-bible-chapter` brown alias.
+- **Q6.7** — Six more multi-use hex values consolidated: `--danger`
+  (10 → 9 uses after Q6.5 deleted one), `--settings-warning`,
+  `--settings-danger`, `--input-text` (with light-mode override),
+  `--white`. 31 raw hex literals replaced with vars.
+- **Q6.8** — Category A `!important` (11 decls): empirically removed.
+  The audit's "shorthand expansion" reasoning didn't match: base
+  `.hl-note.is-active` uses LONGHANDS (no implicit currentColor), and
+  per-color rule's 3-class specificity beats the 2-class base. Probed
+  via `document.styleSheets` live patch + computed-style check across
+  all 11 colors, dark + light mode.
+- **Q6.9** — Categories B/C/D/E/F (25 decls): KEPT. The light-mode
+  palette specificity argument (`body.light .hl-yellow` = 0,0,2,1
+  exceeds `.hl-note:not(.is-active)` = 0,0,2,0) is genuinely
+  load-bearing for the palette-strip guards. `:where()` / `@layer`
+  cleanup is a redesign, deferred.
+
+`!important` count: 36 → 25.
+
+### Q7 — useSyncExternalStore migration (CLOSED 2026-05-25)
+
+23 of 24 Bin 4 `eslint-disable-next-line react-hooks/exhaustive-deps`
+cites removed; the canonical `hlTick` cache-bust pattern replaced with
+per-store React 18 reactivity. The 24th lives in `annotation-store.test.js`
+and documents the OLD pattern with proof it was justified BEFORE
+migration — kept as a historical regression marker.
+
+- **Q7.1** — CachedStore base: added `subscribe(cb) → unsubscribe`,
+  `getVersion()`, `_bump()`, `_version`, `_listeners`. Every store
+  inherits via `extendStore()`. 9 new cases in `cached-store.test.js`
+  prove the contract (notification, unsubscribe, idempotence, throwing
+  subscriber doesn't block siblings, etc.).
+- **Q7.2** — AnnotationStore + NoteStore migrations. 3 consumers
+  migrated (HighlightableText, NoteSheet × 2). Q5.3 test extended
+  with tests E + F (useSyncExternalStore pattern verified end-to-end).
+- **Q7.3** — BookmarkStore + JournalStore + LinkStore _bump. 4
+  consumers migrated (BookmarkIcon, ChapterBookmarkBtn, BookmarksScreen,
+  LibraryScreen). LibraryScreen subscribes to ALL 5 stores so the
+  5-tile dashboard fully reactive.
+- **Q7.4** — NotebookStore + JournalIndexStore _bump. 10 consumers
+  migrated (NotesIndexScreen, NotebookManagerSheet, NotebookPickerSheet,
+  LinkSidebar, LinkIcon, LinksScreen, HighlightsScreen, JournalHubScreen,
+  JournalViewerScreen, JournalChip).
+
+**Stores with `_bump`:** AnnotationStore, NoteStore, BookmarkStore,
+JournalStore, LinkStore, NotebookStore, JournalIndexStore (7).
+
+**Exit check:** all production-code Bin 4 disables removed.
+`grep -rEn "eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust"
+app/src/main/assets/src --include="*.jsx" --include="*.js" | grep -v test`
+returns ZERO matches.
+
+**setHlTick / hlTick prop threading:** still in App() state +
+threaded through some non-migrated callbacks (e.g. BookmarksScreen's
+post-mutation `setHlTick(t => t + 1)` is now a no-op since no
+consumer reads `hlTick`). A follow-up can remove the App-state +
+prop entirely; left in place this session to keep blast radius bounded.
+
+### Bundle-a.js lazy-load (DEFERRED — analysis only)
+
+Prerequisite analysis committed at `BUNDLE-LAZY-LOAD-PLAN.md` (Q8.0,
+`f7dff63`). Recommended implementation strategy documented; defer to
+its own sprint with smoke-tests at each step.
+
+**Why deferred:** every BOOKS access site (12 source sites — including
+ScripturesHome tile counts on the home screen) needs a guard or await,
+which is a ~30-screen smoke matrix. Rushing in this session would
+either ship subtle regressions or fall short of the actual UX win.
+
+**When picked up:** the plan doc has the implementation strategy B2
+(skeleton state + on-navigate loading). Books.js alone (6.9 MB =
+60% of bundle-a) is the highest leverage; full split brings cold-boot
+from 11.3 MB → 3.8 MB.
 
 ### Roadmap
 
