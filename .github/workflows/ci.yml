@@ -120,10 +120,21 @@ jobs:
         # NK2-NK5 fill it with real test cases.
         run: ./gradlew :app:testDebugUnitTest
 
-      - name: Upload test report on failure
+      - name: Verify JaCoCo coverage floor (NK6)
+        # Ratchet gate on the pure-JVM-tested classes (JsBridge,
+        # BoundedLogTree). Floor lives in app/build.gradle.kts and only
+        # ever moves up. See the comment block on the jacoco {} extension
+        # for why StorageManager + framework-coupled classes are out of
+        # scope here (Robolectric sandbox CL bypasses JaCoCo's agent;
+        # those tests still RUN, just aren't COUNTED here).
+        run: ./gradlew :app:jacocoTestReport :app:jacocoTestCoverageVerification
+
+      - name: Upload test + coverage reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: kotlin-test-report
-          path: app/build/reports/tests/testDebugUnitTest/
+          name: kotlin-test-and-coverage-report
+          path: |
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/reports/jacoco/
           retention-days: 14

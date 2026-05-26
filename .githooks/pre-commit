@@ -240,19 +240,22 @@ if [ -n "$kotlin_changed" ]; then
     echo "---------------------------------------------------------------"
     exit 1
   fi
-  $GRADLE_CMD :app:testDebugUnitTest
+  $GRADLE_CMD :app:testDebugUnitTest :app:jacocoTestCoverageVerification
   status=$?
   if [ $status -ne 0 ]; then
     echo ""
     echo "---------------------------------------------------------------"
-    echo "Kotlin tests FAILED — see gradle output above."
-    echo "Full HTML report: app/build/reports/tests/testDebugUnitTest/index.html"
+    echo "Kotlin tests OR coverage gate FAILED — see gradle output above."
+    echo "HTML test report: app/build/reports/tests/testDebugUnitTest/index.html"
+    echo "HTML coverage report:"
+    echo "  app/build/reports/jacoco/jacocoTestReport/html/index.html"
+    echo "  (run \`./gradlew :app:jacocoTestReport\` first if missing)"
     echo "Fix the failing tests, re-stage, then retry the commit."
     echo "Emergency bypass (not recommended): git commit --no-verify"
     echo "---------------------------------------------------------------"
     exit 1
   fi
-  echo "[pre-commit] Kotlin tests OK."
+  echo "[pre-commit] Kotlin tests + coverage gate OK."
 fi
 
 exit 0
