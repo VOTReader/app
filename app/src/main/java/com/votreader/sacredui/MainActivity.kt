@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.util.Base64
 import android.view.Gravity
 import android.view.ViewGroup
@@ -113,6 +114,13 @@ class MainActivity : AppCompatActivity() {
         // arbitrary apps or escalate. Asset-loader URLs are matched by
         // exact prefix earlier and don't reach this allowlist.
         private val ALLOWED_EXTERNAL_SCHEMES = setOf("https", "http", "mailto", "tel")
+        // Cap on what filePickerLauncher will read into memory. A heavy
+        // user export (10k highlights + a year of voice journals) is well
+        // under 30 MB; 50 MB is ~2x headroom. The picker MIME hint is
+        // "application/json" but Android does not enforce it — the user
+        // can still select any file, so a defensive cap stops an
+        // accidental (or hostile) GB-scale pick from OOM-ing the app.
+        private const val MAX_IMPORT_SIZE = 50L * 1024 * 1024
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -131,21 +139,35 @@ class MainActivity : AppCompatActivity() {
         // delivers it to JS as base64 via window.__onImportFile so that
         // allowContentAccess=false on the WebView is never a factor.
         filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            if (uri != null) {
-                try {
-                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
-                    val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                    webView.post {
-                        webView.evaluateJavascript("window.__onImportFile && window.__onImportFile('$b64')", null)
-                    }
-                } catch (e: Exception) {
-                    Timber.w(e, "Import file read failed")
-                    webView.post {
-                        webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
-                    }
-                }
-            } else {
+            if (uri == null) {
                 // User cancelled the picker
+                webView.post {
+                    webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
+                }
+                return@registerForActivityResult
+            }
+
+            // Reject oversized / unknown-size files BEFORE readBytes() —
+            // a multi-GB pick (accidental or hostile) would OOM the app.
+            // The import format is one we own (Export JSON), so a missing
+            // size is suspicious enough to refuse rather than read blindly.
+            val size = querySize(uri)
+            if (size < 0L || size > MAX_IMPORT_SIZE) {
+                Timber.w("Import rejected: size=%d (limit=%d)", size, MAX_IMPORT_SIZE)
+                webView.post {
+                    webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
+                }
+                return@registerForActivityResult
+            }
+
+            try {
+                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
+                val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                webView.post {
+                    webView.evaluateJavascript("window.__onImportFile && window.__onImportFile('$b64')", null)
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Import file read failed")
                 webView.post {
                     webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
                 }
@@ -539,6 +561,24 @@ class MainActivity : AppCompatActivity() {
             }
         }
         setContentView(tv)
+    }
+
+    /**
+     * Ask the content provider how big [uri] is, in bytes. Returns -1 if
+     * the provider doesn't expose [OpenableColumns.SIZE] (some pickers
+     * skip it). Caller is expected to treat -1 as "suspicious, reject"
+     * since the import format is one we control end-to-end.
+     */
+    private fun querySize(uri: Uri): Long {
+        contentResolver.query(
+            uri, arrayOf(OpenableColumns.SIZE), null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (idx != -1 && !cursor.isNull(idx)) return cursor.getLong(idx)
+            }
+        }
+        return -1L
     }
 
     private fun injectInsets() {
