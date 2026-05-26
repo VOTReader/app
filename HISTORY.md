@@ -222,6 +222,55 @@ functionality, not the extraction overhead.
   delegate. Imports of ContentValues, MediaStore, OpenableColumns,
   Build removed from MainActivity. Line count: 991 → 937.
 
+### Post-review hardening (3 commits)
+
+A critical review pass after N1.10b landed surfaced three real
+correctness paths that the build/assemble gate alone hadn't caught.
+Each landed as its own commit with the same one-fix-per-commit
+discipline as the N1.x chain. These are the kind of bugs the Kotlin
+test phase (NK) is designed to catch up-front; documenting them here
+both for traceability and as concrete test-case seeds for NK3 / NK4.
+
+- **N1.3 hardening (`d8d0ab6`)** — Dangling `webView` field in the
+  retry-view path. `onRenderProcessGone` destroyed the dying WebView
+  and then either rebuilt + attached the field (normal recovery) OR
+  jumped straight to `showRendererCrashRetryView()` (>2 crashes /
+  60 s) WITHOUT reassigning `webView` first. JsBridge reads the
+  field via a lazy provider on every call; any in-flight callback
+  that landed during the retry-view window — micPrepLauncher result,
+  fileChooserCallback resolution, a delayed audio-session JS call —
+  would post on the destroyed instance and likely throw
+  `IllegalStateException` on the binder thread. Fix: always rebuild
+  the WebView FIRST, then branch; the retry click handler attaches
+  the already-built fresh instance instead of constructing another.
+
+- **N1.7 hardening (`1ea0127`)** — PixelCopy bitmap recycle race.
+  `invokeOnCancellation { dest.recycle() }` recycled the destination
+  bitmap eagerly when the coroutine was cancelled (e.g. by
+  `withTimeoutOrNull`'s 2-second cap), but Android's PixelCopy
+  contract says the destination "must not be modified or recycled
+  until the callback is invoked." A cancellation mid-flight could
+  let the native side write into a freed buffer — silent corruption
+  at best, native crash at worst. Fix: invokeOnCancellation just
+  sets an `AtomicBoolean`; the PixelCopy callback handles the
+  recycle whether the coroutine cancelled or completed. The
+  IllegalArgumentException path (PixelCopy.request rejects args
+  synchronously — callback won't fire) also recycles inline.
+
+- **N1.10b hardening (`ff0f459`)** — `queryFileSize` exception
+  safety. `contentResolver.query` can throw `SecurityException` (URI
+  permission revoked between picker handoff and our access),
+  `IllegalStateException` (closed provider), and others. The
+  previous implementation didn't catch any of them, so the exception
+  propagated out of `readUriAsBase64` → out of `StorageManager` →
+  out of the `filePickerLauncher` callback → crashed the app, leaving
+  JS waiting on a `__onImportFile` callback that never fired. Fix:
+  wrap the query in try/catch in `queryFileSize`; return -1L on any
+  exception. Folds into the existing "unknown_size" Failure branch —
+  JS contract uniform, user sees the standard generic
+  import-failed toast instead of an app crash. Timber logs the
+  exception at warn level for diagnosis.
+
 ### What's verified vs. what's owed
 
 **Verified at commit time** (every commit):
@@ -230,22 +279,39 @@ functionality, not the extraction overhead.
 - Static analysis (no double `vm.vm.` artifacts, no unused imports
   per spot grep)
 
-**Owed against a real Android device** (couldn't be done in this
-environment):
+**Closed by the post-review hardening pass:**
+- N1.3 retry-path dangling `webView` field — closed by `d8d0ab6`.
+  The retry-view window no longer leaves bridge calls posting on a
+  destroyed WebView.
+- N1.7 PixelCopy bitmap recycle race — closed by `1ea0127`. Recycle
+  deferred to the PixelCopy callback per Android's documented
+  contract; cancellation no longer freezes a buffer the native side
+  may still be writing into.
+- N1.10b queryFileSize exception escape — closed by `ff0f459`. URI
+  permission revocations + closed providers now fold into the
+  existing `"unknown_size"` Failure branch instead of crashing the
+  filePickerLauncher callback.
+
+**Still owed against a real Android device** (couldn't be done in
+this environment):
 - N1.1: chrome://inspect attachment on debug APK
 - N1.3: chrome://crash induced renderer death + recovery cycle;
-  rapid 3-crash flow showing the retry view
+  rapid 3-crash flow showing the retry view (+ verification that
+  the retry-view window no longer crashes per `d8d0ab6`)
 - N1.4: 100-MB file rejection path round-trips correct null callback
 - N1.5: full smoke walk that every bridge migration path still fires
 - N1.6: PixelCopy capture quality across Garden (image-heavy),
   text screens, dark/light mode
 - N1.7: Memory Profiler check for bitmap leaks on rapid back-to-back
-  captures; background-mid-capture safety
+  captures + cancellation paths (`1ea0127` made the cancel path
+  safe; profile it to confirm no regression on the success path);
+  background-mid-capture safety
 - N1.8: the actual visual smoothness on hardware (emulator's IME
   animation differs from real device timing)
 - N1.9: rotation mid-recording — recording survives
 - N1.10a: full record / pause / resume / stop / cancel cycle
-- N1.10b: export → import round-trip identity check; 100-MB rejection
+- N1.10b: export → import round-trip identity check; 100-MB rejection;
+  revoked-URI rejection path returns a proper failure (`ff0f459`)
 
 The Kotlin wiring is correct; the visual + behavioral proof remains
 owed.

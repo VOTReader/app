@@ -10,7 +10,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 ## Current state (2026-05-25)
 
-- **Phase N1 — Native-side polish CLOSED.** 10 commits bring `MainActivity.kt` to the same quality bar as the JS side. New files: `VOTReaderApp.kt` (Application subclass for Timber), `JsBridge.kt` (centralized evaluateJavascript), `MainViewModel.kt` (config-change-surviving state), `NativeAudioRecorder.kt` (MediaRecorder lifecycle), `StorageManager.kt` (file I/O). `MainActivity.kt`: 869 → 937 lines on net (Timber + onRenderProcessGone + JsBridge + N1.8 callback + import-size guard added; recorder + file I/O extracted out). 14 raw `Log.w("VOTReader", …)` calls → Timber; every `evaluateJavascript` site routes through `JsBridge` (one documented N1.8 60Hz-loop exception). PixelCopy + coroutines on screenshot path; renderer-crash recovery with crash-loop guard; per-frame IME tracking via `WindowInsetsAnimationCompat`. New deps: timber 5.0.1, kotlinx-coroutines-android 1.10.2, lifecycle-runtime-ktx 2.9.1, lifecycle-viewmodel-ktx 2.9.1.
+- **Phase N1 — Native-side polish CLOSED.** 13 commits (10 N1.x + 3 post-review hardening) bring `MainActivity.kt` to the same quality bar as the JS side. New files: `VOTReaderApp.kt` (Application subclass for Timber), `JsBridge.kt` (centralized evaluateJavascript), `MainViewModel.kt` (config-change-surviving state), `NativeAudioRecorder.kt` (MediaRecorder lifecycle), `StorageManager.kt` (file I/O). `MainActivity.kt`: 869 → 937 lines on net (Timber + onRenderProcessGone + JsBridge + N1.8 callback + import-size guard added; recorder + file I/O extracted out). 14 raw `Log.w("VOTReader", …)` calls → Timber; every `evaluateJavascript` site routes through `JsBridge` (one documented N1.8 60Hz-loop exception). PixelCopy + coroutines on screenshot path; renderer-crash recovery with crash-loop guard; per-frame IME tracking via `WindowInsetsAnimationCompat`. New deps: timber 5.0.1, kotlinx-coroutines-android 1.10.2, lifecycle-runtime-ktx 2.9.1, lifecycle-viewmodel-ktx 2.9.1.
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
 - **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **797 lines — Phase 1 + Phase 2 CLOSED.** 26 hooks (15 P6 + 11 P7a-k). **All 53 screens dispatch from a single ROUTES table** that lives in its own file (`src/ui/screen-routes.jsx`) via a `buildScreenRoutes(deps)` factory. The 3 substantive inline blocks (matthew-ch, bible-study-chapter, holy-days-index playlist header) extracted to their own screen/component files. Welcome modal + tabs overview + disable-tabs prompt + garden warning live in `AppShellOverlays`; 12 annotation/link/journal/bookmark sheets live in `AppShellSheets`. App() now owns composition, not implementation.
 - **Q6 CSS hardening CLOSED.** app.css 4,410 → 4,125 (−285 dead). 93 raw-hex usages consolidated to vars (`--hl-{yellow|green|pink|...}` palette + `--danger` + `--settings-warning/danger` + `--input-text` + `--white`). `!important` count 36 → 25 (Cat A removed; B-F load-bearing).
@@ -283,9 +283,11 @@ their own smoke tests.
 
 ### N1 — Native-side polish (CLOSED 2026-05-25)
 
-10 commits bring `MainActivity.kt` to the same quality bar as the JS
-side. Same one-commit-per-item discipline as Q3-Q8; same build-and-
-verify-after-each gate.
+13 commits bring `MainActivity.kt` to the same quality bar as the JS
+side: 10 N1.x items plus 3 post-review hardening commits that closed
+real correctness paths found by a critical review pass after N1.10b
+landed. Same one-commit-per-item discipline as Q3-Q8; same
+build-and-verify-after-each gate.
 
 **New deps** (`gradle/libs.versions.toml`): timber 5.0.1,
 kotlinx-coroutines-android 1.10.2, lifecycle-runtime-ktx 2.9.1,
@@ -377,6 +379,42 @@ lifecycle-viewmodel-ktx 2.9.1. Zero third-party risk beyond Timber
   wants its own policy). `MAX_IMPORT_SIZE` moves into the companion.
   Returns its own sealed `Result<T>`. MainActivity 991 → 937 lines.
 
+**Post-review hardening (3 commits):** a critical review pass after
+N1.10b surfaced three real correctness paths that the build/assemble
+gate alone hadn't caught. Each landed as its own commit, same one-fix-
+per-commit discipline as the N1.x chain.
+
+- **N1.3 hardening (`d8d0ab6`)** — Dangling `webView` field in the
+  retry-view path. `onRenderProcessGone` destroyed the dying WebView
+  and then either rebuilt + attached (normal) or called
+  `showRendererCrashRetryView` (>2 crashes / 60 s) — but the retry
+  branch never reassigned the `webView` field, so JsBridge's lazy
+  provider would read the destroyed instance for any in-flight
+  callback during the retry-view window (micPrepLauncher result,
+  fileChooserCallback, delayed audio-session bridge call). Fix:
+  always `webView = createConfiguredWebView()` BEFORE the branch;
+  the retry click handler attaches the already-built fresh
+  instance instead of constructing another.
+- **N1.7 hardening (`1ea0127`)** — PixelCopy bitmap recycle race.
+  `invokeOnCancellation { dest.recycle() }` recycled the destination
+  bitmap eagerly on coroutine cancellation, but PixelCopy's contract
+  requires the bitmap to stay alive "until the callback is invoked."
+  Cancellation during a `withTimeoutOrNull` could let the native side
+  write into a freed buffer. Fix: invokeOnCancellation just sets an
+  `AtomicBoolean`; the PixelCopy callback handles recycle whether the
+  coroutine cancelled or completed. IllegalArgumentException path also
+  recycles inline (callback won't fire).
+- **N1.10b hardening (`ff0f459`)** — `queryFileSize` exception safety.
+  `contentResolver.query` can throw SecurityException (revoked URI
+  permission) or IllegalStateException (closed provider); the previous
+  implementation propagated the exception out of `readUriAsBase64` and
+  out of the `filePickerLauncher` callback, crashing the app and
+  leaving JS waiting on a never-fired `__onImportFile`. Fix: wrap the
+  query in try/catch, return -1L on any exception. Folds into the
+  existing "unknown_size" Failure branch — JS contract uniform,
+  user sees the standard generic import-failed toast instead of a
+  crash.
+
 **Final line counts:** MainActivity 937 + JsBridge 104 + MainViewModel 67
 \+ NativeAudioRecorder 192 + StorageManager 116 + VOTReaderApp 19 =
 **1,435 lines total** (vs 869-line monolith pre-N1). The growth is
@@ -387,9 +425,12 @@ bridge wiring + lifecycle, with the implementation details delegated.
 **Verification:** every commit passed `:app:compileDebugKotlin` +
 `:app:compileReleaseKotlin` + `:app:assembleDebug`. JS-side bundles
 untouched (Kotlin-only commits don't trip the pre-commit's bundle
-rebuild). Real-device verification is OWED for: chrome://inspect
-attachment (N1.1), chrome://crash recovery (N1.3), PixelCopy capture
-on hardware-accelerated content (N1.6), keyboard animation smoothness
+rebuild). The post-review hardening pass closed three real correctness
+paths (`d8d0ab6` / `1ea0127` / `ff0f459`) before any real-device walk
+could trip them; the remaining real-device verification is OWED for:
+chrome://inspect attachment (N1.1), chrome://crash recovery (N1.3 +
+its retry-view branch from the hardening), PixelCopy capture on
+hardware-accelerated content (N1.6), keyboard animation smoothness
 (N1.8), recorder survival across orientation change (N1.9), and the
 full smoke walk covering import/export/record/screenshot. The Kotlin
 wiring is correct; the visual + behavioral proof is owed against an

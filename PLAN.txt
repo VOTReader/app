@@ -51,9 +51,11 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
                                           Q8.2 matthew (dcd06c3) + Q8.3
                                           all VOT corpora (5605f30). Critical
                                           path 11.7 MB → 1.03 MB (91%).
-  N1 native-side polish       ✅ DONE  — 10 commits (f61bb43..c27a525).
-                                          MainActivity.kt brought to parity
-                                          with the JS-side quality bar.
+  N1 native-side polish       ✅ DONE  — 13 commits (f61bb43..ff0f459):
+                                          10 N1.x items + 3 post-review
+                                          hardening commits (d8d0ab6 /
+                                          1ea0127 / ff0f459) closing real
+                                          correctness paths.
                                           See CLAUDE.md "N1" section.
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -104,22 +106,30 @@ POST-Q4 BACKLOG (priority order — top = next)
 
 3. NATIVE-SIDE POLISH — N1 CLOSED (2026-05-25)
    ──────────────────────────────────────────────
-   10 commits bring MainActivity.kt to the same quality bar as the JS
-   side: Timber logging, onRenderProcessGone recovery, PixelCopy
-   screenshots on a coroutine path, type-safe JsBridge for every
-   evaluateJavascript site, per-frame keyboard tracking, ViewModel
-   state, and the recorder + storage logic extracted into focused
-   classes.
+   13 commits bring MainActivity.kt to the same quality bar as the JS
+   side. 10 N1.x items: Timber logging, onRenderProcessGone recovery,
+   PixelCopy screenshots on a coroutine path, type-safe JsBridge for
+   every evaluateJavascript site, per-frame keyboard tracking,
+   ViewModel state, and the recorder + storage logic extracted into
+   focused classes.
 
-   Final commit f61bb43..c27a525. MainActivity 869 → 937 lines (net
-   growth from added functionality; recorder + storage extracted to
-   their own files). New files: VOTReaderApp, JsBridge, MainViewModel,
-   NativeAudioRecorder, StorageManager. New deps: Timber 5.0.1,
-   coroutines 1.10.2, lifecycle 2.9.1 (runtime + viewmodel).
+   Plus 3 post-review hardening commits that closed real correctness
+   paths uncovered by a critical review after N1.10b landed:
+     d8d0ab6  N1.3 retry-path dangling webView field
+     1ea0127  N1.7 PixelCopy bitmap recycle race
+     ff0f459  N1.10b queryFileSize exception escape
+
+   Final commit range f61bb43..ff0f459. MainActivity 869 → 937 lines
+   (net growth from added functionality; recorder + storage extracted
+   to their own files). New files: VOTReaderApp, JsBridge,
+   MainViewModel, NativeAudioRecorder, StorageManager. New deps:
+   Timber 5.0.1, coroutines 1.10.2, lifecycle 2.9.1 (runtime +
+   viewmodel).
 
    Real-device verification owed for: DevTools attach, renderer crash
-   recovery, PixelCopy on hardware-accelerated content, keyboard
-   animation smoothness, rotation mid-recording, full smoke walk.
+   recovery (including retry-view branch), PixelCopy on
+   hardware-accelerated content, keyboard animation smoothness,
+   rotation mid-recording, full smoke walk.
 
    See CLAUDE.md "N1" section + HISTORY.md for the per-commit detail.
 
@@ -151,5 +161,5 @@ USER POLICY REMINDERS (durable; mirror CLAUDE.md)
 - App name is "VOTReader" (personal app; no Play Store thinking yet)
 
 ───────────────────────────────────────────────────────────────────────────────
-END OF DOCUMENT — last pruned 2026-05-25 (N1 native-side polish closed)
+END OF DOCUMENT — last pruned 2026-05-25 (N1 native-side polish closed + post-review hardening)
 ───────────────────────────────────────────────────────────────────────────────
