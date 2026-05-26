@@ -2364,6 +2364,143 @@
     }
   };
 
+  // app/src/main/assets/src/utils/platform-bridge.js
+  var isAndroid = !!(typeof window !== "undefined" && /** @type {any} */
+  window.AndroidBridge);
+  var androidImpl = {
+    setLightStatusBar: (light) => (
+      /** @type {any} */
+      window.AndroidBridge.setLightStatusBar(light)
+    ),
+    setKeepScreenOn: (enabled) => (
+      /** @type {any} */
+      window.AndroidBridge.setKeepScreenOn(enabled)
+    ),
+    setImmersiveMode: (immersive) => (
+      /** @type {any} */
+      window.AndroidBridge.setImmersiveMode(immersive)
+    ),
+    setZoomEnabled: (enabled) => (
+      /** @type {any} */
+      window.AndroidBridge.setZoomEnabled(enabled)
+    ),
+    resetZoom: () => (
+      /** @type {any} */
+      window.AndroidBridge.resetZoom()
+    ),
+    getZoomScale: () => (
+      /** @type {any} */
+      window.AndroidBridge.getZoomScale()
+    ),
+    haptic: (style) => (
+      /** @type {any} */
+      window.AndroidBridge.haptic(style)
+    ),
+    startAudioSession: () => (
+      /** @type {any} */
+      window.AndroidBridge.startAudioSession()
+    ),
+    endAudioSession: () => (
+      /** @type {any} */
+      window.AndroidBridge.endAudioSession()
+    ),
+    requestMicPermission: () => (
+      /** @type {any} */
+      window.AndroidBridge.requestMicPermission()
+    ),
+    nativeRecordStart: () => (
+      /** @type {any} */
+      window.AndroidBridge.nativeRecordStart()
+    ),
+    nativeRecordPause: () => (
+      /** @type {any} */
+      window.AndroidBridge.nativeRecordPause()
+    ),
+    nativeRecordResume: () => (
+      /** @type {any} */
+      window.AndroidBridge.nativeRecordResume()
+    ),
+    nativeRecordAmplitude: () => (
+      /** @type {any} */
+      window.AndroidBridge.nativeRecordAmplitude()
+    ),
+    nativeRecordStop: () => (
+      /** @type {any} */
+      window.AndroidBridge.nativeRecordStop()
+    ),
+    nativeRecordCancel: () => (
+      /** @type {any} */
+      window.AndroidBridge.nativeRecordCancel()
+    ),
+    takeScreenshot: (top, max, q) => (
+      /** @type {any} */
+      window.AndroidBridge.takeScreenshot(top, max, q)
+    ),
+    openFilePicker: () => (
+      /** @type {any} */
+      window.AndroidBridge.openFilePicker()
+    ),
+    saveToDownloads: (name, content) => (
+      /** @type {any} */
+      window.AndroidBridge.saveToDownloads(name, content)
+    ),
+    getCrashLog: () => (
+      /** @type {any} */
+      window.AndroidBridge.getCrashLog()
+    )
+  };
+  var NYI_TAG = "[PlatformBridge]";
+  var notYetImplemented = (name) => () => {
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn(`${NYI_TAG} ${name}() web impl pending (W1.3-W1.5)`);
+    }
+  };
+  var webImpl = {
+    // Category 1 — genuine no-ops on web
+    setLightStatusBar: () => {
+    },
+    // CSS body.light handles the theme
+    startAudioSession: () => {
+    },
+    // Browser handles audio session natively
+    endAudioSession: () => {
+    },
+    // Category 2 — safe defaults
+    getZoomScale: () => 1,
+    getCrashLog: () => "[]",
+    nativeRecordAmplitude: () => 0,
+    takeScreenshot: () => "",
+    // W1.x html2canvas
+    saveToDownloads: (_name, _content) => {
+      notYetImplemented("saveToDownloads")();
+      return "error:web-impl-pending";
+    },
+    nativeRecordStart: () => "error:web-impl-pending",
+    // W1.4
+    nativeRecordPause: () => "error:web-impl-pending",
+    // W1.4
+    nativeRecordResume: () => "error:web-impl-pending",
+    // W1.4
+    // Category 3 — not-yet-implemented warnings (void returns only)
+    setImmersiveMode: notYetImplemented("setImmersiveMode"),
+    // W1.x Fullscreen API
+    setKeepScreenOn: notYetImplemented("setKeepScreenOn"),
+    // W1.x WakeLock API
+    setZoomEnabled: notYetImplemented("setZoomEnabled"),
+    resetZoom: notYetImplemented("resetZoom"),
+    haptic: notYetImplemented("haptic"),
+    // W1.x navigator.vibrate
+    openFilePicker: notYetImplemented("openFilePicker"),
+    // W1.3
+    requestMicPermission: notYetImplemented("requestMicPermission"),
+    // W1.4
+    nativeRecordStop: notYetImplemented("nativeRecordStop"),
+    // W1.4
+    nativeRecordCancel: notYetImplemented("nativeRecordCancel")
+    // W1.4
+  };
+  var PlatformBridge = isAndroid ? androidImpl : webImpl;
+
   // app/src/main/assets/src/hooks/use-ref-mirror.js
   function useRefMirror(value) {
     const r = React.useRef(value);
@@ -5471,8 +5608,8 @@
                 }
               }
             }, 200);
-            var isAndroid = !!(typeof window !== "undefined" && window.AndroidBridge);
-            if (!isAndroid) {
+            var isAndroid2 = !!(typeof window !== "undefined" && window.AndroidBridge);
+            if (!isAndroid2) {
               try {
                 var AudioCtx = window.AudioContext || window.webkitAudioContext;
                 if (AudioCtx) {
@@ -7965,6 +8102,8 @@
 
   // app/src/main/assets/src/stores/_entry-b.js
   Object.assign(window, {
+    // Platform bridge (W1.1)
+    PlatformBridge,
     // Stores
     CachedStore,
     migrateAnnotations,

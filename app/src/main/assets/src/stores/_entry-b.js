@@ -56,6 +56,13 @@ import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
 import { ExpandableText, JrnExpandable } from '../components/ExpandableText.jsx';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 
+// ── Platform bridge (W1.1) ──────────────────────────────────────────────
+// Single source of truth for platform-conditional behavior. Lives in
+// bundle-b so bundle-b hooks (use-settings, use-thumbnails) can import
+// it directly; bundle-d screens/sheets reach it via the window global
+// added below. NEVER access window.AndroidBridge outside this module.
+import { PlatformBridge } from '../utils/platform-bridge.js';
+
 // ── Hooks ───────────────────────────────────────────────────────────────
 import { useMarkAsRead, useReadProgress } from '../hooks/useMarkAsRead.js';
 import { _validateTabState, useSavedState } from '../hooks/use-saved-state.js';
@@ -119,6 +126,8 @@ import {
 // Mirrors the implicit `function NAME(){}` → window.NAME classic-script
 // binding the modules had before this conversion.
 Object.assign(window, {
+  // Platform bridge (W1.1)
+  PlatformBridge,
   // Stores
   CachedStore,
   migrateAnnotations, AnnotationStore, HighlightStore,
