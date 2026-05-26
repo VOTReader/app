@@ -227,9 +227,10 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
 
   // Category 3 — notYetImplemented warns but doesn't throw
+  // (setKeepScreenOn moved out — has a real WakeLock impl as of W1.2 Tier B.1;
+  // its tests live in their own describe block below.)
   it.each([
     'setImmersiveMode',
-    'setKeepScreenOn',
     'setZoomEnabled',
     'resetZoom',
     'haptic',
@@ -246,6 +247,147 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   it('warnings are tagged with [PlatformBridge]', () => {
     bridge.openFilePicker();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[PlatformBridge]'));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Web setKeepScreenOn — WakeLock fire-and-forget (W1.2 Tier B.1)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('PlatformBridge — Web setKeepScreenOn (WakeLock)', () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ let warnSpy;
+  /** @type {any} */ let mockSentinel;
+  /** @type {any} */ let mockRequest;
+  /** @type {any} */ let mockRelease;
+
+  beforeEach(async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockRelease = vi.fn(() => Promise.resolve());
+    mockSentinel = { released: false, release: mockRelease };
+    mockRequest = vi.fn(() => Promise.resolve(mockSentinel));
+    /** @type {any} */ (globalThis.navigator).wakeLock = { request: mockRequest };
+    bridge = await importBridge();
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    delete (/** @type {any} */ (globalThis.navigator)).wakeLock;
+  });
+
+  it('setKeepScreenOn(true) requests WakeLock for screen, returns void (fire-and-forget)', async () => {
+    const result = bridge.setKeepScreenOn(true);
+    expect(result).toBeUndefined();  // contract: void return, not Promise
+    // The internal Promise resolves async; flush microtasks
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockRequest).toHaveBeenCalledWith('screen');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('setKeepScreenOn(true) twice while held = no double-acquire (no second request call)', async () => {
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+    // Second call — sentinel still held + not released
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockRequest).toHaveBeenCalledTimes(1);  // still only the one call
+  });
+
+  it('setKeepScreenOn(false) releases the held sentinel', async () => {
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));  // acquire
+    bridge.setKeepScreenOn(false);
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('setKeepScreenOn(false) when nothing held = no-op (no release call)', () => {
+    bridge.setKeepScreenOn(false);
+    expect(mockRelease).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs warn but does not throw when WakeLock.request rejects', async () => {
+    mockRequest.mockImplementation(() => Promise.reject(new Error('document not visible')));
+    expect(() => bridge.setKeepScreenOn(true)).not.toThrow();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toMatch(/setKeepScreenOn\(true\)/);
+    expect(warnSpy.mock.calls[0][0]).toMatch(/\[PlatformBridge\]/);
+  });
+
+  it('de-duplicates repeat failures with the same reason (no log spam)', async () => {
+    mockRequest.mockImplementation(() => Promise.reject(new Error('document not visible')));
+    // Simulate the useSettings effect firing many times (e.g. on each
+    // settings mutation) — each call triggers a fresh wakeLock.request that
+    // rejects, but only the FIRST rejection should log.
+    for (let i = 0; i < 5; i++) {
+      bridge.setKeepScreenOn(true);
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a new failure reason resets the de-dup and logs again', async () => {
+    mockRequest.mockImplementation(() => Promise.reject(new Error('reason A')));
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    // Same reason — no re-log
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    // Different reason — log again
+    mockRequest.mockImplementation(() => Promise.reject(new Error('reason B')));
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('successful acquire resets the de-dup flag', async () => {
+    // First call fails
+    mockRequest.mockImplementation(() => Promise.reject(new Error('reason A')));
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    // Recovery: release any held sentinel + change behavior to succeed once
+    mockRequest.mockImplementation(() => Promise.resolve(mockSentinel));
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    // Now release and try again with same failure reason — should log again
+    bridge.setKeepScreenOn(false);
+    mockRequest.mockImplementation(() => Promise.reject(new Error('reason A')));
+    bridge.setKeepScreenOn(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips piling-up requests while one is in flight', async () => {
+    // Deferred-resolve mock: only resolve when we explicitly call resolveFn
+    /** @type {(value: any) => void} */ let resolveFn = () => {};
+    mockRequest.mockImplementation(
+      () => new Promise((resolve) => { resolveFn = resolve; })
+    );
+    bridge.setKeepScreenOn(true);  // starts request 1 — in-flight
+    bridge.setKeepScreenOn(true);  // 2nd call while in-flight — should skip
+    bridge.setKeepScreenOn(true);  // 3rd call — also skipped
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+    // Resolve the in-flight request
+    resolveFn(mockSentinel);
+    await new Promise((r) => setTimeout(r, 0));
+    // Now sentinel is held; further calls early-return on "already held"
+    bridge.setKeepScreenOn(true);
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('silently no-ops when navigator.wakeLock is absent (older browsers / http://)', async () => {
+    delete (/** @type {any} */ (globalThis.navigator)).wakeLock;
+    bridge = await importBridge();
+    expect(() => bridge.setKeepScreenOn(true)).not.toThrow();
+    expect(() => bridge.setKeepScreenOn(false)).not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 

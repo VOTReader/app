@@ -117,6 +117,67 @@ const notYetImplemented = (name) => () => {
   }
 };
 
+// Web WakeLock — keepScreenOn impl (W1.2 Tier B.1). Per [[explicit-async-decision]]
+// this is FIRE-AND-FORGET (return void): caller fires from a settings-toggle
+// effect; UI shouldn't block on wake-lock requests, and a request failure
+// isn't worth surfacing to the user. Internal Promise rejection is caught
+// and logged via console.warn (W7.4 will migrate this to DiagnosticLog.warn).
+//
+// Semantic note: Android's setKeepScreenOn sets a window flag the OS respects
+// until the app is backgrounded. The Web WakeLock API auto-releases the
+// sentinel when the document is hidden (tab switch, minimize). Same intent
+// (don't dim while user is reading); slightly different release trigger.
+//
+// De-dup: the consuming useSettings effect fires on every [theme, settings]
+// change. If WakeLock keeps failing for the same reason (e.g. iframe / not
+// visible / http context), log ONCE per failure session. Reset the flag on
+// any successful acquire or any release call. This keeps prod-environment
+// log noise minimal without hiding genuinely-changing failures.
+/** @type {any} */ let _webWakeLockSentinel = null;
+/** @type {boolean} */ let _webWakeLockRequestInFlight = false;
+/** @type {string | null} */ let _webWakeLockLastWarnedReason = null;
+function _warnWakeLock(/** @type {string} */ tag, /** @type {any} */ e) {
+  if (typeof console === 'undefined' || !console.warn) return;
+  const reason = (e && e.message) || String(e);
+  if (reason === _webWakeLockLastWarnedReason) return;  // de-dup repeat failures
+  _webWakeLockLastWarnedReason = reason;
+  console.warn(`[PlatformBridge] setKeepScreenOn(${tag}) failed:`, reason);
+}
+/** @param {boolean} enabled */
+function webSetKeepScreenOn(enabled) {
+  try {
+    const wakeLock = /** @type {any} */ (navigator).wakeLock;
+    if (!wakeLock || typeof wakeLock.request !== 'function') return;  // API absent
+    if (enabled) {
+      if (_webWakeLockSentinel && !_webWakeLockSentinel.released) return;  // already held
+      if (_webWakeLockRequestInFlight) return;  // request pending; don't pile up
+      _webWakeLockRequestInFlight = true;
+      wakeLock.request('screen').then((/** @type {any} */ sentinel) => {
+        _webWakeLockSentinel = sentinel;
+        _webWakeLockLastWarnedReason = null;  // success → reset the de-dup flag
+      }).catch((/** @type {any} */ e) => {
+        _warnWakeLock('true', e);
+      }).finally(() => {
+        _webWakeLockRequestInFlight = false;
+      });
+    } else if (_webWakeLockSentinel) {
+      const s = _webWakeLockSentinel;
+      _webWakeLockSentinel = null;
+      _webWakeLockLastWarnedReason = null;  // explicit disable → reset the de-dup flag
+      try {
+        const p = s.release();
+        if (p && typeof p.catch === 'function') {
+          p.catch((/** @type {any} */ e) => _warnWakeLock('false', e));
+        }
+      } catch (e) {
+        _warnWakeLock('false', e);
+      }
+    }
+  } catch (e) {
+    _warnWakeLock('unexpected', e);
+  }
+}
+
 // Web screenshot — html2canvas integration (W1.2 Tier A). Folded in from
 // use-thumbnails.js's old fallback path per [[consolidate-dont-duplicate]] +
 // [[guard-removal-includes-fallback]]. Bridge owns the implementation;
@@ -201,9 +262,11 @@ const webImpl = {
   nativeRecordPause: () => 'error:web-impl-pending',       // W1.4
   nativeRecordResume: () => 'error:web-impl-pending',      // W1.4
 
+  // Category 1.5 — real web impl (W1.2 Tier B.1, fire-and-forget WakeLock)
+  setKeepScreenOn: webSetKeepScreenOn,
+
   // Category 3 — not-yet-implemented warnings (void returns only)
   setImmersiveMode: notYetImplemented('setImmersiveMode'), // W1.x Fullscreen API
-  setKeepScreenOn: notYetImplemented('setKeepScreenOn'),   // W1.x WakeLock API
   setZoomEnabled: notYetImplemented('setZoomEnabled'),
   resetZoom: notYetImplemented('resetZoom'),
   haptic: notYetImplemented('haptic'),                     // W1.x navigator.vibrate

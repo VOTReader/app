@@ -2458,6 +2458,52 @@
       console.warn(`${NYI_TAG} ${name}() web impl pending (W1.3-W1.5)`);
     }
   };
+  var _webWakeLockSentinel = null;
+  var _webWakeLockRequestInFlight = false;
+  var _webWakeLockLastWarnedReason = null;
+  function _warnWakeLock(tag, e) {
+    if (typeof console === "undefined" || !console.warn) return;
+    const reason = e && e.message || String(e);
+    if (reason === _webWakeLockLastWarnedReason) return;
+    _webWakeLockLastWarnedReason = reason;
+    console.warn(`[PlatformBridge] setKeepScreenOn(${tag}) failed:`, reason);
+  }
+  function webSetKeepScreenOn(enabled) {
+    try {
+      const wakeLock = (
+        /** @type {any} */
+        navigator.wakeLock
+      );
+      if (!wakeLock || typeof wakeLock.request !== "function") return;
+      if (enabled) {
+        if (_webWakeLockSentinel && !_webWakeLockSentinel.released) return;
+        if (_webWakeLockRequestInFlight) return;
+        _webWakeLockRequestInFlight = true;
+        wakeLock.request("screen").then((sentinel) => {
+          _webWakeLockSentinel = sentinel;
+          _webWakeLockLastWarnedReason = null;
+        }).catch((e) => {
+          _warnWakeLock("true", e);
+        }).finally(() => {
+          _webWakeLockRequestInFlight = false;
+        });
+      } else if (_webWakeLockSentinel) {
+        const s = _webWakeLockSentinel;
+        _webWakeLockSentinel = null;
+        _webWakeLockLastWarnedReason = null;
+        try {
+          const p = s.release();
+          if (p && typeof p.catch === "function") {
+            p.catch((e) => _warnWakeLock("false", e));
+          }
+        } catch (e) {
+          _warnWakeLock("false", e);
+        }
+      }
+    } catch (e) {
+      _warnWakeLock("unexpected", e);
+    }
+  }
   var SCREENSHOT_IGNORE_CLASSES = [
     "tabs-overview-layer",
     "top-nav",
@@ -2536,11 +2582,11 @@
     // W1.4
     nativeRecordResume: () => "error:web-impl-pending",
     // W1.4
+    // Category 1.5 — real web impl (W1.2 Tier B.1, fire-and-forget WakeLock)
+    setKeepScreenOn: webSetKeepScreenOn,
     // Category 3 — not-yet-implemented warnings (void returns only)
     setImmersiveMode: notYetImplemented("setImmersiveMode"),
     // W1.x Fullscreen API
-    setKeepScreenOn: notYetImplemented("setKeepScreenOn"),
-    // W1.x WakeLock API
     setZoomEnabled: notYetImplemented("setZoomEnabled"),
     resetZoom: notYetImplemented("resetZoom"),
     haptic: notYetImplemented("haptic"),
@@ -3034,10 +3080,8 @@
       document.body.classList.toggle("arrows-left", settings.arrowLayout === "left");
       document.body.classList.toggle("arrows-nav", settings.arrowLayout === "nav");
       document.body.classList.toggle("arrows-off", settings.arrowLayout === "off");
-      if (window.AndroidBridge) window.AndroidBridge.setLightStatusBar(theme === "light");
-      if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === "function") {
-        window.AndroidBridge.setKeepScreenOn(settings.keepScreenOn !== false);
-      }
+      PlatformBridge.setLightStatusBar(theme === "light");
+      PlatformBridge.setKeepScreenOn(settings.keepScreenOn !== false);
     }, [theme, settings]);
     return { settings, setSettings, toggleSetting, updateSetting };
   }

@@ -44,10 +44,13 @@
      usePersistedState (P6k+1) via the returned settings value.
 
    WINDOW: none — wires no window.__* handler bridges. The body-class
-     effect CALLS window.AndroidBridge.setLightStatusBar / setKeepScreenOn
-     (native methods, absent + no-op on desktop) — those are calls, not
-     bridges this hook owns or must clean up.
+     effect calls PlatformBridge.setLightStatusBar / setKeepScreenOn (W1.2
+     Tier B.1: was if(window.AndroidBridge) guarded; bridge owns the
+     platform branch now — setLightStatusBar is a no-op on web, setKeepScreenOn
+     uses navigator.wakeLock fire-and-forget per [[explicit-async-decision]]).
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { PlatformBridge } from '../utils/platform-bridge.js';
 
 /**
  * Settings object shape. Fields with stable defaults documented inline at
@@ -143,13 +146,13 @@ export function useSettings({ savedSettings, theme }) {
     document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');
     document.body.classList.toggle("arrows-off", settings.arrowLayout === 'off');
-    if (window.AndroidBridge) window.AndroidBridge.setLightStatusBar(theme === "light");
-    // Mirror the keep-screen-on setting to the Android window flag. On PC the
-    // bridge method is absent and this no-ops. Defaults to true (matches the
-    // pre-toggle behavior — the Kotlin side also defaults to keep-on).
-    if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === 'function') {
-      window.AndroidBridge.setKeepScreenOn(settings.keepScreenOn !== false);
-    }
+    // Platform mirror — bridge owns the platform branch (W1.2 Tier B.1):
+    // Android passthrough to native window flags; web is a CSS-only no-op
+    // for the status bar + a navigator.wakeLock fire-and-forget for the
+    // screen-on flag (auto-releases on tab hide). Defaults to true matches
+    // the Kotlin side's default.
+    PlatformBridge.setLightStatusBar(theme === "light");
+    PlatformBridge.setKeepScreenOn(settings.keepScreenOn !== false);
   }, [theme, settings]);
 
   // ── Return ─────────────────────────────────────────────────────────────
