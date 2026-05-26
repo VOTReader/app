@@ -178,6 +178,71 @@ function webSetKeepScreenOn(enabled) {
   }
 }
 
+// Web file picker — openFilePicker impl (W1.2 Tier B.2). Per
+// [[file-input-user-gesture]], the input.click() MUST be invoked synchronously
+// from the caller's user-gesture handler (no await/setTimeout between).
+// Per [[preserve-callback-contracts]], we fire `window.__onImportFile(base64)`
+// with the same shape Android's AppInterface fires — the caller (SettingsScreen)
+// installs that global handler BEFORE calling openFilePicker; web fires it
+// from FileReader.onload exactly like Android fires it from the picker activity.
+//
+// FileReader.readAsDataURL gives us a "data:<mime>;base64,XXX" string; we
+// strip the prefix so the callback receives pure base64 matching the
+// Android contract (atob-decodable directly).
+function webOpenFilePicker() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.onchange = (/** @type {any} */ ev) => {
+    const cb = /** @type {any} */ (window).__onImportFile;
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) {
+      if (typeof cb === 'function') cb(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (/** @type {any} */ re) => {
+      // "data:application/json;base64,XXX" → strip prefix to "XXX"
+      const result = String(re.target.result || '');
+      const idx = result.indexOf(',');
+      const base64 = idx >= 0 ? result.substring(idx + 1) : result;
+      if (typeof cb === 'function') cb(base64);
+    };
+    reader.onerror = () => {
+      if (typeof cb === 'function') cb(null);
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+// Web save-to-downloads — Blob + URL.createObjectURL + anchor click (W1.2
+// Tier B.2). Folded in from SettingsScreen.jsx's existing fallback per
+// [[consolidate-dont-duplicate]]. Returns 'ok' or 'error:<reason>'
+// matching the Android contract from AppInterface.kt.
+/**
+ * @param {string} filename
+ * @param {string} content
+ * @returns {string}
+ */
+function webSaveToDownloads(filename, content) {
+  try {
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      try { URL.revokeObjectURL(url); a.remove(); } catch (_e) { /* DOM teardown best-effort */ }
+    }, 0);
+    return 'ok';
+  } catch (e) {
+    return 'error:' + (/** @type {any} */ (e) && /** @type {any} */ (e).message || e);
+  }
+}
+
 // Web screenshot — html2canvas integration (W1.2 Tier A). Folded in from
 // use-thumbnails.js's old fallback path per [[consolidate-dont-duplicate]] +
 // [[guard-removal-includes-fallback]]. Bridge owns the implementation;
@@ -251,28 +316,27 @@ const webImpl = {
 
   // Category 2 — safe defaults
   getZoomScale: () => 1.0,
-  getCrashLog: () => '[]',
+  getCrashLog: () => '[]',           // W7.4 will populate the JS DiagnosticLog
   nativeRecordAmplitude: () => 0,
-  takeScreenshot: webTakeScreenshot,
-  saveToDownloads: (_name, _content) => {                  // W1.3 — preserves return contract
-    notYetImplemented('saveToDownloads')();
-    return 'error:web-impl-pending';
-  },
-  nativeRecordStart: () => 'error:web-impl-pending',       // W1.4
-  nativeRecordPause: () => 'error:web-impl-pending',       // W1.4
-  nativeRecordResume: () => 'error:web-impl-pending',      // W1.4
 
-  // Category 1.5 — real web impl (W1.2 Tier B.1, fire-and-forget WakeLock)
-  setKeepScreenOn: webSetKeepScreenOn,
+  // Category 3 — real web impls
+  takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)
+  setKeepScreenOn: webSetKeepScreenOn,       // Tier B.1 (WakeLock + de-dup)
+  openFilePicker: webOpenFilePicker,         // Tier B.2 (DOM input + FileReader → __onImportFile)
+  saveToDownloads: webSaveToDownloads,       // Tier B.2 (Blob + URL.createObjectURL + anchor)
 
-  // Category 3 — not-yet-implemented warnings (void returns only)
-  setImmersiveMode: notYetImplemented('setImmersiveMode'), // W1.x Fullscreen API
-  setZoomEnabled: notYetImplemented('setZoomEnabled'),
-  resetZoom: notYetImplemented('resetZoom'),
-  haptic: notYetImplemented('haptic'),                     // W1.x navigator.vibrate
-  openFilePicker: notYetImplemented('openFilePicker'),     // W1.3
+  // Recording string-contract placeholders (W1.4)
+  nativeRecordStart: () => 'error:web-impl-pending',
+  nativeRecordPause: () => 'error:web-impl-pending',
+  nativeRecordResume: () => 'error:web-impl-pending',
+
+  // Category 4 — not-yet-implemented warnings (void returns only)
+  setImmersiveMode: notYetImplemented('setImmersiveMode'),   // W1.2 Tier B.3
+  setZoomEnabled: notYetImplemented('setZoomEnabled'),       // W1.2 Tier B.3
+  resetZoom: notYetImplemented('resetZoom'),                 // W1.2 Tier B.3
+  haptic: notYetImplemented('haptic'),                       // future; haptic JS wiring not yet present
   requestMicPermission: notYetImplemented('requestMicPermission'), // W1.4
-  nativeRecordStop: notYetImplemented('nativeRecordStop'), // W1.4
+  nativeRecordStop: notYetImplemented('nativeRecordStop'),   // W1.4
   nativeRecordCancel: notYetImplemented('nativeRecordCancel'), // W1.4
 };
 

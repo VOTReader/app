@@ -2504,6 +2504,57 @@
       _warnWakeLock("unexpected", e);
     }
   }
+  function webOpenFilePicker() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.onchange = (ev) => {
+      const cb = (
+        /** @type {any} */
+        window.__onImportFile
+      );
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) {
+        if (typeof cb === "function") cb(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        const result = String(re.target.result || "");
+        const idx = result.indexOf(",");
+        const base64 = idx >= 0 ? result.substring(idx + 1) : result;
+        if (typeof cb === "function") cb(base64);
+      };
+      reader.onerror = () => {
+        if (typeof cb === "function") cb(null);
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+  function webSaveToDownloads(filename, content) {
+    try {
+      const blob = new Blob([content], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+          a.remove();
+        } catch (_e) {
+        }
+      }, 0);
+      return "ok";
+    } catch (e) {
+      return "error:" + /** @type {any} */
+      (e && /** @type {any} */
+      e.message || e);
+    }
+  }
   var SCREENSHOT_IGNORE_CLASSES = [
     "tabs-overview-layer",
     "top-nav",
@@ -2570,29 +2621,30 @@
     // Category 2 — safe defaults
     getZoomScale: () => 1,
     getCrashLog: () => "[]",
+    // W7.4 will populate the JS DiagnosticLog
     nativeRecordAmplitude: () => 0,
+    // Category 3 — real web impls
     takeScreenshot: webTakeScreenshot,
-    saveToDownloads: (_name, _content) => {
-      notYetImplemented("saveToDownloads")();
-      return "error:web-impl-pending";
-    },
-    nativeRecordStart: () => "error:web-impl-pending",
-    // W1.4
-    nativeRecordPause: () => "error:web-impl-pending",
-    // W1.4
-    nativeRecordResume: () => "error:web-impl-pending",
-    // W1.4
-    // Category 1.5 — real web impl (W1.2 Tier B.1, fire-and-forget WakeLock)
+    // Tier A (html2canvas)
     setKeepScreenOn: webSetKeepScreenOn,
-    // Category 3 — not-yet-implemented warnings (void returns only)
+    // Tier B.1 (WakeLock + de-dup)
+    openFilePicker: webOpenFilePicker,
+    // Tier B.2 (DOM input + FileReader → __onImportFile)
+    saveToDownloads: webSaveToDownloads,
+    // Tier B.2 (Blob + URL.createObjectURL + anchor)
+    // Recording string-contract placeholders (W1.4)
+    nativeRecordStart: () => "error:web-impl-pending",
+    nativeRecordPause: () => "error:web-impl-pending",
+    nativeRecordResume: () => "error:web-impl-pending",
+    // Category 4 — not-yet-implemented warnings (void returns only)
     setImmersiveMode: notYetImplemented("setImmersiveMode"),
-    // W1.x Fullscreen API
+    // W1.2 Tier B.3
     setZoomEnabled: notYetImplemented("setZoomEnabled"),
+    // W1.2 Tier B.3
     resetZoom: notYetImplemented("resetZoom"),
+    // W1.2 Tier B.3
     haptic: notYetImplemented("haptic"),
-    // W1.x navigator.vibrate
-    openFilePicker: notYetImplemented("openFilePicker"),
-    // W1.3
+    // future; haptic JS wiring not yet present
     requestMicPermission: notYetImplemented("requestMicPermission"),
     // W1.4
     nativeRecordStop: notYetImplemented("nativeRecordStop"),

@@ -4760,10 +4760,8 @@
     const [wipeText, setWipeText] = React.useState("");
     const [diagnosticLog, setDiagnosticLog] = React.useState([]);
     React.useEffect(() => {
-      if (typeof window.AndroidBridge === "undefined") return;
-      if (typeof window.AndroidBridge.getCrashLog !== "function") return;
       try {
-        const raw = window.AndroidBridge.getCrashLog();
+        const raw = PlatformBridge.getCrashLog();
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) setDiagnosticLog(parsed);
       } catch (e) {
@@ -4979,30 +4977,13 @@
         const json = JSON.stringify(payload, null, 2);
         const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
         const filename = `votreader-backup-${stamp}.json`;
-        if (window.AndroidBridge && typeof window.AndroidBridge.saveToDownloads === "function") {
-          const result = window.AndroidBridge.saveToDownloads(filename, json);
-          if (result === "ok") {
-            alert("Backup saved to your Downloads folder.");
-          } else {
-            console.warn("saveToDownloads error:", result);
-            alert("Export failed. Please try again.");
-          }
-          return;
+        const result = PlatformBridge.saveToDownloads(filename, json);
+        if (result === "ok") {
+          alert("Backup saved to your Downloads folder.");
+        } else {
+          console.warn("saveToDownloads error:", result);
+          alert("Export failed. Please try again.");
         }
-        const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          try {
-            URL.revokeObjectURL(url);
-            a.remove();
-          } catch (_e) {
-          }
-        }, 0);
       } catch (e) {
         console.warn("export failed", e);
         alert("Export failed. See console for details.");
@@ -5043,32 +5024,16 @@
           alert("Import failed: " + (err && err.message ? err.message : "invalid file"));
         }
       };
-      if (window.AndroidBridge && typeof window.AndroidBridge.openFilePicker === "function") {
-        window.__onImportFile = (b64OrNull) => {
-          window.__onImportFile = null;
-          if (!b64OrNull) return;
-          try {
-            _doImport(atob(b64OrNull));
-          } catch (_e) {
-            alert("Import failed: could not decode file.");
-          }
-        };
-        window.AndroidBridge.openFilePicker();
-        return;
-      }
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = "application/json,.json";
-      input.onchange = (ev) => {
-        const file = ev.target.files && ev.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (re) => {
-          _doImport(re.target.result);
-        };
-        reader.readAsText(file);
+      window.__onImportFile = (b64OrNull) => {
+        window.__onImportFile = null;
+        if (!b64OrNull) return;
+        try {
+          _doImport(atob(b64OrNull));
+        } catch (_e) {
+          alert("Import failed: could not decode file.");
+        }
       };
-      input.click();
+      PlatformBridge.openFilePicker();
     };
     const clearAllPersonalData = () => {
       try {
@@ -5280,7 +5245,7 @@
       } }, "Export")), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Import from Backup"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, "Restore a previously exported JSON file. Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten.")), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
         e.stopPropagation();
         importPersonalData();
-      } }, "Import")), typeof window !== "undefined" && window.AndroidBridge && typeof window.AndroidBridge.getCrashLog === "function" && /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Diagnostic Log"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, diagnosticLog.length === 0 ? "No recent warnings or errors recorded. Exports include an empty diagnostic field." : `${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? "entry" : "entries"} captured (warnings and errors only, content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`))), /* @__PURE__ */ (() => {
+      } }, "Import")), diagnosticLog.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Diagnostic Log"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, `${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? "entry" : "entries"} captured (warnings and errors only, content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`))), /* @__PURE__ */ (() => {
         const closeWipe = () => {
           setWipeConfirm(false);
           setWipeText("");

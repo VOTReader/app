@@ -220,21 +220,16 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
     expect(bridge[name](...args)).toBe('error:web-impl-pending');
   });
 
-  it('saveToDownloads returns error string AND warns on web', () => {
-    const result = bridge.saveToDownloads('notes.json', '{}');
-    expect(result).toBe('error:web-impl-pending');
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('saveToDownloads'));
-  });
-
   // Category 3 — notYetImplemented warns but doesn't throw
   // (setKeepScreenOn moved out — has a real WakeLock impl as of W1.2 Tier B.1;
-  // its tests live in their own describe block below.)
+  //  openFilePicker + saveToDownloads moved out — Tier B.2 real impls;
+  //  takeScreenshot moved out — Tier A html2canvas impl.
+  //  All have their own describe blocks below.)
   it.each([
     'setImmersiveMode',
     'setZoomEnabled',
     'resetZoom',
     'haptic',
-    'openFilePicker',
     'requestMicPermission',
     'nativeRecordStop',
     'nativeRecordCancel',
@@ -245,10 +240,192 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
 
   it('warnings are tagged with [PlatformBridge]', () => {
-    bridge.openFilePicker();
+    bridge.setImmersiveMode(true);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[PlatformBridge]'));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// Web openFilePicker — DOM input + FileReader (W1.2 Tier B.2)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('PlatformBridge — Web openFilePicker (DOM input + FileReader)', () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ let inputEl;
+  /** @type {any} */ let inputClickSpy;
+  /** @type {any} */ let createElementSpy;
+
+  beforeEach(async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    delete (/** @type {any} */ (globalThis.window)).__onImportFile;
+    // Stub document.createElement('input') so we can intercept .click() + simulate file selection
+    inputEl = /** @type {any} */ ({
+      type: '',
+      accept: '',
+      onchange: null,
+      click: vi.fn(),
+    });
+    inputClickSpy = inputEl.click;
+    const realCreate = document.createElement.bind(document);
+    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'input') return /** @type {any} */ (inputEl);
+      return realCreate(tag);
+    });
+    bridge = await importBridge();
+  });
+
+  afterEach(() => {
+    createElementSpy.mockRestore();
+    delete (/** @type {any} */ (globalThis.window)).__onImportFile;
+  });
+
+  it('synchronously creates a file input and calls .click() in the same callstack', () => {
+    bridge.openFilePicker();
+    expect(inputEl.type).toBe('file');
+    expect(inputEl.accept).toBe('application/json,.json');
+    expect(inputClickSpy).toHaveBeenCalledTimes(1);
+    // click() fires sync — must not be wrapped in a Promise / setTimeout per
+    // [[file-input-user-gesture]] (browsers block programmatic click outside user gesture).
+  });
+
+  it('fires window.__onImportFile(base64) when a file is picked (preserves Android contract)', async () => {
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onImportFile = cb;
+    bridge.openFilePicker();
+
+    // Stub FileReader so onload fires immediately with a data URL
+    const origFileReader = globalThis.FileReader;
+    /** @this {any} */
+    function MockFileReader() {
+      /** @type {any} */ const self = this;
+      self.readAsDataURL = (/** @type {any} */ _file) => {
+        // Immediately simulate onload with a data URL — base64 of '{"a":1}'
+        setTimeout(() => {
+          if (self.onload) self.onload({ target: { result: 'data:application/json;base64,eyJhIjoxfQ==' } });
+        }, 0);
+      };
+    }
+    /** @type {any} */ (globalThis).FileReader = MockFileReader;
+
+    // Simulate user picking a file
+    /** @type {any} */ (inputEl).onchange({ target: { files: [/** @type {any} */ ({ name: 'backup.json' })] } });
+    await new Promise((r) => setTimeout(r, 5));
+
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith('eyJhIjoxfQ==');  // pure base64, prefix stripped
+
+    /** @type {any} */ (globalThis).FileReader = origFileReader;
+  });
+
+  it('fires window.__onImportFile(null) when user cancels (no file selected)', () => {
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onImportFile = cb;
+    bridge.openFilePicker();
+    // No file selected — onchange fires with empty files
+    /** @type {any} */ (inputEl).onchange({ target: { files: null } });
+    expect(cb).toHaveBeenCalledWith(null);
+  });
+
+  it('fires window.__onImportFile(null) when FileReader errors', async () => {
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onImportFile = cb;
+    bridge.openFilePicker();
+
+    const origFileReader = globalThis.FileReader;
+    /** @this {any} */
+    function MockFileReaderErr() {
+      /** @type {any} */ const self = this;
+      self.readAsDataURL = () => {
+        setTimeout(() => { if (self.onerror) self.onerror(); }, 0);
+      };
+    }
+    /** @type {any} */ (globalThis).FileReader = MockFileReaderErr;
+
+    /** @type {any} */ (inputEl).onchange({ target: { files: [{ name: 'x' }] } });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(cb).toHaveBeenCalledWith(null);
+
+    /** @type {any} */ (globalThis).FileReader = origFileReader;
+  });
+
+  it('does not throw when window.__onImportFile is not installed', () => {
+    delete (/** @type {any} */ (globalThis.window)).__onImportFile;
+    bridge.openFilePicker();
+    expect(() => /** @type {any} */ (inputEl).onchange({ target: { files: null } })).not.toThrow();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Web saveToDownloads — Blob + anchor click (W1.2 Tier B.2)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('PlatformBridge — Web saveToDownloads (Blob + anchor)', () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ let createElementSpy;
+  /** @type {any} */ let createObjectURLSpy;
+  /** @type {any} */ let revokeObjectURLSpy;
+  /** @type {any} */ let anchorClickSpy;
+  /** @type {any} */ let anchorRemoveSpy;
+  /** @type {any} */ let anchorEl;
+
+  beforeEach(async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    // Build a REAL <a> element (jsdom HTMLAnchorElement) so document.body.appendChild()
+    // doesn't reject it as "not of type Node." Spy click + remove on the real instance.
+    const realCreate = document.createElement.bind(document);
+    anchorEl = /** @type {any} */ (realCreate('a'));
+    anchorClickSpy = vi.fn();
+    anchorEl.click = anchorClickSpy;
+    anchorRemoveSpy = vi.spyOn(anchorEl, 'remove');
+    createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'a') return anchorEl;
+      return realCreate(tag);
+    });
+    createObjectURLSpy = vi.fn(() => 'blob:mock-url');
+    revokeObjectURLSpy = vi.fn();
+    /** @type {any} */ (globalThis).URL.createObjectURL = createObjectURLSpy;
+    /** @type {any} */ (globalThis).URL.revokeObjectURL = revokeObjectURLSpy;
+    bridge = await importBridge();
+  });
+
+  afterEach(() => {
+    createElementSpy.mockRestore();
+    anchorRemoveSpy.mockRestore();
+  });
+
+  it('creates Blob, anchors a download link, clicks it, returns "ok"', () => {
+    const result = bridge.saveToDownloads('backup.json', '{"a":1}');
+    expect(result).toBe('ok');
+    expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
+    expect(anchorEl.download).toBe('backup.json');
+    expect(anchorEl.getAttribute('href')).toBe('blob:mock-url');
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('revokes the object URL after click (deferred via setTimeout 0)', async () => {
+    bridge.saveToDownloads('backup.json', '{}');
+    // The setTimeout 0 hasn't fired yet
+    expect(revokeObjectURLSpy).not.toHaveBeenCalled();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:mock-url');
+    expect(anchorRemoveSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns "error:<reason>" when Blob construction throws', () => {
+    const origBlob = globalThis.Blob;
+    /** @type {any} */ (globalThis).Blob = function () { throw new Error('quota exceeded'); };
+    const result = bridge.saveToDownloads('backup.json', '{}');
+    expect(result).toMatch(/^error:/);
+    expect(result).toMatch(/quota exceeded/);
+    /** @type {any} */ (globalThis).Blob = origBlob;
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Web setKeepScreenOn — WakeLock fire-and-forget (W1.2 Tier B.1)
+// ─────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────
 // Web setKeepScreenOn — WakeLock fire-and-forget (W1.2 Tier B.1)

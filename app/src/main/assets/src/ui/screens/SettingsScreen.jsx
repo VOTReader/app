@@ -109,17 +109,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const [openSections, setOpenSections] = React.useState(new Set());
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
-  // NK5c: diagnostic-log snapshot for the "Your Data" section. Only
-  // populated when the native bridge is present + getCrashLog exists
-  // (i.e. release-built APK with NK5b's BoundedLogTree planted). Read
-  // once on mount; the buffer keeps growing in the background but the
-  // count we show is a static snapshot of "what would be exported now."
+  // NK5c: diagnostic-log snapshot for the "Your Data" section. The bridge
+  // (W1.2 Tier B.2) always exposes getCrashLog: Android release builds
+  // return BoundedLogTree JSON; debug builds + web return '[]'; W7.4 will
+  // populate the JS-side DiagnosticLog on web. Read once on mount; the
+  // count is a static snapshot of "what would be exported now."
   const [diagnosticLog, setDiagnosticLog] = React.useState([]);
   React.useEffect(() => {
-    if (typeof window.AndroidBridge === 'undefined') return;
-    if (typeof window.AndroidBridge.getCrashLog !== 'function') return;
     try {
-      const raw = window.AndroidBridge.getCrashLog();
+      const raw = PlatformBridge.getCrashLog();
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) setDiagnosticLog(parsed);
     } catch (e) {
@@ -301,24 +299,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       const json = JSON.stringify(payload, null, 2);
       const stamp = new Date().toISOString().slice(0, 10);
       const filename = `votreader-backup-${stamp}.json`;
-      if (window.AndroidBridge && typeof window.AndroidBridge.saveToDownloads === 'function') {
-        const result = window.AndroidBridge.saveToDownloads(filename, json);
-        if (result === 'ok') {
-          alert('Backup saved to your Downloads folder.');
-        } else {
-          console.warn('saveToDownloads error:', result);
-          alert('Export failed. Please try again.');
-        }
-        return;
+      // W1.2 Tier B.2: bridge owns the platform branch. Android = native
+      // MediaStore.Downloads; web = Blob + anchor click. Both return
+      // 'ok' / 'error:<reason>' per the unified contract from [[consolidate-dont-duplicate]].
+      const result = PlatformBridge.saveToDownloads(filename, json);
+      if (result === 'ok') {
+        alert('Backup saved to your Downloads folder.');
+      } else {
+        console.warn('saveToDownloads error:', result);
+        alert('Export failed. Please try again.');
       }
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { try { URL.revokeObjectURL(url); a.remove(); } catch (_e) { /* DOM access — element may not exist or API unsupported */ } }, 0);
     } catch (e) {
       console.warn('export failed', e);
       alert('Export failed. See console for details.');
@@ -352,26 +342,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         alert('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
       }
     };
-    if (window.AndroidBridge && typeof window.AndroidBridge.openFilePicker === 'function') {
-      window.__onImportFile = (b64OrNull) => {
-        window.__onImportFile = null;
-        if (!b64OrNull) return;
-        try { _doImport(atob(b64OrNull)); } catch (_e) { alert('Import failed: could not decode file.'); }
-      };
-      window.AndroidBridge.openFilePicker();
-      return;
-    }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json,.json';
-    input.onchange = (ev) => {
-      const file = ev.target.files && ev.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (re) => { _doImport(re.target.result); };
-      reader.readAsText(file);
+    // W1.2 Tier B.2: bridge owns both platforms' file pickers. Install the
+    // window.__onImportFile callback (preserves the Android contract per
+    // [[preserve-callback-contracts]]); web bridge fires the same callback
+    // from FileReader.onload with base64 just like Android's AppInterface
+    // fires it from the picker activity result.
+    window.__onImportFile = (b64OrNull) => {
+      window.__onImportFile = null;
+      if (!b64OrNull) return;
+      try { _doImport(atob(b64OrNull)); } catch (_e) { alert('Import failed: could not decode file.'); }
     };
-    input.click();
+    PlatformBridge.openFilePicker();
   };
   const clearAllPersonalData = () => {
     try {
@@ -595,18 +576,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             </div>
             <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); importPersonalData(); }}>Import</button>
           </div>
-          {/* NK5c: diagnostic-log status row. Only renders when the native
-              bridge exposes getCrashLog (release-built APK with NK5b's
-              BoundedLogTree planted). Web preview + debug builds skip
-              the row entirely. */}
-          {typeof window !== 'undefined' && window.AndroidBridge && typeof window.AndroidBridge.getCrashLog === 'function' && (
+          {/* Diagnostic-log status row. Renders only when entries exist
+              (Android release with BoundedLogTree; web post-W7.4 with the
+              JS-side DiagnosticLog populated). Empty-state hidden on debug
+              builds + pre-W7.4 web to reduce UI noise. */}
+          {diagnosticLog.length > 0 && (
             <div className="settings-row">
               <div className="settings-row-text">
                 <div className="settings-row-label">Diagnostic Log</div>
                 <div className="settings-row-desc">
-                  {diagnosticLog.length === 0
-                    ? 'No recent warnings or errors recorded. Exports include an empty diagnostic field.'
-                    : `${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? 'entry' : 'entries'} captured (warnings and errors only, content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`}
+                  {`${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? 'entry' : 'entries'} captured (warnings and errors only, content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`}
                 </div>
               </div>
             </div>
