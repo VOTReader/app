@@ -562,48 +562,120 @@ window.AndroidBridge directly after W1.2.
   Mitigation: test on all three browsers in W1.6.
 
 ───────────────────────────────────────────────────────────────────────────────
-W2 — INDEXEDDB MIGRATION (persistence upgrade)
+W2 — STORAGE HARDENING (persistence + scale + safety)
 ───────────────────────────────────────────────────────────────────────────────
 
-Goal: move the 15 data-bearing localStorage keys to IndexedDB. Gains:
-transactional writes (no more partial corruption risk), ~50 MB+ quota
-(vs 5-10 MB), and identical behavior on both platforms.
+Goal: every byte of user data — structured metadata AND binary media —
+is durably stored, protected from eviction, scalable to GB on every
+platform, safe on budget devices, and fully round-tripped through
+export/import. When W2 closes, the storage layer is production-grade
+on Android WebView, Chrome, Edge, Firefox, and Safari (including iOS
+home-screen PWA).
 
-Architecture constraint: IndexedDB is async. Five stores are read
-SYNCHRONOUSLY in React render paths (annotations, notes, links, state,
-prophecy-cards). Strategy: in-memory write-through cache. On boot, load
-all stores from IndexedDB into memory (async, behind a loading gate).
-After hydration, reads come from memory (sync, zero latency). Writes
-go to BOTH memory + IndexedDB (async fire-and-forget with error log).
+Architecture — what exists, what changes:
 
-  W2.1 — IndexedDB adapter layer (new: idb-store.js)
-  ───────────────────────────────────────────────────
-  A new module in src/stores/ that wraps IndexedDB with a CachedStore-
-  compatible API:
+  ALREADY IN PLACE (do not rebuild):
+    - JournalMediaStore (journal-media-store.js) stores audio + image
+      Blobs in IndexedDB (database: "vot-journal-media", store: "media").
+      Journal entries hold mediaId references, not inline base64. This
+      is correct and already gives GB-scale binary storage. OPFS upgrade
+      is a future optimization (W7.6) if profiling warrants it.
+    - CachedStore base class with subscribe/getVersion/_bump (Q7).
+    - 7 stores with useSyncExternalStore reactivity.
 
-    open(dbName, version)       → IDBDatabase
+  CHANGES IN W2:
+    - 15 localStorage keys → IndexedDB (structured data).
+    - Write-through in-memory cache for sync render-path reads.
+    - navigator.storage.persist() for eviction protection.
+    - Startup storage health check (quota guard for budget devices).
+    - Export/import upgraded to include journal media blobs.
+    - QuotaExceededError handling on every write path.
+    - Safari 7-day eviction awareness (pre-install warning).
+    - Dynamic user-facing storage health warnings.
+
+  NOT IN W2 (deferred):
+    - OPFS upgrade for JournalMediaStore → W7.6. IDB Blob storage
+      already works; OPFS is 3-4x faster but Safari has known bugs
+      (WebKit #250495) and the sync API requires a Web Worker.
+    - Store schema versioning → W7.1 (depends on W2 IDB schema).
+    - raw() freeze → W7.2 (independent).
+
+  PLATFORM STORAGE REALITY (from deep research — see conversation
+  2026-05-26 storage research agent report for full sourcing):
+
+    | Platform              | Quota              | persist() | Eviction risk      |
+    |-----------------------|--------------------|-----------|--------------------|
+    | Chrome/Edge (desktop) | 60% of disk        | Auto PWA  | None if persisted  |
+    | Firefox               | min(10% disk,10GB) | Prompt    | None if persisted  |
+    | Safari 17+ (macOS)    | 60% of disk        | Heuristic | 7-day rule (!)     |
+    | Android WebView       | 60% of disk        | Chromium  | None if persisted  |
+    | Chrome Android        | 60% of disk        | Auto PWA  | None if persisted  |
+    | Safari iOS 17+ (PWA)  | ~60% of disk       | Home-scrn | Exempt from 7-day  |
+    | Safari iOS 17+ (tab)  | ~20% of disk       | Heuristic | 7-day rule (!)     |
+    | Firefox Android       | min(10% disk,10GB) | Prompt    | None if persisted  |
+    | Samsung Internet      | 60% of disk        | Chromium  | None if persisted  |
+    | Budget Android (low)  | 60% of FREE disk   | Chromium  | Quota may be <50MB |
+
+    Baked-in constraints:
+    1. Safari evicts ALL storage after 7 days of no interaction unless
+       the user has added the PWA to Home Screen. Home-screen PWAs are
+       exempt. The Safari install prompt (W3) is a DATA PRESERVATION
+       requirement, not a nice-to-have.
+    2. Budget Android with <500 MB free disk gets quota as low as a few
+       MB. The app must detect this and warn, not crash.
+    3. Firefox requires persist() from a user gesture (click handler).
+       Silent failure otherwise.
+    4. iOS PWA installation creates an ISOLATED storage container. Data
+       from Safari tabs does NOT carry over. Users must install BEFORE
+       creating data, or use export/import to bridge.
+    5. Blob storage in IDB is native on all platforms. No base64 needed.
+       Blobs >64 KB are stored as separate files on disk (Chrome).
+    6. For playback/display of large blobs: ALWAYS use
+       URL.createObjectURL(blob) or blob.stream(). NEVER use
+       FileReader.readAsArrayBuffer() for blobs >1 MB — loads entire
+       blob into heap, OOMs on budget devices (2-3 GB RAM).
+
+  W2.1 — IndexedDB adapter (new: idb-adapter.js)
+  ───────────────────────────────────────────────
+  A new module in src/stores/ that wraps IndexedDB for structured data
+  with a CachedStore-compatible API:
+
+    open(dbName, version)       → Promise<IDBDatabase>
     get(storeName, key)         → Promise<value>
     put(storeName, key, value)  → Promise<void>
     delete(storeName, key)      → Promise<void>
     getAll(storeName)           → Promise<Record<key, value>>
 
   Single database: "votreader". One object store per localStorage key.
-  Schema version starts at 1. onupgradeneeded creates all 15 stores.
+  Schema version starts at 1. onupgradeneeded creates all stores.
 
-  Error handling: quota exceeded → log warning + surface to user via a
-  new "Storage full" banner (same pattern as network-offline indicator).
-  Transaction abort → retry once, then log + continue with stale cache.
+  IMPORTANT: this is for structured data only (JSON-serializable).
+  JournalMediaStore already has its own IDB database ("vot-journal-media")
+  for binary blobs — do NOT duplicate or merge the two databases.
+
+  Error handling:
+    - QuotaExceededError → StorageHealth.onWriteFailure(e) (W2.7) +
+      in-memory cache still holds latest value (reads still work but
+      data won't survive page refresh) + surface degraded-mode warning.
+    - Transaction abort → retry once, then log + continue with cache.
+    - IDB open failure (corrupted DB, private browsing) → fall back to
+      localStorage as last resort. Log the fallback. Survival path.
+
+  Tests: vitest with fake-indexeddb. Cover: open, CRUD, schema upgrade,
+  QuotaExceededError path, transaction abort + retry, open failure.
 
   W2.2 — Write-through cache layer (modify cached-store.js)
   ──────────────────────────────────────────────────────────
   Extend CachedStore to support an async backing store:
 
-    _load()  → read from in-memory cache (sync, fast)
-               if cache is cold, return default (empty)
-    _save()  → write to in-memory cache (sync, immediate)
-               ALSO write to IndexedDB (async, fire-and-forget)
-    _hydrate() → async one-time load from IndexedDB into memory
-               called at boot, before React renders
+    _load()    → read from in-memory cache (sync, fast)
+                  if cache is cold, return default (empty)
+    _save()    → write to in-memory cache (sync, immediate)
+                  ALSO write to IDB (async, with error handling —
+                  every write wraps in QuotaExceededError catch →
+                  StorageHealth.onWriteFailure)
+    _hydrate() → async one-time load from IDB into memory
+                  called at boot, before React renders
 
   The hydration gate: App() renders a loading screen until all stores
   report hydrated. This is the ONLY async boundary — after hydration,
@@ -611,61 +683,315 @@ go to BOTH memory + IndexedDB (async fire-and-forget with error log).
 
   Boot sequence:
     1. index.html inline script reads `vot-state` from localStorage
-       (sync) for theme class — KEEP THIS as a fast-path shim.
+       (sync) for theme class — KEEP THIS as the fast-path shim. The
+       localStorage copy is updated on every _save() as a write-behind
+       mirror for the next cold boot's theme shim.
     2. React mounts, App() calls hydrateAllStores() (async).
-    3. Each store loads from IndexedDB → populates in-memory cache.
-    4. App() gets notified (Promise.all), sets hydrated=true, renders.
+    3. Each store opens IDB, reads data, populates in-memory cache.
+    4. Promise.all resolves. App() sets hydrated=true, renders.
     5. All subsequent reads are sync from memory.
+
+  Hydration timeout: if IDB open takes >3 seconds (corrupted DB,
+  Firefox storage permission prompt, etc.), render anyway with empty/
+  default stores and log a warning. User sees empty data rather than
+  infinite loading screen. Background retry continues.
 
   W2.3 — Migrate data stores (one-by-one, test each)
   ───────────────────────────────────────────────────
   Migration order: low-risk → high-risk (per [[low-risk-pilot-first]]).
 
   Tier 1 (cold stores, non-render-path, low traffic):
-    vot-welcomed            (1 byte flag)
-    vot-about-seen          (1 byte flag)
+    vot-welcomed             (1 byte flag)
+    vot-about-seen           (1 byte flag)
     vot-garden-warning-acked (1 byte flag)
-    vot-ann-migrated        (1 byte migration gate)
-    vot-recent-nav          (< 5 KB)
-    vot-prophecy-cards      (< 10 KB)
+    vot-ann-migrated         (1 byte migration gate)
+    vot-recent-nav           (< 5 KB)
+    vot-prophecy-cards       (< 10 KB)
 
   Tier 2 (warm stores, moderate traffic):
-    vot-journal             (10-100 KB)
-    vot-journal-notebooks   (< 10 KB)
-    vot-journal-index       (< 5 KB)
-    vot-journal-stats       (< 10 KB)
-    vot-bookmarks           (10-100 KB)
-    vot-notebooks           (< 10 KB)
+    vot-journal              (10-100 KB metadata — blobs in own IDB)
+    vot-journal-notebooks    (< 10 KB)
+    vot-journal-index        (< 5 KB)
+    vot-journal-stats        (< 10 KB)
+    vot-bookmarks            (10-100 KB)
+    vot-notebooks            (< 10 KB)
 
   Tier 3 (hot stores, render-path — CRITICAL):
-    vot-history             (500 KB - 1 MB, capped at 2000 entries)
-    vot-state               (50-200 KB, drives tab state + theme)
-    vot-annotations         (100-500 KB, every annotated verse)
-    vot-notes               (50-300 KB, pulled on annotation render)
-    vot-links               (20-150 KB, per-hlKey icon rendering)
+    vot-history              (500 KB - 1 MB, capped at 2000 entries)
+    vot-state                (50-200 KB, drives tab state + theme)
+    vot-annotations          (100-500 KB, every annotated verse)
+    vot-notes                (50-300 KB, pulled on annotation render)
+    vot-links                (20-150 KB, per-hlKey icon rendering)
 
-  Each tier: implement → vitest → smoke walk → commit. Same one-commit-
-  per-item discipline as Q3-NK.
+  Each tier: implement → vitest → preview-eval smoke walk → commit.
+
+  Tier 3 latency gate: measure time from page load to hydrated=true
+  using performance.mark/measure. Target: <200ms mid-range, <500ms
+  budget. If Tier 3 hydration exceeds 500ms, split into two phases:
+  state + annotations first (initial render), then notes + links +
+  history (after first paint).
 
   W2.4 — One-time localStorage → IndexedDB migration
   ───────────────────────────────────────────────────
   On first boot post-migration:
-    1. Check IDB for a "migrated-v1" flag
-    2. If absent, read every localStorage key, write to IndexedDB
-    3. Set "migrated-v1" flag in IDB
-    4. Clear migrated keys from localStorage (free quota)
-    5. KEEP: vot-state in localStorage (fast theme shim, line 63)
+    1. Open IDB. Check for "migrated-v1" key in a "meta" store.
+    2. If absent: read every vot-* localStorage key, write to IDB.
+    3. Set "migrated-v1" in IDB meta store.
+    4. Clear migrated keys from localStorage (free quota) EXCEPT:
+       vot-state stays (fast theme shim). Gets a reduced copy (theme
+       + essential boot props only) to minimize localStorage usage.
+    5. Log migration timing.
 
-  Idempotent: if migration is interrupted, next boot retries. Same
-  pattern as the existing annotation-store.js migrateAnnotations().
+  Idempotent: if migration is interrupted, next boot retries. The
+  "migrated-v1" flag is set LAST, after all writes succeed.
 
-  W2.5 — Quota monitoring
-  ───────────────────────
-  navigator.storage.estimate() → { quota, usage }. Surface a warning
-  in Settings → Your Data when usage > 80% of quota. Add `storageUsed`
-  field to the existing export JSON for diagnostics.
+  iOS PWA storage isolation edge case: if the user has been using
+  VOTReader in Safari tab and then installs the PWA, the installed PWA
+  gets a NEW, EMPTY storage container. Migration runs against empty
+  localStorage, finds nothing, sets the flag. User sees blank app.
+  Mitigation: detect this (hydrated with zero data + no flag in old LS)
+  and surface the iOS PWA welcome card (W2.7 Scenario 4).
 
-  W2.6 — Error boundary in App
+  W2.5 — Storage persistence + quota monitoring
+  ──────────────────────────────────────────────
+  Two capabilities:
+
+  A. Persistence (prevent eviction):
+    Do NOT call persist() at boot (Firefox silently fails if not from
+    user gesture). Strategy:
+      1. After first meaningful data creation: check persisted().
+      2. If false: show banner — "Your data isn't protected from browser
+         cleanup yet." Button: "[Protect my data]" calls persist().
+      3. Chrome auto-grants for installed PWAs. Firefox shows prompt
+         (must fire from click handler). Safari heuristic-based.
+      4. Surface result in Settings → Your Data.
+      5. On Safari tab (not PWA): banner also says "Add to Home Screen
+         to keep your data safe" — the 7-day rule is the real threat.
+
+  B. Quota monitoring:
+    navigator.storage.estimate() → { quota, usage }.
+    Surface in Settings → Your Data: "Storage: 45 MB of 2.4 GB used"
+    Warn when usage > 80% of quota.
+    Warn when quota < 50 MB (budget device guard).
+    Add storageQuota + storageUsed to export JSON for diagnostics.
+    Note: Brave fuzzes values (anti-fingerprinting) — show "approximate."
+
+  W2.6 — Export/import upgrade (include journal media)
+  ────────────────────────────────────────────────────
+  EXISTING BUG: exportPersonalData() (SettingsScreen.jsx:283) iterates
+  localStorage only. JournalMediaStore blobs in IndexedDB are silently
+  dropped. Export → clear → import = every audio recording and image
+  permanently lost.
+
+  Fix — export becomes async. After collecting structured data, reads
+  all JournalMediaStore blobs, converts each to base64, includes them
+  in the payload under a "media" key:
+
+    {
+      app: "VOTReader",
+      exportVersion: 2,      // was 1
+      data: { ... },          // structured data (as before)
+      media: {                // NEW
+        "m_123_abc": { type, mime, size, duration, data: "base64..." },
+        ...
+      }
+    }
+
+  Import detects exportVersion 2 (has media key) vs 1 (no media).
+  V1 imports: structured data only (backward compatible).
+  V2 imports: structured + media blobs. Confirm dialog lists counts.
+  After import: run pruneOrphans() to clean unreferenced media.
+
+  Scale guard: if total media > 100 MB, warn user export will be large
+  and may take time. Future W7 work can add ZIP-based streaming export
+  (fflate, 8 KB gzipped, no deps) for GB-scale media libraries.
+
+  Round-trip verification: export → clear all → import → all data
+  intact including audio playback + image display. This is a W2 exit
+  gate, not optional.
+
+  W2.7 — Storage Health system (dynamic, platform-aware user warnings)
+  ────────────────────────────────────────────────────────────────────
+  The app reads the storage situation continuously and communicates
+  risks to the user in plain language — before they lose data, not
+  after. No jargon. Every warning tells the user what to DO. Warnings
+  are invisible when everything is fine.
+
+  Architecture: StorageHealth module (src/utils/storage-health.js) owns
+  detection, assessment, and state. UI components subscribe to it.
+
+  Detection engine — StorageHealth.assess() runs:
+    1. Platform detection (one-time, cached):
+       Android WebView / Safari tab / Safari PWA / Firefox / Chrome /
+       private browsing (probe via IDB open + quota check)
+    2. Quota snapshot (async): navigator.storage.estimate()
+    3. Persistence check: navigator.storage.persisted()
+    4. Derived health tier:
+       HEALTHY  — <50% used, persisted, no platform risks
+       CAUTION  — 50-80% used, OR not persisted, OR Safari tab
+       WARNING  — 80-95% used, OR quota < 100 MB
+       CRITICAL — >95% used, OR quota < 50 MB, OR private browsing
+       READONLY — active write failure this session (QuotaExceededError)
+    5. Risk flags (zero or more): safari-7day, ios-pwa-isolate,
+       low-quota, critical-quota, not-persisted, private-mode,
+       write-failed, quota-declining
+
+  StorageHealth API:
+    assess()                → Promise<StorageHealthReport>
+    checkBeforeWrite(bytes) → { ok, warning? }
+    onWriteFailure(error)   → updates tier to READONLY
+    onWriteSuccess()        → clears READONLY if quota recovered
+    subscribe(callback)     → unsubscribe function
+    getReport()             → last cached report (sync, for render)
+    requestPersistence()    → Promise<boolean>
+
+  When to check:
+    1. Boot (after hydration)
+    2. After every meaningful data creation (journal, annotation, etc.)
+       — only re-assess if tier >= CAUTION
+    3. Periodic: every 5 min while app is active (disk space changes)
+    4. After any write failure: immediate re-assess
+    5. On resume from background (visibilitychange): if >60s stale
+
+  Eight scenarios (each with specific trigger, placement, text,
+  dismissal logic):
+
+  SCENARIO 1 — Everything is fine
+    Tier = HEALTHY, no risk flags → nothing shown. Invisible.
+    Settings → Your Data shows "Storage: [X] MB used" (informational).
+
+  SCENARIO 2 — Not persisted, user has data
+    Trigger: persisted=false AND user has >0 annotations/journal entries
+    When: after first data-creating action (not on boot)
+    Placement: soft banner below header, gold accent
+    Text: "Your data isn't protected from browser cleanup yet."
+    Button: "[Protect my data]" → calls persist()
+      Chrome PWA: silent grant → "Data protected ✓"
+      Firefox: browser prompt → grant or deny
+      Denied: "Browser denied protection. Export regularly. [Export now]"
+    Dismissal: disappears on grant. If denied, per-session. Re-shows
+    next session if still not persisted AND new data created.
+
+  SCENARIO 3 — Safari tab (7-day eviction risk)
+    Trigger: platform = safari-tab (not PWA, not android)
+    When: BEFORE first data-creating gesture — first long-press to
+    highlight, first journal entry tap, first bookmark. NOT on boot.
+    The trigger fires from the gesture handler via a one-line gate:
+    StorageHealth.checkFirstDataCreation() → returns immediately if
+    non-Safari or already shown; else shows modal and awaits choice.
+    Placement: modal overlay (important enough to interrupt)
+    Text:
+      "Before you start saving notes and highlights —
+       Safari may delete your saved data if you don't visit for
+       7 days. To keep your data safe, add VOTReader to your
+       Home Screen.
+       [How to add to Home Screen]  [I understand the risk]"
+    "How to add" shows platform instructions:
+      iOS: "Tap the Share button → Add to Home Screen"
+      macOS: "File → Add to Dock"
+    Dismissal: per-session. If user creates >20 items without installing,
+    one softer banner reminder. After that, once per next session if
+    still safari-tab + has data.
+
+  SCENARIO 4 — iOS PWA installed, empty storage (migration needed)
+    Trigger: platform = safari-pwa AND total items = 0 AND no
+    "ios-pwa-welcomed" flag in IDB
+    When: on boot, after hydration finds nothing
+    Placement: full-screen welcome card
+    Text:
+      "Welcome to VOTReader!
+       If you've been using VOTReader in Safari, your saved data
+       didn't transfer automatically — that's how apps on iOS work.
+       To bring your data over:
+       1. Open VOTReader in Safari (not this app)
+       2. Go to Settings → Export
+       3. Come back here → Settings → Import
+       [I'm new — skip this]  [I'll import my data]"
+    Shows once only (flag-gated).
+
+  SCENARIO 5 — Space getting tight (caution: 50-80% used)
+    Placement: banner in Settings → Your Data only (not app-wide)
+    Text: "Storage is filling up — [X] MB of [Y] MB used. Consider
+    exporting your data as a backup."
+    Dismissal: per-session. Re-shows next session if still in tier.
+
+  SCENARIO 6 — Space running low (warning: 80-95% OR quota < 100 MB)
+    Placement: persistent banner at top of app, amber styling
+    NOT dismissable.
+    Text: "Storage is running low — [X] MB remaining. New notes and
+    recordings may not save. Free up space or export your data."
+    Buttons: "[Export data]  [How to free space]"
+    "How to free space" shows platform-appropriate guidance.
+
+  SCENARIO 7 — Critically low / budget device / write failure
+    Trigger: >95% used, OR quota < 50 MB, OR QuotaExceededError
+    Placement: blocking banner at top, red/danger styling. NOT dismissable.
+    Text varies:
+      Quota < 50 MB: "Your device has very little storage ([X] MB).
+        VOTReader needs at least 50 MB. Please free up space."
+      >95%: "Storage is almost full — [X] MB remaining. Your data may
+        not save. Export now to avoid losing it."
+      Write failure: "Your last change couldn't be saved — storage is
+        full. Your work is still on screen but won't be kept if you
+        close the app. Export your data now."
+    Clears on successful write or export.
+
+  SCENARIO 8 — Private browsing
+    Trigger: platform = private (detected by IDB probe)
+    Placement: permanent banner, not dismissable
+    Text: "You're in a private window. Nothing you save here will be
+    kept when you close it."
+
+  Dismissal summary:
+    | Scenario | Dismissable? | Re-shows when?                       |
+    |----------|-------------|---------------------------------------|
+    | 1 healthy | n/a        | n/a                                   |
+    | 2 persist | per-session | next session if still + new data      |
+    | 3 Safari  | per-session | next session if still at risk         |
+    | 4 iOS     | once ever  | never (flag-gated)                    |
+    | 5 caution | per-session | next session if still in tier         |
+    | 6 warning | NEVER      | clears when tier drops                |
+    | 7 critical| NEVER      | clears on success or export           |
+    | 8 private | NEVER      | permanent for session                 |
+
+  Write-path integration:
+    Every store _save() wraps IDB write in QuotaExceededError catch →
+    StorageHealth.onWriteFailure(e). In-memory cache still has the
+    value so reads work, but data won't survive page refresh.
+
+    JournalMediaStore.put() gets the same treatment. Audio/image save
+    failures surface immediately: "Couldn't save this recording —
+    storage is full."
+
+    checkBeforeWrite(estimatedBytes) called BEFORE large writes only
+    (audio save, image save). If estimated write would push past 95%:
+    "You're almost out of storage. This recording ([X] MB) may not
+    save. Continue anyway? [Save anyway] [Cancel]"
+
+    CRITICAL — pre-record check: checkBeforeWrite must fire BEFORE
+    recording starts, not just before save. Estimate: N minutes at
+    current codec bitrate = ~N*50 KB. If insufficient, warn BEFORE
+    the user records a 3-minute memo only to lose it on save. The
+    recording UI (JournalRecordingSheet) calls this on record-button
+    press and shows the warning inline if storage is tight.
+
+  Settings → Your Data — storage status (always visible):
+    Storage
+    ─────────────────────────────────────
+    Used:        45 MB of 2.4 GB
+    Protection:  Active ✓    [or: Not active — Protect now]
+    Platform:    Chrome (Desktop)
+    ─────────────────────────────────────
+    (Brave: values marked "approximate")
+
+  Implementation order:
+    W2.7a — StorageHealth module + vitest (detection engine, no UI)
+    W2.7b — StorageHealthBanner component (subscribes, renders banners)
+    W2.7c — Write-path integration (_save + JournalMediaStore.put)
+    W2.7d — Settings → Your Data integration
+    W2.7e — Safari-specific flows (7-day modal + iOS welcome card)
+
+  W2.8 — Error boundary in App
   ────────────────────────────
   Wrap the ROUTES dispatcher + AppShellSheets + AppShellOverlays in an
   ErrorBoundary (the component already exists in src/components/).
@@ -674,20 +1000,41 @@ go to BOTH memory + IndexedDB (async fire-and-forget with error log).
   (N1.3) but for React errors.
 
   Exit criteria:
-    [ ] idb-store.js adapter committed with full vitest coverage
-    [ ] cached-store.js extended with write-through + _hydrate()
-    [ ] All 15+ keys migrated (Tier 1 → Tier 2 → Tier 3)
+    [ ] idb-adapter.js committed with full vitest coverage (CRUD +
+        schema upgrade + QuotaExceededError + fallback)
+    [ ] cached-store.js extended with write-through + _hydrate() +
+        hydration timeout (3s)
+    [ ] All 15 localStorage keys migrated (Tier 1 → Tier 2 → Tier 3)
     [ ] One-time migration runs on first boot, idempotent
     [ ] Sync render-path reads confirmed zero-latency (in-memory)
-    [ ] Quota monitoring visible in Settings
+    [ ] Hydration latency: <200ms mid-range, <500ms budget
+    [ ] persist() called from user gesture, result in Settings
+    [ ] Quota monitoring visible in Settings (used / total)
+    [ ] Export includes journal media blobs (exportVersion: 2)
+    [ ] Import restores journal media + structured data
+    [ ] Round-trip: export → clear all → import → all data intact
+        including audio playback + image display
+    [ ] StorageHealth module with full vitest (every tier, platform,
+        risk flag, write-failure cycle, periodic refresh)
+    [ ] Banner renders correct message for each of 8 scenarios
+    [ ] Safari 7-day modal fires on first data-creating gesture
+    [ ] iOS PWA welcome card fires on empty-storage boot
+    [ ] Write failures surface immediately with actionable guidance
+    [ ] checkBeforeWrite warns BEFORE recording starts (not just save)
+    [ ] Private browsing detected and warned permanently
+    [ ] Budget device (<50 MB) warned at boot
+    [ ] All warnings have correct dismissal behavior (see table)
+    [ ] No warnings when storage is healthy (Scenario 1)
     [ ] Error boundary catches render crashes
-    [ ] localStorage usage drops to < 1 KB post-migration
+    [ ] localStorage < 5 KB post-migration (theme shim only)
     [ ] Android APK still works identically
-    [ ] Desktop Chrome/Edge/Firefox all pass store round-trips
+    [ ] Chrome/Edge/Firefox all pass store round-trips
 
-  Risk: HIGH for Tier 3 (render-path stores). Mitigation: extensive
-  vitest for every store's load/save round-trip + manual smoke walks
-  after each tier.
+  Risk: HIGH for Tier 3 (render-path stores). Mitigation: vitest for
+  every store's load/save round-trip + preview-eval after each tier.
+  Risk: MEDIUM for export with media. Mitigation: Option A (JSON +
+  base64) first with 100 MB guard; ZIP streaming deferred to W7.
+  Risk: MEDIUM for budget devices. Mitigation: startup health check.
 
 ───────────────────────────────────────────────────────────────────────────────
 W3 — PWA SHELL (installable + offline)
@@ -1230,6 +1577,34 @@ after W6. But they MUST land before the project is called done.
     - tsc --noEmit passes
     - Full 53-screen smoke walk
 
+  W7.6 — OPFS upgrade for JournalMediaStore (perf optimization)
+  ─────────────────────────────────────────────────────────────
+  Problem: JournalMediaStore uses IndexedDB Blob storage (correct,
+  GB-scale, works on all platforms). But IDB Blob writes for 100 MB
+  payloads take ~850 ms vs ~90 ms with OPFS. For power users with
+  hundreds of recordings, the cumulative I/O overhead matters.
+
+  OPFS advantages: 3-4x faster writes, partial range reads via
+  `read(buffer, { at: offset })` without loading whole file, no
+  structured clone overhead.
+
+  OPFS constraints:
+    - Fast sync API (createSyncAccessHandle) ONLY works in a Web Worker
+    - Safari has known bugs (WebKit #250495 — data loss on handle create)
+    - Firefox: OPFS-only, no full File System Access API
+    - Async-only API on main thread (no sync reads)
+
+  Architecture: dedicated BlobWorker (src/utils/blob-worker.js).
+  Main thread communicates via postMessage. JournalMediaStore API
+  stays identical — the change is the backing store, not the contract.
+  Fallback: if OPFS unavailable or fails write-read-verify test on
+  first launch, stay on IDB Blobs (current behavior).
+
+  Gate: profile JournalMediaStore I/O under real usage BEFORE building
+  this. If 90th percentile write latency is <200ms (likely for typical
+  memo sizes of 50-500 KB), the optimization isn't worth the Worker
+  complexity + Safari risk. Build only if profiling justifies it.
+
   Exit criteria (W7 complete):
     [ ] Schema versioning: every IDB store has a version integer +
         migration chain. Existing migrations (annotations, links)
@@ -1243,6 +1618,8 @@ after W6. But they MUST land before the project is called done.
         vitest coverage.
     [ ] buildScreenRoutes: 47 flat props → 5 domain bundles. All
         vitest + tsc pass. 53-screen smoke walk.
+    [ ] OPFS: profiled + built if justified, OR explicitly deferred
+        with profiling data showing IDB is sufficient.
     [ ] Zero critiques remaining from the architectural review.
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -1441,6 +1818,34 @@ RISK REGISTER
     increase. Measure: time from page load to first render, compare
     pre/post migration. Target: < 200ms overhead.
 
+  HIGH — Safari 7-day data eviction (W2.7 Scenario 3)
+    Safari evicts all script-writable storage after 7 days without user
+    interaction. Home-screen PWAs are exempt. Users who create data in
+    a Safari tab without installing will lose everything. Mitigation:
+    intercept first data-creating gesture with a modal explaining the
+    risk + install instructions. Can't fix the platform constraint —
+    can only warn clearly enough that the user acts before data loss.
+
+  MEDIUM — Export/import media round-trip (W2.6)
+    exportPersonalData currently drops all journal media blobs (audio,
+    images). Fix adds async base64 encoding of all blobs into the JSON
+    payload. For users with >100 MB of media, this may OOM or produce
+    a multi-hundred-MB JSON file. Mitigation: 100 MB guard warns user;
+    ZIP-based streaming export deferred to W7.
+
+  MEDIUM — iOS PWA storage isolation (W2.4 + W2.7 Scenario 4)
+    Installing a PWA on iOS creates a NEW storage container. Data from
+    the Safari tab is invisible. Users who build up data in Safari then
+    install lose access to it. Mitigation: detect empty-storage-on-
+    first-PWA-boot and show an export/import bridge card. Can't fix
+    the platform constraint — Apple isolates by design.
+
+  MEDIUM — Budget Android near-zero quota (W2.7 Scenario 7)
+    Chrome/WebView quota = 60% of FREE disk. Devices with <500 MB free
+    get quotas as low as a few MB. App must detect and warn, not crash.
+    Mitigation: startup health check + QuotaExceededError handling on
+    every write path → graceful degradation to read-only mode.
+
   MEDIUM — Audio recording cross-browser (W1.4)
     MediaRecorder API: Chrome supports audio/webm, Firefox supports
     audio/ogg. Safari doesn't support MediaRecorder reliably. Need
@@ -1496,7 +1901,7 @@ work item. Zero gaps.
   |   |                                       |         | validates) |
   | 2 | localStorage quota ceiling            | W2      | RESOLVED   |
   | 3 | localStorage partial-write corruption | W2      | RESOLVED   |
-  | 4 | No error boundary in App              | W2.6    | RESOLVED   |
+  | 4 | No error boundary in App              | W2.8    | RESOLVED   |
   | 5 | Window bridge informal globals        | W1      | RESOLVED   |
   | 6 | No offline/installable desktop        | W3      | RESOLVED   |
   | 7 | Missing font files                    | W0.1    | RESOLVED   |
