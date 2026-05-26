@@ -69,7 +69,13 @@ class JsBridge(private val webViewProvider: () -> WebView) {
         webView.post { webView.evaluateJavascript(js, null) }
     }
 
-    private fun escapeArg(arg: Any?): String = when (arg) {
+    // `internal` (not `private`) so the same-module test source set can
+    // exercise these directly -- they are pure functions of their input,
+    // so unit-testing them without spinning up a Robolectric WebView is
+    // the right call. The visibility change is test-only; production
+    // callers (callOptional, setCssProperties) sit inside this class
+    // and are unaffected.
+    internal fun escapeArg(arg: Any?): String = when (arg) {
         null -> "null"
         is Boolean -> arg.toString()
         is Number -> arg.toString()
@@ -84,7 +90,7 @@ class JsBridge(private val webViewProvider: () -> WebView) {
     // JSON strings but illegal as bare characters in JavaScript source --
     // not escaping them would turn an apparently-safe payload into a
     // syntax error inside evaluateJavascript.
-    private fun quote(s: String): String {
+    internal fun quote(s: String): String {
         val sb = StringBuilder(s.length + 2)
         sb.append('\'')
         for (c in s) {
