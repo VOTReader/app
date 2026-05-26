@@ -6212,15 +6212,15 @@
     const pageRef = React.useRef(page);
     pageRef.current = page;
     React.useEffect(() => {
-      if (window.AndroidBridge?.setImmersiveMode) window.AndroidBridge.setImmersiveMode(true);
+      PlatformBridge.setImmersiveMode(true);
       return () => {
-        if (window.AndroidBridge?.setImmersiveMode) window.AndroidBridge.setImmersiveMode(false);
+        PlatformBridge.setImmersiveMode(false);
       };
     }, []);
     React.useEffect(() => {
       setError(false);
       setLoading(!gardenIsCached(page, tier));
-      if (window.AndroidBridge?.resetZoom) window.AndroidBridge.resetZoom();
+      PlatformBridge.resetZoom();
     }, [page, tier]);
     React.useEffect(() => {
       gardenPreload(page, tier);
@@ -6267,9 +6267,9 @@
       setJumpInput("");
     };
     React.useEffect(() => {
-      if (window.AndroidBridge?.setZoomEnabled) window.AndroidBridge.setZoomEnabled(true);
+      PlatformBridge.setZoomEnabled(true);
       return () => {
-        if (window.AndroidBridge?.setZoomEnabled) window.AndroidBridge.setZoomEnabled(false);
+        PlatformBridge.setZoomEnabled(false);
       };
     }, []);
     return /* @__PURE__ */ React.createElement("div", { className: "garden-fullscreen" }, /* @__PURE__ */ React.createElement("div", { className: "garden-top-bar" }, /* @__PURE__ */ React.createElement("button", { className: "garden-back-btn", onClick: onBack }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /* @__PURE__ */ React.createElement("polyline", { points: "15 18 9 12 15 6" }))), jumpMode ? /* @__PURE__ */ React.createElement("form", { className: "garden-jump-form", onSubmit: (e) => {

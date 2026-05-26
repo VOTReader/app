@@ -178,6 +178,58 @@ function webSetKeepScreenOn(enabled) {
   }
 }
 
+// Web immersive mode — Fullscreen API (W1.2 Tier B.3). GardenView calls
+// setImmersiveMode(true) from a mount-time useEffect, which is OUTSIDE
+// the user-gesture chain that triggered navigation. Most browsers block
+// requestFullscreen() in that context with a "Permissions check failed"
+// TypeError — we swallow it (best-effort; on Android this works natively;
+// on web Garden remains in-page with browser chrome visible).
+/** @param {boolean} immersive */
+function webSetImmersiveMode(immersive) {
+  try {
+    if (immersive) {
+      const elem = /** @type {any} */ (document).documentElement;
+      if (elem && typeof elem.requestFullscreen === 'function') {
+        const result = elem.requestFullscreen();
+        if (result && typeof result.catch === 'function') {
+          result.catch((/** @type {any} */ e) => {
+            if (typeof console !== 'undefined' && console.warn) {
+              console.warn('[PlatformBridge] setImmersiveMode(true) requestFullscreen blocked:', e && e.message || e);
+            }
+          });
+        }
+      }
+    } else {
+      const doc = /** @type {any} */ (document);
+      if (typeof doc.exitFullscreen === 'function' && doc.fullscreenElement) {
+        const result = doc.exitFullscreen();
+        if (result && typeof result.catch === 'function') {
+          result.catch((/** @type {any} */ e) => {
+            if (typeof console !== 'undefined' && console.warn) {
+              console.warn('[PlatformBridge] setImmersiveMode(false) exitFullscreen failed:', e && e.message || e);
+            }
+          });
+        }
+      }
+    }
+  } catch (e) {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[PlatformBridge] setImmersiveMode unexpected error:', /** @type {any} */ (e).message || e);
+    }
+  }
+}
+
+// Web zoom — DELIBERATE NO-OPS (W1.2 Tier B.3). Per
+// [[verify-inertness-not-equivalence]]: the Android methods exist to
+// override WebView's default (zoom DISABLED), enabling pinch-zoom on the
+// Garden image specifically. Browsers default to zoom ENABLED — there's
+// nothing for the bridge to do. CSS touch-action: none would actively
+// BREAK the natural pinch behavior the user expects. resetZoom has no
+// web equivalent at all (no JS API can undo a user's pinch-zoom). These
+// are no-ops, NOT CSS hacks.
+const webSetZoomEnabled = () => {};
+const webResetZoom = () => {};
+
 // Web file picker — openFilePicker impl (W1.2 Tier B.2). Per
 // [[file-input-user-gesture]], the input.click() MUST be invoked synchronously
 // from the caller's user-gesture handler (no await/setTimeout between).
@@ -324,6 +376,9 @@ const webImpl = {
   setKeepScreenOn: webSetKeepScreenOn,       // Tier B.1 (WakeLock + de-dup)
   openFilePicker: webOpenFilePicker,         // Tier B.2 (DOM input + FileReader → __onImportFile)
   saveToDownloads: webSaveToDownloads,       // Tier B.2 (Blob + URL.createObjectURL + anchor)
+  setImmersiveMode: webSetImmersiveMode,     // Tier B.3 (Fullscreen API, best-effort)
+  setZoomEnabled: webSetZoomEnabled,         // Tier B.3 (no-op — browsers handle zoom natively)
+  resetZoom: webResetZoom,                   // Tier B.3 (no-op — no JS API to reset user pinch-zoom)
 
   // Recording string-contract placeholders (W1.4)
   nativeRecordStart: () => 'error:web-impl-pending',
@@ -331,9 +386,6 @@ const webImpl = {
   nativeRecordResume: () => 'error:web-impl-pending',
 
   // Category 4 — not-yet-implemented warnings (void returns only)
-  setImmersiveMode: notYetImplemented('setImmersiveMode'),   // W1.2 Tier B.3
-  setZoomEnabled: notYetImplemented('setZoomEnabled'),       // W1.2 Tier B.3
-  resetZoom: notYetImplemented('resetZoom'),                 // W1.2 Tier B.3
   haptic: notYetImplemented('haptic'),                       // future; haptic JS wiring not yet present
   requestMicPermission: notYetImplemented('requestMicPermission'), // W1.4
   nativeRecordStop: notYetImplemented('nativeRecordStop'),   // W1.4

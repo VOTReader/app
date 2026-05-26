@@ -226,9 +226,6 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   //  takeScreenshot moved out — Tier A html2canvas impl.
   //  All have their own describe blocks below.)
   it.each([
-    'setImmersiveMode',
-    'setZoomEnabled',
-    'resetZoom',
     'haptic',
     'requestMicPermission',
     'nativeRecordStop',
@@ -240,8 +237,82 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
 
   it('warnings are tagged with [PlatformBridge]', () => {
-    bridge.setImmersiveMode(true);
+    bridge.haptic(1);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[PlatformBridge]'));
+  });
+
+  // Tier B.3: zoom methods are DELIBERATE no-ops on web (verify inertness
+  // per [[verify-inertness-not-equivalence]]). Browsers handle zoom
+  // natively; CSS hacks would interfere with the Garden image's pinch.
+  it('setZoomEnabled is silent no-op on web (no warn, no throw)', () => {
+    bridge.setZoomEnabled(true);
+    bridge.setZoomEnabled(false);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+  it('resetZoom is silent no-op on web', () => {
+    bridge.resetZoom();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Web setImmersiveMode — Fullscreen API (W1.2 Tier B.3)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('PlatformBridge — Web setImmersiveMode (Fullscreen API)', () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ let warnSpy;
+  /** @type {any} */ let mockRequestFullscreen;
+  /** @type {any} */ let mockExitFullscreen;
+
+  beforeEach(async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockRequestFullscreen = vi.fn(() => Promise.resolve());
+    mockExitFullscreen = vi.fn(() => Promise.resolve());
+    /** @type {any} */ (document.documentElement).requestFullscreen = mockRequestFullscreen;
+    /** @type {any} */ (document).exitFullscreen = mockExitFullscreen;
+    /** @type {any} */ (document).fullscreenElement = null;
+    bridge = await importBridge();
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    delete (/** @type {any} */ (document.documentElement)).requestFullscreen;
+    delete (/** @type {any} */ (document)).exitFullscreen;
+    delete (/** @type {any} */ (document)).fullscreenElement;
+  });
+
+  it('setImmersiveMode(true) calls documentElement.requestFullscreen', () => {
+    bridge.setImmersiveMode(true);
+    expect(mockRequestFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('setImmersiveMode(false) calls document.exitFullscreen only when in fullscreen', () => {
+    // Not in fullscreen — no exit attempt
+    bridge.setImmersiveMode(false);
+    expect(mockExitFullscreen).not.toHaveBeenCalled();
+    // Pretend we entered fullscreen
+    /** @type {any} */ (document).fullscreenElement = document.documentElement;
+    bridge.setImmersiveMode(false);
+    expect(mockExitFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows requestFullscreen rejection (user-gesture blocked) with a warn', async () => {
+    mockRequestFullscreen.mockImplementation(() => Promise.reject(new Error('Permissions check failed')));
+    expect(() => bridge.setImmersiveMode(true)).not.toThrow();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toMatch(/setImmersiveMode\(true\)/);
+  });
+
+  it('silently no-ops when Fullscreen API is absent', () => {
+    delete (/** @type {any} */ (document.documentElement)).requestFullscreen;
+    delete (/** @type {any} */ (document)).exitFullscreen;
+    expect(() => bridge.setImmersiveMode(true)).not.toThrow();
+    expect(() => bridge.setImmersiveMode(false)).not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 

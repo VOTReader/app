@@ -2504,6 +2504,53 @@
       _warnWakeLock("unexpected", e);
     }
   }
+  function webSetImmersiveMode(immersive) {
+    try {
+      if (immersive) {
+        const elem = (
+          /** @type {any} */
+          document.documentElement
+        );
+        if (elem && typeof elem.requestFullscreen === "function") {
+          const result = elem.requestFullscreen();
+          if (result && typeof result.catch === "function") {
+            result.catch((e) => {
+              if (typeof console !== "undefined" && console.warn) {
+                console.warn("[PlatformBridge] setImmersiveMode(true) requestFullscreen blocked:", e && e.message || e);
+              }
+            });
+          }
+        }
+      } else {
+        const doc = (
+          /** @type {any} */
+          document
+        );
+        if (typeof doc.exitFullscreen === "function" && doc.fullscreenElement) {
+          const result = doc.exitFullscreen();
+          if (result && typeof result.catch === "function") {
+            result.catch((e) => {
+              if (typeof console !== "undefined" && console.warn) {
+                console.warn("[PlatformBridge] setImmersiveMode(false) exitFullscreen failed:", e && e.message || e);
+              }
+            });
+          }
+        }
+      }
+    } catch (e) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn(
+          "[PlatformBridge] setImmersiveMode unexpected error:",
+          /** @type {any} */
+          e.message || e
+        );
+      }
+    }
+  }
+  var webSetZoomEnabled = () => {
+  };
+  var webResetZoom = () => {
+  };
   function webOpenFilePicker() {
     const input = document.createElement("input");
     input.type = "file";
@@ -2632,17 +2679,17 @@
     // Tier B.2 (DOM input + FileReader → __onImportFile)
     saveToDownloads: webSaveToDownloads,
     // Tier B.2 (Blob + URL.createObjectURL + anchor)
+    setImmersiveMode: webSetImmersiveMode,
+    // Tier B.3 (Fullscreen API, best-effort)
+    setZoomEnabled: webSetZoomEnabled,
+    // Tier B.3 (no-op — browsers handle zoom natively)
+    resetZoom: webResetZoom,
+    // Tier B.3 (no-op — no JS API to reset user pinch-zoom)
     // Recording string-contract placeholders (W1.4)
     nativeRecordStart: () => "error:web-impl-pending",
     nativeRecordPause: () => "error:web-impl-pending",
     nativeRecordResume: () => "error:web-impl-pending",
     // Category 4 — not-yet-implemented warnings (void returns only)
-    setImmersiveMode: notYetImplemented("setImmersiveMode"),
-    // W1.2 Tier B.3
-    setZoomEnabled: notYetImplemented("setZoomEnabled"),
-    // W1.2 Tier B.3
-    resetZoom: notYetImplemented("resetZoom"),
-    // W1.2 Tier B.3
     haptic: notYetImplemented("haptic"),
     // future; haptic JS wiring not yet present
     requestMicPermission: notYetImplemented("requestMicPermission"),

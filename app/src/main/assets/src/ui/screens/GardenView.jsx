@@ -15,17 +15,22 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
   const pageRef = React.useRef(page);
   pageRef.current = page;
 
-  // Enter immersive mode on mount, exit on unmount
+  // Enter immersive mode on mount, exit on unmount. W1.2 Tier B.3:
+  // bridge owns the platform branch — Android hides system bars natively;
+  // web tries Fullscreen API (best-effort; user-gesture chain has expired
+  // by the time this effect fires, so the request is typically blocked
+  // and silently logged).
   React.useEffect(() => {
-    if (window.AndroidBridge?.setImmersiveMode) window.AndroidBridge.setImmersiveMode(true);
-    return () => {if (window.AndroidBridge?.setImmersiveMode) window.AndroidBridge.setImmersiveMode(false);};
+    PlatformBridge.setImmersiveMode(true);
+    return () => { PlatformBridge.setImmersiveMode(false); };
   }, []);
 
-  // Reset error + native zoom on page change or tier change.
+  // Reset error + zoom on page/tier change. W1.2 Tier B.3: resetZoom is a
+  // no-op on web (browsers don't expose an API to reset user pinch-zoom).
   React.useEffect(() => {
     setError(false);
     setLoading(!gardenIsCached(page, tier));
-    if (window.AndroidBridge?.resetZoom) window.AndroidBridge.resetZoom();
+    PlatformBridge.resetZoom();
   }, [page, tier]);
 
   // Priority preload: current page + 5 ahead (immediate, no throttle)
@@ -85,10 +90,13 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
     setJumpInput("");
   };
 
-  // Enable native Android zoom while Garden is open
+  // Enable native pinch-zoom while Garden is open. W1.2 Tier B.3: Android
+  // overrides WebView's default-disabled zoom; web is a no-op since
+  // browsers default to zoom-enabled and CSS touch-action hacks would
+  // actively break the natural pinch (per [[verify-inertness-not-equivalence]]).
   React.useEffect(() => {
-    if (window.AndroidBridge?.setZoomEnabled) window.AndroidBridge.setZoomEnabled(true);
-    return () => {if (window.AndroidBridge?.setZoomEnabled) window.AndroidBridge.setZoomEnabled(false);};
+    PlatformBridge.setZoomEnabled(true);
+    return () => { PlatformBridge.setZoomEnabled(false); };
   }, []);
 
   return (
