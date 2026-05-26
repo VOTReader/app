@@ -25,6 +25,13 @@ android {
         }
     }
 
+    // AGP 8.0+ disabled automatic BuildConfig generation; re-enable so
+    // BuildConfig.DEBUG can gate developer-only paths (e.g.
+    // WebView.setWebContentsDebuggingEnabled in onCreate).
+    buildFeatures {
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11

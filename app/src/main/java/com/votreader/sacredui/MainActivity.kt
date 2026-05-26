@@ -208,6 +208,14 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (keepScreenOnEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // Debug-only: let Chrome DevTools attach to the WebView via
+        // chrome://inspect/#devices. Static method — affects all WebViews
+        // in the process. BuildConfig.DEBUG is false on release builds, so
+        // the debugging surface is never exposed in shipped APKs.
+        if (BuildConfig.DEBUG) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
+
         webView = WebView(this)
         setContentView(webView)
 
