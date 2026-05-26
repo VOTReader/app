@@ -117,6 +117,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override fun launchMicPermissionRequest() {
         micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
+    override fun hasAudioPermission(): Boolean = ContextCompat.checkSelfPermission(
+        this, Manifest.permission.RECORD_AUDIO
+    ) == PackageManager.PERMISSION_GRANTED
     override fun captureScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String {
         // The JS-facing API is synchronous (returns the base64 directly),
         // so we runBlocking on this binder thread until the coroutine

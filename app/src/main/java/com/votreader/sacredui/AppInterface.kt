@@ -1,8 +1,6 @@
 package com.votreader.sacredui
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Build
 import android.os.VibrationEffect
@@ -10,7 +8,6 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import timber.log.Timber
@@ -74,10 +71,7 @@ class AppInterface(
     @JavascriptInterface
     fun requestMicPermission() {
         host.postToUi {
-            val granted = ContextCompat.checkSelfPermission(
-                host.activityContext, Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-            if (granted) {
+            if (host.hasAudioPermission()) {
                 bridge.callOptional(JsEvent.MicPermissionResult, true)
             } else {
                 try {

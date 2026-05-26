@@ -57,6 +57,13 @@ interface BridgeHost {
     fun launchMicPermissionRequest()
 
     /**
+     * True if RECORD_AUDIO is currently granted. Wraps the static
+     * ContextCompat.checkSelfPermission call so AppInterface can be
+     * tested without spinning up Robolectric for a permission probe.
+     */
+    fun hasAudioPermission(): Boolean
+
+    /**
      * Capture the WebView as a JPEG data URI. Synchronous return preserves
      * the @JavascriptInterface contract; implementation runs the actual
      * PixelCopy + encode on the UI thread with a bounded timeout.
