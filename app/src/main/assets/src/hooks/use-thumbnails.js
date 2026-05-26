@@ -41,10 +41,11 @@
      on mount. Keys are content-signature strings produced by
      tabContentKey(tab) — survive tab-index shifts (close/reorder).
 
-   WINDOW: none — no window.__* handler bridges wired. The native capture
-     fast-path CALLS window.AndroidBridge.takeScreenshot() (a native
-     method, absent on desktop → html2canvas fallback); that is a call,
-     not a bridge this hook owns or must clean up.
+   WINDOW: none — no window.__* handler bridges wired. The screenshot
+     capture goes through PlatformBridge.takeScreenshot() (W1.2 Tier A:
+     bridge owns the platform branch — native PixelCopy on Android,
+     html2canvas on web). Pre-W1.2 the hook held the if(window.AndroidBridge)
+     guard + html2canvas fallback inline; both moved INTO the bridge.
 
    ┌─ HARD INVARIANT — captureActiveTabThumbnail identity stability ───────┐
    │ captureActiveTabThumbnail MUST be the direct return value of          │
@@ -55,6 +56,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { PlatformBridge } from '../utils/platform-bridge.js';
 
 /**
  * Per-tab thumbnail capture + IDB persistence + scroll-stop refresh.
@@ -122,7 +124,10 @@ export function useThumbnails({
 
   // ── Capture callback ───────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
-  const captureActiveTabThumbnail = React.useCallback(() => {
+  // W1.2 Tier A: was a sync if(window.AndroidBridge) branch + async
+  // html2canvas fallback; both folded INTO PlatformBridge.takeScreenshot
+  // per [[guard-removal-includes-fallback]]. Single async await path now.
+  const captureActiveTabThumbnail = React.useCallback(async () => {
     if (!tabsEnabled) return;
     if (tabsOverviewOpenRef.current) return; // overview open → no point capturing
     if (captureInFlightRef.current) return;
@@ -130,7 +135,9 @@ export function useThumbnails({
     if (!tab) return;
     const key = tabContentKey(tab);
 
-    // Measure nav height (in CSS px) so the native side can crop it
+    // Measure nav height (in CSS px) so the native side can crop it. Web
+    // ignores topCropDp (chrome hidden via the capturing-thumb body class
+    // + the bridge's SCREENSHOT_IGNORE_CLASSES selector list).
     const navEl = document.querySelector('.top-nav');
     const navHeightDp = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0;
 
@@ -145,60 +152,17 @@ export function useThumbnails({
     // of the capture so the thumbnail shows pure content only.
     document.body.classList.add('capturing-thumb');
     // Force a synchronous layout so the visibility:hidden takes effect
-    // before we hand control to the native bridge.
+    // before we hand control to the bridge.
     void document.body.offsetHeight;
 
-    // Native fast path — synchronous because WebView JS interfaces run on
-    // a worker thread; blocking here on the UI thread for ~50ms does not
-    // deadlock. Synchronous is important: callers (like goTabs) need the
-    // thumbnail captured BEFORE the overlay mounts and covers the screen.
-    if (window.AndroidBridge && typeof window.AndroidBridge.takeScreenshot === 'function') {
-      captureInFlightRef.current = true;
-      try {
-        const dataUrl = window.AndroidBridge.takeScreenshot(navHeightDp, 1440, 90);
-        applyThumb(dataUrl);
-      } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
-      captureInFlightRef.current = false;
-      document.body.classList.remove('capturing-thumb');
-      return;
-    }
-
-    // html2canvas fallback (dev browser / no bridge)
-    if (typeof html2canvas !== 'function') return;
     captureInFlightRef.current = true;
-    const bg = document.body.classList.contains('light') ? '#f7f2e8' : '#07070e';
     try {
-      html2canvas(document.body, {
-        backgroundColor: bg,
-        scale: Math.min(window.devicePixelRatio || 1, 2),
-        useCORS: true, logging: false, allowTaint: false, imageTimeout: 2000,
-        ignoreElements: (el) => el.classList && (
-          el.classList.contains('tabs-overview-layer') ||
-          el.classList.contains('top-nav') ||
-          el.classList.contains('back-hint-row') ||
-          el.classList.contains('chapter-nav-sticky') ||
-          el.classList.contains('reading-dot-global') ||
-          el.classList.contains('surprise-fab') ||
-          el.classList.contains('mode-toggle-wrap'))
-      }).then((canvas) => {
-        const MAX_DIM = 1440;
-        const w = canvas.width, h = canvas.height;
-        const scale = Math.min(MAX_DIM / w, MAX_DIM / h, 1);
-        let out = canvas;
-        if (scale < 1) {
-          const c2 = document.createElement('canvas');
-          c2.width = Math.round(w * scale); c2.height = Math.round(h * scale);
-          const ctx = c2.getContext('2d');
-          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(canvas, 0, 0, c2.width, c2.height);
-          out = c2;
-        }
-        applyThumb(out.toDataURL('image/jpeg', 0.90));
-      }).catch(() => {}).finally(() => {
-        captureInFlightRef.current = false;
-        document.body.classList.remove('capturing-thumb');
-      });
+      const dataUrl = await PlatformBridge.takeScreenshot(navHeightDp, 1440, 90);
+      applyThumb(dataUrl);
     } catch (_e) {
+      // Best-effort capture — failures are silent (thumbnails are visual
+      // sugar; missing one isn't an error worth surfacing to the user).
+    } finally {
       captureInFlightRef.current = false;
       document.body.classList.remove('capturing-thumb');
     }

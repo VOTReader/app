@@ -52,7 +52,7 @@
  * @property {() => number} nativeRecordAmplitude
  * @property {() => void} nativeRecordStop
  * @property {() => void} nativeRecordCancel
- * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => string} takeScreenshot
+ * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
  * @property {() => void} openFilePicker
  * @property {(filename: string, content: string) => string} saveToDownloads
  * @property {() => string} getCrashLog
@@ -85,7 +85,10 @@ const androidImpl = {
   nativeRecordAmplitude: () => /** @type {any} */ (window).AndroidBridge.nativeRecordAmplitude(),
   nativeRecordStop: () => /** @type {any} */ (window).AndroidBridge.nativeRecordStop(),
   nativeRecordCancel: () => /** @type {any} */ (window).AndroidBridge.nativeRecordCancel(),
-  takeScreenshot: (top, max, q) => /** @type {any} */ (window).AndroidBridge.takeScreenshot(top, max, q),
+  // Android takeScreenshot is sync (PixelCopy on a binder thread); wrap in
+  // Promise.resolve to give consumers a uniform Promise<string> shape on
+  // both platforms. Web returns html2canvas's genuine async Promise.
+  takeScreenshot: async (top, max, q) => /** @type {any} */ (window).AndroidBridge.takeScreenshot(top, max, q),
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToDownloads: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToDownloads(name, content),
   getCrashLog: () => /** @type {any} */ (window).AndroidBridge.getCrashLog(),
@@ -114,6 +117,70 @@ const notYetImplemented = (name) => () => {
   }
 };
 
+// Web screenshot — html2canvas integration (W1.2 Tier A). Folded in from
+// use-thumbnails.js's old fallback path per [[consolidate-dont-duplicate]] +
+// [[guard-removal-includes-fallback]]. Bridge owns the implementation;
+// consumers (use-thumbnails) become pure callers of PlatformBridge.takeScreenshot.
+//
+// IGNORE_CLASSES is coupled to the app's UI structure — if a new chrome
+// element is added that shouldn't appear in tab thumbnails, update this list.
+// Long-term cleanup (post-W1): drive chrome-hiding entirely via CSS tied to
+// the existing body.capturing-thumb class so the bridge doesn't need this knowledge.
+const SCREENSHOT_IGNORE_CLASSES = [
+  'tabs-overview-layer', 'top-nav', 'back-hint-row',
+  'chapter-nav-sticky', 'reading-dot-global', 'surprise-fab',
+  'mode-toggle-wrap',
+];
+
+/**
+ * Web screenshot impl using html2canvas (bundled in bundle-a). Returns
+ * a JPEG data URL string, or '' on failure / when html2canvas isn't loaded.
+ *
+ * @param {number} _topCropDp  - ignored on web (chrome hidden via classes)
+ * @param {number} maxDim      - max width/height in CSS px; downscale if exceeded
+ * @param {number} jpegQuality - 0-100 integer (matches Android contract);
+ *                                converted to 0.0-1.0 for canvas.toDataURL
+ * @returns {Promise<string>}
+ */
+async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality) {
+  // html2canvas ships in bundle-a (vendor); guard for unit-test env / cold boot
+  if (typeof /** @type {any} */ (globalThis).html2canvas !== 'function') return '';
+  const h2c = /** @type {any} */ (globalThis).html2canvas;
+  const isLight = (typeof document !== 'undefined') && document.body.classList.contains('light');
+  const bg = isLight ? '#f7f2e8' : '#07070e';
+  try {
+    const canvas = await h2c(document.body, {
+      backgroundColor: bg,
+      scale: Math.min(/** @type {any} */ (window).devicePixelRatio || 1, 2),
+      useCORS: true,
+      logging: false,
+      allowTaint: false,
+      imageTimeout: 2000,
+      ignoreElements: (/** @type {Element} */ el) =>
+        el.classList && SCREENSHOT_IGNORE_CLASSES.some((c) => el.classList.contains(c)),
+    });
+    const w = canvas.width;
+    const h = canvas.height;
+    const scale = Math.min(maxDim / w, maxDim / h, 1);
+    let out = canvas;
+    if (scale < 1) {
+      const c2 = document.createElement('canvas');
+      c2.width = Math.round(w * scale);
+      c2.height = Math.round(h * scale);
+      const ctx = c2.getContext('2d');
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        /** @type {any} */ (ctx).imageSmoothingQuality = 'high';
+        ctx.drawImage(canvas, 0, 0, c2.width, c2.height);
+      }
+      out = c2;
+    }
+    return out.toDataURL('image/jpeg', Math.max(0, Math.min(100, jpegQuality)) / 100);
+  } catch (_e) {
+    return '';
+  }
+}
+
 /** @type {PlatformBridgeShape} */
 const webImpl = {
   // Category 1 — genuine no-ops on web
@@ -125,7 +192,7 @@ const webImpl = {
   getZoomScale: () => 1.0,
   getCrashLog: () => '[]',
   nativeRecordAmplitude: () => 0,
-  takeScreenshot: () => '',                                // W1.x html2canvas
+  takeScreenshot: webTakeScreenshot,
   saveToDownloads: (_name, _content) => {                  // W1.3 — preserves return contract
     notYetImplemented('saveToDownloads')();
     return 'error:web-impl-pending';

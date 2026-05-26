@@ -2432,7 +2432,10 @@
       /** @type {any} */
       window.AndroidBridge.nativeRecordCancel()
     ),
-    takeScreenshot: (top, max, q) => (
+    // Android takeScreenshot is sync (PixelCopy on a binder thread); wrap in
+    // Promise.resolve to give consumers a uniform Promise<string> shape on
+    // both platforms. Web returns html2canvas's genuine async Promise.
+    takeScreenshot: async (top, max, q) => (
       /** @type {any} */
       window.AndroidBridge.takeScreenshot(top, max, q)
     ),
@@ -2455,6 +2458,59 @@
       console.warn(`${NYI_TAG} ${name}() web impl pending (W1.3-W1.5)`);
     }
   };
+  var SCREENSHOT_IGNORE_CLASSES = [
+    "tabs-overview-layer",
+    "top-nav",
+    "back-hint-row",
+    "chapter-nav-sticky",
+    "reading-dot-global",
+    "surprise-fab",
+    "mode-toggle-wrap"
+  ];
+  async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality) {
+    if (typeof /** @type {any} */
+    globalThis.html2canvas !== "function") return "";
+    const h2c = (
+      /** @type {any} */
+      globalThis.html2canvas
+    );
+    const isLight = typeof document !== "undefined" && document.body.classList.contains("light");
+    const bg = isLight ? "#f7f2e8" : "#07070e";
+    try {
+      const canvas = await h2c(document.body, {
+        backgroundColor: bg,
+        scale: Math.min(
+          /** @type {any} */
+          window.devicePixelRatio || 1,
+          2
+        ),
+        useCORS: true,
+        logging: false,
+        allowTaint: false,
+        imageTimeout: 2e3,
+        ignoreElements: (el) => el.classList && SCREENSHOT_IGNORE_CLASSES.some((c) => el.classList.contains(c))
+      });
+      const w = canvas.width;
+      const h = canvas.height;
+      const scale = Math.min(maxDim / w, maxDim / h, 1);
+      let out = canvas;
+      if (scale < 1) {
+        const c2 = document.createElement("canvas");
+        c2.width = Math.round(w * scale);
+        c2.height = Math.round(h * scale);
+        const ctx = c2.getContext("2d");
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(canvas, 0, 0, c2.width, c2.height);
+        }
+        out = c2;
+      }
+      return out.toDataURL("image/jpeg", Math.max(0, Math.min(100, jpegQuality)) / 100);
+    } catch (_e) {
+      return "";
+    }
+  }
   var webImpl = {
     // Category 1 — genuine no-ops on web
     setLightStatusBar: () => {
@@ -2469,8 +2525,7 @@
     getZoomScale: () => 1,
     getCrashLog: () => "[]",
     nativeRecordAmplitude: () => 0,
-    takeScreenshot: () => "",
-    // W1.x html2canvas
+    takeScreenshot: webTakeScreenshot,
     saveToDownloads: (_name, _content) => {
       notYetImplemented("saveToDownloads")();
       return "error:web-impl-pending";
@@ -2664,7 +2719,7 @@
     const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
     const captureInFlightRef = React.useRef(false);
     const thumbnailsRef = React.useRef({});
-    const captureActiveTabThumbnail = React.useCallback(() => {
+    const captureActiveTabThumbnail = React.useCallback(async () => {
       if (!tabsEnabled) return;
       if (tabsOverviewOpenRef.current) return;
       if (captureInFlightRef.current) return;
@@ -2681,51 +2736,12 @@
       };
       document.body.classList.add("capturing-thumb");
       void document.body.offsetHeight;
-      if (window.AndroidBridge && typeof window.AndroidBridge.takeScreenshot === "function") {
-        captureInFlightRef.current = true;
-        try {
-          const dataUrl = window.AndroidBridge.takeScreenshot(navHeightDp, 1440, 90);
-          applyThumb(dataUrl);
-        } catch (_e) {
-        }
-        captureInFlightRef.current = false;
-        document.body.classList.remove("capturing-thumb");
-        return;
-      }
-      if (typeof html2canvas !== "function") return;
       captureInFlightRef.current = true;
-      const bg = document.body.classList.contains("light") ? "#f7f2e8" : "#07070e";
       try {
-        html2canvas(document.body, {
-          backgroundColor: bg,
-          scale: Math.min(window.devicePixelRatio || 1, 2),
-          useCORS: true,
-          logging: false,
-          allowTaint: false,
-          imageTimeout: 2e3,
-          ignoreElements: (el) => el.classList && (el.classList.contains("tabs-overview-layer") || el.classList.contains("top-nav") || el.classList.contains("back-hint-row") || el.classList.contains("chapter-nav-sticky") || el.classList.contains("reading-dot-global") || el.classList.contains("surprise-fab") || el.classList.contains("mode-toggle-wrap"))
-        }).then((canvas) => {
-          const MAX_DIM = 1440;
-          const w = canvas.width, h = canvas.height;
-          const scale = Math.min(MAX_DIM / w, MAX_DIM / h, 1);
-          let out = canvas;
-          if (scale < 1) {
-            const c2 = document.createElement("canvas");
-            c2.width = Math.round(w * scale);
-            c2.height = Math.round(h * scale);
-            const ctx = c2.getContext("2d");
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
-            ctx.drawImage(canvas, 0, 0, c2.width, c2.height);
-            out = c2;
-          }
-          applyThumb(out.toDataURL("image/jpeg", 0.9));
-        }).catch(() => {
-        }).finally(() => {
-          captureInFlightRef.current = false;
-          document.body.classList.remove("capturing-thumb");
-        });
+        const dataUrl = await PlatformBridge.takeScreenshot(navHeightDp, 1440, 90);
+        applyThumb(dataUrl);
       } catch (_e) {
+      } finally {
         captureInFlightRef.current = false;
         document.body.classList.remove("capturing-thumb");
       }

@@ -101,4 +101,8 @@ quality-uplift-plan.txt
 
 # ─── More IDE-local state (sibling to existing .idea/* entries above) ──
 # appInsightsSettings.xml = current Android Vitals tab selection (UI state)
+# .idea/caches/ contains UI-churn state (deviceStreaming.xml grows whenever
+# the device manager UI is opened — Android Studio auto-appends entries).
+# Untracked starting W1.2 Tier A.
 .idea/appInsightsSettings.xml
+.idea/caches/
