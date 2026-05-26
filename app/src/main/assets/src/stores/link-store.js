@@ -114,7 +114,7 @@ export const LinkStore = extendStore(
         }
         return true;
       });
-      if (migrated) this._save();
+      if (migrated) this._save(); this._bump();
       return this._cache;
     },
 
@@ -159,6 +159,7 @@ export const LinkStore = extendStore(
     add(link) {
       this._load().push(link);
       this._save();
+      this._bump();
     },
 
     /**
@@ -169,6 +170,7 @@ export const LinkStore = extendStore(
     remove(linkId) {
       this._cache = this._load().filter(l => l.id !== linkId);
       this._save();
+      this._bump();
     }
   }
 );

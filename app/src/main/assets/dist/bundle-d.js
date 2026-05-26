@@ -1569,13 +1569,14 @@
   }
 
   // app/src/main/assets/src/ui/components/ChapterBookmarkBtn.jsx
-  function ChapterBookmarkBtn2({ chapterBookmark, hlTick }) {
-    const hlKey = chapterBookmark && chapterBookmark.hlKey;
-    const existing = React.useMemo(
-      () => hlKey && typeof BookmarkStore !== "undefined" ? BookmarkStore.getForKey(hlKey) : [],
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-      [hlKey, hlTick]
+  function ChapterBookmarkBtn2({ chapterBookmark }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof BookmarkStore !== "undefined" ? BookmarkStore.subscribe(cb) : () => {
+      }, []),
+      () => typeof BookmarkStore !== "undefined" ? BookmarkStore.getVersion() : 0
     );
+    const hlKey = chapterBookmark && chapterBookmark.hlKey;
+    const existing = hlKey && typeof BookmarkStore !== "undefined" ? BookmarkStore.getForKey(hlKey) : [];
     if (!hlKey || typeof BookmarkStore === "undefined") return null;
     const isBookmarked = existing.length > 0;
     const onClick = (e) => {
@@ -2030,12 +2031,12 @@
   }
 
   // app/src/main/assets/src/ui/components/BookmarkIcon.jsx
-  function BookmarkIcon2({ hlKey, hlTick }) {
-    const bookmarks = React.useMemo(
-      () => BookmarkStore.getForKeyPrefix(hlKey),
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-      [hlKey, hlTick]
+  function BookmarkIcon2({ hlKey }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => BookmarkStore.subscribe(cb), []),
+      () => BookmarkStore.getVersion()
     );
+    const bookmarks = BookmarkStore.getForKeyPrefix(hlKey);
     if (!bookmarks || bookmarks.length === 0) return null;
     const ids = bookmarks.map((b) => b.id);
     const open = (e) => {
@@ -4050,12 +4051,35 @@
   }
 
   // app/src/main/assets/src/ui/screens/LibraryScreen.jsx
-  function LibraryScreen2({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, hlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
-    const noteCount = React.useMemo(() => NoteStore.count(), [hlTick]);
-    const linkCount = React.useMemo(() => LinkStore.all().length, [hlTick]);
-    const bookmarkCount = React.useMemo(() => typeof BookmarkStore !== "undefined" ? BookmarkStore.count() : 0, [hlTick]);
-    const journalCount = React.useMemo(() => typeof JournalStore !== "undefined" ? JournalStore.count() : 0, [hlTick]);
-    const highlightCount = React.useMemo(() => {
+  function LibraryScreen2({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NoteStore.subscribe(cb), []),
+      () => NoteStore.getVersion()
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => LinkStore.subscribe(cb), []),
+      () => LinkStore.getVersion()
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof BookmarkStore !== "undefined" ? BookmarkStore.subscribe(cb) : () => {
+      }, []),
+      () => typeof BookmarkStore !== "undefined" ? BookmarkStore.getVersion() : 0
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof JournalStore !== "undefined" ? JournalStore.subscribe(cb) : () => {
+      }, []),
+      () => typeof JournalStore !== "undefined" ? JournalStore.getVersion() : 0
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof AnnotationStore !== "undefined" ? AnnotationStore.subscribe(cb) : () => {
+      }, []),
+      () => typeof AnnotationStore !== "undefined" ? AnnotationStore.getVersion() : 0
+    );
+    const noteCount = NoteStore.count();
+    const linkCount = LinkStore.all().length;
+    const bookmarkCount = typeof BookmarkStore !== "undefined" ? BookmarkStore.count() : 0;
+    const journalCount = typeof JournalStore !== "undefined" ? JournalStore.count() : 0;
+    const highlightCount = (() => {
       if (typeof AnnotationStore === "undefined") return 0;
       const data = AnnotationStore.all() || {};
       const seen = {};
@@ -4063,7 +4087,7 @@
         if (a.kind === "highlight" || a.kind === "underline") seen[a.groupId || a.id] = 1;
       }));
       return Object.keys(seen).length;
-    }, [hlTick]);
+    })();
     const noteDetail = noteCount === 0 ? "No notes yet" : noteCount + (noteCount === 1 ? " note" : " notes");
     const linkDetail = linkCount === 0 ? "No links yet" : linkCount + (linkCount === 1 ? " link" : " links");
     const tiles = [
@@ -6836,12 +6860,19 @@
   function BookmarksScreen2(props) {
     var onBack = props.onBack;
     var onNavigateToSource = props.onNavigateToSource;
-    var hlTick = props.hlTick;
     var setHlTick = props.setHlTick;
     var theme = props.theme;
     var onThemeChange = props.onThemeChange;
     var onSearch = props.onSearch;
     var onHistory = props.onHistory;
+    React.useSyncExternalStore(
+      React.useCallback(function(cb) {
+        return BookmarkStore.subscribe(cb);
+      }, []),
+      function() {
+        return BookmarkStore.getVersion();
+      }
+    );
     var useState2 = React.useState;
     var useMemo = React.useMemo;
     var _sq = useState2("");
@@ -6856,9 +6887,7 @@
     var _ei = useState2(null);
     var editingId = _ei[0];
     var setEditingId = _ei[1];
-    var allBookmarks = useMemo(function() {
-      return BookmarkStore.all().slice();
-    }, [hlTick]);
+    var allBookmarks = BookmarkStore.all().slice();
     var displayBookmarks = useMemo(function() {
       var q = searchQuery.trim().toLowerCase();
       var filtered = q ? allBookmarks.filter(function(bkm) {

@@ -978,6 +978,7 @@
           return true;
         });
         if (migrated) this._save();
+        this._bump();
         return this._cache;
       },
       /**
@@ -1019,6 +1020,7 @@
       add(link) {
         this._load().push(link);
         this._save();
+        this._bump();
       },
       /**
        * Delete a link by id. Idempotent.
@@ -1028,6 +1030,7 @@
       remove(linkId) {
         this._cache = this._load().filter((l) => l.id !== linkId);
         this._save();
+        this._bump();
       }
     }
   );
@@ -1116,6 +1119,7 @@
         if (!bookmark.updated) bookmark.updated = ts;
         this._load().push(bookmark);
         this._save();
+        this._bump();
       },
       /**
        * Patch an existing bookmark — typically used to update label/thought.
@@ -1132,6 +1136,7 @@
         if (idx < 0) return;
         data[idx] = Object.assign({}, data[idx], patch, { updated: Date.now() });
         this._save();
+        this._bump();
       },
       /**
        * Delete a bookmark by id. Idempotent.
@@ -1143,6 +1148,7 @@
           return b.id !== id;
         });
         this._save();
+        this._bump();
       }
     }
   );
@@ -1880,6 +1886,7 @@
         if (!data.list) data.list = [];
         data.list.push(entry);
         this._save();
+        this._bump();
         this._reindex(entry);
         return entry;
       },
@@ -1902,6 +1909,7 @@
         if (idx < 0) return null;
         list[idx] = Object.assign({}, list[idx], patch, { updated: Date.now() });
         this._save();
+        this._bump();
         if (patch.blocks) this._reindex(list[idx]);
         return list[idx];
       },
@@ -2058,6 +2066,7 @@
           return e.id !== id;
         });
         this._save();
+        this._bump();
         if (typeof JournalIndexStore !== "undefined") JournalIndexStore.removeEntry(id);
         if (typeof JournalStatsStore !== "undefined") JournalStatsStore.recordDeletion();
       },
@@ -2119,6 +2128,7 @@
           }
         }
         if (changed) this._save();
+        this._bump();
       },
       /**
        * Case-insensitive substring search across entry title, block text,
@@ -2207,6 +2217,7 @@
       clear() {
         this._cache = { list: [] };
         this._save();
+        this._bump();
         if (typeof JournalIndexStore !== "undefined") JournalIndexStore.clear();
       }
     }
@@ -2255,6 +2266,7 @@
         var nb = { id, name: trimmed, sortIndex: data.list.length, created: ts, updated: ts };
         data.list.push(nb);
         this._save();
+        this._bump();
         return nb;
       },
       /**
@@ -2274,6 +2286,7 @@
           nb.name = trimmed;
           nb.updated = Date.now();
           this._save();
+          this._bump();
         }
       },
       /**
@@ -2288,6 +2301,7 @@
           return n.id !== id;
         });
         this._save();
+        this._bump();
         if (typeof JournalStore2 !== "undefined") JournalStore2.pruneNotebook(id);
       }
     }

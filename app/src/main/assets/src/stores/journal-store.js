@@ -182,6 +182,7 @@ export var JournalStore = extendStore(
       if (!data.list) data.list = [];
       data.list.push(entry);
       this._save();
+      this._bump();
       this._reindex(entry);
       return entry;
     },
@@ -203,6 +204,7 @@ export var JournalStore = extendStore(
       if (idx < 0) return null;
       list[idx] = Object.assign({}, list[idx], patch, { updated: Date.now() });
       this._save();
+      this._bump();
       if (patch.blocks) this._reindex(list[idx]);
       return list[idx];
     },
@@ -346,6 +348,7 @@ export var JournalStore = extendStore(
       var data = this._load();
       data.list = (data.list || []).filter(function(e) { return e.id !== id; });
       this._save();
+      this._bump();
       if (typeof JournalIndexStore !== 'undefined') JournalIndexStore.removeEntry(id);
       if (typeof JournalStatsStore !== 'undefined') JournalStatsStore.recordDeletion();
     },
@@ -402,7 +405,7 @@ export var JournalStore = extendStore(
         e.notebookIds = e.notebookIds.filter(function(n) { return n !== notebookId; });
         if (e.notebookIds.length !== before) { e.updated = Date.now(); changed = true; }
       }
-      if (changed) this._save();
+      if (changed) this._save(); this._bump();
     },
 
     /**
@@ -495,6 +498,7 @@ export var JournalStore = extendStore(
     clear() {
       this._cache = { list: [] };
       this._save();
+      this._bump();
       if (typeof JournalIndexStore !== 'undefined') JournalIndexStore.clear();
     }
   }
@@ -540,6 +544,7 @@ export var JournalNotebookStore = extendStore(
       var nb = { id: id, name: trimmed, sortIndex: data.list.length, created: ts, updated: ts };
       data.list.push(nb);
       this._save();
+      this._bump();
       return nb;
     },
 
@@ -554,7 +559,7 @@ export var JournalNotebookStore = extendStore(
       if (!trimmed) return;
       var data = this._load();
       var nb = (data.list || []).find(function(n) { return n.id === id; });
-      if (nb) { nb.name = trimmed; nb.updated = Date.now(); this._save(); }
+      if (nb) { nb.name = trimmed; nb.updated = Date.now(); this._save(); this._bump(); }
     },
 
     /**
@@ -567,6 +572,7 @@ export var JournalNotebookStore = extendStore(
       var data = this._load();
       data.list = (data.list || []).filter(function(n) { return n.id !== id; });
       this._save();
+      this._bump();
       if (typeof JournalStore !== 'undefined') JournalStore.pruneNotebook(id);
     }
   }

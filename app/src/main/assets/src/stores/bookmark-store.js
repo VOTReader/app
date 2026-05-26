@@ -118,6 +118,7 @@ export const BookmarkStore = extendStore(
       if (!bookmark.updated) bookmark.updated = ts;
       this._load().push(bookmark);
       this._save();
+      this._bump();
     },
 
     /**
@@ -133,6 +134,7 @@ export const BookmarkStore = extendStore(
       if (idx < 0) return;
       data[idx] = Object.assign({}, data[idx], patch, { updated: Date.now() });
       this._save();
+      this._bump();
     },
 
     /**
@@ -143,6 +145,7 @@ export const BookmarkStore = extendStore(
     remove(id) {
       this._cache = this._load().filter(function(b) { return b.id !== id; });
       this._save();
+      this._bump();
     }
   }
 );

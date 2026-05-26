@@ -2,12 +2,15 @@
    BookmarkIcon — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function BookmarkIcon({ hlKey, hlTick }) {
-  const bookmarks = React.useMemo(
-    () => BookmarkStore.getForKeyPrefix(hlKey),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-    [hlKey, hlTick]
+export function BookmarkIcon({ hlKey }) {
+  // Subscribe to BookmarkStore mutations — re-renders this component
+  // whenever a bookmark is added / removed / updated. Replaces the
+  // legacy hlTick cache-bust prop.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => BookmarkStore.subscribe(cb), []),
+    () => BookmarkStore.getVersion()
   );
+  const bookmarks = BookmarkStore.getForKeyPrefix(hlKey);
   if (!bookmarks || bookmarks.length === 0) return null;
 
   const ids = bookmarks.map((b) => b.id);

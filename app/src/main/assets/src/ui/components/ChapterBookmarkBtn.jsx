@@ -2,17 +2,19 @@
    ChapterBookmarkBtn — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterBookmarkBtn({ chapterBookmark, hlTick }) {
-  // Hook must run on every render (rules-of-hooks) — guard moved INSIDE the
-  // memo so we always call useMemo regardless of whether we'll render anything.
-  const hlKey = chapterBookmark && chapterBookmark.hlKey;
-  const existing = React.useMemo(
-    () => (hlKey && typeof BookmarkStore !== 'undefined')
-      ? BookmarkStore.getForKey(hlKey)
-      : [],
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-    [hlKey, hlTick]
+export function ChapterBookmarkBtn({ chapterBookmark }) {
+  // Subscribe to BookmarkStore mutations. Guard with typeof check —
+  // BookmarkStore is a cross-bundle global that may not be defined yet
+  // in some bundle init orderings (defensive carryover from the legacy
+  // pattern; the subscription is a no-op if Store is undefined).
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, []),
+    () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
   );
+  const hlKey = chapterBookmark && chapterBookmark.hlKey;
+  const existing = (hlKey && typeof BookmarkStore !== 'undefined')
+    ? BookmarkStore.getForKey(hlKey)
+    : [];
   if (!hlKey || typeof BookmarkStore === 'undefined') return null;
   const isBookmarked = existing.length > 0;
 

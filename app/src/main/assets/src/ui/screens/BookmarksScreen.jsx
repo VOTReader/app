@@ -383,12 +383,17 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
 export function BookmarksScreen(props) {
   var onBack = props.onBack;
   var onNavigateToSource = props.onNavigateToSource;
-  var hlTick = props.hlTick;
   var setHlTick = props.setHlTick;
   var theme = props.theme;
   var onThemeChange = props.onThemeChange;
   var onSearch = props.onSearch;
   var onHistory = props.onHistory;
+
+  // Subscribe to BookmarkStore — re-renders when any bookmark mutates.
+  React.useSyncExternalStore(
+    React.useCallback(function(cb) { return BookmarkStore.subscribe(cb); }, []),
+    function() { return BookmarkStore.getVersion(); }
+  );
   // (onHome, historyEnabled props are accepted by the component's API but
   //  this screen doesn't use them — removed local var bindings.)
 
@@ -414,10 +419,7 @@ export function BookmarksScreen(props) {
   var editingId = _ei[0];
   var setEditingId = _ei[1];
 
-  var allBookmarks = useMemo(function() {
-    return BookmarkStore.all().slice();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  }, [hlTick]);
+  var allBookmarks = BookmarkStore.all().slice();
 
   var displayBookmarks = useMemo(function() {
     var q = searchQuery.trim().toLowerCase();
