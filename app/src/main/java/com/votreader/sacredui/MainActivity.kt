@@ -13,7 +13,6 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Base64
-import android.util.Log
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
@@ -47,6 +46,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.max
+import timber.log.Timber
 
 class MainActivity : AppCompatActivity() {
 
@@ -129,7 +129,7 @@ class MainActivity : AppCompatActivity() {
                         webView.evaluateJavascript("window.__onImportFile && window.__onImportFile('$b64')", null)
                     }
                 } catch (e: Exception) {
-                    Log.w("VOTReader", "import file read failed", e)
+                    Timber.w(e, "Import file read failed")
                     webView.post {
                         webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
                     }
@@ -172,13 +172,13 @@ class MainActivity : AppCompatActivity() {
                     webView.postDelayed({
                         runOnUiThread {
                             try { req.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) }
-                            catch (e: Exception) { Log.w("VOTReader", "PermissionRequest resolution failed", e) }
+                            catch (e: Exception) { Timber.w(e, "PermissionRequest grant failed") }
                         }
                     }, 250L)
                 } else {
                     runOnUiThread {
                         try { req.deny() }
-                        catch (e: Exception) { Log.w("VOTReader", "PermissionRequest resolution failed", e) }
+                        catch (e: Exception) { Timber.w(e, "PermissionRequest deny failed") }
                     }
                 }
             }
@@ -256,13 +256,13 @@ class MainActivity : AppCompatActivity() {
             override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
                 val src = msg.sourceId() ?: ""
                 val line = msg.lineNumber()
-                val level = when (msg.messageLevel()) {
-                    ConsoleMessage.MessageLevel.ERROR -> Log.ERROR
-                    ConsoleMessage.MessageLevel.WARNING -> Log.WARN
-                    ConsoleMessage.MessageLevel.DEBUG -> Log.DEBUG
-                    else -> Log.INFO
+                val text = msg.message()
+                when (msg.messageLevel()) {
+                    ConsoleMessage.MessageLevel.ERROR -> Timber.tag("WebViewJS").e("%s  (%s:%d)", text, src, line)
+                    ConsoleMessage.MessageLevel.WARNING -> Timber.tag("WebViewJS").w("%s  (%s:%d)", text, src, line)
+                    ConsoleMessage.MessageLevel.DEBUG -> Timber.tag("WebViewJS").d("%s  (%s:%d)", text, src, line)
+                    else -> Timber.tag("WebViewJS").i("%s  (%s:%d)", text, src, line)
                 }
-                Log.println(level, "WebViewJS", "${msg.message()}  ($src:$line)")
                 return true
             }
 
@@ -293,7 +293,7 @@ class MainActivity : AppCompatActivity() {
                     webFileChooserLauncher.launch(accept)
                     true
                 } catch (e: Exception) {
-                    Log.w("VOTReader", "onShowFileChooser launch failed", e)
+                    Timber.w(e, "onShowFileChooser launch failed")
                     fileChooserCallback = null
                     filePathCallback.onReceiveValue(null)
                     false
@@ -325,7 +325,7 @@ class MainActivity : AppCompatActivity() {
                     webView.postDelayed({
                         runOnUiThread {
                             try { request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) }
-                            catch (e: Exception) { Log.w("VOTReader", "Mic grant failed", e) }
+                            catch (e: Exception) { Timber.w(e, "Mic grant failed") }
                         }
                     }, 250L)
                 } else {
@@ -335,7 +335,7 @@ class MainActivity : AppCompatActivity() {
                     runOnUiThread {
                         try { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
                         catch (e: Exception) {
-                            Log.w("VOTReader", "RECORD_AUDIO launch failed", e)
+                            Timber.w(e, "RECORD_AUDIO launch failed")
                             pendingMicPermission = null
                             try { request.deny() } catch (_: Exception) {}
                         }
@@ -366,13 +366,13 @@ class MainActivity : AppCompatActivity() {
                 // arbitrary scheme and launch unwanted apps.
                 val scheme = url.scheme?.lowercase(Locale.US)
                 if (scheme == null || scheme !in ALLOWED_EXTERNAL_SCHEMES) {
-                    Log.w("VOTReader", "Refused external URL with disallowed scheme: $urlStr")
+                    Timber.w("Refused external URL with disallowed scheme: %s", urlStr)
                     return true
                 }
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, urlStr.toUri()))
                 } catch (e: Exception) {
-                    Log.w("VOTReader", "ACTION_VIEW failed for $urlStr", e)
+                    Timber.w(e, "ACTION_VIEW failed for %s", urlStr)
                 }
                 return true
             }
@@ -565,7 +565,7 @@ class MainActivity : AppCompatActivity() {
                     try {
                         micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     } catch (e: Exception) {
-                        Log.w("VOTReader", "requestMicPermission launch failed", e)
+                        Timber.w(e, "requestMicPermission launch failed")
                         webView.post {
                             webView.evaluateJavascript(
                                 "window.__onMicPermissionResult && window.__onMicPermissionResult(false)", null
@@ -588,7 +588,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     am.mode = AudioManager.MODE_IN_COMMUNICATION
                 } catch (e: Exception) {
-                    Log.w("VOTReader", "startAudioSession setMode failed", e)
+                    Timber.w(e, "startAudioSession setMode failed")
                 }
             }
         }
@@ -603,7 +603,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     am.mode = previousAudioMode
                 } catch (e: Exception) {
-                    Log.w("VOTReader", "endAudioSession restoreMode failed", e)
+                    Timber.w(e, "endAudioSession restoreMode failed")
                 }
             }
         }
@@ -651,7 +651,7 @@ class MainActivity : AppCompatActivity() {
                     nativeRecordPauseStartMs = 0L
                     "ok"
                 } catch (e: Exception) {
-                    Log.w("VOTReader", "nativeRecordStart failed", e)
+                    Timber.w(e, "nativeRecordStart failed")
                     try { nativeRecorder?.release() } catch (_: Exception) {}
                     nativeRecorder = null
                     nativeRecordFile?.let { try { it.delete() } catch (_: Exception) {} }
@@ -717,7 +717,7 @@ class MainActivity : AppCompatActivity() {
                     mr.stop()
                 } catch (e: Exception) {
                     // stop() throws if stopped too fast (no valid frames written).
-                    Log.w("VOTReader", "nativeRecordStop stop() failed", e)
+                    Timber.w(e, "nativeRecordStop stop() failed")
                     try { mr.release() } catch (_: Exception) {}
                     try { f.delete() } catch (_: Exception) {}
                     nativeRecordFile = null
@@ -732,7 +732,7 @@ class MainActivity : AppCompatActivity() {
                     nativeRecordFile = null
                     postNativeComplete(b64, if (durMs < 0L) 0L else durMs)
                 } catch (e: Exception) {
-                    Log.w("VOTReader", "nativeRecordStop read failed", e)
+                    Timber.w(e, "nativeRecordStop read failed")
                     try { f.delete() } catch (_: Exception) {}
                     nativeRecordFile = null
                     postNativeComplete(null, 0L)
@@ -856,7 +856,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 "ok"
             } catch (e: Exception) {
-                Log.w("VOTReader", "saveToDownloads failed", e)
+                Timber.w(e, "saveToDownloads failed")
                 "error:${e.message}"
             }
         }
