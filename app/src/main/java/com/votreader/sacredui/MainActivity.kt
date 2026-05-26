@@ -669,20 +669,28 @@ class MainActivity : AppCompatActivity() {
      * Wrap PixelCopy.request in a suspend function. The continuation
      * resumes with `true` on PixelCopy.SUCCESS, `false` otherwise.
      *
-     * invokeOnCancellation recycles [dest] if the coroutine is cancelled
-     * before PixelCopy completes (e.g. withTimeoutOrNull fires) -- without
-     * it, an interrupted capture leaks width * height * 4 bytes.
+     * Cancellation handling: PixelCopy's contract requires [dest] to
+     * stay alive until the callback fires ("must not be modified or
+     * recycled until the callback is invoked"). So invokeOnCancellation
+     * does NOT recycle eagerly -- it flags the cancellation, and the
+     * PixelCopy callback handles the recycle once the native side is
+     * done with the bitmap. Either way an interrupted capture cleans
+     * up; we just defer the cleanup to a safe moment.
      */
     private suspend fun capturePixelCopy(srcRect: Rect, dest: Bitmap): Boolean =
         suspendCancellableCoroutine { cont ->
-            cont.invokeOnCancellation {
-                try { dest.recycle() } catch (_: Exception) {}
-            }
+            val cancelled = java.util.concurrent.atomic.AtomicBoolean(false)
+            cont.invokeOnCancellation { cancelled.set(true) }
             try {
                 PixelCopy.request(
                     window, srcRect, dest,
                     { pixelResult ->
-                        if (!cont.isActive) return@request
+                        if (cancelled.get() || !cont.isActive) {
+                            // Cancelled (timeout / parent cancellation) --
+                            // safe to recycle now that PixelCopy is done.
+                            try { dest.recycle() } catch (_: Exception) {}
+                            return@request
+                        }
                         if (pixelResult != PixelCopy.SUCCESS) {
                             Timber.w("PixelCopy failed with code %d", pixelResult)
                         }
@@ -691,6 +699,10 @@ class MainActivity : AppCompatActivity() {
                     Handler(Looper.getMainLooper())
                 )
             } catch (e: IllegalArgumentException) {
+                // PixelCopy.request itself rejected the args (rare --
+                // typically srcRect outside window bounds). The callback
+                // will not fire, so we recycle here ourselves.
+                try { dest.recycle() } catch (_: Exception) {}
                 if (cont.isActive) cont.resume(false)
             }
         }
