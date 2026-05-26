@@ -4,6 +4,254 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## N1 — Native-side polish (CLOSED 2026-05-25)
+
+10 commits bring `MainActivity.kt` to the same quality bar as the JS
+side. Same one-commit-per-item discipline that drove Q3-Q8; same
+build-and-verify-after-each gate (Kotlin-only commits run
+`:app:compileDebugKotlin` + `:app:compileReleaseKotlin` +
+`:app:assembleDebug` rather than the JS-side pre-commit hook, which
+doesn't fire on `.kt` files).
+
+### Sequencing
+
+The plan sequenced low-risk to high-risk so cheap commits would shake
+out the gate-mechanics before the architectural items rode on the
+infrastructure:
+
+1. N1.1 setWebContentsDebuggingEnabled (trivial — DevTools attach in
+   debug builds)
+2. N1.2 Timber (trivial — mechanical Log.w → Timber.w)
+3. N1.3 onRenderProcessGone (low — extracts the WebView factory N1.10
+   would otherwise need to invent later)
+4. N1.4 Memory-safe file reading (low — size cap before readBytes)
+5. N1.5 JsBridge (medium — every evaluateJavascript site funnels here)
+6. N1.6 PixelCopy (medium — replaces webView.draw(Canvas))
+7. N1.7 Coroutines on screenshot (medium — rides on N1.6 and N1.5
+   plumbing)
+8. N1.8 WindowInsetsAnimationCompat (medium — per-frame IME tracking,
+   with a documented exception to N1.5)
+9. N1.9 ViewModel (medium-high — moves state into the AndroidViewModel)
+10. N1.10a/b extractions (high — NativeAudioRecorder + StorageManager
+    as focused classes)
+
+### New deps (gradle/libs.versions.toml)
+
+```toml
+timber = "5.0.1"                # Jake Wharton, universally adopted
+coroutines = "1.10.2"            # kotlinx-coroutines-android
+lifecycleRuntime = "2.9.1"       # androidx.lifecycle:lifecycle-runtime-ktx
+lifecycleViewModel = "2.9.1"     # androidx.lifecycle:lifecycle-viewmodel-ktx
+```
+
+Zero third-party risk beyond Timber. Two separate version refs for
+lifecycle — they happen to match today; they can drift independently
+in future bumps if needed.
+
+### New files (under app/src/main/java/com/votreader/sacredui)
+
+- **`VOTReaderApp.kt`** (19 lines) — Application subclass that plants
+  `Timber.DebugTree()` in debug builds. Release builds plant nothing,
+  so logging compiles to no-ops. Registered in AndroidManifest via
+  `android:name=".VOTReaderApp"`.
+- **`JsBridge.kt`** (104 lines) — Wraps every evaluateJavascript call.
+  `callOptional(fn, vararg args)` for the optional-window-function
+  pattern; `callWithResult(js, callback)` for synchronous-return JS;
+  `setCssProperties(vararg pairs)` for the inset CSS update. The
+  constructor takes a `webViewProvider: () -> WebView` so N1.3's
+  WebView recovery automatically picks up — no re-instantiation. Args
+  flow through `escapeArg` (handles `\`, `'`, `\n`, `\r`, U+2028,
+  U+2029).
+- **`MainViewModel.kt`** (67 lines) — `AndroidViewModel` holding
+  config-change-surviving state. Insets, scale, splash hold,
+  keep-screen-on, previous audio mode, render-recovery counters, plus
+  the `NativeAudioRecorder` + `StorageManager` instances. `onCleared`
+  delegates to `audioRecorder.release()` for the mid-recording
+  app-exit case.
+- **`NativeAudioRecorder.kt`** (192 lines) — Owns the MediaRecorder
+  lifecycle. Six public ops (start/pause/resume/amplitude/stop/cancel)
+  plus release. Returns a sealed `Result<T>` (Success(value) /
+  Failure(reason)) matching the JS-side "ok" / "error:<reason>"
+  contract. The `@JavascriptInterface` recording methods become 4-line
+  delegates.
+- **`StorageManager.kt`** (116 lines) — File I/O surface area.
+  `readUriAsBase64(uri, maxBytes)` (size check + read + base64),
+  `writeJsonToDownloads(filename, content)` (Q+ MediaStore path),
+  `queryFileSize(uri)` (the OpenableColumns.SIZE probe).
+  `MAX_IMPORT_SIZE = 50 MB` lives on the companion. Own sealed Result.
+
+### Line-count accounting
+
+| File | Pre-N1 | Post-N1 | Δ |
+|---|---|---|---|
+| MainActivity.kt | 869 | 937 | +68 |
+| VOTReaderApp.kt | — | 19 | +19 |
+| JsBridge.kt | — | 104 | +104 |
+| MainViewModel.kt | — | 67 | +67 |
+| NativeAudioRecorder.kt | — | 192 | +192 |
+| StorageManager.kt | — | 116 | +116 |
+| **Total** | **869** | **1,435** | **+566** |
+
+MainActivity grew on net (+68) despite extracting recorder + storage
+because N1 also added: Timber wiring, the createConfiguredWebView
+factory, onRenderProcessGone + retry view, the JsBridge field +
+delegates, the import size-rejection branch, the
+WindowInsetsAnimationCompat callback, the suspend screenshot helpers,
+and the ViewModel delegation. The growth is mostly the new
+functionality, not the extraction overhead.
+
+### Commit chain
+
+- **N1.1 (`f61bb43`)** — Enable WebContents debugging in debug builds.
+  Added `buildFeatures { buildConfig = true }` to app/build.gradle.kts
+  (required under AGP 9.x — automatic BuildConfig generation was
+  disabled in 8.0+). `WebView.setWebContentsDebuggingEnabled(true)`
+  in onCreate gated by `BuildConfig.DEBUG`. Verified generated
+  `BuildConfig.java` for both variants — DEBUG=true on debug,
+  DEBUG=false on release.
+
+- **N1.2 (`c791381`)** — Timber.  Add the dep (libs.versions.toml +
+  build.gradle.kts). Create VOTReaderApp Application subclass; plant
+  DebugTree in debug. Register in AndroidManifest. Mechanical
+  replacement of all 14 `Log.w("VOTReader", …)` calls to
+  `Timber.w(e, "…")`. The WebChromeClient `Log.println(level, …)`
+  dispatcher fans out to per-level Timber methods. The two duplicate
+  "PermissionRequest resolution failed" messages diverge into
+  "grant failed" / "deny failed" so logcat shows which path failed.
+  `import android.util.Log` removed entirely.
+
+- **N1.3 (`1c3ddaf`)** — Renderer crash recovery. Extract the inline
+  WebView setup (~200 lines: settings + assetLoader + JS interface +
+  chrome client + web client + inset listener) into a private
+  `createConfiguredWebView(): WebView` factory. onCreate becomes:
+  ```kotlin
+  webView = createConfiguredWebView()
+  setContentView(webView)
+  if (savedInstanceState != null) webView.restoreState(savedInstanceState)
+  else { webView.clearCache(true); webView.loadUrl(...) }
+  ```
+  `onRenderProcessGone` override inside the WebViewClientCompat
+  resolves any in-flight permission / file-chooser callback (same as
+  onDestroy), removes the dying view from its parent, destroys it,
+  and either rebuilds via the factory + reloads index.html OR shows
+  a tap-to-reload TextView if the 60-second window has accumulated
+  >2 crashes. Two new fields: `renderRecoveryCount`, `firstRecoveryMs`.
+
+- **N1.4 (`4ab52e9`)** — Defensive file reading. Add MAX_IMPORT_SIZE
+  = 50 MB constant + private `querySize(uri)` helper that reads
+  OpenableColumns.SIZE. filePickerLauncher checks size before
+  readBytes; rejects > limit OR unknown size. JS gets the same
+  `__onImportFile(null)` callback the existing cancel/error paths use.
+
+- **N1.5 (`78a5048`)** — Type-safe JS bridge. New `JsBridge` class
+  (described above). Migrated 8 raw evaluateJavascript sites + 3
+  surrounding `webView.post {}` wrappers to bridge calls:
+  - filePickerLauncher's 4 paths
+  - micPrepLauncher's 2 paths
+  - onBackPressed (callWithResult)
+  - injectInsets (setCssProperties)
+  - postNativeComplete
+  - requestMicPermission's 2 paths
+  Zero raw evaluateJavascript calls remain in MainActivity. (N1.8
+  later adds one intentional 60-Hz exception with an inline justify.)
+
+- **N1.6 (`9a7f5e2`)** — PixelCopy screenshots. Replace
+  `webView.draw(Canvas(full))` in `takeScreenshot` with
+  `PixelCopy.request(window, srcRect, full, callback, mainHandler)`.
+  The PixelCopy callback fires on the main thread but the
+  `@JavascriptInterface` is on a binder thread, so the runOnUiThread
+  block kicks off PixelCopy and RETURNS — the callback then does the
+  crop/scale/encode + counts down the outer latch. No deadlock; the
+  main thread is free between the kick-off and the callback. JS API
+  stays synchronous (returns base64 string). `import android.graphics.Canvas`
+  removed.
+
+- **N1.7 (`f7e6ae0`)** — Coroutines on screenshot. Replace the
+  CountDownLatch + Handler ceremony with `suspendCancellableCoroutine`
+  wrapping PixelCopy.request. Two new private suspend functions:
+  `captureScreenshotSuspend` (the full pipeline, runs on Main) and
+  `capturePixelCopy` (just the PixelCopy.request wrapper). The
+  `@JavascriptInterface` does `runBlocking { withTimeoutOrNull(2000L)
+  { captureScreenshotSuspend(…) } ?: "" }` to preserve the 2-s cap
+  and the synchronous return. `invokeOnCancellation` recycles the
+  bitmap if the coroutine is cancelled before PixelCopy fires (avoids
+  width*height*4 byte leak on timeout). Imports of CountDownLatch +
+  TimeUnit removed.
+
+- **N1.8 (`54ca4b6`)** — Per-frame IME tracking. Add
+  `WindowInsetsAnimationCompat.Callback` to the WebView in
+  createConfiguredWebView. `onProgress` (fires ~60 Hz with
+  interpolated insets) writes `--inset-top` / `--inset-bottom`
+  directly into the document — inline evaluateJavascript that
+  intentionally bypasses JsBridge (60-Hz loop, only %.2f-formatted
+  numbers interpolated, justified inline). `onEnd` calls
+  `requestApplyInsets` so the resting state routes through the
+  normal listener (which updates savedTopInset / savedBottomInset).
+  The existing inset listener stays in place — it fires for
+  non-animated changes; the animation callback covers smoothness
+  during the slide.
+
+- **N1.9 (`8bd7e0e`)** — `MainViewModel : ViewModel()` (initially a
+  plain ViewModel; N1.10a upgraded to AndroidViewModel for the
+  recorder's Context need). 13 state fields move from MainActivity
+  to vm.X. Bulk substitution across the file. Verified no `vm.vm.`
+  double-prefix artifacts. `onDestroy` drops the recorder cleanup
+  block — moves to `MainViewModel.onCleared` which fires when the
+  Activity is finishing (not on config change). Manifest's existing
+  `configChanges` covers rotation/uiMode/screenSize, so the ViewModel
+  is mostly insurance + a single named place for cleanup +
+  future-proofing for config changes that escape the manifest list.
+
+- **N1.10a (`9dc4852`)** — Extract `NativeAudioRecorder`. The recorder
+  state (lock + recorder + recordFile + 3 timing longs) was just
+  moved into MainViewModel in N1.9; this commit gives them their own
+  class with a tight interface. Six public ops, sealed `Result<T>`,
+  six `@JavascriptInterface` methods collapse to thin delegates.
+  MainViewModel becomes `AndroidViewModel(application)` so it can
+  hand the Application context to the recorder (S+ MediaRecorder
+  constructor needs Context). `onCleared` delegates to
+  `audioRecorder.release()`. Imports of MediaRecorder + java.io.File
+  removed from MainActivity. Line count: 1031 → 991.
+
+- **N1.10b (`c27a525`)** — Extract `StorageManager`. The
+  filePickerLauncher's inline read + saveToDownloads's inline writer
+  move into one class with three methods: readUriAsBase64,
+  writeJsonToDownloads, queryFileSize. MAX_IMPORT_SIZE +
+  OpenableColumns logic move along with them. The filePickerLauncher
+  collapses to a 4-line when-block; saveToDownloads to a 4-line
+  delegate. Imports of ContentValues, MediaStore, OpenableColumns,
+  Build removed from MainActivity. Line count: 991 → 937.
+
+### What's verified vs. what's owed
+
+**Verified at commit time** (every commit):
+- `:app:compileDebugKotlin` + `:app:compileReleaseKotlin` clean
+- `:app:assembleDebug` builds full APK with no warnings/errors
+- Static analysis (no double `vm.vm.` artifacts, no unused imports
+  per spot grep)
+
+**Owed against a real Android device** (couldn't be done in this
+environment):
+- N1.1: chrome://inspect attachment on debug APK
+- N1.3: chrome://crash induced renderer death + recovery cycle;
+  rapid 3-crash flow showing the retry view
+- N1.4: 100-MB file rejection path round-trips correct null callback
+- N1.5: full smoke walk that every bridge migration path still fires
+- N1.6: PixelCopy capture quality across Garden (image-heavy),
+  text screens, dark/light mode
+- N1.7: Memory Profiler check for bitmap leaks on rapid back-to-back
+  captures; background-mid-capture safety
+- N1.8: the actual visual smoothness on hardware (emulator's IME
+  animation differs from real device timing)
+- N1.9: rotation mid-recording — recording survives
+- N1.10a: full record / pause / resume / stop / cancel cycle
+- N1.10b: export → import round-trip identity check; 100-MB rejection
+
+The Kotlin wiring is correct; the visual + behavioral proof remains
+owed.
+
+---
+
 ## Q6 — CSS hardening (CLOSED 2026-05-25)
 
 Mechanical execution against the 772-line `css-audit.txt` work order.

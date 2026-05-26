@@ -3,7 +3,7 @@ VOTReader-studio — Strategic Working Memory
 ═══════════════════════════════════════════════════════════════════════════════
 
 Started: 2026-05-10
-Last pruned: 2026-05-25 (Q6 + Q7 + Q8 lazy-load CLOSED; bundle-a 11.7 → 1.03 MB)
+Last pruned: 2026-05-25 (Q6 + Q7 + Q8 lazy-load CLOSED; N1 native-side polish CLOSED)
 Status: ACTIVE — kept slim as work progresses
 Companions: CLAUDE.md (live status), HISTORY.md (landed work), ARCHITECTURE.md (system ref)
 
@@ -51,6 +51,10 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
                                           Q8.2 matthew (dcd06c3) + Q8.3
                                           all VOT corpora (5605f30). Critical
                                           path 11.7 MB → 1.03 MB (91%).
+  N1 native-side polish       ✅ DONE  — 10 commits (f61bb43..c27a525).
+                                          MainActivity.kt brought to parity
+                                          with the JS-side quality bar.
+                                          See CLAUDE.md "N1" section.
 
 ───────────────────────────────────────────────────────────────────────────────
 POST-Q4 SEQUENCING (executed 2026-05-24)
@@ -98,6 +102,27 @@ POST-Q4 BACKLOG (priority order — top = next)
    See CLAUDE.md "Q8" section + HISTORY.md for the per-commit
    implementation details + smoke walk results.
 
+3. NATIVE-SIDE POLISH — N1 CLOSED (2026-05-25)
+   ──────────────────────────────────────────────
+   10 commits bring MainActivity.kt to the same quality bar as the JS
+   side: Timber logging, onRenderProcessGone recovery, PixelCopy
+   screenshots on a coroutine path, type-safe JsBridge for every
+   evaluateJavascript site, per-frame keyboard tracking, ViewModel
+   state, and the recorder + storage logic extracted into focused
+   classes.
+
+   Final commit f61bb43..c27a525. MainActivity 869 → 937 lines (net
+   growth from added functionality; recorder + storage extracted to
+   their own files). New files: VOTReaderApp, JsBridge, MainViewModel,
+   NativeAudioRecorder, StorageManager. New deps: Timber 5.0.1,
+   coroutines 1.10.2, lifecycle 2.9.1 (runtime + viewmodel).
+
+   Real-device verification owed for: DevTools attach, renderer crash
+   recovery, PixelCopy on hardware-accelerated content, keyboard
+   animation smoothness, rotation mid-recording, full smoke walk.
+
+   See CLAUDE.md "N1" section + HISTORY.md for the per-commit detail.
+
 ───────────────────────────────────────────────────────────────────────────────
 INFRA / TOOLING ITEMS (one-liners — open small, ship fast)
 ───────────────────────────────────────────────────────────────────────────────
@@ -126,5 +151,5 @@ USER POLICY REMINDERS (durable; mirror CLAUDE.md)
 - App name is "VOTReader" (personal app; no Play Store thinking yet)
 
 ───────────────────────────────────────────────────────────────────────────────
-END OF DOCUMENT — last pruned 2026-05-24 (Q3 closed)
+END OF DOCUMENT — last pruned 2026-05-25 (N1 native-side polish closed)
 ───────────────────────────────────────────────────────────────────────────────

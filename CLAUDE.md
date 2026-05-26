@@ -10,6 +10,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 ## Current state (2026-05-25)
 
+- **Phase N1 — Native-side polish CLOSED.** 10 commits bring `MainActivity.kt` to the same quality bar as the JS side. New files: `VOTReaderApp.kt` (Application subclass for Timber), `JsBridge.kt` (centralized evaluateJavascript), `MainViewModel.kt` (config-change-surviving state), `NativeAudioRecorder.kt` (MediaRecorder lifecycle), `StorageManager.kt` (file I/O). `MainActivity.kt`: 869 → 937 lines on net (Timber + onRenderProcessGone + JsBridge + N1.8 callback + import-size guard added; recorder + file I/O extracted out). 14 raw `Log.w("VOTReader", …)` calls → Timber; every `evaluateJavascript` site routes through `JsBridge` (one documented N1.8 60Hz-loop exception). PixelCopy + coroutines on screenshot path; renderer-crash recovery with crash-loop guard; per-frame IME tracking via `WindowInsetsAnimationCompat`. New deps: timber 5.0.1, kotlinx-coroutines-android 1.10.2, lifecycle-runtime-ktx 2.9.1, lifecycle-viewmodel-ktx 2.9.1.
 - **JSX conversion COMPLETE** (Q2.7-2, `b233cc3`). Every React component is JSX.
 - **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **797 lines — Phase 1 + Phase 2 CLOSED.** 26 hooks (15 P6 + 11 P7a-k). **All 53 screens dispatch from a single ROUTES table** that lives in its own file (`src/ui/screen-routes.jsx`) via a `buildScreenRoutes(deps)` factory. The 3 substantive inline blocks (matthew-ch, bible-study-chapter, holy-days-index playlist header) extracted to their own screen/component files. Welcome modal + tabs overview + disable-tabs prompt + garden warning live in `AppShellOverlays`; 12 annotation/link/journal/bookmark sheets live in `AppShellSheets`. App() now owns composition, not implementation.
 - **Q6 CSS hardening CLOSED.** app.css 4,410 → 4,125 (−285 dead). 93 raw-hex usages consolidated to vars (`--hl-{yellow|green|pink|...}` palette + `--danger` + `--settings-warning/danger` + `--input-text` + `--white`). `!important` count 36 → 25 (Cat A removed; B-F load-bearing).
@@ -280,6 +281,120 @@ bundle-a for now. Per the pattern-proof discipline established by
 earlier phases, expand to other splits in follow-up commits with
 their own smoke tests.
 
+### N1 — Native-side polish (CLOSED 2026-05-25)
+
+10 commits bring `MainActivity.kt` to the same quality bar as the JS
+side. Same one-commit-per-item discipline as Q3-Q8; same build-and-
+verify-after-each gate.
+
+**New deps** (`gradle/libs.versions.toml`): timber 5.0.1,
+kotlinx-coroutines-android 1.10.2, lifecycle-runtime-ktx 2.9.1,
+lifecycle-viewmodel-ktx 2.9.1. Zero third-party risk beyond Timber
+(Jake Wharton, universally adopted).
+
+**Commit chain:**
+
+- **N1.1 (`f61bb43`)** — Enable WebContents debugging in debug builds.
+  `buildFeatures { buildConfig = true }` to re-enable BuildConfig under
+  AGP 9.x; `WebView.setWebContentsDebuggingEnabled(true)` gated by
+  `BuildConfig.DEBUG`. chrome://inspect attaches on debug APKs; release
+  APKs unaffected.
+- **N1.2 (`c791381`)** — Timber. New `VOTReaderApp` Application
+  subclass plants `Timber.DebugTree()` in debug builds. All 14
+  `Log.w("VOTReader", …)` calls → `Timber.w(e, …)`. The
+  WebChromeClient console dispatcher fans out to per-level Timber
+  calls (e/w/d/i), so the `android.util.Log` import disappears
+  entirely. The two duplicate "PermissionRequest resolution failed"
+  messages diverge into "grant failed" / "deny failed".
+- **N1.3 (`1c3ddaf`)** — Renderer crash recovery. Extract the WebView
+  setup into `createConfiguredWebView()` factory. `onRenderProcessGone`
+  inside the `WebViewClientCompat` rebuilds the WebView + reloads
+  index.html. Tracks `renderRecoveryCount` + `firstRecoveryMs` (60-s
+  sliding window); >2 crashes shows a TextView "Tap to reload" rather
+  than infinite-looping. Pending mic permission + file chooser
+  callback get the same cleanup the dying-Activity path used to do.
+- **N1.4 (`4ab52e9`)** — Defensive file reading. `MAX_IMPORT_SIZE = 50 MB`
+  on the companion; `querySize(uri)` reads `OpenableColumns.SIZE`
+  before `readBytes()`. Rejects oversized + unknown-size files — both
+  flow to JS as `__onImportFile(null)`, same code path as cancel /
+  read error.
+- **N1.5 (`78a5048`)** — Type-safe JS bridge. New `JsBridge` class.
+  Three entry points: `callOptional(fn, vararg args)` (escapes
+  arguments, posts to WebView thread), `callWithResult(js, callback)`
+  (sync return for back-press), `setCssProperties(vararg pairs)` (the
+  inset CSS update). 11 raw `evaluateJavascript` sites + their
+  `webView.post {}` wrappers collapse into one-line bridge calls. The
+  bridge holds a lazy `webViewProvider: () -> WebView` so N1.3's
+  WebView recovery doesn't require re-instantiation. JS string source
+  construction outside the bridge is structurally impossible.
+- **N1.6 (`9a7f5e2`)** — PixelCopy screenshots. `webView.draw(Canvas(…))`
+  → `PixelCopy.request`. Captures the actual rendered surface
+  (hardware layers included) instead of asking the View to redraw.
+  Kept the CountDownLatch + synchronous JS API for this commit
+  (N1.7 handles the async cleanup).
+- **N1.7 (`f7e6ae0`)** — Coroutines on the screenshot path.
+  `suspendCancellableCoroutine` wraps `PixelCopy.request`;
+  `withTimeoutOrNull(2_000L)` preserves the 2-s latch cap;
+  `invokeOnCancellation` recycles the destination bitmap on timeout
+  so an interrupted capture doesn't leak `width*height*4` bytes. The
+  `@JavascriptInterface` still returns a String synchronously
+  (`runBlocking { withTimeoutOrNull { … } ?: "" }`); JS contract
+  unchanged. `CountDownLatch + TimeUnit` imports gone.
+- **N1.8 (`54ca4b6`)** — Per-frame IME tracking via
+  `WindowInsetsAnimationCompat.Callback`. The existing
+  `setOnApplyWindowInsetsListener` fires at start/end of the
+  keyboard slide — bottom UI "jumps". The new callback fires at
+  ~60 Hz with interpolated insets, updating `--inset-top` /
+  `--inset-bottom` per frame so the existing CSS tracks smoothly.
+  `onEnd` calls `requestApplyInsets` so the resting state routes
+  through the normal listener (which updates the saved Activity-side
+  fields for any future `injectInsets` callers). Intentional N1.5
+  exception: per-frame inline `evaluateJavascript` (bypasses
+  JsBridge for budget reasons; only %.2f-formatted numbers
+  interpolated, so quote-injection is structurally impossible).
+- **N1.9 (`8bd7e0e`)** — `MainViewModel` (AndroidViewModel). Holds
+  the config-change-surviving state: insets, scale, splash hold,
+  keep-screen-on, audio session mode, recorder state (later moved
+  into NativeAudioRecorder), renderer recovery counters. Every
+  reference becomes `vm.X` via bulk substitution. `onCleared` fires
+  the recorder release. Manifest's existing `configChanges` covers
+  rotation/uiMode/screenSize/etc., so the ViewModel is mostly
+  insurance + a single named place for cleanup + future-proofing
+  against config changes that escape the manifest list (locale).
+- **N1.10a (`9dc4852`)** — Extract `NativeAudioRecorder` (192 lines).
+  Six operations (start/pause/resume/amplitude/stop/cancel) + release.
+  Returns a small sealed `Result<T>` (Success(value) / Failure(reason))
+  matching the JS-side "ok" / "error:<reason>" string contract. Six
+  `@JavascriptInterface` recording methods collapse to thin delegates.
+  `MainViewModel` holds a single `audioRecorder` instance via
+  `AndroidViewModel(application)`. `onCleared` delegates to release.
+  MainActivity 1031 → 991 lines.
+- **N1.10b (`c27a525`)** — Extract `StorageManager` (116 lines).
+  `readUriAsBase64(uri, maxBytes)` (does size check + read + base64
+  encode); `writeJsonToDownloads(filename, content)` (the Q+
+  MediaStore Downloads path); `queryFileSize(uri)` (the
+  OpenableColumns.SIZE query, exposed publicly in case a caller
+  wants its own policy). `MAX_IMPORT_SIZE` moves into the companion.
+  Returns its own sealed `Result<T>`. MainActivity 991 → 937 lines.
+
+**Final line counts:** MainActivity 937 + JsBridge 104 + MainViewModel 67
+\+ NativeAudioRecorder 192 + StorageManager 116 + VOTReaderApp 19 =
+**1,435 lines total** (vs 869-line monolith pre-N1). The growth is
+deliberate — each new file owns one concern (logging, JS bridge,
+recorder, storage), and MainActivity is now the WebView shell + JS
+bridge wiring + lifecycle, with the implementation details delegated.
+
+**Verification:** every commit passed `:app:compileDebugKotlin` +
+`:app:compileReleaseKotlin` + `:app:assembleDebug`. JS-side bundles
+untouched (Kotlin-only commits don't trip the pre-commit's bundle
+rebuild). Real-device verification is OWED for: chrome://inspect
+attachment (N1.1), chrome://crash recovery (N1.3), PixelCopy capture
+on hardware-accelerated content (N1.6), keyboard animation smoothness
+(N1.8), recorder survival across orientation change (N1.9), and the
+full smoke walk covering import/export/record/screenshot. The Kotlin
+wiring is correct; the visual + behavioral proof is owed against an
+actual phone.
+
 ### Roadmap
 
 **`PLAN.txt`** (repo root) is the strategic working memory — slim, current-state. HISTORY.md has the landed-work chapter. CLAUDE.md is the 30-second briefing.
@@ -333,7 +448,13 @@ D:/VOTReader-studio/
 │   │       ├── hooks/                 # 26 App() hooks (P6 + P7a–k; Phase 1 closed)
 │   │       ├── components/            # ExpandableText, ErrorBoundary
 │   │       └── styles/                # journal-styles
-│   └── java/com/votreader/sacredui/MainActivity.kt   # WebView shell + native bridges
+│   └── java/com/votreader/sacredui/
+│       ├── MainActivity.kt              # WebView shell + JS bridge wiring + lifecycle (937 lines)
+│       ├── MainViewModel.kt             # AndroidViewModel — recorder + storage + insets + recovery state
+│       ├── VOTReaderApp.kt              # Application subclass — plants Timber DebugTree in debug
+│       ├── JsBridge.kt                  # Type-safe wrapper around evaluateJavascript
+│       ├── NativeAudioRecorder.kt       # MediaRecorder lifecycle for journal voice memos
+│       └── StorageManager.kt            # File I/O: import readUriAsBase64 + saveToDownloads
 └── _ocr_out/, check_balance.py, etc.  # OCR pipeline + data validators
 ```
 
