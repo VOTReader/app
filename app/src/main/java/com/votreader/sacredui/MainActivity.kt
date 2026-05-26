@@ -467,13 +467,21 @@ class MainActivity : AppCompatActivity() {
                 (view.parent as? ViewGroup)?.removeView(view)
                 view.destroy()
 
+                // Always rebuild the WebView FIRST so the bridge's lazy
+                // webViewProvider never reads the destroyed instance --
+                // any in-flight launcher callback or pending bridge call
+                // that lands during the retry-view window would otherwise
+                // post on the dead WebView and crash. Both paths use the
+                // same fresh instance; the retry path just defers
+                // attaching + loading until the user taps.
+                webView = createConfiguredWebView()
+
                 if (vm.renderRecoveryCount > 2) {
                     Timber.e("Renderer crashed %d times in 60s. Showing retry view.", vm.renderRecoveryCount)
                     showRendererCrashRetryView()
                     return true
                 }
 
-                webView = createConfiguredWebView()
                 setContentView(webView)
                 webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
                 return true
@@ -563,7 +571,9 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener {
                 vm.renderRecoveryCount = 0
                 vm.firstRecoveryMs = 0L
-                webView = createConfiguredWebView()
+                // [webView] was already rebuilt by onRenderProcessGone
+                // before this retry view was shown -- attach it now and
+                // trigger the load. No need to create another instance.
                 setContentView(webView)
                 webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
             }
