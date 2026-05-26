@@ -31,8 +31,17 @@ class JsBridge(private val webViewProvider: () -> WebView) {
      * flows through escapeArg -- strings become safe JS string literals,
      * booleans / numbers their literal form, null becomes the literal
      * `null`. Posts to the WebView thread.
+     *
+     * [fn] is restricted to a bare JS identifier (matches [FN_NAME], i.e.
+     * `\w+`). Without that check, a future caller passing something like
+     * `__onFoo(); doEvilThing(` would yield a generated JS source where
+     * the prefix executes before the trailing args even render -- a
+     * structural injection. Every existing caller in MainActivity uses
+     * a hardcoded `__onCamelCase` string, so the require() is invariant
+     * in production and only fires on programmer error.
      */
     fun callOptional(fn: String, vararg args: Any?) {
+        require(fn.matches(FN_NAME)) { "JsBridge: fn must be a JS identifier, got '$fn'" }
         val rendered = args.joinToString(", ") { escapeArg(it) }
         val js = "window.$fn && window.$fn($rendered)"
         webView.post { webView.evaluateJavascript(js, null) }
@@ -85,11 +94,19 @@ class JsBridge(private val webViewProvider: () -> WebView) {
         )
     }
 
-    // JS string literal with \, ', \n, \r, and U+2028 / U+2029 escaped.
-    // U+2028 / U+2029 (LINE / PARAGRAPH SEPARATOR) are valid characters in
-    // JSON strings but illegal as bare characters in JavaScript source --
-    // not escaping them would turn an apparently-safe payload into a
+    // JS string literal with \, ', \n, \r, U+0000, and U+2028 / U+2029
+    // escaped.
+    //
+    // U+2028 / U+2029 (LINE / PARAGRAPH SEPARATOR) are valid characters
+    // in JSON strings but illegal as bare characters in JavaScript source
+    // -- not escaping them would turn an apparently-safe payload into a
     // syntax error inside evaluateJavascript.
+    //
+    // U+0000 (NUL) is similarly legal in a JSON string but a parser-
+    // hostile char in a JS source string literal -- embedded NUL has
+    // historically tripped V8 and other engines (truncating the string,
+    // raising "Invalid character"). Escaping it preserves the bytes
+    // through the bridge and back to JS-side memory.
     internal fun quote(s: String): String {
         val sb = StringBuilder(s.length + 2)
         sb.append('\'')
@@ -99,6 +116,7 @@ class JsBridge(private val webViewProvider: () -> WebView) {
                 '\'' -> sb.append("\\'")
                 '\n' -> sb.append("\\n")
                 '\r' -> sb.append("\\r")
+                '\u0000' -> sb.append("\\u0000")
                 ' ' -> sb.append("\\u2028")
                 ' ' -> sb.append("\\u2029")
                 else -> sb.append(c)
@@ -106,5 +124,15 @@ class JsBridge(private val webViewProvider: () -> WebView) {
         }
         sb.append('\'')
         return sb.toString()
+    }
+
+    companion object {
+        // JS identifier regex used by callOptional's require(). Restrictive
+        // by choice -- the bridge's actual callees are all `__onCamelCase`
+        // style; widening to e.g. `[$\w]+` would broaden the surface
+        // without any concrete need. If a future feature needs dotted
+        // names (e.g. `console.log`), route through callWithResult (which
+        // takes a trusted JS expression) instead of relaxing this.
+        private val FN_NAME = Regex("^\\w+$")
     }
 }

@@ -27,12 +27,17 @@ import kotlin.test.assertEquals
  */
 class JsBridgeTest {
 
-    // The webViewProvider is never invoked by quote/escapeArg, so we hand
-    // in a lambda that errors loudly if it ever IS called. That way any
-    // future regression that accidentally reads webView from one of these
-    // helpers fails the test instead of silently NPE-ing in production.
+    // The throwing webViewProvider serves two purposes:
+    //   1. For quote/escapeArg tests, asserts the pure helpers never
+    //      reach the WebView -- any future regression that does NPE in
+    //      production gets caught here as IllegalStateException instead.
+    //   2. For callOptional fn-validation tests, lets us distinguish
+    //      "require() rejected the fn" (IllegalArgumentException) from
+    //      "require() accepted, then tried to access webView"
+    //      (IllegalStateException). The two exception types are the
+    //      assertion seam for whether the guard fired.
     private val bridge = JsBridge {
-        error("webViewProvider should not be invoked by pure helpers")
+        error("test stub: webViewProvider invoked (require passed, no real WebView)")
     }
 
     // ─── quote ────────────────────────────────────────────────────────
@@ -117,6 +122,23 @@ class JsBridgeTest {
         assertEquals("'a\tb'", bridge.quote("a\tb"))
     }
 
+    @Test
+    fun `quote escapes U+0000 NUL`() {
+        // NK2b: a stray NUL inside a payload (e.g. from a binary blob
+        // round-tripped through a string) used to land in the generated
+        // JS source verbatim, where Chromium's parser truncates at the
+        // first NUL and the bridge call silently mangles. Escaping
+        // preserves the byte through the bridge.
+        assertEquals("'\\u0000'", bridge.quote("\u0000"))
+    }
+
+    @Test
+    fun `quote escapes NUL surrounded by ASCII`() {
+        // Same case but realistic placement -- proves the branch fires
+        // mid-string, not just for a single-char input.
+        assertEquals("'a\\u0000b'", bridge.quote("a\u0000b"))
+    }
+
     // ─── escapeArg dispatch ───────────────────────────────────────────
 
     @Test
@@ -165,6 +187,73 @@ class JsBridgeTest {
         // pins the delegation: if escapeArg ever stopped routing String
         // through quote, untrusted text would land in JS source unescaped.
         assertEquals("'hi'", bridge.escapeArg("hi"))
+    }
+
+    // ─── callOptional fn validation (NK2b) ────────────────────────────
+
+    @Test
+    fun `callOptional rejects fn containing dot`() {
+        // Dot-prefixed names like `console.log` would generate
+        //   window.console.log && window.console.log(args)
+        // which evaluates fine but defeats the bridge's intent of a flat,
+        // app-defined callback surface. The require() refuses up front.
+        assertThrows<IllegalArgumentException> {
+            bridge.callOptional("console.log")
+        }
+    }
+
+    @Test
+    fun `callOptional rejects fn containing parenthesis`() {
+        // The actual injection class: a paren in fn opens a syntactic
+        // hole in the generated JS source. require() blocks it before
+        // a single byte of JS is emitted.
+        assertThrows<IllegalArgumentException> {
+            bridge.callOptional("__onFoo(); alert(1)//")
+        }
+    }
+
+    @Test
+    fun `callOptional rejects fn containing whitespace`() {
+        assertThrows<IllegalArgumentException> {
+            bridge.callOptional("foo bar")
+        }
+    }
+
+    @Test
+    fun `callOptional rejects empty fn`() {
+        // Empty fn would yield `window. && window.(args)` -- a SyntaxError
+        // at runtime. The require() turns it into a fail-fast at call-site.
+        assertThrows<IllegalArgumentException> {
+            bridge.callOptional("")
+        }
+    }
+
+    @Test
+    fun `callOptional accepts a plain identifier`() {
+        // require() passes; control reaches webView.post {} which triggers
+        // the throwing stub. Catching IllegalStateException (NOT
+        // IllegalArgumentException) implicitly asserts that the require()
+        // accepted the fn name.
+        assertThrows<IllegalStateException> {
+            bridge.callOptional("__onValid")
+        }
+    }
+
+    @Test
+    fun `callOptional accepts all production callee names`() {
+        // Regression guard: the three names MainActivity actually invokes.
+        // If FN_NAME's pattern were ever tightened in a way that broke an
+        // existing callee, this test catches it -- the negative-space
+        // counterpart of the rejection tests above.
+        for (name in listOf(
+            "__onImportFile",
+            "__onMicPermissionResult",
+            "__onNativeRecordingComplete"
+        )) {
+            assertThrows<IllegalStateException>("$name should pass require()") {
+                bridge.callOptional(name)
+            }
+        }
     }
 
     @Test
