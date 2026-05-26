@@ -5448,6 +5448,15 @@
         window.__loadVotCorpus().catch((e) => console.warn("VOT corpus pre-load failed", e));
       }
     }, []);
+    React.useEffect(() => {
+      if (!showSurprise) return;
+      if (typeof window.__loadBibleCorpus === "function") {
+        window.__loadBibleCorpus().catch((e) => console.warn("Bible corpus pre-load (surprise) failed", e));
+      }
+      if (typeof window.__loadMatthewCorpus === "function") {
+        window.__loadMatthewCorpus().catch((e) => console.warn("Matthew corpus pre-load (surprise) failed", e));
+      }
+    }, [showSurprise]);
     React.useEffect(() => () => {
       clearTimeout(pressTimerRef.current);
       if (activeCleanupRef.current) activeCleanupRef.current();
@@ -5679,7 +5688,7 @@
       },
       /* @__PURE__ */ React.createElement("span", { className: "hni-text" }, /* @__PURE__ */ React.createElement("span", { className: "hni-eyebrow" }, item.eyebrow), /* @__PURE__ */ React.createElement("span", { className: "hni-title" }, item.title), /* @__PURE__ */ React.createElement("span", { className: "hni-detail" }, item.detail)),
       /* @__PURE__ */ React.createElement("span", { className: "hni-arrow" }, "\u203A")
-    ))), isFirstVisit && /* @__PURE__ */ React.createElement("span", { className: "home-rearrange-hint" }, "Hold to rearrange")), showSurprise && /* @__PURE__ */ React.createElement("button", { className: "surprise-fab", onClick: onSurprise, title: "Open a Random Chapter or Letter", "aria-label": "Surprise Me" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "3.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "8", cy: "8", r: "1.15", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "16", cy: "8", r: "1.15", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "1.15", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "8", cy: "16", r: "1.15", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "16", cy: "16", r: "1.15", fill: "currentColor", stroke: "none" }))));
+    ))), isFirstVisit && /* @__PURE__ */ React.createElement("span", { className: "home-rearrange-hint" }, "Hold to rearrange"), showSurprise && /* @__PURE__ */ React.createElement("button", { className: "surprise-fab", onClick: onSurprise, title: "Open a Random Chapter or Letter", "aria-label": "Surprise Me" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "3.5" }), /* @__PURE__ */ React.createElement("circle", { cx: "8", cy: "8", r: "1.15", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "16", cy: "8", r: "1.15", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "1.15", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "8", cy: "16", r: "1.15", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "16", cy: "16", r: "1.15", fill: "currentColor", stroke: "none" })))));
   }
 
   // app/src/main/assets/src/ui/screens/SearchScreen.jsx

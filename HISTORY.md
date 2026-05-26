@@ -4,6 +4,44 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## Q8 follow-up — Surprise button + lazy-load (LANDED 2026-05-26)
+
+After Q8 made `MATTHEW` + `BIBLE_BOOK_LIST` lazy globals, the Random
+Letter dice button on Home silently no-op'd: `handleSurprise()` reads
+bare-identifier `MATTHEW.chapters` + `BIBLE_BOOK_LIST.flatMap()`
+directly, and HomeScreen only pre-fired the VOT loader — not Bible or
+Matthew. Tapping the dice threw a `ReferenceError` inside the React
+click handler and never navigated.
+
+Three fixes, one commit:
+
+- **`use-surprise.js`** — `typeof`-guard `MATTHEW` + `BIBLE_BOOK_LIST`
+  when building the pool. If pool comes up empty (cold-boot tap before
+  any loader resolves), kick off all three corpus loaders and bail.
+  No-op is recoverable: the next tap (after loaders resolve) works.
+- **`HomeScreen.jsx`** — new `useEffect` gated on
+  `settings.showSurpriseButton` pre-fires `__loadBibleCorpus()` +
+  `__loadMatthewCorpus()` so the dice has its pool ready well before
+  the user can reach for it. Parallel to the existing Q8.3 VOT
+  pre-fire.
+- **`HomeScreen.jsx` + `app.css`** — moved the dice from floating FAB
+  (`position:fixed; bottom-right`) to inline at the END of the
+  `home-screen-app` flex stack. Centered via parent's
+  `align-items:center`;
+  `margin:1.2rem 0 calc(var(--inset-bottom, 0px) + 1.5rem)`. Sits
+  below whatever the last visible card is (Library / Settings /
+  History, depending on `historyEnabled` + the user's drag-order).
+  Page scrolls naturally if cards + dice exceed the viewport.
+
+**Verified in preview** (mobile 375x812): dice renders below History
+with default 6 cards (scrollHeight 920 > clientHeight 745); below
+Settings with History disabled (5 cards); centered; zero console
+errors; `Math.random=0` click navigates to Matthew Ch 1 (first pool
+entry). **+1 vitest case** asserts the lazy-load race no-op + all
+three loaders fire (now 9 tests in `use-surprise.test.js`).
+
+---
+
 ## N1 — Native-side polish (CLOSED 2026-05-25)
 
 10 commits bring `MainActivity.kt` to the same quality bar as the JS

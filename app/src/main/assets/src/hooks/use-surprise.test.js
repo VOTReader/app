@@ -137,4 +137,34 @@ describe('useSurprise — pool filtering', () => {
     expect(props.setLetterId).not.toHaveBeenCalled();
     expect(props.setScreen).not.toHaveBeenCalled();
   });
+
+  it('lazy-load race: MATTHEW + BIBLE_BOOK_LIST undefined → no-op + triggers loaders', () => {
+    // Regression: Q8 lazy-load made MATTHEW + BIBLE_BOOK_LIST undefined
+    // before their loaders resolve. Tapping dice on Home pre-load used to
+    // ReferenceError (bare-identifier MATTHEW). Now: pool builds empty
+    // from those two sources, _studies + COLLECTIONS still empty in this
+    // setup, handler kicks off the loaders and bails without crashing.
+    window.MATTHEW = undefined;
+    window.BIBLE_BOOK_LIST = undefined;
+    window._studies = () => [];
+    window.COLLECTIONS = [];
+    const bibleLoad = vi.fn();
+    const matthewLoad = vi.fn();
+    const votLoad = vi.fn();
+    window.__loadBibleCorpus = bibleLoad;
+    window.__loadMatthewCorpus = matthewLoad;
+    window.__loadVotCorpus = votLoad;
+    const props = baseProps();
+    const { result } = renderHook(() => useSurprise(props));
+    act(() => { result.current.handleSurprise(); });
+    expect(props.setBookId).not.toHaveBeenCalled();
+    expect(props.setScreen).not.toHaveBeenCalled();
+    expect(props.selectStudyChapter).not.toHaveBeenCalled();
+    expect(bibleLoad).toHaveBeenCalledTimes(1);
+    expect(matthewLoad).toHaveBeenCalledTimes(1);
+    expect(votLoad).toHaveBeenCalledTimes(1);
+    delete window.__loadBibleCorpus;
+    delete window.__loadMatthewCorpus;
+    delete window.__loadVotCorpus;
+  });
 });

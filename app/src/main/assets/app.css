@@ -1320,18 +1320,20 @@
     .genre-col-stretch .genre-tile { flex:1; }
     /* Genre sub-screen: compact hero, top-aligned */
     /* Larger book cards for small groups */
-      /* Floating Surprise Me FAB (bottom-right) — intensity/interval synced with .reading-dot-global */
+      /* Inline Surprise Me button — sits below the last home card, in the
+         home-screen-app flex flow so it pushes scroll height when the cards
+         already fill the viewport. align-items:center on the parent
+         centers it horizontally. intensity/interval synced with .reading-dot-global */
       @keyframes surprise-breathe {
         0%, 100% { transform:scale(1);    opacity:0.7; filter:drop-shadow(0 0 2px rgba(200,164,86,0.25)); }
         50%      { transform:scale(1.08); opacity:1;   filter:drop-shadow(0 0 8px rgba(200,164,86,0.55)); }
       }
       .surprise-fab {
-        position:fixed; right:1.3rem;
-        bottom:calc(var(--inset-bottom, 0px) + 1.5rem);
+        margin:1.2rem 0 calc(var(--inset-bottom, 0px) + 1.5rem);
         width:52px; height:52px; padding:0;
         display:flex; align-items:center; justify-content:center;
         background:transparent; border:none;
-        color:var(--gold); cursor:pointer; z-index:40;
+        color:var(--gold); cursor:pointer;
         transition:transform 0.2s ease;
       }
       .surprise-fab svg {

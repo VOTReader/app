@@ -76,6 +76,20 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     }
   }, []);
 
+  // Surprise button needs MATTHEW + BIBLE_BOOK_LIST (Q8 lazy globals) to
+  // build its random pool. Pre-fire both loaders when the button is shown
+  // so the tap resolves cleanly instead of waiting on the user's next visit
+  // to Scriptures / Studies.
+  React.useEffect(() => {
+    if (!showSurprise) return;
+    if (typeof window.__loadBibleCorpus === 'function') {
+      window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load (surprise) failed', e));
+    }
+    if (typeof window.__loadMatthewCorpus === 'function') {
+      window.__loadMatthewCorpus().catch((e) => console.warn('Matthew corpus pre-load (surprise) failed', e));
+    }
+  }, [showSurprise]);
+
   // Cleanup timer + any in-flight doc listeners on unmount
   React.useEffect(() => () => {
     clearTimeout(pressTimerRef.current);
@@ -350,19 +364,19 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           ))}
         </div>
         {isFirstVisit && <span className="home-rearrange-hint">Hold to rearrange</span>}
+        {showSurprise && (
+          <button className="surprise-fab" onClick={onSurprise} title="Open a Random Chapter or Letter" aria-label="Surprise Me">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3.5" />
+              <circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" />
+              <circle cx="16" cy="8" r="1.15" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none" />
+              <circle cx="8" cy="16" r="1.15" fill="currentColor" stroke="none" />
+              <circle cx="16" cy="16" r="1.15" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+        )}
       </div>
-      {showSurprise && (
-        <button className="surprise-fab" onClick={onSurprise} title="Open a Random Chapter or Letter" aria-label="Surprise Me">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="3.5" />
-            <circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" />
-            <circle cx="16" cy="8" r="1.15" fill="currentColor" stroke="none" />
-            <circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none" />
-            <circle cx="8" cy="16" r="1.15" fill="currentColor" stroke="none" />
-            <circle cx="16" cy="16" r="1.15" fill="currentColor" stroke="none" />
-          </svg>
-        </button>
-      )}
     </ScreenLayout>
   );
 }

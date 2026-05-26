@@ -227,6 +227,13 @@ App-side guards added across:
 - `HomeScreen` + `VolumesHome` + `ScripturesHome` + `StudiesHome` +
   `SettingsScreen` — `useEffect` pre-fires the relevant loader(s) on
   mount so corpora download in parallel with user's tile scan.
+  HomeScreen additionally pre-fires Bible + Matthew when
+  `settings.showSurpriseButton` is true (the dice's random-pool
+  builder reads both globals); `use-surprise.js` also `typeof`-guards
+  + early-returns on empty pool to make the cold-boot race
+  recoverable instead of throwing. The dice button itself now flows
+  inline below the last home card (no longer `position:fixed`), so
+  the home view scrolls when cards + dice exceed the viewport.
 - `VolumesHome` — `_locked = _votReady && _cnt === 0` so the lock
   flag only kicks in for known-empty collections once the corpus
   arrives (during loading window, NO tile is locked).

@@ -60,14 +60,26 @@ export function useSurprise({
   setActiveReadKey, setLastReadForVol, selectStudyChapter,
 }) {
   const handleSurprise = () => {
+    // Q8 lazy-load made MATTHEW / BIBLE_BOOK_LIST undefined until their loaders
+    // resolve. Guard each source so the pool builds cleanly during the load
+    // window; if everything is empty, kick off the loaders and bail (user
+    // sees no-op for the brief race; subsequent tap works).
+    const _MATTHEW = (typeof MATTHEW !== 'undefined' && MATTHEW) ? MATTHEW : null;
+    const _BBL = (typeof BIBLE_BOOK_LIST !== 'undefined' && BIBLE_BOOK_LIST) ? BIBLE_BOOK_LIST : [];
     const pool = [
-      ...MATTHEW.chapters.map((ch) => ({ _k: 'matthew', num: ch.num })),
-      ...BIBLE_BOOK_LIST.flatMap((b) => b.chapters.map((ch) => ({ _k: 'bible', bookId: b.id, num: ch.num }))),
+      ...(_MATTHEW ? _MATTHEW.chapters.map((ch) => ({ _k: 'matthew', num: ch.num })) : []),
+      ..._BBL.flatMap((b) => b.chapters.map((ch) => ({ _k: 'bible', bookId: b.id, num: ch.num }))),
       ..._studies().filter((s) => !s.locked && s.chapters && s.chapters.length > 0).flatMap((s) => s.chapters.map((ch) => ({ _k: 'study', studyId: s.id, chId: ch.id }))),
     ];
     for (const col of COLLECTIONS) {
       if (!col.surpriseType) continue;
       for (const l of colLetterArr(col)) pool.push({ _k: 'col', volKey: col.volKey, id: l.id });
+    }
+    if (pool.length === 0) {
+      if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
+      if (typeof window.__loadMatthewCorpus === 'function') window.__loadMatthewCorpus();
+      if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
+      return;
     }
     const pick = pool[Math.floor(Math.random() * pool.length)];
     setSurpriseAnchor(null);
