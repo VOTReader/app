@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 357 distinct identifiers.
+// Total: 356 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -39,8 +39,6 @@ declare const BookmarkRowActionSheet: any;
 declare const BookmarkStore: any;
 declare const BookmarksScreen: any;
 declare const CANON_SUBTITLES: any;
-declare const CLEAR_CLASSES: any;
-declare const CLEAR_LABELS: any;
 declare const COLLECTIONS: any;
 declare const COL_BY_CARD: any;
 declare const COL_BY_INDEX_SC: any;
@@ -55,6 +53,7 @@ declare const ChapterIndex: any;
 declare const ChapterView: any;
 declare const ClearProgressRow: any;
 declare const Components: any;
+declare const ConfirmStrip: any;
 declare const Data: any;
 declare const EXPAND_THRESHOLD: any;
 declare const ErrorBoundary: any;

@@ -261,16 +261,8 @@
     R(".jrn-block-del-btn:hover { opacity: 1; color: #c75c4a; background: rgba(199, 92, 74, 0.12); border-color: rgba(199, 92, 74, 0.45); }");
     R(".jrn-block-del-btn:active { transform: scale(0.92); }");
     R(".jrn-block-del-btn svg { width: 14px; height: 14px; }");
-    R(".jrn-block-confirm { order: -1; align-self: stretch; display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin: 0 0 10px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }");
-    R(".jrn-block-confirm-q { flex: 1; font-family: var(--font-cinzel); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #c75c4a; padding: 0 2px; }");
-    R(".jrn-block-confirm-cancel { background: none; border: 1px solid var(--gold-border); color: var(--cream-dim); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 17px; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 32px; }");
-    R(".jrn-block-confirm-cancel:hover { background: var(--bg3); color: var(--cream); }");
-    R(".jrn-block-confirm-yes { background: #c75c4a; border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 32px; margin-left: 12px; }");
-    R(".jrn-block-confirm-yes svg { width: 15px; height: 15px; }");
-    R(".jrn-block-confirm-yes:hover { background: #b04d3d; }");
-    R(".jrn-block-confirm-step2 { background: rgba(199, 92, 74, 0.22); border-color: #c75c4a; }");
-    R(".jrn-block-confirm-step2 .jrn-block-confirm-q { color: #e07a66; font-weight: 600; }");
-    R(".jrn-block-confirm-step2 .jrn-block-confirm-yes { box-shadow: 0 0 0 3px rgba(199, 92, 74, 0.28); }");
+    R(".jrn-block-confirm { order: -1; align-self: stretch; padding: 8px 12px; margin: 0 0 10px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }");
+    R(".jrn-block-confirm .ann-chip-confirm-q { color: #c75c4a; }");
     R(".jrn-tripledel { margin: 0 18px 12px; padding: 14px 18px; background: rgba(199, 92, 74, 0.08); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 10px; }");
     R(".jrn-tripledel-step-label { font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #c75c4a; margin-bottom: 6px; }");
     R(".jrn-tripledel-question { font-family: var(--font-garamond); font-size: 15px; line-height: 1.4; color: var(--cream); margin-bottom: 12px; }");
@@ -3340,7 +3332,6 @@
     const { tabs, activeTabIdx, setTabs, setActiveTabIdx } = tabState;
     const [tabActionIdx, setTabActionIdx] = React.useState(null);
     const [disableTabsPromptOpen, setDisableTabsPromptOpen] = React.useState(false);
-    const [clearAllStage, setClearAllStage] = React.useState(0);
     const lastTabCloseStrikes = React.useRef(0);
     const openNewTab = React.useCallback(() => {
       setTabs((prev) => {
@@ -3437,8 +3428,6 @@
       setTabActionIdx,
       disableTabsPromptOpen,
       setDisableTabsPromptOpen,
-      clearAllStage,
-      setClearAllStage,
       lastTabCloseStrikes,
       MAX_TABS
       // re-exported for the TabsOverview render (the cap badge)
@@ -6487,11 +6476,19 @@
       "Create"
     )), notebooks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : /* @__PURE__ */ React.createElement("div", { className: "nb-picker-list" }, notebooks.map(function(nb) {
       if (confirmDelete === nb.id) {
-        return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete \u201C", nb.name, "\u201D? Entries will move to Uncategorized."), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
-          setConfirmDelete(null);
-        } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: function() {
-          deleteNb(nb.id);
-        } }, "Yes, delete"));
+        return /* @__PURE__ */ React.createElement(
+          ConfirmStrip,
+          {
+            key: nb.id,
+            question: "Delete \u201C" + nb.name + "\u201D? Entries will move to Uncategorized.",
+            onCancel: function() {
+              setConfirmDelete(null);
+            },
+            onConfirm: function() {
+              deleteNb(nb.id);
+            }
+          }
+        );
       }
       var checked = members.has(nb.id);
       return /* @__PURE__ */ React.createElement(
@@ -7447,16 +7444,12 @@
     var _confirmDel = useState(null);
     var confirmDelIdx = _confirmDel[0];
     var setConfirmDelIdx = _confirmDel[1];
-    var _confirmDelStep = useState(1);
-    var confirmDelStep = _confirmDelStep[0];
-    var setConfirmDelStep = _confirmDelStep[1];
     useEffect(function() {
       if (confirmDelIdx === null) return;
       function onDocDown(e) {
         var t = e.target;
         if (t && t.closest && t.closest(".jrn-block-confirm")) return;
         setConfirmDelIdx(null);
-        setConfirmDelStep(1);
       }
       document.addEventListener("pointerdown", onDocDown, true);
       return function() {
@@ -7545,17 +7538,8 @@
         return next.length === 0 ? JournalHelpers.defaultBlocks() : next;
       });
       setConfirmDelIdx(null);
-      setConfirmDelStep(1);
       setConfirmAudioDelete(null);
       scheduleSave();
-    }
-    function requestDeleteBlock(idx) {
-      setConfirmDelIdx(idx);
-      setConfirmDelStep(1);
-    }
-    function cancelDeleteBlock() {
-      setConfirmDelIdx(null);
-      setConfirmDelStep(1);
     }
     function insertBlockAt(idx, block) {
       setBlocks(function(arr) {
@@ -7678,36 +7662,15 @@
     }
     function blockDeleteUI(idx) {
       if (confirmDelIdx === idx) {
-        var step2 = confirmDelStep === 2;
-        return /* @__PURE__ */ React.createElement("div", { className: "jrn-block-confirm" + (step2 ? " jrn-block-confirm-step2" : ""), onClick: function(e) {
-          e.stopPropagation();
-        } }, /* @__PURE__ */ React.createElement("span", { className: "jrn-block-confirm-q" }, step2 ? "Are you sure?" : "Delete?"), /* @__PURE__ */ React.createElement(
-          "button",
+        return /* @__PURE__ */ React.createElement(
+          ConfirmStrip,
           {
-            className: "jrn-block-confirm-cancel",
-            onClick: function(e) {
-              e.stopPropagation();
-              cancelDeleteBlock();
-            },
-            "aria-label": "Cancel"
-          },
-          "\xD7"
-        ), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: "jrn-block-confirm-yes",
-            onClick: function(e) {
-              e.stopPropagation();
-              if (step2) {
-                deleteBlock(idx);
-              } else {
-                setConfirmDelStep(2);
-              }
-            },
-            "aria-label": step2 ? "Confirm delete" : "Continue"
-          },
-          /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))
-        ));
+            className: "jrn-block-confirm",
+            question: "Delete this block?",
+            onCancel: () => setConfirmDelIdx(null),
+            onConfirm: () => deleteBlock(idx)
+          }
+        );
       }
       return /* @__PURE__ */ React.createElement(
         "button",
@@ -7715,7 +7678,7 @@
           className: "jrn-block-del-btn",
           onClick: function(e) {
             e.stopPropagation();
-            requestDeleteBlock(idx);
+            setConfirmDelIdx(idx);
           },
           title: "Delete block",
           "aria-label": "Delete block"

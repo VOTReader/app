@@ -101,6 +101,7 @@ import { LibraryNav } from './components/LibraryNav.jsx';
 import { FootnoteListSection } from './components/FootnoteListSection.jsx';
 import { StickyChapterNav } from './components/StickyChapterNav.jsx';
 import { ClearProgressRow } from './components/ClearProgressRow.jsx';
+import { ConfirmStrip } from './components/ConfirmStrip.jsx';
 import { SrchCard } from './components/SrchCard.jsx';
 import { SrchSnippet } from './components/SrchSnippet.jsx';
 import { SrchGroup } from './components/SrchGroup.jsx';
@@ -210,7 +211,7 @@ Object.assign(window, {
   InlineNotes, InlineEcho, StudyPanels,
   ChapterBookmarkBtn, NavButtons, ProphecyExpandToggle,
   HomeBtn, TabsNavBtn, LibraryNav,
-  FootnoteListSection, StickyChapterNav, ClearProgressRow,
+  FootnoteListSection, StickyChapterNav, ClearProgressRow, ConfirmStrip,
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, VolumeLetterIndex, HistoryEntryCard,
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader, AppShellOverlays, AppShellSheets,

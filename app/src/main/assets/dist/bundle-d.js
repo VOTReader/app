@@ -1759,9 +1759,42 @@
   }
 
   // app/src/main/assets/src/ui/components/ClearProgressRow.jsx
-  function ClearProgressRow2({ label, total, count, stage, onTap }) {
+  function ClearProgressRow2({ label, total, count, onClear }) {
+    const [confirming, setConfirming] = React.useState(false);
     if (count === 0) return /* @__PURE__ */ React.createElement("div", { className: "progress-row" }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, label), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, "0 / ", total), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", disabled: true }, "Clear"));
-    return /* @__PURE__ */ React.createElement("div", { className: "progress-row" }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, label), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, count, " / ", total), /* @__PURE__ */ React.createElement("button", { className: CLEAR_CLASSES[stage], onClick: onTap }, CLEAR_LABELS[stage]));
+    if (confirming) return /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        question: `Clear progress for \u201C${label}\u201D?`,
+        yesLabel: "Yes, clear",
+        onCancel: () => setConfirming(false),
+        onConfirm: () => {
+          onClear();
+          setConfirming(false);
+        }
+      }
+    );
+    return /* @__PURE__ */ React.createElement("div", { className: "progress-row" }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, label), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, count, " / ", total), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: () => setConfirming(true) }, "Clear"));
+  }
+
+  // app/src/main/assets/src/ui/components/ConfirmStrip.jsx
+  function ConfirmStrip2({ question, yesLabel, onCancel, onConfirm, className, style }) {
+    const cls = className ? "ann-chip-confirm " + className : "ann-chip-confirm";
+    return /* @__PURE__ */ React.createElement("div", { className: cls, style }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, question), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ann-chip-confirm-btn ann-chip-confirm-cancel",
+        onClick: onCancel
+      },
+      "Cancel"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ann-chip-confirm-btn ann-chip-confirm-yes",
+        onClick: onConfirm
+      },
+      yesLabel || "Yes, delete"
+    ));
   }
 
   // app/src/main/assets/src/ui/components/SrchCard.jsx
@@ -1978,34 +2011,15 @@
         }
       },
       "Remove link"
-    )), confirmRemove && /* @__PURE__ */ React.createElement(
-      "div",
+    )), confirmRemove && /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
       {
-        className: "ann-chip-confirm",
-        style: { padding: "10px 12px" },
-        onClick: (e) => e.stopPropagation()
-      },
-      /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Remove this link?"),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "ann-chip-confirm-btn ann-chip-confirm-cancel",
-          onClick: (e) => {
-            e.stopPropagation();
-            setConfirmRemove(false);
-          }
-        },
-        "Cancel"
-      ),
-      /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "ann-chip-confirm-btn ann-chip-confirm-yes",
-          onClick: doRemove
-        },
-        "Yes, remove"
-      )
-    ));
+        question: "Remove this link?",
+        yesLabel: "Yes, remove",
+        onCancel: () => setConfirmRemove(false),
+        onConfirm: doRemove
+      }
+    )));
   }
 
   // app/src/main/assets/src/ui/components/LinkIcon.jsx
@@ -2102,8 +2116,6 @@
     deduplicateTabs,
     tabActionIdx,
     setTabActionIdx,
-    clearAllStage,
-    setClearAllStage,
     lastTabCloseStrikesRef,
     // Disable-tabs prompt
     disableTabsPromptOpen,
@@ -2181,20 +2193,10 @@
           setTabsOverviewOpen(false);
         },
         onLongPress: (i) => setTabActionIdx(i),
-        onClearAll: (signal) => {
-          if (signal === -1) {
-            setClearAllStage(0);
-            return;
-          }
-          if (clearAllStage === 0) setClearAllStage(1);
-          else if (clearAllStage === 1) setClearAllStage(2);
-          else {
-            closeAllTabs();
-            setClearAllStage(0);
-            lastTabCloseStrikesRef.current = 0;
-          }
+        onClearAll: () => {
+          closeAllTabs();
+          lastTabCloseStrikesRef.current = 0;
         },
-        clearAllStage,
         onDedupe: () => deduplicateTabs(),
         MAX_TABS,
         thumbnails: tabThumbnails
@@ -4325,7 +4327,15 @@
         },
         maxLength: 60
       }
-    ) : /* @__PURE__ */ React.createElement("span", { className: "nb-drilled-title" }, drilledTitle), renaming ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nb-drilled-action", onClick: commitRename, title: "Save name" }, "Save"), /* @__PURE__ */ React.createElement("button", { className: "nb-drilled-action", onClick: () => setRenaming(false), title: "Cancel rename" }, "Cancel")) : drilledNb && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nb-drilled-action", onClick: startRename, title: "Rename notebook" }, "Rename"), /* @__PURE__ */ React.createElement("button", { className: "nb-drilled-action danger", onClick: () => setConfirmDeleteNb(true), title: "Delete notebook" }, "Delete"))), confirmDeleteNb && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm", style: { padding: "10px 12px", marginBottom: "0.8rem" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete \u201C", drilledTitle, "\u201D? Notes will move to Uncategorized."), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDeleteNb(false) }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: deleteCurrent }, "Yes, delete")), drilledNotes.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "notes-index-controls" }, /* @__PURE__ */ React.createElement(
+    ) : /* @__PURE__ */ React.createElement("span", { className: "nb-drilled-title" }, drilledTitle), renaming ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nb-drilled-action", onClick: commitRename, title: "Save name" }, "Save"), /* @__PURE__ */ React.createElement("button", { className: "nb-drilled-action", onClick: () => setRenaming(false), title: "Cancel rename" }, "Cancel")) : drilledNb && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nb-drilled-action", onClick: startRename, title: "Rename notebook" }, "Rename"), /* @__PURE__ */ React.createElement("button", { className: "nb-drilled-action danger", onClick: () => setConfirmDeleteNb(true), title: "Delete notebook" }, "Delete"))), confirmDeleteNb && /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        style: { marginBottom: "0.8rem" },
+        question: `Delete \u201C${drilledTitle}\u201D? Notes will move to Uncategorized.`,
+        onCancel: () => setConfirmDeleteNb(false),
+        onConfirm: deleteCurrent
+      }
+    ), drilledNotes.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "notes-index-controls" }, /* @__PURE__ */ React.createElement(
       "button",
       {
         className: "notes-index-sort-btn",
@@ -4569,36 +4579,7 @@
     };
     const isOpen = (id) => id in overrides ? overrides[id] : defaultOpen(id);
     const toggle = (id) => setOverrides((prev) => ({ ...prev, [id]: !(id in prev ? prev[id] : defaultOpen(id)) }));
-    const [pending, setPending] = React.useState(null);
-    const pendingTimer = React.useRef(null);
-    const pendingBtnRef = React.useRef(null);
-    const requestPrune = (dayId, y, m, d) => {
-      if (pending === dayId) {
-        onPruneDay(y, m, d);
-        setPending(null);
-        if (pendingTimer.current) clearTimeout(pendingTimer.current);
-      } else {
-        setPending(dayId);
-        if (pendingTimer.current) clearTimeout(pendingTimer.current);
-        pendingTimer.current = setTimeout(() => {
-          setPending((cur) => cur === dayId ? null : cur);
-        }, 5e3);
-      }
-    };
-    React.useEffect(() => () => {
-      if (pendingTimer.current) clearTimeout(pendingTimer.current);
-    }, []);
-    React.useEffect(() => {
-      if (!pending) return;
-      const onDocTap = (e) => {
-        const btn = pendingBtnRef.current;
-        if (btn && btn.contains(e.target)) return;
-        setPending(null);
-        if (pendingTimer.current) clearTimeout(pendingTimer.current);
-      };
-      document.addEventListener("click", onDocTap, true);
-      return () => document.removeEventListener("click", onDocTap, true);
-    }, [pending]);
+    const [confirmingDayId, setConfirmingDayId] = React.useState(null);
     const dupeCount = (entries) => {
       const seen = /* @__PURE__ */ new Set();
       let n = 0;
@@ -4619,15 +4600,27 @@
       const dId = isCurrent ? `cd:${year}-${month}-${dg.day}` : `ymd:${year}-${month}-${dg.day}`;
       const dOpen = isOpen(dId);
       const dupes = dupeCount(dg.entries);
-      const isPending = pending === dId;
-      return /* @__PURE__ */ React.createElement("div", { key: dId, className: "history-day-section" }, /* @__PURE__ */ React.createElement("button", { className: "history-day-header", onClick: () => toggle(dId) }, /* @__PURE__ */ React.createElement("span", { className: "history-day-label" }, dayLabel(year, month, dg.day)), dg.entries.length > 1 && /* @__PURE__ */ React.createElement("span", { className: "history-day-count" }, "\xB7 ", dg.entries.length), /* @__PURE__ */ React.createElement("span", { className: "history-day-spacer" }), /* @__PURE__ */ React.createElement("span", { className: `history-chevron${dOpen ? " is-open" : ""}` }, "\u203A")), dOpen && dupes > 0 && /* @__PURE__ */ React.createElement("div", { className: "history-dedupe-row" }, /* @__PURE__ */ React.createElement(
+      const isConfirming = confirmingDayId === dId;
+      return /* @__PURE__ */ React.createElement("div", { key: dId, className: "history-day-section" }, /* @__PURE__ */ React.createElement("button", { className: "history-day-header", onClick: () => toggle(dId) }, /* @__PURE__ */ React.createElement("span", { className: "history-day-label" }, dayLabel(year, month, dg.day)), dg.entries.length > 1 && /* @__PURE__ */ React.createElement("span", { className: "history-day-count" }, "\xB7 ", dg.entries.length), /* @__PURE__ */ React.createElement("span", { className: "history-day-spacer" }), /* @__PURE__ */ React.createElement("span", { className: `history-chevron${dOpen ? " is-open" : ""}` }, "\u203A")), dOpen && dupes > 0 && /* @__PURE__ */ React.createElement("div", { className: "history-dedupe-row" }, isConfirming ? /* @__PURE__ */ React.createElement(
+        ConfirmStrip,
+        {
+          question: `Remove ${dupes} duplicate ${dupes === 1 ? "entry" : "entries"} from this day?`,
+          yesLabel: "Yes, remove",
+          onCancel: () => setConfirmingDayId(null),
+          onConfirm: () => {
+            onPruneDay(year, month, dg.day);
+            setConfirmingDayId(null);
+          }
+        }
+      ) : /* @__PURE__ */ React.createElement(
         "button",
         {
-          ref: isPending ? pendingBtnRef : null,
-          className: `history-dedupe-btn${isPending ? " is-pending" : ""}`,
-          onClick: () => requestPrune(dId, year, month, dg.day)
+          className: "history-dedupe-btn",
+          onClick: () => setConfirmingDayId(dId)
         },
-        isPending ? `Tap again to confirm \u2014 removes ${dupes}` : `Deduplicate (${dupes})`
+        "Deduplicate (",
+        dupes,
+        ")"
       )), dOpen && /* @__PURE__ */ React.createElement("div", { className: "chapter-cards" }, dg.entries.map((entry, i) => /* @__PURE__ */ React.createElement(HistoryEntryCard, { key: entry.key + ":" + entry.ts + ":" + i, entry, onSelect }))));
     };
     return /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home nav-back-icon", onClick: onBack, title: "Back", "aria-label": "Back" }, "\u2039"), /* @__PURE__ */ React.createElement(HomeBtn, null), /* @__PURE__ */ React.createElement("button", { className: "settings-gear-btn", onClick: onSettings, title: "Settings" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))), /* @__PURE__ */ React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))), /* @__PURE__ */ React.createElement(ThemeBtn, { theme, onThemeChange })) }, /* @__PURE__ */ React.createElement("div", { className: "vol-index history-screen" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-header" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-eyebrow" }, "Reading Activity"), /* @__PURE__ */ React.createElement("h1", { className: "vol-index-title" }, "History"), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "vol-index-ornament-line r" }))), history.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "history-empty" }, /* @__PURE__ */ React.createElement("div", { className: "history-empty-sigil" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "history-empty-title" }, "The scroll is blank."), /* @__PURE__ */ React.createElement("div", { className: "history-empty-body" }, "Every chapter, letter, and study you visit will land here \u2014 a trail of what the Spirit has led you through. Begin reading and this will populate.")) : /* @__PURE__ */ React.createElement(React.Fragment, null, currentDays.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "history-current-section" }, currentDays.map((dg) => renderDaySection(curY, curM, dg, true))), tree.map((yg) => {
@@ -4660,6 +4653,87 @@
   }
 
   // app/src/main/assets/src/ui/screens/SettingsScreen.jsx
+  function HistoryClearRow({ historyCount, onClearHistory }) {
+    const [confirming, setConfirming] = React.useState(false);
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "progress-row", style: { background: "var(--bg2)", borderTop: "1px solid var(--gold-border)", borderRadius: "4px", marginTop: "0.4rem" } }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label", style: { color: "var(--cream-muted)" } }, "Reading history"), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, historyCount, " ", historyCount === 1 ? "entry" : "entries"), !confirming && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "settings-clear-btn",
+        disabled: historyCount === 0,
+        onClick: (e) => {
+          e.stopPropagation();
+          setConfirming(true);
+        }
+      },
+      "Clear History"
+    )), confirming && /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        question: "Clear all reading history?",
+        yesLabel: "Yes, clear",
+        onCancel: () => setConfirming(false),
+        onConfirm: () => {
+          onClearHistory();
+          setConfirming(false);
+        }
+      }
+    ));
+  }
+  function SectionClearBtn({ label, disabled, onClear }) {
+    const [confirming, setConfirming] = React.useState(false);
+    if (confirming) {
+      return /* @__PURE__ */ React.createElement(
+        ConfirmStrip,
+        {
+          question: `Clear all progress in "${label}"?`,
+          yesLabel: "Yes, clear",
+          onCancel: () => setConfirming(false),
+          onConfirm: () => {
+            onClear();
+            setConfirming(false);
+          }
+        }
+      );
+    }
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "settings-clear-btn",
+        disabled,
+        onClick: (e) => {
+          e.stopPropagation();
+          setConfirming(true);
+        }
+      },
+      "Clear"
+    );
+  }
+  function AllProgressClearRow({ totalRead, totalItems, onClearAll }) {
+    const [confirming, setConfirming] = React.useState(false);
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "progress-row total-row" }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, "All Scriptures"), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, totalRead, " / ", totalItems), !confirming && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "settings-clear-btn",
+        disabled: totalRead === 0,
+        onClick: (e) => {
+          e.stopPropagation();
+          setConfirming(true);
+        }
+      },
+      "Clear All"
+    )), confirming && /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        question: "Clear all reading progress across every book?",
+        yesLabel: "Yes, clear",
+        onCancel: () => setConfirming(false),
+        onConfirm: () => {
+          onClearAll();
+          setConfirming(false);
+        }
+      }
+    ));
+  }
   function SettingsScreen2({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
     React.useEffect(() => {
       if (typeof window.__loadBibleCorpus === "function") {
@@ -4681,7 +4755,6 @@
     );
     const _BOOKS_READY = typeof BOOKS !== "undefined" && !!BOOKS;
     const _VOT_READY = typeof window.__votCorpus !== "undefined" ? window.__votCorpus.loaded : false;
-    const [clearPending, setClearPending] = React.useState(null);
     const [openSections, setOpenSections] = React.useState(/* @__PURE__ */ new Set());
     const [wipeConfirm, setWipeConfirm] = React.useState(false);
     const [wipeText, setWipeText] = React.useState("");
@@ -4699,18 +4772,6 @@
     }, []);
     const wipeOk = wipeText.trim().toUpperCase() === "DELETE";
     const VERSION_ID = "v1";
-    const getStage = (key) => clearPending && clearPending.key === key ? clearPending.stage : 0;
-    const handleClearTap = (key, action) => (e) => {
-      e.stopPropagation();
-      const s = getStage(key);
-      if (s < 2) {
-        setClearPending({ key, stage: s + 1 });
-      } else {
-        action();
-        setClearPending(null);
-      }
-    };
-    const resetClearPending = () => setClearPending(null);
     const PROGRESS_GROUPS = !_BOOKS_READY || !_VOT_READY ? [] : [
       {
         id: "volumes",
@@ -5037,7 +5098,7 @@
       {
         navChildren: /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home nav-back-icon", onClick: onBack, title: "Back", "aria-label": "Back" }, "\u2039"), /* @__PURE__ */ React.createElement(HomeBtn, null), /* @__PURE__ */ React.createElement("button", { className: "nav-search-btn", onClick: onHistory, title: "History", style: { marginLeft: "auto" } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polyline", { points: "1 4 1 10 7 10" }), /* @__PURE__ */ React.createElement("path", { d: "M3.51 15a9 9 0 1 0 .49-5.01" }))), /* @__PURE__ */ React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))), /* @__PURE__ */ React.createElement(ThemeBtn, { theme, onThemeChange }))
       },
-      /* @__PURE__ */ React.createElement("div", { className: "settings-screen", onClick: resetClearPending }, /* @__PURE__ */ React.createElement("div", { className: "settings-header" }, /* @__PURE__ */ React.createElement("div", { className: "settings-eyebrow" }, "VOT Study Bible"), /* @__PURE__ */ React.createElement("h1", { className: "settings-title" }, "Settings"), /* @__PURE__ */ React.createElement("div", { className: "settings-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "settings-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "settings-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "settings-ornament-line r" }))), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "Text & Translation"), /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("div", { className: "settings-screen" }, /* @__PURE__ */ React.createElement("div", { className: "settings-header" }, /* @__PURE__ */ React.createElement("div", { className: "settings-eyebrow" }, "VOT Study Bible"), /* @__PURE__ */ React.createElement("h1", { className: "settings-title" }, "Settings"), /* @__PURE__ */ React.createElement("div", { className: "settings-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "settings-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "settings-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "settings-ornament-line r" }))), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "Text & Translation"), /* @__PURE__ */ React.createElement(
         SelectField,
         {
           eyebrow: "Text & Translation",
@@ -5198,19 +5259,7 @@
           checked: settings.historyEnabled !== false,
           onToggle: () => onToggle("historyEnabled")
         }
-      ), (() => {
-        const histStage = getStage("history-clear");
-        const histLabel = histStage === 0 ? "Clear History" : CLEAR_LABELS[histStage];
-        return /* @__PURE__ */ React.createElement("div", { className: "progress-row", style: { background: "var(--bg2)", borderTop: "1px solid var(--gold-border)", borderRadius: "4px", marginTop: "0.4rem" } }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label", style: { color: "var(--cream-muted)" } }, "Reading history"), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, historyCount, " ", historyCount === 1 ? "entry" : "entries"), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: CLEAR_CLASSES[histStage],
-            disabled: historyCount === 0,
-            onClick: handleClearTap("history-clear", onClearHistory)
-          },
-          histLabel
-        ));
-      })()), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "A Return to The Garden"), /* @__PURE__ */ React.createElement(
+      ), /* @__PURE__ */ React.createElement(HistoryClearRow, { historyCount, onClearHistory })), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "A Return to The Garden"), /* @__PURE__ */ React.createElement(
         SelectField,
         {
           eyebrow: "A Return to The Garden",
@@ -5315,8 +5364,6 @@
         const isOpen = openSections.has(grp.id);
         const sRead = sectionRead(grp);
         const sTotal = sectionTotal(grp);
-        const sectionKey = `section:${grp.id}`;
-        const secStage = getStage(sectionKey);
         return /* @__PURE__ */ React.createElement(React.Fragment, { key: grp.id }, /* @__PURE__ */ React.createElement(
           "div",
           {
@@ -5325,47 +5372,29 @@
             onClick: (e) => {
               e.stopPropagation();
               toggleSection(grp.id);
-              resetClearPending();
             }
           },
           /* @__PURE__ */ React.createElement("span", { style: { color: "var(--gold-dim)", fontSize: "0.75rem", minWidth: "0.75rem" } }, isOpen ? "\u25BE" : "\u25B8"),
           /* @__PURE__ */ React.createElement("span", { className: "progress-row-label", style: { color: "var(--gold)" } }, grp.label),
           /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, sRead, " / ", sTotal),
           /* @__PURE__ */ React.createElement(
-            "button",
+            SectionClearBtn,
             {
-              className: CLEAR_CLASSES[secStage],
+              label: grp.label,
               disabled: sRead === 0,
-              onClick: handleClearTap(sectionKey, () => sectionBooks(grp).forEach((b) => onClearBook(b.id)))
-            },
-            CLEAR_LABELS[secStage]
-          )
-        ), isOpen && grp.genres.map((genre) => /* @__PURE__ */ React.createElement(React.Fragment, { key: genre.label }, /* @__PURE__ */ React.createElement("div", { className: "progress-row", style: { background: "var(--bg2)", paddingTop: "0.45rem", paddingBottom: "0.45rem", paddingLeft: "2rem" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--gold-dim)", flex: 1 } }, genre.label)), genre.books.map((src) => {
-          const bookKey = `book:${src.id}`;
-          return /* @__PURE__ */ React.createElement("div", { key: src.id, style: { paddingLeft: "1rem" } }, /* @__PURE__ */ React.createElement(
-            ClearProgressRow,
-            {
-              label: src.label,
-              total: src.total,
-              count: countFor(src.id),
-              stage: getStage(bookKey),
-              onTap: handleClearTap(bookKey, () => onClearBook(src.id))
+              onClear: () => sectionBooks(grp).forEach((b) => onClearBook(b.id))
             }
-          ));
-        }))));
-      }), /* @__PURE__ */ React.createElement("div", { className: "progress-divider" }), /* @__PURE__ */ React.createElement("div", { className: "progress-row total-row" }, /* @__PURE__ */ React.createElement("span", { className: "progress-row-label" }, "All Scriptures"), /* @__PURE__ */ React.createElement("span", { className: "progress-row-tally" }, totalRead, " / ", totalItems), (() => {
-        const allStage = getStage("all");
-        const label = allStage === 0 ? "Clear All" : CLEAR_LABELS[allStage];
-        return /* @__PURE__ */ React.createElement(
-          "button",
+          )
+        ), isOpen && grp.genres.map((genre) => /* @__PURE__ */ React.createElement(React.Fragment, { key: genre.label }, /* @__PURE__ */ React.createElement("div", { className: "progress-row", style: { background: "var(--bg2)", paddingTop: "0.45rem", paddingBottom: "0.45rem", paddingLeft: "2rem" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--gold-dim)", flex: 1 } }, genre.label)), genre.books.map((src) => /* @__PURE__ */ React.createElement("div", { key: src.id, style: { paddingLeft: "1rem" } }, /* @__PURE__ */ React.createElement(
+          ClearProgressRow,
           {
-            className: CLEAR_CLASSES[allStage],
-            disabled: totalRead === 0,
-            onClick: handleClearTap("all", onClearAll)
-          },
-          label
-        );
-      })()))))
+            label: src.label,
+            total: src.total,
+            count: countFor(src.id),
+            onClear: () => onClearBook(src.id)
+          }
+        ))))));
+      }), /* @__PURE__ */ React.createElement("div", { className: "progress-divider" }), /* @__PURE__ */ React.createElement(AllProgressClearRow, { totalRead, totalItems, onClearAll }))))
     );
   }
 
@@ -6519,9 +6548,17 @@
       onClose();
     } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M5 12h14" }), /* @__PURE__ */ React.createElement("polyline", { points: "12 5 19 12 12 19" })), /* @__PURE__ */ React.createElement("span", null, "Open Target")), /* @__PURE__ */ React.createElement("button", { className: "link-action-btn link-action-btn-danger", onClick: function() {
       setConfirming(true);
-    } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" })), /* @__PURE__ */ React.createElement("span", null, "Delete Link"))), confirming && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm", style: { padding: "14px 12px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete this link?"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
-      setConfirming(false);
-    } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: doDelete }, "Yes, delete"))));
+    } }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" })), /* @__PURE__ */ React.createElement("span", null, "Delete Link"))), confirming && /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        style: { padding: "14px 12px" },
+        question: "Delete this link?",
+        onCancel: function() {
+          setConfirming(false);
+        },
+        onConfirm: doDelete
+      }
+    )));
   }
   function LinksScreen2(props) {
     var onBack = props.onBack;
@@ -6884,9 +6921,17 @@
           }
         }
       }
-    ), /* @__PURE__ */ React.createElement("div", { className: "bkm-action-thought-actions" }, /* @__PURE__ */ React.createElement("button", { className: "link-action-btn", onClick: cancelEditThought }, /* @__PURE__ */ React.createElement("span", null, "Cancel")), /* @__PURE__ */ React.createElement("button", { className: "link-action-btn", onClick: saveThought, style: { color: "var(--gold)" } }, /* @__PURE__ */ React.createElement("span", null, "Save")))), confirming && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm", style: { padding: "14px 12px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete this bookmark?"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
-      setConfirming(false);
-    } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: doDelete }, "Yes, delete"))));
+    ), /* @__PURE__ */ React.createElement("div", { className: "bkm-action-thought-actions" }, /* @__PURE__ */ React.createElement("button", { className: "link-action-btn", onClick: cancelEditThought }, /* @__PURE__ */ React.createElement("span", null, "Cancel")), /* @__PURE__ */ React.createElement("button", { className: "link-action-btn", onClick: saveThought, style: { color: "var(--gold)" } }, /* @__PURE__ */ React.createElement("span", null, "Save")))), confirming && /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        style: { padding: "14px 12px" },
+        question: "Delete this bookmark?",
+        onCancel: function() {
+          setConfirming(false);
+        },
+        onConfirm: doDelete
+      }
+    )));
   }
   function BookmarkPopover2({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
     var useState2 = React.useState;
@@ -6976,11 +7021,19 @@
           }
         ), /* @__PURE__ */ React.createElement("div", { className: "bkm-popover-actions" }, /* @__PURE__ */ React.createElement("button", { className: "bkm-popover-btn", onClick: cancelEditThought }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "bkm-popover-btn bkm-popover-btn-primary", onClick: function() {
           saveThought(bkm);
-        } }, "Save"))), isConfirming && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm", style: { padding: "8px 10px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete this bookmark?"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
-          setConfirmingId(null);
-        } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: function() {
-          doDelete(bkm);
-        } }, "Yes, delete")));
+        } }, "Save"))), isConfirming && /* @__PURE__ */ React.createElement(
+          ConfirmStrip,
+          {
+            style: { padding: "8px 10px" },
+            question: "Delete this bookmark?",
+            onCancel: function() {
+              setConfirmingId(null);
+            },
+            onConfirm: function() {
+              doDelete(bkm);
+            }
+          }
+        ));
       })
     ));
   }
@@ -7417,8 +7470,9 @@
   }
 
   // app/src/main/assets/src/ui/sheets/TabsOverview.jsx
-  function TabsOverview2({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onLongPress, onClearAll, clearAllStage, onDedupe, MAX_TABS, thumbnails }) {
+  function TabsOverview2({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onLongPress, onClearAll, onDedupe, MAX_TABS, thumbnails }) {
     const total = tabs.length;
+    const [confirmingClearAll, setConfirmingClearAll] = React.useState(false);
     const handleLongPress = React.useRef(null);
     const startLongPress = (idx) => (_e) => {
       handleLongPress.current = setTimeout(() => {
@@ -7443,22 +7497,28 @@
       });
       return dupes;
     }, [tabs]);
-    const clearLabelLocal = clearAllStage === 0 ? "Clear All" : CLEAR_LABELS[clearAllStage];
-    const clearClassLocal = CLEAR_CLASSES[clearAllStage];
-    const resetClearOnOutsideTap = (_e) => {
-      if (clearAllStage > 0) onClearAll && onClearAll(-1);
-    };
-    return /* @__PURE__ */ React.createElement("div", { className: "tabs-overview", onClick: resetClearOnOutsideTap }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-header" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-eyebrow" }, "Reading Places"), /* @__PURE__ */ React.createElement("h1", { className: "tabs-overview-title" }, "Tabs"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-diamond" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-meta" }, total, " / ", MAX_TABS, " ", total === 1 ? "tab" : "tabs", " open"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-actions" }, /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "tabs-overview" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-header" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-eyebrow" }, "Reading Places"), /* @__PURE__ */ React.createElement("h1", { className: "tabs-overview-title" }, "Tabs"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-diamond" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-ornament-line r" })), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-meta" }, total, " / ", MAX_TABS, " ", total === 1 ? "tab" : "tabs", " open"), /* @__PURE__ */ React.createElement("div", { className: "tabs-overview-actions" }, confirmingClearAll ? /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        question: `Close all ${total} tabs?`,
+        yesLabel: "Yes, close all",
+        onCancel: () => setConfirmingClearAll(false),
+        onConfirm: () => {
+          onClearAll();
+          setConfirmingClearAll(false);
+        }
+      }
+    ) : /* @__PURE__ */ React.createElement(
       "button",
       {
-        className: clearClassLocal,
+        className: "settings-clear-btn",
         onClick: (e) => {
           e.stopPropagation();
-          onClearAll();
+          setConfirmingClearAll(true);
         },
-        disabled: total <= 1 && clearAllStage === 0
+        disabled: total <= 1
       },
-      clearLabelLocal
+      "Clear All"
     ), /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -7672,7 +7732,15 @@
       "Create"
     )), notebooks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : /* @__PURE__ */ React.createElement("div", { className: "nb-picker-list" }, notebooks.map((nb) => {
       if (confirmDeleteNb === nb.id) {
-        return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete \u201C", nb.name, "\u201D? Notes will move to Uncategorized."), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDeleteNb(null) }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: () => deleteNb(nb.id) }, "Yes, delete"));
+        return /* @__PURE__ */ React.createElement(
+          ConfirmStrip,
+          {
+            key: nb.id,
+            question: `Delete \u201C${nb.name}\u201D? Notes will move to Uncategorized.`,
+            onCancel: () => setConfirmDeleteNb(null),
+            onConfirm: () => deleteNb(nb.id)
+          }
+        );
       }
       const checked = memberIds.has(nb.id);
       return /* @__PURE__ */ React.createElement(
@@ -7857,7 +7925,14 @@
         const nb = NotebookStore.get(id);
         return nb ? nb.name : null;
       }).filter(Boolean).join(", ") || "Add to notebook\u2026" : "Add to notebook\u2026"
-    ), mode === "edit" && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-footer" }, /* @__PURE__ */ React.createElement("button", { className: "note-sheet-secondary", onClick: cancelEdit }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-save", onClick: save }, "Save")), mode === "read" && menuOpen && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-menu" }, confirmDelete ? /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm" }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete this note?"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDelete(false) }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: remove }, "Yes, delete")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-item", onClick: () => {
+    ), mode === "edit" && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-footer" }, /* @__PURE__ */ React.createElement("button", { className: "note-sheet-secondary", onClick: cancelEdit }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-save", onClick: save }, "Save")), mode === "read" && menuOpen && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-menu" }, confirmDelete ? /* @__PURE__ */ React.createElement(
+      ConfirmStrip,
+      {
+        question: "Delete this note?",
+        onCancel: () => setConfirmDelete(false),
+        onConfirm: remove
+      }
+    ) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-item", onClick: () => {
       setMenuOpen(false);
       setMode("edit");
     } }, "Edit note"), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-item", onClick: () => {
@@ -8322,6 +8397,10 @@
     const [pos, setPos] = React.useState({ x: 0, y: 0 });
     const [selInfo, setSelInfo] = React.useState(null);
     const [activeStyle, setActiveStyle] = React.useState("highlight");
+    const [confirmingRemove, setConfirmingRemove] = React.useState(false);
+    React.useEffect(() => {
+      setConfirmingRemove(false);
+    }, [selInfo]);
     const toolbarRef = React.useRef(null);
     const suppressRef = React.useRef(false);
     const computeOffset = React.useCallback((container, node, offset) => {
@@ -8879,7 +8958,18 @@
           }, 300);
         }
       },
-      showColors && /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-row sel-toolbar-styles" }, /* @__PURE__ */ React.createElement(
+      confirmingRemove ? /* @__PURE__ */ React.createElement(
+        ConfirmStrip,
+        {
+          question: "Remove this highlight?",
+          yesLabel: "Yes, remove",
+          onCancel: () => setConfirmingRemove(false),
+          onConfirm: () => {
+            removeHighlight();
+            setConfirmingRemove(false);
+          }
+        }
+      ) : /* @__PURE__ */ React.createElement(React.Fragment, null, showColors && /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-row sel-toolbar-styles" }, /* @__PURE__ */ React.createElement(
         "button",
         {
           className: "sel-style-btn" + (activeStyle === "highlight" ? " active" : ""),
@@ -8908,12 +8998,11 @@
         "button",
         {
           className: "sel-color-btn sel-color-clear",
-          onClick: removeHighlight,
+          onClick: () => setConfirmingRemove(true),
           title: "Remove highlight"
         },
         "\u2715"
-      ))),
-      /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-row sel-toolbar-actions" }, !mv && /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleNote, title: "Note" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), /* @__PURE__ */ React.createElement("polyline", { points: "14 2 14 8 20 8" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "17", x2: "16", y2: "17" })), /* @__PURE__ */ React.createElement("span", null, "Note")), showColors && /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleLink, title: "Link" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })), /* @__PURE__ */ React.createElement("span", null, "Link")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: copyText, title: "Copy" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })), /* @__PURE__ */ React.createElement("span", null, "Copy")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleShare, title: "Share" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "5", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "19", r: "3" }), /* @__PURE__ */ React.createElement("line", { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }), /* @__PURE__ */ React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" })), /* @__PURE__ */ React.createElement("span", null, "Share")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })), /* @__PURE__ */ React.createElement("span", null, "Search")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleBookmark, title: "Bookmark" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" })), /* @__PURE__ */ React.createElement("span", null, "Bookmark")))
+      ))), /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-row sel-toolbar-actions" }, !mv && /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleNote, title: "Note" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), /* @__PURE__ */ React.createElement("polyline", { points: "14 2 14 8 20 8" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "17", x2: "16", y2: "17" })), /* @__PURE__ */ React.createElement("span", null, "Note")), showColors && /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleLink, title: "Link" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })), /* @__PURE__ */ React.createElement("span", null, "Link")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: copyText, title: "Copy" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })), /* @__PURE__ */ React.createElement("span", null, "Copy")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleShare, title: "Share" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "5", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "19", r: "3" }), /* @__PURE__ */ React.createElement("line", { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" }), /* @__PURE__ */ React.createElement("line", { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" })), /* @__PURE__ */ React.createElement("span", null, "Share")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })), /* @__PURE__ */ React.createElement("span", null, "Search")), /* @__PURE__ */ React.createElement("button", { className: "sel-action-btn", onClick: handleBookmark, title: "Bookmark" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" })), /* @__PURE__ */ React.createElement("span", null, "Bookmark"))))
     );
   }
 
@@ -9008,21 +9097,15 @@
         /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), /* @__PURE__ */ React.createElement("polyline", { points: "14 2 14 8 20 8" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "13", x2: "16", y2: "13" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "17", x2: "16", y2: "17" })),
         /* @__PURE__ */ React.createElement("span", null, "Note")
       )),
-      mode === "confirm" && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm" }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Remove this ", kindLabel, "?"), /* @__PURE__ */ React.createElement(
-        "button",
+      mode === "confirm" && /* @__PURE__ */ React.createElement(
+        ConfirmStrip,
         {
-          className: "ann-chip-confirm-btn ann-chip-confirm-cancel",
-          onClick: () => setMode("main")
-        },
-        "Cancel"
-      ), /* @__PURE__ */ React.createElement(
-        "button",
-        {
-          className: "ann-chip-confirm-btn ann-chip-confirm-yes",
-          onClick: remove
-        },
-        "Yes, remove"
-      )),
+          question: `Remove this ${kindLabel}?`,
+          yesLabel: "Yes, remove",
+          onCancel: () => setMode("main"),
+          onConfirm: remove
+        }
+      ),
       mode === "colors" && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-colors" }, /* @__PURE__ */ React.createElement("button", { className: "ann-chip-back", onClick: () => setMode("main"), title: "Back" }, "\u2039"), HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
         "button",
         {
@@ -9206,9 +9289,17 @@
         },
         /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("polyline", { points: "3 6 5 6 21 6" }), /* @__PURE__ */ React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }), /* @__PURE__ */ React.createElement("path", { d: "M10 11v6" }), /* @__PURE__ */ React.createElement("path", { d: "M14 11v6" })),
         /* @__PURE__ */ React.createElement("span", null, "Delete")
-      ), confirmingDelete && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-confirm bkm-create-edit-confirm" }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete bookmark?"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: function() {
-        setConfirmingDelete(false);
-      } }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: handleDelete }, "Yes, delete"))))
+      ), confirmingDelete && /* @__PURE__ */ React.createElement(
+        ConfirmStrip,
+        {
+          className: "bkm-create-edit-confirm",
+          question: "Delete bookmark?",
+          onCancel: function() {
+            setConfirmingDelete(false);
+          },
+          onConfirm: handleDelete
+        }
+      )))
     ));
   }
 
@@ -9291,7 +9382,15 @@
       "Create"
     )), notebooks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : /* @__PURE__ */ React.createElement("div", { className: "nb-picker-list" }, notebooks.map((nb) => {
       if (confirmDeleteId === nb.id) {
-        return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "ann-chip-confirm", style: { padding: "10px 12px" } }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, "Delete \u201C", nb.name, "\u201D? Notes will move to Uncategorized."), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-cancel", onClick: () => setConfirmDeleteId(null) }, "Cancel"), /* @__PURE__ */ React.createElement("button", { className: "ann-chip-confirm-btn ann-chip-confirm-yes", onClick: () => deleteNb(nb.id) }, "Yes, delete"));
+        return /* @__PURE__ */ React.createElement(
+          ConfirmStrip,
+          {
+            key: nb.id,
+            question: `Delete \u201C${nb.name}\u201D? Notes will move to Uncategorized.`,
+            onCancel: () => setConfirmDeleteId(null),
+            onConfirm: () => deleteNb(nb.id)
+          }
+        );
       }
       if (renameId === nb.id) {
         return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "nb-picker-row checked", style: { gap: "8px" } }, /* @__PURE__ */ React.createElement(
@@ -9512,9 +9611,6 @@
         setStudiesTick((v) => v + 1);
       });
     }, [screen]);
-    useEffect(() => {
-      setClearAllStage(0);
-    }, [tabsOverviewOpen]);
     const [titleFocusHidden, setTitleFocusHidden] = tabField("titleFocusHidden");
     const [headingsFocusHidden, setHeadingsFocusHidden] = tabField("headingsFocusHidden");
     const [fromSearch, setFromSearch] = tabField("fromSearch");
@@ -9624,8 +9720,6 @@
       setTabActionIdx,
       disableTabsPromptOpen,
       setDisableTabsPromptOpen,
-      clearAllStage,
-      setClearAllStage,
       lastTabCloseStrikes,
       MAX_TABS
     } = useTabActions({ tabState, cancelDwell, setTabThumbnails });
@@ -10113,8 +10207,6 @@
         deduplicateTabs,
         tabActionIdx,
         setTabActionIdx,
-        clearAllStage,
-        setClearAllStage,
         lastTabCloseStrikesRef: lastTabCloseStrikes,
         disableTabsPromptOpen,
         setDisableTabsPromptOpen,
@@ -10249,6 +10341,7 @@
     FootnoteListSection: FootnoteListSection2,
     StickyChapterNav: StickyChapterNav2,
     ClearProgressRow: ClearProgressRow2,
+    ConfirmStrip: ConfirmStrip2,
     SrchCard: SrchCard2,
     SrchSnippet: SrchSnippet2,
     SrchGroup: SrchGroup2,
