@@ -3,8 +3,8 @@ VOTReader-studio — Strategic Working Memory
 ═══════════════════════════════════════════════════════════════════════════════
 
 Started: 2026-05-10
-Last pruned: 2026-05-25 (Q6 + Q7 + Q8 lazy-load CLOSED; N1 native-side polish CLOSED)
-Status: ACTIVE — kept slim as work progresses
+Last pruned: 2026-05-26 (PWA migration W0-W8 plan added; all prior phases CLOSED)
+Status: ACTIVE — W0-W8 cross-platform + quality hardening plan in progress
 Companions: CLAUDE.md (live status), HISTORY.md (landed work), ARCHITECTURE.md (system ref)
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -133,6 +133,1229 @@ POST-Q4 BACKLOG (priority order — top = next)
 
    See CLAUDE.md "N1" section + HISTORY.md for the per-commit detail.
 
+═══════════════════════════════════════════════════════════════════════════════
+PWA MIGRATION — CROSS-PLATFORM (Android + PC)
+═══════════════════════════════════════════════════════════════════════════════
+
+Goal: VOTReader runs as a native Android APK (existing) AND as an installable
+PWA on desktop (Chrome/Edge/Firefox). One JS codebase, two shells. All data
+stays local on both platforms. No server, no credentials, no API keys.
+
+Rationale — the inversion:
+
+  The architectural review surfaced 18 critiques. The deepest one — "WebView
+  fighting native UX" — is the meta-critique behind most of the others.
+  Going cross-platform doesn't just ADD a platform. It INVERTS that critique.
+  The 135+ modules of battle-tested web code stop being a limitation locked
+  inside a single-platform Android shell and become the core asset. PWA
+  validates the foundation rather than rebuilding it.
+
+  Concretely, every strength W0-W8 leans on is already in place:
+    - AndroidBridge call sites are already guarded with `if (window.AndroidBridge)`
+      — desktop browser mostly works today (W1 is formalization, not invention).
+    - N1's native extraction (BridgeHost / AppInterface / JsBridge /
+      MainViewModel / NativeAudioRecorder / StorageManager) already demonstrates
+      the shell-vs-app separation that PlatformBridge will mirror on the JS side.
+    - The 6-step pre-commit gate + 476 vitest + 134 JUnit + JaCoCo 0.85 floor
+      means changes are inspectable per-commit. The safety net is built;
+      this work uses it rather than rebuilding it.
+    - 1.03 MB critical-path bundle is small enough to cache as the PWA
+      install-time shell (W3).
+
+  One codebase, two shells, all data local. No server, no credentials, no API
+  keys, no runtime network egress. The PWA isn't a port — it's revealing what
+  was already there.
+
+  W0-W6 makes the app work everywhere. W7-W8 closes every remaining critique.
+  When W8 closes, the 18-item traceability matrix at the bottom of this file
+  is clean — zero gaps.
+
+  Mandate: not just executing the plan. Stay alert to anything broken or
+  missable as we touch each file. Improve as we go. Creative & professional.
+  Every commit ships to production.
+
+Current state (pre-migration):
+  - The JS app ALREADY mostly works in a desktop browser (React, stores,
+    corpus, rendering all load). AndroidBridge calls silently no-op because
+    every call site is already guarded: `if (window.AndroidBridge) {...}`.
+  - What DOESN'T work on desktop: file import/export, audio recording,
+    native screenshots, back-button navigation, fullscreen toggle, zoom,
+    haptics, status bar, keep-screen-on.
+  - Font files are declared in CSS @font-face but DO NOT EXIST in the repo
+    (fonts/ directory is empty). This is a pre-existing visual bug on any
+    platform — system fallback fonts render instead of Cinzel/Garamond.
+  - localStorage persistence works on both but has quota ceiling (~5-10 MB)
+    and no transactional writes.
+  - No PWA infrastructure exists: no manifest.json, no service worker, no
+    offline fallback, no PWA meta tags.
+
+Sequencing rationale:
+  W0 → W1 → W2 → W3 → W4 → W5 → W6
+
+  W0 (prerequisites) unblocks everything: fonts + owed device verification.
+  W1 (platform bridge) makes desktop functionally correct — file I/O, audio,
+    back-button, screenshots all work via browser APIs.
+  W2 (IndexedDB) fixes the persistence ceiling on BOTH platforms — the one
+    change with highest user-facing impact.
+  W3 (PWA shell) makes it installable + offline on desktop.
+  W4 (desktop polish) optimizes the desktop experience after it works.
+  W5 (hosting + CI) ships it.
+  W6 (cross-platform verification) proves it.
+
+  Each phase is independently shippable. W1 alone makes the app usable on
+  desktop. W2 alone improves both platforms. Nothing breaks mid-migration
+  because every phase is additive — the Android path continues to work
+  unchanged throughout.
+
+───────────────────────────────────────────────────────────────────────────────
+W0 — PREREQUISITES (unblock everything)
+───────────────────────────────────────────────────────────────────────────────
+
+W0 exists to close two debts that become blockers under cross-platform: the
+missing font files (visual correctness on any platform) and the NK7 device
+verification (Android stability baseline before we add a second platform).
+
+  W0.1 — Source and commit font files — LANDED 2026-05-26 (5688f6e)
+  ──────────────────────────────────────────────────────────────────
+  6 WOFF2 fonts + 2 OFL.txt attribution files (~140 KB total) at
+  app/src/main/assets/fonts/. Sourced from fontsource (descended from
+  NDISCOVER/Cinzel + octaviopardo/EBGaramond12 upstream; all SIL OFL 1.1):
+
+    cinzel-latin-400-normal.woff2                14 KB
+    cinzel-latin-700-normal.woff2                15 KB  (covers 600 + 700)
+    cinzel-decorative-latin-400-normal.woff2     14 KB
+    cinzel-decorative-latin-700-normal.woff2     15 KB
+    eb-garamond-latin-wght-normal.woff2          41 KB  (variable axis)
+    eb-garamond-latin-wght-italic.woff2          42 KB  (variable italic)
+    OFL-Cinzel.txt  +  OFL-EBGaramond.txt
+
+  Pre-existing bug discovered + fixed: the previous @font-face declarations
+  referenced Cinzel-Regular.otf / Cinzel-Bold.otf / EBGaramond-VariableFont_
+  wght.ttf — filenames that have never existed in the upstream repos. Only
+  Cinzel Decorative was rendering correctly (its declarations happened to
+  match fontsource's naming convention). Cinzel + EB Garamond were silently
+  falling back to system serif on every platform since the @font-face block
+  first landed. The kind of latent rot a fresh look surfaces; called out per
+  the W0 mandate to stay alert to anything broken or missable.
+
+  index.html @font-face declarations updated to match the WOFF2 filenames.
+  Net structural change: 7 blocks → 6 (Cinzel 600+700 merged into one
+  weight range — both pointed to the same file). Format hints opentype +
+  truetype → woff2 across the board.
+
+  Verified via preview server (port 8090):
+    - document.fonts.check() = true for all 6 declared faces (after lazy-load)
+    - Width measurement at 32pt distinct from serif fallback (Cinzel 375 vs
+      serif 281) — proves actual rendering, not silent fallback
+    - Zero failed network requests, zero console errors
+
+  W0.2 — NK7 real-device verification walk
+  ──────────────────────────────────────────
+  The 287-line numbered checklist at tools/n1-smoke-walk.md has been owed
+  since NK closed (2026-05-25). Items that specifically need a physical
+  phone (not emulator):
+    - chrome://inspect DevTools attachment on debug APK (N1.1)
+    - chrome://crash renderer recovery + retry-view branch (N1.3 + d8d0ab6)
+    - PixelCopy screenshot on hardware-accelerated content (N1.6)
+    - Keyboard animation smoothness / per-frame inset tracking (N1.8)
+    - Recorder survival across orientation change (N1.9)
+    - Full import/export/record/screenshot smoke walk
+
+  This is the stability BASELINE before adding a second platform.
+  May surface bugs from N1 hardening that need fixes before proceeding.
+
+  Exit criteria:
+    [ ] All 6 font files committed and rendering verified
+    [ ] NK7 smoke walk completed — all items PASS or defects filed + fixed
+
+───────────────────────────────────────────────────────────────────────────────
+W1 — PLATFORM BRIDGE (decouple JS from AndroidBridge)
+───────────────────────────────────────────────────────────────────────────────
+
+Goal: every feature that currently requires AndroidBridge works on desktop
+via browser-native APIs. The Android path is unchanged — it still uses
+the native bridge. Desktop gets its own implementation.
+
+Architecture: a single `platform-bridge.js` module (new file in src/utils/)
+exports a PlatformBridge object. At boot, it detects the environment and
+wires up the correct implementation. All existing call sites change from
+`window.AndroidBridge.foo()` to `PlatformBridge.foo()`.
+
+Detection: `const isAndroid = typeof window.AndroidBridge !== 'undefined'`
+(this guard already exists in JournalRecordingSheet + use-thumbnails).
+
+  W1.1 — PlatformBridge interface + Android impl (passthrough)
+  ─────────────────────────────────────────────────────────────
+  Define the interface (JSDoc typedef) and the Android implementation that
+  delegates every call to window.AndroidBridge. This is a mechanical 1:1
+  wrapper. All 15 methods:
+
+    Platform-only (Android bridge passthrough, web no-op):
+      setLightStatusBar(light)    → no-op on web (CSS handles it)
+      setImmersiveMode(immersive) → Fullscreen API
+      setKeepScreenOn(enabled)    → WakeLock API
+      startAudioSession()         → no-op on web
+      endAudioSession()           → no-op on web
+      haptic(style)               → navigator.vibrate()
+      setZoomEnabled(enabled)     → CSS touch-action
+      resetZoom()                 → CSS transform
+      getZoomScale()              → return 1.0
+
+    File I/O:
+      openFilePicker()            → <input type="file"> click
+      saveToDownloads(name, data) → Blob + <a download>
+
+    Audio recording:
+      requestMicPermission()      → navigator.mediaDevices.getUserMedia
+      nativeRecordStart()         → MediaRecorder API
+      nativeRecordPause()         → mediaRecorder.pause()
+      nativeRecordResume()        → mediaRecorder.resume()
+      nativeRecordAmplitude()     → AnalyserNode
+      nativeRecordStop()          → mediaRecorder.stop() + ondataavailable
+      nativeRecordCancel()        → discard blobs
+
+    Screenshots:
+      takeScreenshot(crop,max,q)  → html2canvas (already bundled)
+
+    Diagnostics:
+      getCrashLog()               → return "[]" (no native log on web)
+
+  No behavior change for Android — the passthrough delegates identically
+  to what the existing code does. Tests: vitest for the web impl (mock
+  MediaRecorder, mock navigator.vibrate, etc.).
+
+  W1.2 — Migrate call sites (mechanical substitution)
+  ────────────────────────────────────────────────────
+  15 unique methods across 6 files:
+    use-settings.js         — setLightStatusBar, setKeepScreenOn
+    use-thumbnails.js       — takeScreenshot
+    GardenView.jsx          — setZoomEnabled, resetZoom, setImmersiveMode
+    JournalRecordingSheet   — requestMicPermission, startAudioSession,
+                              endAudioSession, nativeRecord*
+    SettingsScreen.jsx      — openFilePicker, saveToDownloads, getCrashLog
+    (haptic — not yet wired in JS, see memory [[haptic-bridge-ready]])
+
+  Each file: replace `window.AndroidBridge?.method()` with
+  `PlatformBridge.method()`. Remove the `if (window.AndroidBridge)`
+  guards — the bridge now always exists, with the correct impl.
+
+  W1.3 — Web file I/O implementation
+  ───────────────────────────────────
+  The most user-facing desktop gap. Two flows:
+
+  Import: create a hidden `<input type="file" accept=".json">`, click it
+  programmatically, read result via FileReader, fire the existing
+  `window.__onImportFile(base64)` callback. Same contract as Android.
+
+  Export: `new Blob([content], {type:'application/json'})`, create an
+  `<a>` element with `href = URL.createObjectURL(blob)` and
+  `download = filename`, click it, revoke the URL. Equivalent to the
+  native MediaStore.Downloads path.
+
+  W1.4 — Web audio recording implementation
+  ──────────────────────────────────────────
+  JournalRecordingSheet already has a MediaRecorder code path
+  (detected via `isAndroid` flag at line 214). The web impl formalizes
+  this: getUserMedia → MediaRecorder → AnalyserNode (for amplitude)
+  → ondataavailable → base64 encode → fire the existing
+  `window.__onNativeRecordingComplete(base64, durationMs, mime)`
+  callback.
+
+  The 250ms mic permission grace period is Android-specific and can be
+  skipped on web (browser handles the permission dialog synchronously
+  before returning the stream).
+
+  W1.5 — Back-button navigation (History API)
+  ────────────────────────────────────────────
+  On Android, back-press routes through `window.handleAndroidBack()`.
+  On desktop, wire two equivalent triggers:
+
+    1. Keyboard: Escape key → call handleAndroidBack()
+    2. Browser: History API popstate → call handleAndroidBack()
+
+  The existing handleAndroidBack logic is platform-agnostic (it reads
+  JS state and returns "true"/"false"). The only change is the trigger
+  source. Register listener in useAndroidBack.js (already owns this
+  domain).
+
+  W1.6 — Desktop smoke walk
+  ─────────────────────────
+  Open index.html in Chrome, Edge, Firefox. Walk:
+    - Home → navigate all 53 screens (ROUTES table)
+    - Settings → Export JSON → verify download
+    - Settings → Import JSON → verify file picker + load
+    - Journal → Record voice memo → verify playback
+    - Garden View → verify fullscreen toggle (Fullscreen API)
+    - Bible chapter → add annotation → verify persistence
+    - Back button (Escape key) → verify navigation history
+    - Resize window → verify responsive layout
+
+  Exit criteria:
+    [ ] PlatformBridge module committed with Android + Web impls
+    [ ] All 15 methods have web equivalents (or justified no-ops)
+    [ ] All 6 call-site files migrated, zero raw AndroidBridge refs remain
+    [ ] File import/export works on desktop Chrome
+    [ ] Audio recording works on desktop Chrome
+    [ ] Back navigation works via Escape key
+    [ ] Desktop smoke walk passes on Chrome + Edge + Firefox
+    [ ] All pre-commit gates pass (lint + typecheck + vitest + build)
+    [ ] Android APK still works identically (regression check)
+
+  Risk: MEDIUM (audio recording across browsers is the riskiest surface
+  — Firefox MediaRecorder mime support differs from Chrome).
+  Mitigation: test on all three browsers in W1.6.
+
+───────────────────────────────────────────────────────────────────────────────
+W2 — INDEXEDDB MIGRATION (persistence upgrade)
+───────────────────────────────────────────────────────────────────────────────
+
+Goal: move the 15 data-bearing localStorage keys to IndexedDB. Gains:
+transactional writes (no more partial corruption risk), ~50 MB+ quota
+(vs 5-10 MB), and identical behavior on both platforms.
+
+Architecture constraint: IndexedDB is async. Five stores are read
+SYNCHRONOUSLY in React render paths (annotations, notes, links, state,
+prophecy-cards). Strategy: in-memory write-through cache. On boot, load
+all stores from IndexedDB into memory (async, behind a loading gate).
+After hydration, reads come from memory (sync, zero latency). Writes
+go to BOTH memory + IndexedDB (async fire-and-forget with error log).
+
+  W2.1 — IndexedDB adapter layer (new: idb-store.js)
+  ───────────────────────────────────────────────────
+  A new module in src/stores/ that wraps IndexedDB with a CachedStore-
+  compatible API:
+
+    open(dbName, version)       → IDBDatabase
+    get(storeName, key)         → Promise<value>
+    put(storeName, key, value)  → Promise<void>
+    delete(storeName, key)      → Promise<void>
+    getAll(storeName)           → Promise<Record<key, value>>
+
+  Single database: "votreader". One object store per localStorage key.
+  Schema version starts at 1. onupgradeneeded creates all 15 stores.
+
+  Error handling: quota exceeded → log warning + surface to user via a
+  new "Storage full" banner (same pattern as network-offline indicator).
+  Transaction abort → retry once, then log + continue with stale cache.
+
+  W2.2 — Write-through cache layer (modify cached-store.js)
+  ──────────────────────────────────────────────────────────
+  Extend CachedStore to support an async backing store:
+
+    _load()  → read from in-memory cache (sync, fast)
+               if cache is cold, return default (empty)
+    _save()  → write to in-memory cache (sync, immediate)
+               ALSO write to IndexedDB (async, fire-and-forget)
+    _hydrate() → async one-time load from IndexedDB into memory
+               called at boot, before React renders
+
+  The hydration gate: App() renders a loading screen until all stores
+  report hydrated. This is the ONLY async boundary — after hydration,
+  every read is sync from memory. Zero render-path jank.
+
+  Boot sequence:
+    1. index.html inline script reads `vot-state` from localStorage
+       (sync) for theme class — KEEP THIS as a fast-path shim.
+    2. React mounts, App() calls hydrateAllStores() (async).
+    3. Each store loads from IndexedDB → populates in-memory cache.
+    4. App() gets notified (Promise.all), sets hydrated=true, renders.
+    5. All subsequent reads are sync from memory.
+
+  W2.3 — Migrate data stores (one-by-one, test each)
+  ───────────────────────────────────────────────────
+  Migration order: low-risk → high-risk (per [[low-risk-pilot-first]]).
+
+  Tier 1 (cold stores, non-render-path, low traffic):
+    vot-welcomed            (1 byte flag)
+    vot-about-seen          (1 byte flag)
+    vot-garden-warning-acked (1 byte flag)
+    vot-ann-migrated        (1 byte migration gate)
+    vot-recent-nav          (< 5 KB)
+    vot-prophecy-cards      (< 10 KB)
+
+  Tier 2 (warm stores, moderate traffic):
+    vot-journal             (10-100 KB)
+    vot-journal-notebooks   (< 10 KB)
+    vot-journal-index       (< 5 KB)
+    vot-journal-stats       (< 10 KB)
+    vot-bookmarks           (10-100 KB)
+    vot-notebooks           (< 10 KB)
+
+  Tier 3 (hot stores, render-path — CRITICAL):
+    vot-history             (500 KB - 1 MB, capped at 2000 entries)
+    vot-state               (50-200 KB, drives tab state + theme)
+    vot-annotations         (100-500 KB, every annotated verse)
+    vot-notes               (50-300 KB, pulled on annotation render)
+    vot-links               (20-150 KB, per-hlKey icon rendering)
+
+  Each tier: implement → vitest → smoke walk → commit. Same one-commit-
+  per-item discipline as Q3-NK.
+
+  W2.4 — One-time localStorage → IndexedDB migration
+  ───────────────────────────────────────────────────
+  On first boot post-migration:
+    1. Check IDB for a "migrated-v1" flag
+    2. If absent, read every localStorage key, write to IndexedDB
+    3. Set "migrated-v1" flag in IDB
+    4. Clear migrated keys from localStorage (free quota)
+    5. KEEP: vot-state in localStorage (fast theme shim, line 63)
+
+  Idempotent: if migration is interrupted, next boot retries. Same
+  pattern as the existing annotation-store.js migrateAnnotations().
+
+  W2.5 — Quota monitoring
+  ───────────────────────
+  navigator.storage.estimate() → { quota, usage }. Surface a warning
+  in Settings → Your Data when usage > 80% of quota. Add `storageUsed`
+  field to the existing export JSON for diagnostics.
+
+  W2.6 — Error boundary in App
+  ────────────────────────────
+  Wrap the ROUTES dispatcher + AppShellSheets + AppShellOverlays in an
+  ErrorBoundary (the component already exists in src/components/).
+  On uncaught render error: show a recovery screen with "Tap to reload"
+  + diagnostic info. Same UX as the native renderer-crash retry-view
+  (N1.3) but for React errors.
+
+  Exit criteria:
+    [ ] idb-store.js adapter committed with full vitest coverage
+    [ ] cached-store.js extended with write-through + _hydrate()
+    [ ] All 15+ keys migrated (Tier 1 → Tier 2 → Tier 3)
+    [ ] One-time migration runs on first boot, idempotent
+    [ ] Sync render-path reads confirmed zero-latency (in-memory)
+    [ ] Quota monitoring visible in Settings
+    [ ] Error boundary catches render crashes
+    [ ] localStorage usage drops to < 1 KB post-migration
+    [ ] Android APK still works identically
+    [ ] Desktop Chrome/Edge/Firefox all pass store round-trips
+
+  Risk: HIGH for Tier 3 (render-path stores). Mitigation: extensive
+  vitest for every store's load/save round-trip + manual smoke walks
+  after each tier.
+
+───────────────────────────────────────────────────────────────────────────────
+W3 — PWA SHELL (installable + offline)
+───────────────────────────────────────────────────────────────────────────────
+
+Goal: VOTReader is installable from a desktop browser and works offline.
+
+  W3.1 — manifest.json
+  ─────────────────────
+  New file: app/src/main/assets/manifest.json
+
+    name: "VOTReader"
+    short_name: "VOTReader"
+    start_url: "/index.html"
+    display: "standalone"
+    background_color: "#000000"
+    theme_color: "#b8860b"  (gold accent)
+    icons: 192x192 + 512x512 PNG (generate from splash.jpg or new icon)
+    categories: ["books", "education"]
+
+  Add to index.html:
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#b8860b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  W3.2 — Service worker (cache strategy)
+  ───────────────────────────────────────
+  New file: app/src/main/assets/service-worker.js
+
+  Install phase — cache critical resources (~2.3 MB):
+    index.html, app.css, manifest.json,
+    dist/bundle-a.js, bundle-b.js, bundle-c.js, bundle-d.js,
+    react.min.js, react-dom.min.js, flexsearch.min.js, html2canvas.min.js,
+    fonts/* (6 files),
+    images (splash.jpg, study covers),
+    icons (PWA icons)
+
+  Lazy bundles — cache on first fetch (~10.3 MB):
+    dist/bundle-a-bible.js (6.8 MB)
+    dist/bundle-a-matthew.js (604 KB)
+    dist/bundle-a-vot.js (2.9 MB)
+    Strategy: network-first on first access, cache-first thereafter.
+    User downloads the corpus once, then it's available offline forever.
+
+  Fetch strategy:
+    Cache-first for all assets (immutable between versions).
+    Network-first for lazy bundles (first download) then cache-first.
+    Fallback to offline.html if nothing cached.
+
+  Update strategy:
+    Version string in SW (e.g., "v1.0.0"). On new version deploy,
+    new SW installs → activates → clears old cache → re-caches critical.
+    skipWaiting + clients.claim for immediate activation.
+
+  W3.3 — Service worker registration
+  ───────────────────────────────────
+  In index.html, after the resource-error capture script:
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .catch(err => console.warn('SW registration failed', err));
+    }
+
+  Guard: only registers on HTTPS or localhost. The Android WebView
+  asset loader (appassets.androidplatform.net) is HTTPS-equivalent
+  so registration works there too.
+
+  CSP: already allows script-src 'self' — no changes needed.
+
+  W3.4 — Offline fallback page
+  ────────────────────────────
+  New file: app/src/main/assets/offline.html
+
+  Minimal page: "VOTReader is offline. Open the app while connected
+  to cache content for offline use." Styled with inline CSS matching
+  the app's dark theme. Served by the SW when no cached response
+  exists for a navigation request.
+
+  W3.5 — PWA icons
+  ────────────────
+  Generate from existing splash.jpg or create a new icon:
+    icons/icon-192.png (192x192, maskable)
+    icons/icon-512.png (512x512, maskable)
+    icons/icon-180.png (180x180, Apple touch icon)
+    favicon.ico (32x32 + 16x16)
+
+  W3.6 — Android WebView SW compatibility
+  ────────────────────────────────────────
+  Android WebView supports service workers since Chrome 70+ (API 26+,
+  which is our minSdk). The appassets.androidplatform.net asset loader
+  serves over HTTPS, so SW registration is permitted. However:
+
+  Decision point: do we WANT the SW active inside the Android WebView?
+    Option A: Register on all platforms. Android gets offline caching
+              too (redundant — assets are already in the APK).
+    Option B: Only register on web. Check for AndroidBridge before
+              registering: `if (!window.AndroidBridge && 'serviceWorker'
+              in navigator)`.
+
+  RECOMMEND Option B — the Android APK bundles all assets locally;
+  a service worker adds complexity with zero benefit there.
+
+  Exit criteria:
+    [ ] manifest.json committed with correct metadata + icons
+    [ ] service-worker.js committed with cache + fetch strategies
+    [ ] SW registration in index.html (web-only, gated)
+    [ ] offline.html fallback committed
+    [ ] PWA icons generated (192, 512, 180, favicon)
+    [ ] Desktop Chrome shows "Install" prompt
+    [ ] Installed PWA works offline (critical path)
+    [ ] Installed PWA works offline after loading each corpus once
+    [ ] SW update cycle verified (deploy new version → auto-update)
+    [ ] Android APK unaffected (SW not registered)
+
+  Risk: LOW (additive, no existing code changes).
+
+───────────────────────────────────────────────────────────────────────────────
+W4 — DESKTOP POLISH (optimize the desktop experience)
+───────────────────────────────────────────────────────────────────────────────
+
+The app was designed for mobile. On a 1440px monitor, the full-width
+layout wastes space and text lines are too long for comfortable reading.
+W4 makes it feel at home on desktop WITHOUT breaking the mobile layout.
+
+  W4.1 — Max-width container + centered layout
+  ─────────────────────────────────────────────
+  CSS: #root or a wrapper div gets `max-width: 480px; margin: 0 auto;`
+  on screens wider than ~768px. This constrains the app to a phone-like
+  column centered on screen, with the dark background visible on sides.
+  Alternatively: a two-pane layout at wide breakpoints (nav sidebar +
+  content). Start with the simpler max-width approach.
+
+  W4.2 — Keyboard shortcuts
+  ─────────────────────────
+  Desktop users expect keyboard navigation:
+    Escape       → back (already wired in W1.5)
+    Left/Right   → prev/next chapter in reading view
+    Ctrl+F       → focus search
+    Ctrl+S       → export settings (mirror Settings → Export)
+    /            → focus search (vim-style)
+
+  Wire in a new useDesktopKeyboard.js hook. Only active when
+  !isAndroid (mobile has its own gestures).
+
+  W4.3 — Hover states + cursor
+  ────────────────────────────
+  Mobile uses :active for tap feedback. Desktop needs :hover for
+  mouse feedback. Add `@media (hover: hover)` rules for:
+    - Navigation tiles (gold border glow on hover)
+    - Buttons (subtle background shift)
+    - Links (underline on hover)
+    - Annotation marks (highlight brighten on hover)
+
+  W4.4 — Tooltip for long-press actions
+  ──────────────────────────────────────
+  Mobile uses long-press for context menus (annotation picker, bookmark
+  options). Desktop equivalent: right-click context menu. Use the
+  existing onContextMenu event. Surface a simple tooltip on hover that
+  says "Right-click for options" on desktop.
+
+  W4.5 — Text selection improvements
+  ──────────────────────────────────
+  Mobile text selection is handled by the OS. Desktop: ensure the
+  SelectionToolbar (annotation/highlight/note creation) works with
+  mouse-drag selection. Verify mouseup triggers the same flow as
+  touchend.
+
+  W4.6 — Window title updates
+  ───────────────────────────
+  PWA window title shows "VOTReader" always. Update document.title
+  on screen navigation: "The Wide Path - VOTReader", "Genesis 1 -
+  VOTReader", etc. Helps with browser tab identification + history.
+
+  Exit criteria:
+    [ ] Max-width layout on wide screens (centered, readable line length)
+    [ ] Keyboard shortcuts working (Escape, arrows, Ctrl+F, /)
+    [ ] Hover states on all interactive elements
+    [ ] Right-click context menu for annotation/bookmark actions
+    [ ] Mouse-drag text selection triggers annotation toolbar
+    [ ] Document title updates on navigation
+    [ ] All desktop polish is behind `@media (hover: hover)` or
+        `!isAndroid` guards — mobile layout unchanged
+
+  Risk: LOW (CSS + event listeners, no architecture changes).
+
+───────────────────────────────────────────────────────────────────────────────
+W5 — HOSTING + CI (ship it)
+───────────────────────────────────────────────────────────────────────────────
+
+  W5.1 — GitHub Pages deployment
+  ──────────────────────────────
+  The app is static files — no server needed. GitHub Pages serves from
+  a branch or /docs folder. Strategy:
+
+  New CI workflow: `.github/workflows/deploy-web.yml`
+    Trigger: push to main (or manual dispatch)
+    Steps:
+      1. npm install + npm run build (regenerate bundles)
+      2. Copy web-facing files to a deploy directory:
+         index.html, app.css, manifest.json, service-worker.js,
+         offline.html, dist/*, fonts/*, icons/*, images/*,
+         react.min.js, react-dom.min.js, flexsearch.min.js,
+         html2canvas.min.js
+      3. Deploy to gh-pages branch via peaceiris/actions-gh-pages
+         (or equivalent)
+
+  URL: https://corbinlythgoe.github.io/VOTReader-studio/
+  (Or a custom domain if desired later.)
+
+  W5.2 — CSP update for web hosting
+  ──────────────────────────────────
+  The current CSP references `https://appassets.androidplatform.net`
+  (Android WebView asset loader). On the web, assets are served from
+  the GitHub Pages domain. Two options:
+
+  Option A: Dual CSP — detect platform in index.html, set the
+  appropriate CSP meta tag.
+  Option B: Remove the explicit Android domain from CSP, keep only
+  'self' (which resolves to the correct origin on both platforms).
+
+  RECOMMEND Option B — 'self' already covers same-origin on both the
+  Android asset loader AND GitHub Pages. The explicit
+  appassets.androidplatform.net references are redundant with 'self'
+  on Android and irrelevant on web.
+
+  W5.3 — Dual CI pipeline
+  ───────────────────────
+  Extend .github/workflows/ci.yml:
+
+  Existing jobs (Android):
+    - lint, typecheck, vitest, build, kotlin-tests, assembleDebug
+
+  New jobs (Web):
+    - web-build: npm install + npm run build (verify bundles regenerate)
+    - web-smoke: serve locally + run smoke.js via puppeteer/playwright
+      (optional — may defer to manual smoke walks initially)
+    - deploy-web: gh-pages deployment (on main push only)
+
+  W5.4 — Version synchronization
+  ──────────────────────────────
+  Keep Android APK version and web PWA version in sync:
+    - versionName in build.gradle.kts
+    - CACHE_VERSION in service-worker.js
+    - (Optional) version field in manifest.json
+
+  Single source: define version in package.json, read it from both
+  build.gradle.kts (via a Gradle task) and service-worker.js (via
+  build.py template substitution).
+
+  Exit criteria:
+    [ ] GitHub Pages serving at public URL
+    [ ] CSP works on both Android + web without changes per platform
+    [ ] CI builds and deploys on push to main
+    [ ] Service worker version matches APK version
+    [ ] Web deploy verified: fresh browser → install PWA → works offline
+
+  Risk: LOW (infrastructure, no app changes).
+
+───────────────────────────────────────────────────────────────────────────────
+W6 — CROSS-PLATFORM VERIFICATION (prove it)
+───────────────────────────────────────────────────────────────────────────────
+
+The final gate. Both platforms get a full smoke walk + targeted
+regression testing for the migration surfaces.
+
+  W6.1 — Android regression walk
+  ──────────────────────────────
+  Full NK7 checklist (287 items) on a physical device. Verify:
+    - All N1.x native features still work after PlatformBridge refactor
+    - IndexedDB migration from localStorage completed on first boot
+    - Data integrity: annotations, notes, bookmarks, journal all intact
+    - Performance: no boot-time regression from IndexedDB hydration
+    - Service worker NOT registered (web-only gate working)
+
+  W6.2 — Desktop smoke walk (Chrome + Edge + Firefox)
+  ───────────────────────────────────────────────────
+  Per-browser walk covering:
+    - PWA install + offline access
+    - All 53 screens render
+    - File import/export via browser APIs
+    - Audio recording + playback
+    - Annotation CRUD (highlight, underline, note)
+    - Search (full-text across all corpora)
+    - Back navigation via Escape + browser back button
+    - Keyboard shortcuts
+    - Responsive layout at 1440px, 1024px, 768px widths
+    - Dark/light theme toggle
+    - Service worker update cycle
+
+  W6.3 — Automated cross-platform smoke (stretch goal)
+  ────────────────────────────────────────────────────
+  Add playwright tests that run the smoke walk headlessly in CI.
+  Not required for launch but valuable for regression prevention.
+  Covers: boot → navigate screens → annotate → search → export.
+
+  Exit criteria:
+    [ ] Android 287-item walk: all PASS
+    [ ] Chrome desktop walk: all PASS
+    [ ] Edge desktop walk: all PASS
+    [ ] Firefox desktop walk: all PASS
+    [ ] Data migrated correctly on both platforms
+    [ ] Zero regressions from pre-migration baseline
+
+  Risk: LOW (verification, not implementation).
+
+───────────────────────────────────────────────────────────────────────────────
+W7 — CODE QUALITY HARDENING (close every remaining critique)
+───────────────────────────────────────────────────────────────────────────────
+
+Goal: address every code-quality critique that W0-W6 doesn't cover. These
+are correctness, safety, and observability items — not platform items.
+None depend on the PWA work; they can run in parallel with W4-W6 or
+after W6. But they MUST land before the project is called done.
+
+  W7.1 — Store schema versioning
+  ──────────────────────────────
+  Problem: W2 adds a one-time localStorage → IndexedDB migration, but
+  there is no per-store schema version. If the annotation shape changes
+  again (it already changed once — migrateAnnotations), there's no
+  tracked upgrade path. The existing migration is gated by a single
+  boolean flag, not a version number.
+
+  Fix: add a `schemaVersion` integer to each IDB object store's metadata
+  record. The idb-store.js adapter (created in W2.1) handles this in its
+  `onupgradeneeded` callback:
+
+    - Each store declares its current schema version (e.g., annotations: 2,
+      notes: 1, bookmarks: 1, ...).
+    - On IDB open, if the store's saved version < current version, run the
+      registered migration chain: v1→v2, v2→v3, etc.
+    - Each migration is a pure function: `(oldData) => newData`. Tested
+      independently via vitest.
+    - The existing migrateAnnotations() logic becomes migration v1→v2 for
+      the annotations store, replacing the boolean flag with a version.
+    - The existing link-store shape-detection migration becomes v1→v2 for
+      links.
+
+  This is the IndexedDB equivalent of Room's @Migration pattern on
+  Android or Alembic/Flyway in backend systems.
+
+  Tests:
+    - vitest for each migration function (old shape → new shape)
+    - Round-trip: write v1 data, open with v2 schema, verify migration ran
+    - Idempotency: run migration twice, verify no corruption
+
+  W7.2 — raw() immutability (store mutation safety)
+  ─────────────────────────────────────────────────
+  Problem: `CachedStore.raw()` returns the live `_cache` object. A
+  consumer can mutate the returned object without calling `_save()`,
+  and the change persists in memory but never reaches IndexedDB. This
+  is a silent-corruption vector.
+
+  Current state: research found only 1 call site (a test), and zero
+  production mutations via raw(). But the API PERMITS it, and new code
+  could introduce the bug unknowingly.
+
+  Fix: `raw()` returns `Object.freeze()` of the cache (shallow freeze).
+  Consumers that need to mutate must go through the store's named methods
+  (add/remove/update/set) which call `_save()` + `_bump()` internally.
+
+  Why Object.freeze, not structuredClone:
+    - Freeze is O(1) (just sets a flag on the object), clone is O(n).
+    - Annotations store can be 500 KB — cloning on every read is too
+      expensive for the render-path hot stores.
+    - Freeze catches accidental mutation at dev time (throws in strict
+      mode, silent no-op in sloppy mode). Good enough — strict mode is
+      default in ES modules.
+
+  Implementation:
+    - cached-store.js: change `raw() { return this._load(); }` to
+      `raw() { const d = this._load(); Object.freeze(d); return d; }`
+    - Stores that return nested objects (annotations has hlKey → Array):
+      freeze the top level only. Deep-freeze is too expensive and
+      unnecessary — named methods are the write path.
+    - Run all 476 vitest tests — any test that mutates via raw() will
+      throw, exposing the violation.
+
+  Tests:
+    - New vitest case: `raw()` returns frozen object, mutation throws
+    - Existing tests pass (proves no production code mutates via raw())
+
+  W7.3 — hlTick dead prop cleanup
+  ────────────────────────────────
+  Problem: Q7 migrated all store consumers to useSyncExternalStore, but
+  the App-level `const [hlTick, setHlTick] = useState(0)` and its
+  threading through ~39 files is still in the code. Research found:
+    - ~8 files truly live (call setHlTick or depend on hlTick in deps)
+    - ~20+ files are dead pass-through (receive hlTick, thread it to
+      children, but nobody reads it)
+
+  The live uses (app.jsx effect at line 210, use-journal-mutations,
+  use-sheet-orchestration, AnnotationActionChip, SelectionToolbar) still
+  use setHlTick to trigger DOM re-application of highlights/links after
+  a store mutation. This is the LEGACY mechanism — the correct mechanism
+  is store._bump() → useSyncExternalStore subscriber notification.
+
+  Fix in two sub-steps:
+
+  W7.3a — Complete the useSyncExternalStore migration for the remaining
+  live consumers:
+    - app.jsx line 210: the `useEffect([hlTick, screen, letterId])`
+      that calls applyDOMHighlights/applyDOMLinks. This effect needs to
+      re-run when annotations/notes/links/bookmarks change. Replace
+      `hlTick` in deps with useSyncExternalStore subscriptions to the
+      relevant stores. The stores already have subscribe/getVersion
+      from Q7 — this just wires the effect to them directly.
+    - use-journal-mutations.js line 70: `setHlTick(t => t + 1)` after
+      store mutation. Replace with nothing — the store's _bump() already
+      notifies subscribers. The setHlTick call is redundant.
+    - use-sheet-orchestration.js line 165: same — redundant after _bump.
+    - AnnotationActionChip, SelectionToolbar: audit each setHlTick call;
+      if the store mutation already calls _bump(), remove the setHlTick.
+
+  W7.3b — Remove all hlTick/setHlTick plumbing:
+    - Delete `const [hlTick, setHlTick] = useState(0)` from app.jsx
+    - Remove hlTick from the buildScreenRoutes dependency bundle (1 of
+      47 props eliminated)
+    - Remove hlTick/setHlTick from every component signature, prop
+      destructure, and JSX prop-pass across all ~39 files
+    - Grep for `hlTick` — target: ZERO matches in production code (the
+      one match in annotation-store.test.js documenting the OLD pattern
+      stays as the historical regression marker, per Q7 exit criteria)
+
+  Tests:
+    - All 476+ vitest tests pass (proves no live dependency on hlTick)
+    - Manual smoke walk: annotation CRUD, note creation, bookmark toggle,
+      link sidebar — all re-render correctly without hlTick
+
+  Risk: MEDIUM (W7.3a requires careful effect-dep analysis; W7.3b is
+  mechanical but touches 39 files).
+
+  W7.4 — JS-side diagnostic log (web telemetry)
+  ──────────────────────────────────────────────
+  Problem: BoundedLogTree (Kotlin) captures WARN+ logs on Android with
+  sanitization. On web, there's nothing. You can't see annotation churn,
+  lazy-load timings, store write failures, or quota warnings.
+
+  Fix: a new `DiagnosticLog` module in src/utils/:
+
+    DiagnosticLog.warn(tag, message)
+    DiagnosticLog.error(tag, message)
+    DiagnosticLog.timing(tag, label, durationMs)
+    DiagnosticLog.entries()   → last 200 entries (ring buffer, same as
+                                 BoundedLogTree's capacity)
+    DiagnosticLog.toJSON()    → serializable array for export
+
+  Implementation:
+    - In-memory ring buffer (Array of max 200 entries, FIFO eviction)
+    - NO persistence — cleared on page refresh (matches BoundedLogTree:
+      "in-process only, cleared on app kill")
+    - Sanitization: same URI/path redaction as BoundedLogTree (content://,
+      file://, /storage, /data paths masked)
+    - On Android: DiagnosticLog still runs (captures JS-side events);
+      getCrashLog() returns BOTH Kotlin BoundedLogTree + JS DiagnosticLog
+      entries merged by timestamp
+    - On web: getCrashLog() in PlatformBridge returns DiagnosticLog only
+
+  Wire into existing code:
+    - Store _save() failures → DiagnosticLog.warn('store', ...)
+    - Quota estimate checks → DiagnosticLog.warn('quota', ...)
+    - Lazy-load timings → DiagnosticLog.timing('corpus', 'bible', 1234)
+    - Service worker events → DiagnosticLog.warn('sw', ...)
+    - ErrorBoundary catches → DiagnosticLog.error('render', ...)
+
+  Surface in UI:
+    - Settings → Your Data → Export JSON includes `diagnosticLog` field
+      (already exists for BoundedLogTree; extend to include JS entries)
+    - Settings → Your Data shows "Diagnostic entries: N" row (same as
+      the existing BoundedLogTree display, but for JS log)
+
+  Tests:
+    - vitest: ring buffer capacity, FIFO eviction, sanitization, toJSON
+    - vitest: concurrent writes don't corrupt (port BoundedLogTree's
+      concurrency test pattern)
+
+  W7.5 — buildScreenRoutes domain-scoped prop groups
+  ──────────────────────────────────────────────────
+  Problem: buildScreenRoutes takes a flat destructure of 47 properties.
+  While intentionally explicit (per design comment at lines 6-14), it's
+  a maintenance surface — adding a new screen requires threading a prop
+  through App → buildScreenRoutes → the new screen, touching 3 files for
+  every new dependency.
+
+  Fix: group the 47 props into domain-scoped bundles. The factory still
+  receives explicit, typed objects — no spread, no junk drawer. But each
+  bundle is a single named object rather than 8-13 individual props.
+
+  Proposed groupings (from research, 5 natural domains):
+
+    navState:     { screen, bookId, chapterNum, letterId, studyId,
+                    studyChapterId, fromStudies, mode, showStudy,
+                    genreId, surpriseAnchor, gardenPage }
+                  + their setters (12 values + 12 setters = ~24 props)
+
+    navHandlers:  { goHome, goNavOrigin, goSearch, goHistory, goSettings,
+                    goAbout, goVolumesHome, goScripturesHome,
+                    goScriptureGenre, goBibleIdx, goMatthewIdx,
+                    goStudiesHome, goColIdx, goSearchOrigin,
+                    goNotesIndex, goLinksIndex, goBookmarksIndex,
+                    goJournalHub, goHighlightsIndex, goJournalViewer,
+                    goJournalEditor }
+                  (~21 nav functions)
+
+    readProgress: { activeReadKey, setActiveReadKey, lastReadChapters,
+                    setLastReadChapters, lastReadLetterMap, setLastReadForVol,
+                    readItems, readHistory, markRead, unmarkRead, isRead,
+                    clearReadForBook, clearAllProgress, clearHistory,
+                    pruneHistoryDay }
+                  (~15 progress-related props)
+
+    studies:      { getStudyById, getStudyChapter, studyReadKey,
+                    prevChainEntry, nextChainEntry, goToChainEntryFirst,
+                    goToChainEntryLast, studiesLoading, UNIFIED_CHAIN }
+                  (~9 study-chain props)
+
+    display:      { theme, setTheme, settings, setSettings, toggleSetting,
+                    updateSetting, titleFocusHidden, setTitleFocusHidden,
+                    headingsFocusHidden, setHeadingsFocusHidden }
+                  (~10 display/settings props)
+
+  After grouping, buildScreenRoutes receives ~5 named objects instead
+  of ~47 flat params. Each screen destructures only the bundles it needs.
+
+  Implementation:
+    - App.jsx: build the 5 bundle objects (navState, navHandlers, etc.)
+      from the existing hooks + state, pass to buildScreenRoutes
+    - screen-routes.jsx: destructure function signature changes from
+      47 params to 5 bundle params
+    - Each ROUTES entry destructures from the bundle it needs
+    - JSDoc typedefs for each bundle (NavState, NavHandlers, etc.)
+    - tsc --checkJs verifies the typedefs
+
+  Risk: MEDIUM — 53 ROUTES entries touch these props. Mechanical but
+  wide-surface change. Mitigation: run all vitest tests + full smoke
+  walk after the change.
+
+  Tests:
+    - All 476+ vitest tests pass
+    - tsc --noEmit passes
+    - Full 53-screen smoke walk
+
+  Exit criteria (W7 complete):
+    [ ] Schema versioning: every IDB store has a version integer +
+        migration chain. Existing migrations (annotations, links)
+        ported to the versioned system. vitest coverage.
+    [ ] raw() freeze: Object.freeze on raw() return. All vitest pass.
+    [ ] hlTick: ZERO references in production code (grep confirms).
+        All annotation/note/bookmark/link re-renders work via
+        useSyncExternalStore. All vitest pass. Smoke walk confirms.
+    [ ] DiagnosticLog: JS-side ring buffer, sanitized, wired into
+        stores/corpus/SW/ErrorBoundary. Surfaced in Settings export.
+        vitest coverage.
+    [ ] buildScreenRoutes: 47 flat props → 5 domain bundles. All
+        vitest + tsc pass. 53-screen smoke walk.
+    [ ] Zero critiques remaining from the architectural review.
+
+───────────────────────────────────────────────────────────────────────────────
+W8 — TYPE COVERAGE + CSS ARCHITECTURE (final quality bar)
+───────────────────────────────────────────────────────────────────────────────
+
+Goal: close the two remaining structural gaps — the untyped UI tree
+(40+ screens, 25+ components, 17 sheets) and the 24 load-bearing
+!important declarations that mask a specificity architecture debt.
+
+  W8.1 — UI tree JSDoc typing (screens, sheets, components)
+  ──────────────────────────────────────────────────────────
+  Problem: tsconfig.json excludes src/ui/ entirely. The 82+ files in
+  screens/, sheets/, components/ have no JSDoc types, no @param, no
+  @returns. tsc cannot catch prop mismatches, missing props, or wrong
+  types across the render tree.
+
+  Scope: Q4 typed 37 files (utils/stores/hooks). This phase types the
+  remaining ~82 files in src/ui/ + src/components/ + src/renderer/.
+
+  Approach (same as Q4):
+    1. Extend tsconfig.json include to add:
+         app/src/main/assets/src/ui/**/*
+         app/src/main/assets/src/components/**/*
+         app/src/main/assets/src/renderer/**/*
+    2. Run tsc — expect a flood of errors on the first pass.
+    3. Work file-by-file, adding JSDoc @param / @returns / @typedef.
+       Same extendStore() + ThisType pattern from Q4 where applicable.
+    4. Zero-tolerance: tsc must pass clean after each file.
+
+  Sequencing (risk-ascending, per [[low-risk-pilot-first]]):
+
+  Tier 1 — Leaf components (no children, simple props):
+    HomeBtn, BackBtn, ExpandableText, LoadingCard, ModeToggle,
+    ChapterBookmarkBtn, BookmarkIcon, LinkIcon, JournalChip,
+    AnnotationActionChip, HolyDaysPlaylistHeader
+    (~11 files, mechanical)
+
+  Tier 2 — Mid-level components (children + callbacks):
+    NavButtons, ChapterView, LetterView, VolumeLetterIndex,
+    SelectionToolbar, SearchBar, WtlbEntryView
+    (~7 files, moderate)
+
+  Tier 3 — Screens (props from buildScreenRoutes bundles):
+    HomeScreen, ScripturesHome, StudiesHome, VolumesHome,
+    SettingsScreen, HistoryScreen, BookmarksScreen, NotesIndexScreen,
+    LinksScreen, HighlightsScreen, JournalHubScreen, SearchScreen,
+    JournalEditorScreen, JournalViewerScreen, LibraryScreen,
+    MatthewChapterView, BibleStudyChapterView, GardenView, AboutScreen
+    (~19 files, depends on W7.5 bundle typedefs)
+
+  Tier 4 — Sheets + overlays (modal props + store access):
+    AppShellOverlays, AppShellSheets, AnnotationSheet,
+    BookmarkPopover, NoteSheet, LinkSidebar, ScriptureSheet,
+    NotebookPickerSheet, NotebookManagerSheet, LinkPickerSheet,
+    JournalRecordingSheet, TabActionSheet, + remaining sheets
+    (~17 files, most complex — sheet orchestration + store reads)
+
+  Tier 5 — Renderer (annotation engine + DOM mutation):
+    annotation-engine.jsx, dom-links.js, dom-bookmarks.js,
+    dom-journal-chip.js, _entry.js
+    (~5 files, complex types — sweep-line algorithm, DOM ranges)
+
+  Dependency: W7.5 (domain-scoped bundles) should land first so
+  Tier 3 screens type-check against the bundle typedefs, not 47
+  individual props.
+
+  Tests: tsc --noEmit is the test. Every file must pass zero-tolerance.
+  No new vitest needed (type errors are caught at check time, not
+  runtime).
+
+  Same rate as Q4: file-by-file, zero-tolerance after each.
+
+  W8.2 — CSS @layer architecture (eliminate all !important)
+  ─────────────────────────────────────────────────────────
+  Problem: 24 !important declarations remain in app.css. Research
+  classified them:
+    - 11 annotation/highlight display (prevent palette bleed)
+    - 6 light-mode palette guards (state-specific overrides)
+    - 2 visibility/drag states
+    - 5 structural/spacing overrides
+
+  All 24 are load-bearing — they exist because the cascade order of
+  existing rules doesn't match the intended priority. Removing them
+  without restructuring the cascade would break visual output.
+
+  Fix: CSS @layer (supported in all browsers since 2022, Safari 15.4+,
+  Chrome 99+, Firefox 97+). Define explicit cascade layers:
+
+    @layer reset, base, layout, components, annotations, states, overrides;
+
+  Rules in later layers win over earlier layers regardless of
+  specificity. This means:
+
+    - `@layer annotations` contains .hl-note, .hl-underline, per-color
+      palette rules. No !important needed — the layer order ensures
+      annotation rules beat component rules.
+    - `@layer states` contains .is-active, :hover, .dragging, .capturing-
+      thumb. These win over annotations by layer order.
+    - `@layer overrides` is the final layer — currently empty, reserved
+      for future escape hatches. If any !important survives the
+      migration, it goes here with a comment explaining why.
+
+  Migration approach:
+
+  W8.2a — Layer scaffold:
+    Add `@layer` declaration at top of app.css. Wrap existing rules in
+    their appropriate layers using `@layer X { ... }` blocks. NO rule
+    changes — just wrapping. Verify zero visual change via screenshot
+    diff (tools/smoke.js can capture screenshots for comparison).
+
+  W8.2b — Remove !important one-by-one:
+    For each of the 24 declarations:
+      1. Remove `!important`
+      2. Verify the rule still wins (it should, because layer order
+         guarantees it)
+      3. If it doesn't win, the rule is in the wrong layer — move it
+      4. Screenshot-diff to confirm zero visual change
+    Same one-commit-per-item discipline.
+
+  W8.2c — Verify dark + light mode:
+    Full visual walk in both themes at 3 breakpoints (mobile 375px,
+    tablet 768px, desktop 1440px). Every annotation color (10 colors)
+    × active/inactive × note/highlight/underline × dark/light = 120
+    visual states. Spot-check representative samples (not all 120).
+
+  Risk: MEDIUM — @layer is a cascade-order change that could have
+  unexpected interactions with the existing specificity hierarchy.
+  Mitigation: the scaffold step (W8.2a) wraps without changing, so
+  any breakage from the layer order itself is caught before any
+  !important is removed. The removal step (W8.2b) is one-at-a-time
+  with screenshot verification.
+
+  Browser support: @layer is in our support matrix (minSdk 26 =
+  Android 8 = Chrome 99+ in WebView; desktop Chrome/Edge/Firefox all
+  support since early 2022). No polyfill needed.
+
+  W8.3 — Scripture parsing JSDoc return types
+  ───────────────────────────────────────────
+  Problem (nuanced): research found parseRefStr and parseScriptureRef
+  already return null on invalid input, and all callers check for null.
+  No unsafe dereference patterns exist today. BUT: the functions lack
+  JSDoc @returns typedefs, so tsc cannot enforce null-checking in
+  future callers.
+
+  Fix:
+    - Add @returns typedef to parseRefStr:
+        @returns {{ rawBook: string, chapter: number, verse: number|null,
+                    verseEnd: number|null, tag: string|null } | null}
+    - Add @returns typedef to parseScriptureRef:
+        @returns {{ bookId: string, bookTitle: string, chapter: number,
+                    verse: number, verseEnd: number|null, label: string,
+                    text: string } | null}
+    - Add @returns to findBook, lookupVersesFromBooks, resolveVerseText
+    - Extend tsconfig.json include to cover src/data/scripture-resolution.js
+    - tsc --noEmit verifies all callers handle null correctly
+
+  Small task that gives tsc the information to catch future bugs.
+  No runtime change.
+
+  Exit criteria (W8 complete):
+    [ ] tsconfig.json includes src/ui/, src/components/, src/renderer/,
+        src/data/scripture-resolution.js. tsc passes zero-tolerance.
+    [ ] All ~82 UI files have JSDoc @param + @returns. Tier 1-5 complete.
+    [ ] app.css uses @layer for cascade control. Zero !important
+        declarations (or documented exceptions in @layer overrides
+        with rationale). Screenshot-verified dark + light + 3 widths.
+    [ ] parseRefStr + parseScriptureRef have @returns typedefs.
+        tsc enforces null-check at all call sites.
+
+───────────────────────────────────────────────────────────────────────────────
+SEQUENCING + PARALLELISM
+───────────────────────────────────────────────────────────────────────────────
+
+  Critical path: W0 → W1 → W2 → W3 → W5 → W6 (cross-platform launch).
+  Then W7 + W8 (quality hardening).
+
+  Parallelism opportunities:
+    W4 (desktop polish) can run alongside W3 or W5.
+    W7.1-W7.2 (schema + raw freeze) can start during W2 (same store layer).
+    W7.3 (hlTick) can run anytime after W2 (no dependency).
+    W7.4 (diagnostics) can run anytime after W1 (needs PlatformBridge).
+    W7.5 (prop bundles) must precede W8.1 Tier 3 (screens need bundles).
+    W8.1 (UI typing) can start Tier 1-2 during W6 (leaf components first).
+    W8.2 (CSS @layer) is independent of everything — can run anytime.
+    W8.3 (scripture types) is small — slot anywhere.
+
+───────────────────────────────────────────────────────────────────────────────
+RISK REGISTER
+───────────────────────────────────────────────────────────────────────────────
+
+  HIGH — IndexedDB sync render-path (W2 Tier 3)
+    The 5 stores read synchronously in render paths (annotations, notes,
+    links, state, prophecy-cards) must be in-memory before React renders.
+    The hydration gate is the mitigation, but boot-time latency may
+    increase. Measure: time from page load to first render, compare
+    pre/post migration. Target: < 200ms overhead.
+
+  MEDIUM — Audio recording cross-browser (W1.4)
+    MediaRecorder API: Chrome supports audio/webm, Firefox supports
+    audio/ogg. Safari doesn't support MediaRecorder reliably. Need
+    to test mime negotiation and base64 encoding on all three browsers.
+    Mitigation: mime detection at start time, fallback to audio/wav
+    if needed.
+
+  MEDIUM — Service worker cache size (~12.5 MB total)
+    Full corpus cache is large. Some browsers may throttle or reject.
+    Mitigation: cache critical path on install (~2.3 MB), lazy bundles
+    on first fetch. Monitor navigator.storage.estimate() for pressure.
+
+  MEDIUM — hlTick removal blast radius (W7.3)
+    39 files touched. The 8 truly-live uses must be migrated to
+    useSyncExternalStore before the plumbing can be removed. If any
+    live use is missed, annotation re-renders will silently stop
+    working. Mitigation: smoke walk every annotation operation (add,
+    remove, color change, note create, bookmark toggle, link add)
+    after W7.3a before starting W7.3b.
+
+  MEDIUM — CSS @layer cascade rewrite (W8.2)
+    Moving 4,100 lines of CSS into @layer blocks changes the cascade
+    globally. Unexpected interactions could break any visual state.
+    Mitigation: scaffold step (W8.2a) wraps without removing any
+    !important; breakage from layer order itself is caught before
+    any rule changes. Screenshot comparison at each step.
+
+  LOW — CSP compatibility on GitHub Pages
+    'self' should resolve correctly. If not, fall back to explicit
+    origin in CSP. Easy to diagnose via console errors.
+
+  LOW — Font licensing
+    Cinzel + EB Garamond are OFL (SIL Open Font License). Bundling
+    in an APK and serving via GitHub Pages are both permitted uses.
+    No license risk.
+
+  LOW — UI typing flood (W8.1)
+    82 files × ~5 type errors each = ~400 initial errors. But Q4
+    proved the pattern: file-by-file, 4-7 files/day, zero-tolerance
+    after each. Risk is tedium, not breakage.
+
+───────────────────────────────────────────────────────────────────────────────
+CRITIQUE TRACEABILITY MATRIX
+───────────────────────────────────────────────────────────────────────────────
+
+Every critique from the architectural review is mapped to a specific
+work item. Zero gaps.
+
+  | # | Critique                              | Phase   | Status     |
+  |---|---------------------------------------|---------|------------|
+  | 1 | WebView fighting native UX            | W1      | INVERTED   |
+  |   |                                       |         | (PWA       |
+  |   |                                       |         | validates) |
+  | 2 | localStorage quota ceiling            | W2      | RESOLVED   |
+  | 3 | localStorage partial-write corruption | W2      | RESOLVED   |
+  | 4 | No error boundary in App              | W2.6    | RESOLVED   |
+  | 5 | Window bridge informal globals        | W1      | RESOLVED   |
+  | 6 | No offline/installable desktop        | W3      | RESOLVED   |
+  | 7 | Missing font files                    | W0.1    | RESOLVED   |
+  | 8 | Owed real-device verification         | W0.2+W6 | RESOLVED   |
+  | 9 | No quota monitoring                   | W2.5    | RESOLVED   |
+  | 10| Desktop UX (layout, hover, keyboard)  | W4      | RESOLVED   |
+  | 11| Store schema versioning               | W7.1    | RESOLVED   |
+  | 12| raw() returns live mutable object     | W7.2    | RESOLVED   |
+  | 13| hlTick dead prop threading            | W7.3    | RESOLVED   |
+  | 14| No JS-side telemetry/diagnostics      | W7.4    | RESOLVED   |
+  | 15| buildScreenRoutes 47-prop surface     | W7.5    | RESOLVED   |
+  | 16| UI tree untyped (82 files)            | W8.1    | RESOLVED   |
+  | 17| 24 !important declarations            | W8.2    | RESOLVED   |
+  | 18| Scripture parsing lacks JSDoc types    | W8.3    | RESOLVED   |
+
 ───────────────────────────────────────────────────────────────────────────────
 INFRA / TOOLING ITEMS (one-liners — open small, ship fast)
 ───────────────────────────────────────────────────────────────────────────────
@@ -159,7 +1382,8 @@ USER POLICY REMINDERS (durable; mirror CLAUDE.md)
 - NO security risks — anything that could leak personal data is a defect
 - android:allowBackup="false" — Export/Import is the only backup mechanism
 - App name is "VOTReader" (personal app; no Play Store thinking yet)
+- CROSS-PLATFORM: same JS codebase, Android APK + PWA desktop. No server.
 
 ───────────────────────────────────────────────────────────────────────────────
-END OF DOCUMENT — last pruned 2026-05-25 (N1 native-side polish closed + post-review hardening)
+END OF DOCUMENT — last updated 2026-05-26 (W0-W8 complete plan: PWA + quality hardening + all 18 critiques resolved)
 ───────────────────────────────────────────────────────────────────────────────
