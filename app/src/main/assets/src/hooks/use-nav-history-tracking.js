@@ -96,7 +96,13 @@ export function useNavHistoryTracking({
 }) {
   React.useEffect(() => {
     if (screen === 'matthew-ch' && chapterNum) {
-      const ch = MATTHEW.chapters.find((c) => c.num === chapterNum);
+      // Q8.2: MATTHEW is lazy-loaded. If the user lands directly on
+      // matthew-ch via saved tab state, this effect fires BEFORE the
+      // corpus loads. Skip the history record; a subsequent effect
+      // re-run after corpus arrival picks it up correctly.
+      const _MATTHEW = (typeof window !== 'undefined') ? window.MATTHEW : undefined;
+      if (!_MATTHEW) return;
+      const ch = _MATTHEW.chapters.find((c) => c.num === chapterNum);
       addToHistory({ type: 'chapter', bookId: 'matthew', bookTitle: 'Matthew', chapterNum, chapterTitle: ch?.title || null });
     } else if (screen === 'bible-ch' && bookId && chapterNum) {
       // Q8: BOOKS is lazy-loaded; if the user lands directly on bible-ch via

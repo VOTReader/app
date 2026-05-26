@@ -69,45 +69,60 @@
        navigation. See BUNDLE-LAZY-LOAD-PLAN.md for the design rationale. -->
   <script src="dist/bundle-a.js"></script>
 
-  <!-- Lazy Bible-corpus loader. Idempotent — subsequent calls return the
-       cached Promise. The on-load callback runs __finishBibleInit() (defined
-       in the inline #3 block below) to wire MATTHEW_PLAIN into BOOKS and
-       build BIBLE_BOOK_LIST + OT_BOOK_IDS — those were eager in the
-       pre-Q8 inline #3 block but now defer until BOOKS is defined. -->
+  <!-- Lazy-corpus loader factory. Builds a (corpus, loader) pair for one
+       lazy bundle file. The corpus object exposes useSyncExternalStore-
+       compatible subscribe/getVersion. The loader returns a cached Promise
+       — subsequent calls share one in-flight download. On script load,
+       runs the named __finish*Init() hook (which wires the corpus globals
+       into any cross-corpus registries that depended on them at boot
+       time) + notifies subscribers + resolves.
+
+       Used by:
+         __bibleCorpus  / __loadBibleCorpus   (Q8.1) — books.js
+         __matthewCorpus / __loadMatthewCorpus (Q8.2) — matthew.js (Study)
+       -->
   <script>
-  (function() {
-    var corpus = window.__bibleCorpus = {
+  window.__makeLazyLoader = function(name, bundlePath, finishFnName) {
+    var corpus = {
       loaded: false,
       _promise: null,
       _listeners: new Set(),
       subscribe: function(cb) { this._listeners.add(cb); var self = this; return function() { self._listeners.delete(cb); }; },
       getVersion: function() { return this.loaded ? 1 : 0; },
-      _notify: function() { this.loaded = true; this._listeners.forEach(function(cb) { try { cb(); } catch (e) { console.warn('bible-corpus subscriber threw', e); } }); }
+      _notify: function() { this.loaded = true; this._listeners.forEach(function(cb) { try { cb(); } catch (e) { console.warn(name + '-corpus subscriber threw', e); } }); }
     };
-    window.__loadBibleCorpus = function() {
+    var load = function() {
       if (corpus._promise) return corpus._promise;
       corpus._promise = new Promise(function(resolve, reject) {
         var script = document.createElement('script');
-        script.src = 'dist/bundle-a-bible.js';
+        script.src = bundlePath;
         script.async = false;
         script.onload = function() {
           try {
-            if (typeof window.__finishBibleInit === 'function') window.__finishBibleInit();
+            if (typeof window[finishFnName] === 'function') window[finishFnName]();
             corpus._notify();
             resolve();
           } catch (e) { reject(e); }
         };
-        script.onerror = function(e) {
-          // Failed to load (network error / missing file). Reset the promise
-          // so a later retry can succeed; reject this Promise so the caller
-          // can show an error state.
+        script.onerror = function() {
+          // Reset the promise so a later retry can succeed; reject this
+          // promise so the caller can show an error state.
           corpus._promise = null;
-          reject(new Error('Failed to load bundle-a-bible.js'));
+          reject(new Error('Failed to load ' + bundlePath));
         };
         document.head.appendChild(script);
       });
       return corpus._promise;
     };
+    return { corpus: corpus, load: load };
+  };
+  (function() {
+    var bible = window.__makeLazyLoader('bible', 'dist/bundle-a-bible.js', '__finishBibleInit');
+    window.__bibleCorpus = bible.corpus;
+    window.__loadBibleCorpus = bible.load;
+    var matthew = window.__makeLazyLoader('matthew', 'dist/bundle-a-matthew.js', '__finishMatthewInit');
+    window.__matthewCorpus = matthew.corpus;
+    window.__loadMatthewCorpus = matthew.load;
   })();
   </script>
 

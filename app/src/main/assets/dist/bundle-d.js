@@ -3065,29 +3065,35 @@
           onThemeChange: setTheme
         }
       ),
-      "matthew-idx": () => /* @__PURE__ */ React.createElement(
-        ChapterIndex,
-        {
-          book: MATTHEW,
-          onSelect: selectMatthewCh,
-          onBack: () => {
-            if (fromStudies) {
-              setFromStudies(false);
-              goStudiesHome();
-            } else {
-              goHome();
-            }
-          },
-          onSearch: goSearch,
-          onHistory: goHistory,
-          onSettings: goSettings,
-          currentChapter: settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null,
-          isRead: (num) => isRead("matthew", num),
-          markAsReadEnabled: settings.markAsRead,
-          theme,
-          onThemeChange: setTheme
+      "matthew-idx": () => {
+        if (typeof MATTHEW === "undefined") {
+          if (typeof window.__loadMatthewCorpus === "function") window.__loadMatthewCorpus();
+          return /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading Matthew\u2026");
         }
-      ),
+        return /* @__PURE__ */ React.createElement(
+          ChapterIndex,
+          {
+            book: MATTHEW,
+            onSelect: selectMatthewCh,
+            onBack: () => {
+              if (fromStudies) {
+                setFromStudies(false);
+                goStudiesHome();
+              } else {
+                goHome();
+              }
+            },
+            onSearch: goSearch,
+            onHistory: goHistory,
+            onSettings: goSettings,
+            currentChapter: settings.showReadingDot && activeReadKey === "matthew" ? lastReadChapters["matthew"] || null : null,
+            isRead: (num) => isRead("matthew", num),
+            markAsReadEnabled: settings.markAsRead,
+            theme,
+            onThemeChange: setTheme
+          }
+        );
+      },
       "studies-home": () => /* @__PURE__ */ React.createElement(
         StudiesHome,
         {
@@ -3185,41 +3191,47 @@
       // ── IIFE screens — render-time-derived locals (study lookups,
       //    letter shims, chain-aware boundaries) extracted to their own
       //    components in src/ui/screens/. ──
-      "matthew-ch": () => /* @__PURE__ */ React.createElement(
-        MatthewChapterView,
-        {
-          chapter,
-          chapterNum,
-          mode,
-          showStudy,
-          fromStudies,
-          settings,
-          titleFocusHidden,
-          setTitleFocusHidden,
-          prevChainEntry,
-          nextChainEntry,
-          goToChainEntryFirst,
-          goToChainEntryLast,
-          setSurpriseAnchor,
-          setFromStudies,
-          setMode,
-          setShowStudy,
-          markRead,
-          selectMatthewCh,
-          goMatthewIdx,
-          goSearch,
-          goSettings,
-          goHistory,
-          goToLetterFromMatthew,
-          theme,
-          setTheme,
-          surpriseAnchor,
-          backHint,
-          tapThroughBack,
-          hlTick,
-          openLinkSidebar
+      "matthew-ch": () => {
+        if (typeof MATTHEW === "undefined") {
+          if (typeof window.__loadMatthewCorpus === "function") window.__loadMatthewCorpus();
+          return /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading Matthew\u2026");
         }
-      ),
+        return /* @__PURE__ */ React.createElement(
+          MatthewChapterView,
+          {
+            chapter,
+            chapterNum,
+            mode,
+            showStudy,
+            fromStudies,
+            settings,
+            titleFocusHidden,
+            setTitleFocusHidden,
+            prevChainEntry,
+            nextChainEntry,
+            goToChainEntryFirst,
+            goToChainEntryLast,
+            setSurpriseAnchor,
+            setFromStudies,
+            setMode,
+            setShowStudy,
+            markRead,
+            selectMatthewCh,
+            goMatthewIdx,
+            goSearch,
+            goSettings,
+            goHistory,
+            goToLetterFromMatthew,
+            theme,
+            setTheme,
+            surpriseAnchor,
+            backHint,
+            tapThroughBack,
+            hlTick,
+            openLinkSidebar
+          }
+        );
+      },
       "bible-study-index": () => {
         if (!studyId) return null;
         const study = getStudyById(studyId);
@@ -4439,6 +4451,11 @@
 
   // app/src/main/assets/src/ui/screens/StudiesHome.jsx
   function StudiesHome2({ studies, studiesLoading, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+    React.useEffect(() => {
+      if (typeof window.__loadMatthewCorpus === "function") {
+        window.__loadMatthewCorpus().catch((e) => console.warn("Matthew corpus pre-load failed", e));
+      }
+    }, []);
     const list = studies || [];
     return /* @__PURE__ */ React.createElement(
       ScreenLayout,
@@ -4624,6 +4641,17 @@
 
   // app/src/main/assets/src/ui/screens/SettingsScreen.jsx
   function SettingsScreen2({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
+    React.useEffect(() => {
+      if (typeof window.__loadBibleCorpus === "function") {
+        window.__loadBibleCorpus().catch((e) => console.warn("Bible corpus pre-load failed", e));
+      }
+    }, []);
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.subscribe(cb) : () => {
+      }, []),
+      () => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.getVersion() : 0
+    );
+    const _BOOKS_READY = typeof BOOKS !== "undefined" && !!BOOKS;
     const [clearPending, setClearPending] = React.useState(null);
     const [openSections, setOpenSections] = React.useState(/* @__PURE__ */ new Set());
     const [wipeConfirm, setWipeConfirm] = React.useState(false);
@@ -4642,7 +4670,7 @@
       }
     };
     const resetClearPending = () => setClearPending(null);
-    const PROGRESS_GROUPS = [
+    const PROGRESS_GROUPS = !_BOOKS_READY ? [] : [
       {
         id: "volumes",
         label: "The Volumes of Truth",
@@ -6261,6 +6289,9 @@
     React.useEffect(() => {
       if (typeof window.__loadBibleCorpus === "function") {
         window.__loadBibleCorpus().catch((e) => console.warn("Bible corpus pre-load failed", e));
+      }
+      if (typeof window.__loadMatthewCorpus === "function") {
+        window.__loadMatthewCorpus().catch((e) => console.warn("Matthew corpus pre-load failed", e));
       }
     }, []);
     const bibleLoaded = typeof window.__bibleCorpus !== "undefined" && window.__bibleCorpus.loaded;
@@ -9566,7 +9597,16 @@
       }, []),
       () => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.getVersion() : 0
     );
-    const ALL_BOOKS = { matthew: MATTHEW, ...typeof BOOKS !== "undefined" ? BOOKS : {} };
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof window.__matthewCorpus !== "undefined" ? window.__matthewCorpus.subscribe(cb) : () => {
+      }, []),
+      () => typeof window.__matthewCorpus !== "undefined" ? window.__matthewCorpus.getVersion() : 0
+    );
+    const _MATTHEW = typeof MATTHEW !== "undefined" ? MATTHEW : null;
+    const ALL_BOOKS = {
+      ..._MATTHEW ? { matthew: _MATTHEW } : {},
+      ...typeof BOOKS !== "undefined" ? BOOKS : {}
+    };
     window.__ALL_BOOKS = ALL_BOOKS;
     const book = bookId ? ALL_BOOKS[bookId] : null;
     const chapter = book && chapterNum != null ? book.chapters.find((c) => c.num === chapterNum) : null;

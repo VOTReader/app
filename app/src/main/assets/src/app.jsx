@@ -443,15 +443,24 @@ function App() {
     activeReadKey, settings, readItems,
   });
 
-  // Q8 lazy-load: BOOKS may be undefined until __loadBibleCorpus() resolves.
-  // Subscribe to window.__bibleCorpus so App() re-renders when BOOKS becomes
-  // defined; until then ALL_BOOKS is just { matthew } and book/chapter stay
-  // null (the bible-ch / bible-idx routes show a loading state).
+  // Q8 lazy-load: BOOKS + MATTHEW may be undefined until their respective
+  // __load*Corpus() loaders resolve. Subscribe to both so App() re-renders
+  // when either becomes defined; until then ALL_BOOKS is sparse and
+  // book/chapter stay null (the bible-ch/matthew-ch/idx routes show a
+  // loading state).
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.subscribe(cb) : () => {}), []),
     () => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.getVersion() : 0)
   );
-  const ALL_BOOKS = { matthew: MATTHEW, ...(typeof BOOKS !== 'undefined' ? BOOKS : {}) };
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined' ? window.__matthewCorpus.subscribe(cb) : () => {}), []),
+    () => (typeof window.__matthewCorpus !== 'undefined' ? window.__matthewCorpus.getVersion() : 0)
+  );
+  const _MATTHEW = (typeof MATTHEW !== 'undefined') ? MATTHEW : null;
+  const ALL_BOOKS = {
+    ...(_MATTHEW ? { matthew: _MATTHEW } : {}),
+    ...(typeof BOOKS !== 'undefined' ? BOOKS : {})
+  };
   window.__ALL_BOOKS = ALL_BOOKS; // expose for parseScriptureRef()
   const book = bookId ? ALL_BOOKS[bookId] : null;
   const chapter = book && chapterNum != null ? book.chapters.find((c) => c.num === chapterNum) : null;

@@ -3,6 +3,22 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
+  // Q8: BOOKS is lazy. SettingsScreen's PROGRESS_GROUPS reads many
+  // BOOKS[...] keys at render time — pre-fire the loader on mount and
+  // subscribe so the screen re-renders with full data once BOOKS arrives.
+  // If user lands directly on Settings via saved tab state, the books
+  // list is empty during the brief loading window.
+  React.useEffect(() => {
+    if (typeof window.__loadBibleCorpus === 'function') {
+      window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load failed', e));
+    }
+  }, []);
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
+    () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
+  );
+  const _BOOKS_READY = typeof BOOKS !== 'undefined' && !!BOOKS;
+
   const [clearPending, setClearPending] = React.useState(null);
   const [openSections, setOpenSections] = React.useState(new Set());
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
@@ -23,7 +39,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   };
   const resetClearPending = () => setClearPending(null);
 
-  const PROGRESS_GROUPS = [
+  const PROGRESS_GROUPS = !_BOOKS_READY ? [] : [
   {
     id: "volumes", label: "The Volumes of Truth",
     genres: [

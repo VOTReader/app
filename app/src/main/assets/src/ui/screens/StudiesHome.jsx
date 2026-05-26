@@ -3,6 +3,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function StudiesHome({ studies, studiesLoading, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+  // Q8.2: pre-fire the Matthew Study Bible corpus load. By the time the
+  // user picks a study from the list, the 618 KB corpus is already
+  // downloading in parallel.
+  React.useEffect(() => {
+    if (typeof window.__loadMatthewCorpus === 'function') {
+      window.__loadMatthewCorpus().catch((e) => console.warn('Matthew corpus pre-load failed', e));
+    }
+  }, []);
   // `studies` is the pre-ordered UNIFIED_CHAIN from App — heavy → light,
   // Matthew Study Bible already inserted at its weighted position.
   // studiesLoading is true while bible-studies.js is fetched the first time.

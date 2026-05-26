@@ -498,20 +498,27 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'matthew-idx': () => (
-      <ChapterIndex
-        book={MATTHEW}
-        onSelect={selectMatthewCh}
-        onBack={() => { if (fromStudies) { setFromStudies(false); goStudiesHome(); } else { goHome(); } }}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        currentChapter={settings.showReadingDot && activeReadKey === 'matthew' ? lastReadChapters['matthew'] || null : null}
-        isRead={(num) => isRead('matthew', num)}
-        markAsReadEnabled={settings.markAsRead}
-        theme={theme} onThemeChange={setTheme}
-      />
-    ),
+    'matthew-idx': () => {
+      // Q8.2: MATTHEW lazy-loaded — render loading state until corpus arrives.
+      if (typeof MATTHEW === 'undefined') {
+        if (typeof window.__loadMatthewCorpus === 'function') window.__loadMatthewCorpus();
+        return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading Matthew…</div>;
+      }
+      return (
+        <ChapterIndex
+          book={MATTHEW}
+          onSelect={selectMatthewCh}
+          onBack={() => { if (fromStudies) { setFromStudies(false); goStudiesHome(); } else { goHome(); } }}
+          onSearch={goSearch}
+          onHistory={goHistory}
+          onSettings={goSettings}
+          currentChapter={settings.showReadingDot && activeReadKey === 'matthew' ? lastReadChapters['matthew'] || null : null}
+          isRead={(num) => isRead('matthew', num)}
+          markAsReadEnabled={settings.markAsRead}
+          theme={theme} onThemeChange={setTheme}
+        />
+      );
+    },
     'studies-home': () => (
       <StudiesHome
         studies={UNIFIED_CHAIN}
@@ -598,24 +605,31 @@ export function buildScreenRoutes({
     // ── IIFE screens — render-time-derived locals (study lookups,
     //    letter shims, chain-aware boundaries) extracted to their own
     //    components in src/ui/screens/. ──
-    'matthew-ch': () => (
-      <MatthewChapterView
-        chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}
-        fromStudies={fromStudies} settings={settings}
-        titleFocusHidden={titleFocusHidden} setTitleFocusHidden={setTitleFocusHidden}
-        prevChainEntry={prevChainEntry} nextChainEntry={nextChainEntry}
-        goToChainEntryFirst={goToChainEntryFirst} goToChainEntryLast={goToChainEntryLast}
-        setSurpriseAnchor={setSurpriseAnchor} setFromStudies={setFromStudies}
-        setMode={setMode} setShowStudy={setShowStudy}
-        markRead={markRead}
-        selectMatthewCh={selectMatthewCh}
-        goMatthewIdx={goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
-        goToLetterFromMatthew={goToLetterFromMatthew}
-        theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
-        backHint={backHint} tapThroughBack={tapThroughBack}
-        hlTick={hlTick} openLinkSidebar={openLinkSidebar}
-      />
-    ),
+    'matthew-ch': () => {
+      // Q8.2: MATTHEW lazy-loaded — render loading state until corpus arrives.
+      if (typeof MATTHEW === 'undefined') {
+        if (typeof window.__loadMatthewCorpus === 'function') window.__loadMatthewCorpus();
+        return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading Matthew…</div>;
+      }
+      return (
+        <MatthewChapterView
+          chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}
+          fromStudies={fromStudies} settings={settings}
+          titleFocusHidden={titleFocusHidden} setTitleFocusHidden={setTitleFocusHidden}
+          prevChainEntry={prevChainEntry} nextChainEntry={nextChainEntry}
+          goToChainEntryFirst={goToChainEntryFirst} goToChainEntryLast={goToChainEntryLast}
+          setSurpriseAnchor={setSurpriseAnchor} setFromStudies={setFromStudies}
+          setMode={setMode} setShowStudy={setShowStudy}
+          markRead={markRead}
+          selectMatthewCh={selectMatthewCh}
+          goMatthewIdx={goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
+          goToLetterFromMatthew={goToLetterFromMatthew}
+          theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
+          backHint={backHint} tapThroughBack={tapThroughBack}
+          hlTick={hlTick} openLinkSidebar={openLinkSidebar}
+        />
+      );
+    },
 
     'bible-study-index': () => {
       if (!studyId) return null;

@@ -16,6 +16,11 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
     if (typeof window.__loadBibleCorpus === 'function') {
       window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load failed', e));
     }
+    // Also pre-fire the Matthew Study Bible — the home screen offers a
+    // "Matthew Study" jump-button which lands directly on matthew-idx.
+    if (typeof window.__loadMatthewCorpus === 'function') {
+      window.__loadMatthewCorpus().catch((e) => console.warn('Matthew corpus pre-load failed', e));
+    }
   }, []);
   const bibleLoaded = typeof window.__bibleCorpus !== 'undefined' && window.__bibleCorpus.loaded;
 

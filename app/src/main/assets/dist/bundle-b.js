@@ -3713,7 +3713,9 @@
   }) {
     React.useEffect(() => {
       if (screen === "matthew-ch" && chapterNum) {
-        const ch = MATTHEW.chapters.find((c) => c.num === chapterNum);
+        const _MATTHEW = typeof window !== "undefined" ? window.MATTHEW : void 0;
+        if (!_MATTHEW) return;
+        const ch = _MATTHEW.chapters.find((c) => c.num === chapterNum);
         addToHistory({ type: "chapter", bookId: "matthew", bookTitle: "Matthew", chapterNum, chapterTitle: ch?.title || null });
       } else if (screen === "bible-ch" && bookId && chapterNum) {
         const _BOOKS = typeof window !== "undefined" ? window.BOOKS : void 0;

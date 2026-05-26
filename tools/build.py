@@ -37,14 +37,14 @@ ROOT  = os.path.join(REPO, 'app', 'src', 'main', 'assets')
 DIST  = os.path.join(ROOT, 'dist')
 
 # Cluster A — vendor + (most) corpus + search engine (CRITICAL PATH).
-# books.js (NKJV, 6.9 MB = 60% of pre-split bundle-a) is intentionally
-# EXCLUDED — it lives in bundle-a-bible.js, loaded lazily via
-# window.__loadBibleCorpus() on first Bible-bound navigation.
+# Bible (books.js, 6.9 MB) is lazy-loaded via bundle-a-bible.js.
+# Matthew Study Bible (matthew.js, 618 KB) is lazy-loaded via
+# bundle-a-matthew.js.
 # See BUNDLE-LAZY-LOAD-PLAN.md (Q8.0) for the design rationale.
 A = [
     'react.min.js', 'react-dom.min.js', 'html2canvas.min.js',
     'src/data/books-restored.js',
-    'src/data/matthew.js', 'src/data/matthew-plain.js', 'src/data/matthew-nkjv.js',
+    'src/data/matthew-plain.js', 'src/data/matthew-nkjv.js',
     'src/data/volume-one.js', 'src/data/volume-two.js', 'src/data/volume-three.js',
     'src/data/volume-four.js', 'src/data/volume-five.js', 'src/data/volume-six.js',
     'src/data/volume-seven.js',
@@ -62,6 +62,16 @@ A = [
 # __loadBibleCorpus() before rendering / navigating.
 A_BIBLE = [
     'src/data/books.js',
+]
+
+# Cluster A-matthew — the Matthew Study Bible. Loaded ON DEMAND via
+# window.__loadMatthewCorpus() on first navigation to Matthew Study
+# Bible content (Studies → Matthew Study Bible, or any chain
+# navigation that crosses into Matthew). Until this bundle loads,
+# `MATTHEW` is undefined; ALL_BOOKS, useBibleStudies' Matthew chain,
+# useSurprise's matthew branch, MatthewChapterView all guard.
+A_MATTHEW = [
+    'src/data/matthew.js',
 ]
 
 # Cluster B — stores + components + hooks + journal subsystem + scripture-resolution
@@ -115,10 +125,11 @@ def bundle(name, files):
 
 
 def main():
-    print('Building 2 classic-script bundles --> ' + DIST)
+    print('Building 3 classic-script bundles --> ' + DIST)
     print('  (clusters B, C, D are bundled by esbuild; run `npm run build` for the full chain)')
     bundle('a', A)
     bundle('a-bible', A_BIBLE)
+    bundle('a-matthew', A_MATTHEW)
     print('Done. (bundle-b.js, bundle-c.js, bundle-d.js belong to esbuild now.)')
 
 
