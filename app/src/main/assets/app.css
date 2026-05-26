@@ -1167,7 +1167,13 @@
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
-      touch-action: none;
+      /* pan-y (not none) so the screen scrolls when finger lands on a card —
+         the cards fill the viewport on mobile, leaving no scroll-grip otherwise.
+         The long-press-to-rearrange still works: it fires after 1.4s of finger
+         stillness, before any vertical pan threshold would trip scroll. Once
+         drag mode is active, the onTouchMove handler calls preventDefault on
+         the (passive:false) document listener to suppress further scrolling. */
+      touch-action: pan-y;
       box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02);
       transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
     }
