@@ -7,6 +7,11 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
   const [pos, setPos] = React.useState({ x: 0, y: 0 });
   const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, existingHl, multiVerse }
   const [activeStyle, setActiveStyle] = React.useState('highlight'); // 'highlight' | 'underline'
+  // Confirm-strip mode for the ✕ remove button. Resets whenever the
+  // selection changes so a fresh selection always lands on the normal
+  // toolbar (not an inherited mid-confirm state from a prior selection).
+  const [confirmingRemove, setConfirmingRemove] = React.useState(false);
+  React.useEffect(() => { setConfirmingRemove(false); }, [selInfo]);
   const toolbarRef = React.useRef(null);
   const suppressRef = React.useRef(false);
 
@@ -597,6 +602,20 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
       onPointerDown={(e) => { e.stopPropagation(); suppressRef.current = true; }}
       onPointerUp={() => { setTimeout(() => { suppressRef.current = false; }, 300); }}
     >
+      {/* While confirming a remove, the whole toolbar collapses to the
+          ConfirmStrip so the user is focused on the single decision (and
+          can't accidentally tap an unrelated action). Cancel returns to
+          the normal toolbar; Yes calls removeHighlight which also hides
+          the toolbar. */}
+      {confirmingRemove ? (
+        <ConfirmStrip
+          question="Remove this highlight?"
+          yesLabel="Yes, remove"
+          onCancel={() => setConfirmingRemove(false)}
+          onConfirm={() => { removeHighlight(); setConfirmingRemove(false); }}
+        />
+      ) : (
+      <>
       {/* Top row: style toggle + colors */}
       {showColors && (
         <div className="sel-toolbar-row sel-toolbar-styles">
@@ -628,7 +647,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
             {(selInfo.existingHl || mvHasExisting) && (
               <button
                 className="sel-color-btn sel-color-clear"
-                onClick={removeHighlight}
+                onClick={() => setConfirmingRemove(true)}
                 title="Remove highlight"
               >
                 ✕
@@ -690,6 +709,8 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
           <span>Bookmark</span>
         </button>
       </div>
+      </>
+      )}
     </div>
   );
 }
