@@ -14,10 +14,11 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **797 lines — Phase 1 + Phase 2 CLOSED.** 26 hooks (15 P6 + 11 P7a-k). **All 53 screens dispatch from a single ROUTES table** that lives in its own file (`src/ui/screen-routes.jsx`) via a `buildScreenRoutes(deps)` factory. The 3 substantive inline blocks (matthew-ch, bible-study-chapter, holy-days-index playlist header) extracted to their own screen/component files. Welcome modal + tabs overview + disable-tabs prompt + garden warning live in `AppShellOverlays`; 12 annotation/link/journal/bookmark sheets live in `AppShellSheets`. App() now owns composition, not implementation.
 - **Q6 CSS hardening CLOSED.** app.css 4,410 → 4,125 (−285 dead). 93 raw-hex usages consolidated to vars (`--hl-{yellow|green|pink|...}` palette + `--danger` + `--settings-warning/danger` + `--input-text` + `--white`). `!important` count 36 → 25 (Cat A removed; B-F load-bearing).
 - **Q7 useSyncExternalStore migration CLOSED.** 23 of 24 Bin 4 `hlTick` cache-bust eslint-disables removed (24th is in `annotation-store.test.js` documenting the old pattern). 7 stores now expose `subscribe / getVersion / _bump`; 14 consumers migrated.
-- **Bundle-a.js lazy-load:** prerequisite analysis only. See `BUNDLE-LAZY-LOAD-PLAN.md`. Deferred to its own sprint.
+- **Q8.1 lazy-load LANDED.** books.js (6.9 MB NKJV) split out to `bundle-a-bible.js`, loaded on demand via `window.__loadBibleCorpus()`. Critical-path bundle: 11.7 MB → 4.65 MB (60% reduction). Single-target pattern proof — other corpus files (matthew, volumes, WTLB, etc.) stay in bundle-a for now.
 - **135+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
-  - `bundle-a.js` 11.7 MB — vendor + 21 corpus + search engine (classic-script; lazy-split planned)
+  - `bundle-a.js` 4.65 MB — vendor + 20 corpus + search engine (critical path; classic-script)
+  - `bundle-a-bible.js` 6.9 MB — books.js (NKJV) lazy-loaded via `window.__loadBibleCorpus()`
   - `bundle-b.js` 351 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 38 files incl. cached-store.test.js excluded from prod)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
   - `bundle-d.js` 540 KB — screens + sheets + components + utils + late stores + screen-routes + App() (esbuild IIFE, 87 files)
@@ -180,21 +181,42 @@ post-mutation `setHlTick(t => t + 1)` is now a no-op since no
 consumer reads `hlTick`). A follow-up can remove the App-state +
 prop entirely; left in place this session to keep blast radius bounded.
 
-### Bundle-a.js lazy-load (DEFERRED — analysis only)
+### Q8 — Bundle-a.js lazy-load (Q8.1 LANDED 2026-05-25)
 
-Prerequisite analysis committed at `BUNDLE-LAZY-LOAD-PLAN.md` (Q8.0,
-`f7dff63`). Recommended implementation strategy documented; defer to
-its own sprint with smoke-tests at each step.
+**Q8.1 (`ea94158`)** — books.js split. Cold-boot critical path
+**11.7 MB → 4.65 MB (60% reduction)**. The 6.9-MB NKJV Bible lives in
+`bundle-a-bible.js`, loaded on demand via `window.__loadBibleCorpus()`.
 
-**Why deferred:** every BOOKS access site (12 source sites — including
-ScripturesHome tile counts on the home screen) needs a guard or await,
-which is a ~30-screen smoke matrix. Rushing in this session would
-either ship subtle regressions or fall short of the actual UX win.
+Runtime contract (index.html inline):
+- `window.__bibleCorpus = { loaded, subscribe(cb), getVersion() }`
+  — React 18 reactivity for the load state.
+- `window.__loadBibleCorpus() → Promise` — idempotent injector;
+  on-load runs `__finishBibleInit()` which assigns
+  `BOOKS["matthew-plain"]`, builds `BIBLE_BOOK_LIST` (66 books in
+  canonical order), populates `OT_BOOK_IDS`.
 
-**When picked up:** the plan doc has the implementation strategy B2
-(skeleton state + on-navigate loading). Books.js alone (6.9 MB =
-60% of bundle-a) is the highest leverage; full split brings cold-boot
-from 11.3 MB → 3.8 MB.
+App-side wiring (pattern proof — only books.js this pass):
+- ScripturesHome pre-fires `__loadBibleCorpus()` on mount via
+  `useEffect`, subscribes to `__bibleCorpus` so tile chapter-counts
+  render `'—'` until BOOKS resolves, then fill in real numbers.
+- App() subscribes to `__bibleCorpus` at the top level so the WHOLE
+  render tree re-runs when BOOKS resolves. `ALL_BOOKS` guards with
+  `typeof` to tolerate pre-load state.
+- `bible-ch` / `bible-idx` ROUTES entries show a centered "Loading
+  Bible…" card if corpus isn't loaded; trigger
+  `__loadBibleCorpus()` on render so cold-boot direct to a saved
+  Bible chapter tab works.
+- `utils/tabs.js` `describeTab` resolves bookId via `window.BOOKS`
+  instead of bare `BOOKS` — tolerates undefined cleanly.
+- `use-nav-history-tracking.js` skips Bible-chapter history records
+  if BOOKS isn't loaded; a subsequent effect run after corpus load
+  picks up the entry correctly.
+
+**Remaining work:** other corpus files (matthew.js, volume-*.js,
+letters-*, WTLB, the-blessed, holy-days, hidden-manna) stay in
+bundle-a for now. Per the pattern-proof discipline established by
+earlier phases, expand to other splits in follow-up commits with
+their own smoke tests.
 
 ### Roadmap
 

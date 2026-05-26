@@ -131,7 +131,89 @@ blast radius.
 
 ---
 
-## Q8.0 — Bundle-a.js lazy-load (ANALYSIS ONLY, DEFERRED)
+## Q8.1 — books.js lazy-load (LANDED 2026-05-25)
+
+`ea94158` lands the single-target pattern proof for bundle-a lazy
+splitting. Cold-boot critical path: **11.7 MB → 4.65 MB (60%
+reduction).** books.js (6.9 MB NKJV Bible) is the only file moved this
+pass — other corpus files (matthew, 7 volumes, letters-* families,
+WTLB, holy-days, hidden-manna) stay in bundle-a for now. Each will
+get its own commit using the pattern proven here.
+
+Build pipeline (`tools/build.py`): A → 26 files (4.65 MB critical),
+A_BIBLE → 1 file (books.js, 6.9 MB lazy). `bundle('a-bible', A_BIBLE)`
+emits `dist/bundle-a-bible.js`.
+
+Runtime contract (inline in `index.html`):
+- `window.__bibleCorpus = { loaded, _promise, _listeners, subscribe(cb),
+  getVersion(), _notify() }` — a tiny React-18-compatible store
+  exposed for `useSyncExternalStore`.
+- `window.__loadBibleCorpus()` — returns a cached Promise; first call
+  injects `<script src="dist/bundle-a-bible.js">`, on-load runs
+  `__finishBibleInit()` + notifies subscribers + resolves.
+- `window.__finishBibleInit()` — assigns `BOOKS["matthew-plain"] =
+  MATTHEW_PLAIN`, builds `BIBLE_BOOK_LIST` (66 books in canonical
+  order), populates `OT_BOOK_IDS` Set. Pre-Q8.1 these were eager
+  `const` declarations directly inside an inline `<script>` block;
+  now `var` (mutable) + `[]` + `new Set()` initially, with real
+  population deferred until BOOKS loads.
+
+App-side wiring (single-target pattern proof — only books.js, only
+the access sites that fire BEFORE the user triggers ScripturesHome's
+pre-load):
+- **ScripturesHome** — subscribes to `__bibleCorpus` via
+  `useSyncExternalStore`; pre-fires `__loadBibleCorpus()` in a
+  mount-time `useEffect` so the corpus is already downloading by the
+  time the user clicks a genre. `bibleLoaded` ternary renders skeleton
+  `'—'` chapter counts until BOOKS resolves, then real numbers.
+  `handleTile` / `handleBook` await the loader before navigating
+  (defensive; usually loaded by then).
+- **App()** — top-level subscription to `__bibleCorpus`. When BOOKS
+  resolves, the whole render tree re-runs. `ALL_BOOKS` guards with
+  `typeof BOOKS !== 'undefined' ? BOOKS : {}` so the pre-load state
+  doesn't throw.
+- **`bible-ch` / `bible-idx` ROUTES entries** (`screen-routes.jsx`) —
+  when `book` is null (because BOOKS is undefined) AND the corpus
+  isn't loaded, render a centered "Loading Bible…" placeholder AND
+  trigger `__loadBibleCorpus()`. Handles the cold-boot-direct-to-
+  bible-ch case (saved tab state).
+- **`utils/tabs.js` `describeTab`** — resolves bookId via
+  `(typeof BOOKS !== 'undefined' ? BOOKS[id] : null)` instead of
+  bare `BOOKS[id]`. Bundle-b's IIFE captures `BOOKS` as a free
+  identifier; a bare reference would throw ReferenceError during the
+  pre-load window.
+- **`use-nav-history-tracking.js`** — early-return for `bible-ch`
+  branch if BOOKS isn't loaded (`const _BOOKS = window.BOOKS; if
+  (!_BOOKS) return;`); a subsequent effect run after the corpus
+  loads picks up the entry correctly.
+
+Visual smoke:
+- Cold-boot direct to Acts 1 (saved tab state from a prior session):
+  renders the centered "Loading Bible…" card for the brief lazy-load
+  window, then re-renders with all 26 verses + the proper section
+  heading.
+- Home → Scriptures: skeleton `'—'` flashes briefly, then real
+  chapter counts fill in (5 OT genres, 5 NT genres, totals match
+  pre-Q8 numbers: 187/249/243/183/67/89/28/100/21/22 chapters).
+- Settings → translation toggle list (reads `BOOKS["matthew-plain"]`,
+  `BOOKS["1corinthians"]`, etc.): renders correctly post-corpus-load.
+
+Gates: lint ✓ typecheck ✓ vitest (476) ✓ build ✓
+
+**Remaining BOOKS access sites NOT guarded this pass:**
+`handleScriptureSelect`, `useAndroidBack`, `useNavigateToLink`'s
+Bible branch, `useSearch`'s book-context computation,
+`useReadingChainNav`'s `goToRevelationLast` + Revelation boundary,
+`MatthewChapterView`'s chain-aware boundary. All of these fire
+inside user-action callbacks that run AFTER ScripturesHome's mount
+or AFTER an explicit Bible-bound nav (which trigger
+`__loadBibleCorpus()` first). They'll be hit by an already-loaded
+corpus in practice. Add guards in follow-up commits if smoke walks
+surface a regression.
+
+---
+
+## Q8.0 — Bundle-a.js lazy-load analysis (DEFERRED, then SUPERSEDED by Q8.1)
 
 `f7dff63` lands the analysis + implementation strategy doc at
 `BUNDLE-LAZY-LOAD-PLAN.md`. The work is deferred to its own sprint —
