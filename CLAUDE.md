@@ -227,13 +227,21 @@ App-side guards added across:
 - `HomeScreen` + `VolumesHome` + `ScripturesHome` + `StudiesHome` +
   `SettingsScreen` — `useEffect` pre-fires the relevant loader(s) on
   mount so corpora download in parallel with user's tile scan.
-  HomeScreen additionally pre-fires Bible + Matthew when
-  `settings.showSurpriseButton` is true (the dice's random-pool
-  builder reads both globals); `use-surprise.js` also `typeof`-guards
-  + early-returns on empty pool to make the cold-boot race
-  recoverable instead of throwing. The dice button itself now flows
-  inline below the last home card (no longer `position:fixed`), so
-  the home view scrolls when cards + dice exceed the viewport.
+  HomeScreen additionally pre-fires Bible + Matthew + bible-studies
+  when `settings.showSurpriseButton` is true (the dice's random-pool
+  builder reads all three globals); `use-surprise.js` also
+  `typeof`-guards + early-returns on empty pool to make the cold-boot
+  race recoverable instead of throwing. The dice button itself now
+  flows inline below the last home card (no longer `position:fixed`),
+  so the home view scrolls when cards + dice exceed the viewport.
+  **Pool scope (2,018 entries):** Matthew Study + Bible + study
+  chapters + every COLLECTION with `surpriseType` set (Vols 1–7,
+  Timothy, Flock, Rebuke, WTLB 1+2, Blessed, Holy Days) including
+  prefaces; Hidden Manna stays out (`surpriseType: null` honors the
+  "reachable only via Matthew study chain" policy); "Return to the
+  Garden" is not in COLLECTIONS so naturally excluded. Index selection
+  uses `crypto.getRandomValues` + rejection-sampling
+  (`Math.random` fallback) for bias-free uniform pick.
 - `VolumesHome` — `_locked = _votReady && _cnt === 0` so the lock
   flag only kicks in for known-empty collections once the corpus
   arrives (during loading window, NO tile is locked).

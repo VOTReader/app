@@ -1,14 +1,15 @@
-/* P7j — useSurprise tests. Single-helper concern; verify the 4 branches
-   (matthew / bible / study / col-letter) all wire correctly + the
-   pool-build includes only surpriseType-tagged collections + locked/
-   empty studies are filtered. */
+/* P7j — useSurprise tests. Verify branch dispatch + pool composition +
+   lazy-load race + the unbiased _randomIndex selector. The random source
+   is stubbed via crypto.getRandomValues (preferred path); a Math.random
+   stub is also set as belt-and-suspenders for the crypto-unavailable
+   fallback branch. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSurprise } from './use-surprise.js';
 
-let _prevMATTHEW, _prevBBL, _prev_studies, _prevCOLLECTIONS, _prevCOL_BY_KEY, _prevColLetterArr;
-let _prevRandom;
+let _prevMATTHEW, _prevBBL, _prev_studies, _prevCOLLECTIONS, _prevCOL_BY_KEY, _prevColLetterArr, _prevColPreface;
+let _prevRandom, _prevGetRandomValues;
 
 beforeEach(() => {
   _prevMATTHEW = window.MATTHEW;
@@ -17,7 +18,9 @@ beforeEach(() => {
   _prevCOLLECTIONS = window.COLLECTIONS;
   _prevCOL_BY_KEY = window.COL_BY_KEY;
   _prevColLetterArr = window.colLetterArr;
+  _prevColPreface = window.colPreface;
   _prevRandom = Math.random;
+  _prevGetRandomValues = window.crypto && window.crypto.getRandomValues;
   window.MATTHEW = { chapters: [{ num: 1 }, { num: 5 }] };
   window.BIBLE_BOOK_LIST = [{ id: 'genesis', chapters: [{ num: 1 }] }];
   window._studies = () => [
@@ -31,6 +34,7 @@ beforeEach(() => {
   ];
   window.COL_BY_KEY = new Map([['two', { volKey: 'two', letterScreen: 'vot-letter' }]]);
   window.colLetterArr = (col) => col?.volKey === 'two' ? [{ id: 'wide' }] : [];
+  window.colPreface = () => null; // no preface in baseline; specific tests opt in.
 });
 
 afterEach(() => {
@@ -40,7 +44,11 @@ afterEach(() => {
   window.COLLECTIONS = _prevCOLLECTIONS;
   window.COL_BY_KEY = _prevCOL_BY_KEY;
   window.colLetterArr = _prevColLetterArr;
+  window.colPreface = _prevColPreface;
   Math.random = _prevRandom;
+  if (window.crypto && _prevGetRandomValues) {
+    window.crypto.getRandomValues = _prevGetRandomValues;
+  }
 });
 
 const baseProps = () => ({
@@ -54,10 +62,21 @@ const baseProps = () => ({
   selectStudyChapter: vi.fn(),
 });
 
-// Force Math.random to deterministically pick a specific pool index
-// (0..n-1). Pool order: [matthew × 2, bible × 1, study × 1, col × 1] = 5
+// Force _randomIndex to deterministically return `idx` for any pool. Stubs
+// both crypto.getRandomValues (the production path) AND Math.random (the
+// fallback) so the test passes regardless of which branch runs.
+//
+// Pool order for baseline setup: [matthew × 2, bible × 1, study × 1, col × 1] = 5
 // items (locked + empty studies filtered, no-surprise collection filtered).
-const setRandomIndex = (idx, poolLen) => { Math.random = () => idx / poolLen; };
+const setRandomIndex = (idx, poolLen) => {
+  // crypto path: rejection-sample acceptCeiling for the given pool size;
+  // idx is < poolLen ≤ acceptCeiling, so idx is always in the accept zone.
+  if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+    window.crypto.getRandomValues = (buf) => { buf[0] = idx; return buf; };
+  }
+  // Math.random fallback: floor(idx/poolLen * poolLen) === idx.
+  Math.random = () => idx / poolLen;
+};
 
 describe('useSurprise — branch dispatch', () => {
   it('matthew branch: setBookId(matthew) + chapter + screen=matthew-ch', () => {
@@ -126,6 +145,66 @@ describe('useSurprise — pool filtering', () => {
     expect(props.setLetterId).toHaveBeenCalledWith('wide');
   });
 
+  it('collection prefaces are included in the pool', () => {
+    // Pool grows from 5 → 6: matthew × 2, bible × 1, study × 1, two-preface, two-wide.
+    // Index 4 is now the preface (inserted before the letters).
+    window.colPreface = (col) => col?.volKey === 'two' ? { id: 'two-warning' } : null;
+    window.COL_BY_KEY = new Map([['two', { volKey: 'two', letterScreen: 'vot-letter' }]]);
+    const props = baseProps();
+    const { result } = renderHook(() => useSurprise(props));
+    setRandomIndex(4, 6);
+    act(() => { result.current.handleSurprise(); });
+    expect(props.setLetterId).toHaveBeenCalledWith('two-warning');
+    expect(props.setScreen).toHaveBeenCalledWith('vot-letter');
+  });
+
+  it('Holy Days entries appear in the pool when COLLECTIONS includes them', () => {
+    // Regression: Holy Days surpriseType was null pre-2026-05-26, filtered
+    // from the dice. Now flipped to 'holydays' in scripture-resolution.js,
+    // its entries must reach the pool.
+    window.COLLECTIONS = [
+      { volKey: 'holydays', surpriseType: 'holydays', letterScreen: 'holy-days-entry' },
+    ];
+    window.COL_BY_KEY = new Map([['holydays', { volKey: 'holydays', letterScreen: 'holy-days-entry' }]]);
+    window.colLetterArr = (col) => col?.volKey === 'holydays' ? [{ id: 'passover' }] : [];
+    // Pool: matthew × 2, bible × 1, study × 1, holydays-passover = 5
+    const props = baseProps();
+    const { result } = renderHook(() => useSurprise(props));
+    setRandomIndex(4, 5);
+    act(() => { result.current.handleSurprise(); });
+    expect(props.setLetterId).toHaveBeenCalledWith('passover');
+    expect(props.setScreen).toHaveBeenCalledWith('holy-days-entry');
+    expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:holydays', expect.any(Function));
+  });
+
+  it('Hidden Manna stays excluded (surpriseType: null is honored)', () => {
+    // Policy: Hidden Manna is reachable only via the Matthew study chain.
+    // The COLLECTIONS row keeps surpriseType: null so the dice never lands
+    // on it. Verify by including an HM-shaped row and confirming the pool
+    // does NOT route to its letterScreen.
+    window.COLLECTIONS = [
+      { volKey: 'two', surpriseType: 'letter', letterScreen: 'vot-letter' },
+      { volKey: 'hm', surpriseType: null, letterScreen: 'hm-letter' },
+    ];
+    window.COL_BY_KEY = new Map([
+      ['two', { volKey: 'two', letterScreen: 'vot-letter' }],
+      ['hm', { volKey: 'hm', letterScreen: 'hm-letter' }],
+    ]);
+    window.colLetterArr = (col) => {
+      if (col?.volKey === 'two') return [{ id: 'wide' }];
+      if (col?.volKey === 'hm') return [{ id: 'woe-to-dallas' }];
+      return [];
+    };
+    // Pool is still 5 (HM filtered out): matthew × 2, bible × 1, study × 1, two-wide.
+    const props = baseProps();
+    const { result } = renderHook(() => useSurprise(props));
+    setRandomIndex(4, 5);  // last entry must be 'wide', NOT 'woe-to-dallas'
+    act(() => { result.current.handleSurprise(); });
+    expect(props.setLetterId).toHaveBeenCalledWith('wide');
+    expect(props.setScreen).toHaveBeenCalledWith('vot-letter');
+    expect(props.setScreen).not.toHaveBeenCalledWith('hm-letter');
+  });
+
   it('col-letter branch is a no-op when COL_BY_KEY misses (defensive)', () => {
     // Edge case: pool has a col entry but COL_BY_KEY has been wiped
     // (cold-boot race). Should early-return rather than crash.
@@ -166,5 +245,21 @@ describe('useSurprise — pool filtering', () => {
     delete window.__loadBibleCorpus;
     delete window.__loadMatthewCorpus;
     delete window.__loadVotCorpus;
+  });
+});
+
+describe('useSurprise — randomness', () => {
+  it('uses crypto.getRandomValues when available (unbiased path)', () => {
+    // Spy on crypto to confirm it's the entropy source. Stub it to a
+    // deterministic value (idx 1 of a 5-item pool → bible-genesis-ch1).
+    const spy = vi.fn((buf) => { buf[0] = 1; return buf; });
+    if (window.crypto) window.crypto.getRandomValues = spy;
+    const props = baseProps();
+    const { result } = renderHook(() => useSurprise(props));
+    act(() => { result.current.handleSurprise(); });
+    expect(spy).toHaveBeenCalled();
+    // Index 1 with current pool (matthew × 2, bible × 1, study × 1, col × 1) = matthew ch 5
+    expect(props.setBookId).toHaveBeenCalledWith('matthew');
+    expect(props.setChapterNum).toHaveBeenCalledWith(5);
   });
 });

@@ -4495,6 +4495,20 @@
   }
 
   // app/src/main/assets/src/hooks/use-surprise.js
+  function _randomIndex(max) {
+    if (!Number.isInteger(max) || max <= 0) return 0;
+    if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+      const RANGE = 4294967296;
+      const acceptCeiling = RANGE - RANGE % max;
+      const buf = new Uint32Array(1);
+      for (let i = 0; i < 16; i++) {
+        crypto.getRandomValues(buf);
+        if (buf[0] < acceptCeiling) return buf[0] % max;
+      }
+      return buf[0] % max;
+    }
+    return Math.floor(Math.random() * max);
+  }
   function useSurprise({
     setSurpriseAnchor,
     setBookId,
@@ -4515,6 +4529,8 @@
       ];
       for (const col of COLLECTIONS) {
         if (!col.surpriseType) continue;
+        const pref = typeof colPreface === "function" ? colPreface(col) : null;
+        if (pref && pref.id) pool.push({ _k: "col", volKey: col.volKey, id: pref.id });
         for (const l of colLetterArr(col)) pool.push({ _k: "col", volKey: col.volKey, id: l.id });
       }
       if (pool.length === 0) {
@@ -4523,7 +4539,7 @@
         if (typeof window.__loadVotCorpus === "function") window.__loadVotCorpus();
         return;
       }
-      const pick = pool[Math.floor(Math.random() * pool.length)];
+      const pick = pool[_randomIndex(pool.length)];
       setSurpriseAnchor(null);
       if (pick._k === "matthew") {
         setBookId("matthew");
@@ -5012,7 +5028,7 @@
     { volKey: "wtlb1", cardId: "words-to-live-by-1", readKey: "wtlb-one", globalName: "WTLB_ONE", prefaceGlobal: null, letterScreen: "wtlb-one-entry", indexScreen: "wtlb-one-index", label: "Words To Live By: Part One", registryLabel: "Words To Live By: Part One", searchVolId: "wtlb1", kind: "wtlb", surpriseType: "wtlb1" },
     { volKey: "wtlb2", cardId: "words-to-live-by-2", readKey: "wtlb-two", globalName: "WTLB_TWO", prefaceGlobal: null, letterScreen: "wtlb-two-entry", indexScreen: "wtlb-two-index", label: "Words To Live By: Part Two", registryLabel: "Words To Live By: Part Two", searchVolId: "wtlb2", kind: "wtlb", surpriseType: "wtlb2" },
     { volKey: "blessed", cardId: "the-blessed", readKey: "the-blessed", globalName: "THE_BLESSED", prefaceGlobal: null, letterScreen: "blessed-entry", indexScreen: "blessed-index", label: "The Blessed", registryLabel: "The Blessed", searchVolId: "blessed", kind: "blessed", surpriseType: "blessed" },
-    { volKey: "holydays", cardId: "holy-days", readKey: "holy-days", globalName: "HOLY_DAYS", prefaceGlobal: null, letterScreen: "holy-days-entry", indexScreen: "holy-days-index", label: "Regarding The Holy Days", registryLabel: "Regarding The Holy Days", searchVolId: "holydays", kind: "holy-days", surpriseType: null },
+    { volKey: "holydays", cardId: "holy-days", readKey: "holy-days", globalName: "HOLY_DAYS", prefaceGlobal: null, letterScreen: "holy-days-entry", indexScreen: "holy-days-index", label: "Regarding The Holy Days", registryLabel: "Regarding The Holy Days", searchVolId: "holydays", kind: "holy-days", surpriseType: "holydays" },
     { volKey: "hm", cardId: null, readKey: "hidden-manna", globalName: "HIDDEN_MANNA", prefaceGlobal: null, letterScreen: "hm-letter", indexScreen: null, label: "Hidden Manna", registryLabel: "Hidden Manna", searchVolId: "hidden-manna", kind: "letter", surpriseType: null }
   ];
   var COL_BY_KEY2 = new Map(COLLECTIONS2.map((c) => [c.volKey, c]));

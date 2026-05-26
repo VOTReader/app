@@ -4,6 +4,61 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## Surprise button — full-app pool + unbiased RNG (LANDED 2026-05-26)
+
+Second pass on the dice in the same day. Scope was: include every
+content surface (except Return to the Garden) so the dice truly spans
+the app, and tighten the random-selection algorithm.
+
+- **Pool expanded** from ~1500 to **2,018 entries** (Bible 1189,
+  Matthew Study 28, Studies 72, all 13 letter/WTLB/Blessed collections
+  729, Holy Days 16). Now includes:
+  - **Holy Days phantom album** — `surpriseType: 'holydays'` flipped
+    from null in `scripture-resolution.js`. The 16 ghost entries
+    (curated cross-references) become dice-reachable for the first
+    time.
+  - **Collection prefaces** — `colPreface(col)` checked + pushed
+    alongside `colLetterArr(col)` so e.g. Volume One's "A Word of
+    Warning", Volume Seven's "The Indignation of The Lord", and the
+    Timothy/Flock/Rebuke prefaces are reachable. Adds ~10 entries
+    overall.
+- **Excluded by design:**
+  - **Hidden Manna** — `surpriseType: null` retained. Per CLAUDE.md,
+    HM is reachable only via the Matthew study chain; the dice
+    explicitly respects that policy.
+  - **Return to the Garden** — `garden-view` screen; not in COLLECTIONS
+    / chapters / studies, so naturally excluded by the pool builder's
+    scope.
+- **Bias-free RNG** — replaced
+  `Math.floor(Math.random() * pool.length)` with a `_randomIndex(max)`
+  helper that uses `crypto.getRandomValues(Uint32Array(1))` with
+  rejection sampling against an `acceptCeiling` (largest multiple of
+  `max` that fits in 2^32). Bias zone for a 2,018-entry pool is
+  ~296 / 4_294_967_296 ≈ 7 × 10⁻⁸; the rejection loop terminates on
+  the first draw essentially always. Falls back to Math.random when
+  crypto is unavailable. For non-degenerate uses Math.random in V8 is
+  already statistically uniform — this is belt-and-suspenders rigor,
+  not a Math.random repair.
+- **Studies pre-fire on HomeScreen** — `loadBibleStudies()` is now
+  pre-fired alongside Bible + Matthew in HomeScreen's `showSurprise`
+  effect, so study chapters reach the pool without a prior visit to
+  the Studies tab. (Pool gracefully degrades if studies haven't
+  loaded yet — they're just absent for the brief race window.)
+
+**+5 vitest cases** in `use-surprise.test.js` (12 total): prefaces
+included, Holy Days dispatch, Hidden Manna stays excluded, crypto
+spy verifies the unbiased path is taken; existing 7 cases unchanged
+in intent (random stub now sets both `crypto.getRandomValues` and
+`Math.random` for path-agnostic determinism).
+
+**Verified in preview** (mobile 375x812): probed pool composition
+via live JS — confirmed 2,018 entries with Holy Days 16 IN, Hidden
+Manna 0 OUT. Forced crypto-stub indices to 2002 + 1217 → dice
+navigated to "Regarding The Holy Days · 1" and to a Bible-study
+preface respectively. Zero console errors.
+
+---
+
 ## Q8 follow-up — Surprise button + lazy-load (LANDED 2026-05-26)
 
 After Q8 made `MATTHEW` + `BIBLE_BOOK_LIST` lazy globals, the Random

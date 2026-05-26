@@ -76,10 +76,10 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     }
   }, []);
 
-  // Surprise button needs MATTHEW + BIBLE_BOOK_LIST (Q8 lazy globals) to
-  // build its random pool. Pre-fire both loaders when the button is shown
-  // so the tap resolves cleanly instead of waiting on the user's next visit
-  // to Scriptures / Studies.
+  // Surprise button needs MATTHEW + BIBLE_BOOK_LIST + BIBLE_STUDIES (all
+  // lazy globals) to build its random pool. Pre-fire each loader when the
+  // button is shown so the tap resolves cleanly instead of waiting on the
+  // user's next visit to Scriptures / Studies.
   React.useEffect(() => {
     if (!showSurprise) return;
     if (typeof window.__loadBibleCorpus === 'function') {
@@ -87,6 +87,11 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     }
     if (typeof window.__loadMatthewCorpus === 'function') {
       window.__loadMatthewCorpus().catch((e) => console.warn('Matthew corpus pre-load (surprise) failed', e));
+    }
+    // bible-studies.js is a separate ~4.3 MB lazy script (translations.js
+    // loadBibleStudies). Without it, study chapters never reach the dice pool.
+    if (typeof loadBibleStudies === 'function') {
+      loadBibleStudies().catch((e) => console.warn('Bible studies pre-load (surprise) failed', e));
     }
   }, [showSurprise]);
 

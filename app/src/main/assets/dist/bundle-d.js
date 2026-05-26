@@ -5456,6 +5456,9 @@
       if (typeof window.__loadMatthewCorpus === "function") {
         window.__loadMatthewCorpus().catch((e) => console.warn("Matthew corpus pre-load (surprise) failed", e));
       }
+      if (typeof loadBibleStudies === "function") {
+        loadBibleStudies().catch((e) => console.warn("Bible studies pre-load (surprise) failed", e));
+      }
     }, [showSurprise]);
     React.useEffect(() => () => {
       clearTimeout(pressTimerRef.current);

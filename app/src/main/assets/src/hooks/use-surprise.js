@@ -38,8 +38,35 @@
 
    READS FROM GLOBAL SCOPE (cross-bundle):
      MATTHEW, BIBLE_BOOK_LIST, _studies, COLLECTIONS, COL_BY_KEY,
-     colLetterArr.
+     colLetterArr, colPreface.
    ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Uniform random integer in [0, max). Uses crypto.getRandomValues with
+ * rejection sampling to avoid modulo bias regardless of max. Falls back
+ * to Math.random when crypto is unavailable. For our pool sizes (~2k)
+ * the rejection loop terminates on the first draw essentially always
+ * (acceptCeiling ~= 4_294_967_000 of 2^32 — bias zone is microscopic).
+ *
+ * @param {number} max
+ * @returns {number}
+ */
+function _randomIndex(max) {
+  if (!Number.isInteger(max) || max <= 0) return 0;
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const RANGE = 0x100000000; // 2^32
+    const acceptCeiling = RANGE - (RANGE % max);
+    const buf = new Uint32Array(1);
+    // Loops < 1-in-a-million for our pool sizes.
+    for (let i = 0; i < 16; i++) {
+      crypto.getRandomValues(buf);
+      if (buf[0] < acceptCeiling) return buf[0] % max;
+    }
+    // Pathological fallback (should be statistically impossible).
+    return buf[0] % max;
+  }
+  return Math.floor(Math.random() * max);
+}
 
 /**
  * @param {{
@@ -71,8 +98,16 @@ export function useSurprise({
       ..._BBL.flatMap((b) => b.chapters.map((ch) => ({ _k: 'bible', bookId: b.id, num: ch.num }))),
       ..._studies().filter((s) => !s.locked && s.chapters && s.chapters.length > 0).flatMap((s) => s.chapters.map((ch) => ({ _k: 'study', studyId: s.id, chId: ch.id }))),
     ];
+    // Every COLLECTION whose surpriseType is set contributes its preface (if
+    // any) + all its letters/entries to the pool. Holy Days IS now included
+    // (surpriseType: 'holydays'); Hidden Manna stays out (surpriseType: null)
+    // per the CLAUDE.md rule that it's reachable only via the Matthew study
+    // chain. "Return to the Garden" is a separate garden-view screen, not in
+    // COLLECTIONS at all, so it's naturally excluded.
     for (const col of COLLECTIONS) {
       if (!col.surpriseType) continue;
+      const pref = (typeof colPreface === 'function') ? colPreface(col) : null;
+      if (pref && pref.id) pool.push({ _k: 'col', volKey: col.volKey, id: pref.id });
       for (const l of colLetterArr(col)) pool.push({ _k: 'col', volKey: col.volKey, id: l.id });
     }
     if (pool.length === 0) {
@@ -81,7 +116,7 @@ export function useSurprise({
       if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
       return;
     }
-    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const pick = pool[_randomIndex(pool.length)];
     setSurpriseAnchor(null);
     if (pick._k === 'matthew') {
       setBookId('matthew'); setChapterNum(pick.num); setScreen('matthew-ch');

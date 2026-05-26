@@ -38,7 +38,7 @@
     "vitest": "^4.1.7"
   },
   "lint-staged": {
-    "app/src/main/assets/src/**/*.{js,jsx}": "eslint --max-warnings 0"
+    "app/src/main/assets/src/**/*.{js,jsx}": "eslint --max-warnings 0 --no-warn-ignored"
   },
   "engines": {
     "node": ">=20"
