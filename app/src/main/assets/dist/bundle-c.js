@@ -389,8 +389,12 @@
     if (kind === "underline") return "hl-mark hl-underline hl-" + ann.color;
     return "hl-mark hl-" + ann.color;
   }
-  function HighlightableText({ text, hlKey, hlTick }) {
-    const annotations = React.useMemo(() => AnnotationStore.get(hlKey), [hlKey, hlTick]);
+  function HighlightableText({ text, hlKey }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
+      () => AnnotationStore.getVersion()
+    );
+    const annotations = AnnotationStore.get(hlKey);
     if (!text) return null;
     if (!annotations || annotations.length === 0) {
       return /* @__PURE__ */ React.createElement("span", { "data-hl-key": hlKey }, text);

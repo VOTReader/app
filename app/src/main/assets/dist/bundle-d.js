@@ -7534,9 +7534,17 @@
   }
 
   // app/src/main/assets/src/ui/sheets/NoteSheet.jsx
-  function NoteSheet2({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpenNotebookPicker }) {
-    const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
-    const segs = React.useMemo(() => AnnotationStore.getByGroup(groupId), [groupId, hlTick]);
+  function NoteSheet2({ groupId, startInEditMode, setHlTick, onClose, onOpenNotebookPicker }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NoteStore.subscribe(cb), []),
+      () => NoteStore.getVersion()
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
+      () => AnnotationStore.getVersion()
+    );
+    const note = NoteStore.get(groupId);
+    const segs = AnnotationStore.getByGroup(groupId);
     const [mode, setMode] = React.useState(startInEditMode ? "edit" : "read");
     const [body, setBody] = React.useState(note ? note.body || "" : "");
     const [menuOpen, setMenuOpen] = React.useState(false);

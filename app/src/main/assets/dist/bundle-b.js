@@ -540,6 +540,7 @@
           ann
         );
         this._save();
+        this._bump();
       },
       /**
        * Patch a single annotation by id (within key's bucket). No-op when
@@ -557,6 +558,7 @@
         if (idx >= 0) {
           arr[idx] = { ...arr[idx], ...patch, updated: Date.now() };
           this._save();
+          this._bump();
         }
       },
       /**
@@ -572,6 +574,7 @@
         data[key] = data[key].filter((h) => h.id !== annId);
         if (data[key].length === 0) delete data[key];
         this._save();
+        this._bump();
       },
       /**
        * Remove every annotation under `key`.
@@ -582,6 +585,7 @@
         const data = this._load();
         delete data[key];
         this._save();
+        this._bump();
       },
       /**
        * Remove every segment belonging to a group across all keys. Cleans
@@ -597,6 +601,7 @@
         });
         this._cache = data;
         this._save();
+        this._bump();
       },
       /**
        * All segments belonging to a group, with each tagged by its key.
@@ -630,6 +635,7 @@
           }
         }));
         this._save();
+        this._bump();
       },
       /**
        * Convert a group from one kind to another (e.g. highlight → note).
@@ -649,6 +655,7 @@
           }
         }));
         this._save();
+        this._bump();
       },
       /**
        * Find the group whose segment spans the given range within `key`.
@@ -731,6 +738,7 @@
           updated: ts
         };
         this._save();
+        this._bump();
       },
       /**
        * Patch an existing note's fields. No-op when groupId is unknown.
@@ -743,6 +751,7 @@
         if (!data[groupId]) return;
         data[groupId] = { ...data[groupId], ...patch, updated: Date.now() };
         this._save();
+        this._bump();
       },
       /**
        * Delete a note record. Idempotent.
@@ -753,6 +762,7 @@
         const data = this._load();
         delete data[groupId];
         this._save();
+        this._bump();
       },
       /**
        * Toggle a notebook membership on a note. No-op when the note doesn't
@@ -771,6 +781,7 @@
         else ids.push(notebookId);
         data[groupId] = { ...note, notebookIds: ids, updated: Date.now() };
         this._save();
+        this._bump();
       },
       /**
        * Strip a notebookId from every note (called when a notebook is
@@ -788,6 +799,7 @@
           }
         });
         this._save();
+        this._bump();
       }
     }
   );

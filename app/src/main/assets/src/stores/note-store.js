@@ -77,6 +77,7 @@ export const NoteStore = extendStore(
         updated: ts
       };
       this._save();
+      this._bump();
     },
 
     /**
@@ -90,6 +91,7 @@ export const NoteStore = extendStore(
       if (!data[groupId]) return;
       data[groupId] = { ...data[groupId], ...patch, updated: Date.now() };
       this._save();
+      this._bump();
     },
 
     /**
@@ -101,6 +103,7 @@ export const NoteStore = extendStore(
       const data = this._load();
       delete data[groupId];
       this._save();
+      this._bump();
     },
 
     /**
@@ -119,6 +122,7 @@ export const NoteStore = extendStore(
       if (i >= 0) ids.splice(i, 1); else ids.push(notebookId);
       data[groupId] = { ...note, notebookIds: ids, updated: Date.now() };
       this._save();
+      this._bump();
     },
 
     /**
@@ -137,6 +141,7 @@ export const NoteStore = extendStore(
         }
       });
       this._save();
+      this._bump();
     }
   }
 );

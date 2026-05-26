@@ -2,11 +2,22 @@
    NoteSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NoteSheet({ groupId, startInEditMode, hlTick, setHlTick, onClose, onOpenNotebookPicker }) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  const segs = React.useMemo(() => AnnotationStore.getByGroup(groupId), [groupId, hlTick]);
+export function NoteSheet({ groupId, startInEditMode, setHlTick, onClose, onOpenNotebookPicker }) {
+  // Subscribe to NoteStore + AnnotationStore mutations. Each store's _bump
+  // triggers a re-render of this component via useSyncExternalStore — the
+  // hlTick prop is no longer needed for THIS component's reads. (setHlTick
+  // is still called after mutations to notify non-migrated consumers; that
+  // stays until BookmarkStore/LinkStore migrations complete.)
+  React.useSyncExternalStore(
+    React.useCallback((cb) => NoteStore.subscribe(cb), []),
+    () => NoteStore.getVersion()
+  );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
+    () => AnnotationStore.getVersion()
+  );
+  const note = NoteStore.get(groupId);
+  const segs = AnnotationStore.getByGroup(groupId);
   const [mode, setMode] = React.useState(startInEditMode ? 'edit' : 'read');
   const [body, setBody] = React.useState(note ? note.body || '' : '');
   const [menuOpen, setMenuOpen] = React.useState(false);

@@ -39,9 +39,16 @@ function annMarkClass(ann, isFirst, isLast) {
    sweep-line algorithm. Sorted boundaries → constant-active-set segments
    → inside-out <mark> nesting per segment using reduceRight (outer = i=0,
    inner = i=N-1; CSS cascade gives "more-specific overrides broader"). */
-export function HighlightableText({ text, hlKey, hlTick }) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  const annotations = React.useMemo(() => AnnotationStore.get(hlKey), [hlKey, hlTick]);
+export function HighlightableText({ text, hlKey }) {
+  // Subscribe to AnnotationStore mutations so this component re-renders
+  // whenever any annotation is added / removed / recolored. Replaces the
+  // legacy hlTick cache-bust prop. The snapshot return value is unused;
+  // the act of subscribing is what triggers the React 18 re-render.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
+    () => AnnotationStore.getVersion()
+  );
+  const annotations = AnnotationStore.get(hlKey);
   if (!text) return null;
   if (!annotations || annotations.length === 0) {
     return <span data-hl-key={hlKey}>{text}</span>;

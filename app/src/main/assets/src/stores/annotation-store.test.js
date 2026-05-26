@@ -167,3 +167,77 @@ describe('AnnotationStore hlTick cache-bust regression (Bin 4 validation)', () =
     expect(result.current[0].kind).toBe('underline');
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Post-Q5.3: useSyncExternalStore pattern (Q7 migration).
+   ─────────────────────────────────────────────────────────────────────────
+   The new pattern that REPLACES the hlTick cache-bust. The store's _bump()
+   call after each mutation notifies useSyncExternalStore subscribers, which
+   triggers React to call getVersion() and re-render the component. The
+   component then reads fresh data directly from the store — no useMemo,
+   no phantom deps, no eslint disable.
+   ───────────────────────────────────────────────────────────────────────── */
+describe('AnnotationStore useSyncExternalStore (Q7.2 pattern)', () => {
+  it('E) subscribe + read pattern — consumer sees fresh data after mutation', () => {
+    const { result } = renderHook(
+      (/** @type {{ hlKey: string }} */ { hlKey }) => {
+        React.useSyncExternalStore(
+          React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
+          () => AnnotationStore.getVersion()
+        );
+        return AnnotationStore.get(hlKey);
+      },
+      { initialProps: { hlKey: 'letter:test:0' } }
+    );
+    expect(result.current).toEqual([]);
+
+    // Mutation triggers _bump() internally → useSyncExternalStore
+    // notifies subscribers → React re-renders → fresh read.
+    act(() => {
+      AnnotationStore.add('letter:test:0', {
+        id: 'ann_e', groupId: 'ann_e', kind: 'highlight', color: 'yellow',
+        start: 0, end: 5, text: 'e',
+      });
+    });
+
+    // NO rerender({...}) call needed — the store self-notified.
+    expect(result.current.length).toBe(1);
+    expect(result.current[0].id).toBe('ann_e');
+  });
+
+  it('F) every mutation method calls _bump (add / update / remove / removeGroup / recolorGroup / convertGroup)', () => {
+    let notifyCount = 0;
+    const unsubscribe = AnnotationStore.subscribe(() => { notifyCount++; });
+    try {
+      const baselineVersion = AnnotationStore.getVersion();
+
+      // add
+      AnnotationStore.add('letter:test:f', {
+        id: 'ann_f1', groupId: 'g_f', kind: 'highlight', color: 'yellow',
+        start: 0, end: 5, text: 'f1',
+      });
+      // update
+      AnnotationStore.update('letter:test:f', 'ann_f1', { color: 'pink' });
+      // recolorGroup
+      AnnotationStore.recolorGroup('g_f', 'blue');
+      // convertGroup
+      AnnotationStore.convertGroup('g_f', 'underline');
+      // remove
+      AnnotationStore.remove('letter:test:f', 'ann_f1');
+      // re-add for removeGroup test
+      AnnotationStore.add('letter:test:f', {
+        id: 'ann_f2', groupId: 'g_f2', kind: 'highlight', color: 'red',
+        start: 0, end: 5, text: 'f2',
+      });
+      // removeGroup
+      AnnotationStore.removeGroup('g_f2');
+
+      // 7 mutations should have fired 7 notifications.
+      expect(notifyCount).toBe(7);
+      // getVersion should have incremented 7 times.
+      expect(AnnotationStore.getVersion()).toBe(baselineVersion + 7);
+    } finally {
+      unsubscribe();
+    }
+  });
+});

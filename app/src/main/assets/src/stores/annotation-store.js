@@ -151,6 +151,7 @@ export const AnnotationStore = extendStore(
       if (!data[key]) data[key] = [];
       data[key].push(/** @type {Annotation} */ (ann));
       this._save();
+      this._bump();
     },
 
     /**
@@ -166,7 +167,7 @@ export const AnnotationStore = extendStore(
       const arr = data[key];
       if (!arr) return;
       const idx = arr.findIndex(h => h.id === annId);
-      if (idx >= 0) { arr[idx] = { ...arr[idx], ...patch, updated: Date.now() }; this._save(); }
+      if (idx >= 0) { arr[idx] = { ...arr[idx], ...patch, updated: Date.now() }; this._save(); this._bump(); }
     },
 
     /**
@@ -182,6 +183,7 @@ export const AnnotationStore = extendStore(
       data[key] = data[key].filter(h => h.id !== annId);
       if (data[key].length === 0) delete data[key];
       this._save();
+      this._bump();
     },
 
     /**
@@ -193,6 +195,7 @@ export const AnnotationStore = extendStore(
       const data = this._load();
       delete data[key];
       this._save();
+      this._bump();
     },
 
     /**
@@ -209,6 +212,7 @@ export const AnnotationStore = extendStore(
       });
       this._cache = data;
       this._save();
+      this._bump();
     },
 
     /**
@@ -240,6 +244,7 @@ export const AnnotationStore = extendStore(
         if (h.groupId === groupId) { h.color = color; h.updated = ts; }
       }));
       this._save();
+      this._bump();
     },
 
     /**
@@ -257,6 +262,7 @@ export const AnnotationStore = extendStore(
         if (h.groupId === groupId) { h.kind = kind; h.updated = ts; }
       }));
       this._save();
+      this._bump();
     },
 
     /**
