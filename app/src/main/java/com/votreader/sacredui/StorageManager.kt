@@ -84,19 +84,29 @@ class StorageManager(private val context: Context) {
     /**
      * Ask [uri]'s content provider how big the resource is, in bytes.
      * Returns -1L if OpenableColumns.SIZE is absent / null (some pickers
-     * skip it). Public so callers can use the value directly when they
-     * want their own rejection policy rather than the canned [readUriAsBase64].
+     * skip it), OR if the query itself throws -- a revoked URI
+     * permission yields SecurityException, a closed provider yields
+     * IllegalStateException, etc. Caller treats -1L as "suspicious,
+     * reject"; folding the exception path into the same branch keeps
+     * the JS-facing contract uniform (one Failure mode for "could not
+     * determine size") and prevents the exception from escaping the
+     * filePickerLauncher callback and crashing the app.
      */
     fun queryFileSize(uri: Uri): Long {
-        context.contentResolver.query(
-            uri, arrayOf(OpenableColumns.SIZE), null, null, null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (idx != -1 && !cursor.isNull(idx)) return cursor.getLong(idx)
+        return try {
+            context.contentResolver.query(
+                uri, arrayOf(OpenableColumns.SIZE), null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (idx != -1 && !cursor.isNull(idx)) return cursor.getLong(idx)
+                }
             }
+            -1L
+        } catch (e: Exception) {
+            Timber.w(e, "queryFileSize failed for %s", uri)
+            -1L
         }
-        return -1L
     }
 
     companion object {
