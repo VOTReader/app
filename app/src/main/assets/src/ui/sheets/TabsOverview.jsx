@@ -2,8 +2,9 @@
    TabsOverview — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onLongPress, onClearAll, clearAllStage, onDedupe, MAX_TABS, thumbnails }) {
+export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onLongPress, onClearAll, onDedupe, MAX_TABS, thumbnails }) {
   const total = tabs.length;
+  const [confirmingClearAll, setConfirmingClearAll] = React.useState(false);
   const handleLongPress = React.useRef(null);
   const startLongPress = (idx) => (_e) => {
     handleLongPress.current = setTimeout(() => {
@@ -26,16 +27,8 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     return dupes;
   }, [tabs]);
 
-  // Clear-All button mirrors the Mark-as-Read clear pattern: stage cycles
-  // 0 → 1 → 2, matching label + color class. Tapping anywhere else in the
-  // overview instantly resets stage back to 0.
-  const clearLabelLocal = clearAllStage === 0 ? 'Clear All' : CLEAR_LABELS[clearAllStage];
-  const clearClassLocal = CLEAR_CLASSES[clearAllStage];
-  const resetClearOnOutsideTap = (_e) => {
-    if (clearAllStage > 0) onClearAll && onClearAll(-1); // -1 signals reset
-  };
   return (
-    <div className="tabs-overview" onClick={resetClearOnOutsideTap}>
+    <div className="tabs-overview">
       <div className="tabs-overview-header">
         <div className="tabs-overview-eyebrow">Reading Places</div>
         <h1 className="tabs-overview-title">Tabs</h1>
@@ -46,11 +39,20 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
         </div>
         <div className="tabs-overview-meta">{total} / {MAX_TABS} {total === 1 ? 'tab' : 'tabs'} open</div>
         <div className="tabs-overview-actions">
-          <button
-            className={clearClassLocal}
-            onClick={(e) => {e.stopPropagation();onClearAll();}}
-            disabled={total <= 1 && clearAllStage === 0}
-          >{clearLabelLocal}</button>
+          {confirmingClearAll ? (
+            <ConfirmStrip
+              question={`Close all ${total} tabs?`}
+              yesLabel="Yes, close all"
+              onCancel={() => setConfirmingClearAll(false)}
+              onConfirm={() => { onClearAll(); setConfirmingClearAll(false); }}
+            />
+          ) : (
+            <button
+              className="settings-clear-btn"
+              onClick={(e) => { e.stopPropagation(); setConfirmingClearAll(true); }}
+              disabled={total <= 1}
+            >Clear All</button>
+          )}
           <button
             className="tabs-action-btn"
             onClick={(e) => {e.stopPropagation();onDedupe();}}

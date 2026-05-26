@@ -218,8 +218,8 @@ function App() {
 
   /* TAB MANAGEMENT — openNewTab / switchToTab / closeTab / closeOtherTabs
      / closeTabsToTheRight / closeAllTabs / deduplicateTabs + the 4 tab-UI
-     state slots (tabActionIdx, disableTabsPromptOpen, clearAllStage,
-     lastTabCloseStrikes) → src/hooks/use-tab-actions.js (P6k Commit B).
+     state slots (tabActionIdx, disableTabsPromptOpen, lastTabCloseStrikes)
+     → src/hooks/use-tab-actions.js (P6k Commit B).
      The useTabActions() call is further down, after useReadingDwell —
      it needs cancelDwell + setTabThumbnails. tabsOverviewOpen stays here
      (useThumbnails consumes it as a param, before useTabActions runs). */
@@ -227,7 +227,7 @@ function App() {
   // That way, switching tabs unmounts the overview cleanly and the
   // individual tabs never carry a stale "tabs" screen.
   const [tabsOverviewOpen, setTabsOverviewOpen] = useState(false);
-  /* tabActionIdx / disableTabsPromptOpen / clearAllStage / lastTabCloseStrikes
+  /* tabActionIdx / disableTabsPromptOpen / lastTabCloseStrikes
      → src/hooks/use-tab-actions.js (P6k Commit B) */
   // (Effect closing overview when tabs are disabled lives further down —
   // it needs `settings`, which is declared after this block.)
@@ -316,10 +316,6 @@ function App() {
       setStudiesTick((v) => v + 1);
     });
   }, [screen]);
-  // Reset Clear-all confirmation stage whenever overview opens/closes
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- setClearAllStage is a useState setter from useTabActions() (identity-stable per React invariant; eslint can't trace through hook-return destructuring).
-  useEffect(() => {setClearAllStage(0);}, [tabsOverviewOpen]);
-
   // Per-tab focus-mode overrides. Each tab has independent state.
   const [titleFocusHidden, setTitleFocusHidden] = tabField('titleFocusHidden');
   const [headingsFocusHidden, setHeadingsFocusHidden] = tabField('headingsFocusHidden');
@@ -431,7 +427,7 @@ function App() {
     closeTabsToTheRight, closeAllTabs, deduplicateTabs,
     tabActionIdx, setTabActionIdx,
     disableTabsPromptOpen, setDisableTabsPromptOpen,
-    clearAllStage, setClearAllStage, lastTabCloseStrikes, MAX_TABS,
+    lastTabCloseStrikes, MAX_TABS,
   } = useTabActions({ tabState, cancelDwell, setTabThumbnails });
 
   /* vot-state persistence sink → src/hooks/use-persisted-state.js (P6k+1).
@@ -779,7 +775,6 @@ function App() {
         closeOtherTabs={closeOtherTabs} closeTabsToTheRight={closeTabsToTheRight}
         closeAllTabs={closeAllTabs} deduplicateTabs={deduplicateTabs}
         tabActionIdx={tabActionIdx} setTabActionIdx={setTabActionIdx}
-        clearAllStage={clearAllStage} setClearAllStage={setClearAllStage}
         lastTabCloseStrikesRef={lastTabCloseStrikes}
         disableTabsPromptOpen={disableTabsPromptOpen} setDisableTabsPromptOpen={setDisableTabsPromptOpen}
         gardenWarningOpen={gardenWarningOpen} setGardenWarningOpen={setGardenWarningOpen}

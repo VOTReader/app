@@ -1782,9 +1782,6 @@
       min-height:40px;
     }
     .history-dedupe-btn:active { color:var(--gold); border-color:var(--gold-dim); }
-    .history-dedupe-btn.is-pending {
-      color:var(--gold-bright); border-color:var(--gold); background:var(--gold-faint);
-    }
     .verse-sup { color:var(--gold); font-size:0.65em; margin-right:0.15em; font-family:'Cinzel',serif; }
     .fn-link { color:var(--gold); text-decoration:underline; }
     .inline-scrip-ref { color:var(--tap-ref); font-style:italic; text-decoration:none; border-bottom:1px dotted var(--tap-ref-sub); cursor:pointer; padding-bottom:0.02em; }

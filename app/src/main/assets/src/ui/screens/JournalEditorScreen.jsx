@@ -46,30 +46,26 @@ export function JournalEditorScreen(props) {
 
   // Per-block delete confirmation (any non-audio block) — holds the index
   // currently awaiting confirm, or null. Audio uses confirmAudioDelete
-  // because its inline waveform layout already has a custom confirm strip.
+  // because its inline waveform layout has its own compact confirm strip
+  // sized for the play-button row.
   var _confirmDel = useState(null);
   var confirmDelIdx = _confirmDel[0]; var setConfirmDelIdx = _confirmDel[1];
-  // Two-step inline delete: step 1 = "Delete?", step 2 = "Are you sure?".
-  // The first ✓ advances the step; only the second ✓ actually removes.
-  var _confirmDelStep = useState(1);
-  var confirmDelStep = _confirmDelStep[0]; var setConfirmDelStep = _confirmDelStep[1];
 
-  // Tap anywhere outside the inline "Delete?" strip fully cancels it.
-  // Capture phase so the gesture is seen even if a child stops propagation;
-  // taps inside .jrn-block-confirm (its own × / ✓) are ignored here and
-  // handled by those buttons' own onClick. The opening tap has finished
-  // propagating by the time this effect attaches, so it never self-cancels.
+  // Tap anywhere outside the ConfirmStrip fully cancels it. Capture phase
+  // so the gesture is seen even if a child stops propagation; taps inside
+  // .jrn-block-confirm (the strip itself) are ignored here. The opening
+  // tap has finished propagating by the time this effect attaches, so it
+  // never self-cancels.
   useEffect(function() {
     if (confirmDelIdx === null) return;
     function onDocDown(e) {
       var t = e.target;
       if (t && t.closest && t.closest('.jrn-block-confirm')) return;
       setConfirmDelIdx(null);
-      setConfirmDelStep(1);
     }
     document.addEventListener('pointerdown', onDocDown, true);
     return function() { document.removeEventListener('pointerdown', onDocDown, true); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setConfirmDelIdx + setConfirmDelStep are useState setters in this component (declared as `var _x = useState(...); var setX = _x[1];` tuple-unpacking pattern; eslint can't always trace this form back to its useState origin). Identity-stable per React invariant.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setConfirmDelIdx is a tuple-unpacked useState setter (identity-stable per React invariant; eslint can't trace this form back to its useState origin).
   }, [confirmDelIdx]);
 
   var fileInputRef = useRef(null);
@@ -166,13 +162,9 @@ export function JournalEditorScreen(props) {
       return next.length === 0 ? JournalHelpers.defaultBlocks() : next;
     });
     setConfirmDelIdx(null);
-    setConfirmDelStep(1);
     setConfirmAudioDelete(null);
     scheduleSave();
   }
-
-  function requestDeleteBlock(idx) { setConfirmDelIdx(idx); setConfirmDelStep(1); }
-  function cancelDeleteBlock() { setConfirmDelIdx(null); setConfirmDelStep(1); }
   function insertBlockAt(idx, block) {
     setBlocks(function(arr) {
       var next = arr.slice();
@@ -317,40 +309,25 @@ export function JournalEditorScreen(props) {
 
   // ─── Shared delete affordance ─────────────────────────────
   // Renders a small × in the corner of every editable block. Tap once →
-  // an inline confirm strip replaces the × in the same spot. Audio blocks
-  // route through their own onRequestDelete callback (the waveform layout
+  // a ConfirmStrip banner flips to the top of the block (order: -1 on
+  // .jrn-block-confirm keeps that positioning). Audio blocks route
+  // through their own onRequestDelete callback (the waveform layout
   // owns the strip), so we don't render a duplicate × on audio.
   function blockDeleteUI(idx) {
     if (confirmDelIdx === idx) {
-      var step2 = confirmDelStep === 2;
       return (
-        <div className={'jrn-block-confirm' + (step2 ? ' jrn-block-confirm-step2' : '')} onClick={function(e) { e.stopPropagation(); }}>
-          <span className="jrn-block-confirm-q">{step2 ? 'Are you sure?' : 'Delete?'}</span>
-          <button
-            className="jrn-block-confirm-cancel"
-            onClick={function(e) { e.stopPropagation(); cancelDeleteBlock(); }}
-            aria-label="Cancel"
-          >×</button>
-          <button
-            className="jrn-block-confirm-yes"
-            onClick={function(e) {
-              e.stopPropagation();
-              if (step2) { deleteBlock(idx); }
-              else { setConfirmDelStep(2); }
-            }}
-            aria-label={step2 ? 'Confirm delete' : 'Continue'}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </button>
-        </div>
+        <ConfirmStrip
+          className="jrn-block-confirm"
+          question="Delete this block?"
+          onCancel={() => setConfirmDelIdx(null)}
+          onConfirm={() => deleteBlock(idx)}
+        />
       );
     }
     return (
       <button
         className="jrn-block-del-btn"
-        onClick={function(e) { e.stopPropagation(); requestDeleteBlock(idx); }}
+        onClick={function(e) { e.stopPropagation(); setConfirmDelIdx(idx); }}
         title="Delete block"
         aria-label="Delete block"
       >

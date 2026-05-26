@@ -337,20 +337,15 @@
   R('.jrn-block-del-btn:hover { opacity: 1; color: #c75c4a; background: rgba(199, 92, 74, 0.12); border-color: rgba(199, 92, 74, 0.45); }');
   R('.jrn-block-del-btn:active { transform: scale(0.92); }');
   R('.jrn-block-del-btn svg { width: 14px; height: 14px; }');
-  // The confirm strip is an IN-FLOW bar at the TOP of the block (order:-1 in
-  // the flex column) so it sits between this block and the one above and
-  // pushes the block's own content down, rather than overlaying it.
-  R('.jrn-block-confirm { order: -1; align-self: stretch; display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin: 0 0 10px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }');
-  R('.jrn-block-confirm-q { flex: 1; font-family: var(--font-cinzel); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #c75c4a; padding: 0 2px; }');
-  R('.jrn-block-confirm-cancel { background: none; border: 1px solid var(--gold-border); color: var(--cream-dim); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 17px; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 32px; }');
-  R('.jrn-block-confirm-cancel:hover { background: var(--bg3); color: var(--cream); }');
-  R('.jrn-block-confirm-yes { background: #c75c4a; border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 32px; margin-left: 12px; }');
-  R('.jrn-block-confirm-yes svg { width: 15px; height: 15px; }');
-  R('.jrn-block-confirm-yes:hover { background: #b04d3d; }');
-  // Step 2 ("Are you sure?") — escalated treatment so the final tap is deliberate.
-  R('.jrn-block-confirm-step2 { background: rgba(199, 92, 74, 0.22); border-color: #c75c4a; }');
-  R('.jrn-block-confirm-step2 .jrn-block-confirm-q { color: #e07a66; font-weight: 600; }');
-  R('.jrn-block-confirm-step2 .jrn-block-confirm-yes { box-shadow: 0 0 0 3px rgba(199, 92, 74, 0.28); }');
+  // The standardized ConfirmStrip (.ann-chip-confirm base) is rendered
+  // with className="jrn-block-confirm" so it flips to the TOP of the
+  // block (order:-1) as a warm-red banner and pushes the block's own
+  // content down rather than overlaying it. .ann-chip-confirm already
+  // supplies display/align/gap; this rule adds positioning + the
+  // contextual red theme; the .ann-chip-confirm-q tint matches the
+  // banner color so the question reads as "this will delete content."
+  R('.jrn-block-confirm { order: -1; align-self: stretch; padding: 8px 12px; margin: 0 0 10px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }');
+  R('.jrn-block-confirm .ann-chip-confirm-q { color: #c75c4a; }');
 
   // Triple-confirmation banner — entry deletion in the viewer
   R('.jrn-tripledel { margin: 0 18px 12px; padding: 14px 18px; background: rgba(199, 92, 74, 0.08); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 10px; }');

@@ -78,37 +78,10 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
   const isOpen = (id) => id in overrides ? overrides[id] : defaultOpen(id);
   const toggle = (id) => setOverrides((prev) => ({ ...prev, [id]: !(id in prev ? prev[id] : defaultOpen(id)) }));
 
-  // Prune-confirmation state (per-day; latest pending wins).
-  const [pending, setPending] = React.useState(null); // string id or null
-  const pendingTimer = React.useRef(null);
-  const pendingBtnRef = React.useRef(null);
-  const requestPrune = (dayId, y, m, d) => {
-    if (pending === dayId) {
-      onPruneDay(y, m, d);
-      setPending(null);
-      if (pendingTimer.current) clearTimeout(pendingTimer.current);
-    } else {
-      setPending(dayId);
-      if (pendingTimer.current) clearTimeout(pendingTimer.current);
-      pendingTimer.current = setTimeout(() => {
-        setPending((cur) => cur === dayId ? null : cur);
-      }, 5000);
-    }
-  };
-  React.useEffect(() => () => {if (pendingTimer.current) clearTimeout(pendingTimer.current);}, []);
-  // Tap anywhere outside the pending dedupe button → cancel.
-  React.useEffect(() => {
-    if (!pending) return;
-    const onDocTap = (e) => {
-      const btn = pendingBtnRef.current;
-      if (btn && btn.contains(e.target)) return;
-      setPending(null);
-      if (pendingTimer.current) clearTimeout(pendingTimer.current);
-    };
-    // Use 'click' (not 'pointerdown') so the button's own onClick fires first.
-    document.addEventListener('click', onDocTap, true);
-    return () => document.removeEventListener('click', onDocTap, true);
-  }, [pending]);
+  // Dedupe-confirmation state (per-day; latest pending wins). The
+  // ConfirmStrip itself is the dismissal affordance — Cancel / Yes are
+  // explicit, so no auto-cancel timer or click-outside listener.
+  const [confirmingDayId, setConfirmingDayId] = React.useState(null);
 
   const dupeCount = (entries) => {
     const seen = new Set();
@@ -131,7 +104,7 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
     const dId = isCurrent ? `cd:${year}-${month}-${dg.day}` : `ymd:${year}-${month}-${dg.day}`;
     const dOpen = isOpen(dId);
     const dupes = dupeCount(dg.entries);
-    const isPending = pending === dId;
+    const isConfirming = confirmingDayId === dId;
     return (
       <div key={dId} className="history-day-section">
         <button className="history-day-header" onClick={() => toggle(dId)}>
@@ -142,13 +115,19 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
         </button>
         {dOpen && dupes > 0 && (
           <div className="history-dedupe-row">
-            <button
-              ref={isPending ? pendingBtnRef : null}
-              className={`history-dedupe-btn${isPending ? ' is-pending' : ''}`}
-              onClick={() => requestPrune(dId, year, month, dg.day)}
-            >
-              {isPending ? `Tap again to confirm — removes ${dupes}` : `Deduplicate (${dupes})`}
-            </button>
+            {isConfirming ? (
+              <ConfirmStrip
+                question={`Remove ${dupes} duplicate ${dupes === 1 ? 'entry' : 'entries'} from this day?`}
+                yesLabel="Yes, remove"
+                onCancel={() => setConfirmingDayId(null)}
+                onConfirm={() => { onPruneDay(year, month, dg.day); setConfirmingDayId(null); }}
+              />
+            ) : (
+              <button
+                className="history-dedupe-btn"
+                onClick={() => setConfirmingDayId(dId)}
+              >Deduplicate ({dupes})</button>
+            )}
           </div>
         )}
         {dOpen && (

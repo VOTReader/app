@@ -782,12 +782,10 @@ const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep
 /* SettingsRow → extracted to src/ui/components/SettingsRow.js */
 
 
-/* Three-stage clear flow: Clear → Are You Sure? → Confirm.
-   Stage is owned by the SettingsScreen parent via `clearPending`, so that
-   tapping anywhere else on the screen resets it. */
-const CLEAR_LABELS = ["Clear", "Are You Sure?", "Confirm"];
-const CLEAR_CLASSES = ["settings-clear-btn", "settings-clear-btn warning", "settings-clear-btn danger"];
-/* ClearProgressRow → extracted to src/ui/components/ClearProgressRow.js */
+/* ClearProgressRow → extracted to src/ui/components/ClearProgressRow.jsx.
+   Owns its own confirm state via ConfirmStrip — the old three-stage
+   CLEAR_LABELS / CLEAR_CLASSES tap pattern was removed in the
+   delete-confirm standardization pass. */
 
 
 /* ═══════════════════════════════════════════════════════════════

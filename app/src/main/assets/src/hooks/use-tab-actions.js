@@ -18,8 +18,6 @@
      - tabActionIdx        long-press target for TabActionSheet
      - disableTabsPromptOpen   the "disable tabs?" dialog gate (raised by
                                 the closeTab 3-strike path)
-     - clearAllStage       0/1/2 — the TabsOverview "Clear All Tabs"
-                            three-tap confirm
      - lastTabCloseStrikes ref — 3-strike counter; the render resets it
                             on normal tab use, so the ref is RETURNED
 
@@ -47,7 +45,7 @@
               closeTabsToTheRight, closeAllTabs, deduplicateTabs,
               tabActionIdx, setTabActionIdx,
               disableTabsPromptOpen, setDisableTabsPromptOpen,
-              clearAllStage, setClearAllStage, lastTabCloseStrikes }
+              lastTabCloseStrikes }
 
    STORAGE: none.
 
@@ -78,8 +76,6 @@ const MAX_TABS = 999;
  *   setTabActionIdx: (val: any) => void,
  *   disableTabsPromptOpen: boolean,
  *   setDisableTabsPromptOpen: (val: any) => void,
- *   clearAllStage: number,
- *   setClearAllStage: (val: any) => void,
  *   lastTabCloseStrikes: { current: number },
  *   MAX_TABS: number
  * }}
@@ -89,7 +85,6 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
 
   const [tabActionIdx, setTabActionIdx] = React.useState(null); // long-press target
   const [disableTabsPromptOpen, setDisableTabsPromptOpen] = React.useState(false);
-  const [clearAllStage, setClearAllStage] = React.useState(0); // 0 = idle, 1 = "Are You Sure?", 2 = confirmed
   const lastTabCloseStrikes = React.useRef(0); // 3-strike counter for last-tab close
 
   // All 7 useCallbacks below intentionally omit setters from their deps. Rationale
@@ -205,7 +200,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
     closeTabsToTheRight, closeAllTabs, deduplicateTabs,
     tabActionIdx, setTabActionIdx,
     disableTabsPromptOpen, setDisableTabsPromptOpen,
-    clearAllStage, setClearAllStage, lastTabCloseStrikes,
+    lastTabCloseStrikes,
     MAX_TABS,  // re-exported for the TabsOverview render (the cap badge)
   };
 }

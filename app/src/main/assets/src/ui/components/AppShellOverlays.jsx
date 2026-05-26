@@ -33,7 +33,6 @@ export function AppShellOverlays({
   switchToTab, closeTab, openNewTab,
   closeOtherTabs, closeTabsToTheRight, closeAllTabs, deduplicateTabs,
   tabActionIdx, setTabActionIdx,
-  clearAllStage, setClearAllStage,
   lastTabCloseStrikesRef,
   // Disable-tabs prompt
   disableTabsPromptOpen, setDisableTabsPromptOpen,
@@ -96,14 +95,7 @@ export function AppShellOverlays({
               onClose={(i) => closeTab(i)}
               onNewTab={() => {lastTabCloseStrikesRef.current = 0;openNewTab();setTabsOverviewOpen(false);}}
               onLongPress={(i) => setTabActionIdx(i)}
-              onClearAll={(signal) => {
-                // -1 = tap-anywhere-else reset; otherwise advance the stage
-                if (signal === -1) {setClearAllStage(0);return;}
-                if (clearAllStage === 0) setClearAllStage(1);else
-                if (clearAllStage === 1) setClearAllStage(2);else
-                {closeAllTabs();setClearAllStage(0);lastTabCloseStrikesRef.current = 0;}
-              }}
-              clearAllStage={clearAllStage}
+              onClearAll={() => { closeAllTabs(); lastTabCloseStrikesRef.current = 0; }}
               onDedupe={() => deduplicateTabs()}
               MAX_TABS={MAX_TABS}
               thumbnails={tabThumbnails}

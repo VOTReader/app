@@ -2,6 +2,86 @@
    SettingsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* Tiny per-row confirm helpers. Each owns its own confirm state and
+   renders either the row's button OR the standardized ConfirmStrip in
+   the slot below the row. Defined at module scope (not inside
+   SettingsScreen) so React identity stays stable across renders. */
+
+function HistoryClearRow({ historyCount, onClearHistory }) {
+  const [confirming, setConfirming] = React.useState(false);
+  return (
+    <>
+      <div className="progress-row" style={{ background: 'var(--bg2)', borderTop: '1px solid var(--gold-border)', borderRadius: '4px', marginTop: '0.4rem' }}>
+        <span className="progress-row-label" style={{ color: 'var(--cream-muted)' }}>Reading history</span>
+        <span className="progress-row-tally">{historyCount} {historyCount === 1 ? 'entry' : 'entries'}</span>
+        {!confirming && (
+          <button
+            className="settings-clear-btn"
+            disabled={historyCount === 0}
+            onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
+          >Clear History</button>
+        )}
+      </div>
+      {confirming && (
+        <ConfirmStrip
+          question="Clear all reading history?"
+          yesLabel="Yes, clear"
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => { onClearHistory(); setConfirming(false); }}
+        />
+      )}
+    </>
+  );
+}
+
+function SectionClearBtn({ label, disabled, onClear }) {
+  const [confirming, setConfirming] = React.useState(false);
+  if (confirming) {
+    return (
+      <ConfirmStrip
+        question={`Clear all progress in "${label}"?`}
+        yesLabel="Yes, clear"
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => { onClear(); setConfirming(false); }}
+      />
+    );
+  }
+  return (
+    <button
+      className="settings-clear-btn"
+      disabled={disabled}
+      onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
+    >Clear</button>
+  );
+}
+
+function AllProgressClearRow({ totalRead, totalItems, onClearAll }) {
+  const [confirming, setConfirming] = React.useState(false);
+  return (
+    <>
+      <div className="progress-row total-row">
+        <span className="progress-row-label">All Scriptures</span>
+        <span className="progress-row-tally">{totalRead} / {totalItems}</span>
+        {!confirming && (
+          <button
+            className="settings-clear-btn"
+            disabled={totalRead === 0}
+            onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
+          >Clear All</button>
+        )}
+      </div>
+      {confirming && (
+        <ConfirmStrip
+          question="Clear all reading progress across every book?"
+          yesLabel="Yes, clear"
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => { onClearAll(); setConfirming(false); }}
+        />
+      )}
+    </>
+  );
+}
+
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
   // Q8: BOOKS + VOT corpora are lazy. PROGRESS_GROUPS reads BOOKS[...] keys
   // (for the NT section) AND LETTERS_V1/LETTERS/etc. globals (for the
@@ -26,7 +106,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const _BOOKS_READY = typeof BOOKS !== 'undefined' && !!BOOKS;
   const _VOT_READY = (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.loaded : false;
 
-  const [clearPending, setClearPending] = React.useState(null);
   const [openSections, setOpenSections] = React.useState(new Set());
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
@@ -49,19 +128,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   }, []);
   const wipeOk = wipeText.trim().toUpperCase() === 'DELETE';
   const VERSION_ID = "v1";
-
-  const getStage = (key) => clearPending && clearPending.key === key ? clearPending.stage : 0;
-  const handleClearTap = (key, action) => (e) => {
-    e.stopPropagation();
-    const s = getStage(key);
-    if (s < 2) {
-      setClearPending({ key, stage: s + 1 });
-    } else {
-      action();
-      setClearPending(null);
-    }
-  };
-  const resetClearPending = () => setClearPending(null);
 
   const PROGRESS_GROUPS = (!_BOOKS_READY || !_VOT_READY) ? [] : [
   {
@@ -342,7 +408,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         </>
       }
     >
-      <div className="settings-screen" onClick={resetClearPending}>
+      <div className="settings-screen">
         <div className="settings-header">
           <div className="settings-eyebrow">VOT Study Bible</div>
           <h1 className="settings-title">Settings</h1>
@@ -492,23 +558,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             checked={settings.historyEnabled !== false}
             onToggle={() => onToggle("historyEnabled")}
           />
-          {(() => {
-            const histStage = getStage('history-clear');
-            const histLabel = histStage === 0 ? 'Clear History' : CLEAR_LABELS[histStage];
-            return (
-              <div className="progress-row" style={{ background: 'var(--bg2)', borderTop: '1px solid var(--gold-border)', borderRadius: '4px', marginTop: '0.4rem' }}>
-                <span className="progress-row-label" style={{ color: 'var(--cream-muted)' }}>Reading history</span>
-                <span className="progress-row-tally">{historyCount} {historyCount === 1 ? 'entry' : 'entries'}</span>
-                <button
-                  className={CLEAR_CLASSES[histStage]}
-                  disabled={historyCount === 0}
-                  onClick={handleClearTap('history-clear', onClearHistory)}
-                >
-                  {histLabel}
-                </button>
-              </div>
-            );
-          })()}
+          <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
+
         </div>
 
         <div className="settings-section">
@@ -639,27 +690,23 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 const isOpen = openSections.has(grp.id);
                 const sRead = sectionRead(grp);
                 const sTotal = sectionTotal(grp);
-                const sectionKey = `section:${grp.id}`;
-                const secStage = getStage(sectionKey);
                 return (
                   <React.Fragment key={grp.id}>
                     <div
                       className="progress-row"
                       style={{ background: "var(--bg)", cursor: "pointer" }}
-                      onClick={(e) => { e.stopPropagation(); toggleSection(grp.id); resetClearPending(); }}
+                      onClick={(e) => { e.stopPropagation(); toggleSection(grp.id); }}
                     >
                       <span style={{ color: "var(--gold-dim)", fontSize: "0.75rem", minWidth: "0.75rem" }}>
                         {isOpen ? "▾" : "▸"}
                       </span>
                       <span className="progress-row-label" style={{ color: "var(--gold)" }}>{grp.label}</span>
                       <span className="progress-row-tally">{sRead} / {sTotal}</span>
-                      <button
-                        className={CLEAR_CLASSES[secStage]}
+                      <SectionClearBtn
+                        label={grp.label}
                         disabled={sRead === 0}
-                        onClick={handleClearTap(sectionKey, () => sectionBooks(grp).forEach((b) => onClearBook(b.id)))}
-                      >
-                        {CLEAR_LABELS[secStage]}
-                      </button>
+                        onClear={() => sectionBooks(grp).forEach((b) => onClearBook(b.id))}
+                      />
                     </div>
 
                     {isOpen && grp.genres.map((genre) => (
@@ -670,43 +717,23 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                           </span>
                         </div>
 
-                        {genre.books.map((src) => {
-                          const bookKey = `book:${src.id}`;
-                          return (
-                            <div key={src.id} style={{ paddingLeft: "1rem" }}>
-                              <ClearProgressRow
-                                label={src.label}
-                                total={src.total}
-                                count={countFor(src.id)}
-                                stage={getStage(bookKey)}
-                                onTap={handleClearTap(bookKey, () => onClearBook(src.id))}
-                              />
-                            </div>
-                          );
-                        })}
+                        {genre.books.map((src) => (
+                          <div key={src.id} style={{ paddingLeft: "1rem" }}>
+                            <ClearProgressRow
+                              label={src.label}
+                              total={src.total}
+                              count={countFor(src.id)}
+                              onClear={() => onClearBook(src.id)}
+                            />
+                          </div>
+                        ))}
                       </React.Fragment>
                     ))}
                   </React.Fragment>
                 );
               })}
               <div className="progress-divider" />
-              <div className="progress-row total-row">
-                <span className="progress-row-label">All Scriptures</span>
-                <span className="progress-row-tally">{totalRead} / {totalItems}</span>
-                {(() => {
-                  const allStage = getStage("all");
-                  const label = allStage === 0 ? "Clear All" : CLEAR_LABELS[allStage];
-                  return (
-                    <button
-                      className={CLEAR_CLASSES[allStage]}
-                      disabled={totalRead === 0}
-                      onClick={handleClearTap("all", onClearAll)}
-                    >
-                      {label}
-                    </button>
-                  );
-                })()}
-              </div>
+              <AllProgressClearRow totalRead={totalRead} totalItems={totalItems} onClearAll={onClearAll} />
             </div>
           )}
         </div>
