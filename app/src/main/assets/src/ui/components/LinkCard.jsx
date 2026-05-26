@@ -82,26 +82,17 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
           </span>
         </div>
       )}
-      {/* Tap-confirm strip — replaces the actions row when confirmRemove=true. */}
+      {/* Tap-confirm strip — replaces the actions row when confirmRemove=true.
+          stopPropagation wraps each handler so taps don't bubble to the
+          parent .link-card (which navigates on tap). */}
       {confirmRemove && (
-        <div
-          className="ann-chip-confirm"
-          style={{ padding: '10px 12px' }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="ann-chip-confirm-q">Remove this link?</span>
-          <button
-            className="ann-chip-confirm-btn ann-chip-confirm-cancel"
-            onClick={(e) => { e.stopPropagation(); setConfirmRemove(false); }}
-          >
-            Cancel
-          </button>
-          <button
-            className="ann-chip-confirm-btn ann-chip-confirm-yes"
-            onClick={doRemove}
-          >
-            Yes, remove
-          </button>
+        <div onClick={(e) => e.stopPropagation()}>
+          <ConfirmStrip
+            question="Remove this link?"
+            yesLabel="Yes, remove"
+            onCancel={() => setConfirmRemove(false)}
+            onConfirm={doRemove}
+          />
         </div>
       )}
     </div>

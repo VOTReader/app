@@ -82,11 +82,12 @@ export function NotebookManagerSheet({ setHlTick, onClose }) {
               {notebooks.map(nb => {
                 if (confirmDeleteId === nb.id) {
                   return (
-                    <div key={nb.id} className="ann-chip-confirm" style={{ padding: '10px 12px' }}>
-                      <span className="ann-chip-confirm-q">Delete “{nb.name}”? Notes will move to Uncategorized.</span>
-                      <button className="ann-chip-confirm-btn ann-chip-confirm-cancel" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
-                      <button className="ann-chip-confirm-btn ann-chip-confirm-yes" onClick={() => deleteNb(nb.id)}>Yes, delete</button>
-                    </div>
+                    <ConfirmStrip
+                      key={nb.id}
+                      question={`Delete “${nb.name}”? Notes will move to Uncategorized.`}
+                      onCancel={() => setConfirmDeleteId(null)}
+                      onConfirm={() => deleteNb(nb.id)}
+                    />
                   );
                 }
                 if (renameId === nb.id) {

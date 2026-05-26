@@ -108,17 +108,12 @@ export function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }
           </>
         )}
         {mode === 'confirm' && (
-          <div className="ann-chip-confirm">
-            <span className="ann-chip-confirm-q">Remove this {kindLabel}?</span>
-            <button
-              className="ann-chip-confirm-btn ann-chip-confirm-cancel"
-              onClick={() => setMode('main')}
-            >Cancel</button>
-            <button
-              className="ann-chip-confirm-btn ann-chip-confirm-yes"
-              onClick={remove}
-            >Yes, remove</button>
-          </div>
+          <ConfirmStrip
+            question={`Remove this ${kindLabel}?`}
+            yesLabel="Yes, remove"
+            onCancel={() => setMode('main')}
+            onConfirm={remove}
+          />
         )}
         {mode === 'colors' && (
           <div className="ann-chip-colors">

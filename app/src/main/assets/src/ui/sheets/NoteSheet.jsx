@@ -232,11 +232,11 @@ export function NoteSheet({ groupId, startInEditMode, setHlTick, onClose, onOpen
             {mode === 'read' && menuOpen && (
               <div className="note-sheet-menu">
                 {confirmDelete ? (
-                  <div className="ann-chip-confirm">
-                    <span className="ann-chip-confirm-q">Delete this note?</span>
-                    <button className="ann-chip-confirm-btn ann-chip-confirm-cancel" onClick={() => setConfirmDelete(false)}>Cancel</button>
-                    <button className="ann-chip-confirm-btn ann-chip-confirm-yes" onClick={remove}>Yes, delete</button>
-                  </div>
+                  <ConfirmStrip
+                    question="Delete this note?"
+                    onCancel={() => setConfirmDelete(false)}
+                    onConfirm={remove}
+                  />
                 ) : (
                   <>
                     <button className="note-sheet-menu-item" onClick={() => { setMenuOpen(false); setMode('edit'); }}>Edit note</button>

@@ -179,11 +179,12 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
               }
             </div>
             {confirmDeleteNb && (
-              <div className="ann-chip-confirm" style={{ padding: '10px 12px', marginBottom: '0.8rem' }}>
-                <span className="ann-chip-confirm-q">Delete “{drilledTitle}”? Notes will move to Uncategorized.</span>
-                <button className="ann-chip-confirm-btn ann-chip-confirm-cancel" onClick={() => setConfirmDeleteNb(false)}>Cancel</button>
-                <button className="ann-chip-confirm-btn ann-chip-confirm-yes" onClick={deleteCurrent}>Yes, delete</button>
-              </div>
+              <ConfirmStrip
+                style={{ marginBottom: '0.8rem' }}
+                question={`Delete “${drilledTitle}”? Notes will move to Uncategorized.`}
+                onCancel={() => setConfirmDeleteNb(false)}
+                onConfirm={deleteCurrent}
+              />
             )}
             {drilledNotes.length > 0 && (
               <div className="notes-index-controls">

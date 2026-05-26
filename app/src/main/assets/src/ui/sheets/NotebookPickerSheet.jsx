@@ -75,11 +75,12 @@ export function NotebookPickerSheet({ groupId, setHlTick, onClose }) {
               {notebooks.map(nb => {
                 if (confirmDeleteNb === nb.id) {
                   return (
-                    <div key={nb.id} className="ann-chip-confirm" style={{ padding: '10px 12px' }}>
-                      <span className="ann-chip-confirm-q">Delete “{nb.name}”? Notes will move to Uncategorized.</span>
-                      <button className="ann-chip-confirm-btn ann-chip-confirm-cancel" onClick={() => setConfirmDeleteNb(null)}>Cancel</button>
-                      <button className="ann-chip-confirm-btn ann-chip-confirm-yes" onClick={() => deleteNb(nb.id)}>Yes, delete</button>
-                    </div>
+                    <ConfirmStrip
+                      key={nb.id}
+                      question={`Delete “${nb.name}”? Notes will move to Uncategorized.`}
+                      onCancel={() => setConfirmDeleteNb(null)}
+                      onConfirm={() => deleteNb(nb.id)}
+                    />
                   );
                 }
                 const checked = memberIds.has(nb.id);

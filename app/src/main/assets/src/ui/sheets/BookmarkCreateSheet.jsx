@@ -214,11 +214,12 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
                 </button>
               )}
               {confirmingDelete && (
-                <div className="ann-chip-confirm bkm-create-edit-confirm">
-                  <span className="ann-chip-confirm-q">Delete bookmark?</span>
-                  <button className="ann-chip-confirm-btn ann-chip-confirm-cancel" onClick={function() { setConfirmingDelete(false); }}>Cancel</button>
-                  <button className="ann-chip-confirm-btn ann-chip-confirm-yes" onClick={handleDelete}>Yes, delete</button>
-                </div>
+                <ConfirmStrip
+                  className="bkm-create-edit-confirm"
+                  question="Delete bookmark?"
+                  onCancel={function() { setConfirmingDelete(false); }}
+                  onConfirm={handleDelete}
+                />
               )}
             </div>
           )}

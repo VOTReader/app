@@ -158,11 +158,12 @@ export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateT
           </>
         )}
         {confirming && (
-          <div className="ann-chip-confirm" style={{ padding: '14px 12px' }}>
-            <span className="ann-chip-confirm-q">Delete this link?</span>
-            <button className="ann-chip-confirm-btn ann-chip-confirm-cancel" onClick={function() { setConfirming(false); }}>Cancel</button>
-            <button className="ann-chip-confirm-btn ann-chip-confirm-yes" onClick={doDelete}>Yes, delete</button>
-          </div>
+          <ConfirmStrip
+            style={{ padding: '14px 12px' }}
+            question="Delete this link?"
+            onCancel={function() { setConfirming(false); }}
+            onConfirm={doDelete}
+          />
         )}
       </div>
     </div>
