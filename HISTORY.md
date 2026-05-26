@@ -131,6 +131,123 @@ blast radius.
 
 ---
 
+## Q8.2 + Q8.3 — Matthew + VOT corpora lazy-load (LANDED 2026-05-25)
+
+Pattern proved in Q8.1 expanded across two follow-up commits.
+Cold-boot critical path: **4.65 MB → 1.03 MB** across Q8.2 + Q8.3,
+total **11.7 MB → 1.03 MB (91% cumulative reduction)** from baseline.
+
+### Q8.2 (`dcd06c3`) — matthew.js (Study Bible) lazy
+
+`bundle-a-matthew.js` (618 KB) loaded on demand. Pre-fires on
+StudiesHome + ScripturesHome mount (the two screens that can route
+into Matthew Study Bible content).
+
+Q8.1's per-corpus loader factored into a reusable factory:
+`window.__makeLazyLoader(name, bundlePath, finishFnName)` returns
+`{ corpus, load }`. Used now for bible / matthew / vot.
+
+App-side guards:
+- `app.jsx` — top-level `useSyncExternalStore` on `__matthewCorpus`
+  alongside `__bibleCorpus`. `ALL_BOOKS` spreads `matthew` only if
+  `MATTHEW` is defined.
+- `screen-routes.jsx` — `matthew-idx` + `matthew-ch` routes render a
+  centered "Loading Matthew…" placeholder + trigger the loader if
+  `MATTHEW` is undefined.
+- `use-nav-history-tracking.js` — `matthew-ch` history-record branch
+  early-returns when `window.MATTHEW` is undefined; a later effect
+  re-run after corpus arrival picks it up.
+- `SettingsScreen` — Q8.2 also fixes a Q8.1 oversight: the
+  `PROGRESS_GROUPS` construction (reads `BOOKS["matthew-plain"]`,
+  `BOOKS["1corinthians"]`, etc.) is now gated on `_BOOKS_READY`.
+  Pre-Q8.2 a cold-boot-direct-to-Settings would throw.
+
+### Q8.3 (`5605f30`) — All VOT corpora lazy
+
+`bundle-a-vot.js` (3 MB) carries all 14 remaining corpus files:
+volume-one through volume-seven, letters-timothy, letters-flock,
+lords-rebuke, wtlb-one, wtlb-two, wtlb-scriptures, the-blessed,
+holy-days, hidden-manna.
+
+`__finishVotInit` runs on bundle-a-vot.js load + re-executes 3
+pieces of cross-corpus wiring that USED to be eager at boot:
+1. `linkWtlbEntries` — wires `prevEntry / nextEntry` for WTLB-shaped
+   collections (WTLB One/Two + The Blessed).
+2. `linkPreface` — connects each collection's preface to its first
+   letter for nav chain.
+3. `VOT_LETTER_REGISTRY` — Map keyed by `"<collection>::<letter
+   title>"` → routing data, consumed by matthew.js's `votNote`
+   tap-through (itself lazy via Q8.2). Const-IIFE pattern in
+   index.html converted to `let` + a `window.__finishVotInit()`
+   function that rebuilds from currently-loaded corpora.
+
+The hook also runs once at boot (with all iterations skipping
+empty corpora), so any not-yet-loaded collection that happens to
+have been loaded by a prior session still works.
+
+App-side wiring (more invasive than Q8.1/Q8.2 because VOT touches
+~27 routes):
+- `_wrapVot` helper in `screen-routes.jsx` wraps every VOT-bound
+  route (13 letter/entry indexes + 10 letter views + 3 entry
+  views + Holy Days + Hidden Manna). The wrapper triggers
+  `__loadVotCorpus()` and renders a generic "Loading…" placeholder
+  until the corpus arrives.
+- All `LETTERS_V1 / LETTERS / LETTERS_V3 / ... / WTLB_ONE /
+  WTLB_TWO` direct references in `screen-routes.jsx` swapped to
+  `colLetterArr(COL_BY_KEY.get(volKey))` (lazy-safe via the
+  long-standing `typeof window[name]` guards in
+  `scripture-resolution.js`).
+- `VolumesHome` — pre-fires `__loadVotCorpus` on mount + subscribes.
+  All direct `LETTERS_X` reads → `colLetterArr(...)`. `locked` flag
+  reads `_votReady && _cnt === 0` so during the loading window no
+  tile is locked (clicking lands on the wrapper's loading state).
+- `HomeScreen` — pre-fires `__loadVotCorpus` on mount (~3 MB starts
+  downloading in parallel with the user's tile-scan time).
+- `SettingsScreen` — extends `_BOOKS_READY` guard with `_VOT_READY`;
+  the `PROGRESS_GROUPS` array literal (which reads `LETTERS_V1`,
+  `LETTERS_REBUKE`, etc. directly) only evaluates when BOTH
+  corpora are ready.
+
+Bundle sizes after Q8.3:
+- bundle-a.js — 1.03 MB (vendor + small data + search infra)
+- bundle-a-bible.js — 6.9 MB (lazy)
+- bundle-a-matthew.js — 618 KB (lazy)
+- bundle-a-vot.js — 3.0 MB (lazy)
+
+Cumulative cold-boot reduction from baseline: **11.7 MB → 1.03 MB
+(91% reduction)**. Mid-range Android cold-boot to first paint is
+now bound by the ~1 MB critical bundle parse, not the 11.7 MB
+total.
+
+Visual smoke (all clean):
+- Cold-boot direct to Home: renders Home tiles; corpus loaders
+  pre-fire on mount.
+- Cold-boot direct to Settings (saved tab): PROGRESS_GROUPS
+  renders empty briefly, then fills with full book + collection
+  counts once both Bible and VOT corpora arrive.
+- Home → Prophetic Letters → Volume Two: brief "Loading…"
+  placeholder, then 29 letter cards.
+- Volume Two → "The Wide Path": full LetterView with content.
+- Home → Studies: Matthew Study Bible pre-loads during scroll.
+- Cold-boot direct to Acts 1: Bible "Loading…" then 26-verse
+  chapter renders.
+
+### Q8 closure summary
+
+| Phase | Files moved | Critical-path delta | New bundle |
+|---|---|---|---|
+| Q8.1 (books.js) | 1 | 11.7 → 4.65 MB | bundle-a-bible.js (6.9 MB) |
+| Q8.2 (matthew.js) | 1 | 4.65 → 4.03 MB | bundle-a-matthew.js (618 KB) |
+| Q8.3 (all VOT) | 14 | 4.03 → 1.03 MB | bundle-a-vot.js (3.0 MB) |
+
+Stays critical-path (1.03 MB total): react/react-dom/html2canvas
+(341 KB), search infra (125 KB), books-restored.js (277 KB —
+restored-name chrome overrides), matthew-plain.js (229 KB — NKJV
+Matthew, referenced by inline scripture refs), matthew-nkjv.js
+(54 KB — translation alternates).
+
+---
+
 ## Q8.1 — books.js lazy-load (LANDED 2026-05-25)
 
 `ea94158` lands the single-target pattern proof for bundle-a lazy

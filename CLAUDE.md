@@ -14,11 +14,13 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **App() lives in `app/src/main/assets/src/app.jsx`** (Q2.7-1, `c1e3da1`). **797 lines — Phase 1 + Phase 2 CLOSED.** 26 hooks (15 P6 + 11 P7a-k). **All 53 screens dispatch from a single ROUTES table** that lives in its own file (`src/ui/screen-routes.jsx`) via a `buildScreenRoutes(deps)` factory. The 3 substantive inline blocks (matthew-ch, bible-study-chapter, holy-days-index playlist header) extracted to their own screen/component files. Welcome modal + tabs overview + disable-tabs prompt + garden warning live in `AppShellOverlays`; 12 annotation/link/journal/bookmark sheets live in `AppShellSheets`. App() now owns composition, not implementation.
 - **Q6 CSS hardening CLOSED.** app.css 4,410 → 4,125 (−285 dead). 93 raw-hex usages consolidated to vars (`--hl-{yellow|green|pink|...}` palette + `--danger` + `--settings-warning/danger` + `--input-text` + `--white`). `!important` count 36 → 25 (Cat A removed; B-F load-bearing).
 - **Q7 useSyncExternalStore migration CLOSED.** 23 of 24 Bin 4 `hlTick` cache-bust eslint-disables removed (24th is in `annotation-store.test.js` documenting the old pattern). 7 stores now expose `subscribe / getVersion / _bump`; 14 consumers migrated.
-- **Q8.1 lazy-load LANDED.** books.js (6.9 MB NKJV) split out to `bundle-a-bible.js`, loaded on demand via `window.__loadBibleCorpus()`. Critical-path bundle: 11.7 MB → 4.65 MB (60% reduction). Single-target pattern proof — other corpus files (matthew, volumes, WTLB, etc.) stay in bundle-a for now.
+- **Q8 lazy-load COMPLETE.** All corpus files lazy-loaded. Critical-path bundle: 11.7 MB → 1.03 MB (**91% reduction**). Q8.1 books.js → `bundle-a-bible.js` (6.9 MB), Q8.2 matthew.js → `bundle-a-matthew.js` (618 KB), Q8.3 all VOT corpora → `bundle-a-vot.js` (3 MB). Loaders pre-fire from the appropriate landing screens (Home / ScripturesHome / StudiesHome / VolumesHome); ROUTES entries show "Loading…" placeholder if user lands directly on a content screen pre-load.
 - **135+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **4 cluster bundles** in `app/src/main/assets/dist/`:
-  - `bundle-a.js` 4.65 MB — vendor + 20 corpus + search engine (critical path; classic-script)
+  - `bundle-a.js` 1.03 MB — vendor + small data (matthew-plain/nkjv, books-restored) + search engine (critical path)
   - `bundle-a-bible.js` 6.9 MB — books.js (NKJV) lazy-loaded via `window.__loadBibleCorpus()`
+  - `bundle-a-matthew.js` 618 KB — matthew.js (Study Bible) lazy-loaded via `window.__loadMatthewCorpus()`
+  - `bundle-a-vot.js` 3 MB — 14 VOT corpora (volumes/letters/WTLB/holy days/hidden manna) lazy-loaded via `window.__loadVotCorpus()`
   - `bundle-b.js` 351 KB — stores + components + hooks + journal + scripture-resolution + letter-linking (esbuild IIFE, 38 files incl. cached-store.test.js excluded from prod)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
   - `bundle-d.js` 540 KB — screens + sheets + components + utils + late stores + screen-routes + App() (esbuild IIFE, 87 files)
@@ -181,11 +183,71 @@ post-mutation `setHlTick(t => t + 1)` is now a no-op since no
 consumer reads `hlTick`). A follow-up can remove the App-state +
 prop entirely; left in place this session to keep blast radius bounded.
 
-### Q8 — Bundle-a.js lazy-load (Q8.1 LANDED 2026-05-25)
+### Q8 — Bundle-a.js lazy-load (COMPLETE 2026-05-25)
 
-**Q8.1 (`ea94158`)** — books.js split. Cold-boot critical path
-**11.7 MB → 4.65 MB (60% reduction)**. The 6.9-MB NKJV Bible lives in
-`bundle-a-bible.js`, loaded on demand via `window.__loadBibleCorpus()`.
+Cold-boot critical path: **11.7 MB → 1.03 MB (91% reduction)** across
+three commits. Pattern proved on books.js (Q8.1), expanded to all
+remaining corpora in Q8.2 + Q8.3.
+
+**Q8.1 (`ea94158`)** — books.js split. Cold-boot 11.7 → 4.65 MB.
+The 6.9-MB NKJV Bible lives in `bundle-a-bible.js`, loaded on demand
+via `window.__loadBibleCorpus()`.
+
+**Q8.2 (`dcd06c3`)** — matthew.js (Study Bible) split. Cold-boot
+4.65 → 4.03 MB. Pre-fires on StudiesHome + ScripturesHome mount.
+Refactored Q8.1's per-corpus loader into a generic factory:
+`window.__makeLazyLoader(name, bundlePath, finishFnName)` →
+`{ corpus, load }`. Each corpus exposes `useSyncExternalStore`-
+compatible `subscribe / getVersion` + an idempotent `load()`.
+
+**Q8.3 (`5605f30`)** — all VOT corpora (14 files, ~3 MB) split.
+Cold-boot 4.03 → 1.03 MB. `bundle-a-vot.js` carries volume-one
+through volume-seven + letters-timothy + letters-flock + lords-rebuke
++ wtlb-one + wtlb-two + wtlb-scriptures + the-blessed + holy-days +
+hidden-manna. `__finishVotInit` re-runs `linkWtlbEntries` +
+`linkPreface` + `VOT_LETTER_REGISTRY` rebuild on load.
+
+Stays critical-path (~1 MB): react + react-dom + html2canvas +
+flexsearch + search.js + search-data.js + books-restored.js
+(restored-name chrome overrides) + matthew-plain.js (NKJV Matthew,
+referenced by inline scripture refs) + matthew-nkjv.js (translation
+alternates).
+
+App-side guards added across:
+- `app.jsx` — 3 `useSyncExternalStore` subscriptions (one per corpus);
+  `ALL_BOOKS` builds sparse if either is undefined.
+- `screen-routes.jsx` — `bible-idx / bible-ch / matthew-idx / matthew-ch`
+  routes show their own "Loading…" placeholder. The 27 VOT routes
+  (volumes + WTLB + Holy Days + Hidden Manna indexes + letters +
+  entries) route through `_wrapVot` helper which triggers the
+  loader and shows a generic placeholder.
+- `HomeScreen` + `VolumesHome` + `ScripturesHome` + `StudiesHome` +
+  `SettingsScreen` — `useEffect` pre-fires the relevant loader(s) on
+  mount so corpora download in parallel with user's tile scan.
+- `VolumesHome` — `_locked = _votReady && _cnt === 0` so the lock
+  flag only kicks in for known-empty collections once the corpus
+  arrives (during loading window, NO tile is locked).
+- `SettingsScreen` — guards `PROGRESS_GROUPS` on
+  `(_BOOKS_READY && _VOT_READY)`. Reads `BOOKS["matthew-plain"]`,
+  `LETTERS_V1`, etc. directly inside the array literal so the gate
+  prevents evaluation.
+- `utils/tabs.js` — `describeTab` reads via `window.BOOKS` and the
+  `colLetterArr` typeof-safe accessors. The lazy-safe pattern used
+  for years pays off.
+- `use-nav-history-tracking.js` — `bible-ch` + `matthew-ch` history-
+  record branches early-return if their corpus isn't loaded; a
+  later effect re-run picks it up.
+- All `LETTERS_X` / `WTLB_X` / `HOLY_DAYS` etc. direct references in
+  `screen-routes.jsx` swapped to `colLetterArr(COL_BY_KEY.get(volKey))`
+  (lazy-safe via the existing typeof guards in
+  `scripture-resolution.js`).
+
+Runtime contract (in `index.html`):
+- `__makeLazyLoader(name, bundlePath, finishFnName)` factory.
+- `__bibleCorpus / __loadBibleCorpus / __finishBibleInit` (books.js).
+- `__matthewCorpus / __loadMatthewCorpus` (matthew.js — no finishInit
+  needed since MATTHEW is read only from its own module).
+- `__votCorpus / __loadVotCorpus / __finishVotInit` (14 VOT files).
 
 Runtime contract (index.html inline):
 - `window.__bibleCorpus = { loaded, subscribe(cb), getVersion() }`

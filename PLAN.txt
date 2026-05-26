@@ -3,7 +3,7 @@ VOTReader-studio — Strategic Working Memory
 ═══════════════════════════════════════════════════════════════════════════════
 
 Started: 2026-05-10
-Last pruned: 2026-05-25 (Q6 + Q7 closed; bundle-a lazy-load deferred with plan)
+Last pruned: 2026-05-25 (Q6 + Q7 + Q8 lazy-load CLOSED; bundle-a 11.7 → 1.03 MB)
 Status: ACTIVE — kept slim as work progresses
 Companions: CLAUDE.md (live status), HISTORY.md (landed work), ARCHITECTURE.md (system ref)
 
@@ -47,12 +47,10 @@ PHASE STATUS — quality-uplift sequence (Q3 → Q4 → Q5 → Q6)
   Q7 (useSyncExternalStore)   ✅ DONE  — 23/24 Bin 4 hlTick disables removed.
                                           7 stores + 14 consumers migrated.
                                           476 vitest tests. See CLAUDE.md "Q7".
-  Bundle-a.js lazy-load (Q8)  🔄 PARTIAL — Q8.1 books.js split LANDED
-                                          (ea94158). Critical path 11.7 MB
-                                          → 4.65 MB. Other corpus files
-                                          (matthew, volumes, WTLB, holy-days,
-                                          hidden-manna) stay in bundle-a;
-                                          expand in follow-up commits.
+  Bundle-a.js lazy-load (Q8)  ✅ DONE  — Q8.1 books (ea94158) +
+                                          Q8.2 matthew (dcd06c3) + Q8.3
+                                          all VOT corpora (5605f30). Critical
+                                          path 11.7 MB → 1.03 MB (91%).
 
 ───────────────────────────────────────────────────────────────────────────────
 POST-Q4 SEQUENCING (executed 2026-05-24)
@@ -85,28 +83,20 @@ POST-Q4 BACKLOG (priority order — top = next)
    pre-commit gates pass; 465 vitest tests passing. Per-commit breakdown
    in CLAUDE.md "Phase 2" section + git log (P7a-k, P8a-c, P9a-g).
 
-2. BUNDLE-A.JS LAZY-LOAD — Q8.1 LANDED, more splits remaining
-   ──────────────────────────────────────────────────────────
-   Q8.1 (commit ea94158): books.js (6.9 MB NKJV) split into
-   bundle-a-bible.js, loaded lazily via window.__loadBibleCorpus().
-   Critical-path bundle: 11.7 MB → 4.65 MB (60% reduction).
+2. BUNDLE-A.JS LAZY-LOAD — Q8 CLOSED (2026-05-25)
+   ──────────────────────────────────────────────
+   Cold-boot critical path: 11.7 MB → 1.03 MB (91% reduction) across
+   three commits.
 
-   Pattern proven on the single highest-leverage target. The contract:
-   window.__bibleCorpus { loaded, subscribe, getVersion } + the inline
-   __loadBibleCorpus() injector + __finishBibleInit() hook into BOOKS
-   downstream consumers (BIBLE_BOOK_LIST / OT_BOOK_IDS / matthew-plain
-   alias) — all in index.html.
+   Q8.1 (ea94158) books.js → bundle-a-bible.js (6.9 MB lazy).
+   Q8.2 (dcd06c3) matthew.js → bundle-a-matthew.js (618 KB lazy).
+                  Factored loader into __makeLazyLoader helper.
+   Q8.3 (5605f30) all 14 VOT corpora → bundle-a-vot.js (3 MB lazy).
+                  __finishVotInit re-runs linkWtlbEntries +
+                  linkPreface + VOT_LETTER_REGISTRY rebuild on load.
 
-   Remaining splits (each follow-up commit, same pattern as Q8.1):
-   - matthew.js (618 KB) + matthew-plain (229 KB) + matthew-nkjv (54 KB)
-   - 7 volumes (2.0 MB combined; biggest single is volume-seven 708 KB)
-   - letters-flock (278 KB) + lords-rebuke (331 KB) + letters-timothy (91 KB)
-   - wtlb-one (99 KB) + wtlb-two (153 KB) + wtlb-scriptures (11 KB)
-   - the-blessed (19 KB) + holy-days (62 KB) + hidden-manna (3 KB)
-
-   Each needs the same load-on-navigate + skeleton-state pattern;
-   smoke walk per split confirms the access-site mapping. Defer each
-   to its own commit — don't rewrite the whole data layer at once.
+   See CLAUDE.md "Q8" section + HISTORY.md for the per-commit
+   implementation details + smoke walk results.
 
 ───────────────────────────────────────────────────────────────────────────────
 INFRA / TOOLING ITEMS (one-liners — open small, ship fast)
