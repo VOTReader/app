@@ -326,7 +326,7 @@ window.AndroidBridge directly after W1.2.
   Pure addition — zero call-site changes, zero behavior change. The
   abstraction commit lands before migration per [[abstraction-before-migration]].
 
-  W1.2 — Migrate call sites — Tiers A + B LANDED, Tier C NEXT
+  W1.2 — Migrate call sites — ALL TIERS LANDED 2026-05-26
   ────────────────────────────────
   Per [[platformbridge-single-source]]: after W1.2, grep for
   `window.AndroidBridge` outside platform-bridge.js returns ZERO matches.
@@ -398,17 +398,66 @@ window.AndroidBridge directly after W1.2.
         are nativeRecordStart/Pause/Resume — Tier C scope)
     Pattern holds; safe to proceed to Tier C.
 
-    Tier C — high reference count + audio domain (riskiest):
-      JournalRecordingSheet.jsx — 10+ refs spanning requestMicPermission,
-                                  startAudioSession, endAudioSession,
-                                  all 6 nativeRecord*, plus 5 different
-                                  detection-variable names. Consolidation
-                                  goal: ZERO local platform-detection
-                                  variables — JournalRecordingSheet becomes
-                                  a pure UI component that calls
-                                  PlatformBridge methods and doesn't know
-                                  what platform it's on. Likely splits
-                                  into A/V/storage sub-commits.
+    Tier C — high reference count + audio domain — LANDED 2026-05-26:
+      Tier C.1 (22d1c5b): bridge web impls for 7 recording methods
+                          (requestMicPermission, nativeRecordStart/Pause/
+                          Resume/Amplitude/Stop/Cancel). ~250 lines of
+                          MediaRecorder + AnalyserNode + MediaStream
+                          lifecycle code MOVED from JournalRecordingSheet
+                          into platform-bridge.js per [[respect-production-code]]
+                          + [[consolidate-dont-duplicate]]. Production-tuned
+                          constants preserved (chunk interval 250ms,
+                          fftSize 256, RMS-from-time-domain calculation,
+                          80ms amplitude polling). Pre-allocated Uint8Array
+                          ampBuffer at recording start per
+                          [[amplitude-buffer-preallocation]] (reused across
+                          the polling loop, no GC pressure). Strict mime
+                          negotiation webm/opus → ogg/opus → 'error:
+                          unsupported-codec' per [[mediarecorder-mime-policy]]
+                          — NO wav/mp4 fallback (the pre-existing 4-candidate
+                          list was deliberately tightened to the 2-candidate
+                          policy). MediaStream tracks .stop()-ed on every
+                          exit path per [[mediastream-track-cleanup]].
+                          21 new vitest cases.
+      Tier C.2 (2538e8f): JournalRecordingSheet consumer migration. File
+                          dropped 701 → 490 lines (-211, -30%). All 5
+                          detection-variable names eliminated (_abc, _ab,
+                          _ab2, AB, raw isAndroid). The web MediaRecorder
+                          code path (beginCapture) DELETED entirely; the
+                          native flow (beginNativeCapture) renamed to
+                          startCapture and made the SOLE path. Per
+                          [[callback-flow-unification]] this was a
+                          contract-unification: pre-Tier-C web processed
+                          blob INLINE in rec.onstop; post-Tier-C BOTH
+                          platforms route through
+                          __onNativeRecordingComplete(b64, durMs, mime).
+                          Cleanup function dropped from 39 lines to 14
+                          (delegates to PlatformBridge.nativeRecordCancel).
+
+  POST-W1.2 EXIT GATES (per [[intermediate-exit-gates]] + directive #5):
+  ALL THREE GATES GREEN.
+    • window.AndroidBridge in live code: ZERO (5 hits remain, all in
+      comments documenting pre-migration state — _entry-b.js line 63 is
+      the literal policy reminder "NEVER access window.AndroidBridge
+      outside this module.")
+    • error:web-impl-pending anywhere in src: ZERO
+    • isAndroid in consumer files outside platform-bridge: ZERO
+
+  BUNDLE TALLY (per [[net-bundle-delta-all-affected]]):
+    Pre-W1.1 baseline ≈ 351 KB bundle-b + 547.8 KB bundle-d = ~898.8 KB
+    Post-W1.2         = 353.5 KB bundle-b + 546.1 KB bundle-d = ~899.6 KB
+    Net sum delta: +0.8 KB (essentially flat — the cost of the abstraction
+    layer is balanced by consumer-side simplification; 570 vitest tests
+    pass on both pre- and post-W1.2 bundles).
+
+  Per-tier bundle-b trajectory:
+    Pre-W1.1: 351 KB        W1.1: 354.5 KB (+3 KB bridge module)
+    Tier A:   354.5 KB (flat — code moved from use-thumbnails into bridge)
+    Tier B.1: 356.0 KB (+1.5 KB WakeLock impl)
+    Tier B.2: 357.6 KB (+1.6 KB file I/O web impls)
+    Tier B.3: 359.1 KB (+1.5 KB Fullscreen API impl)
+    Tier C.1: 365.8 KB (+6.7 KB recording bridge impls)
+    Tier C.2: 353.5 KB (-12.3 KB JournalRecordingSheet shrinkage)
 
   PER-TIER VERIFICATION (per [[preview-eval-replaces-device]]):
   After each tier lands and BEFORE reporting it done:
@@ -428,69 +477,32 @@ window.AndroidBridge directly after W1.2.
   haptic — not yet wired in JS, see [[haptic-bridge-ready]]. Out of W1.2
   scope; lands when JS-side haptic call sites get added (separate task).
 
-  W1.3 — Web file I/O implementation
-  ───────────────────────────────────
-  The most user-facing desktop gap. Two flows:
+  W1.3 — Web file I/O implementation — SATISFIED by Tier B.2 (6ec5ff0)
+  ─────────────────────────────────────────────────────────────────────
+  Per [[plan-reduction-as-work-progresses]], the work originally scoped
+  to W1.3 landed inside Tier B.2's SettingsScreen consumer migration:
+    webOpenFilePicker — synchronous DOM input + FileReader.readAsDataURL
+                         + strips data-URL prefix → fires
+                         window.__onImportFile(base64) per
+                         [[preserve-callback-contracts]]. User-gesture
+                         rule per [[file-input-user-gesture]].
+    webSaveToDownloads — Blob + URL.createObjectURL + anchor click +
+                         deferred revokeObjectURL. Returns "ok" /
+                         "error:<reason>" matching Android.
+  See the Tier B.2 entry above + commit 6ec5ff0 for full details.
 
-  Import: PlatformBridge.openFilePicker() creates a hidden `<input
-  type="file" accept=".json">` and calls .click() — SYNCHRONOUSLY from
-  a user-gesture callstack. Browsers block programmatic input.click()
-  outside user-initiated handlers (see [[file-input-user-gesture]]).
-  FileReader reads the selected file, fires the existing
-  `window.__onImportFile(base64)` callback. Same contract as Android.
-
-  Export: PlatformBridge.saveToDownloads(name, content) creates a
-  `new Blob([content], {type:'application/json'})` + `<a>` with
-  `href = URL.createObjectURL(blob)` + `download = filename`, clicks
-  it, revokes the URL. Equivalent to the native MediaStore.Downloads
-  path. Returns "ok" or "error:<reason>" matching the Android contract.
-
-  Caller (Settings Import button) MUST invoke openFilePicker DIRECTLY
-  from its sync onClick handler — no await/setTimeout/Promise.then
-  between user click and the input.click() call. Failures are SILENT
-  (browser blocks without throwing) so verification must observe the
-  picker actually opened via DOM probe (preview_eval check).
-
-  W1.4 — Web audio recording implementation
-  ──────────────────────────────────────────
-  CONSOLIDATES the existing MediaRecorder code in JournalRecordingSheet.jsx
-  (~lines 140-160) INTO PlatformBridge. Per [[consolidate-dont-duplicate]],
-  the existing code MOVES; W1.4 doesn't ship a second MediaRecorder impl
-  alongside the existing one. After W1.4 lands, the only MediaRecorder
-  reference outside platform-bridge.js is via PlatformBridge.nativeRecord*.
-
-  Mime negotiation (per [[mediarecorder-mime-policy]]):
-    1. MediaRecorder.isTypeSupported('audio/webm;codecs=opus') → use
-    2. else MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') → use
-    3. else return 'error:unsupported-codec' from nativeRecordStart
-  NO wav fallback. NO mp4 fallback. NO uncompressed audio. A wav fallback
-  would balloon ~50 KB/min memos to ~500 KB/min — unacceptable for the
-  offline-first IndexedDB target in W2.
-
-  Flow on web:
-    requestMicPermission() → navigator.mediaDevices.getUserMedia({audio:true})
-    nativeRecordStart() → construct MediaRecorder with negotiated mime,
-                          start; chunks accumulate via ondataavailable
-    nativeRecordPause/Resume() → mediaRecorder.pause/resume()
-    nativeRecordAmplitude() → from AnalyserNode tied to the live stream
-    nativeRecordStop() → mediaRecorder.stop(); on dataavailable:
-                          base64-encode, fire existing
-                          window.__onNativeRecordingComplete(base64,
-                          durationMs, mime) with the negotiated mime
-    nativeRecordCancel() → discard chunks, stop stream tracks
-
-  The 250 ms mic permission grace period is Android-specific (timing
-  required by Android's permission dialog). On web, browsers handle the
-  permission dialog synchronously inside getUserMedia, so the grace
-  period is skipped.
-
-  Module-private state: the MediaRecorder instance, accumulated chunks
-  array, the live MediaStream (for cancel-side teardown). Cleared on
-  every nativeRecordCancel() / nativeRecordStop().
-
-  Tests: vitest stubs MediaRecorder.isTypeSupported + getUserMedia.
-  Cover webm-wins / ogg-wins / both-false-unsupported paths plus
-  pause/resume state, cancel teardown, and the base64 callback shape.
+  W1.4 — Web audio recording implementation — SATISFIED by Tier C
+  ────────────────────────────────────────────────────────────────
+  Per [[plan-reduction-as-work-progresses]], all of W1.4 landed across
+  Tier C.1 (22d1c5b: bridge web impls — getUserMedia + MediaRecorder +
+  AnalyserNode + Blob→base64 + __onNativeRecordingComplete callback +
+  MediaStream cleanup) and Tier C.2 (2538e8f: consumer migration
+  removing the dual paths). Strict mime negotiation per
+  [[mediarecorder-mime-policy]] (webm/opus → ogg/opus → error, no
+  wav/mp4). Pre-allocated ampBuffer per
+  [[amplitude-buffer-preallocation]]. MediaStream tracks .stop()-ed on
+  every exit path per [[mediastream-track-cleanup]]. See the Tier C
+  entries above + commit messages 22d1c5b and 2538e8f for full detail.
 
   W1.5 — Back-button navigation (History API + Escape key)
   ────────────────────────────────────────────────────────
