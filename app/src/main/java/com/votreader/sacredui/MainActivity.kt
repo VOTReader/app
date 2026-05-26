@@ -107,6 +107,12 @@ class MainActivity : AppCompatActivity() {
     // above so the two flows never clobber each other's callback.
     private lateinit var micPrepLauncher: ActivityResultLauncher<String>
 
+    // Single conduit for every JS callback this Activity fires. Reads
+    // [webView] lazily via the lambda so onRenderProcessGone replacing
+    // the WebView instance picks up automatically -- no re-instantiation
+    // of the bridge required.
+    private val bridge: JsBridge = JsBridge { webView }
+
     companion object {
         // Allowlist for shouldOverrideUrlLoading — anything not in this list
         // is refused (not handed to Intent.ACTION_VIEW) so a stray
@@ -141,9 +147,7 @@ class MainActivity : AppCompatActivity() {
         filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri == null) {
                 // User cancelled the picker
-                webView.post {
-                    webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
-                }
+                bridge.callOptional("__onImportFile", null)
                 return@registerForActivityResult
             }
 
@@ -154,23 +158,17 @@ class MainActivity : AppCompatActivity() {
             val size = querySize(uri)
             if (size < 0L || size > MAX_IMPORT_SIZE) {
                 Timber.w("Import rejected: size=%d (limit=%d)", size, MAX_IMPORT_SIZE)
-                webView.post {
-                    webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
-                }
+                bridge.callOptional("__onImportFile", null)
                 return@registerForActivityResult
             }
 
             try {
                 val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
                 val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                webView.post {
-                    webView.evaluateJavascript("window.__onImportFile && window.__onImportFile('$b64')", null)
-                }
+                bridge.callOptional("__onImportFile", b64)
             } catch (e: Exception) {
                 Timber.w(e, "Import file read failed")
-                webView.post {
-                    webView.evaluateJavascript("window.__onImportFile && window.__onImportFile(null)", null)
-                }
+                bridge.callOptional("__onImportFile", null)
             }
         }
 
@@ -224,16 +222,10 @@ class MainActivity : AppCompatActivity() {
                 // Same 250 ms grace period as micPermissionLauncher — lets the OS
                 // release its AudioRecord session before JS calls getUserMedia().
                 webView.postDelayed({
-                    webView.evaluateJavascript(
-                        "window.__onMicPermissionResult && window.__onMicPermissionResult(true)", null
-                    )
+                    bridge.callOptional("__onMicPermissionResult", true)
                 }, 250L)
             } else {
-                webView.post {
-                    webView.evaluateJavascript(
-                        "window.__onMicPermissionResult && window.__onMicPermissionResult(false)", null
-                    )
-                }
+                bridge.callOptional("__onMicPermissionResult", false)
             }
         }
 
@@ -278,7 +270,7 @@ class MainActivity : AppCompatActivity() {
             // screen) and "false" when there's nothing to pop. On "false"
             // we finish() so the user actually exits, instead of being
             // stuck on the home screen.
-            webView.evaluateJavascript(
+            bridge.callWithResult(
                 "(typeof window.handleAndroidBack === 'function') ? window.handleAndroidBack() : 'false'"
             ) { result ->
                 if (result != "\"true\"") finish()
@@ -585,34 +577,22 @@ class MainActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         val topDp = String.format(Locale.US, "%.2f", savedTopInset / density)
         val bottomDp = String.format(Locale.US, "%.2f", savedBottomInset / density)
-        // Guard documentElement — the WindowInsets listener fires during the
-        // initial layout pass before loadUrl finishes parsing the document,
-        // so documentElement can be null on the first 1-3 invocations. Without
-        // the guard, every cold boot logged 3× "Uncaught TypeError: Cannot
-        // read properties of null (reading 'style')" to Logcat / WebViewJS.
-        val js = """
-            (function() {
-                var r = document.documentElement && document.documentElement.style;
-                if (!r) return;
-                r.setProperty('--inset-top',    '${topDp}px');
-                r.setProperty('--inset-bottom', '${bottomDp}px');
-            })();
-        """.trimIndent()
-        webView.evaluateJavascript(js, null)
+        // The bridge's setCssProperties carries the same null-documentElement
+        // guard that the inline JS template used to ship (the listener can
+        // fire during the initial layout pass before loadUrl finishes parsing
+        // the document, leaving documentElement briefly null and otherwise
+        // throwing 3× "Cannot read properties of null" per cold boot).
+        bridge.setCssProperties(
+            "--inset-top" to "${topDp}px",
+            "--inset-bottom" to "${bottomDp}px"
+        )
     }
 
     // Deliver a finished native recording to JS. base64 is null on failure;
-    // mime is always audio/mp4 (AAC in MPEG-4). Marshalled onto the WebView's
-    // own thread via webView.post since nativeRecordStop runs on a binder thread.
+    // mime is always audio/mp4 (AAC in MPEG-4). The bridge marshals the call
+    // onto the WebView's thread; nativeRecordStop runs on a binder thread.
     private fun postNativeComplete(base64: String?, durationMs: Long) {
-        val arg = if (base64 == null) "null" else "'$base64'"
-        webView.post {
-            webView.evaluateJavascript(
-                "window.__onNativeRecordingComplete && " +
-                    "window.__onNativeRecordingComplete($arg, $durationMs, 'audio/mp4')",
-                null
-            )
-        }
+        bridge.callOptional("__onNativeRecordingComplete", base64, durationMs, "audio/mp4")
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -695,21 +675,13 @@ class MainActivity : AppCompatActivity() {
                     this@MainActivity, Manifest.permission.RECORD_AUDIO
                 ) == PackageManager.PERMISSION_GRANTED
                 if (granted) {
-                    webView.post {
-                        webView.evaluateJavascript(
-                            "window.__onMicPermissionResult && window.__onMicPermissionResult(true)", null
-                        )
-                    }
+                    bridge.callOptional("__onMicPermissionResult", true)
                 } else {
                     try {
                         micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     } catch (e: Exception) {
                         Timber.w(e, "requestMicPermission launch failed")
-                        webView.post {
-                            webView.evaluateJavascript(
-                                "window.__onMicPermissionResult && window.__onMicPermissionResult(false)", null
-                            )
-                        }
+                        bridge.callOptional("__onMicPermissionResult", false)
                     }
                 }
             }
