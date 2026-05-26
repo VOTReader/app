@@ -7,9 +7,13 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Base64
 import android.view.Gravity
 import android.view.PixelCopy
@@ -967,6 +971,43 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     controller.show(WindowInsetsCompat.Type.systemBars())
                 }
+            }
+        }
+
+        /**
+         * Fire a short haptic vibration so WebView interactions feel native.
+         * Styles: 0 = tick (light), 1 = click (medium), 2 = heavy click,
+         * 3 = double click. On API 29+ uses predefined platform effects;
+         * on API 26-28 falls back to duration/amplitude one-shots.
+         * Safe to call from the binder thread (Vibrator is thread-safe).
+         */
+        @JavascriptInterface
+        fun haptic(style: Int) {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(VIBRATOR_SERVICE) as Vibrator
+            }
+            val effect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                VibrationEffect.createPredefined(
+                    when (style) {
+                        1 -> VibrationEffect.EFFECT_CLICK
+                        2 -> VibrationEffect.EFFECT_HEAVY_CLICK
+                        3 -> VibrationEffect.EFFECT_DOUBLE_CLICK
+                        else -> VibrationEffect.EFFECT_TICK
+                    }
+                )
+            } else {
+                VibrationEffect.createOneShot(
+                    when (style) { 1 -> 20L; 2 -> 30L; 3 -> 40L; else -> 10L },
+                    when (style) { 1 -> 128; 2 -> 200; 3 -> 255; else -> 80 }
+                )
+            }
+            try {
+                vibrator.vibrate(effect)
+            } catch (e: Exception) {
+                Timber.w(e, "haptic(%d) failed", style)
             }
         }
     }

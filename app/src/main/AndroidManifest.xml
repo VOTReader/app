@@ -15,6 +15,11 @@
          NotReadableError even though RECORD_AUDIO is granted and no other app
          is recording. Required for in-app voice recording to work on Android. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- VIBRATE — a "normal" (non-runtime) permission. Granted at install
+         time. Used by the haptic feedback bridge so the JS layer can fire
+         short vibrations on meaningful interactions (bookmark toggle,
+         recording complete, etc.) to make the WebView UI feel native. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
