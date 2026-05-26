@@ -281,123 +281,208 @@ exports a PlatformBridge object. At boot, it detects the environment and
 wires up the correct implementation. All existing call sites change from
 `window.AndroidBridge.foo()` to `PlatformBridge.foo()`.
 
-Detection: `const isAndroid = typeof window.AndroidBridge !== 'undefined'`
-(this guard already exists in JournalRecordingSheet + use-thumbnails).
+Detection: `!!(typeof window !== 'undefined' && window.AndroidBridge)` —
+truthy check matching the existing pattern at JournalRecordingSheet:214
+verbatim. Per [[platformbridge-single-source]], this expression appears
+in EXACTLY ONE place: platform-bridge.js. Consumers never check
+window.AndroidBridge directly after W1.2.
 
-  W1.1 — PlatformBridge interface + Android impl (passthrough)
-  ─────────────────────────────────────────────────────────────
-  Define the interface (JSDoc typedef) and the Android implementation that
-  delegates every call to window.AndroidBridge. This is a mechanical 1:1
-  wrapper. All 15 methods:
+  W1.1 — PlatformBridge interface + Android impl (passthrough) — LANDED 2026-05-26 (228be7c)
+  ──────────────────────────────────────────────────────────────────────────────────────────
+  New module: app/src/main/assets/src/utils/platform-bridge.js (140 lines).
+  Mirrors the 20 @JavascriptInterface methods on AppInterface.kt (NOT 15
+  as CLAUDE.md previously stated — count grew post-NK with haptic + the
+  AppInterface extraction. Documented + fixed in the same commit batch).
 
-    Platform-only (Android bridge passthrough, web no-op):
-      setLightStatusBar(light)    → no-op on web (CSS handles it)
-      setImmersiveMode(immersive) → Fullscreen API
-      setKeepScreenOn(enabled)    → WakeLock API
-      startAudioSession()         → no-op on web
-      endAudioSession()           → no-op on web
-      haptic(style)               → navigator.vibrate()
-      setZoomEnabled(enabled)     → CSS touch-action
-      resetZoom()                 → CSS transform
-      getZoomScale()              → return 1.0
+  Android impl: pure 1:1 passthrough to window.AndroidBridge.*. Zero
+  behavior change vs. pre-W1.2 — call sites still call window.AndroidBridge
+  directly until W1.2 migrates them; this module just adds an unused
+  parallel path.
 
-    File I/O:
-      openFilePicker()            → <input type="file"> click
-      saveToDownloads(name, data) → Blob + <a download>
+  Web impl: three categories of placeholders:
+    1. Genuine no-ops (setLightStatusBar, startAudioSession,
+       endAudioSession) where browser/CSS handles natively
+    2. Safe defaults: getZoomScale->1.0, getCrashLog->'[]',
+       nativeRecordAmplitude->0, takeScreenshot->''
+    3. notYetImplemented warnings + 'error:web-impl-pending' return for
+       methods awaiting W1.3 (file I/O), W1.4 (audio), W1.5 (back).
+       Recording methods preserve Kotlin's 'error:<reason>' string
+       contract from NativeAudioRecorder.
 
-    Audio recording:
-      requestMicPermission()      → navigator.mediaDevices.getUserMedia
-      nativeRecordStart()         → MediaRecorder API
-      nativeRecordPause()         → mediaRecorder.pause()
-      nativeRecordResume()        → mediaRecorder.resume()
-      nativeRecordAmplitude()     → AnalyserNode
-      nativeRecordStop()          → mediaRecorder.stop() + ondataavailable
-      nativeRecordCancel()        → discard blobs
+  Tests: app/src/main/assets/src/utils/platform-bridge.test.js (45 cases).
+  vitest total grew 491 → 536. Strategy: vi.resetModules() + dynamic
+  import lets each describe block re-evaluate the module under different
+  window.AndroidBridge states.
 
-    Screenshots:
-      takeScreenshot(crop,max,q)  → html2canvas (already bundled)
+  Bundled into bundle-b (added to _entry-b.js imports + window.assign).
+  Bundle-b consumers (use-settings, use-thumbnails, JournalRecordingSheet
+  — all imported by _entry-b) can direct-import in W1.2; bundle-d
+  consumers (GardenView, SettingsScreen) reach it via bare-name
+  `PlatformBridge` at React-render time (window global).
 
-    Diagnostics:
-      getCrashLog()               → return "[]" (no native log on web)
+  Generated globals (eslint-globals.generated.js + globals.generated.d.ts)
+  regenerated to include PlatformBridge so future call sites lint clean.
 
-  No behavior change for Android — the passthrough delegates identically
-  to what the existing code does. Tests: vitest for the web impl (mock
-  MediaRecorder, mock navigator.vibrate, etc.).
+  Pure addition — zero call-site changes, zero behavior change. The
+  abstraction commit lands before migration per [[abstraction-before-migration]].
 
-  W1.2 — Migrate call sites (mechanical substitution)
-  ────────────────────────────────────────────────────
-  15 unique methods across 6 files:
-    use-settings.js         — setLightStatusBar, setKeepScreenOn
-    use-thumbnails.js       — takeScreenshot
-    GardenView.jsx          — setZoomEnabled, resetZoom, setImmersiveMode
-    JournalRecordingSheet   — requestMicPermission, startAudioSession,
-                              endAudioSession, nativeRecord*
-    SettingsScreen.jsx      — openFilePicker, saveToDownloads, getCrashLog
-    (haptic — not yet wired in JS, see memory [[haptic-bridge-ready]])
+  W1.2 — Migrate call sites — NEXT
+  ────────────────────────────────
+  Per [[platformbridge-single-source]]: after W1.2, grep for
+  `window.AndroidBridge` outside platform-bridge.js returns ZERO matches.
 
-  Each file: replace `window.AndroidBridge?.method()` with
-  `PlatformBridge.method()`. Remove the `if (window.AndroidBridge)`
-  guards — the bridge now always exists, with the correct impl.
+  Surface is broader than originally estimated. JournalRecordingSheet
+  alone has 10+ window.AndroidBridge references with FIVE different
+  detection-variable names (`_abc`, `_ab`, `_ab2`, `AB`, raw `isAndroid`
+  locals). Sequence by risk ascending (per [[low-risk-pilot-first]]):
+
+    Tier A — pilot the pattern on single-call mechanical sites:
+      use-thumbnails.js       — takeScreenshot
+      use-settings.js         — setLightStatusBar, setKeepScreenOn
+
+    Tier B — small file, moderate reference count:
+      SettingsScreen.jsx      — openFilePicker, saveToDownloads,
+                                 getCrashLog
+      GardenView.jsx          — setZoomEnabled, resetZoom,
+                                 setImmersiveMode
+
+    Tier C — high reference count + audio domain (riskiest):
+      JournalRecordingSheet.jsx — 10+ refs spanning requestMicPermission,
+                                  startAudioSession, endAudioSession,
+                                  all 6 nativeRecord*, plus inline
+                                  detection variables. Likely splits
+                                  into A/V/storage sub-commits.
+
+  Each tier: replace AndroidBridge access + remove the detection
+  variable + smoke walk via votSmoke() + commit. Post-migration grep
+  should return zero results for `window.AndroidBridge` outside
+  platform-bridge.js (use `grep -rn "window.AndroidBridge"
+  app/src/main/assets/src --include="*.jsx" --include="*.js"
+  | grep -v platform-bridge.js` — empty output is the exit gate).
+
+  haptic — not yet wired in JS, see [[haptic-bridge-ready]]. Out of W1.2
+  scope; lands when JS-side haptic call sites get added (separate task).
 
   W1.3 — Web file I/O implementation
   ───────────────────────────────────
   The most user-facing desktop gap. Two flows:
 
-  Import: create a hidden `<input type="file" accept=".json">`, click it
-  programmatically, read result via FileReader, fire the existing
+  Import: PlatformBridge.openFilePicker() creates a hidden `<input
+  type="file" accept=".json">` and calls .click() — SYNCHRONOUSLY from
+  a user-gesture callstack. Browsers block programmatic input.click()
+  outside user-initiated handlers (see [[file-input-user-gesture]]).
+  FileReader reads the selected file, fires the existing
   `window.__onImportFile(base64)` callback. Same contract as Android.
 
-  Export: `new Blob([content], {type:'application/json'})`, create an
-  `<a>` element with `href = URL.createObjectURL(blob)` and
-  `download = filename`, click it, revoke the URL. Equivalent to the
-  native MediaStore.Downloads path.
+  Export: PlatformBridge.saveToDownloads(name, content) creates a
+  `new Blob([content], {type:'application/json'})` + `<a>` with
+  `href = URL.createObjectURL(blob)` + `download = filename`, clicks
+  it, revokes the URL. Equivalent to the native MediaStore.Downloads
+  path. Returns "ok" or "error:<reason>" matching the Android contract.
+
+  Caller (Settings Import button) MUST invoke openFilePicker DIRECTLY
+  from its sync onClick handler — no await/setTimeout/Promise.then
+  between user click and the input.click() call. Failures are SILENT
+  (browser blocks without throwing) so verification must observe the
+  picker actually opened via DOM probe (preview_eval check).
 
   W1.4 — Web audio recording implementation
   ──────────────────────────────────────────
-  JournalRecordingSheet already has a MediaRecorder code path
-  (detected via `isAndroid` flag at line 214). The web impl formalizes
-  this: getUserMedia → MediaRecorder → AnalyserNode (for amplitude)
-  → ondataavailable → base64 encode → fire the existing
-  `window.__onNativeRecordingComplete(base64, durationMs, mime)`
-  callback.
+  CONSOLIDATES the existing MediaRecorder code in JournalRecordingSheet.jsx
+  (~lines 140-160) INTO PlatformBridge. Per [[consolidate-dont-duplicate]],
+  the existing code MOVES; W1.4 doesn't ship a second MediaRecorder impl
+  alongside the existing one. After W1.4 lands, the only MediaRecorder
+  reference outside platform-bridge.js is via PlatformBridge.nativeRecord*.
 
-  The 250ms mic permission grace period is Android-specific and can be
-  skipped on web (browser handles the permission dialog synchronously
-  before returning the stream).
+  Mime negotiation (per [[mediarecorder-mime-policy]]):
+    1. MediaRecorder.isTypeSupported('audio/webm;codecs=opus') → use
+    2. else MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') → use
+    3. else return 'error:unsupported-codec' from nativeRecordStart
+  NO wav fallback. NO mp4 fallback. NO uncompressed audio. A wav fallback
+  would balloon ~50 KB/min memos to ~500 KB/min — unacceptable for the
+  offline-first IndexedDB target in W2.
 
-  W1.5 — Back-button navigation (History API)
-  ────────────────────────────────────────────
+  Flow on web:
+    requestMicPermission() → navigator.mediaDevices.getUserMedia({audio:true})
+    nativeRecordStart() → construct MediaRecorder with negotiated mime,
+                          start; chunks accumulate via ondataavailable
+    nativeRecordPause/Resume() → mediaRecorder.pause/resume()
+    nativeRecordAmplitude() → from AnalyserNode tied to the live stream
+    nativeRecordStop() → mediaRecorder.stop(); on dataavailable:
+                          base64-encode, fire existing
+                          window.__onNativeRecordingComplete(base64,
+                          durationMs, mime) with the negotiated mime
+    nativeRecordCancel() → discard chunks, stop stream tracks
+
+  The 250 ms mic permission grace period is Android-specific (timing
+  required by Android's permission dialog). On web, browsers handle the
+  permission dialog synchronously inside getUserMedia, so the grace
+  period is skipped.
+
+  Module-private state: the MediaRecorder instance, accumulated chunks
+  array, the live MediaStream (for cancel-side teardown). Cleared on
+  every nativeRecordCancel() / nativeRecordStop().
+
+  Tests: vitest stubs MediaRecorder.isTypeSupported + getUserMedia.
+  Cover webm-wins / ogg-wins / both-false-unsupported paths plus
+  pause/resume state, cancel teardown, and the base64 callback shape.
+
+  W1.5 — Back-button navigation (History API + Escape key)
+  ────────────────────────────────────────────────────────
   On Android, back-press routes through `window.handleAndroidBack()`.
-  On desktop, wire two equivalent triggers:
+  On desktop, wire two triggers:
 
-    1. Keyboard: Escape key → call handleAndroidBack()
-    2. Browser: History API popstate → call handleAndroidBack()
+    1. Keyboard: keydown 'Escape' → handleAndroidBack() — GATED.
+       Per [[escape-key-gating]], the listener fires ONLY if:
+         - document.fullscreenElement === null  (not in fullscreen)
+         - No app-managed modal/sheet open
+       If either condition false: do NOT preventDefault — let the
+       browser exit fullscreen / close its own dialog. Swallowing
+       Escape would break the Garden full-screen view + every
+       open-sheet close-on-escape pattern.
 
-  The existing handleAndroidBack logic is platform-agnostic (it reads
-  JS state and returns "true"/"false"). The only change is the trigger
+    2. Browser: History API popstate → handleAndroidBack(). The app
+       pushes a history entry on each in-app navigation; popstate
+       signals the user clicked the browser-native back button.
+
+  The existing handleAndroidBack logic is platform-agnostic (reads JS
+  state, returns "true"/"false"). The only change is the trigger
   source. Register listener in useAndroidBack.js (already owns this
-  domain).
+  domain). Tests verify (fullscreen, sheet-open, clear-state) — only
+  the third dispatches.
 
-  W1.6 — Desktop smoke walk
-  ─────────────────────────
-  Open index.html in Chrome, Edge, Firefox. Walk:
-    - Home → navigate all 53 screens (ROUTES table)
-    - Settings → Export JSON → verify download
-    - Settings → Import JSON → verify file picker + load
-    - Journal → Record voice memo → verify playback
+  W1.6 — Desktop preview-eval smoke walk
+  ──────────────────────────────────────
+  Per [[preview-eval-replaces-device]], use preview_eval + the
+  tools/smoke.js macro in the preview server (Chrome/Edge/Firefox)
+  rather than manual device walks. tools/smoke.js exposes votSmoke()
+  which runs:
+    - Globals audit (PlatformBridge must be present after W1.1)
+    - Data wiring (COLLECTIONS resolve correctly)
+    - 12-screen render walk (every ROUTES entry's main path)
+    - Annotation round-trip (no regressions in highlight/note/link flow)
+
+  Exit gate: votSmoke().ok === true on Chrome + Edge + Firefox.
+
+  Targeted flow checks (preview_click + preview_snapshot, not device):
+    - Settings → Export JSON → verify download fires via preview_eval
+    - Settings → Import JSON → verify file picker opens (DOM probe;
+      browser blocks silently on user-gesture violations)
+    - Journal → Record voice memo → verify playback Blob URL works
     - Garden View → verify fullscreen toggle (Fullscreen API)
     - Bible chapter → add annotation → verify persistence
-    - Back button (Escape key) → verify navigation history
+    - Escape key → verify back-nav fires only in non-modal state
     - Resize window → verify responsive layout
 
   Exit criteria:
-    [ ] PlatformBridge module committed with Android + Web impls
-    [ ] All 15 methods have web equivalents (or justified no-ops)
-    [ ] All 6 call-site files migrated, zero raw AndroidBridge refs remain
-    [ ] File import/export works on desktop Chrome
-    [ ] Audio recording works on desktop Chrome
-    [ ] Back navigation works via Escape key
-    [ ] Desktop smoke walk passes on Chrome + Edge + Firefox
+    [X] W1.1 PlatformBridge module committed (228be7c) — Android passthrough + web placeholders
+    [ ] All 20 methods have web equivalents (or justified no-ops)
+    [ ] All call-site files migrated; grep for `window.AndroidBridge`
+        outside platform-bridge.js returns ZERO matches
+    [ ] File import/export works on desktop Chrome (user-gesture path)
+    [ ] Audio recording works on desktop Chrome (mime: webm/opus or ogg/opus)
+    [ ] Back navigation via Escape key gated on fullscreen + sheet state
+    [ ] votSmoke().ok === true on Chrome + Edge + Firefox
     [ ] All pre-commit gates pass (lint + typecheck + vitest + build)
     [ ] Android APK still works identically (regression check)
 
