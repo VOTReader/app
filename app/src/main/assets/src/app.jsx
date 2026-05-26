@@ -456,6 +456,10 @@ function App() {
     React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined' ? window.__matthewCorpus.subscribe(cb) : () => {}), []),
     () => (typeof window.__matthewCorpus !== 'undefined' ? window.__matthewCorpus.getVersion() : 0)
   );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(cb) : () => {}), []),
+    () => (typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0)
+  );
   const _MATTHEW = (typeof MATTHEW !== 'undefined') ? MATTHEW : null;
   const ALL_BOOKS = {
     ...(_MATTHEW ? { matthew: _MATTHEW } : {}),

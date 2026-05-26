@@ -18,7 +18,7 @@
    this file's destructure AND the App-side call site. The signature
    compile-checks itself: missing props become undefined references.
 
-   Free-variable refs (LETTERS, MATTHEW, ScreenLayout, NavButtons,
+   Free-variable refs (MATTHEW, ScreenLayout, NavButtons,
    VolumeLetterIndex, LetterView, all *-Screen components, COL_BY_KEY,
    COL_BY_INDEX_SC, GARDEN_DEFAULT_TIER, colIdxProps/colReadNavProps —
    the last two are NOT globals but App-local helpers, so they're
@@ -135,90 +135,103 @@ export function buildScreenRoutes({
   };
   const _navToChapter = (bid, ch) => { setFromWtlb(screen); setBookId(bid); setChapterNum(ch); setScreen('bible-ch'); };
 
+  // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
+  // every VOT route (indexes + letter views + WTLB entries + Holy Days +
+  // Hidden Manna) gets routed through this wrapper which triggers the
+  // loader and renders a centered placeholder. App() subscribes to
+  // __votCorpus so the wrapper re-evaluates when the corpus lands.
+  const _votReady = (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.loaded : false;
+  const _votLoadingPlaceholder = <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading…</div>;
+  const _wrapVot = (jsx) => {
+    if (_votReady) return jsx;
+    if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
+    return _votLoadingPlaceholder;
+  };
+
   return {
     // ── Volume index screens (13) ──
-    'vot-index': () => (
+    'vot-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Two" letters={LETTERS} {...colIdxProps('two')} />
+        <VolumeLetterIndex volumeTitle="Volume Two" letters={colLetterArr(COL_BY_KEY.get('two'))} {...colIdxProps('two')} />
       </ScreenLayout>
-    ),
-    'vot-one-index': () => (
+    )),
+    'vot-one-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume One" letters={LETTERS_V1} preface={LETTERS_V1_PREFACE} {...colIdxProps('one')} />
+        <VolumeLetterIndex volumeTitle="Volume One" letters={colLetterArr(COL_BY_KEY.get('one'))} preface={colPreface(COL_BY_KEY.get('one'))} {...colIdxProps('one')} />
       </ScreenLayout>
-    ),
-    'vot-three-index': () => (
+    )),
+    'vot-three-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Three" letters={LETTERS_V3} preface={LETTERS_V3_PREFACE} {...colIdxProps('three')} />
+        <VolumeLetterIndex volumeTitle="Volume Three" letters={colLetterArr(COL_BY_KEY.get('three'))} preface={colPreface(COL_BY_KEY.get('three'))} {...colIdxProps('three')} />
       </ScreenLayout>
-    ),
-    'vot-four-index': () => (
+    )),
+    'vot-four-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Four" letters={LETTERS_V4} preface={LETTERS_V4_PREFACE} {...colIdxProps('four')} />
+        <VolumeLetterIndex volumeTitle="Volume Four" letters={colLetterArr(COL_BY_KEY.get('four'))} preface={colPreface(COL_BY_KEY.get('four'))} {...colIdxProps('four')} />
       </ScreenLayout>
-    ),
-    'vot-five-index': () => (
+    )),
+    'vot-five-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Five" letters={LETTERS_V5} preface={LETTERS_V5_PREFACE} {...colIdxProps('five')} />
+        <VolumeLetterIndex volumeTitle="Volume Five" letters={colLetterArr(COL_BY_KEY.get('five'))} preface={colPreface(COL_BY_KEY.get('five'))} {...colIdxProps('five')} />
       </ScreenLayout>
-    ),
-    'vot-six-index': () => (
+    )),
+    'vot-six-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Six" letters={LETTERS_V6} preface={LETTERS_V6_PREFACE} {...colIdxProps('six')} />
+        <VolumeLetterIndex volumeTitle="Volume Six" letters={colLetterArr(COL_BY_KEY.get('six'))} preface={colPreface(COL_BY_KEY.get('six'))} {...colIdxProps('six')} />
       </ScreenLayout>
-    ),
-    'vot-seven-index': () => (
+    )),
+    'vot-seven-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Volume Seven" letters={LETTERS_V7} preface={LETTERS_V7_PREFACE} {...colIdxProps('seven')} />
+        <VolumeLetterIndex volumeTitle="Volume Seven" letters={colLetterArr(COL_BY_KEY.get('seven'))} preface={colPreface(COL_BY_KEY.get('seven'))} {...colIdxProps('seven')} />
       </ScreenLayout>
-    ),
-    'vot-timothy-index': () => (
+    )),
+    'vot-timothy-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Letters from Timothy" eyebrow="The Volumes of Truth" letters={LETTERS_TIMOTHY} preface={LETTERS_TIMOTHY_PREFACE} {...colIdxProps('timothy')} />
+        <VolumeLetterIndex volumeTitle="Letters from Timothy" eyebrow="The Volumes of Truth" letters={colLetterArr(COL_BY_KEY.get('timothy'))} preface={colPreface(COL_BY_KEY.get('timothy'))} {...colIdxProps('timothy')} />
       </ScreenLayout>
-    ),
-    'vot-flock-index': () => (
+    )),
+    'vot-flock-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Letters to The Lord's Little Flock" eyebrow="The Volumes of Truth" letters={LETTERS_FLOCK} preface={LETTERS_FLOCK_PREFACE} {...colIdxProps('flock')} />
+        <VolumeLetterIndex volumeTitle="Letters to The Lord's Little Flock" eyebrow="The Volumes of Truth" letters={colLetterArr(COL_BY_KEY.get('flock'))} preface={colPreface(COL_BY_KEY.get('flock'))} {...colIdxProps('flock')} />
       </ScreenLayout>
-    ),
-    'vot-rebuke-index': () => (
+    )),
+    'vot-rebuke-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="The Lord's Rebuke" eyebrow="A Testament Against The World" letters={LETTERS_REBUKE} preface={LETTERS_REBUKE_PREFACE} {...colIdxProps('rebuke')} />
+        <VolumeLetterIndex volumeTitle="The Lord's Rebuke" eyebrow="A Testament Against The World" letters={colLetterArr(COL_BY_KEY.get('rebuke'))} preface={colPreface(COL_BY_KEY.get('rebuke'))} {...colIdxProps('rebuke')} />
       </ScreenLayout>
-    ),
-    'wtlb-one-index': () => (
+    )),
+    'wtlb-one-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part One \xB7 Words of Wisdom"} letters={WTLB_ONE} columns={2} {...colIdxProps('wtlb1')} />
+        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part One \xB7 Words of Wisdom"} letters={colLetterArr(COL_BY_KEY.get('wtlb1'))} columns={2} {...colIdxProps('wtlb1')} />
       </ScreenLayout>
-    ),
-    'wtlb-two-index': () => (
+    )),
+    'wtlb-two-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part Two \xB7 More Words of Wisdom"} letters={WTLB_TWO} columns={2} {...colIdxProps('wtlb2')} />
+        <VolumeLetterIndex volumeTitle="Words To Live By" eyebrow={"Part Two \xB7 More Words of Wisdom"} letters={colLetterArr(COL_BY_KEY.get('wtlb2'))} columns={2} {...colIdxProps('wtlb2')} />
       </ScreenLayout>
-    ),
-    'blessed-index': () => (
+    )),
+    'blessed-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
         <VolumeLetterIndex volumeTitle="The Blessed" eyebrow="Blessings & Promises" letters={colLetterArr(COL_BY_KEY.get('blessed')).map((e) => ({ ...e, date: e.sourceLabel || '' }))} {...colIdxProps('blessed')} />
       </ScreenLayout>
-    ),
+    )),
 
     // ── Letter screens (10) — data-guarded ──
-    'vot-one-letter':     () => letterV1       && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', letterV1)}     letter={letterV1}     volumeLabel="Volume One" />,
-    'vot-letter':         () => letter         && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', letter)}       letter={letter} />,
-    'vot-three-letter':   () => letterV3       && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', letterV3)}   letter={letterV3}     volumeLabel="Volume Three" />,
-    'vot-four-letter':    () => letterV4       && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', letterV4)}    letter={letterV4}     volumeLabel="Volume Four" />,
-    'vot-five-letter':    () => letterV5       && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', letterV5)}    letter={letterV5}     volumeLabel="Volume Five" />,
-    'vot-six-letter':     () => letterV6       && <LetterView {...sharedViewProps} {...colReadNavProps('six', true)}     {...boundaryConfig('six', letterV6)}     letter={letterV6}     volumeLabel="Volume Six" />,
-    'vot-seven-letter':   () => letterV7       && <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)}   {...boundaryConfig('seven', letterV7)}   letter={letterV7}     volumeLabel="Volume Seven" />,
-    'vot-timothy-letter': () => letterTimothy  && <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', letterTimothy)} letter={letterTimothy} volumeLabel="Letters from Timothy" />,
-    'vot-flock-letter':   () => letterFlock    && <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)}   {...boundaryConfig('flock', letterFlock)}   letter={letterFlock}   volumeLabel="Letters to The Lord's Little Flock" />,
-    'vot-rebuke-letter':  () => letterRebuke   && <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)}  {...boundaryConfig('rebuke', letterRebuke)} letter={letterRebuke}  volumeLabel="The Lord's Rebuke" />,
+    'vot-one-letter':    () => _wrapVot(letterV1       && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', letterV1)}     letter={letterV1}     volumeLabel="Volume One" />),
+    'vot-letter':    () => _wrapVot(letter         && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', letter)}       letter={letter} />),
+    'vot-three-letter':    () => _wrapVot(letterV3       && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', letterV3)}   letter={letterV3}     volumeLabel="Volume Three" />),
+    'vot-four-letter':    () => _wrapVot(letterV4       && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', letterV4)}    letter={letterV4}     volumeLabel="Volume Four" />),
+    'vot-five-letter':    () => _wrapVot(letterV5       && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', letterV5)}    letter={letterV5}     volumeLabel="Volume Five" />),
+    'vot-six-letter':    () => _wrapVot(letterV6       && <LetterView {...sharedViewProps} {...colReadNavProps('six', true)}     {...boundaryConfig('six', letterV6)}     letter={letterV6}     volumeLabel="Volume Six" />),
+    'vot-seven-letter':    () => _wrapVot(letterV7       && <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)}   {...boundaryConfig('seven', letterV7)}   letter={letterV7}     volumeLabel="Volume Seven" />),
+    'vot-timothy-letter':    () => _wrapVot(letterTimothy  && <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', letterTimothy)} letter={letterTimothy} volumeLabel="Letters from Timothy" />),
+    'vot-flock-letter':    () => _wrapVot(letterFlock    && <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)}   {...boundaryConfig('flock', letterFlock)}   letter={letterFlock}   volumeLabel="Letters to The Lord's Little Flock" />),
+    'vot-rebuke-letter':    () => _wrapVot(letterRebuke   && <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)}  {...boundaryConfig('rebuke', letterRebuke)} letter={letterRebuke}  volumeLabel="The Lord's Rebuke" />),
 
     // ── WTLB / Blessed entry screens (3) — data-guarded ──
-    'wtlb-one-entry':     () => wtlb1Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', wtlb1Entry)}   entry={wtlb1Entry}   partLabel="Part One" onNavToChapter={_navToChapter} />,
-    'wtlb-two-entry':     () => wtlb2Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', wtlb2Entry)}   entry={wtlb2Entry}   partLabel="Part Two" onNavToChapter={_navToChapter} />,
-    'blessed-entry':      () => blessedEntry   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', blessedEntry)} entry={blessedEntry} partLabel="The Blessed" onNavToChapter={_navToChapter} />,
+    'wtlb-one-entry':    () => _wrapVot(wtlb1Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', wtlb1Entry)}   entry={wtlb1Entry}   partLabel="Part One" onNavToChapter={_navToChapter} />),
+    'wtlb-two-entry':    () => _wrapVot(wtlb2Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', wtlb2Entry)}   entry={wtlb2Entry}   partLabel="Part Two" onNavToChapter={_navToChapter} />),
+    'blessed-entry':    () => _wrapVot(blessedEntry   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', blessedEntry)} entry={blessedEntry} partLabel="The Blessed" onNavToChapter={_navToChapter} />),
 
     // ── AppShell / settings / search / home / library (P8b — 20 medium
     //    prop-threading screens folded in; same pattern as P8a). ──
@@ -683,12 +696,12 @@ export function buildScreenRoutes({
       />
     ),
 
-    'holy-days-index': () => (
+    'holy-days-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
         <HolyDaysPlaylistHeader />
         <VolumeLetterIndex volumeTitle="Regarding The Holy Days" eyebrow="The Appointed Times" letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} />
       </ScreenLayout>
-    ),
+    )),
 
     'holy-days-entry': () => {
       if (!hdEntry) return null;

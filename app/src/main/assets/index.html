@@ -123,6 +123,9 @@
     var matthew = window.__makeLazyLoader('matthew', 'dist/bundle-a-matthew.js', '__finishMatthewInit');
     window.__matthewCorpus = matthew.corpus;
     window.__loadMatthewCorpus = matthew.load;
+    var vot = window.__makeLazyLoader('vot', 'dist/bundle-a-vot.js', '__finishVotInit');
+    window.__votCorpus = vot.corpus;
+    window.__loadVotCorpus = vot.load;
   })();
   </script>
 
@@ -915,71 +918,89 @@ window.__finishBibleInit = function() {
   BIBLE_BOOK_LIST.slice(0, 39).forEach(function(b) { if (b && b.id) OT_BOOK_IDS.add(b.id); });
 };
 
-// Link WTLB entries with prev/next
-/* linkWtlbEntries --> extracted to src/data/letter-linking.js */
-// Link WTLB-style entries with prevEntry/nextEntry nav chain
-// HOLY_DAYS already linked at fetch time (mixed wtlb/letter shapes)
-COLLECTIONS.forEach(function(col) {
-  if (col.kind === 'wtlb' || col.kind === 'blessed') {
-    var arr = colLetterArr(col);
-    if (arr.length > 0) linkWtlbEntries(arr);
-  }
-});
-
-// Link prefaces into nav chain: preface ↔ first letter
-/* linkPreface --> extracted to src/data/letter-linking.js */
-COLLECTIONS.forEach(function(col) {
-  var pref = colPreface(col), arr = colLetterArr(col);
-  if (pref) linkPreface(pref, arr);
-});
-
 // BIBLE_BOOK_LIST + OT_BOOK_IDS are populated by __finishBibleInit()
 // which runs when bundle-a-bible.js loads (see __loadBibleCorpus above).
 
 /* ═══════════════════════════════════════════════════════════════
-   VOT LETTER REGISTRY
-   Maps "<collection>::<letter title>" → { id, screen, activeReadKey, volKey }
-   Used by matthew.js votNote tap-through to resolve the destination screen.
-   Built once at load from all available letter collections.
-═══════════════════════════════════════════════════════════════ */
-const VOT_LETTER_REGISTRY = (() => {
-  const reg = new Map();
-  const add = (collection, entries, screen, volKey) => {
+   VOT CORPUS POST-LOAD WIRING (Q8.3)
+   ═══════════════════════════════════════════════════════════════
+   The VOT corpora (volume-one through volume-seven, letters-timothy,
+   letters-flock, lords-rebuke, wtlb-one, wtlb-two, wtlb-scriptures,
+   the-blessed, holy-days, hidden-manna) are lazy-loaded as
+   bundle-a-vot.js. Three pieces of cross-corpus wiring that USED to
+   run eagerly at module-init now defer until __finishVotInit:
+
+   1. linkWtlbEntries — wires prevEntry/nextEntry for WTLB-shaped
+      collections (WTLB One/Two + The Blessed).
+   2. linkPreface — connects each collection's preface to its first
+      letter for nav chain.
+   3. VOT_LETTER_REGISTRY — Map keyed by "<collection>::<letter
+      title>" → routing data, consumed by matthew.js's votNote
+      tap-through (which is itself in bundle-a-matthew, also lazy).
+
+   __finishVotInit is also called once OPTIONALLY at boot (after this
+   block) so any collections that happen to be loaded already (e.g.
+   if VOT corpus loaded during a previous session and the browser
+   already has matthew.js executing tap-through) work even without
+   a fresh __loadVotCorpus call. */
+let VOT_LETTER_REGISTRY = new Map();
+window.__finishVotInit = function() {
+  // (1) linkWtlbEntries for any WTLB-shaped collections that are loaded.
+  COLLECTIONS.forEach(function(col) {
+    if (col.kind === 'wtlb' || col.kind === 'blessed') {
+      var arr = colLetterArr(col);
+      if (arr.length > 0 && typeof linkWtlbEntries === 'function') linkWtlbEntries(arr);
+    }
+  });
+  // (2) Link prefaces into nav chain: preface ↔ first letter.
+  COLLECTIONS.forEach(function(col) {
+    var pref = colPreface(col), arr = colLetterArr(col);
+    if (pref && typeof linkPreface === 'function') linkPreface(pref, arr);
+  });
+  // (3) Rebuild VOT_LETTER_REGISTRY from currently-loaded corpora.
+  var reg = new Map();
+  var add = function(collection, entries, screen, volKey) {
     if (!entries) return;
-    const list = Array.isArray(entries) ? entries : [entries];
-    for (const l of list) {
+    var list = Array.isArray(entries) ? entries : [entries];
+    for (var i = 0; i < list.length; i++) {
+      var l = list[i];
       if (!l || !l.title || !l.id) continue;
-      reg.set(collection + "::" + l.title, { id: l.id, screen, volKey, activeReadKey: "vol:" + volKey });
+      reg.set(collection + "::" + l.title, { id: l.id, screen: screen, volKey: volKey, activeReadKey: "vol:" + volKey });
     }
   };
-  for (const col of COLLECTIONS) {
-    const letters = colLetters(col);
+  for (var i = 0; i < COLLECTIONS.length; i++) {
+    var col = COLLECTIONS[i];
+    var letters = colLetters(col);
     if (!letters) continue;
-    const pref = colPreface(col);
+    var pref = colPreface(col);
     if (pref) add(col.registryLabel, pref, col.letterScreen, col.volKey);
     add(col.registryLabel, letters, col.letterScreen, col.volKey);
-    // Hidden Manna: also register by exact title (vol === letter pattern in matthew.js)
     if (col.volKey === 'hm') {
-      for (const l of (Array.isArray(letters) ? letters : [])) {
+      var list = Array.isArray(letters) ? letters : [];
+      for (var j = 0; j < list.length; j++) {
+        var l = list[j];
         if (l && l.title && l.id) reg.set(l.title + "::" + l.title, { id: l.id, screen: col.letterScreen, volKey: col.volKey, activeReadKey: "vol:" + col.volKey });
       }
     }
   }
-  // Alias: matthew.js ch5:1-11 references The Blessed by its full wiki title with vol=null
   var _bArr = colLetterArr(COL_BY_KEY.get('blessed'));
   if (_bArr.length > 0) {
-    const intro = _bArr.find((e) => e.id === "introduction");
+    var intro = _bArr.find(function(e) { return e.id === "introduction"; });
     if (intro) reg.set("null::The Blessed: More Declarations of Blessedness From The Lord, Our God and Savior", { id: intro.id, screen: "blessed-entry", volKey: "blessed", activeReadKey: "vol:blessed" });
   }
-  // Bible Studies — register so matthew.js votNotes can tap through
-  for (const study of _studies()) {
+  var studies = _studies();
+  for (var k = 0; k < studies.length; k++) {
+    var study = studies[k];
     if (!study || !study.title || !study.slug) continue;
-    const firstCh = study.chapters && study.chapters[0] || null;
+    var firstCh = study.chapters && study.chapters[0] || null;
     if (!firstCh) continue;
     reg.set(study.title + "::" + study.title, { id: firstCh.id, screen: "bible-study-chapter", studyId: study.slug, studyChapterId: firstCh.id, volKey: "study-" + study.slug, activeReadKey: "bible-study-" + study.slug, isStudy: true });
   }
-  return reg;
-})();
+  VOT_LETTER_REGISTRY = reg;
+};
+// Initial registry build — runs with empty corpora (everything skipped).
+// Real population happens when __loadVotCorpus()'s on-load fires this again.
+window.__finishVotInit();
 
 /* resolveVotLetter --> extracted to src/data/letter-linking.js */
 

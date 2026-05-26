@@ -66,6 +66,16 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   React.useEffect(() => {pressingIdxRef.current = pressingIdx;}, [pressingIdx]);
   React.useEffect(() => {orderRef.current = order;}, [order]);
 
+  // Q8.3: pre-fire the VOT corpus load on home screen mount. Users
+  // typically tap a home tile within a few seconds; by the time they pick
+  // Volumes / Library / Studies, the 3 MB corpus is already downloading
+  // in parallel with their tile scan.
+  React.useEffect(() => {
+    if (typeof window.__loadVotCorpus === 'function') {
+      window.__loadVotCorpus().catch((e) => console.warn('VOT corpus pre-load failed', e));
+    }
+  }, []);
+
   // Cleanup timer + any in-flight doc listeners on unmount
   React.useEffect(() => () => {
     clearTimeout(pressTimerRef.current);

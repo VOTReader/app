@@ -3,21 +3,28 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
-  // Q8: BOOKS is lazy. SettingsScreen's PROGRESS_GROUPS reads many
-  // BOOKS[...] keys at render time — pre-fire the loader on mount and
-  // subscribe so the screen re-renders with full data once BOOKS arrives.
-  // If user lands directly on Settings via saved tab state, the books
-  // list is empty during the brief loading window.
+  // Q8: BOOKS + VOT corpora are lazy. PROGRESS_GROUPS reads BOOKS[...] keys
+  // (for the NT section) AND LETTERS_V1/LETTERS/etc. globals (for the
+  // Volumes section). Pre-fire both loaders on mount and subscribe so the
+  // screen re-renders with full data once they arrive.
   React.useEffect(() => {
     if (typeof window.__loadBibleCorpus === 'function') {
       window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load failed', e));
+    }
+    if (typeof window.__loadVotCorpus === 'function') {
+      window.__loadVotCorpus().catch((e) => console.warn('VOT corpus pre-load failed', e));
     }
   }, []);
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
   );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
+    () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
+  );
   const _BOOKS_READY = typeof BOOKS !== 'undefined' && !!BOOKS;
+  const _VOT_READY = (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.loaded : false;
 
   const [clearPending, setClearPending] = React.useState(null);
   const [openSections, setOpenSections] = React.useState(new Set());
@@ -39,7 +46,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   };
   const resetClearPending = () => setClearPending(null);
 
-  const PROGRESS_GROUPS = !_BOOKS_READY ? [] : [
+  const PROGRESS_GROUPS = (!_BOOKS_READY || !_VOT_READY) ? [] : [
   {
     id: "volumes", label: "The Volumes of Truth",
     genres: [

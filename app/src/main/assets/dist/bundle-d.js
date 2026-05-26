@@ -2711,36 +2711,43 @@
       setChapterNum(ch);
       setScreen("bible-ch");
     };
+    const _votReady = typeof window.__votCorpus !== "undefined" ? window.__votCorpus.loaded : false;
+    const _votLoadingPlaceholder = /* @__PURE__ */ React.createElement("div", { className: "sc-sheet-loading", style: { display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" } }, "Loading\u2026");
+    const _wrapVot = (jsx) => {
+      if (_votReady) return jsx;
+      if (typeof window.__loadVotCorpus === "function") window.__loadVotCorpus();
+      return _votLoadingPlaceholder;
+    };
     return {
       // ── Volume index screens (13) ──
-      "vot-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Two", letters: LETTERS, ...colIdxProps("two") })),
-      "vot-one-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume One", letters: LETTERS_V1, preface: LETTERS_V1_PREFACE, ...colIdxProps("one") })),
-      "vot-three-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Three", letters: LETTERS_V3, preface: LETTERS_V3_PREFACE, ...colIdxProps("three") })),
-      "vot-four-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Four", letters: LETTERS_V4, preface: LETTERS_V4_PREFACE, ...colIdxProps("four") })),
-      "vot-five-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Five", letters: LETTERS_V5, preface: LETTERS_V5_PREFACE, ...colIdxProps("five") })),
-      "vot-six-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Six", letters: LETTERS_V6, preface: LETTERS_V6_PREFACE, ...colIdxProps("six") })),
-      "vot-seven-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Seven", letters: LETTERS_V7, preface: LETTERS_V7_PREFACE, ...colIdxProps("seven") })),
-      "vot-timothy-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters from Timothy", eyebrow: "The Volumes of Truth", letters: LETTERS_TIMOTHY, preface: LETTERS_TIMOTHY_PREFACE, ...colIdxProps("timothy") })),
-      "vot-flock-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters to The Lord's Little Flock", eyebrow: "The Volumes of Truth", letters: LETTERS_FLOCK, preface: LETTERS_FLOCK_PREFACE, ...colIdxProps("flock") })),
-      "vot-rebuke-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Lord's Rebuke", eyebrow: "A Testament Against The World", letters: LETTERS_REBUKE, preface: LETTERS_REBUKE_PREFACE, ...colIdxProps("rebuke") })),
-      "wtlb-one-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part One \xB7 Words of Wisdom", letters: WTLB_ONE, columns: 2, ...colIdxProps("wtlb1") })),
-      "wtlb-two-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part Two \xB7 More Words of Wisdom", letters: WTLB_TWO, columns: 2, ...colIdxProps("wtlb2") })),
-      "blessed-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Blessed", eyebrow: "Blessings & Promises", letters: colLetterArr(COL_BY_KEY.get("blessed")).map((e) => ({ ...e, date: e.sourceLabel || "" })), ...colIdxProps("blessed") })),
+      "vot-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Two", letters: colLetterArr(COL_BY_KEY.get("two")), ...colIdxProps("two") }))),
+      "vot-one-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume One", letters: colLetterArr(COL_BY_KEY.get("one")), preface: colPreface(COL_BY_KEY.get("one")), ...colIdxProps("one") }))),
+      "vot-three-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Three", letters: colLetterArr(COL_BY_KEY.get("three")), preface: colPreface(COL_BY_KEY.get("three")), ...colIdxProps("three") }))),
+      "vot-four-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Four", letters: colLetterArr(COL_BY_KEY.get("four")), preface: colPreface(COL_BY_KEY.get("four")), ...colIdxProps("four") }))),
+      "vot-five-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Five", letters: colLetterArr(COL_BY_KEY.get("five")), preface: colPreface(COL_BY_KEY.get("five")), ...colIdxProps("five") }))),
+      "vot-six-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Six", letters: colLetterArr(COL_BY_KEY.get("six")), preface: colPreface(COL_BY_KEY.get("six")), ...colIdxProps("six") }))),
+      "vot-seven-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Volume Seven", letters: colLetterArr(COL_BY_KEY.get("seven")), preface: colPreface(COL_BY_KEY.get("seven")), ...colIdxProps("seven") }))),
+      "vot-timothy-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters from Timothy", eyebrow: "The Volumes of Truth", letters: colLetterArr(COL_BY_KEY.get("timothy")), preface: colPreface(COL_BY_KEY.get("timothy")), ...colIdxProps("timothy") }))),
+      "vot-flock-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Letters to The Lord's Little Flock", eyebrow: "The Volumes of Truth", letters: colLetterArr(COL_BY_KEY.get("flock")), preface: colPreface(COL_BY_KEY.get("flock")), ...colIdxProps("flock") }))),
+      "vot-rebuke-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Lord's Rebuke", eyebrow: "A Testament Against The World", letters: colLetterArr(COL_BY_KEY.get("rebuke")), preface: colPreface(COL_BY_KEY.get("rebuke")), ...colIdxProps("rebuke") }))),
+      "wtlb-one-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part One \xB7 Words of Wisdom", letters: colLetterArr(COL_BY_KEY.get("wtlb1")), columns: 2, ...colIdxProps("wtlb1") }))),
+      "wtlb-two-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Words To Live By", eyebrow: "Part Two \xB7 More Words of Wisdom", letters: colLetterArr(COL_BY_KEY.get("wtlb2")), columns: 2, ...colIdxProps("wtlb2") }))),
+      "blessed-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "The Blessed", eyebrow: "Blessings & Promises", letters: colLetterArr(COL_BY_KEY.get("blessed")).map((e) => ({ ...e, date: e.sourceLabel || "" })), ...colIdxProps("blessed") }))),
       // ── Letter screens (10) — data-guarded ──
-      "vot-one-letter": () => letterV1 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("one", true), ...boundaryConfig("one", letterV1), letter: letterV1, volumeLabel: "Volume One" }),
-      "vot-letter": () => letter && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("two", true), ...boundaryConfig("two", letter), letter }),
-      "vot-three-letter": () => letterV3 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("three", true), ...boundaryConfig("three", letterV3), letter: letterV3, volumeLabel: "Volume Three" }),
-      "vot-four-letter": () => letterV4 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("four", true), ...boundaryConfig("four", letterV4), letter: letterV4, volumeLabel: "Volume Four" }),
-      "vot-five-letter": () => letterV5 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("five", true), ...boundaryConfig("five", letterV5), letter: letterV5, volumeLabel: "Volume Five" }),
-      "vot-six-letter": () => letterV6 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("six", true), ...boundaryConfig("six", letterV6), letter: letterV6, volumeLabel: "Volume Six" }),
-      "vot-seven-letter": () => letterV7 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("seven", true), ...boundaryConfig("seven", letterV7), letter: letterV7, volumeLabel: "Volume Seven" }),
-      "vot-timothy-letter": () => letterTimothy && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("timothy", true), ...boundaryConfig("timothy", letterTimothy), letter: letterTimothy, volumeLabel: "Letters from Timothy" }),
-      "vot-flock-letter": () => letterFlock && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("flock", true), ...boundaryConfig("flock", letterFlock), letter: letterFlock, volumeLabel: "Letters to The Lord's Little Flock" }),
-      "vot-rebuke-letter": () => letterRebuke && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("rebuke", true), ...boundaryConfig("rebuke", letterRebuke), letter: letterRebuke, volumeLabel: "The Lord's Rebuke" }),
+      "vot-one-letter": () => _wrapVot(letterV1 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("one", true), ...boundaryConfig("one", letterV1), letter: letterV1, volumeLabel: "Volume One" })),
+      "vot-letter": () => _wrapVot(letter && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("two", true), ...boundaryConfig("two", letter), letter })),
+      "vot-three-letter": () => _wrapVot(letterV3 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("three", true), ...boundaryConfig("three", letterV3), letter: letterV3, volumeLabel: "Volume Three" })),
+      "vot-four-letter": () => _wrapVot(letterV4 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("four", true), ...boundaryConfig("four", letterV4), letter: letterV4, volumeLabel: "Volume Four" })),
+      "vot-five-letter": () => _wrapVot(letterV5 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("five", true), ...boundaryConfig("five", letterV5), letter: letterV5, volumeLabel: "Volume Five" })),
+      "vot-six-letter": () => _wrapVot(letterV6 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("six", true), ...boundaryConfig("six", letterV6), letter: letterV6, volumeLabel: "Volume Six" })),
+      "vot-seven-letter": () => _wrapVot(letterV7 && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("seven", true), ...boundaryConfig("seven", letterV7), letter: letterV7, volumeLabel: "Volume Seven" })),
+      "vot-timothy-letter": () => _wrapVot(letterTimothy && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("timothy", true), ...boundaryConfig("timothy", letterTimothy), letter: letterTimothy, volumeLabel: "Letters from Timothy" })),
+      "vot-flock-letter": () => _wrapVot(letterFlock && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("flock", true), ...boundaryConfig("flock", letterFlock), letter: letterFlock, volumeLabel: "Letters to The Lord's Little Flock" })),
+      "vot-rebuke-letter": () => _wrapVot(letterRebuke && /* @__PURE__ */ React.createElement(LetterView, { ...sharedViewProps, ...colReadNavProps("rebuke", true), ...boundaryConfig("rebuke", letterRebuke), letter: letterRebuke, volumeLabel: "The Lord's Rebuke" })),
       // ── WTLB / Blessed entry screens (3) — data-guarded ──
-      "wtlb-one-entry": () => wtlb1Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb1"), ...boundaryConfig("wtlb1", wtlb1Entry), entry: wtlb1Entry, partLabel: "Part One", onNavToChapter: _navToChapter }),
-      "wtlb-two-entry": () => wtlb2Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb2"), ...boundaryConfig("wtlb2", wtlb2Entry), entry: wtlb2Entry, partLabel: "Part Two", onNavToChapter: _navToChapter }),
-      "blessed-entry": () => blessedEntry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("blessed"), ...boundaryConfig("blessed", blessedEntry), entry: blessedEntry, partLabel: "The Blessed", onNavToChapter: _navToChapter }),
+      "wtlb-one-entry": () => _wrapVot(wtlb1Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb1"), ...boundaryConfig("wtlb1", wtlb1Entry), entry: wtlb1Entry, partLabel: "Part One", onNavToChapter: _navToChapter })),
+      "wtlb-two-entry": () => _wrapVot(wtlb2Entry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("wtlb2"), ...boundaryConfig("wtlb2", wtlb2Entry), entry: wtlb2Entry, partLabel: "Part Two", onNavToChapter: _navToChapter })),
+      "blessed-entry": () => _wrapVot(blessedEntry && /* @__PURE__ */ React.createElement(WtlbEntryView, { ...sharedViewProps, ...colReadNavProps("blessed"), ...boundaryConfig("blessed", blessedEntry), entry: blessedEntry, partLabel: "The Blessed", onNavToChapter: _navToChapter })),
       // ── AppShell / settings / search / home / library (P8b — 20 medium
       //    prop-threading screens folded in; same pattern as P8a). ──
       "settings": () => /* @__PURE__ */ React.createElement(
@@ -3285,7 +3292,7 @@
           sharedViewProps
         }
       ),
-      "holy-days-index": () => /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(HolyDaysPlaylistHeader, null), /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })), ...colIdxProps("holydays") })),
+      "holy-days-index": () => _wrapVot(/* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: _idxNav() }, /* @__PURE__ */ React.createElement(HolyDaysPlaylistHeader, null), /* @__PURE__ */ React.createElement(VolumeLetterIndex, { volumeTitle: "Regarding The Holy Days", eyebrow: "The Appointed Times", letters: colLetterArr(COL_BY_KEY.get("holydays")).map((e) => ({ ...e, date: e.date || e.sourceLabel || "" })), ...colIdxProps("holydays") }))),
       "holy-days-entry": () => {
         if (!hdEntry) return null;
         const bc = boundaryConfig("holydays", hdEntry);
@@ -4393,23 +4400,36 @@
 
   // app/src/main/assets/src/ui/screens/VolumesHome.jsx
   function VolumesHome2({ onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+    React.useEffect(() => {
+      if (typeof window.__loadVotCorpus === "function") {
+        window.__loadVotCorpus().catch((e) => console.warn("VOT corpus pre-load failed", e));
+      }
+    }, []);
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof window.__votCorpus !== "undefined" ? window.__votCorpus.subscribe(cb) : () => {
+      }, []),
+      () => typeof window.__votCorpus !== "undefined" ? window.__votCorpus.getVersion() : 0
+    );
+    const _votReady = typeof window.__votCorpus !== "undefined" ? window.__votCorpus.loaded : false;
+    const _cnt = (k) => colLetterArr(COL_BY_KEY.get(k)).length;
+    const _locked = (k) => _votReady && _cnt(k) === 0;
     const collections = [
-      { id: "lords-rebuke", title: "The Lord's Rebuke", sub: "Correction & Warning", locked: LETTERS_REBUKE.length === 0 },
-      { id: "words-to-live-by-1", title: "Words To Live By: Part One", sub: `${WTLB_ONE.length} Entries \xB7 Words of Wisdom`, locked: false },
-      { id: "words-to-live-by-2", title: "Words To Live By: Part Two", sub: `${WTLB_TWO.length} Entries \xB7 More Words of Wisdom`, locked: false },
-      { id: "the-blessed", title: "The Blessed", sub: colLetterArr(COL_BY_KEY.get("blessed")).length > 0 ? `${colLetterArr(COL_BY_KEY.get("blessed")).length} Entries \xB7 Blessings & Promises` : "Blessings & Promises", locked: colLetterArr(COL_BY_KEY.get("blessed")).length === 0 },
-      { id: "little-flock", title: "Letters to The Little Flock", sub: LETTERS_FLOCK.length > 0 ? `${LETTERS_FLOCK.length} Letters` : "Personal Instruction", locked: LETTERS_FLOCK.length === 0 },
-      { id: "letters-timothy", title: "Letters from Timothy", sub: LETTERS_TIMOTHY.length > 0 ? `${LETTERS_TIMOTHY.length} Letters` : "A Servant's Pen", locked: LETTERS_TIMOTHY.length === 0 },
-      { id: "holy-days", title: "Regarding The Holy Days", sub: colLetterArr(COL_BY_KEY.get("holydays")).length > 0 ? `${colLetterArr(COL_BY_KEY.get("holydays")).length} Letters \xB7 Appointed Times` : "Appointed Times", locked: colLetterArr(COL_BY_KEY.get("holydays")).length === 0 }
+      { id: "lords-rebuke", title: "The Lord's Rebuke", sub: "Correction & Warning", locked: _locked("rebuke") },
+      { id: "words-to-live-by-1", title: "Words To Live By: Part One", sub: _cnt("wtlb1") > 0 ? `${_cnt("wtlb1")} Entries \xB7 Words of Wisdom` : "Words of Wisdom", locked: _locked("wtlb1") },
+      { id: "words-to-live-by-2", title: "Words To Live By: Part Two", sub: _cnt("wtlb2") > 0 ? `${_cnt("wtlb2")} Entries \xB7 More Words of Wisdom` : "More Words of Wisdom", locked: _locked("wtlb2") },
+      { id: "the-blessed", title: "The Blessed", sub: _cnt("blessed") > 0 ? `${_cnt("blessed")} Entries \xB7 Blessings & Promises` : "Blessings & Promises", locked: _locked("blessed") },
+      { id: "little-flock", title: "Letters to The Little Flock", sub: _cnt("flock") > 0 ? `${_cnt("flock")} Letters` : "Personal Instruction", locked: _locked("flock") },
+      { id: "letters-timothy", title: "Letters from Timothy", sub: _cnt("timothy") > 0 ? `${_cnt("timothy")} Letters` : "A Servant's Pen", locked: _locked("timothy") },
+      { id: "holy-days", title: "Regarding The Holy Days", sub: _cnt("holydays") > 0 ? `${_cnt("holydays")} Letters \xB7 Appointed Times` : "Appointed Times", locked: _locked("holydays") }
     ];
     const volumes = [
-      { id: "volume-one", title: "Volume One", detail: `${LETTERS_V1.length} Letters`, sub: "2004 \u2013 2006", locked: false },
-      { id: "volume-two", title: "Volume Two", detail: `${LETTERS.length} Letters`, sub: "2004 \u2013 2010", locked: false },
-      { id: "volume-three", title: "Volume Three", detail: LETTERS_V3.length > 0 ? `${LETTERS_V3.length} Letters` : null, sub: "2006 \u2013 2010", locked: LETTERS_V3.length === 0 },
-      { id: "volume-four", title: "Volume Four", detail: LETTERS_V4.length > 0 ? `${LETTERS_V4.length} Letters` : null, sub: "2010 \u2013 2011", locked: LETTERS_V4.length === 0 },
-      { id: "volume-five", title: "Volume Five", detail: LETTERS_V5.length > 0 ? `${LETTERS_V5.length} Letters` : null, sub: "2011 \u2013 2014", locked: LETTERS_V5.length === 0 },
-      { id: "volume-six", title: "Volume Six", detail: LETTERS_V6.length > 0 ? `${LETTERS_V6.length} Letters` : null, sub: "2011 \u2013 2014", locked: LETTERS_V6.length === 0 },
-      { id: "volume-seven", title: "Volume Seven", detail: LETTERS_V7.length > 0 ? `${LETTERS_V7.length} Letters` : null, sub: "2005 \u2013 2014", locked: LETTERS_V7.length === 0 }
+      { id: "volume-one", title: "Volume One", detail: _cnt("one") > 0 ? `${_cnt("one")} Letters` : null, sub: "2004 \u2013 2006", locked: _locked("one") },
+      { id: "volume-two", title: "Volume Two", detail: _cnt("two") > 0 ? `${_cnt("two")} Letters` : null, sub: "2004 \u2013 2010", locked: _locked("two") },
+      { id: "volume-three", title: "Volume Three", detail: _cnt("three") > 0 ? `${_cnt("three")} Letters` : null, sub: "2006 \u2013 2010", locked: _locked("three") },
+      { id: "volume-four", title: "Volume Four", detail: _cnt("four") > 0 ? `${_cnt("four")} Letters` : null, sub: "2010 \u2013 2011", locked: _locked("four") },
+      { id: "volume-five", title: "Volume Five", detail: _cnt("five") > 0 ? `${_cnt("five")} Letters` : null, sub: "2011 \u2013 2014", locked: _locked("five") },
+      { id: "volume-six", title: "Volume Six", detail: _cnt("six") > 0 ? `${_cnt("six")} Letters` : null, sub: "2011 \u2013 2014", locked: _locked("six") },
+      { id: "volume-seven", title: "Volume Seven", detail: _cnt("seven") > 0 ? `${_cnt("seven")} Letters` : null, sub: "2005 \u2013 2014", locked: _locked("seven") }
     ];
     return /* @__PURE__ */ React.createElement(
       ScreenLayout,
@@ -4645,13 +4665,22 @@
       if (typeof window.__loadBibleCorpus === "function") {
         window.__loadBibleCorpus().catch((e) => console.warn("Bible corpus pre-load failed", e));
       }
+      if (typeof window.__loadVotCorpus === "function") {
+        window.__loadVotCorpus().catch((e) => console.warn("VOT corpus pre-load failed", e));
+      }
     }, []);
     React.useSyncExternalStore(
       React.useCallback((cb) => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.subscribe(cb) : () => {
       }, []),
       () => typeof window.__bibleCorpus !== "undefined" ? window.__bibleCorpus.getVersion() : 0
     );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof window.__votCorpus !== "undefined" ? window.__votCorpus.subscribe(cb) : () => {
+      }, []),
+      () => typeof window.__votCorpus !== "undefined" ? window.__votCorpus.getVersion() : 0
+    );
     const _BOOKS_READY = typeof BOOKS !== "undefined" && !!BOOKS;
+    const _VOT_READY = typeof window.__votCorpus !== "undefined" ? window.__votCorpus.loaded : false;
     const [clearPending, setClearPending] = React.useState(null);
     const [openSections, setOpenSections] = React.useState(/* @__PURE__ */ new Set());
     const [wipeConfirm, setWipeConfirm] = React.useState(false);
@@ -4670,7 +4699,7 @@
       }
     };
     const resetClearPending = () => setClearPending(null);
-    const PROGRESS_GROUPS = !_BOOKS_READY ? [] : [
+    const PROGRESS_GROUPS = !_BOOKS_READY || !_VOT_READY ? [] : [
       {
         id: "volumes",
         label: "The Volumes of Truth",
@@ -5372,6 +5401,11 @@
     React.useEffect(() => {
       orderRef.current = order;
     }, [order]);
+    React.useEffect(() => {
+      if (typeof window.__loadVotCorpus === "function") {
+        window.__loadVotCorpus().catch((e) => console.warn("VOT corpus pre-load failed", e));
+      }
+    }, []);
     React.useEffect(() => () => {
       clearTimeout(pressTimerRef.current);
       if (activeCleanupRef.current) activeCleanupRef.current();
@@ -9601,6 +9635,11 @@
       React.useCallback((cb) => typeof window.__matthewCorpus !== "undefined" ? window.__matthewCorpus.subscribe(cb) : () => {
       }, []),
       () => typeof window.__matthewCorpus !== "undefined" ? window.__matthewCorpus.getVersion() : 0
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => typeof window.__votCorpus !== "undefined" ? window.__votCorpus.subscribe(cb) : () => {
+      }, []),
+      () => typeof window.__votCorpus !== "undefined" ? window.__votCorpus.getVersion() : 0
     );
     const _MATTHEW = typeof MATTHEW !== "undefined" ? MATTHEW : null;
     const ALL_BOOKS = {

@@ -36,21 +36,20 @@ REPO  = os.path.dirname(_HERE)
 ROOT  = os.path.join(REPO, 'app', 'src', 'main', 'assets')
 DIST  = os.path.join(ROOT, 'dist')
 
-# Cluster A — vendor + (most) corpus + search engine (CRITICAL PATH).
-# Bible (books.js, 6.9 MB) is lazy-loaded via bundle-a-bible.js.
-# Matthew Study Bible (matthew.js, 618 KB) is lazy-loaded via
-# bundle-a-matthew.js.
-# See BUNDLE-LAZY-LOAD-PLAN.md (Q8.0) for the design rationale.
+# Cluster A — vendor + small data + search engine (CRITICAL PATH).
+# All corpus content is lazy-loaded:
+#   - books.js (6.9 MB NKJV) → bundle-a-bible.js (Q8.1)
+#   - matthew.js (618 KB Study Bible) → bundle-a-matthew.js (Q8.2)
+#   - all VOT collections (7 volumes + letters families + WTLB + holy
+#     days + hidden manna + blessed, ~3.0 MB) → bundle-a-vot.js (Q8.3)
+# books-restored.js + matthew-plain.js + matthew-nkjv.js stay critical
+# because they're cross-referenced by other paths (restored chrome
+# overrides, BOOKS["matthew-plain"] for inline scripture refs).
+# See BUNDLE-LAZY-LOAD-PLAN.md for the design rationale.
 A = [
     'react.min.js', 'react-dom.min.js', 'html2canvas.min.js',
     'src/data/books-restored.js',
     'src/data/matthew-plain.js', 'src/data/matthew-nkjv.js',
-    'src/data/volume-one.js', 'src/data/volume-two.js', 'src/data/volume-three.js',
-    'src/data/volume-four.js', 'src/data/volume-five.js', 'src/data/volume-six.js',
-    'src/data/volume-seven.js',
-    'src/data/letters-timothy.js', 'src/data/letters-flock.js', 'src/data/lords-rebuke.js',
-    'src/data/wtlb-one.js', 'src/data/wtlb-two.js', 'src/data/wtlb-scriptures.js',
-    'src/data/the-blessed.js', 'src/data/holy-days.js', 'src/data/hidden-manna.js',
     'flexsearch.min.js', 'search-data.js', 'search.js',
 ]
 
@@ -72,6 +71,25 @@ A_BIBLE = [
 # useSurprise's matthew branch, MatthewChapterView all guard.
 A_MATTHEW = [
     'src/data/matthew.js',
+]
+
+# Cluster A-vot — all VOT collections (7 volumes + letters families +
+# WTLB + Holy Days + Hidden Manna + The Blessed). Loaded ON DEMAND
+# via window.__loadVotCorpus() on first navigation to ANY VOT-side
+# content (VolumesHome, any letter index, any letter view, any WTLB
+# entry). Until this bundle loads, the corresponding LETTERS_X /
+# WTLB_X / HOLY_DAYS / etc. globals are undefined; consumers route
+# through colLetterArr / colPreface (which use typeof window[name]
+# guards) and render empty / loading state cleanly. __finishVotInit
+# re-runs linkWtlbEntries + linkPreface + rebuilds VOT_LETTER_REGISTRY
+# so cross-corpus tap-through works once the corpus is in.
+A_VOT = [
+    'src/data/volume-one.js', 'src/data/volume-two.js', 'src/data/volume-three.js',
+    'src/data/volume-four.js', 'src/data/volume-five.js', 'src/data/volume-six.js',
+    'src/data/volume-seven.js',
+    'src/data/letters-timothy.js', 'src/data/letters-flock.js', 'src/data/lords-rebuke.js',
+    'src/data/wtlb-one.js', 'src/data/wtlb-two.js', 'src/data/wtlb-scriptures.js',
+    'src/data/the-blessed.js', 'src/data/holy-days.js', 'src/data/hidden-manna.js',
 ]
 
 # Cluster B — stores + components + hooks + journal subsystem + scripture-resolution
@@ -125,11 +143,12 @@ def bundle(name, files):
 
 
 def main():
-    print('Building 3 classic-script bundles --> ' + DIST)
+    print('Building 4 classic-script bundles --> ' + DIST)
     print('  (clusters B, C, D are bundled by esbuild; run `npm run build` for the full chain)')
     bundle('a', A)
     bundle('a-bible', A_BIBLE)
     bundle('a-matthew', A_MATTHEW)
+    bundle('a-vot', A_VOT)
     print('Done. (bundle-b.js, bundle-c.js, bundle-d.js belong to esbuild now.)')
 
 
