@@ -2,22 +2,30 @@
    NotebookManagerSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
+export function NotebookManagerSheet({ setHlTick, onClose }) {
+  // Subscribe to NotebookStore + NoteStore — the manager renders notebook
+  // list AND per-notebook note counts.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => NotebookStore.subscribe(cb), []),
+    () => NotebookStore.getVersion()
+  );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => NoteStore.subscribe(cb), []),
+    () => NoteStore.getVersion()
+  );
+  const notebooks = NotebookStore.list();
   const [newName, setNewName] = React.useState('');
   const [renameId, setRenameId] = React.useState(null);    // notebook id being renamed
   const [renameValue, setRenameValue] = React.useState('');
   const [confirmDeleteId, setConfirmDeleteId] = React.useState(null);
 
-  const counts = React.useMemo(() => {
+  const counts = (() => {
     const map = {};
     NoteStore.list().forEach(n => {
       (n.notebookIds || []).forEach(id => { map[id] = (map[id] || 0) + 1; });
     });
     return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  }, [hlTick]);
+  })();
 
   const createNotebook = () => {
     const trimmed = newName.trim();

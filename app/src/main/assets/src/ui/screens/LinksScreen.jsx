@@ -174,12 +174,17 @@ export function LinksScreen(props) {
   var onBack = props.onBack;
   var onNavigateToSource = props.onNavigateToSource;
   var onNavigateToTarget = props.onNavigateToTarget;
-  var hlTick = props.hlTick;
   var setHlTick = props.setHlTick;
   var theme = props.theme;
   var onThemeChange = props.onThemeChange;
   var onSearch = props.onSearch;
   var onHistory = props.onHistory;
+
+  // Subscribe to LinkStore — index re-renders on any link mutation.
+  React.useSyncExternalStore(
+    React.useCallback(function(cb) { return LinkStore.subscribe(cb); }, []),
+    function() { return LinkStore.getVersion(); }
+  );
   // (onHome, historyEnabled props accepted by API but unused here.)
 
   var useState = React.useState;
@@ -200,10 +205,7 @@ export function LinksScreen(props) {
   var actionTarget = _as[0];
   var setActionTarget = _as[1];
 
-  var allLinks = useMemo(function() {
-    return LinkStore.all();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  }, [hlTick]);
+  var allLinks = LinkStore.all();
 
   var displayLinks = useMemo(function() {
     var q = searchQuery.trim().toLowerCase();

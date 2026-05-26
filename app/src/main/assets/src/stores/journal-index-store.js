@@ -106,6 +106,7 @@ export var JournalIndexStore = extendStore(
         if (data[k].indexOf(entryId) < 0) data[k].push(entryId);
       });
       this._save();
+      this._bump();
     },
 
     /**
@@ -130,7 +131,7 @@ export var JournalIndexStore = extendStore(
           if (list.length === 0) delete data[k];
         }
       }
-      if (changed) this._save();
+      if (changed) this._save(); this._bump();
     },
 
     /**
@@ -162,6 +163,7 @@ export var JournalIndexStore = extendStore(
     clear() {
       this._cache = {};
       this._save();
+      this._bump();
     }
   }
 );

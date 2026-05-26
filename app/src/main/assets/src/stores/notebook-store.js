@@ -77,6 +77,7 @@ export const NotebookStore = extendStore(
       const nb = { id, name: trimmed, sortIndex: data.list.length, created: ts, updated: ts };
       data.list.push(nb);
       this._save();
+      this._bump();
       return nb;
     },
 
@@ -91,7 +92,7 @@ export const NotebookStore = extendStore(
       if (!trimmed) return;
       const data = this._load();
       const nb = (data.list || []).find(n => n.id === id);
-      if (nb) { nb.name = trimmed; nb.updated = Date.now(); this._save(); }
+      if (nb) { nb.name = trimmed; nb.updated = Date.now(); this._save(); this._bump(); }
     },
 
     /**
@@ -105,6 +106,7 @@ export const NotebookStore = extendStore(
       const data = this._load();
       data.list = (data.list || []).filter(n => n.id !== id);
       this._save();
+      this._bump();
       // Cascade: strip the deleted notebook from every note that referenced it
       NoteStore.pruneNotebook(id);
     }

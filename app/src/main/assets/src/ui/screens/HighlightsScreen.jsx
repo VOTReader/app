@@ -140,7 +140,13 @@ export function HighlightsScreen(props) {
 
   var onBack = props.onBack;
   var onNavigateToSource = props.onNavigateToSource;
-  var hlTick = props.hlTick;
+
+  // Subscribe to AnnotationStore — highlights are AnnotationStore entries
+  // with kind=highlight or kind=underline.
+  React.useSyncExternalStore(
+    React.useCallback(function(cb) { return AnnotationStore.subscribe(cb); }, []),
+    function() { return AnnotationStore.getVersion(); }
+  );
 
   // Standardized date sort (matches Notes/Bookmarks/Links/Journal):
   // a single toggle, newest-first by default.
@@ -150,8 +156,7 @@ export function HighlightsScreen(props) {
   var _tf = useState('all'); var typeFilter = _tf[0]; var setTypeFilter = _tf[1];
   var _cf = useState(null); var colorFilter = _cf[0]; var setColorFilter = _cf[1];
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  var marks = useMemo(function() { return _collectMarks(); }, [hlTick]);
+  var marks = _collectMarks();
 
   // Distinct colors present, in palette order — drives the filter dots.
   var presentColors = useMemo(function() {

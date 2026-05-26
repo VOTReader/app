@@ -2,14 +2,22 @@
    NotesIndexScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, hlTick, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+  // Subscribe to NoteStore + NotebookStore mutations so the index re-renders
+  // on any add/remove/rename/membership change.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => NoteStore.subscribe(cb), []),
+    () => NoteStore.getVersion()
+  );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => NotebookStore.subscribe(cb), []),
+    () => NotebookStore.getVersion()
+  );
   // All notes — annotations on letters, scripture, AND journal paragraphs.
   // Notes from inside journal entries are real annotations and belong here,
   // labeled with their journal source via noteSourceLabel.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  const allNotes = React.useMemo(() => NoteStore.list(), [hlTick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
+  const allNotes = NoteStore.list();
+  const notebooks = NotebookStore.list();
   // Restore the user's place (tab + drilled notebook) when returning from a
   // source tap-through. window.__notesReturnCtx is set in onRowTap before we
   // navigate away and consumed on this mount, so the back-pill ("Back to

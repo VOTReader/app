@@ -2,11 +2,19 @@
    NotebookPickerSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NotebookPickerSheet({ groupId, hlTick, setHlTick, onClose }) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
+export function NotebookPickerSheet({ groupId, setHlTick, onClose }) {
+  // Subscribe to both stores. The note's notebookIds list is in NoteStore;
+  // the available notebooks list is in NotebookStore.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => NoteStore.subscribe(cb), []),
+    () => NoteStore.getVersion()
+  );
+  React.useSyncExternalStore(
+    React.useCallback((cb) => NotebookStore.subscribe(cb), []),
+    () => NotebookStore.getVersion()
+  );
+  const note = NoteStore.get(groupId);
+  const notebooks = NotebookStore.list();
   const [newName, setNewName] = React.useState('');
   const [confirmDeleteNb, setConfirmDeleteNb] = React.useState(null); // notebook id or null
   const inputRef = React.useRef(null);

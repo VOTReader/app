@@ -2,15 +2,17 @@
    LinkIcon — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function LinkIcon({ hlKey, hlTick, onClick, prefix }) {
+export function LinkIcon({ hlKey, onClick, prefix }) {
+  // Subscribe to LinkStore — icon appears/disappears as links are
+  // created/removed for this passage.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => LinkStore.subscribe(cb), []),
+    () => LinkStore.getVersion()
+  );
   // When `prefix` is true, hlKey is treated as a prefix and any link whose
   // endpoint key starts with that prefix counts. Used by letter/wtlb blocks
   // because excerpts append ":start-end" to the block-level key.
-  const links = React.useMemo(
-    () => prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-    [hlKey, hlTick, prefix]
-  );
+  const links = prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey);
   if (!links || links.length === 0) return null;
   return (
     <span

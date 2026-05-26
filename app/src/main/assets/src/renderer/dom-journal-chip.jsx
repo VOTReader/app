@@ -5,15 +5,16 @@
    normal React component; the helpers are pure refKey builders.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function JournalChip({ refKey, hlTick, onClick, label }) {
-  var useMemo = React.useMemo;
-  // Hooks must be called unconditionally on every render — no early return
-  // before useMemo, or React detects the changed hook count and throws.
-  var ids = useMemo(function() {
-    if (!refKey || typeof JournalIndexStore === 'undefined') return [];
-    return JournalIndexStore.entriesReferencing(refKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  }, [refKey, hlTick]);
+export function JournalChip({ refKey, onClick, label }) {
+  // Subscribe to JournalIndexStore — chip count updates when an entry
+  // gains/loses a reference to this refKey.
+  React.useSyncExternalStore(
+    React.useCallback(function(cb) { return (typeof JournalIndexStore !== 'undefined') ? JournalIndexStore.subscribe(cb) : function() {}; }, []),
+    function() { return (typeof JournalIndexStore !== 'undefined') ? JournalIndexStore.getVersion() : 0; }
+  );
+  var ids = (!refKey || typeof JournalIndexStore === 'undefined')
+    ? []
+    : JournalIndexStore.entriesReferencing(refKey);
   if (!refKey || !ids || ids.length === 0) return null;
 
   return (

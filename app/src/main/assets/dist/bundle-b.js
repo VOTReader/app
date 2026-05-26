@@ -848,6 +848,7 @@
         const nb = { id, name: trimmed, sortIndex: data.list.length, created: ts, updated: ts };
         data.list.push(nb);
         this._save();
+        this._bump();
         return nb;
       },
       /**
@@ -865,6 +866,7 @@
           nb.name = trimmed;
           nb.updated = Date.now();
           this._save();
+          this._bump();
         }
       },
       /**
@@ -878,6 +880,7 @@
         const data = this._load();
         data.list = (data.list || []).filter((n) => n.id !== id);
         this._save();
+        this._bump();
         NoteStore2.pruneNotebook(id);
       }
     }
@@ -1752,6 +1755,7 @@
           if (data[k2].indexOf(entryId) < 0) data[k2].push(entryId);
         });
         this._save();
+        this._bump();
       },
       /**
        * Strip entryId from every refKey list. Called on entry deletion.
@@ -1776,6 +1780,7 @@
           }
         }
         if (changed) this._save();
+        this._bump();
       },
       /**
        * Slow-path reverse lookup: which refKeys does this entry contribute
@@ -1804,6 +1809,7 @@
       clear() {
         this._cache = {};
         this._save();
+        this._bump();
       }
     }
   );
@@ -6614,13 +6620,19 @@
   }
   function JournalHubScreen(props) {
     var useState = React.useState;
-    var useMemo = React.useMemo;
     var onBack = props.onBack;
     var onOpenEntry = props.onOpenEntry;
     var onEditEntry = props.onEditEntry;
     var onCreateEntry = props.onCreateEntry;
-    var hlTick = props.hlTick;
     var setHlTick = props.setHlTick;
+    React.useSyncExternalStore(
+      React.useCallback(function(cb) {
+        return JournalStore.subscribe(cb);
+      }, []),
+      function() {
+        return JournalStore.getVersion();
+      }
+    );
     var _tab = useState("all");
     var tab = _tab[0];
     var setTab = _tab[1];
@@ -6633,9 +6645,7 @@
     var _menuEntry = useState(null);
     var menuEntry = _menuEntry[0];
     var setMenuEntry = _menuEntry[1];
-    var allEntries = useMemo(function() {
-      return JournalStore.all();
-    }, [hlTick]);
+    var allEntries = JournalStore.all();
     function bump() {
       if (setHlTick) setHlTick(function(t) {
         return t + 1;
@@ -7195,7 +7205,6 @@
   }
   function JournalViewerScreen(props) {
     var useState = React.useState;
-    var useMemo = React.useMemo;
     var entryId = props.entryId;
     var onBack = props.onBack;
     var onEdit = props.onEdit;
@@ -7203,9 +7212,15 @@
     var onOpenJournalEntry = props.onOpenJournalEntry;
     var onOpenNotebook = props.onOpenNotebook;
     var setHlTick = props.setHlTick;
-    var entry = useMemo(function() {
-      return entryId ? JournalStore.get(entryId) : null;
-    }, [entryId, props.hlTick]);
+    React.useSyncExternalStore(
+      React.useCallback(function(cb) {
+        return JournalStore.subscribe(cb);
+      }, []),
+      function() {
+        return JournalStore.getVersion();
+      }
+    );
+    var entry = entryId ? JournalStore.get(entryId) : null;
     var _confirmStep = useState(0);
     var confirmStep = _confirmStep[0];
     var setConfirmStep = _confirmStep[1];
@@ -7939,12 +7954,17 @@
   }
 
   // app/src/main/assets/src/renderer/dom-journal-chip.jsx
-  function JournalChip({ refKey, hlTick, onClick, label }) {
-    var useMemo = React.useMemo;
-    var ids = useMemo(function() {
-      if (!refKey || typeof JournalIndexStore === "undefined") return [];
-      return JournalIndexStore.entriesReferencing(refKey);
-    }, [refKey, hlTick]);
+  function JournalChip({ refKey, onClick, label }) {
+    React.useSyncExternalStore(
+      React.useCallback(function(cb) {
+        return typeof JournalIndexStore !== "undefined" ? JournalIndexStore.subscribe(cb) : function() {
+        };
+      }, []),
+      function() {
+        return typeof JournalIndexStore !== "undefined" ? JournalIndexStore.getVersion() : 0;
+      }
+    );
+    var ids = !refKey || typeof JournalIndexStore === "undefined" ? [] : JournalIndexStore.entriesReferencing(refKey);
     if (!refKey || !ids || ids.length === 0) return null;
     return /* @__PURE__ */ React.createElement(
       "button",

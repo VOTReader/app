@@ -2009,12 +2009,12 @@
   }
 
   // app/src/main/assets/src/ui/components/LinkIcon.jsx
-  function LinkIcon2({ hlKey, hlTick, onClick, prefix }) {
-    const links = React.useMemo(
-      () => prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-      [hlKey, hlTick, prefix]
+  function LinkIcon2({ hlKey, onClick, prefix }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => LinkStore.subscribe(cb), []),
+      () => LinkStore.getVersion()
     );
+    const links = prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey);
     if (!links || links.length === 0) return null;
     return /* @__PURE__ */ React.createElement(
       "span",
@@ -4155,9 +4155,17 @@
   }
 
   // app/src/main/assets/src/ui/screens/NotesIndexScreen.jsx
-  function NotesIndexScreen2({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, hlTick, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
-    const allNotes = React.useMemo(() => NoteStore.list(), [hlTick]);
-    const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
+  function NotesIndexScreen2({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NoteStore.subscribe(cb), []),
+      () => NoteStore.getVersion()
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NotebookStore.subscribe(cb), []),
+      () => NotebookStore.getVersion()
+    );
+    const allNotes = NoteStore.list();
+    const notebooks = NotebookStore.list();
     const _notesRet = typeof window !== "undefined" && window.__notesReturnCtx || null;
     const [tab, setTab] = React.useState(_notesRet && _notesRet.tab || "notebooks");
     const [drilledNbId, setDrilledNbId] = React.useState(_notesRet && _notesRet.drilledNbId || null);
@@ -6405,12 +6413,19 @@
     var onBack = props.onBack;
     var onNavigateToSource = props.onNavigateToSource;
     var onNavigateToTarget = props.onNavigateToTarget;
-    var hlTick = props.hlTick;
     var setHlTick = props.setHlTick;
     var theme = props.theme;
     var onThemeChange = props.onThemeChange;
     var onSearch = props.onSearch;
     var onHistory = props.onHistory;
+    React.useSyncExternalStore(
+      React.useCallback(function(cb) {
+        return LinkStore.subscribe(cb);
+      }, []),
+      function() {
+        return LinkStore.getVersion();
+      }
+    );
     var useState2 = React.useState;
     var useMemo = React.useMemo;
     var _sq = useState2("");
@@ -6422,9 +6437,7 @@
     var _as = useState2(null);
     var actionTarget = _as[0];
     var setActionTarget = _as[1];
-    var allLinks = useMemo(function() {
-      return LinkStore.all();
-    }, [hlTick]);
+    var allLinks = LinkStore.all();
     var displayLinks = useMemo(function() {
       var q = searchQuery.trim().toLowerCase();
       var filtered = q ? allLinks.filter(function(lnk) {
@@ -7155,7 +7168,14 @@
     var useMemo = React.useMemo;
     var onBack = props.onBack;
     var onNavigateToSource = props.onNavigateToSource;
-    var hlTick = props.hlTick;
+    React.useSyncExternalStore(
+      React.useCallback(function(cb) {
+        return AnnotationStore.subscribe(cb);
+      }, []),
+      function() {
+        return AnnotationStore.getVersion();
+      }
+    );
     var _sn = useState2(true);
     var sortNewest = _sn[0];
     var setSortNewest = _sn[1];
@@ -7168,9 +7188,7 @@
     var _cf = useState2(null);
     var colorFilter = _cf[0];
     var setColorFilter = _cf[1];
-    var marks = useMemo(function() {
-      return _collectMarks();
-    }, [hlTick]);
+    var marks = _collectMarks();
     var presentColors = useMemo(function() {
       var seen = {};
       marks.forEach(function(m) {
@@ -7478,9 +7496,17 @@
   }
 
   // app/src/main/assets/src/ui/sheets/NotebookPickerSheet.jsx
-  function NotebookPickerSheet2({ groupId, hlTick, setHlTick, onClose }) {
-    const note = React.useMemo(() => NoteStore.get(groupId), [groupId, hlTick]);
-    const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
+  function NotebookPickerSheet2({ groupId, setHlTick, onClose }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NoteStore.subscribe(cb), []),
+      () => NoteStore.getVersion()
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NotebookStore.subscribe(cb), []),
+      () => NotebookStore.getVersion()
+    );
+    const note = NoteStore.get(groupId);
+    const notebooks = NotebookStore.list();
     const [newName, setNewName] = React.useState("");
     const [confirmDeleteNb, setConfirmDeleteNb] = React.useState(null);
     const inputRef = React.useRef(null);
@@ -8156,13 +8182,13 @@
   }
 
   // app/src/main/assets/src/ui/sheets/LinkSidebar.jsx
-  function LinkSidebar2({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
-    const isBlockScope = hlKey && (hlKey.startsWith("letter:") || hlKey.startsWith("wtlb:") || hlKey.startsWith("blessed:") || hlKey.startsWith("holy-days:"));
-    const links = React.useMemo(
-      () => isBlockScope ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-      [hlKey, hlTick, isBlockScope]
+  function LinkSidebar2({ hlKey, setHlTick, onClose, onNavigate }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => LinkStore.subscribe(cb), []),
+      () => LinkStore.getVersion()
     );
+    const isBlockScope = hlKey && (hlKey.startsWith("letter:") || hlKey.startsWith("wtlb:") || hlKey.startsWith("blessed:") || hlKey.startsWith("holy-days:"));
+    const links = isBlockScope ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey);
     React.useEffect(() => {
       if (!hlKey) return;
       const prev = window.__closeSheet;
@@ -9073,13 +9099,21 @@
   }
 
   // app/src/main/assets/src/ui/sheets/NotebookManagerSheet.jsx
-  function NotebookManagerSheet({ hlTick, setHlTick, onClose }) {
-    const notebooks = React.useMemo(() => NotebookStore.list(), [hlTick]);
+  function NotebookManagerSheet({ setHlTick, onClose }) {
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NotebookStore.subscribe(cb), []),
+      () => NotebookStore.getVersion()
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NoteStore.subscribe(cb), []),
+      () => NoteStore.getVersion()
+    );
+    const notebooks = NotebookStore.list();
     const [newName, setNewName] = React.useState("");
     const [renameId, setRenameId] = React.useState(null);
     const [renameValue, setRenameValue] = React.useState("");
     const [confirmDeleteId, setConfirmDeleteId] = React.useState(null);
-    const counts = React.useMemo(() => {
+    const counts = (() => {
       const map = {};
       NoteStore.list().forEach((n) => {
         (n.notebookIds || []).forEach((id) => {
@@ -9087,7 +9121,7 @@
         });
       });
       return map;
-    }, [hlTick]);
+    })();
     const createNotebook = () => {
       const trimmed = newName.trim();
       if (!trimmed) return;

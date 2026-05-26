@@ -2,17 +2,19 @@
    LinkSidebar — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function LinkSidebar({ hlKey, hlTick, setHlTick, onClose, onNavigate }) {
+export function LinkSidebar({ hlKey, setHlTick, onClose, onNavigate }) {
+  // Subscribe to LinkStore — sidebar re-renders when any link is created
+  // or removed.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => LinkStore.subscribe(cb), []),
+    () => LinkStore.getVersion()
+  );
   // Letter/WTLB/Blessed/Holy-Days blocks anchor links by block-index, but
   // excerpts append ":start-end" to the stored endpoint key. Use prefix
   // matching for those scopes so the sidebar finds excerpt-scoped links from
   // the bare block hlKey. Bible verses stay exact-match (verse N is N).
   const isBlockScope = hlKey && (hlKey.startsWith('letter:') || hlKey.startsWith('wtlb:') || hlKey.startsWith('blessed:') || hlKey.startsWith('holy-days:'));
-  const links = React.useMemo(
-    () => isBlockScope ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-    [hlKey, hlTick, isBlockScope]
-  );
+  const links = isBlockScope ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey);
   React.useEffect(() => {
     if (!hlKey) return;
     const prev = window.__closeSheet;

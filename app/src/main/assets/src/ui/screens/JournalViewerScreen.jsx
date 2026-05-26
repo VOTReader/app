@@ -453,7 +453,6 @@ export function jrnPinIcon(filled) {
 
 export function JournalViewerScreen(props) {
   var useState = React.useState;
-  var useMemo = React.useMemo;
 
   var entryId = props.entryId;
   var onBack = props.onBack;
@@ -463,10 +462,12 @@ export function JournalViewerScreen(props) {
   var onOpenNotebook = props.onOpenNotebook;
   var setHlTick = props.setHlTick;
 
-  var entry = useMemo(function() {
-    return entryId ? JournalStore.get(entryId) : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: props.hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  }, [entryId, props.hlTick]);
+  // Subscribe to JournalStore — viewer re-renders when entry mutates.
+  React.useSyncExternalStore(
+    React.useCallback(function(cb) { return JournalStore.subscribe(cb); }, []),
+    function() { return JournalStore.getVersion(); }
+  );
+  var entry = entryId ? JournalStore.get(entryId) : null;
 
   var _confirmStep = useState(0);
   var confirmStep = _confirmStep[0]; var setConfirmStep = _confirmStep[1];

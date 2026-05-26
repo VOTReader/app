@@ -103,14 +103,18 @@ export function JournalCardMenu(props) {
 
 export function JournalHubScreen(props) {
   var useState = React.useState;
-  var useMemo = React.useMemo;
 
   var onBack = props.onBack;
   var onOpenEntry = props.onOpenEntry;
   var onEditEntry = props.onEditEntry;
   var onCreateEntry = props.onCreateEntry;
-  var hlTick = props.hlTick;
   var setHlTick = props.setHlTick;
+
+  // Subscribe to JournalStore — hub re-renders on any entry mutation.
+  React.useSyncExternalStore(
+    React.useCallback(function(cb) { return JournalStore.subscribe(cb); }, []),
+    function() { return JournalStore.getVersion(); }
+  );
 
   var _tab = useState('all');
   var tab = _tab[0]; var setTab = _tab[1];
@@ -124,10 +128,7 @@ export function JournalHubScreen(props) {
   var _menuEntry = useState(null);
   var menuEntry = _menuEntry[0]; var setMenuEntry = _menuEntry[1];
 
-  var allEntries = useMemo(function() {
-    return JournalStore.all();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cache-bust signal: hlTick bumps on store mutation, forces memo recompute (ARCHITECTURE.md §"Annotation rendering")
-  }, [hlTick]);
+  var allEntries = JournalStore.all();
 
   function bump() { if (setHlTick) setHlTick(function(t) { return t + 1; }); }
 
