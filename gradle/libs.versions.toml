@@ -8,6 +8,7 @@ coreSplashscreen = "1.0.1"
 timber = "5.0.1"
 coroutines = "1.10.2"
 lifecycleRuntime = "2.9.1"
+lifecycleViewModel = "2.9.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -18,6 +19,7 @@ androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscree
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntime" }
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleViewModel" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

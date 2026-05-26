@@ -34,6 +34,7 @@ import android.widget.TextView
 import androidx.activity.addCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
@@ -63,38 +64,20 @@ import timber.log.Timber
 
 class MainActivity : AppCompatActivity() {
 
+    // State that survives configuration changes lives in [MainViewModel]
+    // -- recorder + temp file, audio session, scale, insets, splash hold,
+    // renderer-recovery counters. See its KDoc for the full inventory and
+    // the onCleared cleanup contract. Activity-scoped state below stays in
+    // this class because it's bound to the current WebView / Activity (and
+    // is stale across config changes anyway).
+    private val vm: MainViewModel by viewModels()
+
     private lateinit var webView: WebView
-    private var savedTopInset = 0
-    private var savedBottomInset = 0
-    @Volatile private var currentScale = 1f
-    // Read by setKeepScreenOn(); flips FLAG_KEEP_SCREEN_ON on/off from JS.
-    private var keepScreenOnEnabled = true
     // Audio session management for voice recording. startAudioSession() puts
     // the device into MODE_IN_COMMUNICATION so the WebView's AudioRecord can
     // reliably acquire the mic on Android 8+ (Pixel/Samsung); endAudioSession()
     // restores the prior mode so normal playback isn't routed to the earpiece.
     private var audioManager: AudioManager? = null
-    private var previousAudioMode = AudioManager.MODE_NORMAL
-    // Native voice-recording state. Recording is done with the OS MediaRecorder
-    // (AAC/MPEG-4 → .m4a) instead of WebView getUserMedia, which is unreliable
-    // across the Android version/OEM matrix. recLock guards all access since
-    // @JavascriptInterface methods are invoked on a binder thread, not main.
-    private val recLock = Any()
-    private var nativeRecorder: MediaRecorder? = null
-    private var nativeRecordFile: File? = null
-    private var nativeRecordStartMs = 0L
-    private var nativeRecordPausedAccumMs = 0L
-    private var nativeRecordPauseStartMs = 0L
-    // Held true while the system splash screen should remain on top. Flipped
-    // false after onPageFinished + a short delay to let React mount, so the
-    // cold-boot transition is splash → first frame with no black flash.
-    @Volatile private var splashHolding = true
-    // Renderer-crash recovery state — counts onRenderProcessGone within a
-    // 60-second window. After 2 crashes we stop auto-reloading and show a
-    // static "tap to reload" view so we don't infinite-loop on content that
-    // reproducibly crashes Chromium.
-    private var renderRecoveryCount = 0
-    private var firstRecoveryMs = 0L
     // Launcher for the import file picker; registered in onCreate before the
     // WebView is created so it is ready before any JS calls openFilePicker().
     private lateinit var filePickerLauncher: ActivityResultLauncher<String>
@@ -139,12 +122,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Install the system splash BEFORE super.onCreate. Held visible until
-        // the WebView's first paint (see splashHolding + onPageFinished
+        // the WebView's first paint (see vm.splashHolding + onPageFinished
         // below) so the cold-boot transition is launcher icon → splash icon
         // → first frame with no flash of empty black. core-splashscreen
         // backports the Android 12+ API to API 23+; we target 26+.
         val splash = installSplashScreen()
-        splash.setKeepOnScreenCondition { splashHolding }
+        splash.setKeepOnScreenCondition { vm.splashHolding }
         super.onCreate(savedInstanceState)
 
         // Register the file-picker launcher before the WebView is attached.
@@ -238,7 +221,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        if (keepScreenOnEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (vm.keepScreenOnEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // Debug-only: let Chrome DevTools attach to the WebView via
         // chrome://inspect/#devices. Static method — affects all WebViews
@@ -463,12 +446,12 @@ class MainActivity : AppCompatActivity() {
                 // tick or two after onPageFinished, so 80ms covers the gap
                 // without making the splash feel slow. If it's already
                 // dismissed (config change re-load), this is a no-op.
-                view.postDelayed({ splashHolding = false }, 80L)
+                view.postDelayed({ vm.splashHolding = false }, 80L)
             }
 
             override fun onScaleChanged(view: WebView, oldScale: Float, newScale: Float) {
                 super.onScaleChanged(view, oldScale, newScale)
-                currentScale = newScale
+                vm.currentScale = newScale
             }
 
             /**
@@ -489,11 +472,11 @@ class MainActivity : AppCompatActivity() {
                 Timber.w("WebView renderer died (crashed=%b). Recovering.", crashed)
 
                 val now = System.currentTimeMillis()
-                if (firstRecoveryMs == 0L || now - firstRecoveryMs > 60_000L) {
-                    renderRecoveryCount = 0
-                    firstRecoveryMs = now
+                if (vm.firstRecoveryMs == 0L || now - vm.firstRecoveryMs > 60_000L) {
+                    vm.renderRecoveryCount = 0
+                    vm.firstRecoveryMs = now
                 }
-                renderRecoveryCount++
+                vm.renderRecoveryCount++
 
                 // Resolve any in-flight WebView resource requests bound to
                 // the dying instance — same cleanup as onDestroy. The
@@ -507,8 +490,8 @@ class MainActivity : AppCompatActivity() {
                 (view.parent as? ViewGroup)?.removeView(view)
                 view.destroy()
 
-                if (renderRecoveryCount > 2) {
-                    Timber.e("Renderer crashed %d times in 60s. Showing retry view.", renderRecoveryCount)
+                if (vm.renderRecoveryCount > 2) {
+                    Timber.e("Renderer crashed %d times in 60s. Showing retry view.", vm.renderRecoveryCount)
                     showRendererCrashRetryView()
                     return true
                 }
@@ -529,8 +512,8 @@ class MainActivity : AppCompatActivity() {
                     or WindowInsetsCompat.Type.displayCutout()
                     or WindowInsetsCompat.Type.ime()
             )
-            savedTopInset = bars.top
-            savedBottomInset = bars.bottom
+            vm.savedTopInset = bars.top
+            vm.savedBottomInset = bars.bottom
             injectInsets()
             WindowInsetsCompat.CONSUMED
         }
@@ -577,8 +560,8 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onEnd(animation: WindowInsetsAnimationCompat) {
                     // Final pixel-perfect state -- routes through the normal
-                    // inset listener (above), which updates savedTopInset /
-                    // savedBottomInset for any future injectInsets() callers.
+                    // inset listener (above), which updates vm.savedTopInset /
+                    // vm.savedBottomInset for any future injectInsets() callers.
                     ViewCompat.requestApplyInsets(wv)
                 }
             }
@@ -601,8 +584,8 @@ class MainActivity : AppCompatActivity() {
             textSize = 18f
             setPadding(48, 48, 48, 48)
             setOnClickListener {
-                renderRecoveryCount = 0
-                firstRecoveryMs = 0L
+                vm.renderRecoveryCount = 0
+                vm.firstRecoveryMs = 0L
                 webView = createConfiguredWebView()
                 setContentView(webView)
                 webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
@@ -631,8 +614,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun injectInsets() {
         val density = resources.displayMetrics.density
-        val topDp = String.format(Locale.US, "%.2f", savedTopInset / density)
-        val bottomDp = String.format(Locale.US, "%.2f", savedBottomInset / density)
+        val topDp = String.format(Locale.US, "%.2f", vm.savedTopInset / density)
+        val bottomDp = String.format(Locale.US, "%.2f", vm.savedBottomInset / density)
         // The bridge's setCssProperties carries the same null-documentElement
         // guard that the inline JS template used to ship (the listener can
         // fire during the initial layout pass before loadUrl finishes parsing
@@ -670,7 +653,7 @@ class MainActivity : AppCompatActivity() {
         val h = webView.height
         if (w <= 0 || h <= 0) return@withContext ""
 
-        val originalScale = currentScale
+        val originalScale = vm.currentScale
         val needsZoomReset = originalScale > 0f && abs(originalScale - 1f) > 0.005f
         if (needsZoomReset) webView.zoomBy(1f / originalScale)
 
@@ -763,7 +746,7 @@ class MainActivity : AppCompatActivity() {
         // is torn down. A held PermissionRequest / file-chooser callback is
         // bound to this (dying) WebView; leaving it unresolved leaks it and
         // the JS getUserMedia promise would hang. Unconditional because the
-        // callback is dead either way — on a config-change recreation the
+        // callback is dead either way -- on a config-change recreation the
         // JS-side watchdog + the already-granted fast-path on the next
         // getUserMedia retry handle recovery cleanly.
         pendingMicPermission?.let { try { it.deny() } catch (_: Exception) {} }
@@ -772,18 +755,11 @@ class MainActivity : AppCompatActivity() {
         // callback ("ValueCallback already called" on the next chooser).
         fileChooserCallback?.let { try { it.onReceiveValue(null) } catch (_: Exception) {} }
         fileChooserCallback = null
-        // Release a native recorder still running if the activity is destroyed
-        // mid-recording (config change, app killed) — otherwise the mic session
-        // leaks and the temp file is orphaned in cacheDir.
-        synchronized(recLock) {
-            nativeRecorder?.let {
-                try { it.stop() } catch (_: Exception) {}
-                try { it.release() } catch (_: Exception) {}
-            }
-            nativeRecorder = null
-            nativeRecordFile?.let { try { it.delete() } catch (_: Exception) {} }
-            nativeRecordFile = null
-        }
+        // Recorder cleanup lives in MainViewModel.onCleared -- the
+        // ViewModelStore fires it on isFinishing=true (user exited the
+        // app), and the recorder state survives config-change paths
+        // unconditionally (configChanges in manifest already prevents the
+        // most common recreations, ViewModel covers any that slip through).
         webView.destroy()
         super.onDestroy()
     }
@@ -801,7 +777,7 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun setKeepScreenOn(enabled: Boolean) {
             runOnUiThread {
-                keepScreenOnEnabled = enabled
+                vm.keepScreenOnEnabled = enabled
                 if (enabled) {
                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 } else {
@@ -843,7 +819,7 @@ class MainActivity : AppCompatActivity() {
         fun startAudioSession() {
             runOnUiThread {
                 val am = audioManager ?: return@runOnUiThread
-                previousAudioMode = am.mode
+                vm.previousAudioMode = am.mode
                 try {
                     am.mode = AudioManager.MODE_IN_COMMUNICATION
                 } catch (e: Exception) {
@@ -860,7 +836,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 val am = audioManager ?: return@runOnUiThread
                 try {
-                    am.mode = previousAudioMode
+                    am.mode = vm.previousAudioMode
                 } catch (e: Exception) {
                     Timber.w(e, "endAudioSession restoreMode failed")
                 }
@@ -878,16 +854,16 @@ class MainActivity : AppCompatActivity() {
         /** Start recording. Returns "ok" or "error:<reason>" synchronously. */
         @JavascriptInterface
         fun nativeRecordStart(): String {
-            synchronized(recLock) {
+            synchronized(vm.recLock) {
                 if (ContextCompat.checkSelfPermission(
                         this@MainActivity, Manifest.permission.RECORD_AUDIO
                     ) != PackageManager.PERMISSION_GRANTED) {
                     return "error:permission"
                 }
-                try { nativeRecorder?.release() } catch (_: Exception) {}
-                nativeRecorder = null
-                nativeRecordFile?.let { try { it.delete() } catch (_: Exception) {} }
-                nativeRecordFile = null
+                try { vm.nativeRecorder?.release() } catch (_: Exception) {}
+                vm.nativeRecorder = null
+                vm.nativeRecordFile?.let { try { it.delete() } catch (_: Exception) {} }
+                vm.nativeRecordFile = null
                 return try {
                     val f = File.createTempFile("votrec_", ".m4a", cacheDir)
                     val mr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -903,18 +879,18 @@ class MainActivity : AppCompatActivity() {
                     mr.setOutputFile(f.absolutePath)
                     mr.prepare()
                     mr.start()
-                    nativeRecorder = mr
-                    nativeRecordFile = f
-                    nativeRecordStartMs = System.currentTimeMillis()
-                    nativeRecordPausedAccumMs = 0L
-                    nativeRecordPauseStartMs = 0L
+                    vm.nativeRecorder = mr
+                    vm.nativeRecordFile = f
+                    vm.nativeRecordStartMs = System.currentTimeMillis()
+                    vm.nativeRecordPausedAccumMs = 0L
+                    vm.nativeRecordPauseStartMs = 0L
                     "ok"
                 } catch (e: Exception) {
                     Timber.w(e, "nativeRecordStart failed")
-                    try { nativeRecorder?.release() } catch (_: Exception) {}
-                    nativeRecorder = null
-                    nativeRecordFile?.let { try { it.delete() } catch (_: Exception) {} }
-                    nativeRecordFile = null
+                    try { vm.nativeRecorder?.release() } catch (_: Exception) {}
+                    vm.nativeRecorder = null
+                    vm.nativeRecordFile?.let { try { it.delete() } catch (_: Exception) {} }
+                    vm.nativeRecordFile = null
                     "error:" + (e.message ?: "start_failed")
                 }
             }
@@ -922,10 +898,10 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun nativeRecordPause(): String {
-            synchronized(recLock) {
+            synchronized(vm.recLock) {
                 return try {
-                    nativeRecorder?.pause()
-                    nativeRecordPauseStartMs = System.currentTimeMillis()
+                    vm.nativeRecorder?.pause()
+                    vm.nativeRecordPauseStartMs = System.currentTimeMillis()
                     "ok"
                 } catch (e: Exception) { "error:" + (e.message ?: "pause_failed") }
             }
@@ -933,12 +909,12 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun nativeRecordResume(): String {
-            synchronized(recLock) {
+            synchronized(vm.recLock) {
                 return try {
-                    nativeRecorder?.resume()
-                    if (nativeRecordPauseStartMs > 0L) {
-                        nativeRecordPausedAccumMs += System.currentTimeMillis() - nativeRecordPauseStartMs
-                        nativeRecordPauseStartMs = 0L
+                    vm.nativeRecorder?.resume()
+                    if (vm.nativeRecordPauseStartMs > 0L) {
+                        vm.nativeRecordPausedAccumMs += System.currentTimeMillis() - vm.nativeRecordPauseStartMs
+                        vm.nativeRecordPauseStartMs = 0L
                     }
                     "ok"
                 } catch (e: Exception) { "error:" + (e.message ?: "resume_failed") }
@@ -948,8 +924,8 @@ class MainActivity : AppCompatActivity() {
         /** Peak amplitude since the last call (0..32767). Drives the waveform. */
         @JavascriptInterface
         fun nativeRecordAmplitude(): Int {
-            synchronized(recLock) {
-                return try { nativeRecorder?.maxAmplitude ?: 0 } catch (e: Exception) { 0 }
+            synchronized(vm.recLock) {
+                return try { vm.nativeRecorder?.maxAmplitude ?: 0 } catch (e: Exception) { 0 }
             }
         }
 
@@ -959,18 +935,18 @@ class MainActivity : AppCompatActivity() {
          *  thread (already off the UI thread) then posts to the WebView. */
         @JavascriptInterface
         fun nativeRecordStop() {
-            synchronized(recLock) {
-                val mr = nativeRecorder
-                val f = nativeRecordFile
-                nativeRecorder = null
+            synchronized(vm.recLock) {
+                val mr = vm.nativeRecorder
+                val f = vm.nativeRecordFile
+                vm.nativeRecorder = null
                 if (mr == null || f == null) {
-                    nativeRecordFile = null
+                    vm.nativeRecordFile = null
                     postNativeComplete(null, 0L)
                     return
                 }
-                var durMs = System.currentTimeMillis() - nativeRecordStartMs - nativeRecordPausedAccumMs
-                if (nativeRecordPauseStartMs > 0L) {
-                    durMs -= System.currentTimeMillis() - nativeRecordPauseStartMs
+                var durMs = System.currentTimeMillis() - vm.nativeRecordStartMs - vm.nativeRecordPausedAccumMs
+                if (vm.nativeRecordPauseStartMs > 0L) {
+                    durMs -= System.currentTimeMillis() - vm.nativeRecordPauseStartMs
                 }
                 try {
                     mr.stop()
@@ -979,7 +955,7 @@ class MainActivity : AppCompatActivity() {
                     Timber.w(e, "nativeRecordStop stop() failed")
                     try { mr.release() } catch (_: Exception) {}
                     try { f.delete() } catch (_: Exception) {}
-                    nativeRecordFile = null
+                    vm.nativeRecordFile = null
                     postNativeComplete(null, 0L)
                     return
                 }
@@ -988,12 +964,12 @@ class MainActivity : AppCompatActivity() {
                     val bytes = f.readBytes()
                     val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                     try { f.delete() } catch (_: Exception) {}
-                    nativeRecordFile = null
+                    vm.nativeRecordFile = null
                     postNativeComplete(b64, if (durMs < 0L) 0L else durMs)
                 } catch (e: Exception) {
                     Timber.w(e, "nativeRecordStop read failed")
                     try { f.delete() } catch (_: Exception) {}
-                    nativeRecordFile = null
+                    vm.nativeRecordFile = null
                     postNativeComplete(null, 0L)
                 }
             }
@@ -1002,11 +978,11 @@ class MainActivity : AppCompatActivity() {
         /** Abort recording and delete the temp file with no JS callback. */
         @JavascriptInterface
         fun nativeRecordCancel() {
-            synchronized(recLock) {
-                val mr = nativeRecorder
-                val f = nativeRecordFile
-                nativeRecorder = null
-                nativeRecordFile = null
+            synchronized(vm.recLock) {
+                val mr = vm.nativeRecorder
+                val f = vm.nativeRecordFile
+                vm.nativeRecorder = null
+                vm.nativeRecordFile = null
                 if (mr != null) {
                     try { mr.stop() } catch (_: Exception) {}
                     try { mr.release() } catch (_: Exception) {}
@@ -1019,7 +995,7 @@ class MainActivity : AppCompatActivity() {
         fun setZoomEnabled(enabled: Boolean) {
             runOnUiThread {
                 if (!enabled) {
-                    val current = currentScale
+                    val current = vm.currentScale
                     if (current > 0f && (current != 1f)) webView.zoomBy(1f / current)
                 }
                 webView.settings.setSupportZoom(enabled)
@@ -1031,14 +1007,14 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun resetZoom() {
             runOnUiThread {
-                val current = currentScale
+                val current = vm.currentScale
                 if (current > 0f && (current != 1f)) webView.zoomBy(1f / current)
             }
         }
 
         @JavascriptInterface
         @Suppress("unused")
-        fun getZoomScale(): Float = currentScale
+        fun getZoomScale(): Float = vm.currentScale
 
         @JavascriptInterface
         fun takeScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String {
