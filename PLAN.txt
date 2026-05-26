@@ -326,7 +326,7 @@ window.AndroidBridge directly after W1.2.
   Pure addition — zero call-site changes, zero behavior change. The
   abstraction commit lands before migration per [[abstraction-before-migration]].
 
-  W1.2 — Migrate call sites — NEXT
+  W1.2 — Migrate call sites — Tiers A + B LANDED, Tier C NEXT
   ────────────────────────────────
   Per [[platformbridge-single-source]]: after W1.2, grep for
   `window.AndroidBridge` outside platform-bridge.js returns ZERO matches.
@@ -368,13 +368,35 @@ window.AndroidBridge directly after W1.2.
         Bundle-b: net-flat at 354.5 KB (code moved, not removed; Tiers
         B/C will trend toward the 351 KB baseline).
 
-    Tier B — small files, moderate reference counts:
-      use-settings.js         — setLightStatusBar, setKeepScreenOn
-      SettingsScreen.jsx      — openFilePicker, saveToDownloads,
-                                 getCrashLog (depends on W1.3 file-I/O
-                                 web impl landing first)
-      GardenView.jsx          — setZoomEnabled, resetZoom,
-                                 setImmersiveMode
+    Tier B — small files, moderate reference counts — ALL LANDED 2026-05-26:
+      Tier B.1 (748ed2d): use-settings.js — setLightStatusBar (no-op web),
+                          setKeepScreenOn (real WakeLock + de-dup, fire-and-
+                          forget per [[explicit-async-decision]]).
+                          2 guards removed; +9 vitest cases.
+      Tier B.2 (6ec5ff0): SettingsScreen.jsx — openFilePicker (sync DOM
+                          input + FileReader.readAsDataURL → strips prefix
+                          → fires window.__onImportFile per
+                          [[preserve-callback-contracts]]), saveToDownloads
+                          (Blob + anchor + URL.createObjectURL), getCrashLog
+                          (already '[]' on web; W7.4 will populate it).
+                          4 guards removed; +6 vitest cases. UI render guard
+                          for diagnostic log moved from platform check to
+                          state check (diagnosticLog.length > 0).
+      Tier B.3 (825d38c): GardenView.jsx — setImmersiveMode (Fullscreen API,
+                          best-effort: requests typically blocked by user-
+                          gesture rules from useEffect, gracefully swallowed
+                          + logged), setZoomEnabled + resetZoom (DELIBERATE
+                          no-ops per [[verify-inertness-not-equivalence]] —
+                          browsers default to zoom-enabled, no CSS hacks).
+                          3 guards removed; +3 vitest cases.
+
+    INTERMEDIATE GREP GATE post-Tier-B (per [[intermediate-exit-gates]] +
+    user directive #5): ALL THREE GATES GREEN across the 4 completed files.
+      • window.AndroidBridge in live code: ZERO (4 hits all in comments)
+      • isAndroid locals in consumers: ZERO
+      • error:web-impl-pending in completed methods: ZERO (3 remaining
+        are nativeRecordStart/Pause/Resume — Tier C scope)
+    Pattern holds; safe to proceed to Tier C.
 
     Tier C — high reference count + audio domain (riskiest):
       JournalRecordingSheet.jsx — 10+ refs spanning requestMicPermission,
