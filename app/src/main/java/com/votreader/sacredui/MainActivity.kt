@@ -1,19 +1,15 @@
 package com.votreader.sacredui
 
 import android.Manifest
-import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.media.AudioManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.MediaStore
-import android.provider.OpenableColumns
 import android.util.Base64
 import android.view.Gravity
 import android.view.PixelCopy
@@ -109,13 +105,6 @@ class MainActivity : AppCompatActivity() {
         // arbitrary apps or escalate. Asset-loader URLs are matched by
         // exact prefix earlier and don't reach this allowlist.
         private val ALLOWED_EXTERNAL_SCHEMES = setOf("https", "http", "mailto", "tel")
-        // Cap on what filePickerLauncher will read into memory. A heavy
-        // user export (10k highlights + a year of voice journals) is well
-        // under 30 MB; 50 MB is ~2x headroom. The picker MIME hint is
-        // "application/json" but Android does not enforce it — the user
-        // can still select any file, so a defensive cap stops an
-        // accidental (or hostile) GB-scale pick from OOM-ing the app.
-        private const val MAX_IMPORT_SIZE = 50L * 1024 * 1024
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -139,25 +128,15 @@ class MainActivity : AppCompatActivity() {
                 bridge.callOptional("__onImportFile", null)
                 return@registerForActivityResult
             }
-
-            // Reject oversized / unknown-size files BEFORE readBytes() —
-            // a multi-GB pick (accidental or hostile) would OOM the app.
-            // The import format is one we own (Export JSON), so a missing
-            // size is suspicious enough to refuse rather than read blindly.
-            val size = querySize(uri)
-            if (size < 0L || size > MAX_IMPORT_SIZE) {
-                Timber.w("Import rejected: size=%d (limit=%d)", size, MAX_IMPORT_SIZE)
-                bridge.callOptional("__onImportFile", null)
-                return@registerForActivityResult
-            }
-
-            try {
-                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
-                val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                bridge.callOptional("__onImportFile", b64)
-            } catch (e: Exception) {
-                Timber.w(e, "Import file read failed")
-                bridge.callOptional("__onImportFile", null)
+            // Size cap + read + base64 all live in StorageManager;
+            // Failure here covers oversize, unknown-size, and read-error
+            // alike. All flow back to JS as the same null callback the
+            // cancel path uses -- JS has one generic error toast for the
+            // whole class of failures, so keeping them indistinguishable
+            // matches the existing UX contract.
+            when (val r = vm.storage.readUriAsBase64(uri)) {
+                is StorageManager.Result.Success -> bridge.callOptional("__onImportFile", r.value)
+                is StorageManager.Result.Failure -> bridge.callOptional("__onImportFile", null)
             }
         }
 
@@ -592,24 +571,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(tv)
     }
 
-    /**
-     * Ask the content provider how big [uri] is, in bytes. Returns -1 if
-     * the provider doesn't expose [OpenableColumns.SIZE] (some pickers
-     * skip it). Caller is expected to treat -1 as "suspicious, reject"
-     * since the import format is one we control end-to-end.
-     */
-    private fun querySize(uri: Uri): Long {
-        contentResolver.query(
-            uri, arrayOf(OpenableColumns.SIZE), null, null, null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (idx != -1 && !cursor.isNull(idx)) return cursor.getLong(idx)
-            }
-        }
-        return -1L
-    }
-
     private fun injectInsets() {
         val density = resources.displayMetrics.density
         val topDp = String.format(Locale.US, "%.2f", vm.savedTopInset / density)
@@ -954,24 +915,9 @@ class MainActivity : AppCompatActivity() {
          *  older devices returns "error:requires_android_10". */
         @JavascriptInterface
         fun saveToDownloads(filename: String, content: String): String {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                return "error:requires_android_10"
-            }
-            return try {
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, filename)
-                    put(MediaStore.Downloads.MIME_TYPE, "application/json")
-                }
-                val uri = contentResolver.insert(
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
-                ) ?: return "error:no_uri"
-                contentResolver.openOutputStream(uri)?.use { stream ->
-                    stream.write(content.toByteArray(Charsets.UTF_8))
-                }
-                "ok"
-            } catch (e: Exception) {
-                Timber.w(e, "saveToDownloads failed")
-                "error:${e.message}"
+            return when (val r = vm.storage.writeJsonToDownloads(filename, content)) {
+                is StorageManager.Result.Success -> "ok"
+                is StorageManager.Result.Failure -> "error:${r.reason}"
             }
         }
 

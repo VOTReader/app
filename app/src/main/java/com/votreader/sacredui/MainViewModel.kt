@@ -45,6 +45,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ---- Native recorder. Owns its own lock + recorder + temp-file state. ----
     val audioRecorder: NativeAudioRecorder = NativeAudioRecorder(application)
 
+    // ---- File I/O. Stateless; just gives a named home for the JS-facing
+    // read/write helpers + the import size cap.
+    val storage: StorageManager = StorageManager(application)
+
     // ---- Renderer-crash recovery (60-second sliding window) ----
     var renderRecoveryCount: Int = 0
     var firstRecoveryMs: Long = 0L
