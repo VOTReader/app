@@ -350,14 +350,23 @@ window.AndroidBridge directly after W1.2.
   bundle-b should be ≤ pre-W1.1 baseline (~351 KB). If positive, some
   detection / guard / fallback survived somewhere. Track delta per tier.
 
-    Tier A — pilot the three-step pattern on a single mechanical site:
+    Tier A — pilot the three-step pattern on a single mechanical site — LANDED 2026-05-26 (a0546c0)
       use-thumbnails.js       — takeScreenshot
-        Has an html2canvas fallback at lines 166-204 — folds INTO the
-        bridge's web impl. ALSO surfaces a W1.1 design issue: the
-        bridge's takeScreenshot signature is sync-returning-string, but
-        html2canvas is genuinely async. Bridge becomes ()=>Promise<string>
-        on BOTH platforms (Android wraps sync in Promise.resolve, web
-        returns html2canvas's Promise). Standard JS interop shape.
+        Pre-Tier-A: had a sync if(window.AndroidBridge) fast-path + an
+        async html2canvas fallback (~50 lines of branching). Now: single
+        `await PlatformBridge.takeScreenshot(...)` flow. The html2canvas
+        impl + the SCREENSHOT_IGNORE_CLASSES selector list FOLDED INTO
+        platform-bridge.js webImpl per [[consolidate-dont-duplicate]].
+        Surfaced + fixed a W1.1 design issue: takeScreenshot was sync-
+        returning-string but html2canvas is genuinely async. Bridge
+        signature now () => Promise<string> on BOTH platforms (Android's
+        sync PixelCopy call lifted to Promise via `async`, web returns
+        html2canvas's genuine Promise). Verified end-to-end via
+        preview_eval: bridge returns valid JPEG data URL (~1.4 KB) in
+        ~1.7s using real html2canvas. 4 new tests for the integration
+        (49 cases total in platform-bridge.test.js, 540 across project).
+        Bundle-b: net-flat at 354.5 KB (code moved, not removed; Tiers
+        B/C will trend toward the 351 KB baseline).
 
     Tier B — small files, moderate reference counts:
       use-settings.js         — setLightStatusBar, setKeepScreenOn
