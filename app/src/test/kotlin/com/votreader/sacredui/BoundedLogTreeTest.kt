@@ -178,6 +178,120 @@ class BoundedLogTreeTest {
         assertEquals("Pick from [path] failed", tree.getEntries().single().message)
     }
 
+    // ─── toJson + escaping (NK5b) ─────────────────────────────────────
+
+    @Test
+    fun `toJson on empty buffer returns empty array`() {
+        assertEquals("[]", BoundedLogTree().toJson())
+    }
+
+    @Test
+    fun `toJson renders single entry`() {
+        val tree = BoundedLogTree(clock = { 1_700_000_000_000L })
+        tree.record(Log.WARN, "MyTag", "hello")
+        assertEquals(
+            "[{\"t\":1700000000000,\"lvl\":\"W\",\"tag\":\"MyTag\",\"msg\":\"hello\"}]",
+            tree.toJson()
+        )
+    }
+
+    @Test
+    fun `toJson renders multiple entries in insertion order`() {
+        var t = 0L
+        val tree = BoundedLogTree(clock = { ++t })
+        tree.record(Log.WARN, "A", "one")
+        tree.record(Log.ERROR, "B", "two")
+        assertEquals(
+            "[{\"t\":1,\"lvl\":\"W\",\"tag\":\"A\",\"msg\":\"one\"}," +
+                "{\"t\":2,\"lvl\":\"E\",\"tag\":\"B\",\"msg\":\"two\"}]",
+            tree.toJson()
+        )
+    }
+
+    @Test
+    fun `toJson emits literal null for null tag`() {
+        val tree = BoundedLogTree(clock = { 0L })
+        tree.record(Log.WARN, null, "msg")
+        assertEquals(
+            "[{\"t\":0,\"lvl\":\"W\",\"tag\":null,\"msg\":\"msg\"}]",
+            tree.toJson()
+        )
+    }
+
+    @Test
+    fun `toJson maps WARN ERROR ASSERT to W E A`() {
+        var t = 0L
+        val tree = BoundedLogTree(clock = { ++t })
+        tree.record(Log.WARN, "T", "w")
+        tree.record(Log.ERROR, "T", "e")
+        tree.record(Log.ASSERT, "T", "a")
+        val json = tree.toJson()
+        assertTrue("\"lvl\":\"W\"" in json)
+        assertTrue("\"lvl\":\"E\"" in json)
+        assertTrue("\"lvl\":\"A\"" in json)
+    }
+
+    @Test
+    fun `jsonString escapes quote and backslash`() {
+        assertEquals("\"a\\\"b\\\\c\"", BoundedLogTree.jsonString("a\"b\\c"))
+    }
+
+    @Test
+    fun `jsonString escapes hot-path control chars`() {
+        // Newline, CR, tab — the three most common control chars in
+        // free-text log lines.
+        assertEquals(
+            "\"line1\\nline2\\r\\tcol\"",
+            BoundedLogTree.jsonString("line1\nline2\r\tcol")
+        )
+    }
+
+    @Test
+    fun `jsonString escapes other control chars via uXXXX`() {
+        // Form feed (0x0c) + bell (0x07) — uncommon but a malformed
+        // payload could contain them. Falls back to the generic
+        // sub-0x20 path.
+        assertEquals(
+            "\"\\u0007\\u000c\"",
+            BoundedLogTree.jsonString("\u0007\u000c")
+        )
+    }
+
+    @Test
+    fun `jsonString leaves non-ASCII verbatim`() {
+        // Unicode passes through; the consumer reads the output as UTF-8.
+        // Em-dash + arrow + ellipsis — multi-byte UTF-8 sequences.
+        val msg = "— → …"
+        assertEquals("\"$msg\"", BoundedLogTree.jsonString(msg))
+    }
+
+    @Test
+    fun `toJson roundtrips a sanitized payload`() {
+        // Realistic end-to-end: a log line with a sensitive path lands
+        // sanitized in the entry, AND the JSON-string escape keeps the
+        // surrounding text intact.
+        val tree = BoundedLogTree(clock = { 99L })
+        tree.record(Log.WARN, "Pick", "Picked /storage/emulated/0/x.json: \"odd\"")
+        // After sanitize: "Picked [path]: \"odd\""
+        // After jsonString: "\"Picked [path]: \\\"odd\\\"\""
+        assertEquals(
+            "[{\"t\":99,\"lvl\":\"W\",\"tag\":\"Pick\"," +
+                "\"msg\":\"Picked [path]: \\\"odd\\\"\"}]",
+            tree.toJson()
+        )
+    }
+
+    // ─── levelChar ────────────────────────────────────────────────────
+
+    @Test
+    fun `levelChar maps Log priorities`() {
+        assertEquals("W", BoundedLogTree.levelChar(Log.WARN))
+        assertEquals("E", BoundedLogTree.levelChar(Log.ERROR))
+        assertEquals("A", BoundedLogTree.levelChar(Log.ASSERT))
+        // Unknown levels (shouldn't appear post-filter, but defensive).
+        assertEquals("?", BoundedLogTree.levelChar(Log.DEBUG))
+    }
+
     // ─── concurrent writes ────────────────────────────────────────────
 
     @Test

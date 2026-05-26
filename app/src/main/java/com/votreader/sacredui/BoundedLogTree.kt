@@ -81,6 +81,35 @@ class BoundedLogTree(
     /** Drop all stored entries. */
     fun clear(): Unit = synchronized(lock) { buffer.clear() }
 
+    /**
+     * Serialize the buffer to a JSON array string. Each entry becomes
+     * `{"t": <millis>, "lvl": "W|E|A", "tag": "<tag>" | null, "msg": "<message>"}`.
+     * Empty buffer → `"[]"`.
+     *
+     * Hand-rolled rather than using org.json.JSONArray so this stays
+     * pure-JVM (the org.json classes are Android-stub in unit tests
+     * unless Robolectric is loaded). Escapes the four hot-path chars
+     * (\, ", \n, \r, \t) directly and falls back to `\uXXXX` for the
+     * remaining sub-0x20 control characters.
+     */
+    fun toJson(): String {
+        val entries = getEntries()
+        if (entries.isEmpty()) return "[]"
+        val sb = StringBuilder(entries.size * 64).append('[')
+        for ((i, e) in entries.withIndex()) {
+            if (i > 0) sb.append(',')
+            sb.append("{\"t\":").append(e.timestamp)
+                .append(",\"lvl\":\"").append(levelChar(e.level)).append('"')
+                .append(",\"tag\":")
+            if (e.tag == null) sb.append("null")
+            else sb.append(jsonString(e.tag))
+            sb.append(",\"msg\":").append(jsonString(e.message))
+                .append('}')
+        }
+        sb.append(']')
+        return sb.toString()
+    }
+
     companion object {
         const val DEFAULT_CAPACITY = 200
 
@@ -90,17 +119,54 @@ class BoundedLogTree(
         private val SENSITIVE_URI = Regex("(?:content|file)://\\S+")
 
         // Match the small set of absolute-path roots Android exposes to
-        // the app -- this is conservative on purpose, since over-matching
-        // could redact legitimate informative substrings. The roots
-        // covered are the ones actually appearing in MediaRecorder /
-        // cacheDir / picker paths we log from.
+        // the app. Body uses a tight character class (\w + dot + slash +
+        // dash) rather than \S so trailing punctuation (colons, commas,
+        // quote marks) in the surrounding sentence is NOT consumed by
+        // the redaction -- that would erase context-bearing words like
+        // ": failed" that follow a path.
         private val SENSITIVE_PATH =
-            Regex("/(?:storage|data|sdcard|cache|system|mnt|root)/\\S*")
+            Regex("/(?:storage|data|sdcard|cache|system|mnt|root)/[\\w./-]*")
 
         // `internal` so the same-module test set can exercise sanitize()
         // directly. Production callers only reach it via log().
         internal fun sanitize(s: String): String =
             s.replace(SENSITIVE_URI, "[uri]")
                 .replace(SENSITIVE_PATH, "[path]")
+
+        // Render the four-letter shorthand the Export JSON includes for
+        // each entry's level. Confined to the values that survive the
+        // WARN-floor filter in log().
+        internal fun levelChar(lvl: Int): String = when (lvl) {
+            Log.WARN -> "W"
+            Log.ERROR -> "E"
+            Log.ASSERT -> "A"
+            else -> "?"
+        }
+
+        // JSON string escape: only the four hot-path chars + a generic
+        // `\uXXXX` fallback for the remaining sub-0x20 control set.
+        // Higher code points are emitted verbatim (the consumer reads
+        // this as UTF-8). Internal so tests can hit it directly.
+        internal fun jsonString(s: String): String {
+            val sb = StringBuilder(s.length + 2).append('"')
+            for (c in s) {
+                when (c) {
+                    '\\' -> sb.append("\\\\")
+                    '"' -> sb.append("\\\"")
+                    '\n' -> sb.append("\\n")
+                    '\r' -> sb.append("\\r")
+                    '\t' -> sb.append("\\t")
+                    else -> {
+                        if (c.code < 0x20) {
+                            sb.append(String.format("\\u%04x", c.code))
+                        } else {
+                            sb.append(c)
+                        }
+                    }
+                }
+            }
+            sb.append('"')
+            return sb.toString()
+        }
     }
 }

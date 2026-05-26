@@ -943,6 +943,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        /**
+         * Return the BoundedLogTree's JSON-array snapshot, used by the
+         * JS-side Export to include a diagnostic tail in the user's
+         * "Your Data" export. Returns "[]" on debug builds (the
+         * DebugTree is planted instead of BoundedLogTree, so there's no
+         * captured buffer to read). The contract from JS's perspective
+         * is "always a valid JSON array string", which both branches
+         * honour.
+         */
+        @JavascriptInterface
+        fun getCrashLog(): String {
+            return VOTReaderApp.releaseTree?.toJson() ?: "[]"
+        }
+
         @JavascriptInterface
         fun setImmersiveMode(immersive: Boolean) {
             runOnUiThread {
