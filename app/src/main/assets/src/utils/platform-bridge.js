@@ -359,6 +359,278 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality) {
   }
 }
 
+// Web audio recording — MediaRecorder + AnalyserNode (W1.2 Tier C).
+// Consolidates the existing inline MediaRecorder code from
+// JournalRecordingSheet.jsx:118-279 per [[consolidate-dont-duplicate]].
+// The component (Tier C consumer migration) becomes a pure UI shell with
+// no platform branches — ALL recording state + lifecycle lives here.
+//
+// Architecture (per directives + memories):
+// - Module-level _webRecorder holds session state (mediaStream,
+//   mediaRecorder, audioContext, analyser, ampBuffer, chunks, timing).
+// - Pre-allocated Uint8Array ampBuffer per [[amplitude-buffer-preallocation]] —
+//   AnalyserNode.getByteTimeDomainData(buf) reuses the same buffer instance
+//   across every amplitude poll (~50ms cadence) to avoid GC pressure.
+// - requestMicPermission is fire-and-forget per [[explicit-async-decision]]:
+//   getUserMedia + store stream + fire window.__onMicPermissionResult.
+// - nativeRecordStop fires the existing __onNativeRecordingComplete(b64,
+//   durMs, mime) callback to UNIFY with the Android contract per
+//   [[callback-flow-unification]] (pre-W1.2 web processed the blob inline).
+// - MediaStream tracks are .stop()-ed on every exit path (stop / cancel /
+//   error) per [[mediastream-track-cleanup]] — leaked tracks keep the mic
+//   indicator active + hardware allocated.
+// - Mime negotiation strictly webm/opus → ogg/opus → 'error:unsupported-codec'
+//   per [[mediarecorder-mime-policy]] — NO wav fallback (would 10× per-memo
+//   storage size). Existing 4-candidate list (webm-no-codec, mp4) intentionally
+//   removed in favor of the policy memo's discipline.
+
+const _webRecorder = {
+  /** @type {any} */ mediaStream: null,
+  /** @type {any} */ mediaRecorder: null,
+  /** @type {any} */ audioContext: null,
+  /** @type {any} */ analyser: null,
+  /** @type {Uint8Array | null} */ ampBuffer: null,
+  /** @type {any[]} */ chunks: [],
+  /** @type {number} */ startTimeMs: 0,
+  /** @type {number} */ accumulatedMs: 0,
+  /** @type {string} */ mime: '',
+  /** @type {'inactive'|'recording'|'paused'} */ state: 'inactive',
+};
+
+// Full session teardown — used by stop's onstop AND cancel AND error paths.
+// Stops MediaStream tracks (releases mic + clears OS indicator), closes
+// AudioContext, clears chunks. Safe to call multiple times (idempotent).
+function _webRecorderCleanup() {
+  if (_webRecorder.mediaStream) {
+    try { _webRecorder.mediaStream.getTracks().forEach((/** @type {any} */ t) => t.stop()); } catch (_e) { /* best-effort */ }
+    _webRecorder.mediaStream = null;
+  }
+  if (_webRecorder.audioContext) {
+    try { _webRecorder.audioContext.close(); } catch (_e) { /* best-effort */ }
+    _webRecorder.audioContext = null;
+  }
+  _webRecorder.analyser = null;
+  _webRecorder.ampBuffer = null;
+  _webRecorder.chunks = [];
+  _webRecorder.mediaRecorder = null;
+  _webRecorder.state = 'inactive';
+  _webRecorder.startTimeMs = 0;
+  _webRecorder.accumulatedMs = 0;
+  _webRecorder.mime = '';
+}
+
+// Blob → pure base64 (strips the 'data:<mime>;base64,' prefix from
+// FileReader.readAsDataURL) — matches Android NativeAudioRecorder's
+// base64 output for __onNativeRecordingComplete callback.
+/** @param {Blob} blob @returns {Promise<string>} */
+function _webRecordBlobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const idx = result.indexOf(',');
+      resolve(idx >= 0 ? result.substring(idx + 1) : result);
+    };
+    reader.onerror = () => reject(new Error('blob-read-failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Fire __onNativeRecordingComplete(base64, durationMs, mime) — the global
+// callback that the consumer (JournalRecordingSheet) installs before
+// recording starts. Wrapped in try/catch so a consumer-side throw doesn't
+// leak out of the bridge.
+/**
+ * @param {string | null} b64
+ * @param {number} durMs
+ * @param {string} mime
+ */
+function _fireRecordingComplete(b64, durMs, mime) {
+  const cb = /** @type {any} */ (window).__onNativeRecordingComplete;
+  if (typeof cb === 'function') {
+    try { cb(b64, durMs, mime); } catch (e) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[PlatformBridge] __onNativeRecordingComplete consumer threw:', /** @type {any} */ (e).message || e);
+      }
+    }
+  }
+}
+
+function webRequestMicPermission() {
+  // Fire-and-forget: getUserMedia is async, but the bridge contract is
+  // sync void. Caller installs window.__onMicPermissionResult BEFORE
+  // calling; we fire it from the async result. Stream is stored for
+  // nativeRecordStart to consume next.
+  const cbName = '__onMicPermissionResult';
+  /** @param {boolean} granted */
+  const fire = (granted) => {
+    const cb = /** @type {any} */ (window)[cbName];
+    if (typeof cb === 'function') {
+      try { cb(granted); } catch (_e) { /* consumer-side error — best-effort */ }
+    }
+  };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    fire(false);
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then((/** @type {any} */ stream) => {
+      // Store the stream for nativeRecordStart to use
+      _webRecorder.mediaStream = stream;
+      fire(true);
+    })
+    .catch((/** @type {any} */ _err) => {
+      // NotAllowedError / NotFoundError / NotReadableError / etc.
+      fire(false);
+    });
+}
+
+/** @returns {string} */
+function webNativeRecordStart() {
+  if (typeof MediaRecorder === 'undefined') return 'error:no-MediaRecorder';
+  if (!_webRecorder.mediaStream) return 'error:no-stream';
+
+  // Strict mime negotiation per [[mediarecorder-mime-policy]]
+  const candidates = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'];
+  let mime = '';
+  for (const c of candidates) {
+    if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) { mime = c; break; }
+  }
+  if (!mime) {
+    // Neither opus codec available — surface clean error, DO NOT fall back to wav
+    _webRecorderCleanup();
+    return 'error:unsupported-codec';
+  }
+
+  /** @type {any} */ let rec;
+  try {
+    rec = new MediaRecorder(_webRecorder.mediaStream, { mimeType: mime });
+  } catch (e) {
+    _webRecorderCleanup();
+    return 'error:' + ((/** @type {any} */ (e) && /** @type {any} */ (e).message) || e);
+  }
+
+  _webRecorder.mediaRecorder = rec;
+  _webRecorder.chunks = [];
+  _webRecorder.mime = mime;
+
+  rec.ondataavailable = (/** @type {any} */ e) => {
+    if (e.data && e.data.size > 0) _webRecorder.chunks.push(e.data);
+  };
+  rec.onstop = () => {
+    // Fire __onNativeRecordingComplete with the assembled blob.
+    // Per [[callback-flow-unification]], web mirrors the Android contract:
+    // base64-encoded audio, duration ms, mime type.
+    const finalMime = _webRecorder.mime || mime;
+    const blob = new Blob(_webRecorder.chunks, { type: finalMime });
+    const durMs = _webRecorder.accumulatedMs;
+    _webRecordBlobToBase64(blob)
+      .then((b64) => _fireRecordingComplete(b64, durMs, finalMime))
+      .catch(() => _fireRecordingComplete(null, 0, finalMime))
+      .finally(() => _webRecorderCleanup());
+  };
+
+  // AnalyserNode for amplitude polling. Optional — if AudioContext isn't
+  // available (rare), amplitude returns 0 and the waveform displays as
+  // baseline. Pre-allocated buffer per [[amplitude-buffer-preallocation]].
+  try {
+    const AudioCtx = /** @type {any} */ (window).AudioContext || /** @type {any} */ (window).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      _webRecorder.audioContext = ctx;
+      const source = ctx.createMediaStreamSource(_webRecorder.mediaStream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      _webRecorder.analyser = analyser;
+      _webRecorder.ampBuffer = new Uint8Array(analyser.frequencyBinCount);
+    }
+  } catch (_e) { /* analyser is optional */ }
+
+  rec.start(250);  // 250 ms chunk interval — preserved from production code
+  _webRecorder.startTimeMs = Date.now();
+  _webRecorder.accumulatedMs = 0;
+  _webRecorder.state = 'recording';
+  return 'ok';
+}
+
+/** @returns {string} */
+function webNativeRecordPause() {
+  if (!_webRecorder.mediaRecorder || _webRecorder.state !== 'recording') return 'error:not-recording';
+  try {
+    _webRecorder.mediaRecorder.pause();
+  } catch (e) {
+    return 'error:' + ((/** @type {any} */ (e) && /** @type {any} */ (e).message) || e);
+  }
+  _webRecorder.accumulatedMs += Date.now() - _webRecorder.startTimeMs;
+  _webRecorder.state = 'paused';
+  return 'ok';
+}
+
+/** @returns {string} */
+function webNativeRecordResume() {
+  if (!_webRecorder.mediaRecorder || _webRecorder.state !== 'paused') return 'error:not-paused';
+  try {
+    _webRecorder.mediaRecorder.resume();
+  } catch (e) {
+    return 'error:' + ((/** @type {any} */ (e) && /** @type {any} */ (e).message) || e);
+  }
+  _webRecorder.startTimeMs = Date.now();
+  _webRecorder.state = 'recording';
+  return 'ok';
+}
+
+/**
+ * Per [[amplitude-buffer-preallocation]], reuses the pre-allocated
+ * ampBuffer (never allocates per-call). Computes RMS from time-domain
+ * data (matches the existing production code's tuning) and maps to
+ * Android's 0-32767 contract for getMaxAmplitude parity.
+ * @returns {number}
+ */
+function webNativeRecordAmplitude() {
+  if (!_webRecorder.analyser || !_webRecorder.ampBuffer) return 0;
+  _webRecorder.analyser.getByteTimeDomainData(_webRecorder.ampBuffer);
+  const buf = _webRecorder.ampBuffer;
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const v = (buf[i] - 128) / 128;
+    sum += v * v;
+  }
+  const rms = Math.sqrt(sum / buf.length);
+  return Math.round(rms * 32767);  // map RMS [0,1] → amp [0,32767]
+}
+
+function webNativeRecordStop() {
+  if (!_webRecorder.mediaRecorder) return;
+  // Snapshot duration BEFORE stopping (onstop runs async and reads accumulatedMs)
+  if (_webRecorder.state === 'recording') {
+    _webRecorder.accumulatedMs += Date.now() - _webRecorder.startTimeMs;
+  }
+  _webRecorder.state = 'inactive';
+  try {
+    _webRecorder.mediaRecorder.stop();  // triggers onstop → fires __onNativeRecordingComplete
+  } catch (_e) {
+    // Stop failed — fire callback with null to unblock the consumer
+    _fireRecordingComplete(null, 0, _webRecorder.mime);
+    _webRecorderCleanup();
+  }
+}
+
+function webNativeRecordCancel() {
+  // Discard recording WITHOUT firing __onNativeRecordingComplete. Per
+  // [[mediastream-track-cleanup]] this must stop all tracks so the mic
+  // indicator goes off + the hardware is released.
+  if (_webRecorder.mediaRecorder) {
+    try {
+      _webRecorder.mediaRecorder.onstop = null;  // suppress the callback fire
+      if (_webRecorder.mediaRecorder.state !== 'inactive') {
+        _webRecorder.mediaRecorder.stop();
+      }
+    } catch (_e) { /* best-effort */ }
+  }
+  _webRecorderCleanup();
+}
+
 /** @type {PlatformBridgeShape} */
 const webImpl = {
   // Category 1 — genuine no-ops on web
@@ -369,7 +641,6 @@ const webImpl = {
   // Category 2 — safe defaults
   getZoomScale: () => 1.0,
   getCrashLog: () => '[]',           // W7.4 will populate the JS DiagnosticLog
-  nativeRecordAmplitude: () => 0,
 
   // Category 3 — real web impls
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)
@@ -379,17 +650,17 @@ const webImpl = {
   setImmersiveMode: webSetImmersiveMode,     // Tier B.3 (Fullscreen API, best-effort)
   setZoomEnabled: webSetZoomEnabled,         // Tier B.3 (no-op — browsers handle zoom natively)
   resetZoom: webResetZoom,                   // Tier B.3 (no-op — no JS API to reset user pinch-zoom)
-
-  // Recording string-contract placeholders (W1.4)
-  nativeRecordStart: () => 'error:web-impl-pending',
-  nativeRecordPause: () => 'error:web-impl-pending',
-  nativeRecordResume: () => 'error:web-impl-pending',
+  // Tier C (W1.4): MediaRecorder + AnalyserNode recording flow
+  requestMicPermission: webRequestMicPermission,
+  nativeRecordStart: webNativeRecordStart,
+  nativeRecordPause: webNativeRecordPause,
+  nativeRecordResume: webNativeRecordResume,
+  nativeRecordAmplitude: webNativeRecordAmplitude,
+  nativeRecordStop: webNativeRecordStop,
+  nativeRecordCancel: webNativeRecordCancel,
 
   // Category 4 — not-yet-implemented warnings (void returns only)
   haptic: notYetImplemented('haptic'),                       // future; haptic JS wiring not yet present
-  requestMicPermission: notYetImplemented('requestMicPermission'), // W1.4
-  nativeRecordStop: notYetImplemented('nativeRecordStop'),   // W1.4
-  nativeRecordCancel: notYetImplemented('nativeRecordCancel'), // W1.4
 };
 
 /**

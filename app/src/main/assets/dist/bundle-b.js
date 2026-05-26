@@ -2655,6 +2655,231 @@
       return "";
     }
   }
+  var _webRecorder = {
+    /** @type {any} */
+    mediaStream: null,
+    /** @type {any} */
+    mediaRecorder: null,
+    /** @type {any} */
+    audioContext: null,
+    /** @type {any} */
+    analyser: null,
+    /** @type {Uint8Array | null} */
+    ampBuffer: null,
+    /** @type {any[]} */
+    chunks: [],
+    /** @type {number} */
+    startTimeMs: 0,
+    /** @type {number} */
+    accumulatedMs: 0,
+    /** @type {string} */
+    mime: "",
+    /** @type {'inactive'|'recording'|'paused'} */
+    state: "inactive"
+  };
+  function _webRecorderCleanup() {
+    if (_webRecorder.mediaStream) {
+      try {
+        _webRecorder.mediaStream.getTracks().forEach((t) => t.stop());
+      } catch (_e) {
+      }
+      _webRecorder.mediaStream = null;
+    }
+    if (_webRecorder.audioContext) {
+      try {
+        _webRecorder.audioContext.close();
+      } catch (_e) {
+      }
+      _webRecorder.audioContext = null;
+    }
+    _webRecorder.analyser = null;
+    _webRecorder.ampBuffer = null;
+    _webRecorder.chunks = [];
+    _webRecorder.mediaRecorder = null;
+    _webRecorder.state = "inactive";
+    _webRecorder.startTimeMs = 0;
+    _webRecorder.accumulatedMs = 0;
+    _webRecorder.mime = "";
+  }
+  function _webRecordBlobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const idx = result.indexOf(",");
+        resolve(idx >= 0 ? result.substring(idx + 1) : result);
+      };
+      reader.onerror = () => reject(new Error("blob-read-failed"));
+      reader.readAsDataURL(blob);
+    });
+  }
+  function _fireRecordingComplete(b64, durMs, mime) {
+    const cb = (
+      /** @type {any} */
+      window.__onNativeRecordingComplete
+    );
+    if (typeof cb === "function") {
+      try {
+        cb(b64, durMs, mime);
+      } catch (e) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn(
+            "[PlatformBridge] __onNativeRecordingComplete consumer threw:",
+            /** @type {any} */
+            e.message || e
+          );
+        }
+      }
+    }
+  }
+  function webRequestMicPermission() {
+    const cbName = "__onMicPermissionResult";
+    const fire = (granted) => {
+      const cb = (
+        /** @type {any} */
+        window[cbName]
+      );
+      if (typeof cb === "function") {
+        try {
+          cb(granted);
+        } catch (_e) {
+        }
+      }
+    };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      fire(false);
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+      _webRecorder.mediaStream = stream;
+      fire(true);
+    }).catch((_err) => {
+      fire(false);
+    });
+  }
+  function webNativeRecordStart() {
+    if (typeof MediaRecorder === "undefined") return "error:no-MediaRecorder";
+    if (!_webRecorder.mediaStream) return "error:no-stream";
+    const candidates = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus"];
+    let mime = "";
+    for (const c of candidates) {
+      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) {
+        mime = c;
+        break;
+      }
+    }
+    if (!mime) {
+      _webRecorderCleanup();
+      return "error:unsupported-codec";
+    }
+    let rec;
+    try {
+      rec = new MediaRecorder(_webRecorder.mediaStream, { mimeType: mime });
+    } catch (e) {
+      _webRecorderCleanup();
+      return "error:" + /** @type {any} */
+      (e && /** @type {any} */
+      e.message || e);
+    }
+    _webRecorder.mediaRecorder = rec;
+    _webRecorder.chunks = [];
+    _webRecorder.mime = mime;
+    rec.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) _webRecorder.chunks.push(e.data);
+    };
+    rec.onstop = () => {
+      const finalMime = _webRecorder.mime || mime;
+      const blob = new Blob(_webRecorder.chunks, { type: finalMime });
+      const durMs = _webRecorder.accumulatedMs;
+      _webRecordBlobToBase64(blob).then((b64) => _fireRecordingComplete(b64, durMs, finalMime)).catch(() => _fireRecordingComplete(null, 0, finalMime)).finally(() => _webRecorderCleanup());
+    };
+    try {
+      const AudioCtx = (
+        /** @type {any} */
+        window.AudioContext || /** @type {any} */
+        window.webkitAudioContext
+      );
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        _webRecorder.audioContext = ctx;
+        const source = ctx.createMediaStreamSource(_webRecorder.mediaStream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        _webRecorder.analyser = analyser;
+        _webRecorder.ampBuffer = new Uint8Array(analyser.frequencyBinCount);
+      }
+    } catch (_e) {
+    }
+    rec.start(250);
+    _webRecorder.startTimeMs = Date.now();
+    _webRecorder.accumulatedMs = 0;
+    _webRecorder.state = "recording";
+    return "ok";
+  }
+  function webNativeRecordPause() {
+    if (!_webRecorder.mediaRecorder || _webRecorder.state !== "recording") return "error:not-recording";
+    try {
+      _webRecorder.mediaRecorder.pause();
+    } catch (e) {
+      return "error:" + /** @type {any} */
+      (e && /** @type {any} */
+      e.message || e);
+    }
+    _webRecorder.accumulatedMs += Date.now() - _webRecorder.startTimeMs;
+    _webRecorder.state = "paused";
+    return "ok";
+  }
+  function webNativeRecordResume() {
+    if (!_webRecorder.mediaRecorder || _webRecorder.state !== "paused") return "error:not-paused";
+    try {
+      _webRecorder.mediaRecorder.resume();
+    } catch (e) {
+      return "error:" + /** @type {any} */
+      (e && /** @type {any} */
+      e.message || e);
+    }
+    _webRecorder.startTimeMs = Date.now();
+    _webRecorder.state = "recording";
+    return "ok";
+  }
+  function webNativeRecordAmplitude() {
+    if (!_webRecorder.analyser || !_webRecorder.ampBuffer) return 0;
+    _webRecorder.analyser.getByteTimeDomainData(_webRecorder.ampBuffer);
+    const buf = _webRecorder.ampBuffer;
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const v = (buf[i] - 128) / 128;
+      sum += v * v;
+    }
+    const rms = Math.sqrt(sum / buf.length);
+    return Math.round(rms * 32767);
+  }
+  function webNativeRecordStop() {
+    if (!_webRecorder.mediaRecorder) return;
+    if (_webRecorder.state === "recording") {
+      _webRecorder.accumulatedMs += Date.now() - _webRecorder.startTimeMs;
+    }
+    _webRecorder.state = "inactive";
+    try {
+      _webRecorder.mediaRecorder.stop();
+    } catch (_e) {
+      _fireRecordingComplete(null, 0, _webRecorder.mime);
+      _webRecorderCleanup();
+    }
+  }
+  function webNativeRecordCancel() {
+    if (_webRecorder.mediaRecorder) {
+      try {
+        _webRecorder.mediaRecorder.onstop = null;
+        if (_webRecorder.mediaRecorder.state !== "inactive") {
+          _webRecorder.mediaRecorder.stop();
+        }
+      } catch (_e) {
+      }
+    }
+    _webRecorderCleanup();
+  }
   var webImpl = {
     // Category 1 — genuine no-ops on web
     setLightStatusBar: () => {
@@ -2669,7 +2894,6 @@
     getZoomScale: () => 1,
     getCrashLog: () => "[]",
     // W7.4 will populate the JS DiagnosticLog
-    nativeRecordAmplitude: () => 0,
     // Category 3 — real web impls
     takeScreenshot: webTakeScreenshot,
     // Tier A (html2canvas)
@@ -2685,19 +2909,17 @@
     // Tier B.3 (no-op — browsers handle zoom natively)
     resetZoom: webResetZoom,
     // Tier B.3 (no-op — no JS API to reset user pinch-zoom)
-    // Recording string-contract placeholders (W1.4)
-    nativeRecordStart: () => "error:web-impl-pending",
-    nativeRecordPause: () => "error:web-impl-pending",
-    nativeRecordResume: () => "error:web-impl-pending",
+    // Tier C (W1.4): MediaRecorder + AnalyserNode recording flow
+    requestMicPermission: webRequestMicPermission,
+    nativeRecordStart: webNativeRecordStart,
+    nativeRecordPause: webNativeRecordPause,
+    nativeRecordResume: webNativeRecordResume,
+    nativeRecordAmplitude: webNativeRecordAmplitude,
+    nativeRecordStop: webNativeRecordStop,
+    nativeRecordCancel: webNativeRecordCancel,
     // Category 4 — not-yet-implemented warnings (void returns only)
-    haptic: notYetImplemented("haptic"),
+    haptic: notYetImplemented("haptic")
     // future; haptic JS wiring not yet present
-    requestMicPermission: notYetImplemented("requestMicPermission"),
-    // W1.4
-    nativeRecordStop: notYetImplemented("nativeRecordStop"),
-    // W1.4
-    nativeRecordCancel: notYetImplemented("nativeRecordCancel")
-    // W1.4
   };
   var PlatformBridge = isAndroid ? androidImpl : webImpl;
 

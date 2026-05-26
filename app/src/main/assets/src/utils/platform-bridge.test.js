@@ -209,27 +209,14 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
     expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
   });
 
-  // Recording methods preserve "error:<reason>" string contract
-  /** @type {Array<[string, any[]]>} */
-  const recordErrorCases = [
-    ['nativeRecordStart', []],
-    ['nativeRecordPause', []],
-    ['nativeRecordResume', []],
-  ];
-  it.each(recordErrorCases)('%s returns error contract string on web', (name, args) => {
-    expect(bridge[name](...args)).toBe('error:web-impl-pending');
-  });
-
   // Category 3 — notYetImplemented warns but doesn't throw
-  // (setKeepScreenOn moved out — has a real WakeLock impl as of W1.2 Tier B.1;
-  //  openFilePicker + saveToDownloads moved out — Tier B.2 real impls;
-  //  takeScreenshot moved out — Tier A html2canvas impl.
-  //  All have their own describe blocks below.)
+  // (Most methods now have real impls in their own describe blocks below:
+  //   setKeepScreenOn (Tier B.1), openFilePicker + saveToDownloads (Tier B.2),
+  //   takeScreenshot (Tier A), setImmersiveMode + setZoomEnabled + resetZoom
+  //   (Tier B.3), recording methods (Tier C). Only haptic remains — its JS
+  //   wiring is post-W1; see [[haptic-bridge-ready]].)
   it.each([
     'haptic',
-    'requestMicPermission',
-    'nativeRecordStop',
-    'nativeRecordCancel',
   ])('notYetImplemented method %s warns once but does not throw', (name) => {
     expect(() => bridge[name](0)).not.toThrow();
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -727,6 +714,260 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     const r1 = await bridge.takeScreenshot(0, 1024, 80);
     const r2 = await bridge.takeScreenshot(200, 1024, 80);
     expect(r1).toBe(r2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// Web recording — MediaRecorder + AnalyserNode (W1.2 Tier C)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ let mockGetUserMedia;
+  /** @type {any} */ let mockTracks;
+  /** @type {any} */ let mockStream;
+  /** @type {any} */ let mockRecorder;
+  /** @type {any} */ let mockMediaRecorderCtor;
+  /** @type {any} */ let mockAnalyser;
+  /** @type {any} */ let mockAudioCtxClose;
+  /** @type {any} */ let mockSource;
+  /** @type {any} */ let recOnDataAvailable;
+  /** @type {any} */ let recOnStop;
+
+  /** @param {string[]} supported  list of mime types isTypeSupported returns true for */
+  function setupMediaRecorderMock(supported) {
+    mockMediaRecorderCtor = vi.fn();
+    /** @type {any} */ (globalThis).MediaRecorder = function (/** @type {any} */ stream, /** @type {any} */ opts) {
+      mockMediaRecorderCtor(stream, opts);
+      mockRecorder = {
+        state: 'inactive',
+        mimeType: (opts && opts.mimeType) || 'audio/webm',
+        set ondataavailable(fn) { recOnDataAvailable = fn; },
+        set onstop(fn) { recOnStop = fn; },
+        start: vi.fn(function (/** @type {any} */ _interval) { mockRecorder.state = 'recording'; }),
+        pause: vi.fn(function () { mockRecorder.state = 'paused'; }),
+        resume: vi.fn(function () { mockRecorder.state = 'recording'; }),
+        stop: vi.fn(function () {
+          mockRecorder.state = 'inactive';
+          // Simulate the browser firing onstop synchronously (real impl is async,
+          // but we control that timing via awaits in tests where it matters).
+          if (recOnStop) setTimeout(() => recOnStop(), 0);
+        }),
+      };
+      return mockRecorder;
+    };
+    /** @type {any} */ (globalThis.MediaRecorder).isTypeSupported = (/** @type {string} */ m) => supported.indexOf(m) >= 0;
+  }
+
+  beforeEach(async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    // MediaStream + tracks
+    mockTracks = [
+      { stop: vi.fn(), kind: 'audio' },
+    ];
+    mockStream = {
+      getTracks: vi.fn(() => mockTracks),
+    };
+    mockGetUserMedia = vi.fn(() => Promise.resolve(mockStream));
+    /** @type {any} */ (globalThis.navigator).mediaDevices = { getUserMedia: mockGetUserMedia };
+    // MediaRecorder stub — default to webm/opus supported
+    setupMediaRecorderMock(['audio/webm;codecs=opus']);
+    // AudioContext + AnalyserNode + MediaStreamSource
+    mockAudioCtxClose = vi.fn();
+    mockSource = { connect: vi.fn() };
+    mockAnalyser = {
+      fftSize: 0,
+      frequencyBinCount: 128,
+      getByteTimeDomainData: vi.fn(),
+    };
+    /** @type {any} */ (globalThis.window).AudioContext = function () {
+      this.createMediaStreamSource = vi.fn(() => mockSource);
+      this.createAnalyser = vi.fn(() => mockAnalyser);
+      this.close = mockAudioCtxClose;
+    };
+    bridge = await importBridge();
+  });
+
+  afterEach(() => {
+    delete (/** @type {any} */ (globalThis.navigator)).mediaDevices;
+    delete (/** @type {any} */ (globalThis)).MediaRecorder;
+    delete (/** @type {any} */ (globalThis.window)).AudioContext;
+    delete (/** @type {any} */ (globalThis.window)).__onMicPermissionResult;
+    delete (/** @type {any} */ (globalThis.window)).__onNativeRecordingComplete;
+  });
+
+  // ── requestMicPermission ──
+
+  it('requestMicPermission fires __onMicPermissionResult(true) on getUserMedia success', async () => {
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onMicPermissionResult = cb;
+    bridge.requestMicPermission();
+    expect(mockGetUserMedia).toHaveBeenCalledWith({ audio: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(cb).toHaveBeenCalledWith(true);
+  });
+
+  it('requestMicPermission fires __onMicPermissionResult(false) on getUserMedia rejection', async () => {
+    mockGetUserMedia.mockImplementation(() => Promise.reject(new Error('NotAllowedError')));
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onMicPermissionResult = cb;
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(cb).toHaveBeenCalledWith(false);
+  });
+
+  it('requestMicPermission fires (false) when navigator.mediaDevices is absent', () => {
+    delete (/** @type {any} */ (globalThis.navigator)).mediaDevices;
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onMicPermissionResult = cb;
+    bridge.requestMicPermission();
+    expect(cb).toHaveBeenCalledWith(false);
+  });
+
+  // ── nativeRecordStart ──
+
+  it('nativeRecordStart returns "ok" with webm/opus when supported', async () => {
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    expect(mockMediaRecorderCtor).toHaveBeenCalledWith(mockStream, { mimeType: 'audio/webm;codecs=opus' });
+    expect(mockRecorder.start).toHaveBeenCalledWith(250);  // 250ms chunk interval preserved
+  });
+
+  it('nativeRecordStart falls back to ogg/opus when webm/opus unsupported', async () => {
+    setupMediaRecorderMock(['audio/ogg;codecs=opus']);
+    bridge = await importBridge();
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(bridge.nativeRecordStart()).toBe('ok');
+    expect(mockMediaRecorderCtor).toHaveBeenCalledWith(mockStream, { mimeType: 'audio/ogg;codecs=opus' });
+  });
+
+  it('nativeRecordStart returns "error:unsupported-codec" when NEITHER webm/opus NOR ogg/opus supported (no wav fallback)', async () => {
+    setupMediaRecorderMock([]);  // nothing supported
+    bridge = await importBridge();
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(bridge.nativeRecordStart()).toBe('error:unsupported-codec');
+    // Track cleanup must run — leak prevention per [[mediastream-track-cleanup]]
+    expect(mockTracks[0].stop).toHaveBeenCalled();
+  });
+
+  it('nativeRecordStart returns "error:no-stream" when called before requestMicPermission', () => {
+    expect(bridge.nativeRecordStart()).toBe('error:no-stream');
+  });
+
+  it('nativeRecordStart pre-allocates AnalyserNode buffer at start (not per amplitude call)', async () => {
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.nativeRecordStart();
+    expect(mockAnalyser.fftSize).toBe(256);
+    // Probe amplitude — getByteTimeDomainData should be called with the SAME buffer instance each time
+    bridge.nativeRecordAmplitude();
+    bridge.nativeRecordAmplitude();
+    const callA = mockAnalyser.getByteTimeDomainData.mock.calls[0][0];
+    const callB = mockAnalyser.getByteTimeDomainData.mock.calls[1][0];
+    expect(callA).toBe(callB);  // SAME instance, not a fresh allocation
+    expect(callA).toBeInstanceOf(Uint8Array);
+    expect(callA.length).toBe(mockAnalyser.frequencyBinCount);
+  });
+
+  // ── nativeRecordAmplitude ──
+
+  it('nativeRecordAmplitude returns 0 when not recording', () => {
+    expect(bridge.nativeRecordAmplitude()).toBe(0);
+  });
+
+  it('nativeRecordAmplitude maps RMS [0,1] to amp [0,32767] (Android contract)', async () => {
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.nativeRecordStart();
+    // Stub time-domain data: all values 192 → (192-128)/128 = 0.5 → RMS = 0.5 → amp ≈ 16384
+    mockAnalyser.getByteTimeDomainData.mockImplementation((/** @type {Uint8Array} */ buf) => {
+      for (let i = 0; i < buf.length; i++) buf[i] = 192;
+    });
+    const amp = bridge.nativeRecordAmplitude();
+    expect(amp).toBeCloseTo(16384, -2);  // within ±100
+  });
+
+  // ── pause / resume ──
+
+  it('nativeRecordPause returns "ok" and updates state', async () => {
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.nativeRecordStart();
+    expect(bridge.nativeRecordPause()).toBe('ok');
+    expect(mockRecorder.pause).toHaveBeenCalledTimes(1);
+  });
+
+  it('nativeRecordPause returns "error:not-recording" if not currently recording', () => {
+    expect(bridge.nativeRecordPause()).toBe('error:not-recording');
+  });
+
+  it('nativeRecordResume returns "ok" after pause', async () => {
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.nativeRecordStart();
+    bridge.nativeRecordPause();
+    expect(bridge.nativeRecordResume()).toBe('ok');
+    expect(mockRecorder.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('nativeRecordResume returns "error:not-paused" if not currently paused', async () => {
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.nativeRecordStart();
+    expect(bridge.nativeRecordResume()).toBe('error:not-paused');
+  });
+
+  // ── nativeRecordStop ──
+
+  it('nativeRecordStop triggers onstop which fires __onNativeRecordingComplete with base64 + duration + mime', async () => {
+    const completeCb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onNativeRecordingComplete = completeCb;
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.nativeRecordStart();
+    // Simulate a chunk being captured before stop
+    if (recOnDataAvailable) recOnDataAvailable({ data: new Blob(['x'], { type: 'audio/webm' }) });
+    bridge.nativeRecordStop();
+    // Wait for onstop's microtasks (Blob → base64 + callback fire)
+    await new Promise((r) => setTimeout(r, 20));
+    expect(completeCb).toHaveBeenCalledTimes(1);
+    const [b64, durMs, mime] = completeCb.mock.calls[0];
+    expect(typeof b64).toBe('string');
+    expect(typeof durMs).toBe('number');
+    expect(mime).toBe('audio/webm;codecs=opus');
+  });
+
+  it('nativeRecordStop cleans up — stops MediaStream tracks (no mic indicator leak)', async () => {
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.nativeRecordStart();
+    bridge.nativeRecordStop();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mockTracks[0].stop).toHaveBeenCalledTimes(1);
+    expect(mockAudioCtxClose).toHaveBeenCalledTimes(1);
+  });
+
+  // ── nativeRecordCancel ──
+
+  it('nativeRecordCancel stops tracks WITHOUT firing __onNativeRecordingComplete', async () => {
+    const completeCb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onNativeRecordingComplete = completeCb;
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    bridge.nativeRecordStart();
+    bridge.nativeRecordCancel();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(completeCb).not.toHaveBeenCalled();
+    expect(mockTracks[0].stop).toHaveBeenCalledTimes(1);  // MediaStream cleanup
+    expect(mockAudioCtxClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('nativeRecordCancel is safe when no recording in progress (no-op)', () => {
+    expect(() => bridge.nativeRecordCancel()).not.toThrow();
   });
 });
 
