@@ -4685,6 +4685,18 @@
     const [openSections, setOpenSections] = React.useState(/* @__PURE__ */ new Set());
     const [wipeConfirm, setWipeConfirm] = React.useState(false);
     const [wipeText, setWipeText] = React.useState("");
+    const [diagnosticLog, setDiagnosticLog] = React.useState([]);
+    React.useEffect(() => {
+      if (typeof window.AndroidBridge === "undefined") return;
+      if (typeof window.AndroidBridge.getCrashLog !== "function") return;
+      try {
+        const raw = window.AndroidBridge.getCrashLog();
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setDiagnosticLog(parsed);
+      } catch (e) {
+        console.warn("getCrashLog read failed", e);
+      }
+    }, []);
     const wipeOk = wipeText.trim().toUpperCase() === "DELETE";
     const VERSION_ID = "v1";
     const getStage = (key) => clearPending && clearPending.key === key ? clearPending.stage : 0;
@@ -4900,6 +4912,7 @@
           app: "VOTReader",
           exportVersion: 1,
           exportDate: (/* @__PURE__ */ new Date()).toISOString(),
+          diagnosticLog,
           data
         };
         const json = JSON.stringify(payload, null, 2);
@@ -5218,7 +5231,7 @@
       } }, "Export")), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Import from Backup"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, "Restore a previously exported JSON file. Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten.")), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
         e.stopPropagation();
         importPersonalData();
-      } }, "Import")), /* @__PURE__ */ (() => {
+      } }, "Import")), typeof window !== "undefined" && window.AndroidBridge && typeof window.AndroidBridge.getCrashLog === "function" && /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Diagnostic Log"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, diagnosticLog.length === 0 ? "No recent warnings or errors recorded. Exports include an empty diagnostic field." : `${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? "entry" : "entries"} captured (warnings and errors only, content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`))), /* @__PURE__ */ (() => {
         const closeWipe = () => {
           setWipeConfirm(false);
           setWipeText("");

@@ -30,6 +30,23 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const [openSections, setOpenSections] = React.useState(new Set());
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
+  // NK5c: diagnostic-log snapshot for the "Your Data" section. Only
+  // populated when the native bridge is present + getCrashLog exists
+  // (i.e. release-built APK with NK5b's BoundedLogTree planted). Read
+  // once on mount; the buffer keeps growing in the background but the
+  // count we show is a static snapshot of "what would be exported now."
+  const [diagnosticLog, setDiagnosticLog] = React.useState([]);
+  React.useEffect(() => {
+    if (typeof window.AndroidBridge === 'undefined') return;
+    if (typeof window.AndroidBridge.getCrashLog !== 'function') return;
+    try {
+      const raw = window.AndroidBridge.getCrashLog();
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) setDiagnosticLog(parsed);
+    } catch (e) {
+      console.warn('getCrashLog read failed', e);
+    }
+  }, []);
   const wipeOk = wipeText.trim().toUpperCase() === 'DELETE';
   const VERSION_ID = "v1";
 
@@ -203,10 +220,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     try {
       const data = {};
       _collectVotKeys().forEach((k) => { data[k] = localStorage.getItem(k); });
+      // NK5c: include the BoundedLogTree's WARN+ tail (already
+      // sanitized — content URIs + absolute paths redacted). Importer
+      // ignores this field; it's purely informational so the user
+      // can share a failure trail without writing anything to disk
+      // first. Empty array on debug builds / no bridge / no entries.
       const payload = {
         app: 'VOTReader',
         exportVersion: 1,
         exportDate: new Date().toISOString(),
+        diagnosticLog: diagnosticLog,
         data: data
       };
       const json = JSON.stringify(payload, null, 2);
@@ -521,6 +544,22 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             </div>
             <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); importPersonalData(); }}>Import</button>
           </div>
+          {/* NK5c: diagnostic-log status row. Only renders when the native
+              bridge exposes getCrashLog (release-built APK with NK5b's
+              BoundedLogTree planted). Web preview + debug builds skip
+              the row entirely. */}
+          {typeof window !== 'undefined' && window.AndroidBridge && typeof window.AndroidBridge.getCrashLog === 'function' && (
+            <div className="settings-row">
+              <div className="settings-row-text">
+                <div className="settings-row-label">Diagnostic Log</div>
+                <div className="settings-row-desc">
+                  {diagnosticLog.length === 0
+                    ? 'No recent warnings or errors recorded. Exports include an empty diagnostic field.'
+                    : `${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? 'entry' : 'entries'} captured (warnings and errors only, content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`}
+                </div>
+              </div>
+            </div>
+          )}
           {(() => {
             const closeWipe = () => { setWipeConfirm(false); setWipeText(''); };
             return (
