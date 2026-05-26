@@ -87,3 +87,18 @@ app_webview/
 # Keep the content in case we need it later, but skip from git.
 # If you want them tracked, remove the next line.
 HTML\ Archives/
+
+# ─── Local reference scrape (mirrors HTML Archives/ pattern; note typo) ──
+Downloaded\ Webssite\ Source/
+
+# ─── Workspace-local artifacts (Drive-sync temp + superseded legacy plan) ──
+# quality-uplift-plan.txt is the original Q3-Q6 sequence from 2026-05-21;
+# fully superseded by PLAN.txt (which carries all closure status). Keep
+# the local file as a historical artifact, but it shouldn't surface in
+# git status anymore.
+.tmp.driveupload/
+quality-uplift-plan.txt
+
+# ─── More IDE-local state (sibling to existing .idea/* entries above) ──
+# appInsightsSettings.xml = current Android Vitals tab selection (UI state)
+.idea/appInsightsSettings.xml
