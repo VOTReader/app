@@ -282,14 +282,8 @@ export function buildScreenRoutes({
     ),
     'about': () => (
       <AboutScreen
-        onContinue={() => {
-          try { localStorage.setItem('vot-about-seen', '1'); } catch (_e) { /* localStorage access — non-fatal */ }
-          goNavOrigin();
-        }}
-        onBack={() => {
-          try { localStorage.setItem('vot-about-seen', '1'); } catch (_e) { /* localStorage access — non-fatal */ }
-          goNavOrigin();
-        }}
+        onContinue={() => { AboutSeenFlagStore.set(); goNavOrigin(); }}
+        onBack={() => { AboutSeenFlagStore.set(); goNavOrigin(); }}
         onSearch={goSearch}
         onHistory={goHistory}
         theme={theme} onThemeChange={setTheme}

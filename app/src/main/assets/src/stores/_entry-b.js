@@ -39,6 +39,8 @@ import '../styles/journal-styles.js';
 // ── Stores ──────────────────────────────────────────────────────────────
 import { CachedStore, hydrateAllStores, hasAnyPendingStores } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
+import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore } from './app-flag-stores.js';
+import { ProphecyCardsStore } from './prophecy-cards-store.js';
 import { migrateAnnotations, AnnotationStore, HighlightStore } from './annotation-store.js';
 import { NoteStore } from './note-store.js';
 import { NotebookStore } from './notebook-store.js';
@@ -134,6 +136,8 @@ Object.assign(window, {
   // Stores
   CachedStore, hydrateAllStores, hasAnyPendingStores,
   IDBAdapter,
+  WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore,
+  ProphecyCardsStore,
   migrateAnnotations, AnnotationStore, HighlightStore,
   NoteStore, NotebookStore, RecentNavStore,
   hlId, lnkId, LinkStore, persistLink,

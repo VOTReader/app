@@ -89,6 +89,8 @@
                                screen to route to).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
+
 /**
  * Reading-cursor coordination hook. Owns setLastReadForVol +
  * selectMatthewCh/BibleCh + goToLastRead + the prophecy-card-state
@@ -129,21 +131,18 @@ export function useReadingPositionNav({
   setLastReadLetterMap, setLastReadChapters,
   getStudyById, selectStudy, selectStudyChapter,
 }) {
-  // ── Prophecy card expand/collapse state (localStorage-persisted) ─────
+  // ── Prophecy card expand/collapse state (IDB-backed via ProphecyCardsStore) ─
   // Key format: "chapterId:blockIndex:cardType" → boolean.
-  // Lazy-init: useRef accepts a factory only at construction; React
-  // doesn't invoke the function for us — the if-check below resolves
-  // it on first render and stamps the value, then becomes a no-op.
-  const prophecyCardStatesRef = React.useRef(() => {
-    try { return JSON.parse(localStorage.getItem('vot-prophecy-cards') || '{}'); }
-    catch (_e) { return {}; }
-  });
+  // The ref-cached pattern is preserved so consumers can batch mutations
+  // synchronously then flush via saveProphecyCardStates on commit. W2.3b
+  // routes the read + write through ProphecyCardsStore (HydrationGate has
+  // already resolved by the time this hook runs).
+  const prophecyCardStatesRef = React.useRef(() => ProphecyCardsStore.getAll());
   if (typeof prophecyCardStatesRef.current === 'function') {
     prophecyCardStatesRef.current = prophecyCardStatesRef.current();
   }
   const saveProphecyCardStates = React.useCallback(() => {
-    try { localStorage.setItem('vot-prophecy-cards', JSON.stringify(prophecyCardStatesRef.current)); }
-    catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+    ProphecyCardsStore.setAll(prophecyCardStatesRef.current);
   }, []);
 
   // ── setLastReadForVol — the per-volume cursor writer ──────────────────

@@ -573,10 +573,8 @@ function App() {
     const col = COL_BY_CARD.get(id);
     if (col && col.indexScreen) { setScreen(col.indexScreen); return; }
     if (id === "garden") {
-      let acked = false;
-      try {acked = !!localStorage.getItem('vot-garden-warning-acked');} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
-      if (acked) setScreen("garden-view");else
-      setGardenWarningOpen(true);
+      if (GardenWarningFlagStore.is()) setScreen("garden-view");
+      else setGardenWarningOpen(true);
     }
   };
 

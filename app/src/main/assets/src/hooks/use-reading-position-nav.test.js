@@ -37,6 +37,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useReadingPositionNav } from './use-reading-position-nav.js';
+import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
 
 // ── Global stubs ────────────────────────────────────────────────────────
 let _prevCOL_BY_KEY;
@@ -47,8 +48,9 @@ beforeEach(() => {
     ['two', { volKey: 'two', letterScreen: 'vot-letter' }],
     ['one', { volKey: 'one', letterScreen: 'vot-one-letter' }],
   ]);
-  // Ensure clean localStorage per test (the hook reads vot-prophecy-cards
-  // on init).
+  // W2.3b: prophecy card state lives in ProphecyCardsStore (IDB-backed).
+  // Reset its state machine; forceLoaded skips async hydration.
+  ProphecyCardsStore._resetForTests({ forceLoaded: true });
   localStorage.removeItem('vot-prophecy-cards');
 });
 
@@ -92,25 +94,28 @@ describe('useReadingPositionNav — prophecy card state', () => {
     expect(result.current.prophecyCardStatesRef.current).toEqual({});
   });
 
-  it('hydrates from vot-prophecy-cards localStorage on init', () => {
-    const seed = { 'chap-1:0:prophecy': true, 'chap-2:3:rapture': false };
-    localStorage.setItem('vot-prophecy-cards', JSON.stringify(seed));
+  it('hydrates from ProphecyCardsStore on init', () => {
+    // Pre-populate the store directly (in IDB-mode 'loaded' state,
+    // setOne is a normal write-through; ProphecyCardsStore.setAll
+    // filters falsy so we set only the truthy keys).
+    ProphecyCardsStore.setAll({ 'chap-1:0:prophecy': true });
     const { result } = setup();
-    expect(result.current.prophecyCardStatesRef.current).toEqual(seed);
+    expect(result.current.prophecyCardStatesRef.current).toEqual({ 'chap-1:0:prophecy': true });
   });
 
-  it('handles corrupt JSON gracefully — defaults to {}', () => {
-    localStorage.setItem('vot-prophecy-cards', '{not valid json');
+  it('handles empty/corrupt store gracefully — defaults to {}', () => {
+    // ProphecyCardsStore's CachedStore handles JSON parse failure via
+    // legacy-LS-fallback; here we just verify the empty default case.
+    ProphecyCardsStore._cache = /** @type {any} */ ({});
     const { result } = setup();
     expect(result.current.prophecyCardStatesRef.current).toEqual({});
   });
 
-  it('saveProphecyCardStates writes the ref to localStorage', () => {
+  it('saveProphecyCardStates writes the ref to ProphecyCardsStore', () => {
     const { result } = setup();
     result.current.prophecyCardStatesRef.current['chap-1:0:prophecy'] = true;
     act(() => { result.current.saveProphecyCardStates(); });
-    const persisted = JSON.parse(localStorage.getItem('vot-prophecy-cards') || '{}');
-    expect(persisted).toEqual({ 'chap-1:0:prophecy': true });
+    expect(ProphecyCardsStore.getAll()).toEqual({ 'chap-1:0:prophecy': true });
   });
 
   it('saveProphecyCardStates is identity-stable across renders (useCallback)', () => {

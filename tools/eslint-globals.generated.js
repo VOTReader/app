@@ -6,11 +6,12 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 364 distinct identifiers.
+// Total: 368 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
   AboutScreen: "readonly",
+  AboutSeenFlagStore: "readonly",
   AnnotationActionChip: "readonly",
   AnnotationStore: "readonly",
   App: "readonly",
@@ -67,6 +68,7 @@ export const projectGlobals = {
   GARDEN_TIERS: "readonly",
   GARDEN_TOTAL: "readonly",
   GardenView: "readonly",
+  GardenWarningFlagStore: "readonly",
   HIDDEN_MANNA: "readonly",
   HIDDEN_MANNA_TITLES: "readonly",
   HL_COLORS: "readonly",
@@ -157,6 +159,7 @@ export const projectGlobals = {
   OT_BOOK_IDS: "readonly",
   PlatformBridge: "readonly",
   ProphecyCard: "readonly",
+  ProphecyCardsStore: "readonly",
   ProphecyExpandToggle: "readonly",
   ProphecyGroup: "readonly",
   READING_CHAIN: "readonly",
@@ -214,6 +217,7 @@ export const projectGlobals = {
   WTLB_ONE: "readonly",
   WTLB_SCRIPTURES: "readonly",
   WTLB_TWO: "readonly",
+  WelcomedFlagStore: "readonly",
   WtlbEntryView: "readonly",
   _BOUNDARY_SHORT: "readonly",
   _BOUNDARY_SHORT_OUTSIDE: "readonly",

@@ -54,6 +54,8 @@
                         cleaned up at unmount via `delete`.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { WelcomedFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
+
 /**
  * @param {{
  *   setHlTick: (updater: (prev: number) => number) => void,
@@ -75,10 +77,10 @@ export function useAppShellEffects({ setHlTick, setNavOrigin, setScreen }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only bridge; setHlTick is a useState setter (identity-stable per React invariant).
   }, []);
 
-  // First-run welcome state.
-  const [showWelcome, setShowWelcome] = React.useState(() => {
-    try { return !localStorage.getItem('vot-welcomed'); } catch (_e) { return true; }
-  });
+  // First-run welcome state. WelcomedFlagStore is IDB-backed (W2.3b);
+  // HydrationGate has already resolved by the time this hook runs, so
+  // the read is sync from the in-memory cache.
+  const [showWelcome, setShowWelcome] = React.useState(() => !WelcomedFlagStore.is());
 
   // Online-status ping. Re-runs when showWelcome flips (so the splash
   // gets a fresh check at dismissal time; non-welcome paths don't poll).
@@ -95,17 +97,15 @@ export function useAppShellEffects({ setHlTick, setNavOrigin, setScreen }) {
   }, [showWelcome]);
 
   const dismissWelcome = () => {
-    try { localStorage.setItem('vot-welcomed', '1'); } catch (_e) { /* localStorage — non-fatal */ }
+    WelcomedFlagStore.set();
     setShowWelcome(false);
     // First-time users see the About intro right after the splash. After
-    // CONTINUE marks `vot-about-seen`, this path becomes a no-op and the
-    // splash just dismisses straight to home on subsequent uses.
-    try {
-      if (!localStorage.getItem('vot-about-seen')) {
-        setNavOrigin({ screen: 'home', bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
-        setScreen('about');
-      }
-    } catch (_e) { /* localStorage — non-fatal */ }
+    // CONTINUE marks the about-seen flag, this path becomes a no-op and
+    // the splash just dismisses straight to home on subsequent uses.
+    if (!AboutSeenFlagStore.is()) {
+      setNavOrigin({ screen: 'home', bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
+      setScreen('about');
+    }
   };
 
   return { showWelcome, setShowWelcome, isOnline, dismissWelcome };

@@ -1026,6 +1026,115 @@
     );
   }
 
+  // app/src/main/assets/src/stores/app-flag-stores.js
+  function buildFlagStore(key) {
+    return extendStore(
+      CachedStore(
+        key,
+        /** @type {boolean} */
+        false,
+        { idb: true }
+      ),
+      {
+        /**
+         * True iff the flag has been set (legacy "1" string from pre-W2
+         * data is truthy after JSON.parse → number 1).
+         */
+        is() {
+          return !!this._load();
+        },
+        /** Record the flag as truthy. Idempotent. */
+        set() {
+          if (this._shouldDefer("set")) return;
+          this._cache = /** @type {any} */
+          true;
+          this._save();
+          this._bump();
+        },
+        /** Record the flag as falsy. Idempotent. */
+        clear() {
+          if (this._shouldDefer("clear")) return;
+          this._cache = /** @type {any} */
+          false;
+          this._save();
+          this._bump();
+        }
+      }
+    );
+  }
+  var WelcomedFlagStore = buildFlagStore("vot-welcomed");
+  var AboutSeenFlagStore2 = buildFlagStore("vot-about-seen");
+  var GardenWarningFlagStore = buildFlagStore("vot-garden-warning-acked");
+
+  // app/src/main/assets/src/stores/prophecy-cards-store.js
+  var ProphecyCardsStore = extendStore(
+    CachedStore(
+      "vot-prophecy-cards",
+      /** @type {ProphecyCardsData} */
+      {},
+      { idb: true }
+    ),
+    {
+      /**
+       * Full state map (defensive copy — callers may mutate without
+       * affecting the cache; flush via setAll when done).
+       * @returns {ProphecyCardsData}
+       */
+      getAll() {
+        const data = this._load();
+        return Object.assign(
+          /** @type {ProphecyCardsData} */
+          {},
+          data || {}
+        );
+      },
+      /**
+       * Boolean for one key. Defaults to false (collapsed).
+       * @param {string} key
+       * @returns {boolean}
+       */
+      getOne(key) {
+        const data = this._load();
+        return !!(data && data[key]);
+      },
+      /**
+       * Set the boolean for one key. Idempotent.
+       * @param {string} key
+       * @param {boolean} value
+       * @returns {void}
+       */
+      setOne(key, value) {
+        if (!key) return;
+        if (this._shouldDefer("setOne", key, value)) return;
+        const data = this._load();
+        if (value) data[key] = true;
+        else delete data[key];
+        this._save();
+        this._bump();
+      },
+      /**
+       * Replace the full map. Used by the consumer that batches changes
+       * into a ref, then flushes via this method on commit (e.g. tap
+       * commit). Filters falsy values so the persisted map stays
+       * minimal.
+       * @param {ProphecyCardsData | null | undefined} map
+       * @returns {void}
+       */
+      setAll(map) {
+        if (this._shouldDefer("setAll", map)) return;
+        const next = {};
+        if (map && typeof map === "object") {
+          for (const k of Object.keys(map)) {
+            if (map[k]) next[k] = true;
+          }
+        }
+        this._cache = next;
+        this._save();
+        this._bump();
+      }
+    }
+  );
+
   // app/src/main/assets/src/stores/annotation-store.js
   function migrateAnnotations() {
     try {
@@ -4889,10 +4998,7 @@
           goNavOrigin();
           return "true";
         } else if (s === "about") {
-          try {
-            localStorage.setItem("vot-about-seen", "1");
-          } catch (_e) {
-          }
+          AboutSeenFlagStore.set();
           goNavOrigin();
           return "true";
         } else if (s === "notes-index") {
@@ -5830,21 +5936,12 @@
     selectStudy,
     selectStudyChapter
   }) {
-    const prophecyCardStatesRef = React.useRef(() => {
-      try {
-        return JSON.parse(localStorage.getItem("vot-prophecy-cards") || "{}");
-      } catch (_e) {
-        return {};
-      }
-    });
+    const prophecyCardStatesRef = React.useRef(() => ProphecyCardsStore.getAll());
     if (typeof prophecyCardStatesRef.current === "function") {
       prophecyCardStatesRef.current = prophecyCardStatesRef.current();
     }
     const saveProphecyCardStates = React.useCallback(() => {
-      try {
-        localStorage.setItem("vot-prophecy-cards", JSON.stringify(prophecyCardStatesRef.current));
-      } catch (_e) {
-      }
+      ProphecyCardsStore.setAll(prophecyCardStatesRef.current);
     }, []);
     const setLastReadForVol = (volKey, id) => {
       setLastReadLetterMap((prev) => ({ ...prev, [volKey]: id }));
@@ -6110,13 +6207,7 @@
         delete window.__bumpHlTick;
       };
     }, []);
-    const [showWelcome, setShowWelcome] = React.useState(() => {
-      try {
-        return !localStorage.getItem("vot-welcomed");
-      } catch (_e) {
-        return true;
-      }
-    });
+    const [showWelcome, setShowWelcome] = React.useState(() => !WelcomedFlagStore.is());
     const [isOnline, setIsOnline] = React.useState(false);
     React.useEffect(() => {
       let cancelled = false;
@@ -6133,17 +6224,11 @@
       };
     }, [showWelcome]);
     const dismissWelcome = () => {
-      try {
-        localStorage.setItem("vot-welcomed", "1");
-      } catch (_e) {
-      }
+      WelcomedFlagStore.set();
       setShowWelcome(false);
-      try {
-        if (!localStorage.getItem("vot-about-seen")) {
-          setNavOrigin({ screen: "home", bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
-          setScreen("about");
-        }
-      } catch (_e) {
+      if (!AboutSeenFlagStore2.is()) {
+        setNavOrigin({ screen: "home", bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
+        setScreen("about");
       }
     };
     return { showWelcome, setShowWelcome, isOnline, dismissWelcome };
@@ -9049,6 +9134,10 @@
     hydrateAllStores,
     hasAnyPendingStores,
     IDBAdapter,
+    WelcomedFlagStore,
+    AboutSeenFlagStore: AboutSeenFlagStore2,
+    GardenWarningFlagStore,
+    ProphecyCardsStore,
     migrateAnnotations,
     AnnotationStore: AnnotationStore2,
     HighlightStore,

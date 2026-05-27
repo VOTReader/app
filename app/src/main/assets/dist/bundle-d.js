@@ -2280,10 +2280,7 @@
         {
           className: "garden-warning-btn garden-warning-btn-proceed",
           onClick: () => {
-            try {
-              localStorage.setItem("vot-garden-warning-acked", "1");
-            } catch (_e) {
-            }
+            GardenWarningFlagStore.set();
             setGardenWarningOpen(false);
             setScreen("garden-view");
           }
@@ -2889,17 +2886,11 @@
         AboutScreen,
         {
           onContinue: () => {
-            try {
-              localStorage.setItem("vot-about-seen", "1");
-            } catch (_e) {
-            }
+            AboutSeenFlagStore.set();
             goNavOrigin();
           },
           onBack: () => {
-            try {
-              localStorage.setItem("vot-about-seen", "1");
-            } catch (_e) {
-            }
+            AboutSeenFlagStore.set();
             goNavOrigin();
           },
           onSearch: goSearch,
@@ -9910,14 +9901,8 @@
         return;
       }
       if (id === "garden") {
-        let acked = false;
-        try {
-          acked = !!localStorage.getItem("vot-garden-warning-acked");
-        } catch (_e) {
-        }
-        if (acked) setScreen("garden-view");
-        else
-          setGardenWarningOpen(true);
+        if (GardenWarningFlagStore.is()) setScreen("garden-view");
+        else setGardenWarningOpen(true);
       }
     };
     const fromMatthewChRef = useRefMirror(fromMatthewCh);

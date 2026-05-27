@@ -200,7 +200,7 @@ export function AppShellOverlays({
                   onClick={() => setGardenWarningOpen(false)}>Go Back</button>
                 <button className="garden-warning-btn garden-warning-btn-proceed"
                   onClick={() => {
-                    try {localStorage.setItem('vot-garden-warning-acked', '1');} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+                    GardenWarningFlagStore.set();
                     setGardenWarningOpen(false);
                     setScreen("garden-view");
                   }}>Proceed</button>

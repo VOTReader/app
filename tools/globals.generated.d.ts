@@ -7,11 +7,12 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 364 distinct identifiers.
+// Total: 368 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
 declare const AboutScreen: any;
+declare const AboutSeenFlagStore: any;
 declare const AnnotationActionChip: any;
 declare const AnnotationStore: any;
 declare const App: any;
@@ -68,6 +69,7 @@ declare const GARDEN_PRELOAD_AHEAD: any;
 declare const GARDEN_TIERS: any;
 declare const GARDEN_TOTAL: any;
 declare const GardenView: any;
+declare const GardenWarningFlagStore: any;
 declare const HIDDEN_MANNA: any;
 declare const HIDDEN_MANNA_TITLES: any;
 declare const HL_COLORS: any;
@@ -158,6 +160,7 @@ declare const NotesIndexScreen: any;
 declare const OT_BOOK_IDS: any;
 declare const PlatformBridge: any;
 declare const ProphecyCard: any;
+declare const ProphecyCardsStore: any;
 declare const ProphecyExpandToggle: any;
 declare const ProphecyGroup: any;
 declare const READING_CHAIN: any;
@@ -215,6 +218,7 @@ declare const WEEKDAY_NAMES: any;
 declare const WTLB_ONE: any;
 declare const WTLB_SCRIPTURES: any;
 declare const WTLB_TWO: any;
+declare const WelcomedFlagStore: any;
 declare const WtlbEntryView: any;
 declare const _BOUNDARY_SHORT: any;
 declare const _BOUNDARY_SHORT_OUTSIDE: any;

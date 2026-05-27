@@ -3,11 +3,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAppShellEffects } from './use-app-shell-effects.js';
+import { WelcomedFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
 let _prevFetch;
 
 beforeEach(() => {
   localStorage.clear();
+  // W2.3b: WelcomedFlagStore + AboutSeenFlagStore are now IDB-backed.
+  // Reset their state machine so each test starts with empty cache
+  // and 'loaded' state (forceLoaded skips the async hydration path).
+  WelcomedFlagStore._resetForTests({ forceLoaded: true });
+  AboutSeenFlagStore._resetForTests({ forceLoaded: true });
   delete window.__bumpHlTick;
   _prevFetch = window.fetch;
   // Default: online (favicon fetch resolves). Cast through `any` —
@@ -45,18 +51,18 @@ describe('useAppShellEffects — showWelcome init', () => {
     expect(result.current.showWelcome).toBe(true);
   });
 
-  it('initializes false when vot-welcomed is set', () => {
-    localStorage.setItem('vot-welcomed', '1');
+  it('initializes false when WelcomedFlagStore.is() is true', () => {
+    WelcomedFlagStore._cache = /** @type {any} */ (true);
     const { result } = renderHook(() => useAppShellEffects(baseProps()));
     expect(result.current.showWelcome).toBe(false);
   });
 });
 
 describe('useAppShellEffects — dismissWelcome', () => {
-  it('writes vot-welcomed + clears showWelcome', () => {
+  it('records welcomed flag + clears showWelcome', () => {
     const { result } = renderHook(() => useAppShellEffects(baseProps()));
     act(() => { result.current.dismissWelcome(); });
-    expect(localStorage.getItem('vot-welcomed')).toBe('1');
+    expect(WelcomedFlagStore.is()).toBe(true);
     expect(result.current.showWelcome).toBe(false);
   });
 
@@ -68,8 +74,8 @@ describe('useAppShellEffects — dismissWelcome', () => {
     expect(props.setScreen).toHaveBeenCalledWith('about');
   });
 
-  it('subsequent run: skips About redirect when vot-about-seen is set', () => {
-    localStorage.setItem('vot-about-seen', '1');
+  it('subsequent run: skips About redirect when AboutSeenFlagStore.is() is true', () => {
+    AboutSeenFlagStore._cache = /** @type {any} */ (true);
     const props = baseProps();
     const { result } = renderHook(() => useAppShellEffects(props));
     act(() => { result.current.dismissWelcome(); });

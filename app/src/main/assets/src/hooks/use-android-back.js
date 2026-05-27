@@ -173,7 +173,7 @@ export function useAndroidBack({
       }
       if (s === "settings") {goNavOrigin();return "true";} else
       if (s === "history") {goNavOrigin();return "true";} else
-      if (s === "about") {try{localStorage.setItem('vot-about-seen','1');}catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }goNavOrigin();return "true";} else
+      if (s === "about") {AboutSeenFlagStore.set();goNavOrigin();return "true";} else
       if (s === "notes-index") {setScreen("library");return "true";} else
       if (s === "links-index") {setScreen("library");return "true";} else
       if (s === "bookmarks-index") {setScreen("library");return "true";} else
