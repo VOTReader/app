@@ -27,7 +27,7 @@ import { CachedStore, extendStore } from './cached-store.js';
 /* NoteStore — note bodies as first-class records keyed by groupId.
    A note exists iff its group's kind === 'note'. */
 export const NoteStore = extendStore(
-  CachedStore('vot-notes', /** @type {Record<string, Note>} */ ({})),
+  CachedStore('vot-notes', /** @type {Record<string, Note>} */ ({}), { idb: true }),
   {
     /**
      * Look up a note by its groupId.
@@ -66,6 +66,7 @@ export const NoteStore = extendStore(
      * @returns {void}
      */
     set(groupId, fields) {
+      if (this._shouldDefer('set', groupId, fields)) return;
       const data = this._load();
       const existing = data[groupId];
       const ts = Date.now();
@@ -87,6 +88,7 @@ export const NoteStore = extendStore(
      * @returns {void}
      */
     update(groupId, patch) {
+      if (this._shouldDefer('update', groupId, patch)) return;
       const data = this._load();
       if (!data[groupId]) return;
       data[groupId] = { ...data[groupId], ...patch, updated: Date.now() };
@@ -100,6 +102,7 @@ export const NoteStore = extendStore(
      * @returns {void}
      */
     remove(groupId) {
+      if (this._shouldDefer('remove', groupId)) return;
       const data = this._load();
       delete data[groupId];
       this._save();
@@ -114,6 +117,7 @@ export const NoteStore = extendStore(
      * @returns {void}
      */
     toggleNotebook(groupId, notebookId) {
+      if (this._shouldDefer('toggleNotebook', groupId, notebookId)) return;
       const data = this._load();
       const note = data[groupId];
       if (!note) return;
@@ -132,6 +136,7 @@ export const NoteStore = extendStore(
      * @returns {void}
      */
     pruneNotebook(notebookId) {
+      if (this._shouldDefer('pruneNotebook', notebookId)) return;
       const data = this._load();
       const ts = Date.now();
       Object.keys(data).forEach(k => {

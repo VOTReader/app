@@ -38,7 +38,7 @@ const ep = (x) => /** @type {any} */ (x);
 
 beforeEach(() => {
   localStorage.clear();
-  LinkStore._resetForTests();
+  LinkStore._resetForTests({ forceLoaded: true });
 });
 
 describe('LinkStore — legacy {a, b} → {source, target} migration', () => {
@@ -201,7 +201,7 @@ describe('LinkStore — legacy {a, b} → {source, target} migration', () => {
     const firstSerialized = JSON.stringify(first);
 
     // Bust the cache to force a re-load from localStorage.
-    LinkStore._resetForTests();
+    LinkStore._resetForTests({ forceLoaded: true });
 
     // Second load — should produce identical output (no double-migration).
     const second = LinkStore.all();
@@ -256,7 +256,14 @@ describe('LinkStore — legacy {a, b} → {source, target} migration', () => {
     }
   });
 
-  it('migration persists to localStorage (next session sees clean data)', () => {
+  it('migration persists in in-memory cache (subsequent reads see clean data)', () => {
+    // W2.3 Tier 3: vot-links migrated to IDB-backed CachedStore. _save
+    // now writes to IDB, not localStorage. The legacy LS key is read
+    // once via the W2.2 legacy-LS-fallback path during _hydrate (or
+    // directly via _load in LS-mode tests like this), normalized, and
+    // the migrated cache is what subsequent reads see. The pre-W2 test
+    // assertion ("LS key gets rewritten") is no longer the invariant —
+    // the user-observable invariant is "next read sees clean data."
     const legacy = {
       id: 'lnk_persist',
       a: { type: 'bible', key: 'bible:genesis:1:1', label: 'Gen 1:1' },
@@ -265,14 +272,15 @@ describe('LinkStore — legacy {a, b} → {source, target} migration', () => {
     };
     localStorage.setItem('vot-links', JSON.stringify([legacy]));
 
-    LinkStore.all();  // trigger migration
+    LinkStore.all();  // trigger migration into the in-memory cache
 
-    const rawAfter = JSON.parse(localStorage.getItem('vot-links') || '[]');
-    expect(rawAfter.length).toBe(1);
-    expect(rawAfter[0].source).toBeDefined();
-    expect(rawAfter[0].target).toBeDefined();
-    expect(asAny(rawAfter[0]).a).toBeUndefined();
-    expect(asAny(rawAfter[0]).b).toBeUndefined();
+    // Second read returns the migrated shape from the cache.
+    const links = LinkStore.all();
+    expect(links.length).toBe(1);
+    expect(links[0].source).toBeDefined();
+    expect(links[0].target).toBeDefined();
+    expect(asAny(links[0]).a).toBeUndefined();
+    expect(asAny(links[0]).b).toBeUndefined();
   });
 });
 

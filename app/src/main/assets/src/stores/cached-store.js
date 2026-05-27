@@ -109,7 +109,7 @@ const _idbStoreRegistry = new Set();
  *   _rebaseAndPromote(loadedData: T | undefined | null): void,
  *   _applyToPendingCache(opName: string, args: any[]): void,
  *   _backgroundRetry(): void,
- *   _resetForTests(): void,
+ *   _resetForTests(opts?: { forceLoaded?: boolean }): void,
  * }} CachedStoreBase
  */
 
@@ -482,15 +482,23 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * leaks between cases. Use this helper instead of poking fields
      * directly so the reset stays consistent with future state
      * additions. Do NOT call from production code.
+     *
+     * @param {{ forceLoaded?: boolean }} [opts]
+     *   `forceLoaded: true` skips the IDB-mode 'pending' default and
+     *   sets state to 'loaded' — used by store tests that exercise
+     *   LS-side fallback migration paths synchronously (e.g.
+     *   link-store.test's legacy {a,b} → {source,target} cases),
+     *   bypassing the async _hydrate roundtrip.
      */
-    _resetForTests() {
+    _resetForTests(opts) {
       this._cache = null;
       this._pendingCache = null;
       this._queue = [];
       this._replaying = false;
       this._applyingPending = false;
       this._hydratePromise = null;
-      this._state = useIdb ? 'pending' : 'loaded';
+      const forceLoaded = opts && opts.forceLoaded === true;
+      this._state = (forceLoaded || !useIdb) ? 'loaded' : 'pending';
     },
 
     /**

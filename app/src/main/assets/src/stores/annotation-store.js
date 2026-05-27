@@ -119,7 +119,7 @@ migrateAnnotations();
    ('highlight' | 'underline' | 'note') and a groupId (always present;
    single-segment annotations get a unique groupId == id at create time). */
 export const AnnotationStore = extendStore(
-  CachedStore('vot-annotations', /** @type {AnnotationData} */ ({})),
+  CachedStore('vot-annotations', /** @type {AnnotationData} */ ({}), { idb: true }),
   {
     /**
      * All annotation segments anchored at `key`. Empty array if none.
@@ -147,6 +147,7 @@ export const AnnotationStore = extendStore(
       if (!ann.kind) ann.kind = 'highlight';
       if (!ann.created) ann.created = Date.now();
       ann.updated = Date.now();
+      if (this._shouldDefer('add', key, ann)) return;
       const data = this._load();
       if (!data[key]) data[key] = [];
       data[key].push(/** @type {Annotation} */ (ann));
@@ -163,6 +164,7 @@ export const AnnotationStore = extendStore(
      * @returns {void}
      */
     update(key, annId, patch) {
+      if (this._shouldDefer('update', key, annId, patch)) return;
       const data = this._load();
       const arr = data[key];
       if (!arr) return;
@@ -178,6 +180,7 @@ export const AnnotationStore = extendStore(
      * @returns {void}
      */
     remove(key, annId) {
+      if (this._shouldDefer('remove', key, annId)) return;
       const data = this._load();
       if (!data[key]) return;
       data[key] = data[key].filter(h => h.id !== annId);
@@ -192,6 +195,7 @@ export const AnnotationStore = extendStore(
      * @returns {void}
      */
     removeAllForKey(key) {
+      if (this._shouldDefer('removeAllForKey', key)) return;
       const data = this._load();
       delete data[key];
       this._save();
@@ -205,6 +209,7 @@ export const AnnotationStore = extendStore(
      * @returns {void}
      */
     removeGroup(groupId) {
+      if (this._shouldDefer('removeGroup', groupId)) return;
       const data = this._load();
       Object.keys(data).forEach(k => {
         data[k] = data[k].filter(h => h.groupId !== groupId);
@@ -238,6 +243,7 @@ export const AnnotationStore = extendStore(
      * @returns {void}
      */
     recolorGroup(groupId, color) {
+      if (this._shouldDefer('recolorGroup', groupId, color)) return;
       const data = this._load();
       const ts = Date.now();
       Object.keys(data).forEach(k => data[k].forEach(h => {
@@ -256,6 +262,7 @@ export const AnnotationStore = extendStore(
      * @returns {void}
      */
     convertGroup(groupId, kind) {
+      if (this._shouldDefer('convertGroup', groupId, kind)) return;
       const data = this._load();
       const ts = Date.now();
       Object.keys(data).forEach(k => data[k].forEach(h => {

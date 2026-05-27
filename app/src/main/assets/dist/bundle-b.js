@@ -950,15 +950,23 @@
        * leaks between cases. Use this helper instead of poking fields
        * directly so the reset stays consistent with future state
        * additions. Do NOT call from production code.
+       *
+       * @param {{ forceLoaded?: boolean }} [opts]
+       *   `forceLoaded: true` skips the IDB-mode 'pending' default and
+       *   sets state to 'loaded' — used by store tests that exercise
+       *   LS-side fallback migration paths synchronously (e.g.
+       *   link-store.test's legacy {a,b} → {source,target} cases),
+       *   bypassing the async _hydrate roundtrip.
        */
-      _resetForTests() {
+      _resetForTests(opts2) {
         this._cache = null;
         this._pendingCache = null;
         this._queue = [];
         this._replaying = false;
         this._applyingPending = false;
         this._hydratePromise = null;
-        this._state = useIdb ? "pending" : "loaded";
+        const forceLoaded = opts2 && opts2.forceLoaded === true;
+        this._state = forceLoaded || !useIdb ? "loaded" : "pending";
       },
       /**
        * Schedule a chain of background IDB retries while in 'degraded'
@@ -1101,7 +1109,8 @@
     CachedStore(
       "vot-annotations",
       /** @type {AnnotationData} */
-      {}
+      {},
+      { idb: true }
     ),
     {
       /**
@@ -1132,6 +1141,7 @@
         if (!ann.kind) ann.kind = "highlight";
         if (!ann.created) ann.created = Date.now();
         ann.updated = Date.now();
+        if (this._shouldDefer("add", key, ann)) return;
         const data = this._load();
         if (!data[key]) data[key] = [];
         data[key].push(
@@ -1150,6 +1160,7 @@
        * @returns {void}
        */
       update(key, annId, patch) {
+        if (this._shouldDefer("update", key, annId, patch)) return;
         const data = this._load();
         const arr = data[key];
         if (!arr) return;
@@ -1168,6 +1179,7 @@
        * @returns {void}
        */
       remove(key, annId) {
+        if (this._shouldDefer("remove", key, annId)) return;
         const data = this._load();
         if (!data[key]) return;
         data[key] = data[key].filter((h) => h.id !== annId);
@@ -1181,6 +1193,7 @@
        * @returns {void}
        */
       removeAllForKey(key) {
+        if (this._shouldDefer("removeAllForKey", key)) return;
         const data = this._load();
         delete data[key];
         this._save();
@@ -1193,6 +1206,7 @@
        * @returns {void}
        */
       removeGroup(groupId) {
+        if (this._shouldDefer("removeGroup", groupId)) return;
         const data = this._load();
         Object.keys(data).forEach((k) => {
           data[k] = data[k].filter((h) => h.groupId !== groupId);
@@ -1225,6 +1239,7 @@
        * @returns {void}
        */
       recolorGroup(groupId, color) {
+        if (this._shouldDefer("recolorGroup", groupId, color)) return;
         const data = this._load();
         const ts = Date.now();
         Object.keys(data).forEach((k) => data[k].forEach((h) => {
@@ -1245,6 +1260,7 @@
        * @returns {void}
        */
       convertGroup(groupId, kind) {
+        if (this._shouldDefer("convertGroup", groupId, kind)) return;
         const data = this._load();
         const ts = Date.now();
         Object.keys(data).forEach((k) => data[k].forEach((h) => {
@@ -1279,7 +1295,8 @@
     CachedStore(
       "vot-notes",
       /** @type {Record<string, Note>} */
-      {}
+      {},
+      { idb: true }
     ),
     {
       /**
@@ -1321,6 +1338,7 @@
        * @returns {void}
        */
       set(groupId, fields) {
+        if (this._shouldDefer("set", groupId, fields)) return;
         const data = this._load();
         const existing = data[groupId];
         const ts = Date.now();
@@ -1346,6 +1364,7 @@
        * @returns {void}
        */
       update(groupId, patch) {
+        if (this._shouldDefer("update", groupId, patch)) return;
         const data = this._load();
         if (!data[groupId]) return;
         data[groupId] = { ...data[groupId], ...patch, updated: Date.now() };
@@ -1358,6 +1377,7 @@
        * @returns {void}
        */
       remove(groupId) {
+        if (this._shouldDefer("remove", groupId)) return;
         const data = this._load();
         delete data[groupId];
         this._save();
@@ -1371,6 +1391,7 @@
        * @returns {void}
        */
       toggleNotebook(groupId, notebookId) {
+        if (this._shouldDefer("toggleNotebook", groupId, notebookId)) return;
         const data = this._load();
         const note = data[groupId];
         if (!note) return;
@@ -1389,6 +1410,7 @@
        * @returns {void}
        */
       pruneNotebook(notebookId) {
+        if (this._shouldDefer("pruneNotebook", notebookId)) return;
         const data = this._load();
         const ts = Date.now();
         Object.keys(data).forEach((k) => {
@@ -1547,29 +1569,59 @@
     CachedStore(
       "vot-links",
       /** @type {Link[]} */
-      []
+      [],
+      { idb: true }
     ),
     {
       /**
-       * Override _load to migrate legacy {a,b} records to {source,target}
-       * on first access. Migration is one-time per user: after it runs
-       * the persisted data is already in the new shape, so subsequent
-       * loads are no-ops in the migration branch.
+       * State-aware load. Three branches:
        *
-       * Coalesces FIRST so a half-migrated record (source set but `a`
-       * still present, or vice-versa — e.g. an interrupted prior
-       * migration or a hand-edited export) is healed instead of silently
-       * dropped (was real data-loss in an earlier version).
+       *   1. _cache already populated → return it (fast path; covers both
+       *      LS-mode lazy-init and IDB-mode post-hydration).
+       *   2. IDB-mode pending/degraded → return overlay or fresh defaults.
+       *      DO NOT read localStorage here; the CachedStore base owns the
+       *      legacy-LS-fallback path inside _hydrate, and reading LS
+       *      directly here would side-channel the W2.2 state machine.
+       *   3. LS-mode initial load → read LS + normalize (legacy {a,b} →
+       *      {source,target} migration). After migration, _normalize
+       *      flushes via _save.
+       *
+       * The post-hydration normalization for IDB mode is wired below the
+       * extendStore call via a one-shot subscribe — when the store
+       * transitions to 'loaded' the first time, _normalize runs against
+       * the IDB-loaded cache (which may itself have been seeded from the
+       * legacy LS key by the W2.2 fallback).
        *
        * @returns {Link[]}
        */
       _load() {
         if (this._cache) return this._cache;
+        if (this._idb && this._state !== "loaded") {
+          return (
+            /** @type {Link[]} */
+            this._pendingCache !== null ? this._pendingCache : []
+          );
+        }
         try {
           this._cache = JSON.parse(localStorage.getItem("vot-links") || "[]");
         } catch (_e) {
           this._cache = [];
         }
+        this._normalize();
+        return this._cache;
+      },
+      /**
+       * Apply the legacy {a,b} → {source,target} migration to `this._cache`.
+       * Idempotent — once data is in the new shape, the filter is a no-op.
+       * Drops records that can't be salvaged (both endpoints missing keys).
+       * Flushes via _save when a migration actually happened so the next
+       * boot reads pre-normalized data. _bump fires regardless so any
+       * subscriber sees the post-normalize state.
+       *
+       * @returns {void}
+       */
+      _normalize() {
+        if (!Array.isArray(this._cache)) return;
         let migrated = false;
         this._cache = this._cache.filter(function(lnk) {
           if (!lnk || typeof lnk !== "object") return false;
@@ -1595,9 +1647,10 @@
           }
           return true;
         });
-        if (migrated) this._save();
-        this._bump();
-        return this._cache;
+        if (migrated) {
+          this._save();
+          this._bump();
+        }
       },
       /**
        * All links touching `key` on either endpoint.
@@ -1636,6 +1689,7 @@
        * @returns {void}
        */
       add(link) {
+        if (this._shouldDefer("add", link)) return;
         this._load().push(link);
         this._save();
         this._bump();
@@ -1646,12 +1700,26 @@
        * @returns {void}
        */
       remove(linkId) {
+        if (this._shouldDefer("remove", linkId)) return;
         this._cache = this._load().filter((l) => l.id !== linkId);
         this._save();
         this._bump();
       }
     }
   );
+  (function() {
+    if (!LinkStore2._idb) return;
+    let unsub = null;
+    unsub = LinkStore2.subscribe(function() {
+      if (LinkStore2.getState() === "loaded") {
+        LinkStore2._normalize();
+        try {
+          if (unsub) unsub();
+        } catch (_e) {
+        }
+      }
+    });
+  })();
   function persistLink(sourceEndpoint, targetEndpoint) {
     if (!sourceEndpoint || !sourceEndpoint.key) return null;
     const existing = LinkStore2.getForKey(sourceEndpoint.key);
@@ -3031,8 +3099,22 @@
     const [hydrated, setHydrated] = useState(false);
     useEffect(() => {
       let alive = true;
+      try {
+        performance.mark("vot-hydration-start");
+      } catch (_e) {
+      }
+      const startMs = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
       hydrateAllStores().finally(() => {
-        if (alive) setHydrated(true);
+        if (!alive) return;
+        const endMs = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+        const elapsed = endMs - startMs;
+        window.__hydrationLatencyMs = elapsed;
+        try {
+          performance.mark("vot-hydration-end");
+          performance.measure("vot-hydration", "vot-hydration-start", "vot-hydration-end");
+        } catch (_e) {
+        }
+        setHydrated(true);
       });
       return () => {
         alive = false;

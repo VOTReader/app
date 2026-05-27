@@ -37,7 +37,7 @@ beforeEach(() => {
   // Isolate each test: clear localStorage + bust the AnnotationStore
   // module cache so a fresh load() picks up the cleared storage.
   localStorage.clear();
-  AnnotationStore._resetForTests();
+  AnnotationStore._resetForTests({ forceLoaded: true });
 });
 
 describe('AnnotationStore hlTick cache-bust regression (Bin 4 validation)', () => {

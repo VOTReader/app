@@ -40,8 +40,24 @@ export function HydrationGate({ children }) {
 
   useEffect(() => {
     let alive = true;
+    // W2.3 Tier 3 latency gate: mark hydration start + end with the
+    // Performance API so preview-eval can read window.__hydrationLatencyMs
+    // for verification. PLAN.txt target: <200ms mid-range, <500ms budget.
+    // If the budget is exceeded in real-device testing, split hot-store
+    // hydration into two waves (state+annotations first, then notes+
+    // links+history after first paint) per PLAN W2.3 Tier 3.
+    try { performance.mark('vot-hydration-start'); } catch (_e) { /* perf unsupported */ }
+    const startMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     hydrateAllStores().finally(() => {
-      if (alive) setHydrated(true);
+      if (!alive) return;
+      const endMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      const elapsed = endMs - startMs;
+      /** @type {any} */ (window).__hydrationLatencyMs = elapsed;
+      try {
+        performance.mark('vot-hydration-end');
+        performance.measure('vot-hydration', 'vot-hydration-start', 'vot-hydration-end');
+      } catch (_e) { /* perf unsupported */ }
+      setHydrated(true);
     });
     return () => { alive = false; };
   }, []);

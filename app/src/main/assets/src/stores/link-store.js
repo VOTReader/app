@@ -80,42 +80,69 @@ export function hlId() { return 'hl_' + Date.now() + '_' + Math.random().toStrin
 export function lnkId() { return 'lnk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
 
 export const LinkStore = extendStore(
-  CachedStore('vot-links', /** @type {Link[]} */ ([])),
+  CachedStore('vot-links', /** @type {Link[]} */ ([]), { idb: true }),
   {
     /**
-     * Override _load to migrate legacy {a,b} records to {source,target}
-     * on first access. Migration is one-time per user: after it runs
-     * the persisted data is already in the new shape, so subsequent
-     * loads are no-ops in the migration branch.
+     * State-aware load. Three branches:
      *
-     * Coalesces FIRST so a half-migrated record (source set but `a`
-     * still present, or vice-versa — e.g. an interrupted prior
-     * migration or a hand-edited export) is healed instead of silently
-     * dropped (was real data-loss in an earlier version).
+     *   1. _cache already populated → return it (fast path; covers both
+     *      LS-mode lazy-init and IDB-mode post-hydration).
+     *   2. IDB-mode pending/degraded → return overlay or fresh defaults.
+     *      DO NOT read localStorage here; the CachedStore base owns the
+     *      legacy-LS-fallback path inside _hydrate, and reading LS
+     *      directly here would side-channel the W2.2 state machine.
+     *   3. LS-mode initial load → read LS + normalize (legacy {a,b} →
+     *      {source,target} migration). After migration, _normalize
+     *      flushes via _save.
+     *
+     * The post-hydration normalization for IDB mode is wired below the
+     * extendStore call via a one-shot subscribe — when the store
+     * transitions to 'loaded' the first time, _normalize runs against
+     * the IDB-loaded cache (which may itself have been seeded from the
+     * legacy LS key by the W2.2 fallback).
      *
      * @returns {Link[]}
      */
     _load() {
       if (this._cache) return this._cache;
+      if (this._idb && this._state !== 'loaded') {
+        return /** @type {Link[]} */ (this._pendingCache !== null ? this._pendingCache : []);
+      }
       try { this._cache = JSON.parse(localStorage.getItem('vot-links') || '[]'); }
       catch (_e) { this._cache = []; }
+      this._normalize();
+      return this._cache;
+    },
 
+    /**
+     * Apply the legacy {a,b} → {source,target} migration to `this._cache`.
+     * Idempotent — once data is in the new shape, the filter is a no-op.
+     * Drops records that can't be salvaged (both endpoints missing keys).
+     * Flushes via _save when a migration actually happened so the next
+     * boot reads pre-normalized data. _bump fires regardless so any
+     * subscriber sees the post-normalize state.
+     *
+     * @returns {void}
+     */
+    _normalize() {
+      if (!Array.isArray(this._cache)) return;
       let migrated = false;
-      this._cache = this._cache.filter(function(/** @type {any} */ lnk) {
+      this._cache = this._cache.filter(function (/** @type {any} */ lnk) {
         if (!lnk || typeof lnk !== 'object') return false;
         if (!lnk.source && lnk.a) { lnk.source = lnk.a; migrated = true; }
         if (!lnk.target && lnk.b) { lnk.target = lnk.b; migrated = true; }
         if (lnk.a) { delete lnk.a; migrated = true; }
         if (lnk.b) { delete lnk.b; migrated = true; }
-        // A record is only unusable if BOTH endpoints (with .key) are missing.
         if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) {
           console.warn('[LinkStore] dropping malformed record (incomplete endpoints):', lnk.id);
           return false;
         }
         return true;
       });
-      if (migrated) this._save(); this._bump();
-      return this._cache;
+      if (migrated) {
+        this._save();
+        this._bump();
+      }
     },
 
     /**
@@ -157,6 +184,7 @@ export const LinkStore = extendStore(
      * @returns {void}
      */
     add(link) {
+      if (this._shouldDefer('add', link)) return;
       this._load().push(link);
       this._save();
       this._bump();
@@ -168,12 +196,33 @@ export const LinkStore = extendStore(
      * @returns {void}
      */
     remove(linkId) {
+      if (this._shouldDefer('remove', linkId)) return;
       this._cache = this._load().filter(l => l.id !== linkId);
       this._save();
       this._bump();
     }
   }
 );
+
+/* Post-hydration normalize: when IDB-mode LinkStore transitions to
+   'loaded' (either from a fresh IDB read or from the legacy-LS-seed
+   fallback path in CachedStore._hydrate), run the legacy {a,b} →
+   {source,target} migration against the rebased cache exactly once.
+   Mirrors the JournalStatsStore.recomputeFromLoad post-hydration
+   pattern. Without this, a user upgrading from a pre-W2 deploy whose
+   data was in the {a,b} shape would have it seeded into IDB still
+   in {a,b} shape and the migration would never run. */
+(function () {
+  if (!LinkStore._idb) return;
+  /** @type {(() => void) | null} */
+  let unsub = null;
+  unsub = LinkStore.subscribe(function () {
+    if (LinkStore.getState() === 'loaded') {
+      LinkStore._normalize();
+      try { if (unsub) unsub(); } catch (_e) { /* idempotent */ }
+    }
+  });
+})();
 
 /**
  * Persist a link, dedup'ing if the exact pair already exists. Returns
