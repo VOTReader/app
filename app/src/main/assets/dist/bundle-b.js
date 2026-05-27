@@ -4200,6 +4200,92 @@
     }, []);
   }
 
+  // app/src/main/assets/src/hooks/use-modal-registry.js
+  var _registry = /* @__PURE__ */ new Map();
+  var modalRegistry = {
+    /**
+     * Add a modal to the registry, or move an existing entry to the top.
+     * Re-registering an existing id deletes-then-sets so the entry moves
+     * to the end of the Map's insertion order (= "topmost"). Silently
+     * ignores invalid input rather than throwing — registration failure
+     * should NOT prevent a modal from rendering.
+     *
+     * @param {{ id: string, dismiss: () => void }} entry
+     * @returns {void}
+     */
+    register(entry) {
+      if (!entry || !entry.id || typeof entry.dismiss !== "function") return;
+      _registry.delete(entry.id);
+      _registry.set(entry.id, entry.dismiss);
+    },
+    /**
+     * Remove a modal from the registry. Idempotent — unregistering an
+     * unknown id is a no-op.
+     *
+     * @param {string} id
+     * @returns {void}
+     */
+    unregister(id) {
+      if (!id) return;
+      _registry.delete(id);
+    },
+    /**
+     * @returns {boolean} true iff at least one modal is currently registered.
+     */
+    isAnyOpen() {
+      return _registry.size > 0;
+    },
+    /**
+     * @returns {string[]} all registered IDs in insertion order (first = oldest,
+     *                     last = topmost). Useful for debug output.
+     */
+    openIds() {
+      return Array.from(_registry.keys());
+    },
+    /**
+     * @returns {{ id: string, dismiss: () => void } | null}
+     *   The most-recently-registered entry (= topmost modal), or null if
+     *   the registry is empty. Returns a fresh object each call.
+     */
+    peek() {
+      if (_registry.size === 0) return null;
+      let lastId = "";
+      let lastDismiss = null;
+      for (const [id, dismiss] of _registry) {
+        lastId = id;
+        lastDismiss = dismiss;
+      }
+      if (!lastDismiss) return null;
+      return { id: lastId, dismiss: lastDismiss };
+    },
+    /**
+     * Clear the registry. TEST-ONLY: production code MUST go through
+     * register/unregister so component lifecycles stay symmetric. Test
+     * harnesses call this in `beforeEach` since the registry is a
+     * module-level singleton that survives between renderHook calls.
+     *
+     * @returns {void}
+     */
+    _reset() {
+      _registry.clear();
+    }
+  };
+  function useModalRegistry({ id, dismiss, active = true }) {
+    const dismissRef = useRefMirror(dismiss);
+    React.useEffect(() => {
+      if (!active) return void 0;
+      if (!id) return void 0;
+      modalRegistry.register({
+        id,
+        dismiss: () => {
+          const fn = dismissRef.current;
+          if (typeof fn === "function") fn();
+        }
+      });
+      return () => modalRegistry.unregister(id);
+    }, [id, active]);
+  }
+
   // app/src/main/assets/src/hooks/use-nav-history-tracking.js
   function useNavHistoryTracking({
     screen,
@@ -8185,6 +8271,8 @@
     useTabActions,
     usePersistedState,
     useAndroidBack,
+    modalRegistry,
+    useModalRegistry,
     useNavHistoryTracking,
     useNav,
     useSearch,

@@ -511,23 +511,102 @@ window.AndroidBridge directly after W1.2.
   (browser back button).
 
   IMPLEMENTATION SEQUENCING (4 sub-steps; each independently testable):
-    (a) Modal registry hook + wire all 23 consumers from the inventory
-        below. Prerequisite for (c) — Escape needs a working isAnyOpen().
+    (a) Modal registry hook + wire all 24 consumers from the inventory
+        below. Prerequisite for (c) — Escape needs a working isAnyOpen()
+        AND the per-modal dismiss callback to dispatch to. Split into
+        (a.1) hook + tests as pure addition, then (a.2) consumer wiring
+        per [[abstraction-before-migration]].
     (b) History-sync layer — every in-app navigation must call
         history.pushState so the browser HAS history entries for
         popstate to consume. Today the app navigates by setting
         React state alone; the browser history is empty. Without
         this layer, (d) is dead code. HIGHEST RISK STEP — touches
         the navigation system. Prerequisite for (d).
-    (c) Escape key listener — gated on document.fullscreenElement
+    (c) Escape key listener — the SOLE Escape dispatcher (see
+        DISPATCHER CONTRACT below). Gated on document.fullscreenElement
         + registry.isAnyOpen() per [[escape-key-gating]] +
         [[centralized-modal-signal]]. Consumes (a)'s hook.
     (d) popstate listener + root-of-stack double-tap-to-exit per
         [[root-of-history-pwa]]. Consumes (b)'s history stack.
 
-  Ship in (a) → (b) → (c) → (d) order. (a) and (b) are independent
-  and CAN run in parallel; (c) needs (a) and (d) needs (b). Out-of-
-  order shipping = later pieces have no infrastructure to consume.
+  Ship in (a.1) → (a.2) → (b) → (c) → (d) order. (a.2) and (b) are
+  independent and CAN run in parallel; (c) needs (a) and (d) needs (b).
+  Out-of-order shipping = later pieces have no infrastructure to consume.
+
+  ─── DISPATCHER CONTRACT (single-source Escape, no listener races) ───
+  Refinement from review: modals do NOT add their own Escape keydown
+  listeners. If two listeners on the same target both react to Escape,
+  the modal's listener fires first → calls dismiss → unregisters → app-
+  level handler then reads isAnyOpen() as false → fires handleAndroidBack.
+  One Escape press = dismiss AND navigate. Wrong.
+
+  Resolution: the app-level Escape handler in (c) is the ONLY dispatcher.
+  Registry entries store `{ id: string, dismiss: () => void }` — not just
+  the ID. When Escape fires:
+    • document.fullscreenElement → skip (browser native exit, no
+      preventDefault)
+    • registry.isAnyOpen() → call peek().dismiss(). Do NOT also call
+      handleAndroidBack. The dismiss callback handles its own state
+      teardown; the registry unregister fires from its unmount effect.
+    • else → handleAndroidBack()
+
+  The registry uses a Set<string> for ID lookup + a parallel Map<string,
+  () => void> for dismiss callbacks (or equivalently a single
+  Map<string, { id, dismiss }> with the Set behavior emergent — Sets
+  in JS preserve insertion order, so peek() = "last registered"
+  works naturally on Maps too).
+
+  ─── CONFIRMSTRIP UNIQUE-ID CONTRACT ───
+  Refinement from review: the original "registering once inside
+  ConfirmStrip's body covers all 12 usage sites" wording was WRONG
+  for concurrent instances. If a future screen mounts two ConfirmStrip
+  instances simultaneously (a list with multiple delete-confirmable
+  rows, for example) and both register under the shared key
+  "confirm-strip", then when instance A unmounts and unregisters
+  "confirm-strip", the Set drops the key — even though instance B
+  is still rendering. The next Escape fires back-nav while B is mid-
+  confirm.
+
+  Resolution: each ConfirmStrip instance generates a UNIQUE registry ID
+  via React.useId() (React 18 native; available in this codebase).
+  Registration key is `'confirm-strip:' + reactGeneratedId`. Each
+  instance's mount-effect registers + cleanup unregisters its own
+  unique ID. Set + Map handle the multiple-instance case naturally;
+  the change is one-line at the registration site, no architectural
+  cost.
+
+  Same principle applies to any other modal where multiple
+  simultaneous instances are plausible. Single-instance overlays
+  (welcome-modal, garden-warning) can use a literal string ID since
+  only one is mountable at a time by construction.
+
+  ─── KNOWN UX ROUGH EDGES (documented, not fixed in W1.5) ───
+  • Rapid pushState — tapping through 10 screens fast pushes 10
+    browser history entries. Back button then requires 10 presses
+    to get home. Acceptable for W1.5; future polish could
+    replaceState for sub-screen state transitions (tab switches,
+    sequential chapter reads) and only pushState for meaningful
+    nav jumps. Not fixed now — out of W1.5 scope, low real-world
+    impact, behavior mirrors most native apps anyway.
+  • Forward button stays dead — Option B pushState (empty state
+    object). Future polish could land Option A (full nav state
+    in pushState) if anyone misses forward-button behavior.
+
+  ─── PLATFORM GOTCHAS BAKED INTO (b)+(d) ───
+  • Firefox popstate-on-load — Firefox fires popstate on page load
+    (older HTML5 spec interpretation); Chrome doesn't. Without
+    guarding, back-nav triggers on boot. Fix in (b): set a
+    `_historyReady` flag AFTER the first real pushState; popstate
+    listener early-returns if the flag is false.
+  • handleAndroidBack returns "true" / "false" as STRINGS, not
+    booleans — they're @JavascriptInterface return values shaped
+    for Kotlin. Comparison in (d)'s root-detection MUST be against
+    the string `"false"`. Writing `if (!result)` would NEVER hit
+    the root-of-stack path because the string `"false"` is truthy.
+  • Forward navigation must clear the armed root-exit timer — see
+    [[root-of-history-pwa]]. Tie the timer-clear to the SAME
+    nav-key effect (b) watches: any nav-key change while armed
+    clears.
 
   ───────────────────────
   Triggers detail:
@@ -677,53 +756,93 @@ window.AndroidBridge directly after W1.2.
     [ ] bookmark-row-action-sheet — BookmarksScreen.jsx:545 (long-press)
     [ ] link-row-action-sheet     — LinksScreen.jsx:365 (long-press)
 
-  ConfirmStrip / inline confirms — REGISTERS (decided per [[centralized-modal-signal]]):
-    [ ] confirm-strip             — register inside ConfirmStrip's mount
-                                     effect; unregister on unmount.
-                                     Behavior:
+  ConfirmStrip / inline confirms — REGISTERS PER INSTANCE (decided per
+  [[centralized-modal-signal]] + the unique-ID refinement above):
+    [ ] confirm-strip:<useId>     — each ConfirmStrip instance generates
+                                     a unique React.useId() at mount
+                                     and registers as
+                                     `'confirm-strip:' + useId`. Mount
+                                     effect register({id, dismiss:
+                                     onCancel}); cleanup unregister(id).
+                                     Behavior under the dispatcher
+                                     contract:
                                        ConfirmStrip showing → Escape →
-                                         calls onCancel (dismisses confirm)
+                                         registry sees the entry →
+                                         dispatcher calls dismiss() =
+                                         the ConfirmStrip's onCancel
+                                         (collapses the confirm)
                                        ConfirmStrip NOT showing → Escape →
-                                         back navigation as normal.
+                                         registry empty → handleAndroidBack
                                      Rationale: keyboard accessibility
                                      (Escape cancels; Enter could confirm
                                      as a follow-up polish); prevents
                                      fumble-Escape-during-delete-confirm
                                      from navigating away mid-action.
-                                     Wiring is trivial (3-line useEffect
-                                     inside ConfirmStrip itself).
-                                     Note: ConfirmStrip rendered in 12+
-                                     files (BookmarksScreen, LinksScreen,
+                                     Wiring is a single useEffect inside
+                                     ConfirmStrip — the unique-ID per
+                                     instance protects future screens
+                                     that may mount multiple confirms
+                                     simultaneously (a list with two
+                                     delete-confirmable rows would
+                                     otherwise share a registry key and
+                                     break on first unmount).
+                                     ConfirmStrip is mounted in 12+ files
+                                     (BookmarksScreen, LinksScreen,
                                      SettingsScreen, JournalEditorScreen,
-                                     etc.) — but they all use the same
-                                     ConfirmStrip component, so registering
-                                     once inside ConfirmStrip's body
-                                     covers every usage automatically.
+                                     ClearProgressRow, TabsOverview,
+                                     NoteSheet, NotebookPickerSheet,
+                                     BookmarkCreateSheet, LinkCard,
+                                     AnnotationActionChip, JournalAudioBlock,
+                                     etc.) — one component file's
+                                     registration effect covers all
+                                     instances via useId().
 
-  Dead-code discovery (out-of-W1.5-scope cleanup):
-    NotebookManagerSheet (src/ui/sheets/NotebookManagerSheet.jsx) and
-    JournalNotebookSheet (src/ui/sheets/JournalNotebookSheet.jsx) are
-    exported on `window` via the entry bundles but have ZERO `<X>` JSX
-    mount sites anywhere in the codebase. They're inert dead code —
-    not part of the W1.5 modal inventory (no Escape gate needed for
-    something that never renders), but a separate housekeeping
-    follow-up should either delete them or restore a mount site if
-    the UX was supposed to use them. Surfaced during the W1.5
-    inventory grep at 2026-05-26.
+  Dead-code discovery — adjacent housekeeping (folded into W1.5 batch):
+    NotebookManagerSheet (src/ui/sheets/NotebookManagerSheet.jsx, 126 L)
+    and JournalNotebookSheet (src/ui/sheets/JournalNotebookSheet.jsx,
+    142 L) are exported on `window` via the entry bundles (NotebookManager
+    via _entry-d.js into bundle-d, JournalNotebook via _entry-b.js into
+    bundle-b) but have ZERO `<X>` JSX mount sites anywhere in the
+    codebase. The user-facing notebook-manager flow already routes
+    through NotebookPickerSheet's "Manage notebooks" entry, which renders
+    inline editors — these two sheet files were superseded but never
+    deleted. Bundle impact: ~3-4 KB minified shipping to every user.
+    Surfaced during the W1.5 inventory grep at 2026-05-26; user directive
+    is to fold adjacent easy wins into the same batch rather than defer
+    indefinitely. Removal lands as its own commit alongside W1.5(a.1)
+    so the diff is reviewable on its own.
 
   Tests:
     - Each entry above mounted in isolation → registry.openIds()
-      contains the expected ID → Escape gated (does not dispatch).
-    - Entry unmounted → registry.openIds() empty → Escape dispatches.
+      contains the expected ID → Escape gated (does not dispatch
+      handleAndroidBack; dismiss callback fires instead).
+    - Entry unmounted → registry.openIds() empty → Escape dispatches
+      handleAndroidBack.
     - Double-mount/unmount cycles (React StrictMode) → Set is
-      idempotent; openIds() and isAnyOpen() always correct.
-    - ConfirmStrip showing + Escape pressed → onCancel fires; Escape
-      does NOT dispatch back-nav. ConfirmStrip dismissed (registers
-      out) → Escape resumes back-nav.
+      idempotent; openIds() and isAnyOpen() always correct. Note:
+      StrictMode double-invoke order is mount-cleanup-mount-render,
+      so the second mount re-adds the ID before any further work
+      depends on it — but the registry MUST tolerate the intervening
+      cleanup gracefully (Set.delete then Set.add returns the same
+      end state).
+    - ConfirmStrip showing + Escape pressed → onCancel fires (via
+      dispatcher's registry.peek().dismiss() call), Escape does NOT
+      additionally call handleAndroidBack. ConfirmStrip dismissed
+      (registers out) → Escape resumes back-nav.
+    - Two ConfirmStrip instances mounted simultaneously (use the
+      unique-ID contract) → each has a distinct registry ID; first
+      one's onCancel does not affect the second's registration.
     - (fullscreen, sheet-open, clear-state) Escape → only clear-state
-      dispatches.
-    - popstate at root → stays in app (history entry pushed + toast shown).
+      calls handleAndroidBack; fullscreen → no preventDefault, browser
+      exits; sheet-open → dismiss fires.
+    - popstate at root → stays in app (history entry pushed + toast
+      shown). Compare against the STRING "false" not boolean.
+    - popstate at root × 2 within 2s → second one allows exit.
+    - popstate at root → forward-nav → popstate at root again → FRESH
+      toast (forward-nav cleared the armed timer).
     - popstate mid-stack → handleAndroidBack runs normally.
+    - popstate fires on page load (Firefox quirk) → guarded by
+      `_historyReady` flag; no handleAndroidBack call at boot.
 
   W1.6 — Desktop preview-eval smoke walk
   ──────────────────────────────────────
