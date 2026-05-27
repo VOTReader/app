@@ -506,26 +506,36 @@ window.AndroidBridge directly after W1.2.
 
   W1.5 — Back-button navigation (History API + Escape key) — CLOSED 2026-05-26
   ───────────────────────────────────────────────────────────────────────────
-  Six commits land the full desktop-back UX. Final commit range
-  905b78d..0073c10 + the housekeeping commit fd8aa22 folded into the
+  Seven commits land the full desktop-back UX. Final commit range
+  905b78d..b6107ca + the housekeeping commit fd8aa22 folded into the
   batch per the user-directed "adjacent easy wins" protocol.
 
   Sub-step commits:
-    W1.5(a.1)     905b78d  modal registry hook + 25 vitest cases
-    housekeeping  fd8aa22  delete NotebookManagerSheet + JournalNotebookSheet
-    W1.5(a.2)     195cfb3  wire 25 consumers (24 inventory + 1 discovered)
-    W1.5(b)       5babe86  history-sync layer + 16 vitest cases
-    W1.5(c)       732bf6b  Escape key listener (sole dispatcher)
-    W1.5(d)       0073c10  popstate + root-of-stack double-tap-to-exit
-                           + root-exit-toast utility + 14 vitest cases
+    W1.5(a.1)        905b78d  modal registry hook + 25 vitest cases
+    housekeeping     fd8aa22  delete NotebookManagerSheet + JournalNotebookSheet
+                              (-10 KB total bundle; imports cleaned from
+                              both _entry-b.js + _entry-d.js)
+    W1.5(a.2)        195cfb3  wire 25 consumers (24 inventory + 1 discovered:
+                              letter-scripture-sheet = LetterView scripRef state)
+    W1.5(b)          5babe86  history-sync layer + 16 vitest cases
+    W1.5(c)          732bf6b  Escape key listener (sole dispatcher, 6 gates)
+    W1.5(d)          0073c10  popstate + root-of-stack double-tap-to-exit
+                              + root-exit-toast utility + 14 vitest cases
+    W1.5(c) harden   b6107ca  activeElement gate — don't navigate away
+                              when typing in a plain input (search bar,
+                              etc.). Registry check stays BEFORE the
+                              activeElement check so sheets with input
+                              fields inside (NoteSheet, BookmarkCreateSheet)
+                              still dismiss the sheet on Escape rather
+                              than just blurring the input.
 
   See CLAUDE.md "Current state" + the per-commit messages for the full
   per-step detail. The DISPATCHER CONTRACT, CONFIRMSTRIP UNIQUE-ID
   CONTRACT, and TIMER-CLEAR-ON-FORWARD-NAV invariant from the design
   refinements all hold; preview_eval against real Chrome confirmed
-  end-to-end. Bundle-b: 351.0 → 356.6 KB (+5.6 KB net for the whole
+  end-to-end. Bundle-b: 351.0 → 356.9 KB (+5.9 KB net for the whole
   batch — registry + history-sync + Escape + popstate handlers +
-  root-exit-toast). 595 → 625 vitest tests (+30).
+  root-exit-toast + activeElement gate). 595 → 625 vitest tests (+30).
 
   Known UX rough edges (documented, not fixed in W1.5):
     - Rapid navigation inflates the back stack — 10 fast taps = 10
@@ -535,10 +545,28 @@ window.AndroidBridge directly after W1.2.
     - Browser forward button is dead — Option B pushState (empty
       state). Future polish could land Option A if anyone misses
       forward.
-    - Pre-existing flake under combined vitest load: nativeRecordStop
-      + nativeRecordCancel track-cleanup tests in platform-bridge.test.js
-      (MediaRecorder timing — pass standalone, flake occasionally
-      under the 25-file suite). Flagged for future stabilization.
+
+  Pre-existing flake under combined vitest load — stabilization owed:
+    `nativeRecordStop` + `nativeRecordCancel` MediaStream-track-cleanup
+    tests in `platform-bridge.test.js` pass standalone but flake
+    occasionally under the 25-file suite. Both await `new Promise(r
+    => setTimeout(r, 20))` then assert sync-fake-MediaRecorder cleanup
+    happened. Concrete fix for the W1.6 / W2 agent: replace the real
+    `setTimeout(r, 20)` with `vi.useFakeTimers()` +
+    `vi.advanceTimersByTime` so the async sequence is deterministic
+    regardless of suite load. Alternative: fully mock MediaRecorder
+    + AnalyserNode + getUserMedia at the test boundary instead of
+    relying on the jsdom partial-fake. ~30 minutes either way. Not a
+    W1.5 blocker but will get worse as W2 adds 30-50 IDB tests to
+    the concurrent load.
+
+  Memory consolidation directive (carry forward):
+    Run `/consolidate-memory` at the START of the W2 session, NOT
+    before W1.6. The smoke walk is a manual browser pass that doesn't
+    benefit from clean memory. W2's storage architecture / hydration
+    semantics / platform constraints come from ~36 entries with some
+    near-duplicates around blob handling + migration mechanics —
+    that's where the signal-to-noise pays off.
 
   IMPLEMENTATION SEQUENCING (4 sub-steps; each independently testable):
     (a) Modal registry hook + wire all 24 consumers from the inventory
