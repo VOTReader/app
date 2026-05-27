@@ -4,6 +4,224 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## W1 — Cross-platform PWA platform-bridge (CLOSED 2026-05-27)
+
+W1 of the W0-W8 PWA migration plan. Same JS codebase becomes runnable
+on Android APK (existing) AND installable desktop PWA. W1 specifically
+decouples the JS layer from `window.AndroidBridge` direct access,
+adds desktop-equivalent implementations of the 20 native bridge
+methods, wires the desktop-only UX surfaces (Escape key + browser
+back-button), and verifies the result against real Chrome.
+
+Final commit range: `5688f6e..5f5bcc7`. 28 commits total across
+W0.1 → W1 hygiene. W1 IS NOW STRUCTURALLY COMPLETE; Edge + Firefox
++ Android regression deferred to W5/W6 (hosting + cross-platform
+verification phase).
+
+### W0.1 — Fonts (5688f6e)
+
+6 OFL WOFF2 fonts at app/src/main/assets/fonts/ (~140 KB total).
+Fixed pre-existing bug along the way: the @font-face block
+referenced `.otf` / `.ttf` filenames that have never existed in
+the upstream repos — Cinzel + EB Garamond were silently falling
+back to system serif on every platform since the declarations
+first landed. Verified document.fonts.check() = true for all 6
+declared faces + width measurement at 32pt distinct from serif
+fallback (Cinzel 375 vs serif 281).
+
+### W1.1 — PlatformBridge module (228be7c)
+
+src/utils/platform-bridge.js (140 lines). 20 @JavascriptInterface
+methods mirrored from AppInterface.kt. Android impl is pure 1:1
+passthrough (zero behavior change); web impl is placeholders
+(no-ops / safe defaults / NYI warnings). Pure-addition commit
+per [[abstraction-before-migration]]. 45 new vitest cases (491 → 536).
+
+### W1.2 — Call-site migration across 3 tiers (a0546c0..2538e8f)
+
+**Tier A** (a0546c0) — use-thumbnails migrated; html2canvas
+fallback FOLDED INTO bridge web impl per
+[[consolidate-dont-duplicate]]; takeScreenshot signature became
+`() => Promise<string>` uniformly.
+
+**Tier B** — 3 sub-tiers:
+- B.1 (748ed2d): use-settings + WakeLock fire-and-forget impl with
+  same-reason de-dup
+- B.2 (6ec5ff0): SettingsScreen + DOM-input openFilePicker preserving
+  the `window.__onImportFile(base64)` callback contract per
+  [[preserve-callback-contracts]] + Blob/anchor saveToDownloads.
+- B.3 (825d38c): GardenView + Fullscreen API (best-effort swallowing
+  user-gesture rejections) + setZoomEnabled/resetZoom as DELIBERATE
+  no-ops per [[verify-inertness-not-equivalence]].
+
+**Tier C** — 2 sub-tiers:
+- C.1 (22d1c5b): 7 recording-flow web impls in the bridge
+  (MediaRecorder + AnalyserNode + MediaStream + Blob→base64 +
+  `__onNativeRecordingComplete`) with strict mime negotiation per
+  [[mediarecorder-mime-policy]] + pre-allocated AnalyserNode buffer
+  per [[amplitude-buffer-preallocation]] + 21 vitest cases.
+- C.2 (2538e8f): JournalRecordingSheet migration — 701 → 490 lines
+  (-211, -30%). All 5 detection-variable names eliminated; web
+  MediaRecorder code path deleted; native flow renamed to startCapture
+  and made the sole path. Per [[callback-flow-unification]] this was
+  a contract-unification (pre-Tier-C web processed blob INLINE in
+  rec.onstop; post-Tier-C BOTH platforms route through
+  __onNativeRecordingComplete(b64, durMs, mime)).
+
+Post-W1.2 exit gates all green: zero `window.AndroidBridge` in live
+code, zero `error:web-impl-pending`, zero local `isAndroid` in
+consumers. Per [[plan-reduction-as-work-progresses]] the original
+W1.3 (file I/O) was SATISFIED by Tier B.2, and W1.4 (audio) was
+SATISFIED by Tier C — only W1.5 + W1.6 remained.
+
+### W1.5 — Back-button navigation (905b78d..b6107ca, 9 commits)
+
+Seven sub-step commits + the dead-code housekeeping + closure-doc
+commits. Desktop browser Escape key + browser back button now route
+through the SAME handleAndroidBack as Android's system back, with
+the well-known "press back again to exit" double-tap pattern at
+root.
+
+- **W1.5(a.1)** (905b78d) — modal registry hook +
+  src/hooks/use-modal-registry.js (~170 lines) + 25 vitest cases.
+  Module-level Map<string, () => void> (Maps preserve insertion
+  order → peek() returns last-registered = topmost). useModalRegistry
+  mirrors dismiss via useRefMirror so inline-arrow callbacks don't
+  churn insertion order. Explicit shared-IDs FAIL vs unique-IDs FIX
+  test comparison.
+
+- **Dead-code housekeeping** (fd8aa22) — NotebookManagerSheet (126 L)
+  + JournalNotebookSheet (142 L) deleted. ~10 KB total bundle savings
+  (bundle-b -5.3 KB, bundle-d -5.4 KB). Both files' imports +
+  window-assignments removed from _entry-b.js / _entry-d.js.
+
+- **W1.5(a.2)** (195cfb3) — wires 25 consumers (24 from the
+  original inventory + 1 discovered during wiring:
+  `letter-scripture-sheet` — LetterView.jsx's inline scripRef
+  state, structurally distinct from ChapterView's ScriptureSheet).
+  ConfirmStrip uses React.useId() per-instance for unique IDs per
+  the locked contract — shared literals would collapse concurrent
+  instances and break peer registrations on first unmount.
+  vitest.setup.js globalizes useModalRegistry + modalRegistry so
+  colocated UI tests resolve them as free variables.
+
+- **W1.5(b)** (5babe86) — src/hooks/use-history-sync.js (~165 lines)
+  + 16 vitest cases. Watches the 8-field per-active-tab nav-key
+  tuple; pushes empty-state entries (Option B per
+  [[root-of-history-pwa]]). window.__historyReady flag set after
+  first-mount-skip for the Firefox popstate-on-load guard in (d).
+  `suppressNextHistoryPush()` + `clearSuppressNextHistoryPush()`
+  exported pair — caller sets the flag before back-induced nav;
+  if handleAndroidBack returns the STRING "false", caller clears
+  to prevent flag stranding.
+
+- **W1.5(c)** (732bf6b) + **(c) hardening** (b6107ca) — second
+  []-deps effect inside use-android-back.js adds the keydown
+  listener as the SOLE Escape dispatcher per the DISPATCHER CONTRACT.
+  Seven gates in priority order: web-only / Escape-key-only /
+  not-composing / not-in-fullscreen (browser handles natively, no
+  preventDefault) / registry-isAnyOpen / **activeElement-is-INPUT/
+  TEXTAREA/contenteditable (added in b6107ca after review — skip
+  without preventDefault so the browser blurs the field instead
+  of navigating away when the user just wanted to dismiss focus)**
+  / else-handleAndroidBack-with-suppress+clear. Registry check
+  intentionally precedes the activeElement check so a sheet with
+  an input inside dismisses the SHEET on Escape rather than just
+  blurring the input.
+
+- **W1.5(d)** (0073c10) — src/utils/root-exit-toast.js (~150 lines)
+  + 14 vitest cases + a third []-deps effect in use-android-back.
+  Toast is a fixed-position div appended directly to document.body
+  (independent of the React tree, matching jrnShowMilestoneToast
+  convention) with role="status" + aria-live="polite" + Cinzel
+  typography. popstate listener: web-only + __historyReady Firefox
+  guard + suppress+handleAndroidBack handshake. At root: if armed
+  → second back within 2s → disarm + NO replacement push (popstate
+  already consumed an entry); else first back at root → pushState
+  replacement + arm(). **TIMER-CLEAR-ON-FORWARD-NAV invariant**
+  enforced inside useHistorySync's forward-push branch.
+
+### W1.6 — Cross-browser smoke walk + hardening (9c35993..5f5bcc7)
+
+Dual-track verification: preview_eval agent ran the iframe-friendly
+subset (12-screen render walk + globals audit + annotation round-trip
++ Escape priority chain + popstate flow + responsive resize at
+375/768/1440); Claude in Chrome drove the real-browser-only surfaces
+(file export download, file import full round-trip with localStorage
+replacement + reload, audio recording mic-request path, garden-warning
+modal via real OS Escape key).
+
+**votSmoke result PASS**: 142 globals / 0 missing, 12/12 screens
+reached / 0 crashed, letterAnn 133 marks + 13 note icons,
+wtlbAnn 51 marks + 6 note icons, 0 console.errors, 0 resource 404s.
+
+**Export round-trip** verified end-to-end: PlatformBridge.saveToDownloads
+creates valid `votreader-backup-YYYY-MM-DD.json` (exportVersion 1, all
+vot-* keys preserved). Chrome's silent multi-download safety queues
+subsequent downloads as .tmp until user confirms (browser-level UX,
+not our code). Larger-volume re-verification with seeded 3 bookmarks
++ 1 notebook showed payload growing 1620 → 3250 bytes (10 keys, all
+seeded data present in vot-bookmarks). Mechanism scales with real
+data; the small original was a fresh-state artifact.
+
+**Import round-trip** verified end-to-end: window.__onImportFile(base64)
+callback fires, REPLACE confirm prompt shown, old localStorage wiped,
+new localStorage installed, alert + reload trigger, post-reload state
+preserves injected marker key.
+
+**5 BOOKS bare-ref bugs found + fixed across 2 commits** (9c35993 +
+bdebd34). Pre-existing latent bugs predating W1.5 — introduced when
+Q8 lazy-loading (5605f30, 2026-05-25) moved BOOKS into the lazy
+bundle-a-bible bundle. Same class repeats with MATTHEW (1 site
+fixed in 5f5bcc7). Optional chaining (?.) does NOT save you from
+undeclared identifier ReferenceError; only `typeof BOOKS !== 'undefined'`
+guard works. CLASS-of-bug audit completed: SettingsScreen's
+PROGRESS_GROUPS (40+ refs) is fully gated by `_BOOKS_READY &&
+_VOT_READY`; ScripturesHome is gated by `bibleLoaded`; MatthewChapterView
+is gated by the matthew-ch route's typeof guard.
+
+**MediaStream-cleanup test flake fixed** (5f5bcc7) — 3 affected tests
+in platform-bridge.test.js replaced fixed-time `setTimeout(20)` with
+`vi.waitFor` polls. Verified across 5 isolated runs + 3 full-suite
+runs all green.
+
+**Final W1 bundle delta**: bundle-b 351.0 KB → 357.2 KB (+6.2 KB net
+for platform abstraction + Escape/popstate handlers + modal registry
++ history sync + root-exit toast + 6 BOOKS/MATTHEW guards). bundle-d
+unchanged. Vitest 595 → 628 (+33).
+
+**Cross-browser coverage**: W1.6 verified Chrome + preview_eval only;
+Edge + Firefox + Android regression deferred to W6 — see W6 exit
+criteria. The structural correctness invariants (dispatcher contract,
+registry semantics, history-sync suppress + clear, popstate flow,
+activeElement gate, BOOKS/MATTHEW typeof guards) are browser-
+independent JS state-machine behavior; Chrome-only verification is
+sufficient to call W1 structurally complete.
+
+### Known UX findings carried into W2
+
+- **alert() in exportPersonalData + importPersonalData blocks the
+  renderer** on every desktop platform. UPGRADED from "W7 polish"
+  to W2.6 SCOPE BLOCKER per W1 follow-up review: the W2.6 agent
+  (already touching export/import for the media-blob upgrade) MUST
+  migrate the 4 alert sites to in-app toast (jrnShowMilestoneToast
+  pattern) in the same pass.
+
+- **W2.6 must verify export-import at realistic data volume.** W1.6
+  tested at toy scale (3 bookmarks + 1 notebook = 3.25 KB). The
+  W2.6 agent must seed at least 50 annotations + 10 bookmarks + 5
+  journal entries (with media blobs) before testing export-import
+  to catch truncation/timeout bugs at 200-500 KB scale.
+
+- **exportVersion 1 ↔ 2 forward-compat.** W2.6 upgrades the export
+  format to v2 (adds media key). The v2 import handler should
+  explicitly skip unknown top-level keys rather than blindly writing
+  them, so a v2 file imported into an older v1-speaking client
+  (Android APK still on v1 schema) doesn't silently store unknown
+  data into localStorage as wasted quota.
+
+---
+
 ## Surprise button — full-app pool + unbiased RNG (LANDED 2026-05-26)
 
 Second pass on the dice in the same day. Scope was: include every
