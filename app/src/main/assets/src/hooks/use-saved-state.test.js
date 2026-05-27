@@ -23,6 +23,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { _validateTabState, useSavedState } from './use-saved-state.js';
+import { StateStore } from '../stores/state-store.js';
 
 /** Run _validateTabState on a fresh copy of the input and return the result. */
 function validate(/** @type {Record<string, any>} */ input) {
@@ -345,19 +346,22 @@ describe('_validateTabState — 13 coercion rules', () => {
   });
 
   // ── Q5.6: useSavedState (the actual hook) ────────────────────────
-  describe('useSavedState — load + validate localStorage[vot-state]', () => {
+  describe('useSavedState — load + validate StateStore (vot-state)', () => {
     beforeEach(() => {
       localStorage.clear();
+      // W2.3b: useSavedState now reads via StateStore. Reset its state
+      // machine + force loaded so the hook's sync useMemo read sees the
+      // seeded cache without going through async hydration.
+      StateStore._resetForTests({ forceLoaded: true });
     });
 
-    it('returns the parsed + validated state from localStorage on mount', () => {
-      const persisted = {
+    it('returns the parsed + validated state from StateStore on mount', () => {
+      StateStore._cache = /** @type {any} */ ({
         screen: 'home',
         theme: 'dark',
         tabs: [{ screen: 'home' }],
         settings: { keepScreenOn: true },
-      };
-      localStorage.setItem('vot-state', JSON.stringify(persisted));
+      });
 
       const { result } = renderHook(() => useSavedState());
 
@@ -371,7 +375,7 @@ describe('_validateTabState — 13 coercion rules', () => {
       // The critical silent-loss case: a tab persisted with screen:
       // 'search' (unrestoreable) should be coerced to 'home', but
       // its OTHER fields must survive.
-      const persisted = {
+      StateStore._cache = /** @type {any} */ ({
         screen: 'search',  // top-level stale
         bookId: 'genesis',
         tabs: [
@@ -379,8 +383,7 @@ describe('_validateTabState — 13 coercion rules', () => {
           { screen: 'search', bookId: 'preserve-me' },                   // stale → home
           { screen: 'journal-viewer', letterId: 'preserve-me-too' },     // stale → journal-home
         ],
-      };
-      localStorage.setItem('vot-state', JSON.stringify(persisted));
+      });
 
       const { result } = renderHook(() => useSavedState());
 

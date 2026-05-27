@@ -1135,6 +1135,59 @@
     }
   );
 
+  // app/src/main/assets/src/stores/state-store.js
+  function _bootScriptShim(full) {
+    return {
+      theme: full && full.theme,
+      settings: {
+        fontStyle: full && full.settings && full.settings.fontStyle
+      }
+    };
+  }
+  var StateStore = extendStore(
+    CachedStore(
+      "vot-state",
+      /** @type {VotState} */
+      {},
+      {
+        idb: true,
+        lsShim: _bootScriptShim
+      }
+    ),
+    {
+      /**
+       * Full state object (HydrationGate guarantees this is the loaded
+       * cache by the time any consumer calls). Returns the live cache
+       * reference — mutations through it persist on the next set().
+       * @returns {VotState}
+       */
+      get() {
+        return (
+          /** @type {VotState} */
+          this._load()
+        );
+      },
+      /**
+       * Replace the full state. usePersistedState calls this on every
+       * effect tick with the latest 8-value union. The W2.2 state
+       * machine handles rebase (pending → loaded) by replaying the
+       * single queued set() against the IDB-loaded base — last write
+       * wins, which matches the pre-W2 semantics where every effect
+       * tick wrote the full LS payload.
+       *
+       * @param {VotState} fullState
+       * @returns {void}
+       */
+      set(fullState) {
+        if (this._shouldDefer("set", fullState)) return;
+        this._cache = /** @type {any} */
+        fullState;
+        this._save();
+        this._bump();
+      }
+    }
+  );
+
   // app/src/main/assets/src/stores/annotation-store.js
   function migrateAnnotations() {
     try {
@@ -3854,7 +3907,9 @@
   function useSavedState() {
     return React.useMemo(() => {
       try {
-        const s = JSON.parse(localStorage.getItem("vot-state") || "{}");
+        const raw = StateStore.get();
+        const s = raw && typeof raw === "object" ? Object.assign({}, raw) : {};
+        if (Array.isArray(s.tabs)) s.tabs = s.tabs.map((t) => Object.assign({}, t));
         _validateTabState(s);
         if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
         return s;
@@ -4827,20 +4882,16 @@
     readItems
   }) {
     React.useEffect(() => {
-      try {
-        localStorage.setItem("vot-state", JSON.stringify({
-          tabs,
-          activeTabIdx,
-          theme,
-          lastReadChapters,
-          lastReadLetterMap,
-          activeReadKey,
-          settings,
-          readItems
-        }));
-      } catch (e) {
-        console.warn("localStorage write failed for vot-state", e);
-      }
+      StateStore.set({
+        tabs,
+        activeTabIdx,
+        theme,
+        lastReadChapters,
+        lastReadLetterMap,
+        activeReadKey,
+        settings,
+        readItems
+      });
     }, [tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap, activeReadKey, settings, readItems]);
   }
 
@@ -9138,6 +9189,7 @@
     AboutSeenFlagStore: AboutSeenFlagStore2,
     GardenWarningFlagStore,
     ProphecyCardsStore,
+    StateStore,
     migrateAnnotations,
     AnnotationStore: AnnotationStore2,
     HighlightStore,

@@ -59,17 +59,21 @@
  * }} args
  * @returns {void}
  */
+import { StateStore } from '../stores/state-store.js';
+
 export function usePersistedState({
   tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap,
   activeReadKey, settings, readItems,
 }) {
   React.useEffect(() => {
-    try {
-      localStorage.setItem("vot-state", JSON.stringify({
-        tabs, activeTabIdx,
-        theme, lastReadChapters, lastReadLetterMap,
-        activeReadKey, settings, readItems
-      }));
-    } catch (e) { console.warn('localStorage write failed for vot-state', e); }
+    // W2.3b: persistence routes through StateStore (IDB-backed). The
+    // store's lsShim hook continues to write the reduced theme +
+    // fontStyle copy to localStorage for the boot-script sync read at
+    // index.html:73 — no boot FOUC.
+    StateStore.set({
+      tabs, activeTabIdx,
+      theme, lastReadChapters, lastReadLetterMap,
+      activeReadKey, settings, readItems,
+    });
   }, [tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap, activeReadKey, settings, readItems]);
 }

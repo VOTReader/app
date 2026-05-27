@@ -41,6 +41,7 @@ import { CachedStore, hydrateAllStores, hasAnyPendingStores } from './cached-sto
 import { IDBAdapter } from './idb-adapter.js';
 import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore } from './app-flag-stores.js';
 import { ProphecyCardsStore } from './prophecy-cards-store.js';
+import { StateStore } from './state-store.js';
 import { migrateAnnotations, AnnotationStore, HighlightStore } from './annotation-store.js';
 import { NoteStore } from './note-store.js';
 import { NotebookStore } from './notebook-store.js';
@@ -138,6 +139,7 @@ Object.assign(window, {
   IDBAdapter,
   WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore,
   ProphecyCardsStore,
+  StateStore,
   migrateAnnotations, AnnotationStore, HighlightStore,
   NoteStore, NotebookStore, RecentNavStore,
   hlId, lnkId, LinkStore, persistLink,

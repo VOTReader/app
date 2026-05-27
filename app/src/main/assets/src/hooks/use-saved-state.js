@@ -96,21 +96,36 @@ export function _validateTabState(s) {
   return s;
 }
 
+import { StateStore } from '../stores/state-store.js';
+
 /**
- * Read + validate localStorage['vot-state'] exactly once on mount.
- * Returns the parsed object (with stale screens coerced via
- * _validateTabState) or {} when JSON.parse throws. Caller distributes
+ * Read + validate vot-state exactly once on mount. Source-of-truth
+ * pre-W2.3b was localStorage; post-W2.3b is StateStore (IDB-backed via
+ * the W2.2 state machine). HydrationGate has already resolved by the
+ * time this hook runs, so StateStore.get() returns the in-memory cache
+ * synchronously. The legacy-LS-fallback path inside CachedStore handles
+ * the migration boundary (first boot post-W2.3b: empty IDB →
+ * StateStore reads vot-state from LS, seeds IDB, populates cache).
+ *
+ * Returns the validated state (with stale screens coerced via
+ * _validateTabState) or {} when the store is empty. Caller distributes
  * the fields to the appropriate subsystems (useTabs / useSettings /
  * useReadingDwell / App-local useState).
  *
- * usePersistedState (P6k+1) owns the matching WRITE side.
+ * usePersistedState (P6k+1) owns the matching WRITE side via
+ * StateStore.set().
  *
  * @returns {SavedState}
  */
 export function useSavedState() {
   return React.useMemo(() => {
     try {
-      const s = JSON.parse(localStorage.getItem("vot-state") || "{}");
+      const raw = StateStore.get();
+      // Defensive copy — _validateTabState mutates in place, and the
+      // live store cache reference shouldn't be silently rewritten by
+      // a read.
+      const s = raw && typeof raw === 'object' ? Object.assign({}, raw) : {};
+      if (Array.isArray(s.tabs)) s.tabs = s.tabs.map((t) => Object.assign({}, t));
       _validateTabState(s);
       if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
       return s;
