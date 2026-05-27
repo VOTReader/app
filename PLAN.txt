@@ -1050,18 +1050,42 @@ W2 — STORAGE HARDENING (persistence + scale + safety)
   └──────────────────────────────────────────────────────────────────┘
 
   ┌──────────────────────────────────────────────────────────────────┐
-  │ W2.6 SCOPE EXPANSION — kill the blocking alert() calls            │
+  │ W2.6 SCOPE EXPANSION — 3 carry-forward items from W1 closure     │
   │                                                                  │
   │ The W2.6 agent already touches exportPersonalData +              │
   │ importPersonalData to add the media-blob round-trip               │
-  │ (exportVersion 2). Within the SAME PASS, the agent MUST          │
-  │ replace the alert(...) calls (4 sites: 'Backup saved...',        │
-  │ 'Export failed...', 'This file does not look...', 'Import        │
-  │ complete...') with the in-app toast pattern matching             │
-  │ jrnShowMilestoneToast in journal-stats-store.js. alert() blocks  │
-  │ the renderer on every desktop platform; this is a UX defect      │
-  │ that ships, not optional polish. Surfaced + flagged during       │
-  │ W1.6 closure (2026-05-27).                                       │
+  │ (exportVersion 2). Within the SAME PASS, three additional        │
+  │ items surfaced during W1.6 closure (2026-05-27) MUST land:       │
+  │                                                                  │
+  │ (a) ALERT → TOAST. Replace the 4 alert(...) sites in             │
+  │     exportPersonalData + importPersonalData ('Backup saved...',  │
+  │     'Export failed...', 'This file does not look...', 'Import    │
+  │     complete...') with the in-app toast pattern matching         │
+  │     jrnShowMilestoneToast in journal-stats-store.js. alert()     │
+  │     blocks the renderer on every desktop platform; this is a UX  │
+  │     defect that ships, not optional polish.                      │
+  │                                                                  │
+  │ (b) REALISTIC-VOLUME ROUND-TRIP. W1.6 verified export/import at  │
+  │     toy scale (3 bookmarks + 1 notebook + nav history = 3.25 KB).│
+  │     W2.6 MUST seed at least 50 annotations + 10 bookmarks + 5    │
+  │     journal entries (each with at least one image OR audio blob) │
+  │     BEFORE running the round-trip test. Realistic exports run    │
+  │     200-500 KB structured + tens-of-MB media; truncation /       │
+  │     timeout / streaming bugs only surface at that scale. Failing │
+  │     to seed makes the round-trip test prove only the happy path. │
+  │                                                                  │
+  │ (c) FORWARD-COMPAT V1 ↔ V2. exportVersion 2 adds a `media` top-  │
+  │     level key. The V2 import handler MUST explicitly check       │
+  │     `parsed.exportVersion === 2` before attempting to use the    │
+  │     `media` key (instead of blindly iterating Object.keys), AND  │
+  │     skip unknown top-level keys (forward compat). Concrete       │
+  │     failure modes to prevent: (1) older Android APK still on V1  │
+  │     schema imports a V2 file → silently writes `media: {...}`    │
+  │     into localStorage as wasted quota; (2) future V3 file        │
+  │     imported into V2 client → V2 import handler should warn      │
+  │     "Backup created with a newer version; some data not          │
+  │     imported." and proceed with what it understands rather than  │
+  │     fail or silently store unknown data.                         │
   └──────────────────────────────────────────────────────────────────┘
 
 Goal: every byte of user data — structured metadata AND binary media —
