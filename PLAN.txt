@@ -1400,6 +1400,42 @@ Architecture — what exists, what changes:
   state + annotations first (initial render), then notes + links +
   history (after first paint).
 
+  W2.3 SCOPE: only the 10 stores that already use CachedStore. The
+  7 direct-localStorage keys (vot-welcomed, vot-about-seen, vot-
+  garden-warning-acked, vot-ann-migrated, vot-prophecy-cards, vot-
+  state, vot-history) are owned by hooks/components that call
+  localStorage.{get,set,remove}Item() directly — not via CachedStore.
+  Routing those through the W2.2 abstraction is structural work that
+  mixes badly with the mechanical "add idb: true" of W2.3. They
+  migrate in W2.3b (next).
+
+  W2.3b — Direct-localStorage key migration
+  ──────────────────────────────────────────
+  Refactor the 7 hook-owned direct-LS keys into IDB-backed accessors.
+  Strategy per key TBD (lightweight per-key CachedStore, batch
+  "FlagStore," or async-read-with-LS-fallback pattern for the boot
+  flags). MUST land BEFORE W2.4 — if W2.4 clears LS while any hook
+  still reads via localStorage.getItem(), the read returns null and
+  data is lost from the hook's perspective.
+
+  Keys + current owners:
+    - vot-welcomed              — use-app-shell-effects.js
+    - vot-about-seen            — use-app-shell-effects.js, use-android-
+                                  back.js, screen-routes.jsx
+    - vot-garden-warning-acked  — TBD (search needed)
+    - vot-ann-migrated          — annotation-store.js (migration gate;
+                                  read once at module load)
+    - vot-prophecy-cards        — use-reading-position-nav.js
+    - vot-state                 — use-saved-state.js (large, drives
+                                  tabs + theme; needs lsShim for boot)
+    - vot-history               — use-history.js (capped at 2000
+                                  entries; per [[user-data-paramount]]
+                                  losing history is data loss)
+
+  Exit gate: every read path for these keys goes through IDB. Tests
+  prove the rebase semantics hold for vot-state and vot-history (the
+  two non-trivial ones). Then and only then does W2.4 run.
+
   W2.4 — One-time localStorage → IndexedDB migration
   ───────────────────────────────────────────────────
   On first boot post-migration:

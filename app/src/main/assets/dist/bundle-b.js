@@ -591,12 +591,14 @@
   })();
 
   // app/src/main/assets/src/stores/cached-store.js
+  var _idbStoreRegistry = /* @__PURE__ */ new Set();
   function CachedStore(storageKey, defaultVal, opts) {
     opts = opts || {};
     const useIdb = opts.idb === true;
     const idbStoreName = opts.storeName || storageKey;
     const lsShim = opts.lsShim || null;
     const hydrationTimeoutMs = opts.hydrationTimeoutMs != null ? opts.hydrationTimeoutMs : 3e3;
+    const legacyLsKey = opts.legacyLsKey === null ? null : opts.legacyLsKey || storageKey;
     const backgroundRetryDelays = [5e3, 1e4, 3e4, 6e4];
     function copyDefault() {
       if (Array.isArray(defaultVal)) return (
@@ -609,7 +611,7 @@
       );
       return defaultVal;
     }
-    return {
+    const inst = {
       _cache: null,
       _pendingCache: null,
       /** Internal mirror of useIdb so tests / consumers can ask. */
@@ -844,6 +846,20 @@
               settle();
               return;
             }
+            if ((loadedData === void 0 || loadedData === null) && legacyLsKey) {
+              try {
+                const lsRaw = localStorage.getItem(legacyLsKey);
+                if (lsRaw) {
+                  const parsed = JSON.parse(lsRaw);
+                  IDBAdapter.put(idbStoreName, "v", parsed).catch(function(e) {
+                    console.warn("IDB legacy-LS seed failed for", storageKey, e);
+                  });
+                  loadedData = parsed;
+                }
+              } catch (e) {
+                console.warn("legacy LS parse failed for", storageKey, e);
+              }
+            }
             self._rebaseAndPromote(
               /** @type {any} */
               loadedData
@@ -941,6 +957,18 @@
           if (self._state === "loaded") return;
           IDBAdapter.get(idbStoreName, "v").then(function(loadedData) {
             if (self._state === "loaded") return;
+            if ((loadedData === void 0 || loadedData === null) && legacyLsKey) {
+              try {
+                const lsRaw = localStorage.getItem(legacyLsKey);
+                if (lsRaw) {
+                  const parsed = JSON.parse(lsRaw);
+                  IDBAdapter.put(idbStoreName, "v", parsed).catch(function() {
+                  });
+                  loadedData = parsed;
+                }
+              } catch (_e) {
+              }
+            }
             self._rebaseAndPromote(
               /** @type {any} */
               loadedData
@@ -954,6 +982,22 @@
         setTimeout(tick, this._backgroundRetryDelays[0]);
       }
     };
+    if (useIdb) _idbStoreRegistry.add(inst);
+    return inst;
+  }
+  function hydrateAllStores() {
+    const stores = Array.from(_idbStoreRegistry);
+    if (stores.length === 0) return Promise.resolve();
+    return Promise.allSettled(stores.map(function(s) {
+      return s._hydrate();
+    })).then(function() {
+    });
+  }
+  function hasAnyPendingStores() {
+    for (const s of _idbStoreRegistry) {
+      if (s._state === "pending") return true;
+    }
+    return false;
   }
   function extendStore(base, methods) {
     return (
@@ -1429,11 +1473,15 @@
     CachedStore(
       "vot-recent-nav",
       /** @type {NavItemRecord[]} */
-      []
+      [],
+      { idb: true }
     ),
     {
       /**
-       * Top-20 of the recent list (newest first).
+       * Top-20 of the recent list (newest first). Reads are synchronous
+       * via `_load()` — during pending/degraded states the W2.2 overlay
+       * returns the queue-applied snapshot, so the user always sees
+       * their most recent writes.
        * @returns {NavItemRecord[]}
        */
       list() {
@@ -1443,11 +1491,18 @@
        * Insert a nav item at the top of the list. No-op when item is null
        * or has no `kind`. Dedups against the (kind/bookId/chapter/letterId/
        * entryId) tuple and trims the list to 30 entries.
+       *
+       * During W2.2 pending/degraded states, `_shouldDefer` queues the
+       * op and applies it to the overlay so the UI reflects the user's
+       * action immediately; on rebase the op replays against the
+       * IDB-loaded base.
+       *
        * @param {NavItemRecord | null | undefined} item
        * @returns {void}
        */
       add(item) {
         if (!item || !item.kind) return;
+        if (this._shouldDefer("add", item)) return;
         let data = this._load();
         const sig = JSON.stringify({ kind: item.kind, bookId: item.bookId, chapter: item.chapter, letterId: item.letterId, entryId: item.entryId });
         data = data.filter((x) => JSON.stringify({ kind: x.kind, bookId: x.bookId, chapter: x.chapter, letterId: x.letterId, entryId: x.entryId }) !== sig);
@@ -1455,6 +1510,7 @@
         data = data.slice(0, 30);
         this._cache = data;
         this._save();
+        this._bump();
       }
     }
   );
@@ -2853,12 +2909,12 @@
 
   // app/src/main/assets/src/components/ExpandableText.jsx
   function ExpandableText(props) {
-    var useState = React.useState;
+    var useState2 = React.useState;
     var text = props.text || "";
     var threshold = props.threshold || 240;
     var className = props.className || "";
     var tapToToggle = !!props.tapToToggle;
-    var _exp = useState(false);
+    var _exp = useState2(false);
     var expanded = _exp[0];
     var setExpanded = _exp[1];
     if (!text || text.length <= threshold) {
@@ -2914,6 +2970,25 @@
       ));
     }
   };
+
+  // app/src/main/assets/src/components/HydrationGate.jsx
+  var { useState, useEffect } = React;
+  function HydrationGate({ children }) {
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => {
+      let alive = true;
+      hydrateAllStores().finally(() => {
+        if (alive) setHydrated(true);
+      });
+      return () => {
+        alive = false;
+      };
+    }, []);
+    if (!hydrated) {
+      return /* @__PURE__ */ React.createElement("div", { className: "hydration-loading", role: "status", "aria-live": "polite" }, /* @__PURE__ */ React.createElement("div", { className: "hydration-loading-text" }, "VOTReader"));
+    }
+    return children;
+  }
 
   // app/src/main/assets/src/utils/platform-bridge.js
   var isAndroid = !!(typeof window !== "undefined" && /** @type {any} */
@@ -6566,28 +6641,28 @@
 
   // app/src/main/assets/src/ui/sheets/JournalRecordingSheet.jsx
   function JournalRecordingSheet2({ onSave, onClose }) {
-    var useState = React.useState;
-    var useEffect = React.useEffect;
+    var useState2 = React.useState;
+    var useEffect2 = React.useEffect;
     var useRef = React.useRef;
-    var _stage = useState("requesting");
+    var _stage = useState2("requesting");
     var stage = _stage[0];
     var setStage = _stage[1];
-    var _err = useState(null);
+    var _err = useState2(null);
     var error = _err[0];
     var setError = _err[1];
-    var _seconds = useState(0);
+    var _seconds = useState2(0);
     var seconds = _seconds[0];
     var setSeconds = _seconds[1];
-    var _waveLive = useState([]);
+    var _waveLive = useState2([]);
     var waveLive = _waveLive[0];
     var setWaveLive = _waveLive[1];
-    var _waveFinal = useState([]);
+    var _waveFinal = useState2([]);
     var waveFinal = _waveFinal[0];
     var setWaveFinal = _waveFinal[1];
-    var _progress = useState(0);
+    var _progress = useState2(0);
     var progress = _progress[0];
     var setProgress = _progress[1];
-    var _previewPlaying = useState(false);
+    var _previewPlaying = useState2(false);
     var previewPlaying = _previewPlaying[0];
     var setPreviewPlaying = _previewPlaying[1];
     var tickRef = useRef(0);
@@ -6621,7 +6696,7 @@
         previewUrlRef.current = null;
       }
     }
-    useEffect(function() {
+    useEffect2(function() {
       var cancelled = false;
       var permDecided = false;
       var permTimer = 0;
@@ -6949,19 +7024,19 @@
 
   // app/src/main/assets/src/ui/sheets/JournalInsertSheet.jsx
   function JournalInsertSheet2(props) {
-    var useState = React.useState;
+    var useState2 = React.useState;
     var onClose = props.onClose;
     var onInsertBlock = props.onInsertBlock;
     var onInsertImage = props.onInsertImage;
     var onRecordAudio = props.onRecordAudio;
     var excludeJournalId = props.excludeJournalId;
-    var _mode = useState("menu");
+    var _mode = useState2("menu");
     var mode = _mode[0];
     var setMode = _mode[1];
-    var _q = useState("");
+    var _q = useState2("");
     var query = _q[0];
     var setQuery = _q[1];
-    var _drilled = useState(null);
+    var _drilled = useState2(null);
     var drilledEntry = _drilled[0];
     var setDrilledEntry = _drilled[1];
     function close() {
@@ -7440,12 +7515,12 @@
     JournalHubScreen: () => JournalHubScreen
   });
   function JournalCardMenu(props) {
-    var useState = React.useState;
+    var useState2 = React.useState;
     var entry = props.entry;
-    var _step = useState(0);
+    var _step = useState2(0);
     var step = _step[0];
     var setStep = _step[1];
-    var _typed = useState("");
+    var _typed = useState2("");
     var typed = _typed[0];
     var setTyped = _typed[1];
     if (!entry) return null;
@@ -7500,7 +7575,7 @@
     )))));
   }
   function JournalHubScreen(props) {
-    var useState = React.useState;
+    var useState2 = React.useState;
     var onBack = props.onBack;
     var onOpenEntry = props.onOpenEntry;
     var onEditEntry = props.onEditEntry;
@@ -7514,16 +7589,16 @@
         return JournalStore.getVersion();
       }
     );
-    var _tab = useState("all");
+    var _tab = useState2("all");
     var tab = _tab[0];
     var setTab = _tab[1];
-    var _q = useState("");
+    var _q = useState2("");
     var query = _q[0];
     var setQuery = _q[1];
-    var _sortNewest = useState(true);
+    var _sortNewest = useState2(true);
     var sortNewest = _sortNewest[0];
     var setSortNewest = _sortNewest[1];
-    var _menuEntry = useState(null);
+    var _menuEntry = useState2(null);
     var menuEntry = _menuEntry[0];
     var setMenuEntry = _menuEntry[1];
     var allEntries = JournalStore.all();
@@ -7904,12 +7979,12 @@
     return null;
   }
   function JournalImageBlock2({ mediaId, caption }) {
-    var useState = React.useState;
-    var useEffect = React.useEffect;
-    var _src = useState(null);
+    var useState2 = React.useState;
+    var useEffect2 = React.useEffect;
+    var _src = useState2(null);
     var src = _src[0];
     var setSrc = _src[1];
-    useEffect(function() {
+    useEffect2(function() {
       var cancelled = false;
       if (mediaId && typeof JournalMediaStore !== "undefined") {
         JournalMediaStore.objectUrl(mediaId).then(function(url) {
@@ -7923,8 +7998,8 @@
     return /* @__PURE__ */ React.createElement("div", { className: "jrn-embed-image" }, src ? /* @__PURE__ */ React.createElement("img", { src, alt: caption || "" }) : /* @__PURE__ */ React.createElement("div", { style: { width: "100%", height: "180px", background: "var(--bg3)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--gold-dim)", fontStyle: "italic", fontFamily: "EB Garamond, serif" } }, "Image unavailable"), caption && /* @__PURE__ */ React.createElement("div", { className: "jrn-img-caption", style: { padding: "8px 14px" } }, caption));
   }
   function JournalAudioBlock2(props) {
-    var useState = React.useState;
-    var useEffect = React.useEffect;
+    var useState2 = React.useState;
+    var useEffect2 = React.useEffect;
     var useRef = React.useRef;
     var mediaId = props.mediaId;
     var duration = props.duration;
@@ -7932,20 +8007,20 @@
     var samples = props.samples;
     var editable = !!props.editable;
     var confirming = !!props.confirming;
-    var _src = useState(null);
+    var _src = useState2(null);
     var src = _src[0];
     var setSrc = _src[1];
     var audioRef = useRef(null);
-    var _playing = useState(false);
+    var _playing = useState2(false);
     var playing = _playing[0];
     var setPlaying = _playing[1];
-    var _progress = useState(0);
+    var _progress = useState2(0);
     var progress = _progress[0];
     var setProgress = _progress[1];
-    var _curTime = useState(0);
+    var _curTime = useState2(0);
     var curTime = _curTime[0];
     var setCurTime = _curTime[1];
-    useEffect(function() {
+    useEffect2(function() {
       var cancelled = false;
       if (mediaId && typeof JournalMediaStore !== "undefined") {
         JournalMediaStore.objectUrl(mediaId).then(function(url) {
@@ -8063,7 +8138,7 @@
     return /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: filled ? "currentColor" : "none", stroke: "currentColor", strokeWidth: "1.7", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" }), /* @__PURE__ */ React.createElement("path", { d: "M8 12 L3 19", stroke: "currentColor", fill: "none" }));
   }
   function JournalViewerScreen(props) {
-    var useState = React.useState;
+    var useState2 = React.useState;
     var entryId = props.entryId;
     var onBack = props.onBack;
     var onEdit = props.onEdit;
@@ -8080,10 +8155,10 @@
       }
     );
     var entry = entryId ? JournalStore.get(entryId) : null;
-    var _confirmStep = useState(0);
+    var _confirmStep = useState2(0);
     var confirmStep = _confirmStep[0];
     var setConfirmStep = _confirmStep[1];
-    var _typedDelete = useState("");
+    var _typedDelete = useState2("");
     var typedDelete = _typedDelete[0];
     var setTypedDelete = _typedDelete[1];
     function bump() {
@@ -8268,8 +8343,8 @@
     JournalEditorScreen: () => JournalEditorScreen
   });
   function JournalEditorScreen(props) {
-    var useState = React.useState;
-    var useEffect = React.useEffect;
+    var useState2 = React.useState;
+    var useEffect2 = React.useEffect;
     var useRef = React.useRef;
     var useMemo = React.useMemo;
     var entryId = props.entryId;
@@ -8278,22 +8353,22 @@
     var initial = useMemo(function() {
       return entryId ? JournalStore.get(entryId) : null;
     }, [entryId]);
-    var _title = useState(initial && initial.title || "");
+    var _title = useState2(initial && initial.title || "");
     var title = _title[0];
     var setTitle = _title[1];
-    var _blocks = useState(initial && initial.blocks || JournalHelpers.defaultBlocks());
+    var _blocks = useState2(initial && initial.blocks || JournalHelpers.defaultBlocks());
     var blocks = _blocks[0];
     var setBlocks = _blocks[1];
-    var _mood = useState(initial && initial.mood || null);
+    var _mood = useState2(initial && initial.mood || null);
     var mood = _mood[0];
     var _setMood = _mood[1];
-    var _saved = useState("Saved");
+    var _saved = useState2("Saved");
     var savedLabel = _saved[0];
     var setSavedLabel = _saved[1];
-    var _showInsert = useState(false);
+    var _showInsert = useState2(false);
     var showInsert = _showInsert[0];
     var setShowInsert = _showInsert[1];
-    var _showRec = useState(false);
+    var _showRec = useState2(false);
     var showRec = _showRec[0];
     var setShowRec = _showRec[1];
     useModalRegistry({
@@ -8310,13 +8385,13 @@
       },
       active: showRec
     });
-    var _confirmAudioDelete = useState(null);
+    var _confirmAudioDelete = useState2(null);
     var confirmAudioDelete = _confirmAudioDelete[0];
     var setConfirmAudioDelete = _confirmAudioDelete[1];
-    var _confirmDel = useState(null);
+    var _confirmDel = useState2(null);
     var confirmDelIdx = _confirmDel[0];
     var setConfirmDelIdx = _confirmDel[1];
-    useEffect(function() {
+    useEffect2(function() {
       if (confirmDelIdx === null) return;
       function onDocDown(e) {
         var t = e.target;
@@ -8341,7 +8416,7 @@
     moodRef.current = mood;
     var entryIdRef = useRef(entryId);
     entryIdRef.current = entryId;
-    useEffect(function() {
+    useEffect2(function() {
       if (!entryId) return;
       if (firstRunRef.current) {
         firstRunRef.current = false;
@@ -8359,7 +8434,7 @@
         clearTimeout(t);
       };
     }, [entryId, title, blocks, mood]);
-    useEffect(function() {
+    useEffect2(function() {
       return function() {
         var eid = entryIdRef.current;
         if (eid) {
@@ -8460,7 +8535,7 @@
       pendingFocusIdRef.current = tailId;
       scheduleSave();
     }
-    useEffect(function() {
+    useEffect2(function() {
       var pid = pendingFocusIdRef.current;
       if (!pid) return;
       pendingFocusIdRef.current = null;
@@ -8844,6 +8919,8 @@
     PlatformBridge,
     // Stores
     CachedStore,
+    hydrateAllStores,
+    hasAnyPendingStores,
     IDBAdapter,
     migrateAnnotations,
     AnnotationStore: AnnotationStore2,
@@ -8871,6 +8948,7 @@
     ExpandableText,
     JrnExpandable: JrnExpandable2,
     ErrorBoundary,
+    HydrationGate,
     // Hooks
     useMarkAsRead,
     useReadProgress,

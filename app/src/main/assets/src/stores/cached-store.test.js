@@ -28,7 +28,10 @@
    ─────────────────────────────────────────────────────────────── */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { CachedStore, extendStore } from './cached-store.js';
+import {
+  CachedStore, extendStore,
+  hydrateAllStores, hasAnyPendingStores, _resetStoreRegistry,
+} from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -211,7 +214,7 @@ function createTestStore(key, opts) {
 }
 
 describe('CachedStore W2.2 — initial state machine', () => {
-  beforeEach(() => { localStorage.clear?.(); });
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); });
 
   it('idb:true store starts in pending state', () => {
     const store = createTestStore('vot-test-w22-init', { idb: true });
@@ -237,6 +240,7 @@ describe('CachedStore W2.2 — initial state machine', () => {
 describe('CachedStore W2.2 — happy-path hydration (pending → loaded fast)', () => {
   beforeEach(() => {
     localStorage.clear?.();
+    _resetStoreRegistry();
     vi.restoreAllMocks();
   });
   afterEach(() => { vi.restoreAllMocks(); });
@@ -300,7 +304,7 @@ describe('CachedStore W2.2 — happy-path hydration (pending → loaded fast)', 
 });
 
 describe('CachedStore W2.2 — writes during pending (Vector 1: late stomp prevention)', () => {
-  beforeEach(() => { localStorage.clear?.(); vi.restoreAllMocks(); });
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('writes during pending populate _pendingCache AND queue', () => {
@@ -397,6 +401,7 @@ describe('CachedStore W2.2 — writes during pending (Vector 1: late stomp preve
 describe('CachedStore W2.2 — hydration timeout → degraded → recovery (Vector 2 prevention)', () => {
   beforeEach(() => {
     localStorage.clear?.();
+    _resetStoreRegistry();
     vi.restoreAllMocks();
     vi.useFakeTimers();
   });
@@ -540,7 +545,7 @@ describe('CachedStore W2.2 — hydration timeout → degraded → recovery (Vect
 });
 
 describe('CachedStore W2.2 — batched replay (Flag 2: single save + single bump)', () => {
-  beforeEach(() => { localStorage.clear?.(); vi.restoreAllMocks(); });
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('replaying N queued ops fires ONE IDB.put and ONE subscriber notification', async () => {
@@ -605,7 +610,7 @@ describe('CachedStore W2.2 — batched replay (Flag 2: single save + single bump
 });
 
 describe('CachedStore W2.2 — multiple stores hydrate concurrently with independent state', () => {
-  beforeEach(() => { localStorage.clear?.(); vi.restoreAllMocks(); });
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
   it('two stores: one succeeds fast, one times out → independent states', async () => {
@@ -644,7 +649,7 @@ describe('CachedStore W2.2 — multiple stores hydrate concurrently with indepen
 });
 
 describe('CachedStore W2.2 — LS shim for boot-script reads', () => {
-  beforeEach(() => { localStorage.clear?.(); vi.restoreAllMocks(); });
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('lsShim writes a reduced LS copy on every save', async () => {
@@ -716,7 +721,7 @@ describe('CachedStore W2.2 — LS shim for boot-script reads', () => {
 });
 
 describe('CachedStore W2.2 — remove/delete during pending (reassignment safety)', () => {
-  beforeEach(() => { localStorage.clear?.(); vi.restoreAllMocks(); });
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('remove during pending: queue records remove; pendingCache reflects filter', () => {
@@ -763,8 +768,143 @@ describe('CachedStore W2.2 — remove/delete during pending (reassignment safety
   });
 });
 
+describe('CachedStore W2.3 Tier 1 — registry + hydrateAllStores', () => {
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('idb:true stores auto-register; LS-only stores do not', () => {
+    expect(hasAnyPendingStores()).toBe(false);
+    CachedStore('vot-test-w23-ls', []); // LS-only — NOT registered
+    expect(hasAnyPendingStores()).toBe(false);
+    CachedStore('vot-test-w23-idb', [], { idb: true }); // registered
+    expect(hasAnyPendingStores()).toBe(true);
+  });
+
+  it('hydrateAllStores resolves immediately when registry is empty', async () => {
+    expect(_resetStoreRegistry).toBeDefined();
+    await expect(hydrateAllStores()).resolves.toBeUndefined();
+  });
+
+  it('hydrateAllStores awaits every registered IDB store', async () => {
+    const getSpy = vi.spyOn(IDBAdapter, 'get').mockResolvedValue([]);
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const s1 = createTestStore('vot-test-w23-many-1', { idb: true });
+    const s2 = createTestStore('vot-test-w23-many-2', { idb: true });
+    const s3 = createTestStore('vot-test-w23-many-3', { idb: true });
+    await hydrateAllStores();
+    expect(s1.getState()).toBe('loaded');
+    expect(s2.getState()).toBe('loaded');
+    expect(s3.getState()).toBe('loaded');
+    expect(getSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('hydrateAllStores resolves even if one store fails (Promise.allSettled)', async () => {
+    let getCount = 0;
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(function (storeName) {
+      getCount += 1;
+      if (storeName === 'vot-test-w23-fail-bad') return Promise.reject(new Error('corrupted'));
+      return Promise.resolve([]);
+    });
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const ok = createTestStore('vot-test-w23-fail-ok', { idb: true });
+    const bad = createTestStore('vot-test-w23-fail-bad', { idb: true });
+
+    // Must not throw despite one store failing.
+    await expect(hydrateAllStores()).resolves.toBeUndefined();
+    expect(ok.getState()).toBe('loaded');
+    expect(bad.getState()).toBe('degraded');
+    expect(getCount).toBe(2);
+    consoleSpy.mockRestore();
+  });
+
+  it('hasAnyPendingStores flips to false after hydrateAllStores resolves', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue([]);
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    createTestStore('vot-test-w23-pending', { idb: true });
+    expect(hasAnyPendingStores()).toBe(true);
+    await hydrateAllStores();
+    expect(hasAnyPendingStores()).toBe(false);
+  });
+});
+
+describe('CachedStore W2.3 — legacy LS fallback on first hydration', () => {
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('seeds IDB from legacy LS key when IDB returns undefined', async () => {
+    // Pre-W2 LS data — what a user upgrading from a pre-W2 deploy has.
+    localStorage.setItem('vot-test-w23-legacy', JSON.stringify([
+      { id: 'legacy-A', label: 'pre-W2 data' },
+      { id: 'legacy-B', label: 'also pre-W2' },
+    ]));
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined); // IDB empty
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+
+    const store = createTestStore('vot-test-w23-legacy', { idb: true });
+    await store._hydrate();
+
+    // Cache contains the legacy data.
+    expect(store.all().map((x) => x.id).sort()).toEqual(['legacy-A', 'legacy-B']);
+    // IDB was seeded with the migrated data so the next boot reads from IDB.
+    expect(putSpy).toHaveBeenCalled();
+    const seedCall = putSpy.mock.calls.find((c) => c[0] === 'vot-test-w23-legacy');
+    expect(seedCall).toBeDefined();
+    expect(seedCall[2].map((x) => x.id).sort()).toEqual(['legacy-A', 'legacy-B']);
+  });
+
+  it('does NOT fall back to LS when IDB has data', async () => {
+    localStorage.setItem('vot-test-w23-idb-wins', JSON.stringify([{ id: 'LS-stale', label: 'should-not-appear' }]));
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue([{ id: 'idb-current', label: 'idb-wins' }]);
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+
+    const store = createTestStore('vot-test-w23-idb-wins', { idb: true });
+    await store._hydrate();
+
+    expect(store.all()).toEqual([{ id: 'idb-current', label: 'idb-wins' }]);
+  });
+
+  it('handles unparseable legacy LS gracefully (resolves to defaults)', async () => {
+    localStorage.setItem('vot-test-w23-broken', '{not valid json');
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const store = createTestStore('vot-test-w23-broken', { idb: true });
+    await store._hydrate();
+
+    expect(store.all()).toEqual([]);
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('legacyLsKey: null disables the fallback', async () => {
+    localStorage.setItem('vot-test-w23-no-fallback', JSON.stringify([{ id: 'stays-in-LS' }]));
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+
+    const store = createTestStore('vot-test-w23-no-fallback', { idb: true, legacyLsKey: null });
+    await store._hydrate();
+
+    // LS data is NOT pulled into cache because the fallback was disabled.
+    expect(store.all()).toEqual([]);
+  });
+
+  it('custom legacyLsKey reads from a different LS key', async () => {
+    localStorage.setItem('different-legacy-name', JSON.stringify([{ id: 'X' }]));
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+
+    const store = createTestStore('vot-test-w23-custom', { idb: true, legacyLsKey: 'different-legacy-name' });
+    await store._hydrate();
+
+    expect(store.all()).toEqual([{ id: 'X' }]);
+  });
+});
+
 describe('CachedStore W2.2 — getState / isReady reflect transitions', () => {
-  beforeEach(() => { localStorage.clear?.(); vi.restoreAllMocks(); });
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
   it('observed lifecycle: pending → loaded', async () => {

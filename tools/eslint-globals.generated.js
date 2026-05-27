@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 361 distinct identifiers.
+// Total: 364 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -82,6 +82,7 @@ export const projectGlobals = {
   HomeBtn: "readonly",
   HomeScreen: "readonly",
   Hooks: "readonly",
+  HydrationGate: "readonly",
   IDBAdapter: "readonly",
   InAppLinkButton: "readonly",
   InlineEcho: "readonly",
@@ -285,9 +286,11 @@ export const projectGlobals = {
   getEchoesForVerse: "readonly",
   getGardenTier: "readonly",
   getNotesForVerse: "readonly",
+  hasAnyPendingStores: "readonly",
   highlightExcerptInDom: "readonly",
   hlId: "readonly",
   html2canvas: "readonly",
+  hydrateAllStores: "readonly",
   idbDelete: "readonly",
   idbPut: "readonly",
   idbReadAll: "readonly",

@@ -1126,11 +1126,12 @@ const SRCH_QUICK_PICKS = [
     window.COL_BY_KEY = COL_BY_KEY;
     window.HL_COLORS = HL_COLORS;
     window.ErrorBoundary = ErrorBoundary;
+    window.HydrationGate = HydrationGate;
     window.StaticSubtree = StaticSubtree;
   </script>
   <script>
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(App, null)));
+root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(HydrationGate, null, /*#__PURE__*/React.createElement(App, null))));
 </script>
 </body>
 </html>

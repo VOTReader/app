@@ -34,6 +34,16 @@
 import { IDBAdapter } from './idb-adapter.js';
 
 /**
+ * Module-private registry of IDB-backed stores. Populated automatically
+ * when CachedStore() is called with opts.idb=true. Read by
+ * hydrateAllStores() so App's HydrationGate can await every IDB store
+ * with one Promise.allSettled.
+ *
+ * @type {Set<CachedStoreBase<any>>}
+ */
+const _idbStoreRegistry = new Set();
+
+/**
  * Configuration object accepted by the third arg of CachedStore().
  *
  * @typedef {{
@@ -41,6 +51,7 @@ import { IDBAdapter } from './idb-adapter.js';
  *   storeName?: string,
  *   lsShim?: (full: any) => any,
  *   hydrationTimeoutMs?: number,
+ *   legacyLsKey?: string | null,
  * }} CachedStoreOpts
  */
 
@@ -141,6 +152,17 @@ export function CachedStore(storageKey, defaultVal, opts) {
   const idbStoreName = opts.storeName || storageKey;
   const lsShim = opts.lsShim || null;
   const hydrationTimeoutMs = (opts.hydrationTimeoutMs != null) ? opts.hydrationTimeoutMs : 3000;
+  /**
+   * Legacy localStorage key to consult on first hydration when IDB
+   * returns empty. Defaults to `storageKey` (the existing LS key has
+   * the same name as the new IDB store). Set to `null` to disable —
+   * e.g. for stores that have no pre-W2 LS data. This is the
+   * transparent per-store migration path: each IDB-backed store
+   * self-migrates its previous-deploy data on first hydration so the
+   * Tier commit ships safely without waiting for the explicit W2.4
+   * bulk-migration step.
+   */
+  const legacyLsKey = (opts.legacyLsKey === null) ? null : (opts.legacyLsKey || storageKey);
   /** Linear-backoff schedule (ms) for background IDB retries when
    *  degraded. Exposed via `_backgroundRetryDelays` for test control. */
   const backgroundRetryDelays = [5000, 10000, 30000, 60000];
@@ -157,7 +179,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
     return defaultVal;
   }
 
-  return {
+  /** @type {CachedStoreBase<T>} */
+  const inst = {
     _cache: null,
     _pendingCache: null,
     /** Internal mirror of useIdb so tests / consumers can ask. */
@@ -366,6 +389,24 @@ export function CachedStore(storageKey, defaultVal, opts) {
         IDBAdapter.get(idbStoreName, 'v').then(function (loadedData) {
           clearTimeout(timeoutId);
           if (self._state === 'loaded') { settle(); return; }
+          // Transparent per-store migration: if IDB is empty AND the
+          // legacy LS key has data from a pre-W2 deploy, seed cache
+          // from LS AND flush to IDB so subsequent boots read from
+          // IDB. W2.4 will eventually clear the LS keys; until then
+          // this preserves user data across the W2.3 → W2.4 deploy
+          // window without a separate one-time migration step.
+          if ((loadedData === undefined || loadedData === null) && legacyLsKey) {
+            try {
+              const lsRaw = localStorage.getItem(legacyLsKey);
+              if (lsRaw) {
+                const parsed = JSON.parse(lsRaw);
+                IDBAdapter.put(idbStoreName, 'v', parsed).catch(function (e) {
+                  console.warn('IDB legacy-LS seed failed for', storageKey, e);
+                });
+                loadedData = parsed;
+              }
+            } catch (e) { console.warn('legacy LS parse failed for', storageKey, e); }
+          }
           self._rebaseAndPromote(/** @type {any} */ (loadedData));
           settle();
         }).catch(function (err) {
@@ -447,6 +488,19 @@ export function CachedStore(storageKey, defaultVal, opts) {
         if (self._state === 'loaded') return;
         IDBAdapter.get(idbStoreName, 'v').then(function (loadedData) {
           if (self._state === 'loaded') return;
+          // Same legacy-LS seed as initial hydration — every retry
+          // attempt checks for pre-W2 LS data so data isn't lost if
+          // the first hydration fired before IDB came up.
+          if ((loadedData === undefined || loadedData === null) && legacyLsKey) {
+            try {
+              const lsRaw = localStorage.getItem(legacyLsKey);
+              if (lsRaw) {
+                const parsed = JSON.parse(lsRaw);
+                IDBAdapter.put(idbStoreName, 'v', parsed).catch(function () { /* best-effort */ });
+                loadedData = parsed;
+              }
+            } catch (_e) { /* unparseable — fall through with empty data */ }
+          }
           self._rebaseAndPromote(/** @type {any} */ (loadedData));
         }).catch(function () {
           attempt += 1;
@@ -457,6 +511,57 @@ export function CachedStore(storageKey, defaultVal, opts) {
       setTimeout(tick, this._backgroundRetryDelays[0]);
     },
   };
+  // Auto-register IDB-backed stores so HydrationGate / hydrateAllStores
+  // can await them. LS-only stores don't participate.
+  if (useIdb) _idbStoreRegistry.add(inst);
+  return inst;
+}
+
+/**
+ * Kick off async hydration on every IDB-backed store registered to
+ * date. Returns a Promise that resolves when every store has
+ * transitioned to either 'loaded' or 'degraded' (i.e., its hydration
+ * settled — successful or timed out into background retry).
+ *
+ * Uses Promise.allSettled so one degraded store doesn't block the
+ * others — a store whose IDB is broken stays in degraded mode while
+ * the others fully load. HydrationGate awaits this exactly once at
+ * mount; the resolved promise unlocks the loading screen.
+ *
+ * For LS-only stores (opts.idb !== true), this is a no-op — they
+ * aren't in the registry.
+ *
+ * @returns {Promise<void>}
+ */
+export function hydrateAllStores() {
+  const stores = Array.from(_idbStoreRegistry);
+  if (stores.length === 0) return Promise.resolve();
+  return Promise.allSettled(stores.map(function (s) { return s._hydrate(); })).then(function () { /* drop the settled-result array */ });
+}
+
+/**
+ * True iff at least one IDB-backed store is still in 'pending' state
+ * (hydration in flight or not yet started). Useful as a sync test
+ * helper / a synchronous read for components that want to skip the
+ * loading screen when nothing's pending (the registry happens to be
+ * empty at mount time, e.g. in test environments with no IDB stores).
+ *
+ * @returns {boolean}
+ */
+export function hasAnyPendingStores() {
+  for (const s of _idbStoreRegistry) {
+    if (s._state === 'pending') return true;
+  }
+  return false;
+}
+
+/**
+ * TEST-ONLY: clear the module-private IDB-store registry. Used by
+ * tests that construct fresh stores per case to avoid cross-test
+ * pollution. Do NOT call from production code.
+ */
+export function _resetStoreRegistry() {
+  _idbStoreRegistry.clear();
 }
 
 /**

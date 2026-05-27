@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 361 distinct identifiers.
+// Total: 364 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -83,6 +83,7 @@ declare const HolyDaysPlaylistHeader: any;
 declare const HomeBtn: any;
 declare const HomeScreen: any;
 declare const Hooks: any;
+declare const HydrationGate: any;
 declare const IDBAdapter: any;
 declare const InAppLinkButton: any;
 declare const InlineEcho: any;
@@ -286,9 +287,11 @@ declare const gardenUrl: any;
 declare const getEchoesForVerse: any;
 declare const getGardenTier: any;
 declare const getNotesForVerse: any;
+declare const hasAnyPendingStores: any;
 declare const highlightExcerptInDom: any;
 declare const hlId: any;
 declare const html2canvas: any;
+declare const hydrateAllStores: any;
 declare const idbDelete: any;
 declare const idbPut: any;
 declare const idbReadAll: any;

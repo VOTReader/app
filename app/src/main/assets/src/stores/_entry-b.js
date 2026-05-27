@@ -37,7 +37,7 @@
 import '../styles/journal-styles.js';
 
 // ── Stores ──────────────────────────────────────────────────────────────
-import { CachedStore } from './cached-store.js';
+import { CachedStore, hydrateAllStores, hasAnyPendingStores } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 import { migrateAnnotations, AnnotationStore, HighlightStore } from './annotation-store.js';
 import { NoteStore } from './note-store.js';
@@ -56,6 +56,7 @@ import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
 // ── Components ──────────────────────────────────────────────────────────
 import { ExpandableText, JrnExpandable } from '../components/ExpandableText.jsx';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
+import { HydrationGate } from '../components/HydrationGate.jsx';
 
 // ── Platform bridge (W1.1) ──────────────────────────────────────────────
 // Single source of truth for platform-conditional behavior. Lives in
@@ -131,7 +132,7 @@ Object.assign(window, {
   // Platform bridge (W1.1)
   PlatformBridge,
   // Stores
-  CachedStore,
+  CachedStore, hydrateAllStores, hasAnyPendingStores,
   IDBAdapter,
   migrateAnnotations, AnnotationStore, HighlightStore,
   NoteStore, NotebookStore, RecentNavStore,
@@ -145,6 +146,7 @@ Object.assign(window, {
   // Components
   ExpandableText, JrnExpandable,
   ErrorBoundary,
+  HydrationGate,
   // Hooks
   useMarkAsRead, useReadProgress,
   _validateTabState, useSavedState,
