@@ -110,7 +110,7 @@ export function jrnId() {
 }
 
 export var JournalStore = extendStore(
-  CachedStore('vot-journal', /** @type {JournalStoreData} */ ({ list: [] })),
+  CachedStore('vot-journal', /** @type {JournalStoreData} */ ({ list: [] }), { idb: true }),
   {
     /**
      * All entries, newest first by `updated` (falling back to `created`).
@@ -178,6 +178,7 @@ export var JournalStore = extendStore(
         created: ts,
         updated: ts
       };
+      if (this._shouldDefer('add', entry)) return entry;
       var data = this._load();
       if (!data.list) data.list = [];
       data.list.push(entry);
@@ -198,6 +199,7 @@ export var JournalStore = extendStore(
      */
     update(id, patch) {
       if (!id || !patch) return null;
+      if (this._shouldDefer('update', id, patch)) return null;
       var data = this._load();
       var list = data.list || [];
       var idx = list.findIndex(function(e) { return e.id === id; });
@@ -344,6 +346,7 @@ export var JournalStore = extendStore(
      */
     remove(id) {
       if (!id) return;
+      if (this._shouldDefer('remove', id)) return;
       this._purgeAssociated(id);
       var data = this._load();
       data.list = (data.list || []).filter(function(e) { return e.id !== id; });
@@ -395,6 +398,7 @@ export var JournalStore = extendStore(
      */
     pruneNotebook(notebookId) {
       if (!notebookId) return;
+      if (this._shouldDefer('pruneNotebook', notebookId)) return;
       var data = this._load();
       var list = data.list || [];
       var changed = false;
@@ -496,6 +500,7 @@ export var JournalStore = extendStore(
      * @returns {void}
      */
     clear() {
+      if (this._shouldDefer('clear')) return;
       this._cache = { list: [] };
       this._save();
       this._bump();
@@ -506,7 +511,7 @@ export var JournalStore = extendStore(
 
 /* ── Notebook store: parallel to NotebookStore, separate localStorage key. ── */
 export var JournalNotebookStore = extendStore(
-  CachedStore('vot-journal-notebooks', /** @type {JournalNotebookStoreData} */ ({ list: [] })),
+  CachedStore('vot-journal-notebooks', /** @type {JournalNotebookStoreData} */ ({ list: [] }), { idb: true }),
   {
     /**
      * All journal-notebooks sorted by sortIndex, then created.
@@ -536,6 +541,7 @@ export var JournalNotebookStore = extendStore(
     add(name) {
       var trimmed = (name || '').trim();
       if (!trimmed) return null;
+      if (this._shouldDefer('add', name)) return null;
       var data = this._load();
       if (!data.list) data.list = [];
       var id = 'jnb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
@@ -557,6 +563,7 @@ export var JournalNotebookStore = extendStore(
     rename(id, name) {
       var trimmed = (name || '').trim();
       if (!trimmed) return;
+      if (this._shouldDefer('rename', id, name)) return;
       var data = this._load();
       var nb = (data.list || []).find(function(n) { return n.id === id; });
       if (nb) { nb.name = trimmed; nb.updated = Date.now(); this._save(); this._bump(); }
@@ -569,6 +576,7 @@ export var JournalNotebookStore = extendStore(
      * @returns {void}
      */
     remove(id) {
+      if (this._shouldDefer('remove', id)) return;
       var data = this._load();
       data.list = (data.list || []).filter(function(n) { return n.id !== id; });
       this._save();

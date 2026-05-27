@@ -20,7 +20,7 @@ import { NoteStore } from './note-store.js';
 
 beforeEach(() => {
   localStorage.clear();
-  NoteStore._cache = null;
+  NoteStore._resetForTests();
 });
 
 describe('NoteStore — CRUD surface', () => {

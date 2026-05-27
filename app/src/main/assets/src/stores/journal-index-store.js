@@ -42,7 +42,7 @@ import { CachedStore, extendStore } from './cached-store.js';
  */
 
 export var JournalIndexStore = extendStore(
-  CachedStore('vot-journal-index', /** @type {JournalIndexData} */ ({})),
+  CachedStore('vot-journal-index', /** @type {JournalIndexData} */ ({}), { idb: true }),
   {
     /**
      * Journal-entry ids that reference `refKey`. Returns a defensive copy
@@ -83,6 +83,7 @@ export var JournalIndexStore = extendStore(
      */
     rebuildForEntry(entryId, refs) {
       if (!entryId) return;
+      if (this._shouldDefer('rebuildForEntry', entryId, refs)) return;
       var data = this._load();
       /** @type {Record<string, boolean>} */
       var newSet = {};
@@ -117,6 +118,7 @@ export var JournalIndexStore = extendStore(
      */
     removeEntry(entryId) {
       if (!entryId) return;
+      if (this._shouldDefer('removeEntry', entryId)) return;
       var data = this._load();
       var keys = Object.keys(data);
       var changed = false;
@@ -161,6 +163,7 @@ export var JournalIndexStore = extendStore(
      * @returns {void}
      */
     clear() {
+      if (this._shouldDefer('clear')) return;
       this._cache = {};
       this._save();
       this._bump();

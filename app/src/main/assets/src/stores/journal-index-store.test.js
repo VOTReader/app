@@ -30,7 +30,7 @@ import { JournalIndexStore } from './journal-index-store.js';
 
 beforeEach(() => {
   localStorage.clear();
-  JournalIndexStore._cache = null;
+  JournalIndexStore._resetForTests();
 });
 
 describe('JournalIndexStore — entriesReferencing', () => {

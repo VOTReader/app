@@ -38,7 +38,7 @@ const ep = (x) => /** @type {any} */ (x);
 
 beforeEach(() => {
   localStorage.clear();
-  LinkStore._cache = null;
+  LinkStore._resetForTests();
 });
 
 describe('LinkStore — legacy {a, b} → {source, target} migration', () => {
@@ -201,7 +201,7 @@ describe('LinkStore — legacy {a, b} → {source, target} migration', () => {
     const firstSerialized = JSON.stringify(first);
 
     // Bust the cache to force a re-load from localStorage.
-    LinkStore._cache = null;
+    LinkStore._resetForTests();
 
     // Second load — should produce identical output (no double-migration).
     const second = LinkStore.all();

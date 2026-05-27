@@ -102,7 +102,7 @@ export var JournalStatsStore = extendStore(
     longestStreak: 0,
     lastEntryDate: null,
     milestonesUnlocked: []
-  })),
+  }), { idb: true }),
   {
     /**
      * Read the full stats object.
@@ -139,6 +139,7 @@ export var JournalStatsStore = extendStore(
      * @returns {MilestoneDef[]}  newly-unlocked milestones (may be empty)
      */
     recordNewEntry(ts) {
+      if (this._shouldDefer('recordNewEntry', ts)) return [];
       var data = this._load();
       var today = _jrnDateStr(ts);
       data.totalEntries = (data.totalEntries || 0) + 1;
@@ -190,6 +191,7 @@ export var JournalStatsStore = extendStore(
      * @returns {void}
      */
     recordDeletion() {
+      if (this._shouldDefer('recordDeletion')) return;
       var data = this._load();
       data.totalEntries = Math.max(0, (data.totalEntries || 0) - 1);
       this._save();
@@ -220,8 +222,22 @@ export var JournalStatsStore = extendStore(
   }
 );
 
-/* Run once on page load: break the streak if the user skipped a day. */
+/* Run once on page load: break the streak if the user skipped a day.
+   IDB-mode caveat: at module-load this fires while state is 'pending',
+   so _load() returns empty defaults and the function exits early (no
+   lastEntryDate, no streak to break). Re-run is wired via a one-shot
+   subscriber that fires on the first 'pending' → 'loaded' transition
+   so the streak gets recomputed against the real IDB-loaded state. */
 JournalStatsStore.recomputeFromLoad();
+(function () {
+  if (!JournalStatsStore._idb) return;
+  var unsub = JournalStatsStore.subscribe(function () {
+    if (JournalStatsStore.getState() === 'loaded') {
+      JournalStatsStore.recomputeFromLoad();
+      try { unsub(); } catch (_e) { /* idempotent */ }
+    }
+  });
+})();
 
 /**
  * Pop a small in-app toast at the top of the screen when a milestone

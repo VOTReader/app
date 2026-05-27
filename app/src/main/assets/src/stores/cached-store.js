@@ -109,6 +109,7 @@ const _idbStoreRegistry = new Set();
  *   _rebaseAndPromote(loadedData: T | undefined | null): void,
  *   _applyToPendingCache(opName: string, args: any[]): void,
  *   _backgroundRetry(): void,
+ *   _resetForTests(): void,
  * }} CachedStoreBase
  */
 
@@ -472,6 +473,24 @@ export function CachedStore(storageKey, defaultVal, opts) {
       } finally {
         this._replaying = false;
       }
+    },
+
+    /**
+     * TEST-ONLY: reset the full state machine. Tests that assign
+     * `_cache = null` need to also clear `_pendingCache`, `_queue`,
+     * `_state`, and `_hydratePromise` — otherwise stale overlay data
+     * leaks between cases. Use this helper instead of poking fields
+     * directly so the reset stays consistent with future state
+     * additions. Do NOT call from production code.
+     */
+    _resetForTests() {
+      this._cache = null;
+      this._pendingCache = null;
+      this._queue = [];
+      this._replaying = false;
+      this._applyingPending = false;
+      this._hydratePromise = null;
+      this._state = useIdb ? 'pending' : 'loaded';
     },
 
     /**

@@ -55,7 +55,7 @@ import { CachedStore, extendStore } from './cached-store.js';
 export function bkmId() { return 'bkm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
 
 export const BookmarkStore = extendStore(
-  CachedStore('vot-bookmarks', /** @type {Bookmark[]} */ ([])),
+  CachedStore('vot-bookmarks', /** @type {Bookmark[]} */ ([]), { idb: true }),
   {
     /**
      * Look up a bookmark by id.
@@ -116,6 +116,7 @@ export const BookmarkStore = extendStore(
       var ts = Date.now();
       if (!bookmark.created) bookmark.created = ts;
       if (!bookmark.updated) bookmark.updated = ts;
+      if (this._shouldDefer('add', bookmark)) return;
       this._load().push(bookmark);
       this._save();
       this._bump();
@@ -129,6 +130,7 @@ export const BookmarkStore = extendStore(
      * @returns {void}
      */
     update(id, patch) {
+      if (this._shouldDefer('update', id, patch)) return;
       var data = this._load();
       var idx = data.findIndex(function(b) { return b.id === id; });
       if (idx < 0) return;
@@ -143,6 +145,7 @@ export const BookmarkStore = extendStore(
      * @returns {void}
      */
     remove(id) {
+      if (this._shouldDefer('remove', id)) return;
       this._cache = this._load().filter(function(b) { return b.id !== id; });
       this._save();
       this._bump();

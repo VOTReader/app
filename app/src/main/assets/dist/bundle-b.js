@@ -944,6 +944,23 @@
         }
       },
       /**
+       * TEST-ONLY: reset the full state machine. Tests that assign
+       * `_cache = null` need to also clear `_pendingCache`, `_queue`,
+       * `_state`, and `_hydratePromise` — otherwise stale overlay data
+       * leaks between cases. Use this helper instead of poking fields
+       * directly so the reset stays consistent with future state
+       * additions. Do NOT call from production code.
+       */
+      _resetForTests() {
+        this._cache = null;
+        this._pendingCache = null;
+        this._queue = [];
+        this._replaying = false;
+        this._applyingPending = false;
+        this._hydratePromise = null;
+        this._state = useIdb ? "pending" : "loaded";
+      },
+      /**
        * Schedule a chain of background IDB retries while in 'degraded'
        * state. Each tick attempts `IDBAdapter.get`; on success, promotes
        * to 'loaded' via rebase. On failure, schedules the next tick from
@@ -1391,7 +1408,8 @@
     CachedStore(
       "vot-notebooks",
       /** @type {NotebookStoreData} */
-      { list: [] }
+      { list: [] },
+      { idb: true }
     ),
     {
       /**
@@ -1421,6 +1439,7 @@
       add(name) {
         const trimmed = (name || "").trim();
         if (!trimmed) return null;
+        if (this._shouldDefer("add", name)) return null;
         const data = this._load();
         if (!data.list) data.list = [];
         const existing = data.list.find((n) => (n.name || "").trim().toLowerCase() === trimmed.toLowerCase());
@@ -1442,6 +1461,7 @@
       rename(id, name) {
         const trimmed = (name || "").trim();
         if (!trimmed) return;
+        if (this._shouldDefer("rename", id, name)) return;
         const data = this._load();
         const nb = (data.list || []).find((n) => n.id === id);
         if (nb) {
@@ -1459,6 +1479,7 @@
        * @returns {void}
        */
       remove(id) {
+        if (this._shouldDefer("remove", id)) return;
         const data = this._load();
         data.list = (data.list || []).filter((n) => n.id !== id);
         this._save();
@@ -1649,7 +1670,8 @@
     CachedStore(
       "vot-bookmarks",
       /** @type {Bookmark[]} */
-      []
+      [],
+      { idb: true }
     ),
     {
       /**
@@ -1714,6 +1736,7 @@
         var ts = Date.now();
         if (!bookmark.created) bookmark.created = ts;
         if (!bookmark.updated) bookmark.updated = ts;
+        if (this._shouldDefer("add", bookmark)) return;
         this._load().push(bookmark);
         this._save();
         this._bump();
@@ -1726,6 +1749,7 @@
        * @returns {void}
        */
       update(id, patch) {
+        if (this._shouldDefer("update", id, patch)) return;
         var data = this._load();
         var idx = data.findIndex(function(b) {
           return b.id === id;
@@ -1741,6 +1765,7 @@
        * @returns {void}
        */
       remove(id) {
+        if (this._shouldDefer("remove", id)) return;
         this._cache = this._load().filter(function(b) {
           return b.id !== id;
         });
@@ -2147,7 +2172,8 @@
         longestStreak: 0,
         lastEntryDate: null,
         milestonesUnlocked: []
-      }
+      },
+      { idb: true }
     ),
     {
       /**
@@ -2186,6 +2212,7 @@
        * @returns {MilestoneDef[]}  newly-unlocked milestones (may be empty)
        */
       recordNewEntry(ts) {
+        if (this._shouldDefer("recordNewEntry", ts)) return [];
         var data = this._load();
         var today = _jrnDateStr(ts);
         data.totalEntries = (data.totalEntries || 0) + 1;
@@ -2234,6 +2261,7 @@
        * @returns {void}
        */
       recordDeletion() {
+        if (this._shouldDefer("recordDeletion")) return;
         var data = this._load();
         data.totalEntries = Math.max(0, (data.totalEntries || 0) - 1);
         this._save();
@@ -2262,6 +2290,18 @@
     }
   );
   JournalStatsStore2.recomputeFromLoad();
+  (function() {
+    if (!JournalStatsStore2._idb) return;
+    var unsub = JournalStatsStore2.subscribe(function() {
+      if (JournalStatsStore2.getState() === "loaded") {
+        JournalStatsStore2.recomputeFromLoad();
+        try {
+          unsub();
+        } catch (_e) {
+        }
+      }
+    });
+  })();
   function jrnShowMilestoneToast2(milestone) {
     if (!milestone) return;
     var toast = document.getElementById("jrn-milestone-toast");
@@ -2287,7 +2327,8 @@
     CachedStore(
       "vot-journal-index",
       /** @type {JournalIndexData} */
-      {}
+      {},
+      { idb: true }
     ),
     {
       /**
@@ -2327,6 +2368,7 @@
        */
       rebuildForEntry(entryId, refs) {
         if (!entryId) return;
+        if (this._shouldDefer("rebuildForEntry", entryId, refs)) return;
         var data = this._load();
         var newSet = {};
         (refs || []).forEach(function(r) {
@@ -2359,6 +2401,7 @@
        */
       removeEntry(entryId) {
         if (!entryId) return;
+        if (this._shouldDefer("removeEntry", entryId)) return;
         var data = this._load();
         var keys = Object.keys(data);
         var changed = false;
@@ -2401,6 +2444,7 @@
        * @returns {void}
        */
       clear() {
+        if (this._shouldDefer("clear")) return;
         this._cache = {};
         this._save();
         this._bump();
@@ -2416,7 +2460,8 @@
     CachedStore(
       "vot-journal",
       /** @type {JournalStoreData} */
-      { list: [] }
+      { list: [] },
+      { idb: true }
     ),
     {
       /**
@@ -2482,6 +2527,7 @@
           created: ts,
           updated: ts
         };
+        if (this._shouldDefer("add", entry)) return entry;
         var data = this._load();
         if (!data.list) data.list = [];
         data.list.push(entry);
@@ -2501,6 +2547,7 @@
        */
       update(id, patch) {
         if (!id || !patch) return null;
+        if (this._shouldDefer("update", id, patch)) return null;
         var data = this._load();
         var list = data.list || [];
         var idx = list.findIndex(function(e) {
@@ -2660,6 +2707,7 @@
        */
       remove(id) {
         if (!id) return;
+        if (this._shouldDefer("remove", id)) return;
         this._purgeAssociated(id);
         var data = this._load();
         data.list = (data.list || []).filter(function(e) {
@@ -2712,6 +2760,7 @@
        */
       pruneNotebook(notebookId) {
         if (!notebookId) return;
+        if (this._shouldDefer("pruneNotebook", notebookId)) return;
         var data = this._load();
         var list = data.list || [];
         var changed = false;
@@ -2815,6 +2864,7 @@
        * @returns {void}
        */
       clear() {
+        if (this._shouldDefer("clear")) return;
         this._cache = { list: [] };
         this._save();
         this._bump();
@@ -2826,7 +2876,8 @@
     CachedStore(
       "vot-journal-notebooks",
       /** @type {JournalNotebookStoreData} */
-      { list: [] }
+      { list: [] },
+      { idb: true }
     ),
     {
       /**
@@ -2859,6 +2910,7 @@
       add(name) {
         var trimmed = (name || "").trim();
         if (!trimmed) return null;
+        if (this._shouldDefer("add", name)) return null;
         var data = this._load();
         if (!data.list) data.list = [];
         var id = "jnb_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
@@ -2878,6 +2930,7 @@
       rename(id, name) {
         var trimmed = (name || "").trim();
         if (!trimmed) return;
+        if (this._shouldDefer("rename", id, name)) return;
         var data = this._load();
         var nb = (data.list || []).find(function(n) {
           return n.id === id;
@@ -2896,6 +2949,7 @@
        * @returns {void}
        */
       remove(id) {
+        if (this._shouldDefer("remove", id)) return;
         var data = this._load();
         data.list = (data.list || []).filter(function(n) {
           return n.id !== id;

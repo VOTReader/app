@@ -35,7 +35,7 @@ import { NoteStore } from './note-store.js';
    note. A note can live in 0, 1, or many notebooks (multi-membership
    via NoteStore.notebookIds[]). */
 export const NotebookStore = extendStore(
-  CachedStore('vot-notebooks', /** @type {NotebookStoreData} */ ({ list: [] })),
+  CachedStore('vot-notebooks', /** @type {NotebookStoreData} */ ({ list: [] }), { idb: true }),
   {
     /**
      * All notebooks sorted by sortIndex, then created. Returns a copy
@@ -64,6 +64,7 @@ export const NotebookStore = extendStore(
     add(name) {
       const trimmed = (name || '').trim();
       if (!trimmed) return null;
+      if (this._shouldDefer('add', name)) return null;
       const data = this._load();
       if (!data.list) data.list = [];
       // Dedup by case-insensitive name — return the existing notebook so
@@ -90,6 +91,7 @@ export const NotebookStore = extendStore(
     rename(id, name) {
       const trimmed = (name || '').trim();
       if (!trimmed) return;
+      if (this._shouldDefer('rename', id, name)) return;
       const data = this._load();
       const nb = (data.list || []).find(n => n.id === id);
       if (nb) { nb.name = trimmed; nb.updated = Date.now(); this._save(); this._bump(); }
@@ -103,6 +105,7 @@ export const NotebookStore = extendStore(
      * @returns {void}
      */
     remove(id) {
+      if (this._shouldDefer('remove', id)) return;
       const data = this._load();
       data.list = (data.list || []).filter(n => n.id !== id);
       this._save();
