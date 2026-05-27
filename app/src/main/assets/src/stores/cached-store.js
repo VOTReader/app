@@ -99,6 +99,7 @@ const _idbStoreRegistry = new Set();
  *   _version: number,
  *   _listeners: Set<() => void> | null,
  *   _bump(): void,
+ *   _notifySubscribers(): void,
  *   subscribe(callback: () => void): () => void,
  *   getVersion(): number,
  *   isReady(): boolean,
@@ -263,10 +264,26 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _bump() {
       if (this._replaying) return;
       this._version += 1;
-      if (this._listeners) {
-        for (const cb of this._listeners) {
-          try { cb(); } catch (e) { console.warn('store subscriber threw for', storageKey, e); }
-        }
+      this._notifySubscribers();
+    },
+
+    /**
+     * Iterate `_listeners` with try/catch isolation. Shared by `_bump`
+     * (data-change notification) and the state-transition notification
+     * sites in `_hydrate` (timeout → degraded, error → degraded) and
+     * `_rebaseAndPromote` (post-replay). All three sites need the
+     * same "increment + iterate with isolated try/catch" sequence; this
+     * helper is the single place to maintain that loop.
+     *
+     * Does NOT touch `_version` — the caller decides when to bump.
+     * Does NOT respect `_replaying` — state-transition callers need to
+     * fire notifications even when an immediately-preceding replay
+     * suppressed bumps; the replaying flag is reset before they call in.
+     */
+    _notifySubscribers() {
+      if (!this._listeners) return;
+      for (const cb of this._listeners) {
+        try { cb(); } catch (e) { console.warn('store subscriber threw for', storageKey, e); }
       }
     },
 
@@ -375,14 +392,11 @@ export function CachedStore(storageKey, defaultVal, opts) {
           if (self._state !== 'loaded') {
             self._state = 'degraded';
             // Wake subscribers so any "Storage temporarily unavailable"
-            // UI mounts. Force a synthetic bump (not via _bump because
-            // there's no cache write — just a state-machine event).
+            // UI mounts. Increment _version manually + notify — _bump()
+            // would semantically mean "data changed" but really only the
+            // state-machine state changed (no cache write).
             self._version += 1;
-            if (self._listeners) {
-              for (const cb of self._listeners) {
-                try { cb(); } catch (e) { console.warn('subscriber threw on degraded transition for', storageKey, e); }
-              }
-            }
+            self._notifySubscribers();
             self._backgroundRetry();
           }
           settle();
@@ -417,11 +431,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
           if (self._state !== 'degraded') {
             self._state = 'degraded';
             self._version += 1;
-            if (self._listeners) {
-              for (const cb of self._listeners) {
-                try { cb(); } catch (e) { console.warn('subscriber threw on degraded transition for', storageKey, e); }
-              }
-            }
+            self._notifySubscribers();
             self._backgroundRetry();
           }
           settle();
@@ -442,13 +452,13 @@ export function CachedStore(storageKey, defaultVal, opts) {
       this._replayQueueOnto();
       // Flush the rebased state (single batched save).
       this._save();
-      // Single batched bump.
+      // Single batched bump. _replayQueueOnto already cleared _replaying,
+      // so a plain _bump() would work, but we go through the manual
+      // increment + _notifySubscribers split here for symmetry with the
+      // degraded-transition sites and to make the "one bump per rebase"
+      // intent explicit at the call site.
       this._version += 1;
-      if (this._listeners) {
-        for (const cb of this._listeners) {
-          try { cb(); } catch (e) { console.warn('store subscriber threw for', storageKey, e); }
-        }
-      }
+      this._notifySubscribers();
     },
 
     /**

@@ -715,13 +715,28 @@
       _bump() {
         if (this._replaying) return;
         this._version += 1;
-        if (this._listeners) {
-          for (const cb of this._listeners) {
-            try {
-              cb();
-            } catch (e) {
-              console.warn("store subscriber threw for", storageKey, e);
-            }
+        this._notifySubscribers();
+      },
+      /**
+       * Iterate `_listeners` with try/catch isolation. Shared by `_bump`
+       * (data-change notification) and the state-transition notification
+       * sites in `_hydrate` (timeout → degraded, error → degraded) and
+       * `_rebaseAndPromote` (post-replay). All three sites need the
+       * same "increment + iterate with isolated try/catch" sequence; this
+       * helper is the single place to maintain that loop.
+       *
+       * Does NOT touch `_version` — the caller decides when to bump.
+       * Does NOT respect `_replaying` — state-transition callers need to
+       * fire notifications even when an immediately-preceding replay
+       * suppressed bumps; the replaying flag is reset before they call in.
+       */
+      _notifySubscribers() {
+        if (!this._listeners) return;
+        for (const cb of this._listeners) {
+          try {
+            cb();
+          } catch (e) {
+            console.warn("store subscriber threw for", storageKey, e);
           }
         }
       },
@@ -827,15 +842,7 @@
             if (self._state !== "loaded") {
               self._state = "degraded";
               self._version += 1;
-              if (self._listeners) {
-                for (const cb of self._listeners) {
-                  try {
-                    cb();
-                  } catch (e) {
-                    console.warn("subscriber threw on degraded transition for", storageKey, e);
-                  }
-                }
-              }
+              self._notifySubscribers();
               self._backgroundRetry();
             }
             settle();
@@ -875,15 +882,7 @@
             if (self._state !== "degraded") {
               self._state = "degraded";
               self._version += 1;
-              if (self._listeners) {
-                for (const cb of self._listeners) {
-                  try {
-                    cb();
-                  } catch (e) {
-                    console.warn("subscriber threw on degraded transition for", storageKey, e);
-                  }
-                }
-              }
+              self._notifySubscribers();
               self._backgroundRetry();
             }
             settle();
@@ -904,15 +903,7 @@
         this._replayQueueOnto();
         this._save();
         this._version += 1;
-        if (this._listeners) {
-          for (const cb of this._listeners) {
-            try {
-              cb();
-            } catch (e) {
-              console.warn("store subscriber threw for", storageKey, e);
-            }
-          }
-        }
+        this._notifySubscribers();
       },
       /**
        * Replay every queued op on top of `_cache`. `_save()` and
@@ -1137,11 +1128,11 @@
        * @returns {void}
        */
       add(key, ann) {
+        if (this._shouldDefer("add", key, ann)) return;
         if (!ann.groupId) ann.groupId = ann.id;
         if (!ann.kind) ann.kind = "highlight";
         if (!ann.created) ann.created = Date.now();
         ann.updated = Date.now();
-        if (this._shouldDefer("add", key, ann)) return;
         const data = this._load();
         if (!data[key]) data[key] = [];
         data[key].push(
@@ -1801,10 +1792,10 @@
        */
       add(bookmark) {
         if (!bookmark || !bookmark.id || !bookmark.hlKey) return;
+        if (this._shouldDefer("add", bookmark)) return;
         var ts = Date.now();
         if (!bookmark.created) bookmark.created = ts;
         if (!bookmark.updated) bookmark.updated = ts;
-        if (this._shouldDefer("add", bookmark)) return;
         this._load().push(bookmark);
         this._save();
         this._bump();

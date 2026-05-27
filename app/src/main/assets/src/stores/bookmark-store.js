@@ -113,10 +113,12 @@ export const BookmarkStore = extendStore(
      */
     add(bookmark) {
       if (!bookmark || !bookmark.id || !bookmark.hlKey) return;
+      if (this._shouldDefer('add', bookmark)) return;
+      // Default-stamping happens AFTER the defer guard so the deferred
+      // queue entry isn't pre-mutated. Symmetric with annotation-store.
       var ts = Date.now();
       if (!bookmark.created) bookmark.created = ts;
       if (!bookmark.updated) bookmark.updated = ts;
-      if (this._shouldDefer('add', bookmark)) return;
       this._load().push(bookmark);
       this._save();
       this._bump();

@@ -211,7 +211,19 @@ export const LinkStore = extendStore(
    Mirrors the JournalStatsStore.recomputeFromLoad post-hydration
    pattern. Without this, a user upgrading from a pre-W2 deploy whose
    data was in the {a,b} shape would have it seeded into IDB still
-   in {a,b} shape and the migration would never run. */
+   in {a,b} shape and the migration would never run.
+
+   Semantics nuance: subscribe() fires on every _bump(), not just on
+   state transitions. The implementation reads as "run _normalize on
+   the next bump WHERE state === 'loaded', then unsubscribe." In
+   production this lines up with state transitions because the only
+   bumps after hydration are write-through writes — and the first
+   such bump is the one from _rebaseAndPromote itself. In tests that
+   force state to 'loaded' before calling _bump() manually, the
+   subscriber will fire on that next bump; that's harmless because
+   _normalize is idempotent on already-migrated data, but worth
+   knowing if a future test wonders why a write triggered a
+   normalize. */
 (function () {
   if (!LinkStore._idb) return;
   /** @type {(() => void) | null} */
