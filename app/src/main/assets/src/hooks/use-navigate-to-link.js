@@ -127,8 +127,16 @@ export function useNavigateToLink({
     // Compute the destination snapshot based on the endpoint type. Used by
     // backHint + the pruning effect (useFromLetterStack) to detect "user
     // has moved on".
+    // Q8 lazy: BOOKS lives in bundle-a-bible. The bare `BOOKS[endpoint.bookId]`
+    // reads below would throw ReferenceError if the user taps an in-app
+    // bible-link before __loadBibleCorpus resolves (e.g. cold-boot saved-tab
+    // sitting in a letter that has scripture-ref tap-throughs). Match the
+    // App.jsx + W1.6 hardening pattern. When BOOKS isn't loaded, the bible-
+    // type branch is skipped and we fall through — the matthew + study + screen
+    // branches don't need BOOKS, so they still work.
+    const _BOOKS = (typeof BOOKS !== 'undefined') ? BOOKS : null;
     let destSnapshot = null;
-    if (endpoint.type === 'bible' && endpoint.bookId && BOOKS[endpoint.bookId]) {
+    if (endpoint.type === 'bible' && endpoint.bookId && _BOOKS && _BOOKS[endpoint.bookId]) {
       destSnapshot = { screen: 'bible-ch', bookId: endpoint.bookId, chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
     } else if (endpoint.type === 'study' || (endpoint.type === 'bible' && endpoint.bookId === 'matthew')) {
       destSnapshot = { screen: 'matthew-ch', bookId: 'matthew', chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
@@ -145,7 +153,7 @@ export function useNavigateToLink({
       sourceVolumeLabel: (meta && meta.sourceVolumeLabel) || null,
       destSnapshot: destSnapshot
     });
-    if (endpoint.type === 'bible' && endpoint.bookId && BOOKS[endpoint.bookId]) {
+    if (endpoint.type === 'bible' && endpoint.bookId && _BOOKS && _BOOKS[endpoint.bookId]) {
       setBookId(endpoint.bookId);
       setChapterNum(endpoint.chapter);
       setScreen('bible-ch');

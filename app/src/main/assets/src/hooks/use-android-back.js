@@ -191,7 +191,17 @@ export function useAndroidBack({
       if (s === "studies-home") {goHome();return "true";} else
       if (s === "bible-study-index") {goStudiesHome();return "true";} else
       if (s === "bible-study-chapter") {if (fromSearchRef.current) {setFromSearch(false);setScreen("search");return "true";}const cur = getStudyById(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
-      if (s === "bible-ch") {if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current) {setFromSearch(false);setScreen("search");} else {const bid = bookIdRef.current;if (bid && BOOKS[bid]?.chapters.length === 1) {if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}} else {setChapterNum(null);setScreen("bible-idx");}}return "true";} else
+      if (s === "bible-ch") {if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current) {setFromSearch(false);setScreen("search");} else {const bid = bookIdRef.current;
+        /* Q8 lazy: BOOKS lives in bundle-a-bible. If the user is on bible-ch
+           via saved-tab cold-boot before __loadBibleCorpus resolves, BOOKS
+           is undeclared and a bare BOOKS[bid] throws ReferenceError (optional
+           chaining doesn't save you from undeclared identifiers). Same guard
+           pattern as App.jsx + W1.6 hardening (typeof BOOKS !== 'undefined').
+           When BOOKS isn't loaded, fall through to the index-back path —
+           single-chapter book detection just doesn't run until the corpus
+           arrives. */
+        const _BOOKS = (typeof BOOKS !== 'undefined') ? BOOKS : null;
+        if (bid && _BOOKS && _BOOKS[bid]?.chapters.length === 1) {if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}} else {setChapterNum(null);setScreen("bible-idx");}}return "true";} else
       if (s === "bible-idx") {if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}return "true";} else
       // Letter screens: unified back via COLLECTIONS registry
       { const col = COL_BY_LETTER_SC.get(s);

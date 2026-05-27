@@ -3684,8 +3684,9 @@
     _navToLinkRef.current = (endpoint, meta) => {
       closeLinkSidebar();
       window.__pendingScrollHlKey = endpoint && endpoint.key ? String(endpoint.key).replace(/:\d+-\d+$/, "") : null;
+      const _BOOKS = typeof BOOKS !== "undefined" ? BOOKS : null;
       let destSnapshot = null;
-      if (endpoint.type === "bible" && endpoint.bookId && BOOKS[endpoint.bookId]) {
+      if (endpoint.type === "bible" && endpoint.bookId && _BOOKS && _BOOKS[endpoint.bookId]) {
         destSnapshot = { screen: "bible-ch", bookId: endpoint.bookId, chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
       } else if (endpoint.type === "study" || endpoint.type === "bible" && endpoint.bookId === "matthew") {
         destSnapshot = { screen: "matthew-ch", bookId: "matthew", chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
@@ -3705,7 +3706,7 @@
         sourceVolumeLabel: meta && meta.sourceVolumeLabel || null,
         destSnapshot
       });
-      if (endpoint.type === "bible" && endpoint.bookId && BOOKS[endpoint.bookId]) {
+      if (endpoint.type === "bible" && endpoint.bookId && _BOOKS && _BOOKS[endpoint.bookId]) {
         setBookId(endpoint.bookId);
         setChapterNum(endpoint.chapter);
         setScreen("bible-ch");
@@ -4221,7 +4222,8 @@
             setScreen("search");
           } else {
             const bid = bookIdRef.current;
-            if (bid && BOOKS[bid]?.chapters.length === 1) {
+            const _BOOKS = typeof BOOKS !== "undefined" ? BOOKS : null;
+            if (bid && _BOOKS && _BOOKS[bid]?.chapters.length === 1) {
               if (genreIdRef.current) {
                 setScreen("scripture-genre");
               } else {

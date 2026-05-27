@@ -967,11 +967,25 @@ window.AndroidBridge directly after W1.2.
       close. Full positive path (record + playback) needs manual
       mic permission grant — out of automated scope.
 
+  Cross-browser coverage:
+    W1.6 verified Chrome + preview_eval only. Edge + Firefox + Android
+    regression deferred to W6 — see W6 exit criteria for the full
+    cross-platform gate. The W1.5 + W1.6 structural correctness
+    invariants (dispatcher contract, registry semantics, history-sync
+    suppress + clear, popstate flow, activeElement gate, BOOKS-guard
+    pattern) are browser-independent JS state-machine behavior;
+    Chrome-only verification is sufficient to call W1 structurally
+    complete. W6 re-verifies across the deployed PWA on all three.
+
   Known UX / tooling findings (documented, not blockers):
     - alert() in exportPersonalData + importPersonalData blocks the
-      renderer thread. Needs migration to an in-app toast pattern
-      (W2.6 export upgrade scope, or W7 polish). Not a regression
-      from W1 — pre-existing behavior.
+      renderer thread on every desktop platform. UPGRADED in the W1
+      follow-up review (2026-05-27) from "W7 polish" to W2.6 SCOPE
+      BLOCKER: the W2.6 agent (already touching export/import for the
+      media-blob upgrade) MUST migrate these alerts to the in-app
+      toast pattern (matches jrnShowMilestoneToast convention) in
+      the same pass — this is not optional polish, it's a real UX
+      defect that ships on every desktop browser.
     - CDP-controlled tab won't auto-grant mic / fullscreen permission;
       manual Chrome flag setup required for full positive verification.
     - resize_window via CDP doesn't shrink below ~700px in Windows
@@ -1015,6 +1029,40 @@ window.AndroidBridge directly after W1.2.
 ───────────────────────────────────────────────────────────────────────────────
 W2 — STORAGE HARDENING (persistence + scale + safety)
 ───────────────────────────────────────────────────────────────────────────────
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ W2 PREREQUISITE — RUN /consolidate-memory AS FIRST ACTION        │
+  │                                                                  │
+  │ Before any IDB work begins, the W2 agent MUST run                │
+  │ /consolidate-memory. This is NOT a suggestion — it's a           │
+  │ prerequisite. The ~36 memory entries include near-duplicates     │
+  │ around blob/media handling (3 entries) and migration mechanics   │
+  │ (3 entries), and ~10 storage-related entries that need a clean   │
+  │ signal-to-noise to inform W2.2's rebase semantics + IDB schema   │
+  │ versioning + platform constraints correctly. Conflicting         │
+  │ memories about merge-vs-rebase semantics would be DANGEROUS for  │
+  │ the storage layer.                                               │
+  │                                                                  │
+  │ The W1.6 smoke walk surfacing 4 additional BOOKS bare-refs       │
+  │ after the first fix proves the value of CLASS-of-bug audits      │
+  │ over single-site fixes. /consolidate-memory is the equivalent    │
+  │ for memory entries — run it BEFORE writing any IDB code.         │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ W2.6 SCOPE EXPANSION — kill the blocking alert() calls            │
+  │                                                                  │
+  │ The W2.6 agent already touches exportPersonalData +              │
+  │ importPersonalData to add the media-blob round-trip               │
+  │ (exportVersion 2). Within the SAME PASS, the agent MUST          │
+  │ replace the alert(...) calls (4 sites: 'Backup saved...',        │
+  │ 'Export failed...', 'This file does not look...', 'Import        │
+  │ complete...') with the in-app toast pattern matching             │
+  │ jrnShowMilestoneToast in journal-stats-store.js. alert() blocks  │
+  │ the renderer on every desktop platform; this is a UX defect      │
+  │ that ships, not optional polish. Surfaced + flagged during       │
+  │ W1.6 closure (2026-05-27).                                       │
+  └──────────────────────────────────────────────────────────────────┘
 
 Goal: every byte of user data — structured metadata AND binary media —
 is durably stored, protected from eviction, scalable to GB on every
