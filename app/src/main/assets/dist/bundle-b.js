@@ -4924,8 +4924,10 @@
     };
     const goToChainEntryLast = (slug) => () => {
       if (slug === "matthew-study") {
+        const _MATTHEW = typeof window !== "undefined" ? window.MATTHEW : null;
+        if (!_MATTHEW) return;
         setFromStudies(true);
-        const lastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
+        const lastNum = _MATTHEW.chapters[_MATTHEW.chapters.length - 1].num;
         setBookId("matthew");
         setChapterNum(lastNum);
         setScreen("matthew-ch");

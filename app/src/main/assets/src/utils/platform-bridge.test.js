@@ -932,9 +932,14 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
     // Simulate a chunk being captured before stop
     if (recOnDataAvailable) recOnDataAvailable({ data: new Blob(['x'], { type: 'audio/webm' }) });
     bridge.nativeRecordStop();
-    // Wait for onstop's microtasks (Blob → base64 + callback fire)
-    await new Promise((r) => setTimeout(r, 20));
-    expect(completeCb).toHaveBeenCalledTimes(1);
+    // Wait for onstop's chain (Blob → FileReader → base64 → callback).
+    // Use vi.waitFor instead of a fixed real-time setTimeout to make this
+    // assertion deterministic under heavy combined-suite load — FileReader
+    // microtasks can stretch past a 20ms wait when ~25 test files run
+    // concurrently (the long-flagged platform-bridge.test.js flake). The
+    // poller fires the assertion every 10ms until it passes or hits the
+    // 1s ceiling; typical pass is under 50ms.
+    await vi.waitFor(() => expect(completeCb).toHaveBeenCalledTimes(1), { timeout: 1000 });
     const [b64, durMs, mime] = completeCb.mock.calls[0];
     expect(typeof b64).toBe('string');
     expect(typeof durMs).toBe('number');
@@ -946,9 +951,13 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
     await new Promise((r) => setTimeout(r, 0));
     bridge.nativeRecordStart();
     bridge.nativeRecordStop();
-    await new Promise((r) => setTimeout(r, 20));
-    expect(mockTracks[0].stop).toHaveBeenCalledTimes(1);
-    expect(mockAudioCtxClose).toHaveBeenCalledTimes(1);
+    // onstop's .finally() runs _webRecorderCleanup after the Blob → base64
+    // chain resolves. vi.waitFor polls until cleanup actually completed
+    // rather than guessing at a fixed wait — same load-resilience fix.
+    await vi.waitFor(() => {
+      expect(mockTracks[0].stop).toHaveBeenCalledTimes(1);
+      expect(mockAudioCtxClose).toHaveBeenCalledTimes(1);
+    }, { timeout: 1000 });
   });
 
   // ── nativeRecordCancel ──
@@ -960,10 +969,18 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
     await new Promise((r) => setTimeout(r, 0));
     bridge.nativeRecordStart();
     bridge.nativeRecordCancel();
-    await new Promise((r) => setTimeout(r, 20));
+    // Cancel's cleanup is synchronous BUT the assertion still needs the
+    // same poll-until-pass discipline so the test is uniform with the
+    // stop variant above. Without polling, a sufficiently slow combined-
+    // suite run can win the race and check before cancel's tracks.stop()
+    // actually executed.
+    await vi.waitFor(() => {
+      expect(mockTracks[0].stop).toHaveBeenCalledTimes(1);
+      expect(mockAudioCtxClose).toHaveBeenCalledTimes(1);
+    }, { timeout: 1000 });
+    // Negative assertion: by the time the positive cleanup polled
+    // through, any spurious completion callback would have fired too.
     expect(completeCb).not.toHaveBeenCalled();
-    expect(mockTracks[0].stop).toHaveBeenCalledTimes(1);  // MediaStream cleanup
-    expect(mockAudioCtxClose).toHaveBeenCalledTimes(1);
   });
 
   it('nativeRecordCancel is safe when no recording in progress (no-op)', () => {

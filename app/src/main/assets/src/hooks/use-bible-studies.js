@@ -239,8 +239,17 @@ export function useBibleStudies({
   };
   const goToChainEntryLast = (slug) => () => {
     if (slug === 'matthew-study') {
+      // Q8.2: MATTHEW is lazy-loaded via bundle-a-matthew. Bare MATTHEW
+      // ref would throw ReferenceError if this handler fires before
+      // __loadMatthewCorpus resolves (race: saved-tab cold-boot inside
+      // a different study chain → user taps "go to last chapter" before
+      // HomeScreen / StudiesHome's pre-fire effect resolved). Use the
+      // window-prefixed access so the typeof check is safe; silently
+      // no-op until the corpus loads (the user can retry).
+      const _MATTHEW = (typeof window !== 'undefined') ? window.MATTHEW : null;
+      if (!_MATTHEW) return;
       setFromStudies(true);
-      const lastNum = MATTHEW.chapters[MATTHEW.chapters.length - 1].num;
+      const lastNum = _MATTHEW.chapters[_MATTHEW.chapters.length - 1].num;
       setBookId('matthew'); setChapterNum(lastNum); setScreen('matthew-ch');
       setActiveReadKey('matthew', () => setLastReadChapters((prev) => ({ ...prev, matthew: lastNum })));
       return;
