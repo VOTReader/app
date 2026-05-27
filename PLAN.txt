@@ -507,7 +507,30 @@ window.AndroidBridge directly after W1.2.
   W1.5 — Back-button navigation (History API + Escape key)
   ────────────────────────────────────────────────────────
   On Android, back-press routes through `window.handleAndroidBack()`.
-  On desktop, wire two triggers:
+  On desktop, wire two triggers: Escape key (keyboard) and popstate
+  (browser back button).
+
+  IMPLEMENTATION SEQUENCING (4 sub-steps; each independently testable):
+    (a) Modal registry hook + wire all 23 consumers from the inventory
+        below. Prerequisite for (c) — Escape needs a working isAnyOpen().
+    (b) History-sync layer — every in-app navigation must call
+        history.pushState so the browser HAS history entries for
+        popstate to consume. Today the app navigates by setting
+        React state alone; the browser history is empty. Without
+        this layer, (d) is dead code. HIGHEST RISK STEP — touches
+        the navigation system. Prerequisite for (d).
+    (c) Escape key listener — gated on document.fullscreenElement
+        + registry.isAnyOpen() per [[escape-key-gating]] +
+        [[centralized-modal-signal]]. Consumes (a)'s hook.
+    (d) popstate listener + root-of-stack double-tap-to-exit per
+        [[root-of-history-pwa]]. Consumes (b)'s history stack.
+
+  Ship in (a) → (b) → (c) → (d) order. (a) and (b) are independent
+  and CAN run in parallel; (c) needs (a) and (d) needs (b). Out-of-
+  order shipping = later pieces have no infrastructure to consume.
+
+  ───────────────────────
+  Triggers detail:
 
     1. Keyboard: keydown 'Escape' → handleAndroidBack() — GATED.
        Per [[escape-key-gating]], the listener fires ONLY if:
@@ -545,9 +568,29 @@ window.AndroidBridge directly after W1.2.
        BEFORE writing the hook, and use it as the checklist to ensure
        every modal calls register/unregister.
 
-    2. Browser: History API popstate → handleAndroidBack(). The app
-       pushes a history entry on each in-app navigation; popstate
-       signals the user clicked the browser-native back button.
+    2. Browser: History API popstate → handleAndroidBack(). REQUIRES
+       the history-sync layer from step (b) — today's React-state-only
+       navigation pushes ZERO history entries, so popstate would never
+       fire without (b). The sub-step (b) implementation:
+
+         A useEffect (in useNav or a dedicated useHistorySync hook)
+         watches the active-tab nav-key tuple — screen + bookId +
+         chapterNum + letterId + studyId + studyChapterId + genreId
+         + gardenPage. On any change, call history.pushState(state,
+         '', ''). The active tab's identity is the source; multi-tab
+         is one stream of history entries from the user's perspective.
+
+       pushState state-object: OPTION B LOCKED per [[root-of-history-pwa]].
+         The state object holds NOTHING meaningful. popstate handler
+         doesn't try to restore from event.state; it just calls
+         handleAndroidBack which pops the internal nav stack.
+         Trade-off: browser forward-button is dead (no state to
+         forward to). But this matches Android behavior (no forward
+         button there either), reduces risk, and avoids a second
+         source of truth that could disagree with the in-memory tab
+         state. Option A (full nav state in pushState, enables
+         forward + direct restoration) is deferred to a later polish
+         phase if anyone misses forward-button behavior.
 
        Per [[root-of-history-pwa]], the root-of-stack design is a
        REQUIRED double-tap-to-exit pattern (NOT an optional toast).
@@ -556,7 +599,7 @@ window.AndroidBridge directly after W1.2.
        toast the user is silently TRAPPED. Both pieces are mandatory:
 
          First back at root:
-           1. history.pushState({}, '', '')  — replacement entry, app stays
+           1. history.pushState({}, '', '') — replacement entry, app stays
            2. Show toast "Press back again to exit"
            3. _rootExitArmed = true; setTimeout(2000) to disarm
          Second back within 2s (while armed):
@@ -565,11 +608,23 @@ window.AndroidBridge directly after W1.2.
          After 2s without second back:
            _rootExitArmed flips false; next first-back gets a fresh toast.
 
+       CRITICAL: the armed timer MUST CLEAR on any forward navigation.
+       Otherwise: user presses back at root → toast + timer armed →
+       taps a tile (forward nav) → navigates deep → presses back twice
+       to return to root → first back at root SKIPS the toast because
+       the timer is still armed from the earlier cycle → user
+       surprise-exits. Tie timer-clear to the SAME nav-key effect that
+       step (b) watches; any nav-key change while armed = clear timer.
+
        Tests:
          - popstate at root → toast appears, app stays
          - popstate at root × 2 within 2s → second one allows exit
          - popstate at root → wait 3s → popstate again → fresh toast (cycle resets)
+         - popstate at root → forward-nav → popstate at root again →
+           FRESH toast (timer was cleared by the forward-nav)
          - popstate mid-stack → no toast, handleAndroidBack runs normally
+         - history.pushState fires on every nav-key change (verify
+           the sync layer)
 
   The existing handleAndroidBack logic is platform-agnostic (reads JS
   state, returns "true"/"false"). The trigger source changes; the
@@ -608,40 +663,63 @@ window.AndroidBridge directly after W1.2.
     [ ] journal-inbound-sheet     — inboundJournalPayload state
     [ ] bookmark-create-sheet     — bookmarkCreatePending state
 
-  Screen-local sheets (6+ — rendered inside specific screens):
+  Screen-local sheets (6 — VERIFIED mount sites):
     [ ] journal-insert-sheet      — JournalEditorScreen.jsx:520
     [ ] journal-recording-sheet   — JournalEditorScreen.jsx:530
-    [ ] scripture-sheet           — ChapterView.jsx:233 (+ via openSheetForRef
-                                     indirection from WtlbEntryView /
-                                     BibleChapterView — verify)
-    [ ] footnote-sheet            — LetterView.jsx:424 (+ WtlbEntryView via
-                                     openSheetForRef — verify)
-    [ ] bookmark-row-action-sheet — BookmarksScreen.jsx:545 (long-press menu)
-    [ ] link-row-action-sheet     — LinksScreen.jsx:365 (long-press menu)
-    [ ] notebook-manager-sheet    — NotesIndexScreen (verify mount site)
-    [ ] journal-notebook-sheet    — exists in src/ui/sheets/ — verify
-                                     mount site (likely JournalViewerScreen
-                                     or JournalEditorScreen)
+    [ ] scripture-sheet           — ChapterView.jsx:233
+                                     (WtlbEntryView + BibleChapterView
+                                     use the same sheet via App-level
+                                     state; verify at wiring time but
+                                     same registration ID applies)
+    [ ] footnote-sheet            — LetterView.jsx:424
+                                     (same App-level state pattern as
+                                     scripture-sheet)
+    [ ] bookmark-row-action-sheet — BookmarksScreen.jsx:545 (long-press)
+    [ ] link-row-action-sheet     — LinksScreen.jsx:365 (long-press)
 
-  ConfirmStrip / inline confirms — DEBATE inclusion:
-    [ ] DECISION REQUIRED: should an in-flight ConfirmStrip (e.g.
-        SettingsScreen's "Clear All Personal Data" inline confirm,
-        the JournalAudioBlock delete confirm, the per-tab close
-        confirm in TabsOverview) BLOCK Escape from firing back-nav?
-        Arguments for: Escape should cancel an in-flight confirm
-        first; user expects "Escape cancels what I'm doing."
-        Arguments against: ConfirmStrip is inline UI (not modal); the
-        existing close-on-cancel button is sufficient; Escape should
-        always navigate.
-        W1.5 agent picks ONE behavior + applies consistently across
-        every ConfirmStrip usage. Document the choice in the commit.
+  ConfirmStrip / inline confirms — REGISTERS (decided per [[centralized-modal-signal]]):
+    [ ] confirm-strip             — register inside ConfirmStrip's mount
+                                     effect; unregister on unmount.
+                                     Behavior:
+                                       ConfirmStrip showing → Escape →
+                                         calls onCancel (dismisses confirm)
+                                       ConfirmStrip NOT showing → Escape →
+                                         back navigation as normal.
+                                     Rationale: keyboard accessibility
+                                     (Escape cancels; Enter could confirm
+                                     as a follow-up polish); prevents
+                                     fumble-Escape-during-delete-confirm
+                                     from navigating away mid-action.
+                                     Wiring is trivial (3-line useEffect
+                                     inside ConfirmStrip itself).
+                                     Note: ConfirmStrip rendered in 12+
+                                     files (BookmarksScreen, LinksScreen,
+                                     SettingsScreen, JournalEditorScreen,
+                                     etc.) — but they all use the same
+                                     ConfirmStrip component, so registering
+                                     once inside ConfirmStrip's body
+                                     covers every usage automatically.
+
+  Dead-code discovery (out-of-W1.5-scope cleanup):
+    NotebookManagerSheet (src/ui/sheets/NotebookManagerSheet.jsx) and
+    JournalNotebookSheet (src/ui/sheets/JournalNotebookSheet.jsx) are
+    exported on `window` via the entry bundles but have ZERO `<X>` JSX
+    mount sites anywhere in the codebase. They're inert dead code —
+    not part of the W1.5 modal inventory (no Escape gate needed for
+    something that never renders), but a separate housekeeping
+    follow-up should either delete them or restore a mount site if
+    the UX was supposed to use them. Surfaced during the W1.5
+    inventory grep at 2026-05-26.
 
   Tests:
     - Each entry above mounted in isolation → registry.openIds()
       contains the expected ID → Escape gated (does not dispatch).
     - Entry unmounted → registry.openIds() empty → Escape dispatches.
-    - Double-mount/unmount cycles (React StrictMode) → no negative
-      counter / no missed unregister; isAnyOpen() always correct.
+    - Double-mount/unmount cycles (React StrictMode) → Set is
+      idempotent; openIds() and isAnyOpen() always correct.
+    - ConfirmStrip showing + Escape pressed → onCancel fires; Escape
+      does NOT dispatch back-nav. ConfirmStrip dismissed (registers
+      out) → Escape resumes back-nav.
     - (fullscreen, sheet-open, clear-state) Escape → only clear-state
       dispatches.
     - popstate at root → stays in app (history entry pushed + toast shown).
