@@ -206,6 +206,14 @@ export function LinksScreen(props) {
   var actionTarget = _as[0];
   var setActionTarget = _as[1];
 
+  // W1.5(a.2) — Escape-key dispatch registration for the long-press
+  // action sheet rendered at the bottom of this screen.
+  useModalRegistry({
+    id: 'link-row-action-sheet',
+    dismiss: function() { setActionTarget(null); },
+    active: !!actionTarget,
+  });
+
   var allLinks = LinkStore.all();
 
   var displayLinks = useMemo(function() {

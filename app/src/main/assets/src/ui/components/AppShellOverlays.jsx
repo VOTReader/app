@@ -40,6 +40,35 @@ export function AppShellOverlays({
   gardenWarningOpen, setGardenWarningOpen,
   setSettings, setScreen,
 }) {
+  // W1.5(a.2) — Escape-key dispatch registrations. Each modal registers
+  // a stable string ID + a dismiss callback. The app-level Escape
+  // dispatcher in useAndroidBack calls peek().dismiss when isAnyOpen().
+  // `active` gates whether the entry exists in the registry — these
+  // overlays are always mounted (AppShellOverlays is always rendered)
+  // so we can't conditionally call the hook; instead we toggle active
+  // off when the modal is closed.
+  useModalRegistry({ id: 'welcome-modal', dismiss: dismissWelcome, active: !!showWelcome });
+  useModalRegistry({
+    id: 'tabs-overview',
+    dismiss: () => setTabsOverviewOpen(false),
+    active: !!(settings.tabsEnabled && tabsOverviewOpen),
+  });
+  useModalRegistry({
+    id: 'tab-action-sheet',
+    dismiss: () => setTabActionIdx(null),
+    active: tabActionIdx != null,
+  });
+  useModalRegistry({
+    id: 'disable-tabs-prompt',
+    dismiss: () => setDisableTabsPromptOpen(false),
+    active: !!disableTabsPromptOpen,
+  });
+  useModalRegistry({
+    id: 'garden-warning',
+    dismiss: () => setGardenWarningOpen(false),
+    active: !!gardenWarningOpen,
+  });
+
   return (
     <>
       {showWelcome && (

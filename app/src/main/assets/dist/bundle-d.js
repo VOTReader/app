@@ -1780,6 +1780,8 @@
   // app/src/main/assets/src/ui/components/ConfirmStrip.jsx
   function ConfirmStrip2({ question, yesLabel, onCancel, onConfirm, className, style }) {
     const cls = className ? "ann-chip-confirm " + className : "ann-chip-confirm";
+    const _id = React.useId();
+    useModalRegistry({ id: "confirm-strip:" + _id, dismiss: onCancel });
     return /* @__PURE__ */ React.createElement("div", { className: cls, style }, /* @__PURE__ */ React.createElement("span", { className: "ann-chip-confirm-q" }, question), /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -2126,6 +2128,27 @@
     setSettings,
     setScreen
   }) {
+    useModalRegistry({ id: "welcome-modal", dismiss: dismissWelcome, active: !!showWelcome });
+    useModalRegistry({
+      id: "tabs-overview",
+      dismiss: () => setTabsOverviewOpen(false),
+      active: !!(settings.tabsEnabled && tabsOverviewOpen)
+    });
+    useModalRegistry({
+      id: "tab-action-sheet",
+      dismiss: () => setTabActionIdx(null),
+      active: tabActionIdx != null
+    });
+    useModalRegistry({
+      id: "disable-tabs-prompt",
+      dismiss: () => setDisableTabsPromptOpen(false),
+      active: !!disableTabsPromptOpen
+    });
+    useModalRegistry({
+      id: "garden-warning",
+      dismiss: () => setGardenWarningOpen(false),
+      active: !!gardenWarningOpen
+    });
     return /* @__PURE__ */ React.createElement(React.Fragment, null, showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
       position: "fixed",
       inset: 0,
@@ -2312,6 +2335,66 @@
     setInboundJournalPayload,
     goJournalViewer
   }) {
+    useModalRegistry({
+      id: "annotation-action-chip",
+      dismiss: () => setAnnChip(null),
+      active: !!annChip
+    });
+    useModalRegistry({
+      id: "link-sidebar",
+      dismiss: closeLinkSidebar,
+      active: !!linkSidebarKey
+    });
+    useModalRegistry({
+      id: "link-picker",
+      dismiss: closeLinkPicker,
+      // LinkPicker renders only when `linkPickerSource && !linkRefineRequest`.
+      // Same gate here so the refine screens take dispatch precedence when
+      // they're showing on top.
+      active: !!(linkPickerSource && !linkRefineRequest)
+    });
+    useModalRegistry({
+      id: "verse-picker-screen",
+      // VersePickerScreen's onClose(result) expects a result arg; pass null
+      // to indicate cancellation (matches the back-button code path).
+      dismiss: () => setLinkRefineRequest(null),
+      active: !!(linkRefineRequest && linkRefineRequest.kind === "verse" && linkPickerSource)
+    });
+    useModalRegistry({
+      id: "letter-excerpt-picker",
+      dismiss: () => setLinkRefineRequest(null),
+      active: !!(linkRefineRequest && linkRefineRequest.kind === "excerpt" && linkPickerSource)
+    });
+    useModalRegistry({
+      id: "note-sheet",
+      dismiss: closeNoteSheet,
+      active: !!noteSheetTarget
+    });
+    useModalRegistry({
+      id: "notebook-picker-sheet",
+      dismiss: () => setNotebookPickerTarget(null),
+      active: !!notebookPickerTarget
+    });
+    useModalRegistry({
+      id: "multi-note-popover",
+      dismiss: () => setMultiNotePayload(null),
+      active: !!multiNotePayload
+    });
+    useModalRegistry({
+      id: "bookmark-popover",
+      dismiss: () => setBookmarkPopoverPayload(null),
+      active: !!bookmarkPopoverPayload
+    });
+    useModalRegistry({
+      id: "journal-inbound-sheet",
+      dismiss: () => setInboundJournalPayload(null),
+      active: !!inboundJournalPayload
+    });
+    useModalRegistry({
+      id: "bookmark-create-sheet",
+      dismiss: () => setBookmarkCreatePending(null),
+      active: !!bookmarkCreatePending
+    });
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
       SelectionToolbar,
       {
@@ -3411,6 +3494,16 @@
         window.__closeSheet = prev || null;
       };
     }, [sheetFn, scripRef]);
+    useModalRegistry({
+      id: "footnote-sheet",
+      dismiss: () => setSheetFn(null),
+      active: sheetFn != null
+    });
+    useModalRegistry({
+      id: "letter-scripture-sheet",
+      dismiss: () => setScripRef(null),
+      active: scripRef != null
+    });
     const fnProps = { activeFn: sheetFn != null ? sheetFn : highlightedFn, onFnClick: handleFnClick, onScripClick: handleScripClick, onLetterClick, onInAppLink: wrappedInAppLink, studyMode, footnotes: studyMode ? letter.footnotes : null, highlightText: highlightExcerpt };
     React.useEffect(() => {
       const root = mainRef.current;
@@ -3969,6 +4062,11 @@
         window.__closeSheet = prev || null;
       };
     }, [activeScripRef]);
+    useModalRegistry({
+      id: "scripture-sheet",
+      dismiss: () => setActiveScripRef(null),
+      active: !!activeScripRef
+    });
     React.useEffect(() => {
       if (!surpriseAnchor || surpriseAnchor.type !== "verse") return;
       const vs = surpriseAnchor.verses;
@@ -6565,6 +6663,13 @@
     var _as = useState2(null);
     var actionTarget = _as[0];
     var setActionTarget = _as[1];
+    useModalRegistry({
+      id: "link-row-action-sheet",
+      dismiss: function() {
+        setActionTarget(null);
+      },
+      active: !!actionTarget
+    });
     var allLinks = LinkStore.all();
     var displayLinks = useMemo(function() {
       var q = searchQuery.trim().toLowerCase();
@@ -7041,6 +7146,13 @@
     var _as = useState2(null);
     var actionTarget = _as[0];
     var setActionTarget = _as[1];
+    useModalRegistry({
+      id: "bookmark-row-action-sheet",
+      dismiss: function() {
+        setActionTarget(null);
+      },
+      active: !!actionTarget
+    });
     var _ei = useState2(null);
     var editingId = _ei[0];
     var setEditingId = _ei[1];
@@ -8378,6 +8490,18 @@
     React.useEffect(() => {
       setConfirmingRemove(false);
     }, [selInfo]);
+    useModalRegistry({
+      id: "selection-toolbar",
+      dismiss: () => {
+        setVisible(false);
+        try {
+          const s = window.getSelection();
+          if (s) s.removeAllRanges();
+        } catch (_e) {
+        }
+      },
+      active: visible
+    });
     const toolbarRef = React.useRef(null);
     const suppressRef = React.useRef(false);
     const computeOffset = React.useCallback((container, node, offset) => {

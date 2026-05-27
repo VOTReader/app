@@ -417,6 +417,14 @@ export function BookmarksScreen(props) {
   var actionTarget = _as[0];
   var setActionTarget = _as[1];
 
+  // W1.5(a.2) — Escape-key dispatch registration for the long-press
+  // action sheet rendered at the bottom of this screen.
+  useModalRegistry({
+    id: 'bookmark-row-action-sheet',
+    dismiss: function() { setActionTarget(null); },
+    active: !!actionTarget,
+  });
+
   var _ei = useState(null);
   var editingId = _ei[0];
   var setEditingId = _ei[1];

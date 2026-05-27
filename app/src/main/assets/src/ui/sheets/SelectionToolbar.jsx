@@ -12,6 +12,20 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
   // toolbar (not an inherited mid-confirm state from a prior selection).
   const [confirmingRemove, setConfirmingRemove] = React.useState(false);
   React.useEffect(() => { setConfirmingRemove(false); }, [selInfo]);
+
+  // W1.5(a.2) — register with the central modal registry while the toolbar
+  // is visible so Escape dismisses the selection (via __hideSelectionToolbar's
+  // setVisible + clear-selection routine) instead of firing back-nav. The
+  // toolbar is ALWAYS MOUNTED (the AppShellSheets parent doesn't gate it),
+  // so the registration is gated on `visible` state instead.
+  useModalRegistry({
+    id: 'selection-toolbar',
+    dismiss: () => {
+      setVisible(false);
+      try { const s = window.getSelection(); if (s) s.removeAllRanges(); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
+    },
+    active: visible,
+  });
   const toolbarRef = React.useRef(null);
   const suppressRef = React.useRef(false);
 

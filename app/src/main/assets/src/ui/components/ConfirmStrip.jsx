@@ -33,6 +33,20 @@
 
 export function ConfirmStrip({ question, yesLabel, onCancel, onConfirm, className, style }) {
   const cls = className ? 'ann-chip-confirm ' + className : 'ann-chip-confirm';
+  // W1.5(a.2) — per-instance UNIQUE registry ID via React.useId(). ConfirmStrip
+  // is rendered in 12+ files (BookmarksScreen, LinksScreen, SettingsScreen,
+  // JournalEditorScreen, ClearProgressRow, TabsOverview, NoteSheet,
+  // NotebookPickerSheet, BookmarkCreateSheet, LinkCard, AnnotationActionChip,
+  // JournalAudioBlock, etc.). A shared literal ID like "confirm-strip"
+  // would collapse multiple concurrent instances into one Map entry, so
+  // unmounting the first would remove the registry entry while the second
+  // is still rendering — the dispatcher would then misfire back-nav while
+  // a confirm is still on screen. useId() is React 18+ native, returns a
+  // unique-per-instance string that's stable across renders of the SAME
+  // instance, and is registered as `'confirm-strip:' + id` for debug
+  // legibility in openIds().
+  const _id = React.useId();
+  useModalRegistry({ id: 'confirm-strip:' + _id, dismiss: onCancel });
   return (
     <div className={cls} style={style}>
       <span className="ann-chip-confirm-q">{question}</span>

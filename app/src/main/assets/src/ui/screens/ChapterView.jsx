@@ -13,6 +13,16 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
     return () => { window.__closeSheet = prev || null; };
   }, [activeScripRef]);
 
+  // W1.5(a.2) — Escape-key dispatch registration. The scripture sheet is
+  // always rendered (line ~233 mounts <ScriptureSheet activeRef={...}/>);
+  // the registry gate uses `activeScripRef` because the sheet's onClose
+  // is what actually clears the active ref (= the only meaningful close).
+  useModalRegistry({
+    id: 'scripture-sheet',
+    dismiss: () => setActiveScripRef(null),
+    active: !!activeScripRef,
+  });
+
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== "verse") return;
     const vs = surpriseAnchor.verses;

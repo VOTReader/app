@@ -41,6 +41,21 @@ export function JournalEditorScreen(props) {
   var _showRec = useState(false);
   var showRec = _showRec[0]; var setShowRec = _showRec[1];
 
+  // W1.5(a.2) — Escape-key dispatch registrations for the two screen-local
+  // sheets owned here (insert sheet + voice recording sheet). Both render
+  // conditionally further down; we register/unregister via `active` so
+  // the hook calls stay unconditional at the top of the component body.
+  useModalRegistry({
+    id: 'journal-insert-sheet',
+    dismiss: function() { setShowInsert(false); },
+    active: showInsert,
+  });
+  useModalRegistry({
+    id: 'journal-recording-sheet',
+    dismiss: function() { setShowRec(false); },
+    active: showRec,
+  });
+
   var _confirmAudioDelete = useState(null);  // idx of audio block awaiting delete confirm
   var confirmAudioDelete = _confirmAudioDelete[0]; var setConfirmAudioDelete = _confirmAudioDelete[1];
 

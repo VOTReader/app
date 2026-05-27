@@ -718,47 +718,57 @@ window.AndroidBridge directly after W1.2.
   W1.2-Tier-C-close; W1.5 agent verifies + extends.
 
   AppShellOverlays (4 — always-mounted, conditionally rendered):
-    [ ] welcome-modal             — showWelcome state
-    [ ] tabs-overview             — tabsOverviewOpen state
-    [ ] disable-tabs-prompt       — disableTabsPromptOpen state
-    [ ] garden-warning            — gardenWarningOpen state
+    [X] welcome-modal             — showWelcome state
+    [X] tabs-overview             — tabsOverviewOpen state
+    [X] disable-tabs-prompt       — disableTabsPromptOpen state
+    [X] garden-warning            — gardenWarningOpen state
 
   Nested-inside-overlay (1):
-    [ ] tab-action-sheet          — tabActionIdx state (long-press menu
+    [X] tab-action-sheet          — tabActionIdx state (long-press menu
                                      inside TabsOverview)
 
   AppShellSheets (12 — always-mounted, conditionally rendered):
-    [ ] selection-toolbar         — internal selInfo state (only register
+    [X] selection-toolbar         — internal selInfo state (only register
                                      when actively shown — text selected)
-    [ ] annotation-action-chip    — annChip state
-    [ ] link-sidebar              — linkSidebarKey state
-    [ ] link-picker               — linkPickerSource state
-    [ ] verse-picker-screen       — linkRefineRequest (verse mode)
-    [ ] letter-excerpt-picker     — linkRefineRequest (letter mode)
-    [ ] note-sheet                — noteSheetTarget state
-    [ ] notebook-picker-sheet     — notebookPickerTarget state
-    [ ] multi-note-popover        — multiNotePayload state
-    [ ] bookmark-popover          — bookmarkPopoverPayload state
-    [ ] journal-inbound-sheet     — inboundJournalPayload state
-    [ ] bookmark-create-sheet     — bookmarkCreatePending state
+    [X] annotation-action-chip    — annChip state
+    [X] link-sidebar              — linkSidebarKey state
+    [X] link-picker               — linkPickerSource state
+    [X] verse-picker-screen       — linkRefineRequest (verse mode)
+    [X] letter-excerpt-picker     — linkRefineRequest (letter mode)
+    [X] note-sheet                — noteSheetTarget state
+    [X] notebook-picker-sheet     — notebookPickerTarget state
+    [X] multi-note-popover        — multiNotePayload state
+    [X] bookmark-popover          — bookmarkPopoverPayload state
+    [X] journal-inbound-sheet     — inboundJournalPayload state
+    [X] bookmark-create-sheet     — bookmarkCreatePending state
 
-  Screen-local sheets (6 — VERIFIED mount sites):
-    [ ] journal-insert-sheet      — JournalEditorScreen.jsx:520
-    [ ] journal-recording-sheet   — JournalEditorScreen.jsx:530
-    [ ] scripture-sheet           — ChapterView.jsx:233
-                                     (WtlbEntryView + BibleChapterView
-                                     use the same sheet via App-level
-                                     state; verify at wiring time but
-                                     same registration ID applies)
-    [ ] footnote-sheet            — LetterView.jsx:424
-                                     (same App-level state pattern as
-                                     scripture-sheet)
-    [ ] bookmark-row-action-sheet — BookmarksScreen.jsx:545 (long-press)
-    [ ] link-row-action-sheet     — LinksScreen.jsx:365 (long-press)
+  Screen-local sheets (7 — 6 inventory + 1 discovered during W1.5(a.2)):
+    [X] journal-insert-sheet      — JournalEditorScreen.jsx (showInsert state)
+    [X] journal-recording-sheet   — JournalEditorScreen.jsx (showRec state)
+    [X] scripture-sheet           — ChapterView.jsx (activeScripRef state)
+                                     ChapterView is the SOLE site that renders
+                                     <ScriptureSheet/>. WtlbEntryView and
+                                     BibleChapterView don't use it (W1.5(a.2)
+                                     verification corrected an earlier
+                                     incorrect note about App-level sharing).
+    [X] footnote-sheet            — LetterView.jsx (sheetFn state)
+    [X] letter-scripture-sheet    — LetterView.jsx (scripRef state)
+                                     DISCOVERED during W1.5(a.2) wiring; was
+                                     missed in the original inventory grep.
+                                     It's the inline fn-sheet that opens when
+                                     a footnote's scripture ref is tapped
+                                     INSIDE a letter view (separate from
+                                     ChapterView's ScriptureSheet). The
+                                     existing __closeSheet wiring in
+                                     LetterView routes Android back to its
+                                     dismiss; the registry registration
+                                     handles desktop Escape.
+    [X] bookmark-row-action-sheet — BookmarksScreen.jsx (actionTarget state)
+    [X] link-row-action-sheet     — LinksScreen.jsx (actionTarget state)
 
   ConfirmStrip / inline confirms — REGISTERS PER INSTANCE (decided per
   [[centralized-modal-signal]] + the unique-ID refinement above):
-    [ ] confirm-strip:<useId>     — each ConfirmStrip instance generates
+    [X] confirm-strip:<useId>     — each ConfirmStrip instance generates
                                      a unique React.useId() at mount
                                      and registers as
                                      `'confirm-strip:' + useId`. Mount

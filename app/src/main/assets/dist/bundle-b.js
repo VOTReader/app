@@ -4270,7 +4270,7 @@
       _registry.clear();
     }
   };
-  function useModalRegistry({ id, dismiss, active = true }) {
+  function useModalRegistry2({ id, dismiss, active = true }) {
     const dismissRef = useRefMirror(dismiss);
     React.useEffect(() => {
       if (!active) return void 0;
@@ -7557,6 +7557,20 @@
     var _showRec = useState(false);
     var showRec = _showRec[0];
     var setShowRec = _showRec[1];
+    useModalRegistry({
+      id: "journal-insert-sheet",
+      dismiss: function() {
+        setShowInsert(false);
+      },
+      active: showInsert
+    });
+    useModalRegistry({
+      id: "journal-recording-sheet",
+      dismiss: function() {
+        setShowRec(false);
+      },
+      active: showRec
+    });
     var _confirmAudioDelete = useState(null);
     var confirmAudioDelete = _confirmAudioDelete[0];
     var setConfirmAudioDelete = _confirmAudioDelete[1];
@@ -8136,7 +8150,7 @@
     usePersistedState,
     useAndroidBack,
     modalRegistry,
-    useModalRegistry,
+    useModalRegistry: useModalRegistry2,
     useNavHistoryTracking,
     useNav,
     useSearch,

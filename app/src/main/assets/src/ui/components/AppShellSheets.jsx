@@ -48,6 +48,71 @@ export function AppShellSheets({
   inboundJournalPayload, setInboundJournalPayload,
   goJournalViewer,
 }) {
+  // W1.5(a.2) — Escape-key dispatch registrations for the 11 conditionally-
+  // rendered sheets here. SelectionToolbar is always-mounted with internal
+  // visibility state (registers itself from inside its body, NOT here);
+  // these 11 are gated externally by their App-level state slots.
+  useModalRegistry({
+    id: 'annotation-action-chip',
+    dismiss: () => setAnnChip(null),
+    active: !!annChip,
+  });
+  useModalRegistry({
+    id: 'link-sidebar',
+    dismiss: closeLinkSidebar,
+    active: !!linkSidebarKey,
+  });
+  useModalRegistry({
+    id: 'link-picker',
+    dismiss: closeLinkPicker,
+    // LinkPicker renders only when `linkPickerSource && !linkRefineRequest`.
+    // Same gate here so the refine screens take dispatch precedence when
+    // they're showing on top.
+    active: !!(linkPickerSource && !linkRefineRequest),
+  });
+  useModalRegistry({
+    id: 'verse-picker-screen',
+    // VersePickerScreen's onClose(result) expects a result arg; pass null
+    // to indicate cancellation (matches the back-button code path).
+    dismiss: () => setLinkRefineRequest(null),
+    active: !!(linkRefineRequest && linkRefineRequest.kind === 'verse' && linkPickerSource),
+  });
+  useModalRegistry({
+    id: 'letter-excerpt-picker',
+    dismiss: () => setLinkRefineRequest(null),
+    active: !!(linkRefineRequest && linkRefineRequest.kind === 'excerpt' && linkPickerSource),
+  });
+  useModalRegistry({
+    id: 'note-sheet',
+    dismiss: closeNoteSheet,
+    active: !!noteSheetTarget,
+  });
+  useModalRegistry({
+    id: 'notebook-picker-sheet',
+    dismiss: () => setNotebookPickerTarget(null),
+    active: !!notebookPickerTarget,
+  });
+  useModalRegistry({
+    id: 'multi-note-popover',
+    dismiss: () => setMultiNotePayload(null),
+    active: !!multiNotePayload,
+  });
+  useModalRegistry({
+    id: 'bookmark-popover',
+    dismiss: () => setBookmarkPopoverPayload(null),
+    active: !!bookmarkPopoverPayload,
+  });
+  useModalRegistry({
+    id: 'journal-inbound-sheet',
+    dismiss: () => setInboundJournalPayload(null),
+    active: !!inboundJournalPayload,
+  });
+  useModalRegistry({
+    id: 'bookmark-create-sheet',
+    dismiss: () => setBookmarkCreatePending(null),
+    active: !!bookmarkCreatePending,
+  });
+
   return (
     <>
       <SelectionToolbar

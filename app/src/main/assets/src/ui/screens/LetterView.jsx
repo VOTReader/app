@@ -80,6 +80,32 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
     return () => { window.__closeSheet = prev || null; };
   }, [sheetFn, scripRef]);
 
+  // W1.5(a.2) — Escape-key dispatch registrations.
+  //   footnote-sheet — listed in the W1.5 modal inventory at PLAN.txt
+  //                    line 674 (was "LetterView.jsx:424"; line number
+  //                    shifts as wiring lands but the mount site is the
+  //                    one-and-only <FootnoteSheet> below).
+  //   letter-scripture-sheet — discovered during W1.5(a.2) wiring;
+  //                    NOT in the original inventory. It's the inline
+  //                    fn-sheet for tapped scripture refs inside a letter.
+  //                    Same dismiss semantics as the existing
+  //                    __closeSheet wiring above. Inventory extended
+  //                    in the closure commit so the count goes 24→25.
+  // The two registrations are mutually exclusive in practice (the
+  // useEffect above picks one or the other for __closeSheet); since the
+  // most-recently-opened wins under registry semantics either way,
+  // dispatch order is correct without extra logic.
+  useModalRegistry({
+    id: 'footnote-sheet',
+    dismiss: () => setSheetFn(null),
+    active: sheetFn != null,
+  });
+  useModalRegistry({
+    id: 'letter-scripture-sheet',
+    dismiss: () => setScripRef(null),
+    active: scripRef != null,
+  });
+
   const fnProps = { activeFn: sheetFn != null ? sheetFn : highlightedFn, onFnClick: handleFnClick, onScripClick: handleScripClick, onLetterClick, onInAppLink: wrappedInAppLink, studyMode, footnotes: studyMode ? letter.footnotes : null, highlightText: highlightExcerpt };
 
   React.useEffect(() => {
