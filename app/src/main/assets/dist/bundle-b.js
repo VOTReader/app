@@ -415,6 +415,265 @@
     );
   }
 
+  // app/src/main/assets/src/stores/idb-adapter.js
+  var IDBAdapter = (function() {
+    const DB_NAME = "votreader";
+    const DB_VERSION = 1;
+    const STORE_NAMES = Object.freeze([
+      "vot-welcomed",
+      "vot-about-seen",
+      "vot-garden-warning-acked",
+      "vot-ann-migrated",
+      "vot-recent-nav",
+      "vot-prophecy-cards",
+      "vot-journal",
+      "vot-journal-notebooks",
+      "vot-journal-index",
+      "vot-journal-stats",
+      "vot-bookmarks",
+      "vot-notebooks",
+      "vot-history",
+      "vot-state",
+      "vot-annotations",
+      "vot-notes",
+      "vot-links",
+      "meta"
+    ]);
+    const STORE_SET = new Set(STORE_NAMES);
+    let _dbPromise = null;
+    function wrapRequest(req) {
+      return new Promise(function(resolve, reject) {
+        req.onsuccess = function() {
+          resolve(req.result);
+        };
+        req.onerror = function() {
+          reject(req.error || new Error("IDB request failed"));
+        };
+      });
+    }
+    function open() {
+      if (_dbPromise) return _dbPromise;
+      const p = new Promise(function(resolve, reject) {
+        if (typeof indexedDB === "undefined" || !indexedDB) {
+          reject(new Error("IndexedDB is not available"));
+          return;
+        }
+        let req;
+        try {
+          req = indexedDB.open(DB_NAME, DB_VERSION);
+        } catch (e) {
+          reject(e);
+          return;
+        }
+        req.onupgradeneeded = function(e) {
+          const db = (
+            /** @type {IDBOpenDBRequest} */
+            e.target.result
+          );
+          for (const name of STORE_NAMES) {
+            if (!db.objectStoreNames.contains(name)) {
+              db.createObjectStore(name);
+            }
+          }
+        };
+        req.onsuccess = function(e) {
+          const db = (
+            /** @type {IDBOpenDBRequest} */
+            e.target.result
+          );
+          db.onversionchange = function() {
+            try {
+              db.close();
+            } catch (_e) {
+            }
+            if (_dbPromise === p) _dbPromise = null;
+          };
+          resolve(db);
+        };
+        req.onerror = function(e) {
+          const err = (
+            /** @type {IDBOpenDBRequest} */
+            e.target.error
+          );
+          reject(err || new Error("IDB open failed"));
+        };
+        req.onblocked = function() {
+          reject(new Error("IDB open blocked (another connection holds an older version)"));
+        };
+      });
+      p.catch(function() {
+        if (_dbPromise === p) _dbPromise = null;
+      });
+      _dbPromise = p;
+      return p;
+    }
+    function txStore(storeName, mode) {
+      if (!STORE_SET.has(storeName)) {
+        return Promise.reject(new Error("Unknown IDB store: " + storeName));
+      }
+      return open().then(function(db) {
+        const tx = db.transaction([storeName], mode);
+        const store = tx.objectStore(storeName);
+        return { store, tx };
+      });
+    }
+    function get(storeName, key) {
+      return txStore(storeName, "readonly").then(function(ctx) {
+        return wrapRequest(ctx.store.get(key));
+      });
+    }
+    function put(storeName, key, value) {
+      if (value === void 0) return _self.delete(storeName, key);
+      return _self._putOnce(storeName, key, value).catch(function(err) {
+        if (err && err.name === "AbortError") {
+          return _self._putOnce(storeName, key, value);
+        }
+        throw err;
+      });
+    }
+    function _putOnce(storeName, key, value) {
+      return txStore(storeName, "readwrite").then(function(ctx) {
+        return new Promise(function(resolve, reject) {
+          let settled = false;
+          const settle = function(action) {
+            if (!settled) {
+              settled = true;
+              action();
+            }
+          };
+          let req;
+          try {
+            req = ctx.store.put(value, key);
+          } catch (e) {
+            settle(function() {
+              reject(e);
+            });
+            return;
+          }
+          req.onerror = function() {
+            settle(function() {
+              reject(req.error || _makeAbortError());
+            });
+          };
+          ctx.tx.oncomplete = function() {
+            settle(function() {
+              resolve(void 0);
+            });
+          };
+          ctx.tx.onerror = function() {
+            settle(function() {
+              reject(ctx.tx.error || req && req.error || _makeAbortError());
+            });
+          };
+          ctx.tx.onabort = function() {
+            settle(function() {
+              reject(ctx.tx.error || req && req.error || _makeAbortError());
+            });
+          };
+        });
+      });
+    }
+    function del(storeName, key) {
+      return txStore(storeName, "readwrite").then(function(ctx) {
+        return new Promise(function(resolve, reject) {
+          let settled = false;
+          const settle = function(action) {
+            if (!settled) {
+              settled = true;
+              action();
+            }
+          };
+          let req;
+          try {
+            req = ctx.store.delete(key);
+          } catch (e) {
+            settle(function() {
+              reject(e);
+            });
+            return;
+          }
+          req.onerror = function() {
+            settle(function() {
+              reject(req.error || _makeAbortError());
+            });
+          };
+          ctx.tx.oncomplete = function() {
+            settle(function() {
+              resolve(void 0);
+            });
+          };
+          ctx.tx.onabort = function() {
+            settle(function() {
+              reject(ctx.tx.error || req && req.error || _makeAbortError());
+            });
+          };
+        });
+      });
+    }
+    function getAll(storeName) {
+      return txStore(storeName, "readonly").then(function(ctx) {
+        return new Promise(function(resolve, reject) {
+          const out = {};
+          const req = ctx.store.openCursor();
+          req.onsuccess = function(e) {
+            const cursor = (
+              /** @type {IDBRequest<IDBCursorWithValue | null>} */
+              e.target.result
+            );
+            if (cursor) {
+              out[String(cursor.key)] = cursor.value;
+              cursor.continue();
+            } else {
+              resolve(out);
+            }
+          };
+          req.onerror = function() {
+            reject(req.error || new Error("cursor failed"));
+          };
+        });
+      });
+    }
+    function isQuotaError(err) {
+      if (!err) return false;
+      const e = (
+        /** @type {any} */
+        err
+      );
+      if (e.name === "QuotaExceededError") return true;
+      if (e.code === 22) return true;
+      return false;
+    }
+    function _makeAbortError() {
+      if (typeof DOMException === "function") {
+        try {
+          return new DOMException("Transaction aborted", "AbortError");
+        } catch (_e) {
+        }
+      }
+      const e = new Error("Transaction aborted");
+      e.name = "AbortError";
+      return e;
+    }
+    function _resetForTests() {
+      _dbPromise = null;
+    }
+    const _self = {
+      DB_NAME,
+      DB_VERSION,
+      STORE_NAMES,
+      open,
+      get,
+      put,
+      delete: del,
+      getAll,
+      isQuotaError,
+      _putOnce,
+      _wrapRequest: wrapRequest,
+      _resetForTests
+    };
+    return _self;
+  })();
+
   // app/src/main/assets/src/stores/annotation-store.js
   function migrateAnnotations() {
     try {
@@ -8293,6 +8552,7 @@
     PlatformBridge,
     // Stores
     CachedStore,
+    IDBAdapter,
     migrateAnnotations,
     AnnotationStore: AnnotationStore2,
     HighlightStore,

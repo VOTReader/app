@@ -125,15 +125,27 @@ export default defineConfig({
       // P7i). Lines breaks 30%. Gate floors advance: statements 25→29,
       // branches 21→24, functions 24→27, lines 26→30.
       //
+      // W2.1 baseline (+ idb-adapter, 672 tests — Phase 2 storage
+      // hardening starts; first 220 tests of margin since P7i were
+      // accumulated by W1 tests without a corresponding gate bump):
+      //   statements 40.69 (1527/3752) | branches 30.97 (819/2644)
+      //   functions  42.02 (324/771)   | lines    42.95 (1205/2805)
+      // The total covered surface jumped because the W1 platform-bridge
+      // / W1.5 modal-registry / W1.6 root-exit-toast / scripture-parse
+      // extension tests all landed without bumping the floor. The
+      // baseline now reflects reality. idb-adapter contributes 44 tests
+      // at 78/53/68/82% local coverage (uncovered lines are
+      // DOMException-fallback paths only relevant on legacy WebViews).
+      //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
-        statements: 29,
-        branches: 24,
-        functions: 27,
-        lines: 30,
+        statements: 40,
+        branches: 30,
+        functions: 42,
+        lines: 42,
       },
     },
   },
