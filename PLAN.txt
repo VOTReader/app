@@ -520,39 +520,132 @@ window.AndroidBridge directly after W1.2.
 
        Per [[centralized-modal-signal]], the "no modal/sheet open"
        check MUST go through a SINGLE centralized signal — NOT a
-       multi-source state-check on AppShellSheets + AppShellOverlays +
-       screen-local sheet states. Implementation: a useModalRegistry
-       hook that exposes register() / unregister() + a stable
-       isAnyOpen() ref. Each sheet/overlay calls register() in its
-       mount effect and unregister() on cleanup. Counter-based (not
-       state-based) so identity churn doesn't drop signals. New sheets
-       added later automatically participate via the same register
-       pattern — no need to update the Escape handler.
+       multi-source state-check on AppShellSheets + AppShellOverlays
+       + screen-local sheet states. Implementation: useModalRegistry
+       hook backed by a Set<string> of modal IDs.
+         - register(id: string) — Set.add(id) on sheet mount
+         - unregister(id: string) — Set.delete(id) on sheet unmount
+         - isAnyOpen() — registry.size > 0  (O(1))
+         - openIds() — Array.from(registry)  (for debug logs)
+
+       Set<string> beats a counter:
+         - Same O(1) check.
+         - When debugging, openIds() shows WHICH modals are open
+           ("note-sheet, bookmark-popover") — infinitely more useful
+           than "modal count: 2."
+         - Immune to double-register/unregister bugs (Set is idempotent;
+           a counter goes negative under React's double-invoke in
+           StrictMode, then isAnyOpen() lies).
+
+       PREREQUISITE — exhaustive modal inventory (see CHECKLIST below).
+       The hook is ~20 lines; the wiring audit across every sheet /
+       overlay / popover / screen-local modal is the real work. If
+       even ONE is missed, Escape fires when it shouldn't and the user
+       navigates away mid-action. Land the inventory in this PLAN
+       BEFORE writing the hook, and use it as the checklist to ensure
+       every modal calls register/unregister.
 
     2. Browser: History API popstate → handleAndroidBack(). The app
        pushes a history entry on each in-app navigation; popstate
        signals the user clicked the browser-native back button.
 
-       Per [[root-of-history-pwa]], popstate handling at the navigation
-       ROOT needs special care — a PWA has no "minimize" equivalent
-       to Android's behavior when handleAndroidBack returns "false".
-       Without a root-of-stack guard, the first back-press past the
-       app's home screen EXITS the PWA silently (browser navigates
-       away or closes the standalone window). useAndroidBack tracks
-       whether the current state IS the root; at root, the popstate
-       handler pushes a replacement history entry (history.pushState)
-       so the next back-press lands inside the app, not outside.
-       Optionally show a brief "Press back again to exit" toast on
-       first root-back to match the Android UX pattern.
+       Per [[root-of-history-pwa]], the root-of-stack design is a
+       REQUIRED double-tap-to-exit pattern (NOT an optional toast).
+       PWA has no "minimize" equivalent — without the guard the first
+       back-press past the home screen EXITS the PWA. Without the
+       toast the user is silently TRAPPED. Both pieces are mandatory:
+
+         First back at root:
+           1. history.pushState({}, '', '')  — replacement entry, app stays
+           2. Show toast "Press back again to exit"
+           3. _rootExitArmed = true; setTimeout(2000) to disarm
+         Second back within 2s (while armed):
+           1. _rootExitArmed = false; clearTimeout
+           2. Skip the replacement push — let browser exit normally
+         After 2s without second back:
+           _rootExitArmed flips false; next first-back gets a fresh toast.
+
+       Tests:
+         - popstate at root → toast appears, app stays
+         - popstate at root × 2 within 2s → second one allows exit
+         - popstate at root → wait 3s → popstate again → fresh toast (cycle resets)
+         - popstate mid-stack → no toast, handleAndroidBack runs normally
 
   The existing handleAndroidBack logic is platform-agnostic (reads JS
   state, returns "true"/"false"). The trigger source changes; the
   return-handling for "false" diverges by platform (Android: minimize;
-  Web: stay at root). Register listener in useAndroidBack.js (already
-  owns this domain). Tests:
-    - (fullscreen, sheet-open, clear-state) Escape → only clear-state dispatches
-    - popstate at root → stays in app (history entry pushed)
-    - popstate mid-stack → handleAndroidBack runs normally
+  Web: arm-double-tap-then-exit). Register listener in useAndroidBack.js
+  (already owns this domain).
+
+  ── W1.5 MODAL INVENTORY (per [[centralized-modal-signal]] prerequisite) ──
+  Every modal/sheet/popover/overlay below MUST call register()/unregister()
+  before the Escape gate ships. Missing one = Escape fires when it
+  shouldn't = user navigates away mid-action. Inventory captured at
+  W1.2-Tier-C-close; W1.5 agent verifies + extends.
+
+  AppShellOverlays (4 — always-mounted, conditionally rendered):
+    [ ] welcome-modal             — showWelcome state
+    [ ] tabs-overview             — tabsOverviewOpen state
+    [ ] disable-tabs-prompt       — disableTabsPromptOpen state
+    [ ] garden-warning            — gardenWarningOpen state
+
+  Nested-inside-overlay (1):
+    [ ] tab-action-sheet          — tabActionIdx state (long-press menu
+                                     inside TabsOverview)
+
+  AppShellSheets (12 — always-mounted, conditionally rendered):
+    [ ] selection-toolbar         — internal selInfo state (only register
+                                     when actively shown — text selected)
+    [ ] annotation-action-chip    — annChip state
+    [ ] link-sidebar              — linkSidebarKey state
+    [ ] link-picker               — linkPickerSource state
+    [ ] verse-picker-screen       — linkRefineRequest (verse mode)
+    [ ] letter-excerpt-picker     — linkRefineRequest (letter mode)
+    [ ] note-sheet                — noteSheetTarget state
+    [ ] notebook-picker-sheet     — notebookPickerTarget state
+    [ ] multi-note-popover        — multiNotePayload state
+    [ ] bookmark-popover          — bookmarkPopoverPayload state
+    [ ] journal-inbound-sheet     — inboundJournalPayload state
+    [ ] bookmark-create-sheet     — bookmarkCreatePending state
+
+  Screen-local sheets (6+ — rendered inside specific screens):
+    [ ] journal-insert-sheet      — JournalEditorScreen.jsx:520
+    [ ] journal-recording-sheet   — JournalEditorScreen.jsx:530
+    [ ] scripture-sheet           — ChapterView.jsx:233 (+ via openSheetForRef
+                                     indirection from WtlbEntryView /
+                                     BibleChapterView — verify)
+    [ ] footnote-sheet            — LetterView.jsx:424 (+ WtlbEntryView via
+                                     openSheetForRef — verify)
+    [ ] bookmark-row-action-sheet — BookmarksScreen.jsx:545 (long-press menu)
+    [ ] link-row-action-sheet     — LinksScreen.jsx:365 (long-press menu)
+    [ ] notebook-manager-sheet    — NotesIndexScreen (verify mount site)
+    [ ] journal-notebook-sheet    — exists in src/ui/sheets/ — verify
+                                     mount site (likely JournalViewerScreen
+                                     or JournalEditorScreen)
+
+  ConfirmStrip / inline confirms — DEBATE inclusion:
+    [ ] DECISION REQUIRED: should an in-flight ConfirmStrip (e.g.
+        SettingsScreen's "Clear All Personal Data" inline confirm,
+        the JournalAudioBlock delete confirm, the per-tab close
+        confirm in TabsOverview) BLOCK Escape from firing back-nav?
+        Arguments for: Escape should cancel an in-flight confirm
+        first; user expects "Escape cancels what I'm doing."
+        Arguments against: ConfirmStrip is inline UI (not modal); the
+        existing close-on-cancel button is sufficient; Escape should
+        always navigate.
+        W1.5 agent picks ONE behavior + applies consistently across
+        every ConfirmStrip usage. Document the choice in the commit.
+
+  Tests:
+    - Each entry above mounted in isolation → registry.openIds()
+      contains the expected ID → Escape gated (does not dispatch).
+    - Entry unmounted → registry.openIds() empty → Escape dispatches.
+    - Double-mount/unmount cycles (React StrictMode) → no negative
+      counter / no missed unregister; isAnyOpen() always correct.
+    - (fullscreen, sheet-open, clear-state) Escape → only clear-state
+      dispatches.
+    - popstate at root → stays in app (history entry pushed + toast shown).
+    - popstate mid-stack → handleAndroidBack runs normally.
 
   W1.6 — Desktop preview-eval smoke walk
   ──────────────────────────────────────
@@ -729,52 +822,89 @@ Architecture — what exists, what changes:
     4. Promise.all resolves. App() sets hydrated=true, renders.
     5. All subsequent reads are sync from memory.
 
-  Hydration timeout — data-loss vector (per [[w2-hydration-data-loss]]):
-  if IDB open takes >3 seconds, the naive impl renders with an empty
-  cache + a background retry. THIS IS DANGEROUS: user starts interacting
-  with the empty cache, writes data, then the retry resolves and the
-  loaded IDB data STOMPS the user's writes. Silently lost data.
+  Hydration timeout — TWO data-loss vectors (per [[w2-hydration-data-loss]]):
 
-  Required design — degraded mode + write-queue:
+  Vector 1 (late stomp): if IDB open takes >3 seconds, naive impl
+  renders with empty cache + background retry. User writes A. Retry
+  completes, assigns cache = loaded IDB → A is lost.
+
+  Vector 2 ("cache wins" is the WRONG fix): if degraded-mode treats
+  the cache as authoritative and an IDB retry's "cache wins on
+  conflict" is interpreted as "discard IDB, keep cache" — that
+  destroys ALL previous-session data. Cache during degraded is {A};
+  IDB has {B, C, D}; "cache wins" → keep {A}, lose {B, C, D}.
+  Catastrophic.
+
+  Required design — write-queue REBASE (NOT a store-level cache-wins merge):
 
     State machine per store: 'pending' | 'loaded' | 'degraded'.
 
-    'pending' (boot → hydration in flight):
-       Reads return default values.
-       Writes go to a per-store WRITE QUEUE (not the cache yet).
-       UI shows a brief "Loading..." indicator on the affected surfaces
-       so user knows their action is staged but not yet persistent.
+    'pending' (boot → hydration in flight, ≤3s):
+       Reads return defaults (cache is empty).
+       Writes go to a per-store WRITE QUEUE — separate from cache; the
+       cache stays at defaults.
+       UI shows a brief "Loading..." indicator on the affected surfaces.
 
     'loaded' (hydration succeeded within timeout):
-       Drain write queue → apply to cache (each enqueued write wins
-       over the loaded IDB value at the same key).
-       Flush cache → IDB.
-       Normal write-through from this point.
+       1. Cache = loaded IDB data (the base — previous-session truth).
+       2. REPLAY the write queue on top — each queued write applied to
+          cache; queue wins on per-key conflicts since current-session
+          writes are newer.
+       3. Flush rebased cache → IDB so post-replay state is durable.
+       4. Drain queue. Transition to 'loaded'.
+       5. Subsequent writes are normal write-through.
 
     'degraded' (hydration timeout, e.g. 3s elapsed):
        Mark store degraded.
-       Drain write queue → apply to cache as authoritative.
-       Treat cache as truth from this point.
-       Continue background IDB load attempts; on eventual success,
-       MERGE — cache wins on every conflicting key.
-       Surface a brief UI warning: "Storage temporarily unavailable;
-       your latest changes are kept in memory and will save when
-       storage recovers."
+       KEEP queue separate from cache — DO NOT drain queue into cache
+       as if it were authoritative. (That's the trap that leads to
+       "cache wins discards IDB.")
+       Reads serve `defaults + appliedQueue(key)` — i.e., the queue is
+       the source of truth for keys it touched; defaults for everything
+       else. (Implementation: virtual overlay of queue on defaults, or
+       a read helper that consults queue first.)
+       Writes: still go to queue.
+       UI warning: "Storage temporarily unavailable; your latest
+                    changes are kept in memory and will save when
+                    storage recovers."
+       Background IDB retries continue.
 
-    Background retry on persistent failure → store stays 'degraded'
-    forever (until app reload). Cache is the only source of truth.
-    Per [[user-data-paramount]], silent stomping is unacceptable;
-    a degraded-but-functional app is better than data loss.
+    'degraded' → IDB eventual recovery:
+       1. Cache = loaded IDB data (the previous-session base).
+       2. REPLAY entire write queue on top of cache.
+       3. Flush rebased cache to IDB.
+       4. Transition to 'loaded'.
+       5. NO DATA LOSS: IDB provides previous-session data; queue
+          provides current-session writes. Both survive.
+
+    Persistent failure (IDB never recovers — corrupted DB, permanent
+    permission denial): store stays 'degraded' forever (until app
+    reload). Queue is the ONLY truth for the session. App remains
+    usable; warning persists.
+
+  CRITICAL wording for code/tests/docs: "REBASE the queue ON TOP OF
+  IDB" — NOT "merge with cache wins on conflict." The latter is
+  ambiguous and can be implemented destructively. The former is
+  unambiguous. The W2.2 agent MUST use this terminology and MUST NOT
+  implement a store-level "keep cache, discard IDB" merge.
 
   Tests (must exist in W2.2 vitest):
-    1. Hydration <100ms → 'loaded' state → write-through works normally
-    2. Hydration >3s + user writes during pending → user writes survive
-       when hydration eventually resolves (NOT stomped)
-    3. Hydration NEVER completes (corrupted DB / permission denied) →
-       store stays 'degraded' but app remains usable; user-facing
-       warning surfaced
-    4. Multiple stores hydrate concurrently — some succeed, some time
-       out. Each store's state tracked independently
+    1. Hydration <100ms → 'loaded' → write-through works normally.
+    2. Hydration 100ms-3s + writes during 'pending' → both previous-
+       session IDB data AND current-session queue writes survive.
+    3. Hydration >3s + writes during 'pending' + IDB eventually
+       resolves: BOTH previous-session IDB data {B,C,D} AND
+       current-session writes {A} present in final cache. Test
+       assertion: `cache.keys() ⊇ {A,B,C,D}` and `cache.A === A`.
+    4. Hydration NEVER completes (corrupted DB / permission denied) →
+       store stays 'degraded'; app remains usable; queue is source of
+       truth; warning surfaced.
+    5. Multiple stores hydrate concurrently — some succeed, some time
+       out. Each store's state tracked independently.
+
+  Per [[user-data-paramount]], silent stomping is unacceptable; the
+  W2 agent MUST implement the rebase semantics correctly before any
+  consumer migrates to the async-hydrated path.
 
   W2.3 — Migrate data stores (one-by-one, test each)
   ───────────────────────────────────────────────────
