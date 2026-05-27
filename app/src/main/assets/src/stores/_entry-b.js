@@ -107,7 +107,6 @@ import { linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna } from '.
 // ── Journal UI (sheets) ─────────────────────────────────────────────────
 import { JournalRecordingSheet } from '../ui/sheets/JournalRecordingSheet.jsx';
 import { JournalInsertSheet } from '../ui/sheets/JournalInsertSheet.jsx';
-import { JournalNotebookSheet } from '../ui/sheets/JournalNotebookSheet.jsx';
 import { JournalInboundSheet } from '../ui/sheets/JournalInboundSheet.jsx';
 
 // ── Journal UI (screens) ────────────────────────────────────────────────
@@ -181,7 +180,7 @@ Object.assign(window, {
   findEntryContext, lookupVersesFromBooks,
   linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna,
   // Journal UI (sheets)
-  JournalRecordingSheet, JournalInsertSheet, JournalNotebookSheet, JournalInboundSheet,
+  JournalRecordingSheet, JournalInsertSheet, JournalInboundSheet,
   // Renderer
   JournalChip,
   jrnRefKeyForLetter, jrnRefKeyForChapter,

@@ -2215,7 +2215,7 @@
       }
     }
   );
-  var JournalNotebookStore2 = extendStore(
+  var JournalNotebookStore = extendStore(
     CachedStore(
       "vot-journal-notebooks",
       /** @type {JournalNotebookStoreData} */
@@ -6660,142 +6660,6 @@
     }, style: { maxWidth: "480px" } }, /* @__PURE__ */ React.createElement("div", { className: "note-sheet-header" }, mode !== "menu" && /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-btn", onClick: back, "aria-label": "Back", style: { fontSize: "18px" } }, "\u2039"), /* @__PURE__ */ React.createElement("span", { className: "note-sheet-title", style: { flex: 1 } }, titleStr()), /* @__PURE__ */ React.createElement("button", { className: "note-sheet-menu-btn", onClick: close, "aria-label": "Close", style: { fontSize: "18px" } }, "\xD7")), body()));
   }
 
-  // app/src/main/assets/src/ui/sheets/JournalNotebookSheet.jsx
-  function JournalNotebookSheet({ entryId, memberIds, onClose, onChanged }) {
-    var useState = React.useState;
-    var useEffect = React.useEffect;
-    var useRef = React.useRef;
-    var initial = new Set(memberIds instanceof Set ? Array.from(memberIds) : memberIds || []);
-    var _members = useState(initial);
-    var members = _members[0];
-    var setMembers = _members[1];
-    var _notebooks = useState(JournalNotebookStore.list());
-    var notebooks = _notebooks[0];
-    var setNotebooks = _notebooks[1];
-    var _newName = useState("");
-    var newName = _newName[0];
-    var setNewName = _newName[1];
-    var _confirmDelete = useState(null);
-    var confirmDelete = _confirmDelete[0];
-    var setConfirmDelete = _confirmDelete[1];
-    var inputRef = useRef(null);
-    useEffect(function() {
-      setTimeout(function() {
-        if (inputRef.current) inputRef.current.focus();
-      }, 60);
-    }, []);
-    function reload() {
-      setNotebooks(JournalNotebookStore.list());
-    }
-    function toggle(nbId) {
-      var next = new Set(Array.from(members));
-      if (next.has(nbId)) next.delete(nbId);
-      else next.add(nbId);
-      setMembers(next);
-      if (entryId && typeof JournalStore !== "undefined") {
-        JournalStore.update(entryId, { notebookIds: Array.from(next) });
-      }
-      if (onChanged) onChanged(next);
-    }
-    function createNotebook() {
-      var trimmed = newName.trim();
-      if (!trimmed) return;
-      var nb = JournalNotebookStore.add(trimmed);
-      if (!nb) return;
-      setNewName("");
-      reload();
-      if (entryId) {
-        var next = new Set(Array.from(members));
-        next.add(nb.id);
-        setMembers(next);
-        JournalStore.update(entryId, { notebookIds: Array.from(next) });
-        if (onChanged) onChanged(next);
-      }
-    }
-    function deleteNb(nbId) {
-      JournalNotebookStore.remove(nbId);
-      var next = new Set(Array.from(members));
-      next.delete(nbId);
-      setMembers(next);
-      if (entryId) JournalStore.update(entryId, { notebookIds: Array.from(next) });
-      if (onChanged) onChanged(next);
-      setConfirmDelete(null);
-      reload();
-    }
-    return /* @__PURE__ */ React.createElement("div", { className: "nb-picker-overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker", onClick: function(e) {
-      e.stopPropagation();
-    } }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker-header" }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-title" }, members.size > 0 ? "Manage Notebooks" : "Add to Notebook"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")), /* @__PURE__ */ React.createElement("div", { className: "nb-picker-new" }, /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        ref: inputRef,
-        className: "nb-picker-new-input",
-        type: "text",
-        placeholder: "New notebook name\u2026",
-        value: newName,
-        onChange: function(e) {
-          setNewName(e.target.value);
-        },
-        onKeyDown: function(e) {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            createNotebook();
-          }
-        },
-        maxLength: 60
-      }
-    ), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "nb-picker-new-btn" + (newName.trim() ? "" : " disabled"),
-        onClick: createNotebook,
-        disabled: !newName.trim()
-      },
-      "Create"
-    )), notebooks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : /* @__PURE__ */ React.createElement("div", { className: "nb-picker-list" }, notebooks.map(function(nb) {
-      if (confirmDelete === nb.id) {
-        return /* @__PURE__ */ React.createElement(
-          ConfirmStrip,
-          {
-            key: nb.id,
-            question: "Delete \u201C" + nb.name + "\u201D? Entries will move to Uncategorized.",
-            onCancel: function() {
-              setConfirmDelete(null);
-            },
-            onConfirm: function() {
-              deleteNb(nb.id);
-            }
-          }
-        );
-      }
-      var checked = members.has(nb.id);
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          key: nb.id,
-          className: "nb-picker-row" + (checked ? " checked" : ""),
-          onClick: function() {
-            toggle(nb.id);
-          },
-          role: "button"
-        },
-        /* @__PURE__ */ React.createElement("span", { className: "nb-picker-check" }, checked && /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("polyline", { points: "20 6 9 17 4 12" }))),
-        /* @__PURE__ */ React.createElement("span", { className: "nb-picker-row-name" }, nb.name),
-        /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            className: "nb-picker-row-delete",
-            onClick: function(e) {
-              e.stopPropagation();
-              setConfirmDelete(nb.id);
-            },
-            "aria-label": "Delete notebook"
-          },
-          "\xD7"
-        )
-      );
-    }))));
-  }
-
   // app/src/main/assets/src/ui/sheets/JournalInboundSheet.jsx
   function JournalInboundSheet({ refKey, resourceLabel, onClose, onOpenEntry }) {
     var ids = typeof JournalIndexStore !== "undefined" ? JournalIndexStore.entriesReferencing(refKey) : [];
@@ -8248,7 +8112,7 @@
     JournalIndexStore: JournalIndexStore2,
     jrnId,
     JournalStore: JournalStore2,
-    JournalNotebookStore: JournalNotebookStore2,
+    JournalNotebookStore,
     // Components
     ExpandableText,
     JrnExpandable: JrnExpandable2,
@@ -8319,7 +8183,6 @@
     // Journal UI (sheets)
     JournalRecordingSheet: JournalRecordingSheet2,
     JournalInsertSheet: JournalInsertSheet2,
-    JournalNotebookSheet,
     JournalInboundSheet,
     // Renderer
     JournalChip,

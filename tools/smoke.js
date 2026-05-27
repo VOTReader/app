@@ -125,7 +125,6 @@
       'LinkIcon', 'LinkCard',
       'ChapterIndex', 'BibleStudyIndex', 'GardenView',
       'ScripturesHome', 'ScriptureGenre',
-      'NotebookManagerSheet',
       // P5c sheets — these are now the entire annotation/link/note UI surface
       'AnnotationActionChip', 'SelectionToolbar', 'NoteSheet',
       'NotebookPickerSheet', 'LinkPicker', 'LinkSidebar',

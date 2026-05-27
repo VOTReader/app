@@ -167,7 +167,6 @@ import { LinkSidebar } from './sheets/LinkSidebar.jsx';
 import { SelectionToolbar } from './sheets/SelectionToolbar.jsx';
 import { AnnotationActionChip } from './sheets/AnnotationActionChip.jsx';
 import { BookmarkCreateSheet } from './sheets/BookmarkCreateSheet.jsx';
-import { NotebookManagerSheet } from './sheets/NotebookManagerSheet.jsx';
 
 // ── App — the composition root ──────────────────────────────────────────
 // Extracted from index.html in Q2.7-1 as a verbatim move (still uses
@@ -236,7 +235,7 @@ Object.assign(window, {
   LetterExcerptPickerScreen, VersePickerScreen,
   LinkPicker, LinkSidebar,
   SelectionToolbar, AnnotationActionChip,
-  BookmarkCreateSheet, NotebookManagerSheet,
+  BookmarkCreateSheet,
   // App (composition root)
   App,
 });

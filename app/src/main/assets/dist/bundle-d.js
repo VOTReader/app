@@ -9280,120 +9280,6 @@
     ));
   }
 
-  // app/src/main/assets/src/ui/sheets/NotebookManagerSheet.jsx
-  function NotebookManagerSheet({ setHlTick, onClose }) {
-    React.useSyncExternalStore(
-      React.useCallback((cb) => NotebookStore.subscribe(cb), []),
-      () => NotebookStore.getVersion()
-    );
-    React.useSyncExternalStore(
-      React.useCallback((cb) => NoteStore.subscribe(cb), []),
-      () => NoteStore.getVersion()
-    );
-    const notebooks = NotebookStore.list();
-    const [newName, setNewName] = React.useState("");
-    const [renameId, setRenameId] = React.useState(null);
-    const [renameValue, setRenameValue] = React.useState("");
-    const [confirmDeleteId, setConfirmDeleteId] = React.useState(null);
-    const counts = (() => {
-      const map = {};
-      NoteStore.list().forEach((n) => {
-        (n.notebookIds || []).forEach((id) => {
-          map[id] = (map[id] || 0) + 1;
-        });
-      });
-      return map;
-    })();
-    const createNotebook = () => {
-      const trimmed = newName.trim();
-      if (!trimmed) return;
-      NotebookStore.add(trimmed);
-      setHlTick((t) => t + 1);
-      setNewName("");
-    };
-    const startRename = (nb) => {
-      setRenameId(nb.id);
-      setRenameValue(nb.name);
-    };
-    const commitRename = () => {
-      const trimmed = renameValue.trim();
-      if (trimmed && renameId) {
-        NotebookStore.rename(renameId, trimmed);
-        setHlTick((t) => t + 1);
-      }
-      setRenameId(null);
-      setRenameValue("");
-    };
-    const cancelRename = () => {
-      setRenameId(null);
-      setRenameValue("");
-    };
-    const deleteNb = (id) => {
-      NotebookStore.remove(id);
-      setHlTick((t) => t + 1);
-      setConfirmDeleteId(null);
-    };
-    return /* @__PURE__ */ React.createElement("div", { className: "nb-picker-overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker-header" }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-title" }, "Manage Notebooks"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")), /* @__PURE__ */ React.createElement("div", { className: "nb-picker-new" }, /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        className: "nb-picker-new-input",
-        type: "text",
-        placeholder: "New notebook name\u2026",
-        value: newName,
-        onChange: (e) => setNewName(e.target.value),
-        onKeyDown: (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            createNotebook();
-          }
-        },
-        maxLength: 60
-      }
-    ), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "nb-picker-new-btn" + (newName.trim() ? "" : " disabled"),
-        onClick: createNotebook,
-        disabled: !newName.trim()
-      },
-      "Create"
-    )), notebooks.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "nb-picker-empty" }, "No notebooks yet. Type a name above to create your first one.") : /* @__PURE__ */ React.createElement("div", { className: "nb-picker-list" }, notebooks.map((nb) => {
-      if (confirmDeleteId === nb.id) {
-        return /* @__PURE__ */ React.createElement(
-          ConfirmStrip,
-          {
-            key: nb.id,
-            question: `Delete \u201C${nb.name}\u201D? Notes will move to Uncategorized.`,
-            onCancel: () => setConfirmDeleteId(null),
-            onConfirm: () => deleteNb(nb.id)
-          }
-        );
-      }
-      if (renameId === nb.id) {
-        return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "nb-picker-row checked", style: { gap: "8px" } }, /* @__PURE__ */ React.createElement(
-          "input",
-          {
-            className: "nb-picker-new-input",
-            type: "text",
-            autoFocus: true,
-            value: renameValue,
-            onChange: (e) => setRenameValue(e.target.value),
-            onKeyDown: (e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitRename();
-              } else if (e.key === "Escape") cancelRename();
-            },
-            maxLength: 60,
-            style: { flex: 1 }
-          }
-        ), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-row-delete", onClick: cancelRename, title: "Cancel" }, "\u2715"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-new-btn", onClick: commitRename }, "Save"));
-      }
-      const count = counts[nb.id] || 0;
-      return /* @__PURE__ */ React.createElement("div", { key: nb.id, className: "nb-picker-row", style: { cursor: "default" } }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-name" }, nb.name), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "'Cinzel',serif", fontSize: "0.52rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--cream-muted)", marginRight: "8px" } }, count, count === 1 ? " note" : " notes"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-row-delete", onClick: () => startRename(nb), title: "Rename", style: { color: "var(--cream-muted)", padding: "4px 8px" } }, "\u270E"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-row-delete", onClick: () => setConfirmDeleteId(nb.id), title: "Delete notebook", "aria-label": "Delete notebook" }, "\xD7"));
-    }))));
-  }
-
   // app/src/main/assets/src/app.jsx
   var { useState, useEffect } = React;
   function App() {
@@ -10389,7 +10275,6 @@
     SelectionToolbar: SelectionToolbar2,
     AnnotationActionChip: AnnotationActionChip2,
     BookmarkCreateSheet: BookmarkCreateSheet2,
-    NotebookManagerSheet,
     // App (composition root)
     App
   });

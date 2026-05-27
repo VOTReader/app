@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 359 distinct identifiers.
+// Total: 357 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -98,7 +98,6 @@ declare const JournalInboundSheet: any;
 declare const JournalIndexStore: any;
 declare const JournalInsertSheet: any;
 declare const JournalMediaStore: any;
-declare const JournalNotebookSheet: any;
 declare const JournalNotebookStore: any;
 declare const JournalRecordingSheet: any;
 declare const JournalStatsStore: any;
@@ -151,7 +150,6 @@ declare const NavButtons: any;
 declare const NoteRow: any;
 declare const NoteSheet: any;
 declare const NoteStore: any;
-declare const NotebookManagerSheet: any;
 declare const NotebookPickerSheet: any;
 declare const NotebookStore: any;
 declare const NotesIndexScreen: any;
