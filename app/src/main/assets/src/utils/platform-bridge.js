@@ -62,8 +62,7 @@
 const isAndroid = !!(typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge);
 
 // ── Android impl: pure passthrough to window.AndroidBridge ────────────
-// Each method delegates 1:1 to the native bridge. Zero behavior change
-// vs. the pre-W1.2 pattern of calling window.AndroidBridge directly.
+// Each method delegates 1:1 to the native bridge.
 // The /** @type {any} */ cast on window is needed because TS doesn't know
 // about AndroidBridge until lint:globals regenerates globals.generated.d.ts;
 // inside this file we accept the cast because we ARE the detection layer.
@@ -374,8 +373,8 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality) {
 // - requestMicPermission is fire-and-forget per [[explicit-async-decision]]:
 //   getUserMedia + store stream + fire window.__onMicPermissionResult.
 // - nativeRecordStop fires the existing __onNativeRecordingComplete(b64,
-//   durMs, mime) callback to UNIFY with the Android contract per
-//   [[callback-flow-unification]] (pre-W1.2 web processed the blob inline).
+//   durMs, mime) callback so both platforms share one contract per
+//   [[callback-flow-unification]].
 // - MediaStream tracks are .stop()-ed on every exit path (stop / cancel /
 //   error) per [[mediastream-track-cleanup]] — leaked tracks keep the mic
 //   indicator active + hardware allocated.

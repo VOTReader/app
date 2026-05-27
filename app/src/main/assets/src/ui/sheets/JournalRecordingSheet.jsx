@@ -1,10 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
    JournalRecordingSheet — Cluster B (imported by _entry-b.js)
    ═══════════════════════════════════════════════════════════════════════
-   W1.2 Tier C consumer migration: the recording lifecycle (MediaRecorder,
-   MediaStream, AnalyserNode on web; NativeAudioRecorder on Android) lives
-   in PlatformBridge.* now. This component is a pure UI shell — it owns
-   stage state + UI timing + IDB save, but has no platform branches.
+   Pure UI shell over PlatformBridge — owns stage state + UI timing + IDB
+   save; the recording lifecycle (MediaRecorder + MediaStream + AnalyserNode
+   on web, NativeAudioRecorder on Android) lives in PlatformBridge.*.
 
    Callback contract (per [[preserve-callback-contracts]] +
    [[callback-flow-unification]]):

@@ -11,10 +11,10 @@
                         settings writes from other subsystems if needed)
      - toggleSetting   (plain arrow fn: flips settings[key] boolean)
      - updateSetting   (plain arrow fn: sets settings[key] = val)
-     - body-class + AndroidBridge effect (deps [theme, settings])
+     - body-class + platform-bridge effect (deps [theme, settings])
                         Mirrors theme + every settings flag that has a CSS
-                        body-class or a native Android bridge call onto
-                        document.body.classList and window.AndroidBridge.
+                        body-class or a platform-bridge call onto
+                        document.body.classList and PlatformBridge.
 
    DOES NOT OWN:
      - The vot-state PERSIST effect — it is usePersistedState (P6k+1). That
@@ -44,10 +44,9 @@
      usePersistedState (P6k+1) via the returned settings value.
 
    WINDOW: none — wires no window.__* handler bridges. The body-class
-     effect calls PlatformBridge.setLightStatusBar / setKeepScreenOn (W1.2
-     Tier B.1: was if(window.AndroidBridge) guarded; bridge owns the
-     platform branch now — setLightStatusBar is a no-op on web, setKeepScreenOn
-     uses navigator.wakeLock fire-and-forget per [[explicit-async-decision]]).
+     effect calls PlatformBridge.setLightStatusBar / setKeepScreenOn —
+     setLightStatusBar is a no-op on web; setKeepScreenOn uses
+     navigator.wakeLock fire-and-forget per [[explicit-async-decision]].
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { PlatformBridge } from '../utils/platform-bridge.js';
@@ -146,11 +145,10 @@ export function useSettings({ savedSettings, theme }) {
     document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');
     document.body.classList.toggle("arrows-off", settings.arrowLayout === 'off');
-    // Platform mirror — bridge owns the platform branch (W1.2 Tier B.1):
-    // Android passthrough to native window flags; web is a CSS-only no-op
-    // for the status bar + a navigator.wakeLock fire-and-forget for the
-    // screen-on flag (auto-releases on tab hide). Defaults to true matches
-    // the Kotlin side's default.
+    // Platform mirror — bridge owns the platform branch. Android passes
+    // through to native window flags; web is a CSS-only no-op for the
+    // status bar + navigator.wakeLock fire-and-forget for the screen-on
+    // flag (auto-releases on tab hide).
     PlatformBridge.setLightStatusBar(theme === "light");
     PlatformBridge.setKeepScreenOn(settings.keepScreenOn !== false);
   }, [theme, settings]);

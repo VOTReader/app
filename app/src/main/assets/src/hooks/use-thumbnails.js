@@ -42,10 +42,8 @@
      tabContentKey(tab) — survive tab-index shifts (close/reorder).
 
    WINDOW: none — no window.__* handler bridges wired. The screenshot
-     capture goes through PlatformBridge.takeScreenshot() (W1.2 Tier A:
-     bridge owns the platform branch — native PixelCopy on Android,
-     html2canvas on web). Pre-W1.2 the hook held the if(window.AndroidBridge)
-     guard + html2canvas fallback inline; both moved INTO the bridge.
+     capture goes through PlatformBridge.takeScreenshot() — bridge owns
+     the platform branch (native PixelCopy on Android, html2canvas on web).
 
    ┌─ HARD INVARIANT — captureActiveTabThumbnail identity stability ───────┐
    │ captureActiveTabThumbnail MUST be the direct return value of          │
@@ -124,9 +122,8 @@ export function useThumbnails({
 
   // ── Capture callback ───────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
-  // W1.2 Tier A: was a sync if(window.AndroidBridge) branch + async
-  // html2canvas fallback; both folded INTO PlatformBridge.takeScreenshot
-  // per [[guard-removal-includes-fallback]]. Single async await path now.
+  // Single async-await path: PlatformBridge.takeScreenshot() handles the
+  // platform branch.
   const captureActiveTabThumbnail = React.useCallback(async () => {
     if (!tabsEnabled) return;
     if (tabsOverviewOpenRef.current) return; // overview open → no point capturing
