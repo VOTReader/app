@@ -139,6 +139,47 @@ describe('useReadingChainNav — goToRevelationLast', () => {
   });
 });
 
+// ── W1.6 hardening: lazy-Bible-corpus race ──────────────────────────────
+// BOOKS comes from the lazy bundle-a-bible bundle (Q8). If a saved-tab
+// cold-boot lands the user on a Volume One letter BEFORE the home
+// pre-fire effect resolves __loadBibleCorpus, boundaryConfig and
+// goToRevelationLast can't dereference BOOKS.revelation. Both
+// helpers must no-op (silently, with no exception); next render after
+// load fills in the prev-card.
+describe('useReadingChainNav — BOOKS-undefined race (W1.6 hardening)', () => {
+  beforeEach(() => {
+    // Erase the stub set up by the outer beforeEach so the production
+    // code sees BOOKS as truly undefined (matches pre-load cold boot).
+    delete window.BOOKS;
+  });
+
+  it('goToRevelationLast does NOT throw and does NOT navigate when BOOKS is undefined', () => {
+    const { result, props } = setup();
+    expect(() => result.current.goToRevelationLast()).not.toThrow();
+    expect(props.setBookId).not.toHaveBeenCalled();
+    expect(props.setChapterNum).not.toHaveBeenCalled();
+    expect(props.setScreen).not.toHaveBeenCalled();
+  });
+
+  it('boundaryConfig(volKey="one") returns null prev-boundary when BOOKS undefined (no throw)', () => {
+    const { result } = setup();
+    const call = () => result.current.boundaryConfig('one', null);
+    expect(call).not.toThrow();
+    const cfg = call();
+    expect(cfg.prevBoundary).toBe(null);
+    expect(cfg.onPrevBoundary).toBe(null);
+  });
+
+  it('boundaryConfig for other volKeys still works when BOOKS undefined (chain walk is BOOKS-independent)', () => {
+    const { result } = setup();
+    // 'three' walks back past 'empty' to 'two' — pure COLLECTIONS chain
+    // logic, no BOOKS dependency. Must still produce the V2 boundary
+    // even with BOOKS unavailable.
+    const cfg = result.current.boundaryConfig('three', null);
+    expect(cfg.prevBoundary?.short).toBe('V2');
+  });
+});
+
 // ── boundaryConfig ──────────────────────────────────────────────────────
 
 describe('useReadingChainNav — boundaryConfig', () => {

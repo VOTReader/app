@@ -5149,7 +5149,8 @@
     goToGardenFirst
   }) {
     const goToRevelationLast = () => {
-      const rev = BOOKS.revelation;
+      const rev = typeof BOOKS !== "undefined" ? BOOKS.revelation : null;
+      if (!rev) return;
       setBookId("revelation");
       setChapterNum(rev.chapters[rev.chapters.length - 1].num);
       setScreen("bible-ch");
@@ -5195,8 +5196,11 @@
       let prevBoundary = null, onPrevBoundary = null, nextBoundary = null, onNextBoundary = null;
       if (!hasPrev) {
         if (volKey === "one") {
-          prevBoundary = { short: "Revelation", title: `Revelation \xB7 Chapter ${BOOKS.revelation.chapters[BOOKS.revelation.chapters.length - 1].num}` };
-          onPrevBoundary = goToRevelationLast;
+          const rev = typeof BOOKS !== "undefined" ? BOOKS.revelation : null;
+          if (rev) {
+            prevBoundary = { short: "Revelation", title: `Revelation \xB7 Chapter ${rev.chapters[rev.chapters.length - 1].num}` };
+            onPrevBoundary = goToRevelationLast;
+          }
         } else if (idx > 0) {
           for (let i = idx - 1; i >= 0; i--) {
             const pCol = COL_BY_KEY.get(READING_CHAIN[i]);

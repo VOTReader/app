@@ -168,7 +168,15 @@ export function useReadingChainNav({
 }) {
   // ── Cross-volume reading chain (Revelation → V1 → ... → Timothy → Garden) ──
   const goToRevelationLast = () => {
-    const rev = BOOKS.revelation;
+    // BOOKS is in the lazy bundle-a-bible bundle (Q8 lazy-loading). If
+    // the user reaches this handler before HomeScreen's pre-fire effect
+    // resolved __loadBibleCorpus, a bare `BOOKS.revelation` throws
+    // ReferenceError. Match App.jsx's `typeof BOOKS !== 'undefined'`
+    // pattern; silently no-op until the corpus loads (the boundary card
+    // that wires this handler also short-circuits via boundaryConfig
+    // below, so this guard is double-belt-and-braces).
+    const rev = (typeof BOOKS !== 'undefined') ? BOOKS.revelation : null;
+    if (!rev) return;
     setBookId('revelation');
     setChapterNum(rev.chapters[rev.chapters.length - 1].num);
     setScreen('bible-ch');
@@ -228,9 +236,19 @@ export function useReadingChainNav({
 
     if (!hasPrev) {
       if (volKey === 'one') {
-        // Special: Revelation precedes Volume One
-        prevBoundary = { short: 'Revelation', title: `Revelation · Chapter ${BOOKS.revelation.chapters[BOOKS.revelation.chapters.length - 1].num}` };
-        onPrevBoundary = goToRevelationLast;
+        // Special: Revelation precedes Volume One. BOOKS is in the lazy
+        // bundle-a-bible bundle (Q8 lazy-loading); guard the bare ref to
+        // avoid a ReferenceError on cold-boot direct-to-V1 (saved-tab
+        // state landing the user on a Volume One letter before
+        // HomeScreen's pre-fire effect resolved __loadBibleCorpus).
+        // When BOOKS isn't loaded yet, leave the prev boundary null —
+        // the user's prev-card just doesn't render until the corpus
+        // arrives; the next render after load will produce it.
+        const rev = (typeof BOOKS !== 'undefined') ? BOOKS.revelation : null;
+        if (rev) {
+          prevBoundary = { short: 'Revelation', title: `Revelation · Chapter ${rev.chapters[rev.chapters.length - 1].num}` };
+          onPrevBoundary = goToRevelationLast;
+        }
       } else if (idx > 0) {
         // Walk back through chain skipping empties
         for (let i = idx - 1; i >= 0; i--) {
