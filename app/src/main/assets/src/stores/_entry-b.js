@@ -80,6 +80,7 @@ import { useTabActions } from '../hooks/use-tab-actions.js';
 import { usePersistedState } from '../hooks/use-persisted-state.js';
 import { useAndroidBack } from '../hooks/use-android-back.js';
 import { modalRegistry, useModalRegistry } from '../hooks/use-modal-registry.js';
+import { useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush } from '../hooks/use-history-sync.js';
 import { useNavHistoryTracking } from '../hooks/use-nav-history-tracking.js';
 import { useNav } from '../hooks/use-nav.js';
 import { useSearch } from '../hooks/use-search.js';
@@ -159,6 +160,7 @@ Object.assign(window, {
   usePersistedState,
   useAndroidBack,
   modalRegistry, useModalRegistry,
+  useHistorySync, suppressNextHistoryPush, clearSuppressNextHistoryPush,
   useNavHistoryTracking,
   useNav,
   useSearch,

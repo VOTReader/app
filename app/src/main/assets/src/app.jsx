@@ -502,6 +502,18 @@ function App() {
     setJournalEntryId, setGardenPage,
   });
 
+  /* W1.5(b) — History API sync. Watches the per-active-tab nav-key tuple
+     and pushes an empty-state history entry on every change. Required
+     prerequisite for W1.5(d)'s popstate listener (without this layer
+     there are zero browser history entries to pop). Web-only — skips on
+     Android via window.AndroidBridge guard. See use-history-sync.js for
+     the design + the _suppressNextPush carve-out that (c)/(d) use to
+     prevent back-induced navigations from re-pushing entries. */
+  useHistorySync({
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    genreId, gardenPage,
+  });
+
   /* useBibleStudies() call → moved UP to right after useReadingDwell
      (P7h) so its returns are in scope for useReadingPositionNav. */
 

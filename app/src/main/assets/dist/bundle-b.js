@@ -4286,6 +4286,49 @@
     }, [id, active]);
   }
 
+  // app/src/main/assets/src/hooks/use-history-sync.js
+  var _suppressNextPush = false;
+  function suppressNextHistoryPush() {
+    _suppressNextPush = true;
+  }
+  function clearSuppressNextHistoryPush() {
+    _suppressNextPush = false;
+  }
+  function useHistorySync({
+    screen,
+    bookId,
+    chapterNum,
+    letterId,
+    studyId,
+    studyChapterId,
+    genreId,
+    gardenPage
+  }) {
+    const lastKeyRef = React.useRef(null);
+    React.useEffect(() => {
+      if (typeof window !== "undefined" && window.AndroidBridge) return;
+      if (typeof history === "undefined" || typeof history.pushState !== "function") return;
+      const key = `${screen}|${bookId}|${chapterNum}|${letterId}|${studyId}|${studyChapterId}|${genreId}|${gardenPage}`;
+      if (lastKeyRef.current === null) {
+        lastKeyRef.current = key;
+        window.__historyReady = true;
+        return;
+      }
+      if (lastKeyRef.current === key) {
+        return;
+      }
+      lastKeyRef.current = key;
+      if (_suppressNextPush) {
+        _suppressNextPush = false;
+        return;
+      }
+      try {
+        history.pushState({}, "", "");
+      } catch (_e) {
+      }
+    }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, genreId, gardenPage]);
+  }
+
   // app/src/main/assets/src/hooks/use-nav-history-tracking.js
   function useNavHistoryTracking({
     screen,
@@ -8151,6 +8194,9 @@
     useAndroidBack,
     modalRegistry,
     useModalRegistry: useModalRegistry2,
+    useHistorySync,
+    suppressNextHistoryPush,
+    clearSuppressNextHistoryPush,
     useNavHistoryTracking,
     useNav,
     useSearch,

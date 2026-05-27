@@ -9806,6 +9806,16 @@
       setJournalEntryId,
       setGardenPage
     });
+    useHistorySync({
+      screen,
+      bookId,
+      chapterNum,
+      letterId,
+      studyId,
+      studyChapterId,
+      genreId,
+      gardenPage
+    });
     const { navigateToLink } = useNavigateToLink({
       closeLinkSidebar,
       pushFromLetter,
