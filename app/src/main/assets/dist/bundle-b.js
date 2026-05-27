@@ -1188,6 +1188,95 @@
     }
   );
 
+  // app/src/main/assets/src/stores/history-store.js
+  function _historyKey(entry) {
+    return entry.type === "letter" ? "lt:" + entry.letterId : "ch:" + entry.bookId + ":" + entry.chapterNum;
+  }
+  var HistoryStore = extendStore(
+    CachedStore(
+      "vot-history",
+      /** @type {HistoryEntry[]} */
+      [],
+      { idb: true }
+    ),
+    {
+      /**
+       * The full history array, newest first. Live cache reference —
+       * callers must NOT mutate; use add/clear/pruneDay/setAll for
+       * writes.
+       * @returns {HistoryEntry[]}
+       */
+      list() {
+        return this._load();
+      },
+      /**
+       * Prepend an entry with stamped key + ts. Caps the result at
+       * 2000. Caller is responsible for the historyEnabled gate (the
+       * hook does this so the gate isn't tied to the store API).
+       * @param {HistoryEntry} entry
+       * @returns {void}
+       */
+      add(entry) {
+        if (!entry) return;
+        if (this._shouldDefer("add", entry)) return;
+        const stamped = { ...entry, key: _historyKey(entry), ts: Date.now() };
+        this._cache = [stamped, ...this._load()].slice(0, 2e3);
+        this._save();
+        this._bump();
+      },
+      /**
+       * Wipe the history. Idempotent.
+       * @returns {void}
+       */
+      clear() {
+        if (this._shouldDefer("clear")) return;
+        this._cache = [];
+        this._save();
+        this._bump();
+      },
+      /**
+       * Within the calendar day starting at (year, month, day), keep
+       * only the most-recent visit per dedup key. Entries outside the
+       * day are unaffected. (History is newest-first, so the FIRST
+       * occurrence in iteration is the most-recent visit.)
+       * @param {number} year
+       * @param {number} month
+       * @param {number} day
+       * @returns {void}
+       */
+      pruneDay(year, month, day) {
+        if (this._shouldDefer("pruneDay", year, month, day)) return;
+        const dayStart = new Date(year, month, day).getTime();
+        const dayEnd = new Date(year, month, day + 1).getTime();
+        const seen = /* @__PURE__ */ new Set();
+        const out = [];
+        for (const e of this._load()) {
+          const ts = e.ts || 0;
+          const inDay = ts >= dayStart && ts < dayEnd;
+          if (inDay) {
+            if (seen.has(e.key)) continue;
+            seen.add(e.key);
+          }
+          out.push(e);
+        }
+        this._cache = out;
+        this._save();
+        this._bump();
+      },
+      /**
+       * Replace the full array. Used by the import path (W2.6).
+       * @param {HistoryEntry[]} entries
+       * @returns {void}
+       */
+      setAll(entries) {
+        if (this._shouldDefer("setAll", entries)) return;
+        this._cache = Array.isArray(entries) ? entries.slice(0, 2e3) : [];
+        this._save();
+        this._bump();
+      }
+    }
+  );
+
   // app/src/main/assets/src/stores/annotation-store.js
   function migrateAnnotations() {
     try {
@@ -3920,45 +4009,23 @@
   }
 
   // app/src/main/assets/src/hooks/use-history.js
+  var _subscribeHistory = HistoryStore.subscribe.bind(HistoryStore);
+  var _getHistorySnapshot = () => HistoryStore.list();
   function useHistory(historyEnabled) {
-    const [readHistory, setReadHistory] = React.useState(() => {
-      try {
-        return JSON.parse(localStorage.getItem("vot-history") || "[]");
-      } catch {
-        return [];
-      }
-    });
+    const readHistory = React.useSyncExternalStore(
+      _subscribeHistory,
+      _getHistorySnapshot
+    );
     const enabledRef = useRefMirror(historyEnabled);
     const addToHistory = (entry) => {
       if (enabledRef.current === false) return;
-      const key = entry.type === "letter" ? "lt:" + entry.letterId : "ch:" + entry.bookId + ":" + entry.chapterNum;
-      setReadHistory((prev) => {
-        const next = [{ ...entry, key, ts: Date.now() }, ...prev].slice(0, 2e3);
-        localStorage.setItem("vot-history", JSON.stringify(next));
-        return next;
-      });
+      HistoryStore.add(entry);
     };
     const clearHistory = () => {
-      setReadHistory([]);
-      localStorage.setItem("vot-history", "[]");
+      HistoryStore.clear();
     };
     const pruneHistoryDay = (year, month, day) => {
-      const dayStart = new Date(year, month, day).getTime();
-      const dayEnd = new Date(year, month, day + 1).getTime();
-      setReadHistory((prev) => {
-        const seen = /* @__PURE__ */ new Set();
-        const out = [];
-        for (const e of prev) {
-          const inDay = e.ts >= dayStart && e.ts < dayEnd;
-          if (inDay) {
-            if (seen.has(e.key)) continue;
-            seen.add(e.key);
-          }
-          out.push(e);
-        }
-        localStorage.setItem("vot-history", JSON.stringify(out));
-        return out;
-      });
+      HistoryStore.pruneDay(year, month, day);
     };
     return { readHistory, addToHistory, clearHistory, pruneHistoryDay };
   }
@@ -9190,6 +9257,7 @@
     GardenWarningFlagStore,
     ProphecyCardsStore,
     StateStore,
+    HistoryStore,
     migrateAnnotations,
     AnnotationStore: AnnotationStore2,
     HighlightStore,

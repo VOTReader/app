@@ -23,30 +23,42 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useHistory } from './use-history.js';
+import { HistoryStore } from '../stores/history-store.js';
 
 beforeEach(() => {
   localStorage.clear();
+  // W2.3b: HistoryStore (IDB-backed) is the source of truth. Tests
+  // bypass async hydration via forceLoaded — without this, IDB-mode
+  // pending state would return a fresh [] from copyDefault on every
+  // useSyncExternalStore getSnapshot call, triggering an infinite
+  // re-render loop.
+  HistoryStore._resetForTests({ forceLoaded: true });
 });
 
 describe('useHistory — initial state', () => {
-  it('initializes to [] when localStorage is empty', () => {
+  it('initializes to [] when store is empty', () => {
     const { result } = renderHook(() => useHistory(true));
     expect(result.current.readHistory).toEqual([]);
   });
 
-  it('hydrates from localStorage on mount', () => {
+  it('hydrates from HistoryStore on mount', () => {
     const seed = [
       { type: 'chapter', bookId: 'matthew', chapterNum: 5, key: 'ch:matthew:5', ts: 1700000000000 },
       { type: 'letter', letterId: 'the-wide-path', key: 'lt:the-wide-path', ts: 1700000001000 },
     ];
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
 
     const { result } = renderHook(() => useHistory(true));
 
     expect(result.current.readHistory).toEqual(seed);
   });
 
-  it('returns [] when localStorage has malformed JSON', () => {
+  it('returns [] when the store falls back to LS with malformed JSON', () => {
+    // Wipe any prior cache and seed bad LS — the next _load() will
+    // fall through to the LS read path (state is 'loaded' so it goes
+    // straight to JSON.parse, which throws on the malformed payload
+    // and seeds _cache to []).
+    HistoryStore._cache = null;
     localStorage.setItem('vot-history', '{not valid json');
 
     const { result } = renderHook(() => useHistory(true));
@@ -153,7 +165,7 @@ describe('useHistory — addToHistory (the gate)', () => {
       key: 'ch:matthew:1',
       ts: i,  // ts: 0..1999; seed[0] is OLDEST by ts (but at front of array)
     }));
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
 
     const { result } = renderHook(() => useHistory(true));
     expect(result.current.readHistory.length).toBe(2000);
@@ -170,14 +182,16 @@ describe('useHistory — addToHistory (the gate)', () => {
     expect(result.current.readHistory[1999].ts).toBe(1998);
   });
 
-  it('persists each add to localStorage', () => {
+  it('persists each add to HistoryStore', () => {
     const { result } = renderHook(() => useHistory(true));
 
     act(() => {
       result.current.addToHistory({ type: 'chapter', bookId: 'matthew', chapterNum: 5 });
     });
 
-    const persisted = JSON.parse(localStorage.getItem('vot-history') || '[]');
+    // W2.3b: persistence is now IDB-backed via HistoryStore; the
+    // assertion shifts from "LS has the entry" to "store has it."
+    const persisted = HistoryStore.list();
     expect(persisted.length).toBe(1);
     expect(persisted[0].bookId).toBe('matthew');
   });
@@ -196,14 +210,14 @@ describe('useHistory — clearHistory', () => {
     expect(result.current.readHistory).toEqual([]);
   });
 
-  it('wipes localStorage too', () => {
+  it('wipes the HistoryStore too', () => {
     const seed = [{ type: 'chapter', bookId: 'matthew', chapterNum: 5, key: 'ch:matthew:5', ts: 1 }];
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
     const { result } = renderHook(() => useHistory(true));
 
     act(() => { result.current.clearHistory(); });
 
-    expect(localStorage.getItem('vot-history')).toBe('[]');
+    expect(HistoryStore.list()).toEqual([]);
   });
 });
 
@@ -224,7 +238,7 @@ describe('useHistory — pruneHistoryDay (same-day dedup)', () => {
       { type: 'chapter', bookId: 'matthew', chapterNum: 5, key: 'ch:matthew:5', ts: ts(2026, 0, 15, 10) },
       { type: 'chapter', bookId: 'matthew', chapterNum: 5, key: 'ch:matthew:5', ts: ts(2026, 0, 15, 8) },
     ];
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
     const { result } = renderHook(() => useHistory(true));
 
     act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
@@ -247,7 +261,7 @@ describe('useHistory — pruneHistoryDay (same-day dedup)', () => {
     ];
     // Newest-first ordering.
     seed.sort((a, b) => b.ts - a.ts);
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
     const { result } = renderHook(() => useHistory(true));
 
     // Prune only Jan 15.
@@ -270,7 +284,7 @@ describe('useHistory — pruneHistoryDay (same-day dedup)', () => {
       { type: 'chapter', key: 'ch:matthew:6', ts: ts(2026, 0, 15, 7) },
     ];
     seed.sort((a, b) => b.ts - a.ts);
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
     const { result } = renderHook(() => useHistory(true));
 
     act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
@@ -289,7 +303,7 @@ describe('useHistory — pruneHistoryDay (same-day dedup)', () => {
       { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 14, 12) },
     ];
     seed.sort((a, b) => b.ts - a.ts);
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
     const { result } = renderHook(() => useHistory(true));
 
     act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
@@ -303,7 +317,7 @@ describe('useHistory — pruneHistoryDay (same-day dedup)', () => {
     const seed = [
       { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 14, 10) },
     ];
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
     const { result } = renderHook(() => useHistory(true));
 
     // Prune a different day.
@@ -312,17 +326,16 @@ describe('useHistory — pruneHistoryDay (same-day dedup)', () => {
     expect(result.current.readHistory).toEqual(seed);
   });
 
-  it('persists the prune to localStorage', () => {
+  it('persists the prune to HistoryStore', () => {
     const seed = [
       { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 10) },
       { type: 'chapter', key: 'ch:matthew:5', ts: ts(2026, 0, 15, 8) },
     ];
-    localStorage.setItem('vot-history', JSON.stringify(seed));
+    HistoryStore._cache = /** @type {any} */ (seed);
     const { result } = renderHook(() => useHistory(true));
 
     act(() => { result.current.pruneHistoryDay(2026, 0, 15); });
 
-    const persisted = JSON.parse(localStorage.getItem('vot-history') || '[]');
-    expect(persisted.length).toBe(1);
+    expect(HistoryStore.list().length).toBe(1);
   });
 });

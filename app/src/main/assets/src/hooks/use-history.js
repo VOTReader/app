@@ -44,6 +44,13 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { HistoryStore } from '../stores/history-store.js';
+
+// Stable subscribe + getSnapshot for useSyncExternalStore so React
+// doesn't think the source changed each render. Bound at module
+// scope; both functions retain HistoryStore as `this` via the bind.
+const _subscribeHistory = HistoryStore.subscribe.bind(HistoryStore);
+const _getHistorySnapshot = () => HistoryStore.list();
 
 /**
  * One reading-history entry. The `key` field is computed at add() time
@@ -80,53 +87,29 @@ import { useRefMirror } from './use-ref-mirror.js';
  * }}
  */
 export function useHistory(historyEnabled) {
-  const [readHistory, setReadHistory] = React.useState(() => {
-    try { return JSON.parse(localStorage.getItem('vot-history') || '[]'); }
-    catch { return []; }
-  });
-  // Mirror so addToHistory's closure sees the latest gate value without
-  // having to re-create the function each render or accept the param
-  // explicitly at each call site.
+  // W2.3b: HistoryStore (IDB-backed) is the source of truth.
+  // useSyncExternalStore wires this hook's render to the store's
+  // version bump — every add/clear/pruneDay triggers a re-render
+  // automatically; React state is no longer needed at this layer.
+  const readHistory = React.useSyncExternalStore(
+    _subscribeHistory, _getHistorySnapshot
+  );
+
+  // Mirror so addToHistory's closure sees the latest gate value
+  // without having to re-create the function each render.
   const enabledRef = useRefMirror(historyEnabled);
 
   const addToHistory = (entry) => {
-    // Don't record anything while History is disabled. Existing entries
-    // are preserved (user can re-enable and still have their past trail).
+    // Don't record while History is disabled. Existing entries are
+    // preserved (user can re-enable and still see their past trail).
     if (enabledRef.current === false) return;
-    const key = entry.type === 'letter'
-      ? 'lt:' + entry.letterId
-      : 'ch:' + entry.bookId + ':' + entry.chapterNum;
-    setReadHistory((prev) => {
-      // No dedup: every visit is recorded. User prunes per-day manually.
-      const next = [{ ...entry, key, ts: Date.now() }, ...prev].slice(0, 2000);
-      localStorage.setItem('vot-history', JSON.stringify(next));
-      return next;
-    });
+    HistoryStore.add(entry);
   };
 
-  const clearHistory = () => {
-    setReadHistory([]);
-    localStorage.setItem('vot-history', '[]');
-  };
+  const clearHistory = () => { HistoryStore.clear(); };
 
   const pruneHistoryDay = (year, month, day) => {
-    const dayStart = new Date(year, month, day).getTime();
-    const dayEnd = new Date(year, month, day + 1).getTime();
-    setReadHistory((prev) => {
-      // History is newest-first, so the first occurrence IS the most-recent visit.
-      const seen = new Set();
-      const out = [];
-      for (const e of prev) {
-        const inDay = e.ts >= dayStart && e.ts < dayEnd;
-        if (inDay) {
-          if (seen.has(e.key)) continue;
-          seen.add(e.key);
-        }
-        out.push(e);
-      }
-      localStorage.setItem('vot-history', JSON.stringify(out));
-      return out;
-    });
+    HistoryStore.pruneDay(year, month, day);
   };
 
   return { readHistory, addToHistory, clearHistory, pruneHistoryDay };
