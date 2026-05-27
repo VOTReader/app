@@ -4285,6 +4285,10 @@
           }
           return;
         }
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) {
+          return;
+        }
         suppressNextHistoryPush();
         const result = typeof window.handleAndroidBack === "function" ? window.handleAndroidBack() : "false";
         if (result === "false") {

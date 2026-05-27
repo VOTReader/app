@@ -226,16 +226,29 @@ export function useAndroidBack({
           there's no Escape-key UX to gate.
        2. Not Escape: ignore. event.key === 'Escape' (the deprecated
           event.keyCode would also work but is on its way out).
-       3. Fullscreen open: skip entirely. The browser exits fullscreen
+       3. Composition in flight (IME / autocomplete): skip — Escape
+          there cancels the composition; let the browser handle it.
+       4. Fullscreen open: skip entirely. The browser exits fullscreen
           natively on Escape. Do NOT preventDefault — that would swallow
           the browser's own behavior.
-       4. Composition in flight (IME / autocomplete): skip — Escape
-          there cancels the composition; let the browser handle it.
        5. Modal registry isAnyOpen: call peek().dismiss(). Do NOT also
           fire handleAndroidBack — the dispatcher contract forbids it.
           The dismissed modal's unmount effect unregisters its entry;
           the next Escape will see the next entry (or empty registry).
-       6. Else: route to handleAndroidBack via the same suppress + clear
+          This MUST come before the activeElement check below: a sheet
+          with an input inside (NoteSheet, BookmarkCreateSheet, the link
+          picker's search box, etc.) should dismiss the SHEET on Escape,
+          not just blur the input — even though the input is the active
+          element. The active modal is the more user-meaningful unit.
+       6. activeElement is editable: skip. document.activeElement is an
+          input/textarea/contenteditable. The browser's default Escape
+          behavior is to blur the field (or clear it on some inputs);
+          letting that run is the right UX — navigating away because the
+          user pressed Escape to dismiss a soft keyboard or unfocus a
+          search box would be jarring. This gate runs AFTER the registry
+          check (so sheets dismiss correctly) and BEFORE handleAndroidBack
+          (so plain inputs blur without nav).
+       7. Else: route to handleAndroidBack via the same suppress + clear
           pattern (d)'s popstate uses. handleAndroidBack mutates nav
           state synchronously; the suppress flag prevents
           useHistorySync's effect from pushing a redundant entry.
@@ -272,9 +285,26 @@ export function useAndroidBack({
         return;
       }
 
-      // No modal open + not in fullscreen → route to handleAndroidBack.
-      // Same suppress+clear handshake (d)'s popstate uses so the back-
-      // induced state change doesn't trigger a redundant pushState.
+      // activeElement gate. If a plain input is focused (search bar,
+      // settings text field, journal title, etc.) with no modal open,
+      // Escape should blur the field — browser default — not navigate
+      // away. Runs AFTER the registry check above so a sheet with an
+      // input inside still dismisses the sheet correctly.
+      // isContentEditable lives on HTMLElement, not Element, so the
+      // instanceof narrow is what makes tsc happy without a cast.
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && (
+        active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' ||
+        active.isContentEditable
+      )) {
+        return;
+      }
+
+      // No modal open + not in fullscreen + not editing → route to
+      // handleAndroidBack. Same suppress+clear handshake (d)'s popstate
+      // uses so the back-induced state change doesn't trigger a
+      // redundant pushState.
       suppressNextHistoryPush();
       const result = (typeof window.handleAndroidBack === 'function')
         ? window.handleAndroidBack()
