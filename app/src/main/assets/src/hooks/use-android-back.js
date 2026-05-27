@@ -205,4 +205,98 @@ export function useAndroidBack({
     return () => {delete window.handleAndroidBack;};
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/tabsOverviewOpenRef/journalEntryIdRef + fromLetterRef from useFromLetterStack — all 11 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell/getStudyById same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
   }, []);
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     W1.5(c) — Escape key listener (the SOLE Escape dispatcher).
+     ═══════════════════════════════════════════════════════════════════════
+     Per PLAN.txt DISPATCHER CONTRACT, modals do NOT add their own keydown
+     listeners. They register {id, dismiss} with useModalRegistry. This
+     listener is the only path Escape goes through, ensuring exactly one
+     decision per keypress: dismiss the topmost modal OR navigate back,
+     never both.
+
+     Gates, in priority order:
+       1. Web-only: skip if window.AndroidBridge present. Android has its
+          own back-button routing via Kotlin → window.handleAndroidBack;
+          there's no Escape-key UX to gate.
+       2. Not Escape: ignore. event.key === 'Escape' (the deprecated
+          event.keyCode would also work but is on its way out).
+       3. Fullscreen open: skip entirely. The browser exits fullscreen
+          natively on Escape. Do NOT preventDefault — that would swallow
+          the browser's own behavior.
+       4. Composition in flight (IME / autocomplete): skip — Escape
+          there cancels the composition; let the browser handle it.
+       5. Modal registry isAnyOpen: call peek().dismiss(). Do NOT also
+          fire handleAndroidBack — the dispatcher contract forbids it.
+          The dismissed modal's unmount effect unregisters its entry;
+          the next Escape will see the next entry (or empty registry).
+       6. Else: route to handleAndroidBack via the same suppress + clear
+          pattern (d)'s popstate uses. handleAndroidBack mutates nav
+          state synchronously; the suppress flag prevents
+          useHistorySync's effect from pushing a redundant entry.
+
+     This listener is REGISTERED ONCE at mount via a []-deps effect.
+     handleAndroidBack is read by name through `window.handleAndroidBack`
+     at keypress time (call-time fresh) — same pattern the rest of the
+     file uses. modalRegistry / suppressNextHistoryPush /
+     clearSuppressNextHistoryPush are module-level singletons; their
+     identity is stable across the lifetime of the app.
+     ═══════════════════════════════════════════════════════════════════════ */
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (window.AndroidBridge) return;  // Android handles back via the OS button, not Escape.
+
+    function onKeyDown(e) {
+      if (e.key !== 'Escape') return;
+      if (e.isComposing) return;  // IME composition cancel — browser handles.
+      // Fullscreen exit: let the browser do its native thing. Do NOT
+      // preventDefault; do NOT dismiss a modal underneath the fullscreen
+      // view. The next Escape press (after fullscreen exits) will be a
+      // normal one and the registry/handleAndroidBack path runs then.
+      if (document.fullscreenElement) return;
+
+      if (modalRegistry.isAnyOpen()) {
+        const top = modalRegistry.peek();
+        if (top && typeof top.dismiss === 'function') {
+          // The modal dismisses itself; its unmount effect will
+          // unregister. We do NOT also call handleAndroidBack — that
+          // would dismiss-AND-navigate on a single press.
+          e.preventDefault();
+          top.dismiss();
+        }
+        return;
+      }
+
+      // No modal open + not in fullscreen → route to handleAndroidBack.
+      // Same suppress+clear handshake (d)'s popstate uses so the back-
+      // induced state change doesn't trigger a redundant pushState.
+      suppressNextHistoryPush();
+      const result = (typeof window.handleAndroidBack === 'function')
+        ? window.handleAndroidBack()
+        : 'false';
+      if (result === 'false') {
+        // Root of stack — handleAndroidBack didn't navigate. Clear the
+        // suppress flag so the next legitimate user nav pushes normally.
+        // (W1.5(d) is where root-of-stack double-tap-to-exit lives; this
+        // path here is Escape-at-root, which is a no-op by design — the
+        // PWA window stays put. Document this so future readers don't
+        // think we're missing a toast: Escape-at-root is fine to
+        // silently no-op since the user's keyboard didn't ask to exit
+        // the browser tab; only the browser's back gesture has that
+        // semantic.)
+        clearSuppressNextHistoryPush();
+      } else {
+        // result === 'true' — navigation happened. preventDefault
+        // because we consumed the Escape press.
+        e.preventDefault();
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => { document.removeEventListener('keydown', onKeyDown); };
+    // Mount-only — the closure reads window.handleAndroidBack + modalRegistry
+    // + the suppress/clear helpers as call-time globals (no React state in
+    // deps), so [] is honest here and eslint-react-hooks has nothing to
+    // flag.
+  }, []);
 }

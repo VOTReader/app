@@ -4198,11 +4198,39 @@
         delete window.handleAndroidBack;
       };
     }, []);
+    React.useEffect(() => {
+      if (typeof window === "undefined" || typeof document === "undefined") return;
+      if (window.AndroidBridge) return;
+      function onKeyDown(e) {
+        if (e.key !== "Escape") return;
+        if (e.isComposing) return;
+        if (document.fullscreenElement) return;
+        if (modalRegistry.isAnyOpen()) {
+          const top = modalRegistry.peek();
+          if (top && typeof top.dismiss === "function") {
+            e.preventDefault();
+            top.dismiss();
+          }
+          return;
+        }
+        suppressNextHistoryPush();
+        const result = typeof window.handleAndroidBack === "function" ? window.handleAndroidBack() : "false";
+        if (result === "false") {
+          clearSuppressNextHistoryPush();
+        } else {
+          e.preventDefault();
+        }
+      }
+      document.addEventListener("keydown", onKeyDown);
+      return () => {
+        document.removeEventListener("keydown", onKeyDown);
+      };
+    }, []);
   }
 
   // app/src/main/assets/src/hooks/use-modal-registry.js
   var _registry = /* @__PURE__ */ new Map();
-  var modalRegistry = {
+  var modalRegistry2 = {
     /**
      * Add a modal to the registry, or move an existing entry to the top.
      * Re-registering an existing id deletes-then-sets so the entry moves
@@ -4275,23 +4303,23 @@
     React.useEffect(() => {
       if (!active) return void 0;
       if (!id) return void 0;
-      modalRegistry.register({
+      modalRegistry2.register({
         id,
         dismiss: () => {
           const fn = dismissRef.current;
           if (typeof fn === "function") fn();
         }
       });
-      return () => modalRegistry.unregister(id);
+      return () => modalRegistry2.unregister(id);
     }, [id, active]);
   }
 
   // app/src/main/assets/src/hooks/use-history-sync.js
   var _suppressNextPush = false;
-  function suppressNextHistoryPush() {
+  function suppressNextHistoryPush2() {
     _suppressNextPush = true;
   }
-  function clearSuppressNextHistoryPush() {
+  function clearSuppressNextHistoryPush2() {
     _suppressNextPush = false;
   }
   function useHistorySync({
@@ -8192,11 +8220,11 @@
     useTabActions,
     usePersistedState,
     useAndroidBack,
-    modalRegistry,
+    modalRegistry: modalRegistry2,
     useModalRegistry: useModalRegistry2,
     useHistorySync,
-    suppressNextHistoryPush,
-    clearSuppressNextHistoryPush,
+    suppressNextHistoryPush: suppressNextHistoryPush2,
+    clearSuppressNextHistoryPush: clearSuppressNextHistoryPush2,
     useNavHistoryTracking,
     useNav,
     useSearch,
