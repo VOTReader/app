@@ -3401,6 +3401,11 @@
       document.body.classList.toggle("arrows-left", settings.arrowLayout === "left");
       document.body.classList.toggle("arrows-nav", settings.arrowLayout === "nav");
       document.body.classList.toggle("arrows-off", settings.arrowLayout === "off");
+      const customFontsEl = (
+        /** @type {HTMLStyleElement | null} */
+        document.getElementById("custom-fonts")
+      );
+      if (customFontsEl) customFontsEl.disabled = settings.fontStyle !== "modern";
       PlatformBridge.setLightStatusBar(theme === "light");
       PlatformBridge.setKeepScreenOn(settings.keepScreenOn !== false);
     }, [theme, settings]);

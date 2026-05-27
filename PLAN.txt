@@ -1027,6 +1027,81 @@ window.AndroidBridge directly after W1.2.
   hosting + cross-platform verification phase), not as W1 blockers.
 
 ───────────────────────────────────────────────────────────────────────────────
+FONT TOGGLE — Classic / Modern (LANDED post-W1, pre-W2)
+───────────────────────────────────────────────────────────────────────────────
+
+Context: W0.1 fixed a long-standing latent bug — @font-face declarations had
+pointed to nonexistent files (Cinzel-Regular.otf, EBGaramond-VariableFont_
+wght.ttf) since they were first authored, so for the entire life of the app
+on every platform, Cinzel + EB Garamond silently fell back to the device's
+system serif. The "fix" in W0.1 (real WOFF2 files committed, @font-face
+filenames corrected) was technically correct but introduced a user-visible
+regression: EB Garamond has a ~15-20% smaller x-height than typical system
+serif, and Cinzel is a thin display font at small sizes. The CSS font sizes
+(1.08rem body, 0.78rem date, etc.) had been effectively calibrated against
+the system serif fallback users were ACTUALLY reading for years. Once the
+real fonts loaded, body text felt smaller, headings felt spindlier, and
+readability dropped — especially for older users.
+
+Decision: keep both, default to Classic, ship a toggle. Plan for a fully
+adjustable font/size system later (the design opens that door cleanly).
+
+  Implementation (current — minimal, ship-ready):
+  ────────────────────────────────────────────────
+  Approach: instead of replacing 260 hardcoded font-family declarations in
+  app.css with CSS variables (high churn, high risk), the @font-face block
+  itself is toggled. When disabled, every `font-family: 'Cinzel', serif` in
+  app.css automatically falls back to `serif` via the browser's built-in
+  font fallback — zero CSS rule changes required.
+
+    index.html line 28: <style id="custom-fonts"> wrapping the 6
+                       @font-face declarations. EB Garamond weight range
+                       bumped from `400 500` to `400 800` so when Modern
+                       is active, real bold (600+) renders instead of
+                       browser-synthesized bold.
+    index.html line 66: boot script reads vot-state.settings.fontStyle.
+                       If not "modern", sets customFontsEl.disabled=true
+                       BEFORE React mounts. No FOUC.
+    use-settings.js:    body-class effect mirrors fontStyle onto
+                       customFontsEl.disabled at runtime. Live toggle
+                       works without reload.
+    SettingsScreen.jsx: "Modern Fonts" SettingsRow in the Text & Translation
+                       section, just under Bible Translation.
+    Default:            fontStyle = "classic" (system serif — what every
+                       user has been seeing for the life of the app).
+
+  Future — widely adjustable fonts (post-W2 polish):
+  ───────────────────────────────────────────────────
+  The single-toggle design intentionally leaves room for:
+    - Multiple font choices (system serif, EB Garamond, Cinzel, sans-serif,
+      dyslexic-friendly, larger-x-height serif)
+    - Per-element scope (body / heading separately)
+    - Adjustable size (slider or stepped — 0.9x / 1.0x / 1.1x / 1.25x /
+      1.5x via a body class that scales a --font-scale CSS var that
+      multiplies into a base rem)
+
+  When that lands, the implementation will need to migrate the 260
+  hardcoded app.css font-family declarations to CSS variables
+  (--font-body, --font-display, --font-display-deco) so the font selector
+  can swap them dynamically. Three mechanical replace_all passes:
+    'EB Garamond', serif       → var(--font-body)
+    'Cinzel Decorative', serif → var(--font-display-deco)
+    'Cinzel', serif            → var(--font-display)
+  Plus 9 inline JS style strings (root-exit-toast.js + 8 sheet/screen JSX).
+  The boot script and the use-settings effect grow to set vars instead of
+  toggling .disabled, but everything else stays.
+
+  Verified in Chrome preview (2026-05-27): boot defaults to Classic
+  (system serif); toggle to Modern enables Cinzel + EB Garamond; live
+  toggle works without reload; setting persists across reloads via
+  vot-state. All 628 vitest pass; typecheck + lint clean.
+
+  Owed: real-device verification on Android + visual confirmation on
+  desktop browsers other than Chrome (Edge / Firefox). Both deferred to
+  W6 (cross-platform verification) alongside the rest of W1.6's deferred
+  smoke walks.
+
+───────────────────────────────────────────────────────────────────────────────
 W2 — STORAGE HARDENING (persistence + scale + safety)
 ───────────────────────────────────────────────────────────────────────────────
 

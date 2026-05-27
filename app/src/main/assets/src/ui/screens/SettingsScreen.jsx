@@ -412,6 +412,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             onChange={(v) => onSetting("translation", v)}
           />
           <SettingsRow
+            label="Modern Fonts"
+            desc="Use Cinzel headings and EB Garamond body text instead of your device's built-in serif font. The classic look is larger and more familiar; modern is more elegant."
+            checked={settings.fontStyle === "modern"}
+            onToggle={() => onSetting("fontStyle", settings.fontStyle === "modern" ? "classic" : "modern")}
+          />
+          <SettingsRow
             label="Chapter Titles"
             desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."
             checked={settings.showChapterTitle !== false}

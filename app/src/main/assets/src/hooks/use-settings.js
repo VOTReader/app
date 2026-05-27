@@ -145,6 +145,12 @@ export function useSettings({ savedSettings, theme }) {
     document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');
     document.body.classList.toggle("arrows-off", settings.arrowLayout === 'off');
+    // Font style — "classic" (default) disables the @font-face style block
+    // so all 260 font-family declarations in app.css fall back to system serif.
+    // "modern" enables Cinzel + EB Garamond. The boot script in index.html
+    // handles the initial state; this effect handles runtime toggles.
+    const customFontsEl = /** @type {HTMLStyleElement | null} */ (document.getElementById("custom-fonts"));
+    if (customFontsEl) customFontsEl.disabled = settings.fontStyle !== "modern";
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
     // status bar + navigator.wakeLock fire-and-forget for the screen-on

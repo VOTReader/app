@@ -25,17 +25,24 @@
     form-action 'none';
   " />
   <title>VOTReader</title>
-  <style>
+  <style id="custom-fonts">
     /* Self-hosted OFL fonts. WOFF2 from fontsource (NDISCOVER/Cinzel ships
        both Cinzel + Cinzel Decorative; octaviopardo/EBGaramond12 ships the
        variable axis). Full license terms in fonts/OFL-Cinzel.txt and fonts/
-       OFL-EBGaramond.txt. ~140 KB total — sized to cache as PWA shell (W3). */
+       OFL-EBGaramond.txt. ~140 KB total — sized to cache as PWA shell (W3).
+
+       DISABLED BY DEFAULT — system serif is the "Classic" look users have
+       always seen. When Settings → Font Style is set to "Modern", this
+       block is enabled and Cinzel + EB Garamond render. The boot script
+       below and the use-settings.js effect toggle this block's .disabled
+       property. See PLAN.txt "Font toggle" for the future adjustable-font
+       roadmap. */
     @font-face { font-family: 'Cinzel'; font-weight: 400; font-style: normal; src: url('fonts/cinzel-latin-400-normal.woff2') format('woff2'); font-display: swap; }
     @font-face { font-family: 'Cinzel'; font-weight: 600 700; font-style: normal; src: url('fonts/cinzel-latin-700-normal.woff2') format('woff2'); font-display: swap; }
     @font-face { font-family: 'Cinzel Decorative'; font-weight: 400; font-style: normal; src: url('fonts/cinzel-decorative-latin-400-normal.woff2') format('woff2'); font-display: swap; }
     @font-face { font-family: 'Cinzel Decorative'; font-weight: 700; font-style: normal; src: url('fonts/cinzel-decorative-latin-700-normal.woff2') format('woff2'); font-display: swap; }
-    @font-face { font-family: 'EB Garamond'; font-weight: 400 500; font-style: normal; src: url('fonts/eb-garamond-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
-    @font-face { font-family: 'EB Garamond'; font-weight: 400 500; font-style: italic; src: url('fonts/eb-garamond-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+    @font-face { font-family: 'EB Garamond'; font-weight: 400 800; font-style: normal; src: url('fonts/eb-garamond-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+    @font-face { font-family: 'EB Garamond'; font-weight: 400 800; font-style: italic; src: url('fonts/eb-garamond-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
   </style>
   <link rel="stylesheet" href="app.css" />
   <script>
@@ -63,7 +70,7 @@
   body.light { background: #f7f2e8; }</style>
 </head>
 <body>
-  <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");}catch(e){}</script>
+  <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");var cf=document.getElementById("custom-fonts");if(cf&&(!s.settings||s.settings.fontStyle!=="modern"))cf.disabled=true;}catch(e){}</script>
   <div id="root"></div>
   <!-- Cluster A: vendor + (most) corpus + search engine (26 files, ~4.6 MB).
        Concatenated by tools/build.py — DO NOT edit dist/bundle-a.js by hand.
