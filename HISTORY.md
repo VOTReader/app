@@ -13,10 +13,14 @@ adds desktop-equivalent implementations of the 20 native bridge
 methods, wires the desktop-only UX surfaces (Escape key + browser
 back-button), and verifies the result against real Chrome.
 
-Final commit range: `5688f6e..5f5bcc7`. 28 commits total across
-W0.1 → W1 hygiene. W1 IS NOW STRUCTURALLY COMPLETE; Edge + Firefox
-+ Android regression deferred to W5/W6 (hosting + cross-platform
-verification phase).
+Final commit range: `5688f6e..405b382`. 35 commits total —
+33 code commits across W0.1 → W1 hygiene (`5688f6e..5f5bcc7`)
+plus 2 closure-doc-only commits (`952dd9b` CLAUDE.md prune +
+`405b382` W2.6 plan additions). `git log 5688f6e..405b382
+--oneline | wc -l` returns 35; restricting to code via
+`5688f6e..5f5bcc7` returns 33. W1 IS NOW STRUCTURALLY
+COMPLETE; Edge + Firefox + Android regression deferred to W5/W6
+(hosting + cross-platform verification phase).
 
 ### W0.1 — Fonts (5688f6e)
 
@@ -175,10 +179,60 @@ Q8 lazy-loading (5605f30, 2026-05-25) moved BOOKS into the lazy
 bundle-a-bible bundle. Same class repeats with MATTHEW (1 site
 fixed in 5f5bcc7). Optional chaining (?.) does NOT save you from
 undeclared identifier ReferenceError; only `typeof BOOKS !== 'undefined'`
-guard works. CLASS-of-bug audit completed: SettingsScreen's
-PROGRESS_GROUPS (40+ refs) is fully gated by `_BOOKS_READY &&
-_VOT_READY`; ScripturesHome is gated by `bibleLoaded`; MatthewChapterView
-is gated by the matthew-ch route's typeof guard.
+guard works.
+
+**CLASS-of-bug audit — ASSIGNMENT-site traces for each ruling:**
+
+BOOKS audit (grep `BOOKS\.` in hooks/ + ui/):
+- `use-android-back.js:194` — bare `BOOKS[bid]?` — UNGUARDED, fixed
+  (bdebd34) via local `const _BOOKS = (typeof BOOKS !== 'undefined')
+  ? BOOKS : null;` + null check.
+- `use-navigate-to-link.js:131` + `:148` — bare `BOOKS[endpoint.bookId]`
+  — UNGUARDED, fixed (bdebd34) via same pattern.
+- `SettingsScreen.jsx:157-240` (40+ refs) — SAFE: PROGRESS_GROUPS
+  built via `(!_BOOKS_READY || !_VOT_READY) ? [] : [...array literal...]`
+  ternary at line 130. The array literal containing all the bare
+  `BOOKS.<id>` refs only evaluates when both flags true. ASSIGNMENT
+  of `_BOOKS_READY` is `typeof BOOKS !== 'undefined' && !!BOOKS`
+  at line 106 — typeof-guarded at the source.
+- `ScripturesHome.jsx:80` + `:96` — SAFE: `bibleLoaded ? g.books.reduce
+  ((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0) : '—'`. The
+  bare `BOOKS[b.id]` only evaluates when `bibleLoaded === true`.
+  ASSIGNMENT at line 25: `bibleLoaded = typeof window.__bibleCorpus
+  !== 'undefined' && window.__bibleCorpus.loaded`. The loaded flag
+  flips true via `__finishBibleInit` which has already assigned
+  `var BOOKS = …`, so `bibleLoaded === true` implies BOOKS-the-bare-
+  identifier is safe.
+- `BibleChapterView.jsx:139` — FALSE POSITIVE: `POETIC_BOOKS.has(book.id)`.
+  `POETIC_BOOKS` is a local `Set` literal at line 138, not the BOOKS
+  global. The regex `BOOKS\.` matched the trailing substring.
+
+MATTHEW audit (grep `MATTHEW\.` in hooks/ + ui/):
+- `use-bible-studies.js:243` — bare `MATTHEW.chapters[…]` —
+  UNGUARDED, fixed (5f5bcc7) via local `const _MATTHEW = (typeof
+  window !== 'undefined') ? window.MATTHEW : null;` + null check.
+- `use-nav-history-tracking.js:105` — SAFE: usage is `_MATTHEW.chapters
+  .find(…)`. ASSIGNMENT at line 103 is `const _MATTHEW = (typeof
+  window !== 'undefined') ? window.MATTHEW : undefined;` followed
+  by `if (!_MATTHEW) return;` at line 104. Triple-safe: typeof
+  window guard + window-prefixed access (which is typeof-safe even
+  when MATTHEW global undeclared) + null check before usage.
+- `use-surprise.js:97` — SAFE: usage is `_MATTHEW ? _MATTHEW.chapters
+  .map(…) : []`. ASSIGNMENT at line 94: `const _MATTHEW = (typeof
+  MATTHEW !== 'undefined' && MATTHEW) ? MATTHEW : null;`. Quadruple-
+  safe: typeof check + truthy check at assignment + ternary at usage.
+- `MatthewChapterView.jsx:47` — SAFE: bare `MATTHEW.chapters[…]` but
+  the component only mounts when the route gate at `screen-routes.jsx:
+  621-624` confirms `typeof MATTHEW !== 'undefined'`; otherwise the
+  route returns a "Loading Matthew…" placeholder + fires
+  `__loadMatthewCorpus`. Upstream route gate guarantees the
+  component never sees MATTHEW undef.
+
+The audit principle (formalized as memory [[grep-audit-bug-class]]):
+trace the ASSIGNMENT site, not just the guard at the usage site.
+Bare `const _X = X` at the top of a function will throw before any
+`if (!_X)` check downstream can run; the guard MUST live at the
+assignment expression itself (typeof-checked or window-prefixed).
 
 **MediaStream-cleanup test flake fixed** (5f5bcc7) — 3 affected tests
 in platform-bridge.test.js replaced fixed-time `setTimeout(20)` with
