@@ -518,15 +518,41 @@ window.AndroidBridge directly after W1.2.
        Escape would break the Garden full-screen view + every
        open-sheet close-on-escape pattern.
 
+       Per [[centralized-modal-signal]], the "no modal/sheet open"
+       check MUST go through a SINGLE centralized signal — NOT a
+       multi-source state-check on AppShellSheets + AppShellOverlays +
+       screen-local sheet states. Implementation: a useModalRegistry
+       hook that exposes register() / unregister() + a stable
+       isAnyOpen() ref. Each sheet/overlay calls register() in its
+       mount effect and unregister() on cleanup. Counter-based (not
+       state-based) so identity churn doesn't drop signals. New sheets
+       added later automatically participate via the same register
+       pattern — no need to update the Escape handler.
+
     2. Browser: History API popstate → handleAndroidBack(). The app
        pushes a history entry on each in-app navigation; popstate
        signals the user clicked the browser-native back button.
 
+       Per [[root-of-history-pwa]], popstate handling at the navigation
+       ROOT needs special care — a PWA has no "minimize" equivalent
+       to Android's behavior when handleAndroidBack returns "false".
+       Without a root-of-stack guard, the first back-press past the
+       app's home screen EXITS the PWA silently (browser navigates
+       away or closes the standalone window). useAndroidBack tracks
+       whether the current state IS the root; at root, the popstate
+       handler pushes a replacement history entry (history.pushState)
+       so the next back-press lands inside the app, not outside.
+       Optionally show a brief "Press back again to exit" toast on
+       first root-back to match the Android UX pattern.
+
   The existing handleAndroidBack logic is platform-agnostic (reads JS
-  state, returns "true"/"false"). The only change is the trigger
-  source. Register listener in useAndroidBack.js (already owns this
-  domain). Tests verify (fullscreen, sheet-open, clear-state) — only
-  the third dispatches.
+  state, returns "true"/"false"). The trigger source changes; the
+  return-handling for "false" diverges by platform (Android: minimize;
+  Web: stay at root). Register listener in useAndroidBack.js (already
+  owns this domain). Tests:
+    - (fullscreen, sheet-open, clear-state) Escape → only clear-state dispatches
+    - popstate at root → stays in app (history entry pushed)
+    - popstate mid-stack → handleAndroidBack runs normally
 
   W1.6 — Desktop preview-eval smoke walk
   ──────────────────────────────────────
@@ -703,10 +729,52 @@ Architecture — what exists, what changes:
     4. Promise.all resolves. App() sets hydrated=true, renders.
     5. All subsequent reads are sync from memory.
 
-  Hydration timeout: if IDB open takes >3 seconds (corrupted DB,
-  Firefox storage permission prompt, etc.), render anyway with empty/
-  default stores and log a warning. User sees empty data rather than
-  infinite loading screen. Background retry continues.
+  Hydration timeout — data-loss vector (per [[w2-hydration-data-loss]]):
+  if IDB open takes >3 seconds, the naive impl renders with an empty
+  cache + a background retry. THIS IS DANGEROUS: user starts interacting
+  with the empty cache, writes data, then the retry resolves and the
+  loaded IDB data STOMPS the user's writes. Silently lost data.
+
+  Required design — degraded mode + write-queue:
+
+    State machine per store: 'pending' | 'loaded' | 'degraded'.
+
+    'pending' (boot → hydration in flight):
+       Reads return default values.
+       Writes go to a per-store WRITE QUEUE (not the cache yet).
+       UI shows a brief "Loading..." indicator on the affected surfaces
+       so user knows their action is staged but not yet persistent.
+
+    'loaded' (hydration succeeded within timeout):
+       Drain write queue → apply to cache (each enqueued write wins
+       over the loaded IDB value at the same key).
+       Flush cache → IDB.
+       Normal write-through from this point.
+
+    'degraded' (hydration timeout, e.g. 3s elapsed):
+       Mark store degraded.
+       Drain write queue → apply to cache as authoritative.
+       Treat cache as truth from this point.
+       Continue background IDB load attempts; on eventual success,
+       MERGE — cache wins on every conflicting key.
+       Surface a brief UI warning: "Storage temporarily unavailable;
+       your latest changes are kept in memory and will save when
+       storage recovers."
+
+    Background retry on persistent failure → store stays 'degraded'
+    forever (until app reload). Cache is the only source of truth.
+    Per [[user-data-paramount]], silent stomping is unacceptable;
+    a degraded-but-functional app is better than data loss.
+
+  Tests (must exist in W2.2 vitest):
+    1. Hydration <100ms → 'loaded' state → write-through works normally
+    2. Hydration >3s + user writes during pending → user writes survive
+       when hydration eventually resolves (NOT stomped)
+    3. Hydration NEVER completes (corrupted DB / permission denied) →
+       store stays 'degraded' but app remains usable; user-facing
+       warning surfaced
+    4. Multiple stores hydrate concurrently — some succeed, some time
+       out. Each store's state tracked independently
 
   W2.3 — Migrate data stores (one-by-one, test each)
   ───────────────────────────────────────────────────
