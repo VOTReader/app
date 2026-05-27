@@ -1106,22 +1106,14 @@ W2 — STORAGE HARDENING (persistence + scale + safety)
 ───────────────────────────────────────────────────────────────────────────────
 
   ┌──────────────────────────────────────────────────────────────────┐
-  │ W2 PREREQUISITE — RUN /consolidate-memory AS FIRST ACTION        │
+  │ W2 PREREQUISITE — /consolidate-memory ✅ DONE 2026-05-27         │
   │                                                                  │
-  │ Before any IDB work begins, the W2 agent MUST run                │
-  │ /consolidate-memory. This is NOT a suggestion — it's a           │
-  │ prerequisite. The ~36 memory entries include near-duplicates     │
-  │ around blob/media handling (3 entries) and migration mechanics   │
-  │ (3 entries), and ~10 storage-related entries that need a clean   │
-  │ signal-to-noise to inform W2.2's rebase semantics + IDB schema   │
-  │ versioning + platform constraints correctly. Conflicting         │
-  │ memories about merge-vs-rebase semantics would be DANGEROUS for  │
-  │ the storage layer.                                               │
-  │                                                                  │
-  │ The W1.6 smoke walk surfacing 4 additional BOOKS bare-refs       │
-  │ after the first fix proves the value of CLASS-of-bug audits      │
-  │ over single-site fixes. /consolidate-memory is the equivalent    │
-  │ for memory entries — run it BEFORE writing any IDB code.         │
+  │ 49 → 43 topic files. Blob/media handling (3 → 1:                 │
+  │ recording-bridge-constraints). Migration mechanics (5 → 1:       │
+  │ migration-discipline). 3 stale entries updated (haptic bridge    │
+  │ PlatformBridge ref, lint gate current-state, memory hygiene      │
+  │ stale example). Index reorganized into 8 thematic sections;      │
+  │ W2 load-bearing entries grouped under "Storage & data."          │
   └──────────────────────────────────────────────────────────────────┘
 
   ┌──────────────────────────────────────────────────────────────────┐
