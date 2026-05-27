@@ -504,11 +504,41 @@ window.AndroidBridge directly after W1.2.
   every exit path per [[mediastream-track-cleanup]]. See the Tier C
   entries above + commit messages 22d1c5b and 2538e8f for full detail.
 
-  W1.5 — Back-button navigation (History API + Escape key)
-  ────────────────────────────────────────────────────────
-  On Android, back-press routes through `window.handleAndroidBack()`.
-  On desktop, wire two triggers: Escape key (keyboard) and popstate
-  (browser back button).
+  W1.5 — Back-button navigation (History API + Escape key) — CLOSED 2026-05-26
+  ───────────────────────────────────────────────────────────────────────────
+  Six commits land the full desktop-back UX. Final commit range
+  905b78d..0073c10 + the housekeeping commit fd8aa22 folded into the
+  batch per the user-directed "adjacent easy wins" protocol.
+
+  Sub-step commits:
+    W1.5(a.1)     905b78d  modal registry hook + 25 vitest cases
+    housekeeping  fd8aa22  delete NotebookManagerSheet + JournalNotebookSheet
+    W1.5(a.2)     195cfb3  wire 25 consumers (24 inventory + 1 discovered)
+    W1.5(b)       5babe86  history-sync layer + 16 vitest cases
+    W1.5(c)       732bf6b  Escape key listener (sole dispatcher)
+    W1.5(d)       0073c10  popstate + root-of-stack double-tap-to-exit
+                           + root-exit-toast utility + 14 vitest cases
+
+  See CLAUDE.md "Current state" + the per-commit messages for the full
+  per-step detail. The DISPATCHER CONTRACT, CONFIRMSTRIP UNIQUE-ID
+  CONTRACT, and TIMER-CLEAR-ON-FORWARD-NAV invariant from the design
+  refinements all hold; preview_eval against real Chrome confirmed
+  end-to-end. Bundle-b: 351.0 → 356.6 KB (+5.6 KB net for the whole
+  batch — registry + history-sync + Escape + popstate handlers +
+  root-exit-toast). 595 → 625 vitest tests (+30).
+
+  Known UX rough edges (documented, not fixed in W1.5):
+    - Rapid navigation inflates the back stack — 10 fast taps = 10
+      history entries = 10 back presses to return. Acceptable per
+      the spec; future polish could replaceState for sub-screen
+      state transitions.
+    - Browser forward button is dead — Option B pushState (empty
+      state). Future polish could land Option A if anyone misses
+      forward.
+    - Pre-existing flake under combined vitest load: nativeRecordStop
+      + nativeRecordCancel track-cleanup tests in platform-bridge.test.js
+      (MediaRecorder timing — pass standalone, flake occasionally
+      under the 25-file suite). Flagged for future stabilization.
 
   IMPLEMENTATION SEQUENCING (4 sub-steps; each independently testable):
     (a) Modal registry hook + wire all 24 consumers from the inventory
