@@ -3976,6 +3976,78 @@
     }, [tabs, activeTabIdx, theme, lastReadChapters, lastReadLetterMap, activeReadKey, settings, readItems]);
   }
 
+  // app/src/main/assets/src/utils/root-exit-toast.js
+  var _timer = null;
+  var _armed = false;
+  var _toastEl = null;
+  var TOAST_ID = "vot-root-exit-toast";
+  function _ensureToast() {
+    if (_toastEl) return _toastEl;
+    if (typeof document === "undefined") return null;
+    const el = document.createElement("div");
+    el.id = TOAST_ID;
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    el.textContent = "Press back again to exit";
+    el.style.cssText = [
+      "position:fixed",
+      // Above all overlays; lower than the Welcome modal (z 9999) which
+      // wouldn't be open at root anyway, but be defensive.
+      "z-index:9998",
+      "left:50%",
+      "transform:translateX(-50%)",
+      // Anchor near the bottom; respect safe-area inset for notched devices.
+      "bottom:calc(env(safe-area-inset-bottom, 0px) + 2rem)",
+      "background:rgba(20,20,24,0.92)",
+      "color:#f0e6d2",
+      "border:1px solid rgba(255,215,140,0.35)",
+      "border-radius:24px",
+      "padding:10px 18px",
+      "font-family:'Cinzel',serif",
+      "font-size:0.72rem",
+      "letter-spacing:0.08em",
+      "text-transform:uppercase",
+      "box-shadow:0 6px 24px rgba(0,0,0,0.45)",
+      "pointer-events:none",
+      "opacity:0",
+      "transition:opacity 180ms ease-out"
+    ].join(";");
+    document.body.appendChild(el);
+    _toastEl = el;
+    return el;
+  }
+  function _showToast() {
+    const el = _ensureToast();
+    if (!el) return;
+    void el.offsetHeight;
+    el.style.opacity = "1";
+  }
+  function _hideToast() {
+    if (!_toastEl) return;
+    _toastEl.style.opacity = "0";
+  }
+  function arm(durationMs = 2e3) {
+    if (_timer != null) clearTimeout(_timer);
+    _armed = true;
+    _showToast();
+    _timer = setTimeout(() => {
+      _armed = false;
+      _timer = null;
+      _hideToast();
+    }, durationMs);
+  }
+  function disarm() {
+    if (_timer != null) {
+      clearTimeout(_timer);
+      _timer = null;
+    }
+    _armed = false;
+    _hideToast();
+  }
+  function isArmed() {
+    return _armed;
+  }
+
   // app/src/main/assets/src/hooks/use-android-back.js
   function useAndroidBack({
     screen,
@@ -4226,6 +4298,33 @@
         document.removeEventListener("keydown", onKeyDown);
       };
     }, []);
+    React.useEffect(() => {
+      if (typeof window === "undefined" || typeof document === "undefined") return;
+      if (window.AndroidBridge) return;
+      if (typeof window.addEventListener !== "function") return;
+      function onPopState() {
+        if (!window.__historyReady) return;
+        suppressNextHistoryPush();
+        const result = typeof window.handleAndroidBack === "function" ? window.handleAndroidBack() : "false";
+        if (result !== "false") {
+          return;
+        }
+        clearSuppressNextHistoryPush();
+        if (isArmed()) {
+          disarm();
+          return;
+        }
+        try {
+          history.pushState({}, "", "");
+        } catch (_e) {
+        }
+        arm();
+      }
+      window.addEventListener("popstate", onPopState);
+      return () => {
+        window.removeEventListener("popstate", onPopState);
+      };
+    }, []);
   }
 
   // app/src/main/assets/src/hooks/use-modal-registry.js
@@ -4350,6 +4449,7 @@
         _suppressNextPush = false;
         return;
       }
+      disarm();
       try {
         history.pushState({}, "", "");
       } catch (_e) {

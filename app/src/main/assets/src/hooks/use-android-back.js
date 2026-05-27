@@ -98,6 +98,11 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import {
+  arm as _rootExitArm,
+  disarm as _rootExitDisarm,
+  isArmed as _rootExitIsArmed,
+} from '../utils/root-exit-toast.js';
 
 /**
  * Wire window.handleAndroidBack — the function Kotlin's MainActivity calls
@@ -298,5 +303,114 @@ export function useAndroidBack({
     // + the suppress/clear helpers as call-time globals (no React state in
     // deps), so [] is honest here and eslint-react-hooks has nothing to
     // flag.
+  }, []);
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     W1.5(d) — popstate listener + root-of-stack double-tap-to-exit.
+     ═══════════════════════════════════════════════════════════════════════
+     The desktop counterpart of the Android system back button. When the
+     user clicks the browser back button (or swipes back on a trackpad),
+     popstate fires after the browser has already consumed one history
+     entry. We route to handleAndroidBack for the in-app nav routing;
+     at the root of the stack we run the "press back again to exit"
+     double-tap pattern per [[root-of-history-pwa]].
+
+     Three gates, in order:
+       1. Web-only (window.AndroidBridge absent — Android uses the
+          system back button, never browser navigation).
+       2. Firefox popstate-on-load — older HTML5 spec interpretation
+          says popstate fires on initial page load; Chrome doesn't.
+          window.__historyReady is set by useHistorySync after the
+          first nav-key commit; we ignore any popstate that arrives
+          before that flag goes true.
+       3. handleAndroidBack returns "true" → navigation handled. We
+          set suppressNextHistoryPush BEFORE handleAndroidBack so the
+          state-change-triggered useHistorySync effect skips its push
+          (otherwise back would require N+1 presses per nav step).
+          handleAndroidBack returns "false" → root of stack. Run the
+          double-tap-exit logic.
+
+     Root-of-stack flow (per the contract in
+     [[root-of-history-pwa]]):
+       - First back at root (not armed):
+           push REPLACEMENT entry (browser stack returns to one-deep
+             so the next back has something to consume),
+           arm root-exit-toast for 2 seconds,
+           clearSuppressNextHistoryPush (handleAndroidBack didn't
+             change state → useHistorySync effect won't fire → flag
+             would strand).
+       - Second back at root within 2s (armed):
+           disarm root-exit-toast,
+           DO NOT push a replacement — the popstate already consumed
+             an entry; without our intervention the browser exits the
+             PWA on the user's next gesture (or now, if the stack is
+             empty).
+
+     The TIMER-CLEAR-ON-FORWARD-NAV invariant is enforced inside
+     useHistorySync.js's effect: every legitimate forward pushState
+     calls disarm() on the root-exit-toast module, so an old "first
+     back at root" press from a previous root visit cannot bleed into
+     a future root-back and skip the toast.
+     ═══════════════════════════════════════════════════════════════════════ */
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (window.AndroidBridge) return;
+    if (typeof window.addEventListener !== 'function') return;
+
+    function onPopState() {
+      // Firefox popstate-on-load guard. Chrome doesn't fire popstate
+      // at page load; Firefox does (older HTML5 spec interpretation).
+      // useHistorySync sets __historyReady after the first effect-run;
+      // anything before that is a load-time spurious fire we must
+      // ignore — calling handleAndroidBack at boot would jump the user
+      // to home / library / wherever before the app finished mounting.
+      if (!window.__historyReady) return;
+
+      suppressNextHistoryPush();
+      // handleAndroidBack returns the STRING "true" / "false" (not
+      // boolean) — it's an @JavascriptInterface return value originally
+      // shaped for Kotlin. Compare against 'false' as a string.
+      const result = (typeof window.handleAndroidBack === 'function')
+        ? window.handleAndroidBack()
+        : 'false';
+      if (result !== 'false') {
+        // Navigation happened. handleAndroidBack already updated state;
+        // useHistorySync's effect will fire next render, see suppress
+        // set, no-op. Nothing more to do here.
+        return;
+      }
+
+      // Root of stack. handleAndroidBack didn't change state; the
+      // useHistorySync effect won't fire; clear the suppress flag now
+      // so future legitimate user navs aren't accidentally suppressed.
+      clearSuppressNextHistoryPush();
+
+      if (_rootExitIsArmed()) {
+        // Second back within 2-second window → let the exit happen.
+        // The popstate that triggered THIS call already consumed an
+        // entry from the browser stack; we deliberately do NOT push
+        // a replacement. The user's next gesture exits naturally.
+        _rootExitDisarm();
+        return;
+      }
+
+      // First back at root → push replacement so the app stays mounted,
+      // then arm the toast for 2 seconds.
+      try {
+        history.pushState({}, '', '');
+      } catch (_e) {
+        // Iframe sandbox / unusual hosting may block pushState; the
+        // toast still arms (so a second back will exit cleanly). On
+        // platforms where pushState is blocked, root-back exits on
+        // first press — same as if this code didn't exist. Non-fatal.
+      }
+      _rootExitArm();
+    }
+
+    window.addEventListener('popstate', onPopState);
+    return () => { window.removeEventListener('popstate', onPopState); };
+    // Mount-only — same rationale as the Escape listener above. The
+    // closure reads only module-level singletons + the call-time-fresh
+    // window.handleAndroidBack global; no React state in deps.
   }, []);
 }

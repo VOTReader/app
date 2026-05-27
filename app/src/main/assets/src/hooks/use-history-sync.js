@@ -74,6 +74,8 @@
        misses it.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { disarm as _disarmRootExit } from '../utils/root-exit-toast.js';
+
 // Module-level suppress flag — set by suppressNextHistoryPush(), consumed
 // by the next effect run. Persists across renders intentionally; the
 // effect always reads-and-clears in one step so a stale flag can't strand.
@@ -183,6 +185,14 @@ export function useHistorySync({
       _suppressNextPush = false;
       return;
     }
+
+    // Forward navigation about to push → disarm any pending root-exit
+    // toast per the TIMER-CLEAR-ON-FORWARD-NAV invariant
+    // ([[root-of-history-pwa]]). Without this, a user who pressed back
+    // at root (arming the timer), then navigated forward via a tile,
+    // then returned to root, would silently exit on a single back press
+    // because the earlier timer was still armed.
+    _disarmRootExit();
 
     try {
       history.pushState({}, '', '');
