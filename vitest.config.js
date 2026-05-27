@@ -137,15 +137,24 @@ export default defineConfig({
       // at 78/53/68/82% local coverage (uncovered lines are
       // DOMException-fallback paths only relevant on legacy WebViews).
       //
+      // W2.2 baseline (+ cached-store IDB extension, 705 tests):
+      //   statements 42.24 (1644/3892) | branches 32.33 (879/2718)
+      //   functions  43.21 (341/789)   | lines    44.84 (1309/2919)
+      // cached-store.js coverage rises to ~95% local. The new W2.2
+      // state machine (pending/loaded/degraded + rebase + background
+      // retry + LS shim) is fully exercised by 33 new tests including
+      // both documented data-loss vectors. Gate floors advance:
+      // statements 40→42, branches 30→32, functions 42→43, lines 42→44.
+      //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
-        statements: 40,
-        branches: 30,
-        functions: 42,
-        lines: 42,
+        statements: 42,
+        branches: 32,
+        functions: 43,
+        lines: 44,
       },
     },
   },
