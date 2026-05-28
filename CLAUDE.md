@@ -45,10 +45,10 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
   - `bundle-a-bible.js` 6.9 MB — books.js (NKJV) lazy-loaded via `window.__loadBibleCorpus()`
   - `bundle-a-matthew.js` 618 KB — matthew.js (Study Bible) lazy-loaded via `window.__loadMatthewCorpus()`
   - `bundle-a-vot.js` 3 MB — 14 VOT corpora (volumes/letters/WTLB/holy days/hidden manna) lazy-loaded via `window.__loadVotCorpus()`
-  - `bundle-b.js` 413 KB — stores + components + hooks + journal + scripture-resolution + letter-linking + W1.5 modal registry + history-sync + W1 platform-bridge + W2.7 StorageHealth (esbuild IIFE)
+  - `bundle-b.js` 413.2 KB — stores + components + hooks + journal + scripture-resolution + letter-linking + W1.5 modal registry + history-sync + W1 platform-bridge + W2.7 StorageHealth (esbuild IIFE)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
   - `bundle-d.js` 565.8 KB — screens + sheets + components + utils + late stores + screen-routes + App() + W1.5 AppShell registrations + W2.7 StorageHealthBanner + SafariFlows (esbuild IIFE)
-- **1169 vitest tests** across 44 files.
+- **1182 vitest tests** across 45 files.
 
 ### Q3 ESLint — CLOSED 2026-05-24
 

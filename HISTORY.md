@@ -6,7 +6,8 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ## W2 polish — storage layer hardening (2026-05-28)
 
-4-tier sweep of the W2 storage layer post-close. 8 research findings
+4-tier sweep of the W2 storage layer post-close, plus two adjacent
+cleanups (hlTick prop removal, ThumbStore tests). 8 research findings
 evaluated; 4 shipped, 4 ruled out as false positives.
 
 ### Tier 1 — Real bugs (2 shipped)
@@ -72,14 +73,31 @@ Gates ratcheted: 53/43/59/57 → 55/46/60/60.
   handled correctly by percentage-based tier thresholds; Safari
   heuristic solves a Safari-specific 7-day eviction problem).
 
+### hlTick prop threading removal (adjacent cleanup)
+
+Q7 migrated every component to `useSyncExternalStore`, making the
+`hlTick` prop a no-op in every consumer — but the prop was still
+threaded through ~30 components. Removed all prop drilling: every
+`setHlTick(t => t + 1)` call in sheets/screens now routes through
+`window.__bumpHlTick()` (bridge already wired in useAppShellEffects).
+hlTick state + DOM apply effects stay in App.jsx (load-bearing).
+31 files changed, net −105 lines, bundle-d −1.0 KB.
+
+### ThumbStore tests (adjacent cleanup)
+
+13 tests covering the standalone IDB tab-thumbnail cache (the only
+store not based on CachedStore). openThumbDB connection caching +
+object store creation, idbPut/idbDelete/idbReadAll CRUD, overwrite
+semantics, error-resilience best-effort resolve contract.
+
 ### Totals
 
 | Metric | Before | After | Delta |
 |---|---|---|---|
-| Tests | 1099 | 1170 | +71 |
-| Test files | 40 | 44 | +4 |
-| Bundle-b | 413.0 KB | 413.4 KB | +0.4 |
-| Bundle-d | 566.2 KB | 566.8 KB | +0.6 |
+| Tests | 1099 | 1182 | +83 |
+| Test files | 40 | 45 | +5 |
+| Bundle-b | 413.0 KB | 413.2 KB | +0.2 |
+| Bundle-d | 566.2 KB | 565.8 KB | −0.4 |
 | Coverage (stmts) | 53.57% | 55.92% | +2.35 |
 | Coverage (branch) | 43.31% | 46.34% | +3.03 |
 | Coverage (funcs) | 59.32% | 60.36% | +1.04 |
