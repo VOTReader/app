@@ -53,6 +53,15 @@ jobs:
         # documented `eslint-disable-next-line` with a named rationale).
         run: npm run lint -- --max-warnings 0
 
+      - name: Validate data schemas (W9.1 — Format A)
+        # `npm run validate:data` runs node tools/validate-schemas.js
+        # --strict. Exits nonzero on any Format A schema error (missing
+        # field, bad block/segment type, orphaned footnote ref, broken
+        # prev/next chain) — the "valid JS but invalid letter" class the
+        # syntax/parse checks can't see. Mirrors the pre-commit Step 1b
+        # gate; fails fast (cheap) before the heavier typecheck/test/build.
+        run: npm run validate:data
+
       - name: Typecheck (tsc --noEmit, Q4 scope)
         # `npm run typecheck` runs `tsc --noEmit` against tsconfig.json's
         # narrowed scope (utils + stores + hooks). Zero-tolerance from
