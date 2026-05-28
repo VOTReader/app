@@ -1436,19 +1436,49 @@ Architecture — what exists, what changes:
   prove the rebase semantics hold for vot-state and vot-history (the
   two non-trivial ones). Then and only then does W2.4 run.
 
-  W2.4 — One-time localStorage → IndexedDB migration
-  ───────────────────────────────────────────────────
-  On first boot post-migration:
-    1. Open IDB. Check for "migrated-v1" key in a "meta" store.
-    2. If absent: read every vot-* localStorage key, write to IDB.
-    3. Set "migrated-v1" in IDB meta store.
-    4. Clear migrated keys from localStorage (free quota) EXCEPT:
-       vot-state stays (fast theme shim). Gets a reduced copy (theme
-       + essential boot props only) to minimize localStorage usage.
-    5. Log migration timing.
+  W2.4 — One-time localStorage cleanup (CLOSED 2026-05-27, `599073b`)
+  ───────────────────────────────────────────────────────────────────
+  The PLAN's original W2.4 design was "copy LS keys to IDB then clear
+  them." The W2.3 + W2.3b implementation made W2.4 simpler than
+  designed: each store's `_hydrate()` already self-seeds from its
+  legacy LS key via the W2.2 legacy-LS-fallback path. By the time
+  `hydrateAllStores()` resolves in HydrationGate, every IDB-backed
+  store has consumed its legacy LS data into IDB. W2.4 is therefore
+  CLEANUP only — not a migration.
 
-  Idempotent: if migration is interrupted, next boot retries. The
-  "migrated-v1" flag is set LAST, after all writes succeed.
+  AS SHIPPED (`clearLegacyLs()` in `src/stores/cached-store.js`,
+  wired in HydrationGate.jsx after `hydrateAllStores()` resolves):
+
+    1. Check `meta.migrated-v1` in the meta store. If set, return
+       immediately (idempotent).
+    2. Iterate localStorage; remove every `vot-*` key NOT in
+       LS_SKIP_LIST.
+    3. Write `meta.migrated-v1 = true`.
+
+  ORDERING IS LOAD-BEARING: cleanup MUST run AFTER hydration. The
+  per-store self-seed reads LS during `_hydrate()`; clearing first
+  would null those reads and silently wipe pre-W2 user data.
+  HydrationGate enforces this via `.then(() => clearLegacyLs())`.
+
+  LS_SKIP_LIST (two permanent exceptions):
+    'vot-state'         — reduced theme+fontStyle shim for the sync
+                          boot-script read at index.html:73.
+    'vot-ann-migrated'  — legacy annotation-migration gate read at
+                          annotation-store.js module load before any
+                          IDB store opens.
+
+  HOTFIX (`972944e`): the original W2.4 commit (`599073b`) had a
+  race in clearAllPersonalData — fired four `indexedDB.deleteDatabase()`
+  calls then immediately reloaded. deleteDatabase is async; the
+  reload raced ahead and the new page's IDBAdapter.open() could win
+  against the in-flight deletion, leaving the database alive. Fix:
+  made clearAllPersonalData async; awaits each deletion (with a 3 s
+  timeout per critical DB) before reloading.
+
+  IMPORT PATH IS THE OTHER USE OF LS_SKIP_LIST: W2.6's V2 export
+  payload uses the same list to decide what goes in `data` (boot
+  shim) vs `stores` (full IDB data). Keep the exported `LS_SKIP_LIST`
+  symbol in sync with both consumers.
 
   iOS PWA storage isolation edge case: if the user has been using
   VOTReader in Safari tab and then installs the PWA, the installed PWA
@@ -1457,32 +1487,62 @@ Architecture — what exists, what changes:
   Mitigation: detect this (hydrated with zero data + no flag in old LS)
   and surface the iOS PWA welcome card (W2.7 Scenario 4).
 
-  W2.5 — Storage persistence + quota monitoring
-  ──────────────────────────────────────────────
-  Two capabilities:
+  W2.5 — Storage persistence + quota monitoring (CLOSED 2026-05-27, `d7bacc6`)
+  ────────────────────────────────────────────────────────────────────────────
+  Three browser-API surfaces in Settings → Your Data + the W2.6 export
+  payload. Purely additive — no data paths, no banner system (W2.7
+  owns that).
 
-  A. Persistence (prevent eviction):
-    Do NOT call persist() at boot (Firefox silently fails if not from
-    user gesture). Strategy:
-      1. After first meaningful data creation: check persisted().
-      2. If false: show banner — "Your data isn't protected from browser
-         cleanup yet." Button: "[Protect my data]" calls persist().
-      3. Chrome auto-grants for installed PWAs. Firefox shows prompt
-         (must fire from click handler). Safari heuristic-based.
-      4. Surface result in Settings → Your Data.
-      5. On Safari tab (not PWA): banner also says "Add to Home Screen
-         to keep your data safe" — the 7-day rule is the real threat.
+  AS SHIPPED:
+    `src/utils/format-bytes.js` — formatBytes(bytes) → "X.X MB" with
+      one-decimal precision (1024-base, matching OS storage panels).
+      "?" for null / negative / NaN.
+    `src/hooks/use-storage-info.js` — useStorageInfo() returns
+      { status, quota, usage, persisted, persistDenied, requestPersist }.
+      Feature-detects navigator.storage; reads on mount and never
+      polls (periodic refresh is W2.7's job). requestPersist MUST
+      fire from a user-gesture onClick (Firefox silently fails
+      otherwise).
+    2 new rows in Settings → Your Data, above Export:
+      "Storage: Approximately X of Y used."
+      "Protection: Active" / "Not active — [Protect now]" /
+        "Browser denied protection. Export regularly as a backup."
+    Export payload gains storageQuota + storageUsed (raw bytes from
+      estimate(); null if API unavailable). Diagnostic — if a user
+      shares their backup, the storage situation at export time is
+      captured.
 
-  B. Quota monitoring:
-    navigator.storage.estimate() → { quota, usage }.
-    Surface in Settings → Your Data: "Storage: 45 MB of 2.4 GB used"
-    Warn when usage > 80% of quota.
-    Warn when quota < 50 MB (budget device guard).
-    Add storageQuota + storageUsed to export JSON for diagnostics.
-    Note: Brave fuzzes values (anti-fingerprinting) — show "approximate."
+  Brave fuzzes estimate() for anti-fingerprinting. The UI copy uses
+  "approximately" to disclose imprecision without scaring the user.
 
-  W2.6 — Export/import upgrade (include journal media)
-  ────────────────────────────────────────────────────
+  Banners, write-failure integration, periodic re-assessment,
+  Safari-specific UX, and the rest of the dynamic-warning system
+  live in W2.7. W2.5 is the one-shot status display only.
+
+  W2.6 — Export/import upgrade (CLOSED 2026-05-27, `b8530ec` + `15da427`)
+  ─────────────────────────────────────────────────────────────────────
+  AS SHIPPED — V2 schema with three top-level data containers:
+
+    data    — boot-shim LS keys ONLY (vot-state reduced + vot-ann-
+              migrated). A V1 client reading this file sees just
+              those two keys (documented degraded restore).
+    stores  — every IDB-backed store keyed by store name. Each
+              store's `replaceAll` / `setAll` / `set` method applies
+              its slice during import (rebase-safe; per-store
+              W2.6-prep additions).
+    media   — JournalMediaStore blobs encoded as base64 via a
+              stream-chunked encoder (avoids OOM on >1 MB blobs per
+              [[readAsDataURL-oom-risk]]). 100 MB total guard.
+
+  Forward-compat: V3+ payloads imported into a V2 client trigger a
+  one-line warning in the confirm dialog ("This backup was created
+  with a newer version..."); unknown top-level keys are ignored.
+  Backward-compat (V1 source → V2 client): detects exportVersion !==
+  2, parses each `data[storeName]` as a pre-W2 LS-JSON string, calls
+  the store's bulk-replace method inline.
+
+  Original V1 fix description below kept as historical context:
+
   EXISTING BUG: exportPersonalData() (SettingsScreen.jsx:283) iterates
   localStorage only. JournalMediaStore blobs in IndexedDB are silently
   dropped. Export → clear → import = every audio recording and image
