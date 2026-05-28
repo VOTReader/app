@@ -5050,15 +5050,275 @@
       }
       return keys;
     };
-    const exportPersonalData = () => {
-      alert(
-        "Export is temporarily unavailable.\n\nThe storage layer is mid-upgrade \u2014 your data has moved from browser-local storage to a more durable on-device database, and the export format is being updated to match. Until that lands in the next update, the existing export would produce an incomplete file.\n\nYour data is safe and untouched on this device. No action needed. Please wait for the next update before exporting."
-      );
+    const _TOAST_ID = "vot-toast-info";
+    const _showToast = (html, durationMs) => showToast({
+      id: _TOAST_ID,
+      className: "vot-toast",
+      html,
+      durationMs: durationMs == null ? 3500 : durationMs
+    });
+    const _blobToBase64 = async (blob) => {
+      const CHUNK = 65536;
+      const reader = blob.stream().getReader();
+      let binary = "";
+      for (; ; ) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (let i = 0; i < value.length; i += CHUNK) {
+          const slice = value.subarray(i, Math.min(i + CHUNK, value.length));
+          binary += String.fromCharCode.apply(
+            null,
+            /** @type {any} */
+            slice
+          );
+        }
+      }
+      return btoa(binary);
+    };
+    const _base64ToBlob = (b64, mime) => {
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mime || "application/octet-stream" });
+    };
+    const _exportableStores = () => ({
+      "vot-annotations": { store: AnnotationStore, method: "replaceAll" },
+      "vot-notes": { store: NoteStore, method: "replaceAll" },
+      "vot-bookmarks": { store: BookmarkStore, method: "replaceAll" },
+      "vot-links": { store: LinkStore, method: "replaceAll" },
+      "vot-notebooks": { store: NotebookStore, method: "replaceAll" },
+      "vot-journal": { store: JournalStore, method: "replaceAll" },
+      "vot-journal-notebooks": { store: JournalNotebookStore, method: "replaceAll" },
+      "vot-journal-index": { store: JournalIndexStore, method: "replaceAll" },
+      "vot-journal-stats": { store: JournalStatsStore, method: "replaceAll" },
+      "vot-recent-nav": { store: RecentNavStore, method: "replaceAll" },
+      "vot-history": { store: HistoryStore, method: "setAll" },
+      "vot-prophecy-cards": { store: ProphecyCardsStore, method: "setAll" },
+      "vot-home-order": { store: HomeOrderStore, method: "set" },
+      "vot-state": { store: StateStore, method: "set" }
+    });
+    const _flagStores = () => ({
+      "vot-welcomed": WelcomedFlagStore,
+      "vot-about-seen": AboutSeenFlagStore,
+      "vot-garden-warning-acked": GardenWarningFlagStore
+    });
+    const exportPersonalData = async () => {
+      try {
+        _showToast("Preparing export\u2026", 0);
+        const data = {};
+        for (const k of ["vot-state", "vot-ann-migrated"]) {
+          const v = localStorage.getItem(k);
+          if (v != null) data[k] = v;
+        }
+        const storesMap = _exportableStores();
+        const flagMap = _flagStores();
+        const stores = {};
+        for (const name of Object.keys(storesMap)) {
+          try {
+            const v = await IDBAdapter.get(name, "v");
+            if (v !== void 0) stores[name] = v;
+          } catch (_e) {
+          }
+        }
+        for (const name of Object.keys(flagMap)) {
+          try {
+            const v = await IDBAdapter.get(name, "v");
+            if (v !== void 0) stores[name] = !!v;
+          } catch (_e) {
+          }
+        }
+        const media = {};
+        let totalMediaBytes = 0;
+        const MEDIA_LIMIT_BYTES = 100 * 1024 * 1024;
+        try {
+          const ids = await JournalMediaStore.allIds();
+          for (const id of ids) {
+            const rec = await JournalMediaStore.get(id);
+            if (!rec || !rec.blob) continue;
+            totalMediaBytes += rec.blob.size || 0;
+            if (totalMediaBytes > MEDIA_LIMIT_BYTES) {
+              hideToast(_TOAST_ID);
+              _showToast("Export aborted: media exceeds 100 MB. Streaming export support is planned for a future update.");
+              return;
+            }
+            const b64 = await _blobToBase64(rec.blob);
+            media[id] = {
+              type: rec.type,
+              mime: rec.mime,
+              size: rec.size,
+              width: rec.width,
+              height: rec.height,
+              duration: rec.duration,
+              created: rec.created,
+              data: b64
+            };
+          }
+        } catch (e) {
+          console.warn("media export failed", e);
+        }
+        const payload = {
+          app: "VOTReader",
+          exportVersion: 2,
+          exportDate: (/* @__PURE__ */ new Date()).toISOString(),
+          diagnosticLog,
+          data,
+          stores,
+          media
+        };
+        const json = JSON.stringify(payload);
+        const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const filename = `votreader-backup-${stamp}.json`;
+        const result = PlatformBridge.saveToDownloads(filename, json);
+        hideToast(_TOAST_ID);
+        if (result === "ok") {
+          _showToast("Backup saved to your Downloads folder.");
+        } else {
+          console.warn("saveToDownloads error:", result);
+          _showToast("Export failed. Please try again.");
+        }
+      } catch (e) {
+        console.warn("export failed", e);
+        hideToast(_TOAST_ID);
+        _showToast("Export failed. See console for details.");
+      }
     };
     const importPersonalData = () => {
-      alert(
-        "Import is temporarily unavailable.\n\nThe storage layer is mid-upgrade. Importing a pre-upgrade backup file right now would overwrite your current data with the older format and lose anything created since the last backup. Import will be restored in the next update with full IDB + media support."
-      );
+      const _doImport = async (jsonText) => {
+        try {
+          const parsed = JSON.parse(jsonText);
+          if (!parsed || parsed.app !== "VOTReader" || typeof parsed.data !== "object") {
+            _showToast("This file does not look like a VOTReader backup.");
+            return;
+          }
+          const exportVersion = parsed.exportVersion || 1;
+          const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : "unknown date";
+          const forwardCompatNote = exportVersion > 2 ? "\n\nNOTE: This backup was created with a newer version of VOTReader. Some data may not be imported." : "";
+          const summaryParts = [];
+          if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === "object") {
+            const annData = parsed.stores["vot-annotations"];
+            const annKeys = annData && typeof annData === "object" ? Object.keys(annData).length : 0;
+            const bkms = Array.isArray(parsed.stores["vot-bookmarks"]) ? parsed.stores["vot-bookmarks"].length : 0;
+            const jrn = parsed.stores["vot-journal"] && Array.isArray(parsed.stores["vot-journal"].list) ? parsed.stores["vot-journal"].list.length : 0;
+            if (annKeys) summaryParts.push(`${annKeys} annotated keys`);
+            if (bkms) summaryParts.push(`${bkms} bookmarks`);
+            if (jrn) summaryParts.push(`${jrn} journal entries`);
+          }
+          const mediaCount = parsed.media && typeof parsed.media === "object" ? Object.keys(parsed.media).length : 0;
+          if (mediaCount) summaryParts.push(`${mediaCount} media items`);
+          const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(", ")}.` : "";
+          const proceed = window.confirm(
+            `Importing the backup from ${dateLabel} will REPLACE all your current data on this device.${summary}${forwardCompatNote} This cannot be undone.
+
+Continue?`
+          );
+          if (!proceed) return;
+          _showToast("Importing\u2026 please wait.", 0);
+          ["vot-state", "vot-ann-migrated"].forEach((k) => {
+            try {
+              localStorage.removeItem(k);
+            } catch (_e) {
+            }
+          });
+          Object.keys(parsed.data || {}).forEach((k) => {
+            if (k.indexOf("vot-") !== 0) return;
+            const v = parsed.data[k];
+            if (typeof v === "string") {
+              try {
+                localStorage.setItem(k, v);
+              } catch (e) {
+                console.warn("LS write failed for", k, e);
+              }
+            }
+          });
+          if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === "object") {
+            const storesMap = _exportableStores();
+            const flagMap = _flagStores();
+            for (const name of Object.keys(storesMap)) {
+              if (!(name in parsed.stores)) continue;
+              const { store, method } = storesMap[name];
+              try {
+                store[method](parsed.stores[name]);
+              } catch (e) {
+                console.warn("store import failed for", name, e);
+              }
+            }
+            for (const name of Object.keys(flagMap)) {
+              if (!(name in parsed.stores)) continue;
+              const truthy = !!parsed.stores[name];
+              try {
+                if (truthy) flagMap[name].set();
+                else flagMap[name].clear();
+              } catch (e) {
+                console.warn("flag import failed for", name, e);
+              }
+            }
+          } else {
+            const storesMap = _exportableStores();
+            const flagMap = _flagStores();
+            for (const name of Object.keys(storesMap)) {
+              const raw = parsed.data && parsed.data[name];
+              if (typeof raw !== "string") continue;
+              try {
+                const obj = JSON.parse(raw);
+                const { store, method } = storesMap[name];
+                store[method](obj);
+              } catch (e) {
+                console.warn("V1 import parse failed for", name, e);
+              }
+            }
+            for (const name of Object.keys(flagMap)) {
+              if (parsed.data && (parsed.data[name] === "1" || parsed.data[name] === 1)) {
+                flagMap[name].set();
+              }
+            }
+          }
+          if (exportVersion >= 2 && parsed.media && typeof parsed.media === "object") {
+            try {
+              const existingIds = await JournalMediaStore.allIds();
+              for (const id of existingIds) await JournalMediaStore.delete(id);
+            } catch (e) {
+              console.warn("clear existing media failed", e);
+            }
+            for (const id of Object.keys(parsed.media)) {
+              const record = parsed.media[id];
+              if (!record || typeof record !== "object" || typeof record.data !== "string") continue;
+              try {
+                const blob = _base64ToBlob(record.data, record.mime);
+                await JournalMediaStore.put({
+                  id,
+                  type: record.type,
+                  blob,
+                  mime: record.mime,
+                  size: record.size,
+                  width: record.width,
+                  height: record.height,
+                  duration: record.duration,
+                  created: record.created
+                });
+              } catch (e) {
+                console.warn("media import failed for", id, e);
+              }
+            }
+          }
+          hideToast(_TOAST_ID);
+          _showToast("Import complete. Reloading\u2026", 0);
+          setTimeout(() => window.location.reload(), 1500);
+        } catch (err) {
+          console.warn("import failed", err);
+          hideToast(_TOAST_ID);
+          _showToast("Import failed: " + (err && err.message ? err.message : "invalid file"));
+        }
+      };
+      window.__onImportFile = (b64OrNull) => {
+        window.__onImportFile = null;
+        if (!b64OrNull) return;
+        try {
+          _doImport(atob(b64OrNull));
+        } catch (_e) {
+          _showToast("Import failed: could not decode file.");
+        }
+      };
+      PlatformBridge.openFilePicker();
     };
     const _deleteIdbDatabase = (name, critical) => new Promise((resolve) => {
       let settled = false;

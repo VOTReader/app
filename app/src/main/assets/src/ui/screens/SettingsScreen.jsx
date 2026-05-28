@@ -281,43 +281,317 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     return keys;
   };
   // ════════════════════════════════════════════════════════════════
-  // INTERIM EXPORT/IMPORT GUARD (W2.4-hotfix → removed in W2.6)
+  // EXPORT v2 / IMPORT v1+v2 (W2.6)
   // ════════════════════════════════════════════════════════════════
-  // After W2.3/W2.3b/W2.4, the actual user data lives in IDB. The
-  // pre-W2 export iterates localStorage — which now holds only the
-  // vot-state reduced shim + vot-ann-migrated boot gate (per W2.4's
-  // LS_SKIP_LIST). Running the old export right now produces a
-  // backup file that looks valid but contains almost no data, and
-  // running the old import would overwrite the user's IDB-resident
-  // data with near-nothing.
+  // Payload schema:
+  //   {
+  //     app: 'VOTReader',
+  //     exportVersion: 2,                  (v1 backups have 1 or absent)
+  //     exportDate: ISO,
+  //     diagnosticLog: [...],
+  //     data: {                            (v1+v2: LS boot-shim ONLY in v2;
+  //                                         v1 had FULL state here)
+  //       'vot-state': '<reduced JSON>',
+  //       'vot-ann-migrated': '1',
+  //     },
+  //     stores: { ... },                   (v2 ONLY: IDB-backed stores)
+  //     media: { id: { type, mime, ..., data: base64 } }  (v2 ONLY)
+  //   }
   //
-  // The proper fix is W2.6: export v2 schema with IDB stores + media
-  // blobs, V1↔V2 forward/backward compat, async toast UX. Until that
-  // ships, both functions show an explanatory alert and exit — safer
-  // than letting a user accidentally destroy their data with a stale
-  // backup file. The alerts will be replaced with the real
-  // implementations in W2.6.
-  const exportPersonalData = () => {
-    alert(
-      'Export is temporarily unavailable.\n\n' +
-      'The storage layer is mid-upgrade — your data has moved from ' +
-      'browser-local storage to a more durable on-device database, ' +
-      'and the export format is being updated to match. Until that ' +
-      'lands in the next update, the existing export would produce ' +
-      'an incomplete file.\n\n' +
-      'Your data is safe and untouched on this device. No action ' +
-      'needed. Please wait for the next update before exporting.'
-    );
+  // V1 client reading v2: walks `data` only — restores theme +
+  // fontStyle, ignores unknown top-level keys (stores, media) per
+  // its existing filter loop. User keeps boot-shim settings;
+  // everything else lost. Documented limitation.
+  //
+  // V2 client reading v1: detects exportVersion !== 2, falls back to
+  // parsing `data` values as JSON strings (the pre-W2 format) and
+  // calling replaceAll on each store inline. Full restore.
+  //
+  // V2 client reading v3+ (future): walks `data` + `stores` + `media`
+  // it knows about; ignores unknown top-level keys (forward compat).
+  //
+  // 4 user-facing toast sites replace the pre-W2.6 alert() calls
+  // per [[consolidate-dont-duplicate]] via the showToast utility.
+
+  const _TOAST_ID = 'vot-toast-info';
+  const _showToast = (html, durationMs) => showToast({
+    id: _TOAST_ID, className: 'vot-toast', html: html, durationMs: durationMs == null ? 3500 : durationMs,
+  });
+
+  /**
+   * Encode a Blob to base64 string via streaming Uint8Array chunks.
+   * Avoids the OOM hazard of FileReader.readAsDataURL on blobs > 1 MB
+   * (per [[readAsDataURL-oom-risk]]) by processing in 64KB slices and
+   * incrementally concatenating into the binary string before btoa.
+   */
+  const _blobToBase64 = async (blob) => {
+    const CHUNK = 65536;
+    const reader = blob.stream().getReader();
+    let binary = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      for (let i = 0; i < value.length; i += CHUNK) {
+        const slice = value.subarray(i, Math.min(i + CHUNK, value.length));
+        binary += String.fromCharCode.apply(null, /** @type {any} */ (slice));
+      }
+    }
+    return btoa(binary);
   };
+
+  /** Decode a base64 string to a Blob. Caller owns the lifetime. */
+  const _base64ToBlob = (b64, mime) => {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime || 'application/octet-stream' });
+  };
+
+  /**
+   * Map from IDB store name to its store object + the method used to
+   * apply replacement. `setAll` for stores with whole-collection
+   * primitives, `set` for single-value stores (StateStore, etc.),
+   * `replaceAll` otherwise.
+   */
+  const _exportableStores = () => ({
+    'vot-annotations':         { store: AnnotationStore,      method: 'replaceAll' },
+    'vot-notes':               { store: NoteStore,            method: 'replaceAll' },
+    'vot-bookmarks':           { store: BookmarkStore,        method: 'replaceAll' },
+    'vot-links':               { store: LinkStore,            method: 'replaceAll' },
+    'vot-notebooks':           { store: NotebookStore,        method: 'replaceAll' },
+    'vot-journal':             { store: JournalStore,         method: 'replaceAll' },
+    'vot-journal-notebooks':   { store: JournalNotebookStore, method: 'replaceAll' },
+    'vot-journal-index':       { store: JournalIndexStore,    method: 'replaceAll' },
+    'vot-journal-stats':       { store: JournalStatsStore,    method: 'replaceAll' },
+    'vot-recent-nav':          { store: RecentNavStore,       method: 'replaceAll' },
+    'vot-history':             { store: HistoryStore,         method: 'setAll' },
+    'vot-prophecy-cards':      { store: ProphecyCardsStore,   method: 'setAll' },
+    'vot-home-order':          { store: HomeOrderStore,       method: 'set' },
+    'vot-state':               { store: StateStore,           method: 'set' },
+  });
+  /**
+   * Boolean flag stores keyed by IDB store name. Imported via set()
+   * when value is truthy; clear() otherwise.
+   */
+  const _flagStores = () => ({
+    'vot-welcomed':              WelcomedFlagStore,
+    'vot-about-seen':            AboutSeenFlagStore,
+    'vot-garden-warning-acked':  GardenWarningFlagStore,
+  });
+
+  const exportPersonalData = async () => {
+    try {
+      _showToast('Preparing export…', 0);
+
+      // (a) data: LS boot-shim only. V1 clients reading this file see
+      //     just theme + fontStyle restored (intentional limitation).
+      const data = {};
+      for (const k of ['vot-state', 'vot-ann-migrated']) {
+        const v = localStorage.getItem(k);
+        if (v != null) data[k] = v;
+      }
+
+      // (b) stores: every IDB-backed store, keyed by store name.
+      const storesMap = _exportableStores();
+      const flagMap = _flagStores();
+      const stores = {};
+      for (const name of Object.keys(storesMap)) {
+        try {
+          const v = await IDBAdapter.get(name, 'v');
+          if (v !== undefined) stores[name] = v;
+        } catch (_e) { /* per-store best-effort */ }
+      }
+      for (const name of Object.keys(flagMap)) {
+        try {
+          const v = await IDBAdapter.get(name, 'v');
+          if (v !== undefined) stores[name] = !!v;
+        } catch (_e) { /* best-effort */ }
+      }
+
+      // (c) media: encode JournalMediaStore blobs as base64.
+      const media = {};
+      let totalMediaBytes = 0;
+      const MEDIA_LIMIT_BYTES = 100 * 1024 * 1024; // 100 MB hard guard
+      try {
+        const ids = await JournalMediaStore.allIds();
+        for (const id of ids) {
+          const rec = await JournalMediaStore.get(id);
+          if (!rec || !rec.blob) continue;
+          totalMediaBytes += rec.blob.size || 0;
+          if (totalMediaBytes > MEDIA_LIMIT_BYTES) {
+            hideToast(_TOAST_ID);
+            _showToast('Export aborted: media exceeds 100 MB. Streaming export support is planned for a future update.');
+            return;
+          }
+          const b64 = await _blobToBase64(rec.blob);
+          media[id] = {
+            type: rec.type, mime: rec.mime, size: rec.size,
+            width: rec.width, height: rec.height, duration: rec.duration,
+            created: rec.created,
+            data: b64,
+          };
+        }
+      } catch (e) {
+        console.warn('media export failed', e);
+        /* proceed with structured data only */
+      }
+
+      const payload = {
+        app: 'VOTReader',
+        exportVersion: 2,
+        exportDate: new Date().toISOString(),
+        diagnosticLog: diagnosticLog,
+        data: data,
+        stores: stores,
+        media: media,
+      };
+
+      const json = JSON.stringify(payload);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const filename = `votreader-backup-${stamp}.json`;
+      const result = PlatformBridge.saveToDownloads(filename, json);
+
+      hideToast(_TOAST_ID);
+      if (result === 'ok') {
+        _showToast('Backup saved to your Downloads folder.');
+      } else {
+        console.warn('saveToDownloads error:', result);
+        _showToast('Export failed. Please try again.');
+      }
+    } catch (e) {
+      console.warn('export failed', e);
+      hideToast(_TOAST_ID);
+      _showToast('Export failed. See console for details.');
+    }
+  };
+
   const importPersonalData = () => {
-    alert(
-      'Import is temporarily unavailable.\n\n' +
-      'The storage layer is mid-upgrade. Importing a pre-upgrade ' +
-      'backup file right now would overwrite your current data ' +
-      'with the older format and lose anything created since the ' +
-      'last backup. Import will be restored in the next update ' +
-      'with full IDB + media support.'
-    );
+    const _doImport = async (jsonText) => {
+      try {
+        const parsed = JSON.parse(jsonText);
+        if (!parsed || parsed.app !== 'VOTReader' || typeof parsed.data !== 'object') {
+          _showToast('This file does not look like a VOTReader backup.');
+          return;
+        }
+        const exportVersion = parsed.exportVersion || 1;
+        const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
+
+        // V3+ forward-compat: warn but proceed with the keys this
+        // client understands. Per PLAN W2.6 (c).
+        const forwardCompatNote = exportVersion > 2
+          ? '\n\nNOTE: This backup was created with a newer version of VOTReader. Some data may not be imported.'
+          : '';
+
+        // Summarize what's about to land for the confirm dialog.
+        const summaryParts = [];
+        if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
+          const annData = parsed.stores['vot-annotations'];
+          const annKeys = annData && typeof annData === 'object' ? Object.keys(annData).length : 0;
+          const bkms = Array.isArray(parsed.stores['vot-bookmarks']) ? parsed.stores['vot-bookmarks'].length : 0;
+          const jrn = parsed.stores['vot-journal'] && Array.isArray(parsed.stores['vot-journal'].list)
+            ? parsed.stores['vot-journal'].list.length : 0;
+          if (annKeys) summaryParts.push(`${annKeys} annotated keys`);
+          if (bkms) summaryParts.push(`${bkms} bookmarks`);
+          if (jrn) summaryParts.push(`${jrn} journal entries`);
+        }
+        const mediaCount = parsed.media && typeof parsed.media === 'object' ? Object.keys(parsed.media).length : 0;
+        if (mediaCount) summaryParts.push(`${mediaCount} media items`);
+        const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(', ')}.` : '';
+
+        const proceed = window.confirm(
+          `Importing the backup from ${dateLabel} will REPLACE all your current data on this device.${summary}${forwardCompatNote} This cannot be undone.\n\nContinue?`
+        );
+        if (!proceed) return;
+
+        _showToast('Importing… please wait.', 0);
+
+        // (1) Clear the legacy + shim LS keys and re-seed from data.
+        ['vot-state', 'vot-ann-migrated'].forEach((k) => {
+          try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
+        });
+        Object.keys(parsed.data || {}).forEach((k) => {
+          if (k.indexOf('vot-') !== 0) return;
+          const v = parsed.data[k];
+          if (typeof v === 'string') {
+            try { localStorage.setItem(k, v); } catch (e) { console.warn('LS write failed for', k, e); }
+          }
+        });
+
+        // (2) Apply stores → IDB-backed stores
+        if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
+          const storesMap = _exportableStores();
+          const flagMap = _flagStores();
+          for (const name of Object.keys(storesMap)) {
+            if (!(name in parsed.stores)) continue;
+            const { store, method } = storesMap[name];
+            try { store[method](parsed.stores[name]); }
+            catch (e) { console.warn('store import failed for', name, e); }
+          }
+          for (const name of Object.keys(flagMap)) {
+            if (!(name in parsed.stores)) continue;
+            const truthy = !!parsed.stores[name];
+            try { if (truthy) flagMap[name].set(); else flagMap[name].clear(); }
+            catch (e) { console.warn('flag import failed for', name, e); }
+          }
+        } else {
+          // V1 fallback: parse each LS-shape value in `data` and call
+          // the store's replaceAll/setAll/set with the parsed object.
+          const storesMap = _exportableStores();
+          const flagMap = _flagStores();
+          for (const name of Object.keys(storesMap)) {
+            const raw = parsed.data && parsed.data[name];
+            if (typeof raw !== 'string') continue;
+            try {
+              const obj = JSON.parse(raw);
+              const { store, method } = storesMap[name];
+              store[method](obj);
+            } catch (e) { console.warn('V1 import parse failed for', name, e); }
+          }
+          for (const name of Object.keys(flagMap)) {
+            if (parsed.data && (parsed.data[name] === '1' || parsed.data[name] === 1)) {
+              flagMap[name].set();
+            }
+          }
+        }
+
+        // (3) Apply media → JournalMediaStore (v2 only). Clear
+        //     existing media first so this is a true REPLACE.
+        if (exportVersion >= 2 && parsed.media && typeof parsed.media === 'object') {
+          try {
+            const existingIds = await JournalMediaStore.allIds();
+            for (const id of existingIds) await JournalMediaStore.delete(id);
+          } catch (e) { console.warn('clear existing media failed', e); }
+          for (const id of Object.keys(parsed.media)) {
+            const record = parsed.media[id];
+            if (!record || typeof record !== 'object' || typeof record.data !== 'string') continue;
+            try {
+              const blob = _base64ToBlob(record.data, record.mime);
+              await JournalMediaStore.put({
+                id: id, type: record.type, blob: blob,
+                mime: record.mime, size: record.size,
+                width: record.width, height: record.height, duration: record.duration,
+                created: record.created,
+              });
+            } catch (e) { console.warn('media import failed for', id, e); }
+          }
+        }
+
+        hideToast(_TOAST_ID);
+        _showToast('Import complete. Reloading…', 0);
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (err) {
+        console.warn('import failed', err);
+        hideToast(_TOAST_ID);
+        _showToast('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
+      }
+    };
+    window.__onImportFile = (b64OrNull) => {
+      window.__onImportFile = null;
+      if (!b64OrNull) return;
+      try { _doImport(atob(b64OrNull)); }
+      catch (_e) { _showToast('Import failed: could not decode file.'); }
+    };
+    PlatformBridge.openFilePicker();
   };
 
   /**
