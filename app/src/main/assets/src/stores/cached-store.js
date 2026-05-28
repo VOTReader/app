@@ -621,6 +621,101 @@ export function _resetStoreRegistry() {
   _idbStoreRegistry.clear();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   W2.4 — One-time legacy localStorage cleanup
+   ═══════════════════════════════════════════════════════════════════
+   By the time `hydrateAllStores()` resolves, every IDB-backed store
+   has self-seeded from its legacy LS key (per the W2.2 legacy-LS-
+   fallback path inside `_hydrate`). The original `vot-*` LS payloads
+   are now wasted quota — IDB owns the truth.
+
+   `clearLegacyLs()` removes them on first post-W2.4 boot. It is a
+   CLEANUP function, not a migration function (W2.3+W2.3b already
+   did the data move). Idempotent via a flag in the meta store; safe
+   to call on every boot.
+
+   ORDERING: must run AFTER `hydrateAllStores()` resolves. The
+   per-store self-seed reads the legacy LS key; clearing LS first
+   would null those reads and produce empty IDB stores for pre-W2.4
+   users (catastrophic — looks like a wipe).
+
+   SKIP_LIST: two keys stay in LS permanently:
+     'vot-state'         — reduced theme+fontStyle shim for the sync
+                           boot-script read at index.html:73. Cannot
+                           wait on async IDB.
+     'vot-ann-migrated'  — legacy annotation-migration gate read at
+                           annotation-store.js module load before any
+                           IDB store opens.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/** localStorage keys NOT cleared by W2.4. Frozen + exported so tests
+ *  + the Settings export path can reference the canonical list. */
+export const LS_SKIP_LIST = Object.freeze(['vot-state', 'vot-ann-migrated']);
+
+/** Meta-store key holding the W2.4 cleanup-complete flag. */
+const LS_MIGRATION_FLAG_KEY = 'migrated-v1';
+
+/**
+ * One-time legacy LS cleanup. Idempotent — checks the meta-store
+ * flag; if already set, returns immediately. Otherwise iterates
+ * `localStorage`, removes every `vot-*` key not in `LS_SKIP_LIST`,
+ * then writes the flag.
+ *
+ * MUST run after `hydrateAllStores()` resolves so the per-store
+ * legacy-LS-fallback path has read the LS keys it needs.
+ *
+ * Best-effort: any individual error (meta read, LS iteration, LS
+ * removeItem, meta write) is logged but does not throw. A partial
+ * cleanup is acceptable — the next boot retries because the flag
+ * isn't set yet.
+ *
+ * @returns {Promise<void>}
+ */
+export async function clearLegacyLs() {
+  let alreadyDone;
+  try {
+    alreadyDone = await IDBAdapter.get('meta', LS_MIGRATION_FLAG_KEY);
+  } catch (e) {
+    console.warn('clearLegacyLs: meta read failed; deferring to next boot', e);
+    return;
+  }
+  if (alreadyDone) return;
+
+  /** @type {string[]} */
+  const toClear = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('vot-') === 0 && !LS_SKIP_LIST.includes(k)) {
+        toClear.push(k);
+      }
+    }
+  } catch (e) {
+    console.warn('clearLegacyLs: LS iteration failed', e);
+    return;
+  }
+  for (const k of toClear) {
+    try { localStorage.removeItem(k); }
+    catch (_e) { /* per-key non-fatal */ }
+  }
+
+  try {
+    await IDBAdapter.put('meta', LS_MIGRATION_FLAG_KEY, true);
+  } catch (e) {
+    console.warn('clearLegacyLs: meta write failed; will retry next boot', e);
+  }
+}
+
+/**
+ * TEST-ONLY: clear the W2.4 cleanup flag so the next clearLegacyLs()
+ * call performs the cleanup again. Used by tests to exercise both
+ * the first-run and idempotent paths.
+ * @returns {Promise<void>}
+ */
+export function _resetLegacyLsFlag() {
+  return IDBAdapter.delete('meta', LS_MIGRATION_FLAG_KEY).catch(function (_e) { /* test helper — best effort */ });
+}
+
 /**
  * Compose a CachedStore base with store-specific methods. Identical at
  * runtime to `Object.assign(base, methods)` — the only purpose is to give

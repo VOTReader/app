@@ -5133,6 +5133,14 @@
           }
         });
         try {
+          indexedDB.deleteDatabase("votreader");
+        } catch (_e) {
+        }
+        try {
+          indexedDB.deleteDatabase("vot-journal-media");
+        } catch (_e) {
+        }
+        try {
           indexedDB.deleteDatabase("vot-thumbs");
         } catch (_e) {
         }

@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 372 distinct identifiers.
+// Total: 374 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -130,6 +130,7 @@ export const projectGlobals = {
   LETTERS_V7: "readonly",
   LETTERS_V7_PREFACE: "readonly",
   LETTER_SCREEN_SET: "readonly",
+  LS_SKIP_LIST: "readonly",
   LetterExcerptPickerScreen: "readonly",
   LetterView: "readonly",
   LibraryNav: "readonly",
@@ -275,6 +276,7 @@ export const projectGlobals = {
   buildNavIndex: "readonly",
   buildScreenRoutes: "readonly",
   buildSourceEndpoint: "readonly",
+  clearLegacyLs: "readonly",
   clearSuppressNextHistoryPush: "readonly",
   colLetterArr: "readonly",
   colLetters: "readonly",

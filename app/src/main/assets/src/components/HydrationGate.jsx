@@ -25,7 +25,7 @@
    call.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { hydrateAllStores } from '../stores/cached-store.js';
+import { hydrateAllStores, clearLegacyLs } from '../stores/cached-store.js';
 
 const { useState, useEffect } = React;
 
@@ -48,17 +48,22 @@ export function HydrationGate({ children }) {
     // links+history after first paint) per PLAN W2.3 Tier 3.
     try { performance.mark('vot-hydration-start'); } catch (_e) { /* perf unsupported */ }
     const startMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-    hydrateAllStores().finally(() => {
-      if (!alive) return;
-      const endMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-      const elapsed = endMs - startMs;
-      /** @type {any} */ (window).__hydrationLatencyMs = elapsed;
-      try {
-        performance.mark('vot-hydration-end');
-        performance.measure('vot-hydration', 'vot-hydration-start', 'vot-hydration-end');
-      } catch (_e) { /* perf unsupported */ }
-      setHydrated(true);
-    });
+    hydrateAllStores()
+      // W2.4: legacy-LS cleanup runs AFTER hydration so the
+      // per-store self-seed has already read the legacy keys.
+      // Best-effort + idempotent — failures don't block render.
+      .then(() => clearLegacyLs())
+      .finally(() => {
+        if (!alive) return;
+        const endMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const elapsed = endMs - startMs;
+        /** @type {any} */ (window).__hydrationLatencyMs = elapsed;
+        try {
+          performance.mark('vot-hydration-end');
+          performance.measure('vot-hydration', 'vot-hydration-start', 'vot-hydration-end');
+        } catch (_e) { /* perf unsupported */ }
+        setHydrated(true);
+      });
     return () => { alive = false; };
   }, []);
 

@@ -357,6 +357,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const clearAllPersonalData = () => {
     try {
       _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
+      // W2.4: Clear ALL user-data IDB databases too — the bulk of
+      // user data now lives in IDB, not LS. Without this, "Clear All
+      // Personal Data" would leave annotations, bookmarks, journal
+      // entries, history, and tab state intact while only wiping the
+      // boot-script shim — a user-trust failure.
+      try { indexedDB.deleteDatabase('votreader'); } catch (_e) { /* IDB op — best-effort */ }
+      try { indexedDB.deleteDatabase('vot-journal-media'); } catch (_e) { /* IDB op — best-effort */ }
       try { indexedDB.deleteDatabase('vot-thumbs'); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
       try { indexedDB.deleteDatabase('vot-search-cache'); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
       alert('All personal data cleared. The app will now reload.');

@@ -1027,6 +1027,41 @@
     }
     return false;
   }
+  var LS_SKIP_LIST = Object.freeze(["vot-state", "vot-ann-migrated"]);
+  var LS_MIGRATION_FLAG_KEY = "migrated-v1";
+  async function clearLegacyLs() {
+    let alreadyDone;
+    try {
+      alreadyDone = await IDBAdapter.get("meta", LS_MIGRATION_FLAG_KEY);
+    } catch (e) {
+      console.warn("clearLegacyLs: meta read failed; deferring to next boot", e);
+      return;
+    }
+    if (alreadyDone) return;
+    const toClear = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf("vot-") === 0 && !LS_SKIP_LIST.includes(k)) {
+          toClear.push(k);
+        }
+      }
+    } catch (e) {
+      console.warn("clearLegacyLs: LS iteration failed", e);
+      return;
+    }
+    for (const k of toClear) {
+      try {
+        localStorage.removeItem(k);
+      } catch (_e) {
+      }
+    }
+    try {
+      await IDBAdapter.put("meta", LS_MIGRATION_FLAG_KEY, true);
+    } catch (e) {
+      console.warn("clearLegacyLs: meta write failed; will retry next boot", e);
+    }
+  }
   function extendStore(base, methods) {
     return (
       /** @type {B & M} */
@@ -3411,7 +3446,7 @@
       } catch (_e) {
       }
       const startMs = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
-      hydrateAllStores().finally(() => {
+      hydrateAllStores().then(() => clearLegacyLs()).finally(() => {
         if (!alive) return;
         const endMs = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
         const elapsed = endMs - startMs;
@@ -9316,6 +9351,8 @@
     CachedStore,
     hydrateAllStores,
     hasAnyPendingStores,
+    clearLegacyLs,
+    LS_SKIP_LIST,
     IDBAdapter,
     WelcomedFlagStore,
     AboutSeenFlagStore: AboutSeenFlagStore2,

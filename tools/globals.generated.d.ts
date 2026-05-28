@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 372 distinct identifiers.
+// Total: 374 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -131,6 +131,7 @@ declare const LETTERS_V6_PREFACE: any;
 declare const LETTERS_V7: any;
 declare const LETTERS_V7_PREFACE: any;
 declare const LETTER_SCREEN_SET: any;
+declare const LS_SKIP_LIST: any;
 declare const LetterExcerptPickerScreen: any;
 declare const LetterView: any;
 declare const LibraryNav: any;
@@ -276,6 +277,7 @@ declare const bookCategory: any;
 declare const buildNavIndex: any;
 declare const buildScreenRoutes: any;
 declare const buildSourceEndpoint: any;
+declare const clearLegacyLs: any;
 declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
 declare const colLetters: any;

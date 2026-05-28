@@ -31,6 +31,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   CachedStore, extendStore,
   hydrateAllStores, hasAnyPendingStores, _resetStoreRegistry,
+  clearLegacyLs, _resetLegacyLsFlag, LS_SKIP_LIST,
 } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 
@@ -901,6 +902,110 @@ describe('CachedStore — _defaultRef stability during pending/degraded', () => 
     expect(store._defaultRef).not.toBeNull();
     store._resetForTests();
     expect(store._defaultRef).toBeNull();
+  });
+});
+
+describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
+  beforeEach(() => {
+    localStorage.clear?.();
+    _resetStoreRegistry();
+    vi.restoreAllMocks();
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('LS_SKIP_LIST exports the two permanent LS exceptions', () => {
+    expect(LS_SKIP_LIST).toContain('vot-state');
+    expect(LS_SKIP_LIST).toContain('vot-ann-migrated');
+    expect(LS_SKIP_LIST.length).toBe(2);
+    expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
+  });
+
+  it('first run: clears vot-* LS keys except skip-list AND sets the flag', async () => {
+    // Seed legacy LS state
+    localStorage.setItem('vot-bookmarks', '[]');
+    localStorage.setItem('vot-history', '[]');
+    localStorage.setItem('vot-home-order', '[]');
+    localStorage.setItem('vot-state', '{"theme":"dark"}');           // skip
+    localStorage.setItem('vot-ann-migrated', '1');                    // skip
+    localStorage.setItem('other-non-vot-key', 'untouched');           // not vot-* prefix
+
+    // Mock IDB so the flag round-trip works
+    /** @type {Record<string, any>} */
+    const idbMeta = {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async function (_store, key) {
+      return idbMeta[String(key)];
+    });
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async function (_store, key, value) {
+      idbMeta[String(key)] = value;
+    });
+
+    await clearLegacyLs();
+
+    // Cleared:
+    expect(localStorage.getItem('vot-bookmarks')).toBeNull();
+    expect(localStorage.getItem('vot-history')).toBeNull();
+    expect(localStorage.getItem('vot-home-order')).toBeNull();
+    // Preserved:
+    expect(localStorage.getItem('vot-state')).toBe('{"theme":"dark"}');
+    expect(localStorage.getItem('vot-ann-migrated')).toBe('1');
+    expect(localStorage.getItem('other-non-vot-key')).toBe('untouched');
+    // Flag set:
+    expect(idbMeta['migrated-v1']).toBe(true);
+  });
+
+  it('idempotent: second call is a no-op (flag already set)', async () => {
+    /** @type {Record<string, any>} */
+    const idbMeta = { 'migrated-v1': true };
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async function (_s, k) { return idbMeta[String(k)]; });
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockImplementation(async () => {});
+
+    localStorage.setItem('vot-something', 'should-survive');
+    await clearLegacyLs();
+    expect(localStorage.getItem('vot-something')).toBe('should-survive');
+    expect(putSpy).not.toHaveBeenCalled();
+  });
+
+  it('meta-read failure: returns gracefully without touching LS', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockRejectedValue(new Error('IDB unavailable'));
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    localStorage.setItem('vot-bookmarks', 'preserved-on-error');
+    await clearLegacyLs();
+    expect(localStorage.getItem('vot-bookmarks')).toBe('preserved-on-error');
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('meta-write failure: LS still cleared (partial OK; next boot retries)', async () => {
+    /** @type {Record<string, any>} */
+    const idbMeta = {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async (_s, k) => idbMeta[String(k)]);
+    vi.spyOn(IDBAdapter, 'put').mockRejectedValue(new Error('quota'));
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    localStorage.setItem('vot-bookmarks', '[]');
+    await clearLegacyLs();
+    expect(localStorage.getItem('vot-bookmarks')).toBeNull();  // cleared
+    expect(idbMeta['migrated-v1']).toBeUndefined();             // flag NOT set
+    consoleSpy.mockRestore();
+  });
+
+  it('_resetLegacyLsFlag clears the flag so clearLegacyLs runs again', async () => {
+    /** @type {Record<string, any>} */
+    const idbMeta = { 'migrated-v1': true };
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async (_s, k) => idbMeta[String(k)]);
+    vi.spyOn(IDBAdapter, 'put').mockImplementation(async (_s, k, v) => { idbMeta[String(k)] = v; });
+    vi.spyOn(IDBAdapter, 'delete').mockImplementation(async (_s, k) => { delete idbMeta[String(k)]; });
+
+    expect(idbMeta['migrated-v1']).toBe(true);
+    await _resetLegacyLsFlag();
+    expect(idbMeta['migrated-v1']).toBeUndefined();
+
+    // Now clearLegacyLs runs the cleanup again
+    localStorage.setItem('vot-cleanup-me', 'x');
+    await clearLegacyLs();
+    expect(localStorage.getItem('vot-cleanup-me')).toBeNull();
+    expect(idbMeta['migrated-v1']).toBe(true);
   });
 });
 

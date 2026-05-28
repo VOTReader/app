@@ -37,7 +37,7 @@
 import '../styles/journal-styles.js';
 
 // ── Stores ──────────────────────────────────────────────────────────────
-import { CachedStore, hydrateAllStores, hasAnyPendingStores } from './cached-store.js';
+import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore } from './app-flag-stores.js';
 import { ProphecyCardsStore } from './prophecy-cards-store.js';
@@ -137,7 +137,7 @@ Object.assign(window, {
   // Platform bridge (W1.1)
   PlatformBridge,
   // Stores
-  CachedStore, hydrateAllStores, hasAnyPendingStores,
+  CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
   IDBAdapter,
   WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore,
   ProphecyCardsStore,
