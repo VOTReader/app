@@ -72,6 +72,8 @@ export function AppShellOverlays({
   return (
     <>
       <StorageHealthBanner onNavigateSettings={() => setScreen('settings')} />
+      <Safari7DayModal />
+      <IosPwaWelcomeCard onNavigateSettings={() => setScreen('settings')} />
 
       {showWelcome && (
         <div style={{

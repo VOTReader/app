@@ -242,6 +242,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
 
   const applyHighlight = React.useCallback((color) => {
     if (!selInfo) return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
     suppressRef.current = true;
     const kind = activeStyle === 'underline' ? 'underline' : 'highlight';
     if (selInfo.multiVerse) {
@@ -368,6 +369,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
 
   const handleNote = React.useCallback(() => {
     if (!selInfo) return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
     // Default note color = yellow. If selection sits inside an existing
     // group, convert that group to a note (preserving color); otherwise
     // create a new note-kind annotation across the selected range(s).
@@ -496,6 +498,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
 
   const handleBookmark = React.useCallback(() => {
     if (!selInfo) return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
     // Determine the hlKey: single-container uses selInfo.hlKey;
     // multi-container uses the first container's key.
     var hlKey = selInfo.hlKey;

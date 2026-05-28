@@ -29,6 +29,7 @@ export function ChapterBookmarkBtn({ chapterBookmark }) {
       }
       return;
     }
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
     // Open the pre-commit create sheet so the user can refine label +
     // attach a thought before persisting. Same flow as the
     // SelectionToolbar bookmark action — consistent experience whether

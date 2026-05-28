@@ -6226,6 +6226,7 @@
   function useJournalMutations({ setHlTick, setJournalEntryId, setScreen }) {
     const createAndEditJournal = () => {
       if (typeof JournalStore === "undefined") return;
+      if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
       const e = JournalStore.add();
       if (typeof JournalStatsStore !== "undefined") {
         const newMilestones = JournalStatsStore.recordNewEntry(e.created);
@@ -6729,7 +6730,8 @@
     risks: [],
     privateModeLikely: false,
     lastAssessedAt: 0,
-    writeFailedThisSession: false
+    writeFailedThisSession: false,
+    safariGateBlocked: false
   });
   var _report = null;
   var _version = 0;
@@ -6740,6 +6742,7 @@
   var _refreshIntervalId = null;
   var _lastAssessedAt = 0;
   var _safariWarningShownThisSession = false;
+  var _safariGateBlocked = false;
   var _assessInFlight = null;
   var _visibilityHandler = null;
   var _storageApiOverride = null;
@@ -6830,7 +6833,8 @@
           risks: fallbackRisks,
           privateModeLikely: false,
           lastAssessedAt: Date.now(),
-          writeFailedThisSession: _writeFailedThisSession
+          writeFailedThisSession: _writeFailedThisSession,
+          safariGateBlocked: _safariGateBlocked
         }
       );
       _report = fallback;
@@ -6869,7 +6873,8 @@
       risks,
       privateModeLikely,
       lastAssessedAt: Date.now(),
-      writeFailedThisSession: _writeFailedThisSession
+      writeFailedThisSession: _writeFailedThisSession,
+      safariGateBlocked: _safariGateBlocked
     };
     _report = report;
     _lastAssessedAt = Date.now();
@@ -6917,7 +6922,8 @@
         risks,
         privateModeLikely: _report.privateModeLikely,
         lastAssessedAt: _report.lastAssessedAt,
-        writeFailedThisSession: true
+        writeFailedThisSession: true,
+        safariGateBlocked: _safariGateBlocked
       };
     }
     _bump();
@@ -6949,10 +6955,17 @@
     if (_safariWarningShownThisSession) return { shouldBlock: false };
     if (_sessionDismissals.has("safari-7day")) return { shouldBlock: false };
     _safariWarningShownThisSession = true;
+    _safariGateBlocked = true;
+    if (_report) _report = Object.assign({}, _report, { safariGateBlocked: true });
+    _bump();
     return { shouldBlock: true, reason: "safari-7day" };
   }
   function _dismissScenario(scenarioId) {
     _sessionDismissals.add(scenarioId);
+    if (scenarioId === "safari-7day") {
+      _safariGateBlocked = false;
+      if (_report) _report = Object.assign({}, _report, { safariGateBlocked: false });
+    }
     _bump();
   }
   function _isDismissed(scenarioId) {
@@ -6993,6 +7006,7 @@
     _sessionDismissals = /* @__PURE__ */ new Set();
     _lastAssessedAt = 0;
     _safariWarningShownThisSession = false;
+    _safariGateBlocked = false;
     _assessInFlight = null;
     _storageApiOverride = opts && opts.storageApi || null;
   }

@@ -104,6 +104,7 @@ const RISK = Object.freeze({
  *   privateModeLikely: boolean,
  *   lastAssessedAt: number,
  *   writeFailedThisSession: boolean,
+ *   safariGateBlocked: boolean,
  * }} StorageHealthReport
  */
 
@@ -120,6 +121,7 @@ const _DEFAULT_REPORT = Object.freeze({
   privateModeLikely: false,
   lastAssessedAt: 0,
   writeFailedThisSession: false,
+  safariGateBlocked: false,
 });
 
 /* ─── Module state ──────────────────────────────────────────────────── */
@@ -138,6 +140,7 @@ let _sessionDismissals = new Set();
 let _refreshIntervalId = null;
 let _lastAssessedAt = 0;
 let _safariWarningShownThisSession = false;
+let _safariGateBlocked = false;
 /** @type {Promise<StorageHealthReport> | null} */
 let _assessInFlight = null;
 /** @type {(() => void) | null} */
@@ -283,6 +286,7 @@ async function _assessImpl() {
       privateModeLikely: false,
       lastAssessedAt: Date.now(),
       writeFailedThisSession: _writeFailedThisSession,
+      safariGateBlocked: _safariGateBlocked,
     });
     _report = fallback;
     _lastAssessedAt = Date.now();
@@ -327,6 +331,7 @@ async function _assessImpl() {
     privateModeLikely: privateModeLikely,
     lastAssessedAt: Date.now(),
     writeFailedThisSession: _writeFailedThisSession,
+    safariGateBlocked: _safariGateBlocked,
   };
 
   _report = report;
@@ -403,6 +408,7 @@ function _onWriteFailure(_err) {
       privateModeLikely: _report.privateModeLikely,
       lastAssessedAt: _report.lastAssessedAt,
       writeFailedThisSession: true,
+      safariGateBlocked: _safariGateBlocked,
     };
   }
   _bump();
@@ -461,6 +467,9 @@ function _checkFirstDataCreation() {
   if (_safariWarningShownThisSession) return { shouldBlock: false };
   if (_sessionDismissals.has('safari-7day')) return { shouldBlock: false };
   _safariWarningShownThisSession = true;
+  _safariGateBlocked = true;
+  if (_report) _report = Object.assign({}, _report, { safariGateBlocked: true });
+  _bump();
   return { shouldBlock: true, reason: 'safari-7day' };
 }
 
@@ -472,6 +481,10 @@ function _checkFirstDataCreation() {
  */
 function _dismissScenario(scenarioId) {
   _sessionDismissals.add(scenarioId);
+  if (scenarioId === 'safari-7day') {
+    _safariGateBlocked = false;
+    if (_report) _report = Object.assign({}, _report, { safariGateBlocked: false });
+  }
   _bump();
 }
 
@@ -539,6 +552,7 @@ function _resetForTests(opts) {
   _sessionDismissals = new Set();
   _lastAssessedAt = 0;
   _safariWarningShownThisSession = false;
+  _safariGateBlocked = false;
   _assessInFlight = null;
   _storageApiOverride = (opts && opts.storageApi) || null;
 }

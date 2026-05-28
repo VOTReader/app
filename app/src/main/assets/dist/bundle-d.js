@@ -1589,6 +1589,7 @@
         }
         return;
       }
+      if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
       if (window.__bookmarkCreate) {
         window.__bookmarkCreate({
           hlKey: chapterBookmark.hlKey,
@@ -2204,6 +2205,56 @@
     }
   }
 
+  // app/src/main/assets/src/ui/components/SafariFlows.jsx
+  function Safari7DayModal2() {
+    React.useSyncExternalStore(StorageHealth.subscribe, StorageHealth.getVersion);
+    var report = StorageHealth.getReport();
+    var visible = report.safariGateBlocked && !StorageHealth.isDismissed("safari-7day");
+    useModalRegistry({ id: "safari-7day-modal", dismiss: _dismiss, active: visible });
+    function _dismiss() {
+      StorageHealth.dismissScenario("safari-7day");
+    }
+    var [showInstructions, setShowInstructions] = React.useState(false);
+    if (!visible) return null;
+    var isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform || "");
+    return /* @__PURE__ */ React.createElement("div", { className: "sh-modal-backdrop", role: "dialog", "aria-modal": "true", "aria-label": "Safari storage warning" }, /* @__PURE__ */ React.createElement("div", { className: "sh-modal" }, /* @__PURE__ */ React.createElement("h3", { className: "sh-modal-title" }, "Before you start saving"), /* @__PURE__ */ React.createElement("p", { className: "sh-modal-text" }, "Safari may delete your saved notes and highlights if you don't visit for 7 days. ", "To keep your data safe, add VOTReader to your Home Screen."), showInstructions && /* @__PURE__ */ React.createElement("div", { className: "sh-modal-instructions" }, isMac ? /* @__PURE__ */ React.createElement("p", { className: "sh-modal-text" }, "In Safari: ", /* @__PURE__ */ React.createElement("strong", null, "File"), " ", ">", " ", /* @__PURE__ */ React.createElement("strong", null, "Add to Dock")) : /* @__PURE__ */ React.createElement("p", { className: "sh-modal-text" }, "Tap the ", /* @__PURE__ */ React.createElement("strong", null, "Share"), " button ", ">", " ", /* @__PURE__ */ React.createElement("strong", null, "Add to Home Screen"))), /* @__PURE__ */ React.createElement("div", { className: "sh-modal-actions" }, !showInstructions && /* @__PURE__ */ React.createElement("button", { className: "sh-modal-btn sh-modal-btn-primary", onClick: () => setShowInstructions(true) }, "How to add to Home Screen"), /* @__PURE__ */ React.createElement("button", { className: "sh-modal-btn sh-modal-btn-secondary", onClick: _dismiss }, "I understand the risk"))));
+  }
+  function IosPwaWelcomeCard2({ onNavigateSettings }) {
+    var platform = typeof StorageHealth !== "undefined" ? StorageHealth.getPlatform() : "unknown";
+    var [dismissed, setDismissed] = React.useState(false);
+    var isIosPwa = platform === "safari-pwa";
+    var hasData = _hasAnyUserData();
+    var flagKey = "ios-pwa-welcomed";
+    var alreadyWelcomed = typeof StateStore !== "undefined" && StateStore.get(flagKey);
+    var visible = isIosPwa && !hasData && !alreadyWelcomed && !dismissed;
+    useModalRegistry({ id: "ios-pwa-welcome", dismiss: _skip, active: visible });
+    function _skip() {
+      if (typeof StateStore !== "undefined") StateStore.set(flagKey, true);
+      setDismissed(true);
+    }
+    function _goImport() {
+      _skip();
+      onNavigateSettings();
+    }
+    if (!visible) return null;
+    return /* @__PURE__ */ React.createElement("div", { className: "sh-modal-backdrop sh-welcome-card", role: "dialog", "aria-modal": "true", "aria-label": "Welcome to VOTReader" }, /* @__PURE__ */ React.createElement("div", { className: "sh-modal" }, /* @__PURE__ */ React.createElement("h3", { className: "sh-modal-title" }, "Welcome to VOTReader!"), /* @__PURE__ */ React.createElement("p", { className: "sh-modal-text" }, "If you've been using VOTReader in Safari, your saved data ", "didn't transfer automatically. To bring your data over:"), /* @__PURE__ */ React.createElement("ol", { className: "sh-modal-steps" }, /* @__PURE__ */ React.createElement("li", null, "Open VOTReader in Safari (not this app)"), /* @__PURE__ */ React.createElement("li", null, "Go to Settings ", ">", " Export"), /* @__PURE__ */ React.createElement("li", null, "Come back here ", ">", " Settings ", ">", " Import")), /* @__PURE__ */ React.createElement("div", { className: "sh-modal-actions" }, /* @__PURE__ */ React.createElement("button", { className: "sh-modal-btn sh-modal-btn-primary", onClick: _goImport }, "I'll import my data"), /* @__PURE__ */ React.createElement("button", { className: "sh-modal-btn sh-modal-btn-secondary", onClick: _skip }, "I'm new \u2014 skip this"))));
+  }
+  function _hasAnyUserData() {
+    var stores = [
+      typeof AnnotationStore !== "undefined" && AnnotationStore,
+      typeof BookmarkStore !== "undefined" && BookmarkStore,
+      typeof JournalStore !== "undefined" && JournalStore,
+      typeof NoteStore !== "undefined" && NoteStore
+    ];
+    for (var s of stores) {
+      if (s && typeof s.getAll === "function") {
+        var data = s.getAll();
+        if (data && Object.keys(data).length > 0) return true;
+      }
+    }
+    return false;
+  }
+
   // app/src/main/assets/src/ui/components/AppShellOverlays.jsx
   function AppShellOverlays2({
     // Welcome modal
@@ -2259,7 +2310,7 @@
       dismiss: () => setGardenWarningOpen(false),
       active: !!gardenWarningOpen
     });
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StorageHealthBanner, { onNavigateSettings: () => setScreen("settings") }), showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StorageHealthBanner, { onNavigateSettings: () => setScreen("settings") }), /* @__PURE__ */ React.createElement(Safari7DayModal, null), /* @__PURE__ */ React.createElement(IosPwaWelcomeCard, { onNavigateSettings: () => setScreen("settings") }), showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
       position: "fixed",
       inset: 0,
       zIndex: 9999,
@@ -9085,6 +9136,7 @@ Continue?`
     }, [computeOffset, findHlContainer, hlTick]);
     const applyHighlight = React.useCallback((color) => {
       if (!selInfo) return;
+      if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
       suppressRef.current = true;
       const kind = activeStyle === "underline" ? "underline" : "highlight";
       if (selInfo.multiVerse) {
@@ -9206,6 +9258,7 @@ Continue?`
     }, [selInfo, onLinkRequest]);
     const handleNote = React.useCallback(() => {
       if (!selInfo) return;
+      if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
       const sel = window.getSelection();
       const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
       let groupId;
@@ -9327,6 +9380,7 @@ Continue?`
     }, [selInfo]);
     const handleBookmark = React.useCallback(() => {
       if (!selInfo) return;
+      if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
       var hlKey = selInfo.hlKey;
       if (selInfo.multiVerse && selInfo.multiContainers && selInfo.multiContainers.length > 0) {
         hlKey = selInfo.multiContainers[0].dataset.hlKey;
@@ -10707,6 +10761,8 @@ Continue?`
     HolyDaysPlaylistHeader: HolyDaysPlaylistHeader2,
     StorageHealthBanner: StorageHealthBanner2,
     useStorageHealth,
+    Safari7DayModal: Safari7DayModal2,
+    IosPwaWelcomeCard: IosPwaWelcomeCard2,
     AppShellOverlays: AppShellOverlays2,
     AppShellSheets: AppShellSheets2,
     buildScreenRoutes: buildScreenRoutes2,

@@ -677,6 +677,43 @@ describe('checkFirstDataCreation', () => {
     StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
     expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(true);
   });
+
+  it('bumps version when shouldBlock fires', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB });
+    const vBefore = StorageHealth.getVersion();
+    StorageHealth.checkFirstDataCreation();
+    expect(StorageHealth.getVersion()).toBe(vBefore + 1);
+  });
+
+  it('does not bump version when shouldBlock is false', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME });
+    const vBefore = StorageHealth.getVersion();
+    StorageHealth.checkFirstDataCreation();
+    expect(StorageHealth.getVersion()).toBe(vBefore);
+  });
+
+  it('sets safariGateBlocked in report when shouldBlock fires', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.SAFARI_TAB,
+      storageApi: { estimate: () => Promise.resolve({ quota: 1e9, usage: 1e6 }), persisted: () => Promise.resolve(false) },
+    });
+    await StorageHealth.assess();
+    expect(StorageHealth.getReport().safariGateBlocked).toBe(false);
+    StorageHealth.checkFirstDataCreation();
+    expect(StorageHealth.getReport().safariGateBlocked).toBe(true);
+  });
+
+  it('dismissScenario clears safariGateBlocked', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.SAFARI_TAB,
+      storageApi: { estimate: () => Promise.resolve({ quota: 1e9, usage: 1e6 }), persisted: () => Promise.resolve(false) },
+    });
+    await StorageHealth.assess();
+    StorageHealth.checkFirstDataCreation();
+    expect(StorageHealth.getReport().safariGateBlocked).toBe(true);
+    StorageHealth.dismissScenario('safari-7day');
+    expect(StorageHealth.getReport().safariGateBlocked).toBe(false);
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════

@@ -60,6 +60,7 @@
 export function useJournalMutations({ setHlTick, setJournalEntryId, setScreen }) {
   const createAndEditJournal = () => {
     if (typeof JournalStore === 'undefined') return;
+    if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
     const e = JournalStore.add();
     if (typeof JournalStatsStore !== 'undefined') {
       const newMilestones = JournalStatsStore.recordNewEntry(e.created);

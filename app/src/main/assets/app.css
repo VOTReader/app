@@ -119,6 +119,59 @@
       body.light .sh-banner-danger .sh-banner-btn { color: #a02020; border-color: rgba(160,32,32,0.4); }
       body.light .sh-banner-dismiss { color: rgba(42,32,24,0.5); }
 
+      .sh-modal-backdrop {
+        position: fixed; inset: 0; z-index: 10000;
+        background: rgba(0,0,0,0.75);
+        display: flex; align-items: center; justify-content: center;
+        padding: 1.5rem;
+      }
+      .sh-modal {
+        background: #13131f; border: 1px solid var(--gold-border);
+        border-radius: 12px; padding: 1.6rem 1.4rem;
+        max-width: 380px; width: 100%;
+      }
+      .sh-modal-title {
+        margin: 0 0 0.7rem; font-size: 1.1rem; color: var(--gold);
+        font-weight: 600;
+      }
+      .sh-modal-text {
+        margin: 0 0 0.7rem; font-size: 0.92rem; line-height: 1.5;
+        color: var(--cream-muted);
+      }
+      .sh-modal-steps {
+        margin: 0 0 1rem; padding-left: 1.4rem;
+        font-size: 0.9rem; line-height: 1.6; color: var(--cream-muted);
+      }
+      .sh-modal-instructions { margin-bottom: 0.5rem; }
+      .sh-modal-actions {
+        display: flex; flex-direction: column; gap: 0.5rem;
+      }
+      .sh-modal-btn {
+        padding: 0.6rem 1rem; border-radius: 8px;
+        font-size: 0.9rem; cursor: pointer; text-align: center;
+        border: 1px solid var(--gold-border);
+      }
+      .sh-modal-btn-primary {
+        background: rgba(176,142,87,0.15); color: var(--gold);
+      }
+      .sh-modal-btn-secondary {
+        background: transparent; color: var(--cream-muted);
+        border-color: rgba(255,255,255,0.15);
+      }
+      .sh-welcome-card .sh-modal { max-width: 420px; }
+      body.light .sh-modal {
+        background: #faf8f4; border-color: rgba(160,130,70,0.3);
+      }
+      body.light .sh-modal-title { color: #5a4520; }
+      body.light .sh-modal-text, body.light .sh-modal-steps { color: #3a3020; }
+      body.light .sh-modal-btn-primary {
+        background: rgba(90,69,32,0.1); color: #5a4520;
+        border-color: rgba(90,69,32,0.3);
+      }
+      body.light .sh-modal-btn-secondary {
+        color: #5a5040; border-color: rgba(90,69,32,0.2);
+      }
+
       :root {
         --bg:          #000000;
         --bg2:         #06060e;
