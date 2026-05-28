@@ -250,6 +250,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
         const cacheToWrite = this._cache;
         if (cacheToWrite !== null) {
           IDBAdapter.put(idbStoreName, 'v', cacheToWrite).catch(function (err) {
+            console.error('IDB write failed for', idbStoreName, err);
             if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
           });
         }
@@ -538,6 +539,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * loaded.
      */
     _backgroundRetry() {
+      if (!this._backgroundRetryDelays.length) return;
       const self = this;
       let attempt = 0;
       const tick = function () {
@@ -560,8 +562,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
           self._rebaseAndPromote(/** @type {any} */ (loadedData));
         }).catch(function () {
           attempt += 1;
-          const delay = self._backgroundRetryDelays[Math.min(attempt, self._backgroundRetryDelays.length - 1)];
-          setTimeout(tick, delay);
+          var idx = Math.min(attempt, self._backgroundRetryDelays.length - 1);
+          if (idx < 0) return;
+          setTimeout(tick, self._backgroundRetryDelays[idx]);
         });
       };
       setTimeout(tick, this._backgroundRetryDelays[0]);

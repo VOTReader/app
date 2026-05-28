@@ -547,6 +547,9 @@
           req.onerror = function() {
             reject(req.error || new Error("cursor failed"));
           };
+          ctx.tx.onabort = function() {
+            reject(ctx.tx.error || req.error || _makeAbortError());
+          };
         });
       });
     }
@@ -687,6 +690,7 @@
           const cacheToWrite = this._cache;
           if (cacheToWrite !== null) {
             IDBAdapter.put(idbStoreName, "v", cacheToWrite).catch(function(err) {
+              console.error("IDB write failed for", idbStoreName, err);
               if (typeof StorageHealth !== "undefined") StorageHealth.onWriteFailure(err);
             });
           }
@@ -979,6 +983,7 @@
        * loaded.
        */
       _backgroundRetry() {
+        if (!this._backgroundRetryDelays.length) return;
         const self = this;
         let attempt = 0;
         const tick = function() {
@@ -1003,8 +1008,9 @@
             );
           }).catch(function() {
             attempt += 1;
-            const delay = self._backgroundRetryDelays[Math.min(attempt, self._backgroundRetryDelays.length - 1)];
-            setTimeout(tick, delay);
+            var idx = Math.min(attempt, self._backgroundRetryDelays.length - 1);
+            if (idx < 0) return;
+            setTimeout(tick, self._backgroundRetryDelays[idx]);
           });
         };
         setTimeout(tick, this._backgroundRetryDelays[0]);
@@ -3260,7 +3266,8 @@
               LinkStore.remove(lid);
             });
           }
-        } catch (_e) {
+        } catch (e) {
+          console.warn("_purgeAssociated: cascade step failed for", id, e);
         }
       },
       /**
@@ -6901,7 +6908,8 @@
   function _checkBeforeWrite(bytes) {
     if (_writeFailedThisSession) return { ok: false, reason: "write-failed" };
     var r = _report;
-    if (!r || r.quota == null || r.usage == null || r.quota <= 0) return { ok: true };
+    if (!r || r.quota == null || r.usage == null) return { ok: true };
+    if (r.quota <= 0) return { ok: false, reason: "critical" };
     var afterPercent = (r.usage + bytes) / r.quota;
     if (afterPercent >= CRITICAL_PERCENT) return { ok: false, reason: "critical" };
     if (afterPercent >= WARNING_PERCENT) return { ok: true, reason: "warning" };

@@ -360,7 +360,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
    * incrementally concatenating into the binary string before btoa.
    */
   const _blobToBase64 = async (blob) => {
-    const CHUNK = 65536;
+    const CHUNK = 8192;
     const reader = blob.stream().getReader();
     let binary = '';
     for (;;) {
@@ -557,6 +557,23 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         _showToast('Importing… please wait.', 0);
 
+        // Pre-flight: build store maps once (reused in V2 and V1 paths).
+        const storesMap = _exportableStores();
+        const flagMap = _flagStores();
+
+        // Guard: if any store is 'degraded' (IDB hydration timed out),
+        // replaceAll/set/setAll would queue in memory via _shouldDefer
+        // and the queued ops would be lost on the upcoming reload.
+        const hasDegraded = Object.values(storesMap).some(({ store }) => store.getState() === 'degraded')
+          || Object.values(flagMap).some((s) => s.getState() === 'degraded');
+        if (hasDegraded) {
+          hideToast(_TOAST_ID);
+          _showToast('Storage is temporarily unavailable. Please try again in a moment.');
+          return;
+        }
+
+        let importFailures = 0;
+
         // (1) Clear the legacy + shim LS keys and re-seed from data.
         ['vot-state', 'vot-ann-migrated'].forEach((k) => {
           try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
@@ -571,25 +588,21 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         // (2) Apply stores → IDB-backed stores
         if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
-          const storesMap = _exportableStores();
-          const flagMap = _flagStores();
           for (const name of Object.keys(storesMap)) {
             if (!(name in parsed.stores)) continue;
             const { store, method } = storesMap[name];
             try { store[method](parsed.stores[name]); }
-            catch (e) { console.warn('store import failed for', name, e); }
+            catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
           }
           for (const name of Object.keys(flagMap)) {
             if (!(name in parsed.stores)) continue;
             const truthy = !!parsed.stores[name];
             try { if (truthy) flagMap[name].set(); else flagMap[name].clear(); }
-            catch (e) { console.warn('flag import failed for', name, e); }
+            catch (e) { importFailures += 1; console.warn('flag import failed for', name, e); }
           }
         } else {
           // V1 fallback: parse each LS-shape value in `data` and call
           // the store's replaceAll/setAll/set with the parsed object.
-          const storesMap = _exportableStores();
-          const flagMap = _flagStores();
           for (const name of Object.keys(storesMap)) {
             const raw = parsed.data && parsed.data[name];
             if (typeof raw !== 'string') continue;
@@ -597,7 +610,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               const obj = JSON.parse(raw);
               const { store, method } = storesMap[name];
               store[method](obj);
-            } catch (e) { console.warn('V1 import parse failed for', name, e); }
+            } catch (e) { importFailures += 1; console.warn('V1 import parse failed for', name, e); }
           }
           for (const name of Object.keys(flagMap)) {
             if (parsed.data && (parsed.data[name] === '1' || parsed.data[name] === 1)) {
@@ -624,12 +637,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 width: record.width, height: record.height, duration: record.duration,
                 created: record.created,
               });
-            } catch (e) { console.warn('media import failed for', id, e); }
+            } catch (e) { importFailures += 1; console.warn('media import failed for', id, e); }
           }
         }
 
         hideToast(_TOAST_ID);
-        _showToast('Import complete. Reloading…', 0);
+        if (importFailures > 0) {
+          _showToast(`Import completed with ${importFailures} error${importFailures > 1 ? 's' : ''} (check console). Reloading…`, 0);
+        } else {
+          _showToast('Import complete. Reloading…', 0);
+        }
         setTimeout(() => window.location.reload(), 1500);
       } catch (err) {
         console.warn('import failed', err);

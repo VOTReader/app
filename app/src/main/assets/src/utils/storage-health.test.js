@@ -491,6 +491,17 @@ describe('checkBeforeWrite', () => {
     const result = StorageHealth.checkBeforeWrite(1_000_000);
     expect(result.ok).toBe(true);
   });
+
+  it('critical when quota is zero', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.CHROME,
+      storageApi: mockStorage({ quota: 0, usage: 0, persisted: true }),
+    });
+    await StorageHealth.assess();
+    const result = StorageHealth.checkBeforeWrite(1_000);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('critical');
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════

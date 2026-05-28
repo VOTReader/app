@@ -375,7 +375,8 @@ function _getPlatform() {
 function _checkBeforeWrite(bytes) {
   if (_writeFailedThisSession) return { ok: false, reason: 'write-failed' };
   var r = _report;
-  if (!r || r.quota == null || r.usage == null || r.quota <= 0) return { ok: true };
+  if (!r || r.quota == null || r.usage == null) return { ok: true };
+  if (r.quota <= 0) return { ok: false, reason: 'critical' };
 
   var afterPercent = (r.usage + bytes) / r.quota;
   if (afterPercent >= CRITICAL_PERCENT) return { ok: false, reason: 'critical' };

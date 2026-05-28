@@ -160,15 +160,28 @@ export default defineConfig({
       // nav-store + thumb-store (untouched). Gate floors advance:
       // statements 42→53, branches 32→43, functions 43→59, lines 44→57.
       //
+      // W2 polish — 4 new test files (state-store, recent-nav-store,
+      // prophecy-cards-store, app-flag-stores):
+      //   statements 55.94 (2500/4469) | branches 46.38 (1496/3225)
+      //   functions  60.43 (524/867)   | lines    60.09 (2021/3363)
+      // +70 tests covering: StateStore lsShim dual-write path (boot-
+      // script shim shape verified through JSON round-trip),
+      // RecentNavStore dedup-by-5-tuple + cap-at-30 + list-returns-20,
+      // ProphecyCardsStore falsy-value filtering in setAll +
+      // defensive-copy in getAll, AppFlagStores is/set/clear +
+      // legacy numeric/string truthies + 3-store independence.
+      // Gate floors advance: statements 53→55, branches 43→46,
+      // functions 59→60, lines 57→60.
+      //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
-        statements: 53,
-        branches: 43,
-        functions: 59,
-        lines: 57,
+        statements: 55,
+        branches: 46,
+        functions: 60,
+        lines: 60,
       },
     },
   },

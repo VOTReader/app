@@ -309,6 +309,9 @@ export const IDBAdapter = (function () {
           }
         };
         req.onerror = function () { reject(req.error || new Error('cursor failed')); };
+        ctx.tx.onabort = function () {
+          reject(ctx.tx.error || req.error || _makeAbortError());
+        };
       });
     });
   }

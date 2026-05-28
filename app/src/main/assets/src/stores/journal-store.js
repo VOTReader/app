@@ -333,7 +333,7 @@ export var JournalStore = extendStore(
         if (typeof LinkStore !== 'undefined') {
           s.linkIds.forEach(function(lid) { LinkStore.remove(lid); });
         }
-      } catch (_e) { /* best-effort cascade; entry deletion still proceeds */ }
+      } catch (e) { console.warn('_purgeAssociated: cascade step failed for', id, e); }
     },
 
     /**

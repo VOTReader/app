@@ -4,6 +4,89 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## W2 polish — storage layer hardening (2026-05-28)
+
+4-tier sweep of the W2 storage layer post-close. 8 research findings
+evaluated; 4 shipped, 4 ruled out as false positives.
+
+### Tier 1 — Real bugs (2 shipped)
+
+- **CachedStore `_save()` silent write failure** — catch block logged
+  nothing if `StorageHealth` was undefined. Added unconditional
+  `console.error` before the conditional `onWriteFailure` call.
+- **`checkBeforeWrite()` permissive on zero quota** — guard lumped
+  unknown-API (permissive) with zero-quota (should block). Split into
+  two paths: `quota == null` → ok, `quota <= 0` → critical. Test added.
+- *Ruled out:* `_hydratePromise` not cleared (state machine is one-way;
+  stale resolved promise returns correct answer). Export misses 2 of 19
+  IDB stores (both accounted for — `vot-ann-migrated` in LS data
+  section, `meta` self-heals). `onWriteFailure`/`onWriteSuccess` race
+  (`onWriteSuccess` has zero production callers; flag is write-once).
+
+### Tier 2 — Silent failures / UX gaps (3 shipped)
+
+- **Import partial-failure reporting** — added `importFailures` counter
+  across store/flag/media import phases. Toast now shows error count
+  instead of unconditional success.
+- **Import during degraded state** — pre-flight guard rejects import
+  when any store is degraded. `replaceAll()` on a degraded store queues
+  via `_shouldDefer`, then the 1500ms reload discards the queue.
+- **`_backgroundRetry` infinite loop** — empty `_backgroundRetryDelays`
+  array caused `setTimeout(tick, undefined)` → 0ms tight loop. Added
+  early-return guards.
+
+### Tier 3 — Test coverage (+71 tests, 4 new files)
+
+- **StateStore** (13 tests) — get/set, lsShim dual-write path (boot-
+  script reads theme + fontStyle from LS), null/undefined handling,
+  deferred writes during pending state.
+- **RecentNavStore** (18 tests) — add with dedup-by-5-tuple, cap-at-30,
+  list-returns-at-most-20, replaceAll cap + null/array guards, version
+  bump + subscriber notification.
+- **ProphecyCardsStore** (18 tests) — getAll defensive copy, getOne
+  true/false, setOne delete-on-falsy, setAll falsy-value filtering +
+  null/undefined/array → {}, version bump.
+- **AppFlagStores** (21 tests) — is/set/clear, legacy numeric `1` and
+  string `"1"` as truthy, `0` and `null` as falsy, 3-store independence
+  (WelcomedFlag, AboutSeenFlag, GardenWarningFlag).
+
+Coverage: 53.57 → 55.92 statements, 43.31 → 46.34 branches,
+59.32 → 60.36 functions, 57.70 → 60.07 lines.
+Gates ratcheted: 53/43/59/57 → 55/46/60/60.
+
+### Tier 4 — Minor hardening (3 shipped, 2 skipped)
+
+- **`_purgeAssociated` cascade logging** (journal-store.js) — silent
+  `catch (_e) {}` → `console.warn` with entry id and error. Zero-risk
+  diagnostics improvement.
+- **`getAll()` tx.onabort handler** (idb-adapter.js) — matches the
+  pattern already established on `del()`. Prevents promise hang if a
+  versionchange fires mid-cursor.
+- **`_blobToBase64` chunk size** (SettingsScreen.jsx) — 65536 → 8192.
+  `String.fromCharCode.apply(null, slice)` passes each byte as a
+  separate argument; 65536 args is at the engine limit (some cap at
+  65535). 8192 is safe on all engines.
+- *Skipped:* `clearAllPersonalData` verification (single-tab app, no
+  competing connections; already awaits deleteDatabase promise).
+  Cross-platform private-mode detection (Chrome/Firefox incognito
+  handled correctly by percentage-based tier thresholds; Safari
+  heuristic solves a Safari-specific 7-day eviction problem).
+
+### Totals
+
+| Metric | Before | After | Delta |
+|---|---|---|---|
+| Tests | 1099 | 1170 | +71 |
+| Test files | 40 | 44 | +4 |
+| Bundle-b | 413.0 KB | 413.4 KB | +0.4 |
+| Bundle-d | 566.2 KB | 566.8 KB | +0.6 |
+| Coverage (stmts) | 53.57% | 55.92% | +2.35 |
+| Coverage (branch) | 43.31% | 46.34% | +3.03 |
+| Coverage (funcs) | 59.32% | 60.36% | +1.04 |
+| Coverage (lines) | 57.70% | 60.07% | +2.37 |
+
+---
+
 ## W1 — Cross-platform PWA platform-bridge (CLOSED 2026-05-27)
 
 W1 of the W0-W8 PWA migration plan. Same JS codebase becomes runnable

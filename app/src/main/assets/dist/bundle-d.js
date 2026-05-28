@@ -5254,7 +5254,7 @@
       durationMs: durationMs == null ? 3500 : durationMs
     });
     const _blobToBase64 = async (blob) => {
-      const CHUNK = 65536;
+      const CHUNK = 8192;
       const reader = blob.stream().getReader();
       let binary = "";
       for (; ; ) {
@@ -5421,6 +5421,15 @@ Continue?`
           );
           if (!proceed) return;
           _showToast("Importing\u2026 please wait.", 0);
+          const storesMap = _exportableStores();
+          const flagMap = _flagStores();
+          const hasDegraded = Object.values(storesMap).some(({ store }) => store.getState() === "degraded") || Object.values(flagMap).some((s) => s.getState() === "degraded");
+          if (hasDegraded) {
+            hideToast(_TOAST_ID);
+            _showToast("Storage is temporarily unavailable. Please try again in a moment.");
+            return;
+          }
+          let importFailures = 0;
           ["vot-state", "vot-ann-migrated"].forEach((k) => {
             try {
               localStorage.removeItem(k);
@@ -5439,14 +5448,13 @@ Continue?`
             }
           });
           if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === "object") {
-            const storesMap = _exportableStores();
-            const flagMap = _flagStores();
             for (const name of Object.keys(storesMap)) {
               if (!(name in parsed.stores)) continue;
               const { store, method } = storesMap[name];
               try {
                 store[method](parsed.stores[name]);
               } catch (e) {
+                importFailures += 1;
                 console.warn("store import failed for", name, e);
               }
             }
@@ -5457,12 +5465,11 @@ Continue?`
                 if (truthy) flagMap[name].set();
                 else flagMap[name].clear();
               } catch (e) {
+                importFailures += 1;
                 console.warn("flag import failed for", name, e);
               }
             }
           } else {
-            const storesMap = _exportableStores();
-            const flagMap = _flagStores();
             for (const name of Object.keys(storesMap)) {
               const raw = parsed.data && parsed.data[name];
               if (typeof raw !== "string") continue;
@@ -5471,6 +5478,7 @@ Continue?`
                 const { store, method } = storesMap[name];
                 store[method](obj);
               } catch (e) {
+                importFailures += 1;
                 console.warn("V1 import parse failed for", name, e);
               }
             }
@@ -5504,12 +5512,17 @@ Continue?`
                   created: record.created
                 });
               } catch (e) {
+                importFailures += 1;
                 console.warn("media import failed for", id, e);
               }
             }
           }
           hideToast(_TOAST_ID);
-          _showToast("Import complete. Reloading\u2026", 0);
+          if (importFailures > 0) {
+            _showToast(`Import completed with ${importFailures} error${importFailures > 1 ? "s" : ""} (check console). Reloading\u2026`, 0);
+          } else {
+            _showToast("Import complete. Reloading\u2026", 0);
+          }
           setTimeout(() => window.location.reload(), 1500);
         } catch (err) {
           console.warn("import failed", err);
