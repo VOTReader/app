@@ -63,6 +63,7 @@ export function HydrationGate({ children }) {
           performance.measure('vot-hydration', 'vot-hydration-start', 'vot-hydration-end');
         } catch (_e) { /* perf unsupported */ }
         setHydrated(true);
+        if (typeof StorageHealth !== 'undefined') StorageHealth.start();
       });
     return () => { alive = false; };
   }, []);

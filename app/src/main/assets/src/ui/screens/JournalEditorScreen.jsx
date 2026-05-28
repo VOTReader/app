@@ -301,8 +301,8 @@ export function JournalEditorScreen(props) {
     }).then(function(mid) {
       insertAtCursor(JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
     }).catch(function(err) {
-      console.warn('Image insert failed', err);
-      alert('Could not load that image.');
+      if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+      showToast('Could not save that image.');
     });
   }
 

@@ -250,8 +250,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
         const cacheToWrite = this._cache;
         if (cacheToWrite !== null) {
           IDBAdapter.put(idbStoreName, 'v', cacheToWrite).catch(function (err) {
-            // W2.7 will replace this with StorageHealth.onWriteFailure.
-            console.warn('IDB write failed for', storageKey, err);
+            if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
           });
         }
         if (lsShim) {

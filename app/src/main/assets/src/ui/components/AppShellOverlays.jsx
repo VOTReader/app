@@ -71,6 +71,8 @@ export function AppShellOverlays({
 
   return (
     <>
+      <StorageHealthBanner onNavigateSettings={() => setScreen('settings')} />
+
       {showWelcome && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,

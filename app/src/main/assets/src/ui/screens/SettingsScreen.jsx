@@ -82,6 +82,18 @@ function AllProgressClearRow({ totalRead, totalItems, onClearAll }) {
   );
 }
 
+function _platformLabel(platform) {
+  switch (platform) {
+    case 'android-webview': return 'Android (App)';
+    case 'safari-tab': return 'Safari';
+    case 'safari-pwa': return 'Safari (Home Screen App)';
+    case 'firefox': return 'Firefox';
+    case 'chrome': return 'Chrome';
+    case 'edge': return 'Edge';
+    default: return 'Web Browser';
+  }
+}
+
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
   // Q8: BOOKS + VOT corpora are lazy. PROGRESS_GROUPS reads BOOKS[...] keys
   // (for the NT section) AND LETTERS_V1/LETTERS/etc. globals (for the
@@ -890,9 +902,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         <div className="settings-section">
           <div className="settings-section-label">Your Data</div>
-          {/* W2.5 — navigator.storage estimate + persist surfaced here.
-              Renders once on mount; W2.7 will add periodic re-assessment
-              + write-failure-driven refresh. */}
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <div className="settings-row-label">Platform</div>
+              <div className="settings-row-desc">{_platformLabel(StorageHealth.getPlatform())}</div>
+            </div>
+          </div>
           <div className="settings-row">
             <div className="settings-row-text">
               <div className="settings-row-label">Storage</div>

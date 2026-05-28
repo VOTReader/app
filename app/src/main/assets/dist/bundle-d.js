@@ -2094,6 +2094,116 @@
     return /* @__PURE__ */ React.createElement("div", { className: "hd-playlists" }, HOLY_DAYS_META.audioPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.audioPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("path", { d: "M9 18V5l12-2v13" }), /* @__PURE__ */ React.createElement("circle", { cx: "6", cy: "18", r: "3" }), /* @__PURE__ */ React.createElement("circle", { cx: "18", cy: "16", r: "3" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Audio Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Listen on Bandcamp")), HOLY_DAYS_META.videoPlaylist && /* @__PURE__ */ React.createElement("a", { className: "hd-playlist-btn", href: HOLY_DAYS_META.videoPlaylist, target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polygon", { points: "23 7 16 12 23 17 23 7" }), /* @__PURE__ */ React.createElement("rect", { x: "1", y: "5", width: "15", height: "14", rx: "2", ry: "2" })), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-label" }, "Video Playlist"), /* @__PURE__ */ React.createElement("span", { className: "hd-playlist-sub" }, "Watch on YouTube")));
   }
 
+  // app/src/main/assets/src/ui/components/StorageHealthBanner.jsx
+  function useStorageHealth() {
+    React.useSyncExternalStore(StorageHealth.subscribe, StorageHealth.getVersion);
+    return StorageHealth.getReport();
+  }
+  function StorageHealthBanner2({ onNavigateSettings }) {
+    const report = useStorageHealth();
+    const [persistResult, setPersistResult] = React.useState(
+      /** @type {'idle' | 'granted' | 'denied'} */
+      "idle"
+    );
+    const scenario = _pickScenario(report, persistResult);
+    if (!scenario) return null;
+    return /* @__PURE__ */ React.createElement("div", { className: `sh-banner sh-banner-${scenario.style}`, role: "alert" }, /* @__PURE__ */ React.createElement("div", { className: "sh-banner-text" }, scenario.text), /* @__PURE__ */ React.createElement("div", { className: "sh-banner-actions" }, scenario.buttons.map((btn, i) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: i,
+        className: `sh-banner-btn${btn.primary ? " sh-banner-btn-primary" : ""}`,
+        onClick: btn.onClick
+      },
+      btn.label
+    )), scenario.dismissable && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "sh-banner-dismiss",
+        onClick: () => StorageHealth.dismissScenario(scenario.id),
+        "aria-label": "Dismiss"
+      },
+      "\u2715"
+    )));
+    function _pickScenario(r, persist) {
+      const { tier, risks, remaining, privateModeLikely, writeFailedThisSession } = r;
+      if (tier === StorageHealth.TIER.READONLY && writeFailedThisSession) {
+        return {
+          id: "write-failed",
+          style: "danger",
+          text: "Your last change couldn't be saved \u2014 storage is full. Your work is still on screen but won't be kept if you close the app. Export your data now.",
+          dismissable: false,
+          buttons: [{ label: "Export now", primary: true, onClick: _goExport }]
+        };
+      }
+      if (privateModeLikely) {
+        return {
+          id: "private-mode",
+          style: "danger",
+          text: "You're in a private window. Nothing you save here will be kept when you close it.",
+          dismissable: false,
+          buttons: []
+        };
+      }
+      if (tier === StorageHealth.TIER.CRITICAL) {
+        var remainText = remaining != null ? formatBytes(remaining) : "very little";
+        return {
+          id: "critical",
+          style: "danger",
+          text: `Storage is almost full \u2014 ${remainText} remaining. Your data may not save. Export now to avoid losing it.`,
+          dismissable: false,
+          buttons: [{ label: "Export now", primary: true, onClick: _goExport }]
+        };
+      }
+      if (tier === StorageHealth.TIER.WARNING) {
+        var warnRemain = remaining != null ? formatBytes(remaining) : "limited space";
+        return {
+          id: "warning",
+          style: "amber",
+          text: `Storage is running low \u2014 ${warnRemain} remaining. New notes and recordings may not save.`,
+          dismissable: false,
+          buttons: [
+            { label: "Export data", primary: true, onClick: _goExport }
+          ]
+        };
+      }
+      if (risks.includes(StorageHealth.RISK.NOT_PERSISTED) && !StorageHealth.isDismissed("not-persisted")) {
+        if (persist === "granted") {
+          return {
+            id: "not-persisted",
+            style: "gold",
+            text: "Data protected \u2713",
+            dismissable: true,
+            buttons: []
+          };
+        }
+        if (persist === "denied") {
+          return {
+            id: "not-persisted",
+            style: "gold",
+            text: "Browser denied protection. Export regularly to keep your data safe.",
+            dismissable: true,
+            buttons: [{ label: "Export now", primary: false, onClick: _goExport }]
+          };
+        }
+        return {
+          id: "not-persisted",
+          style: "gold",
+          text: "Your data isn't protected from browser cleanup yet.",
+          dismissable: true,
+          buttons: [{ label: "Protect my data", primary: true, onClick: _handlePersist }]
+        };
+      }
+      return null;
+    }
+    async function _handlePersist() {
+      var granted = await StorageHealth.requestPersistence();
+      setPersistResult(granted ? "granted" : "denied");
+    }
+    function _goExport() {
+      if (onNavigateSettings) onNavigateSettings();
+    }
+  }
+
   // app/src/main/assets/src/ui/components/AppShellOverlays.jsx
   function AppShellOverlays2({
     // Welcome modal
@@ -2149,7 +2259,7 @@
       dismiss: () => setGardenWarningOpen(false),
       active: !!gardenWarningOpen
     });
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StorageHealthBanner, { onNavigateSettings: () => setScreen("settings") }), showWelcome && /* @__PURE__ */ React.createElement("div", { style: {
       position: "fixed",
       inset: 0,
       zIndex: 9999,
@@ -4823,6 +4933,24 @@
       }
     ));
   }
+  function _platformLabel(platform) {
+    switch (platform) {
+      case "android-webview":
+        return "Android (App)";
+      case "safari-tab":
+        return "Safari";
+      case "safari-pwa":
+        return "Safari (Home Screen App)";
+      case "firefox":
+        return "Firefox";
+      case "chrome":
+        return "Chrome";
+      case "edge":
+        return "Edge";
+      default:
+        return "Web Browser";
+    }
+  }
   function SettingsScreen2({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
     React.useEffect(() => {
       if (typeof window.__loadBibleCorpus === "function") {
@@ -5577,7 +5705,7 @@ Continue?`
           })),
           onChange: (v) => onSetting("gardenTier", v)
         }
-      )), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Storage"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, storageDisplayText))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Protection"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, protectionDisplayText)), showProtectButton && /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
+      )), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Platform"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, _platformLabel(StorageHealth.getPlatform())))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Storage"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, storageDisplayText))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Protection"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, protectionDisplayText)), showProtectButton && /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
         e.stopPropagation();
         storageInfo.requestPersist();
       } }, "Protect now")), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Export Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, "Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as a single JSON file. No credentials or login info \u2014 just your data. Save the file anywhere you control.")), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
@@ -10577,6 +10705,8 @@ Continue?`
     LinkIcon: LinkIcon2,
     BookmarkIcon: BookmarkIcon2,
     HolyDaysPlaylistHeader: HolyDaysPlaylistHeader2,
+    StorageHealthBanner: StorageHealthBanner2,
+    useStorageHealth,
     AppShellOverlays: AppShellOverlays2,
     AppShellSheets: AppShellSheets2,
     buildScreenRoutes: buildScreenRoutes2,

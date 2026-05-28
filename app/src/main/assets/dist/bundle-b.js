@@ -687,7 +687,7 @@
           const cacheToWrite = this._cache;
           if (cacheToWrite !== null) {
             IDBAdapter.put(idbStoreName, "v", cacheToWrite).catch(function(err) {
-              console.warn("IDB write failed for", storageKey, err);
+              if (typeof StorageHealth !== "undefined") StorageHealth.onWriteFailure(err);
             });
           }
           if (lsShim) {
@@ -1075,7 +1075,7 @@
 
   // app/src/main/assets/src/utils/toast.js
   var _hideTimers = /* @__PURE__ */ new Map();
-  function showToast(opts) {
+  function showToast2(opts) {
     if (typeof document === "undefined") return;
     const id = opts && opts.id;
     if (!id) return;
@@ -2864,7 +2864,7 @@
   })();
   function jrnShowMilestoneToast2(milestone) {
     if (!milestone) return;
-    showToast({
+    showToast2({
       id: "jrn-milestone-toast",
       className: "jrn-milestone-toast",
       html: '<span style="font-size:14px">\u2726</span><span>Milestone: ' + (milestone.label || milestone.key) + "</span>",
@@ -3644,6 +3644,7 @@
         } catch (_e) {
         }
         setHydrated(true);
+        if (typeof StorageHealth !== "undefined") StorageHealth.start();
       });
       return () => {
         alive = false;
@@ -6641,79 +6642,29 @@
 
   // app/src/main/assets/src/hooks/use-storage-info.js
   function useStorageInfo() {
-    const [state, setState] = React.useState(() => ({
-      status: (
-        /** @type {'loading' | 'ready' | 'unavailable'} */
-        "loading"
-      ),
-      quota: (
-        /** @type {number | null} */
-        null
-      ),
-      usage: (
-        /** @type {number | null} */
-        null
-      ),
-      persisted: (
-        /** @type {boolean | null} */
-        null
-      ),
-      persistDenied: false
-    }));
-    const apiRef = React.useRef(
-      /** @type {StorageManager | null} */
-      null
+    const [persistDenied, setPersistDenied] = React.useState(false);
+    React.useSyncExternalStore(StorageHealth.subscribe, StorageHealth.getVersion);
+    const report = StorageHealth.getReport();
+    const status = report.lastAssessedAt === 0 ? (
+      /** @type {'loading'} */
+      "loading"
+    ) : report.quota == null && report.usage == null ? (
+      /** @type {'unavailable'} */
+      "unavailable"
+    ) : (
+      /** @type {'ready'} */
+      "ready"
     );
-    React.useEffect(() => {
-      const nav = typeof navigator !== "undefined" ? navigator : null;
-      const storage = nav && nav.storage;
-      if (!storage || typeof storage.estimate !== "function") {
-        setState((prev) => ({ ...prev, status: "unavailable" }));
-        return;
-      }
-      apiRef.current = storage;
-      let cancelled = false;
-      const fetchEstimate = storage.estimate();
-      const fetchPersisted = typeof storage.persisted === "function" ? storage.persisted() : Promise.resolve(false);
-      Promise.all([fetchEstimate.catch(() => null), fetchPersisted.catch(() => false)]).then(([estimate, persisted]) => {
-        if (cancelled) return;
-        const quota = estimate && typeof estimate.quota === "number" ? estimate.quota : null;
-        const usage = estimate && typeof estimate.usage === "number" ? estimate.usage : null;
-        setState((prev) => ({
-          ...prev,
-          status: "ready",
-          quota,
-          usage,
-          persisted: !!persisted
-        }));
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, []);
     const requestPersist = React.useCallback(async () => {
-      const storage = apiRef.current;
-      if (!storage || typeof storage.persist !== "function") {
-        setState((prev) => ({ ...prev, persistDenied: true }));
-        return;
-      }
-      try {
-        const granted = await storage.persist();
-        setState((prev) => ({
-          ...prev,
-          persisted: !!granted,
-          persistDenied: !granted
-        }));
-      } catch (_e) {
-        setState((prev) => ({ ...prev, persistDenied: true }));
-      }
+      var granted = await StorageHealth.requestPersistence();
+      if (!granted) setPersistDenied(true);
     }, []);
     return {
-      status: state.status,
-      quota: state.quota,
-      usage: state.usage,
-      persisted: state.persisted,
-      persistDenied: state.persistDenied,
+      status,
+      quota: report.quota,
+      usage: report.usage,
+      persisted: report.persisted,
+      persistDenied,
       requestPersist
     };
   }
@@ -7045,7 +6996,7 @@
     _assessInFlight = null;
     _storageApiOverride = opts && opts.storageApi || null;
   }
-  var StorageHealth = {
+  var StorageHealth2 = {
     assess: _assess,
     getReport: _getReport,
     subscribe: _subscribe,
@@ -7791,6 +7742,14 @@
       };
       function startCapture() {
         if (cancelled) return;
+        if (typeof StorageHealth !== "undefined") {
+          var check = StorageHealth.checkBeforeWrite(300 * 1024);
+          if (!check.ok) {
+            setError("Storage is full. Free up space before recording.");
+            setStage("error");
+            return;
+          }
+        }
         var res;
         try {
           res = PlatformBridge.nativeRecordStart();
@@ -7945,7 +7904,7 @@
         });
         cleanup();
       }).catch(function(err) {
-        console.warn("Save failed", err);
+        if (typeof StorageHealth !== "undefined") StorageHealth.onWriteFailure(err);
         setError("Failed to save recording.");
         setStage("error");
       });
@@ -9637,8 +9596,8 @@
       }).then(function(mid) {
         insertAtCursor(JournalHelpers.newBlock("image", { mediaId: mid, caption: "" }));
       }).catch(function(err) {
-        console.warn("Image insert failed", err);
-        alert("Could not load that image.");
+        if (typeof StorageHealth !== "undefined") StorageHealth.onWriteFailure(err);
+        showToast("Could not save that image.");
       });
     }
     function onRecordingSaved(info) {
@@ -9969,7 +9928,7 @@
     hasAnyPendingStores,
     clearLegacyLs,
     LS_SKIP_LIST,
-    showToast,
+    showToast: showToast2,
     hideToast,
     IDBAdapter,
     WelcomedFlagStore,
@@ -10042,7 +10001,7 @@
     useAppShellEffects,
     useStorageInfo,
     formatBytes,
-    StorageHealth,
+    StorageHealth: StorageHealth2,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,

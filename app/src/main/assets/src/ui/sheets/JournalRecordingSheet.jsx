@@ -135,6 +135,15 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     function startCapture() {
       if (cancelled) return;
 
+      if (typeof StorageHealth !== 'undefined') {
+        var check = StorageHealth.checkBeforeWrite(300 * 1024);
+        if (!check.ok) {
+          setError('Storage is full. Free up space before recording.');
+          setStage('error');
+          return;
+        }
+      }
+
       var res;
       try { res = PlatformBridge.nativeRecordStart(); } catch (_e) { res = 'error:exception'; }
       if (res !== 'ok') {
@@ -289,7 +298,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       });
       cleanup();
     }).catch(function(err) {
-      console.warn('Save failed', err);
+      if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
       setError('Failed to save recording.');
       setStage('error');
     });
