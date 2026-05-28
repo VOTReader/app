@@ -5470,15 +5470,7 @@
       settings: { id: "settings", eyebrow: "App Configuration", title: "Settings", detail: "Display, themes & preferences" },
       history: { id: "history", eyebrow: "Recently Visited", title: "History", detail: "Resume where you left off" }
     };
-    const DEFAULT_ORDER = ["volumes", "scriptures", "studies", "library", "settings", "history"];
-    const [order, setOrder] = React.useState(() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem("vot-home-order") || "null");
-        if (Array.isArray(saved) && saved.length === DEFAULT_ORDER.length && DEFAULT_ORDER.every((id) => saved.includes(id))) return saved;
-      } catch (_e) {
-      }
-      return DEFAULT_ORDER;
-    });
+    const [order, setOrder] = React.useState(() => HomeOrderStore.get());
     const [pressingIdx, setPressingIdx] = React.useState(-1);
     const [dragIdx, setDragIdx] = React.useState(-1);
     const cardRefs = React.useRef([]);
@@ -5690,10 +5682,7 @@
             const [moved] = newOrder.splice(from, 1);
             newOrder.splice(to, 0, moved);
             setOrder(newOrder);
-            try {
-              localStorage.setItem("vot-home-order", JSON.stringify(newOrder));
-            } catch (_e) {
-            }
+            HomeOrderStore.set(newOrder);
           }
           setDragIdx(-1);
           targetIdxRef.current = -1;

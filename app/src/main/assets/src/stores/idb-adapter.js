@@ -45,7 +45,14 @@
 
 export const IDBAdapter = (function () {
   const DB_NAME = 'votreader';
-  const DB_VERSION = 1;
+  // Schema versions:
+  //   1 — initial W2.1 schema (17 vot-* stores + meta).
+  //   2 — W2.3b.4 added vot-home-order. New installs get all 19
+  //       stores at once; existing v1 installs get vot-home-order
+  //       added via the onupgradeneeded guard (the existing
+  //       objectStoreNames.contains check skips already-created
+  //       stores, so the bump is additive only).
+  const DB_VERSION = 2;
 
   /**
    * The 17 vot-* localStorage keys that migrate into IDB, plus the
@@ -76,6 +83,7 @@ export const IDBAdapter = (function () {
     'vot-annotations',
     'vot-notes',
     'vot-links',
+    'vot-home-order',
     'meta',
   ]);
   const STORE_SET = new Set(STORE_NAMES);

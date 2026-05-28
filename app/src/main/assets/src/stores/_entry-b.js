@@ -43,6 +43,7 @@ import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore } from '.
 import { ProphecyCardsStore } from './prophecy-cards-store.js';
 import { StateStore } from './state-store.js';
 import { HistoryStore } from './history-store.js';
+import { HomeOrderStore, DEFAULT_HOME_ORDER } from './home-order-store.js';
 import { migrateAnnotations, AnnotationStore, HighlightStore } from './annotation-store.js';
 import { NoteStore } from './note-store.js';
 import { NotebookStore } from './notebook-store.js';
@@ -142,6 +143,7 @@ Object.assign(window, {
   ProphecyCardsStore,
   StateStore,
   HistoryStore,
+  HomeOrderStore, DEFAULT_HOME_ORDER,
   migrateAnnotations, AnnotationStore, HighlightStore,
   NoteStore, NotebookStore, RecentNavStore,
   hlId, lnkId, LinkStore, persistLink,

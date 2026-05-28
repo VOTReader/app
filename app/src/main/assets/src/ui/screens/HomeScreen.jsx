@@ -26,17 +26,11 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     settings: { id: "settings", eyebrow: "App Configuration", title: "Settings", detail: "Display, themes & preferences" },
     history: { id: "history", eyebrow: "Recently Visited", title: "History", detail: "Resume where you left off" }
   };
-  const DEFAULT_ORDER = ["volumes", "scriptures", "studies", "library", "settings", "history"];
-
-  // Load persisted order (permanent unless storage cleared)
-  const [order, setOrder] = React.useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("vot-home-order") || "null");
-      if (Array.isArray(saved) && saved.length === DEFAULT_ORDER.length &&
-      DEFAULT_ORDER.every((id) => saved.includes(id))) return saved;
-    } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
-    return DEFAULT_ORDER;
-  });
+  // DEFAULT_ORDER + the validation logic moved into HomeOrderStore
+  // (W2.3b.4). HomeScreen reads via the store; HydrationGate has
+  // resolved by the time this component mounts so the read is sync
+  // from the in-memory cache.
+  const [order, setOrder] = React.useState(() => HomeOrderStore.get());
 
   /* Drag architecture — IMPERATIVE DOM, not React state.
      React state re-renders at <60fps in Android WebView; direct writes to
@@ -279,7 +273,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           const [moved] = newOrder.splice(from, 1);
           newOrder.splice(to, 0, moved);
           setOrder(newOrder);
-          try {localStorage.setItem("vot-home-order", JSON.stringify(newOrder));} catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ }
+          HomeOrderStore.set(newOrder);
         }
         setDragIdx(-1);
         targetIdxRef.current = -1;

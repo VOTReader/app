@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 368 distinct identifiers.
+// Total: 372 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -55,6 +55,7 @@ declare const ChapterView: any;
 declare const ClearProgressRow: any;
 declare const Components: any;
 declare const ConfirmStrip: any;
+declare const DEFAULT_HOME_ORDER: any;
 declare const Data: any;
 declare const EXPAND_THRESHOLD: any;
 declare const ErrorBoundary: any;
@@ -81,8 +82,10 @@ declare const HighlightableText: any;
 declare const HighlightsScreen: any;
 declare const HistoryEntryCard: any;
 declare const HistoryScreen: any;
+declare const HistoryStore: any;
 declare const HolyDaysPlaylistHeader: any;
 declare const HomeBtn: any;
+declare const HomeOrderStore: any;
 declare const HomeScreen: any;
 declare const Hooks: any;
 declare const HydrationGate: any;
@@ -191,6 +194,7 @@ declare const Sheets: any;
 declare const SrchCard: any;
 declare const SrchGroup: any;
 declare const SrchSnippet: any;
+declare const StateStore: any;
 declare const StaticSubtree: any;
 declare const StickyChapterNav: any;
 declare const Stores: any;

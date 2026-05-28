@@ -334,7 +334,7 @@
   // app/src/main/assets/src/stores/idb-adapter.js
   var IDBAdapter = (function() {
     const DB_NAME = "votreader";
-    const DB_VERSION = 1;
+    const DB_VERSION = 2;
     const STORE_NAMES = Object.freeze([
       "vot-welcomed",
       "vot-about-seen",
@@ -353,6 +353,7 @@
       "vot-annotations",
       "vot-notes",
       "vot-links",
+      "vot-home-order",
       "meta"
     ]);
     const STORE_SET = new Set(STORE_NAMES);
@@ -1282,6 +1283,58 @@
       setAll(entries) {
         if (this._shouldDefer("setAll", entries)) return;
         this._cache = Array.isArray(entries) ? entries.slice(0, 2e3) : [];
+        this._save();
+        this._bump();
+      }
+    }
+  );
+
+  // app/src/main/assets/src/stores/home-order-store.js
+  var DEFAULT_HOME_ORDER = Object.freeze([
+    "volumes",
+    "scriptures",
+    "studies",
+    "library",
+    "settings",
+    "history"
+  ]);
+  var HomeOrderStore = extendStore(
+    CachedStore(
+      "vot-home-order",
+      /** @type {string[]} */
+      [],
+      { idb: true }
+    ),
+    {
+      /**
+       * Saved order if it passes the schema check (exact length match +
+       * every default id present); otherwise DEFAULT_HOME_ORDER. Returns
+       * a defensive read — callers must not mutate the returned array.
+       * @returns {string[]}
+       */
+      get() {
+        const saved = this._load();
+        if (Array.isArray(saved) && saved.length === DEFAULT_HOME_ORDER.length && DEFAULT_HOME_ORDER.every((id) => saved.includes(id))) {
+          return (
+            /** @type {string[]} */
+            saved
+          );
+        }
+        return (
+          /** @type {string[]} */
+          DEFAULT_HOME_ORDER
+        );
+      },
+      /**
+       * Replace the saved order. Empty array or schema-mismatched arrays
+       * are persisted as-is — the next get() will fall back to
+       * DEFAULT_HOME_ORDER until set() is called with a valid order.
+       * @param {string[]} order
+       * @returns {void}
+       */
+      set(order) {
+        if (this._shouldDefer("set", order)) return;
+        this._cache = Array.isArray(order) ? order.slice() : [];
         this._save();
         this._bump();
       }
@@ -9270,6 +9323,8 @@
     ProphecyCardsStore,
     StateStore,
     HistoryStore,
+    HomeOrderStore,
+    DEFAULT_HOME_ORDER,
     migrateAnnotations,
     AnnotationStore: AnnotationStore2,
     HighlightStore,

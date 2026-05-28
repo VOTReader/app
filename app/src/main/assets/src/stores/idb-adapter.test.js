@@ -63,17 +63,17 @@ describe('IDBAdapter — open + schema', () => {
     expect(Object.isFrozen(IDBAdapter.STORE_NAMES)).toBe(true);
   });
 
-  it('STORE_NAMES contains the 17 vot-* keys plus meta', () => {
+  it('STORE_NAMES contains the 18 vot-* keys plus meta (W2.3b.4 added vot-home-order)', () => {
     const expected = new Set([
       'vot-welcomed', 'vot-about-seen', 'vot-garden-warning-acked',
       'vot-ann-migrated', 'vot-recent-nav', 'vot-prophecy-cards',
       'vot-journal', 'vot-journal-notebooks', 'vot-journal-index',
       'vot-journal-stats', 'vot-bookmarks', 'vot-notebooks',
       'vot-history', 'vot-state', 'vot-annotations', 'vot-notes',
-      'vot-links', 'meta',
+      'vot-links', 'vot-home-order', 'meta',
     ]);
     expect(new Set(IDBAdapter.STORE_NAMES)).toEqual(expected);
-    expect(IDBAdapter.STORE_NAMES.length).toBe(18);
+    expect(IDBAdapter.STORE_NAMES.length).toBe(19);
   });
 
   it('DB_NAME is "votreader" — separate from vot-journal-media and vot-thumbs', () => {
@@ -82,8 +82,8 @@ describe('IDBAdapter — open + schema', () => {
     expect(IDBAdapter.DB_NAME).not.toBe('vot-thumbs');
   });
 
-  it('DB_VERSION is 1', () => {
-    expect(IDBAdapter.DB_VERSION).toBe(1);
+  it('DB_VERSION is 2 (W2.3b.4 bumped from 1 to add vot-home-order)', () => {
+    expect(IDBAdapter.DB_VERSION).toBe(2);
   });
 
   it('reopening after _resetForTests creates a fresh promise', async () => {
