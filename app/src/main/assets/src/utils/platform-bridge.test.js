@@ -39,6 +39,7 @@ const METHODS = [
   'getCrashLog',
   'setImmersiveMode',
   'haptic',
+  'isAndroid',
 ];
 
 /**
@@ -102,7 +103,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     delete (/** @type {any} */ (globalThis.window).AndroidBridge);
   });
 
-  it('exposes exactly the 20 expected methods', () => {
+  it('exposes exactly the 21 expected keys', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);
@@ -174,7 +175,7 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
     warnSpy.mockRestore();
   });
 
-  it('exposes the same 20 methods as Android impl (uniform shape)', () => {
+  it('exposes the same 21 keys as Android impl (uniform shape)', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);

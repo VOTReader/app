@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 379 distinct identifiers.
+// Total: 383 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -88,11 +88,11 @@ export const projectGlobals = {
   HomeScreen: "readonly",
   Hooks: "readonly",
   HydrationGate: "readonly",
-  IosPwaWelcomeCard: "readonly",
   IDBAdapter: "readonly",
   InAppLinkButton: "readonly",
   InlineEcho: "readonly",
   InlineNotes: "readonly",
+  IosPwaWelcomeCard: "readonly",
   JournalAudioBlock: "readonly",
   JournalBlockView: "readonly",
   JournalCardMenu: "readonly",
@@ -179,6 +179,7 @@ export const projectGlobals = {
   SRCH_KIND_LABEL: "readonly",
   SRCH_QUICK_PICKS: "readonly",
   STUDY_ABBREVS: "readonly",
+  Safari7DayModal: "readonly",
   ScreenLayout: "readonly",
   Screens: "readonly",
   ScriptureGenre: "readonly",
@@ -192,7 +193,6 @@ export const projectGlobals = {
   SettingsRow: "readonly",
   SettingsScreen: "readonly",
   Sheets: "readonly",
-  Safari7DayModal: "readonly",
   SrchCard: "readonly",
   SrchGroup: "readonly",
   SrchSnippet: "readonly",

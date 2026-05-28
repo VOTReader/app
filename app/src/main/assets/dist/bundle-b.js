@@ -4220,7 +4220,11 @@
     haptic: notYetImplemented("haptic")
     // future; haptic JS wiring not yet present
   };
-  var PlatformBridge = isAndroid ? androidImpl : webImpl;
+  var PlatformBridge = (
+    /** @type {PlatformBridgeExport} */
+    isAndroid ? androidImpl : webImpl
+  );
+  PlatformBridge.isAndroid = isAndroid;
 
   // app/src/main/assets/src/hooks/use-ref-mirror.js
   function useRefMirror(value) {
@@ -7039,6 +7043,29 @@
     PLATFORM,
     RISK
   };
+
+  // app/src/main/assets/src/utils/sw-register.js
+  var TOAST_ID2 = "vot-toast-sw-update";
+  function registerServiceWorker() {
+    if (PlatformBridge.isAndroid) return;
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("./service-worker.js").catch((err) => {
+      console.warn("SW registration failed", err);
+    });
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      showToast2({
+        id: TOAST_ID2,
+        html: "New version available \u2014 <b>tap to update</b>",
+        className: "vot-toast-sw-update",
+        durationMs: 0
+      });
+      var el = document.getElementById(TOAST_ID2);
+      if (el) el.addEventListener("click", () => window.location.reload(), { once: true });
+    });
+  }
 
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
@@ -10057,4 +10084,5 @@
     jrnRefKeyForLetterByLabel
   });
   Object.assign(window, JournalHubScreen_exports, JournalViewerScreen_exports, JournalEditorScreen_exports);
+  registerServiceWorker();
 })();

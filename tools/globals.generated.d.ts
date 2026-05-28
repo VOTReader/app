@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 379 distinct identifiers.
+// Total: 383 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -89,11 +89,11 @@ declare const HomeOrderStore: any;
 declare const HomeScreen: any;
 declare const Hooks: any;
 declare const HydrationGate: any;
-declare const IosPwaWelcomeCard: any;
 declare const IDBAdapter: any;
 declare const InAppLinkButton: any;
 declare const InlineEcho: any;
 declare const InlineNotes: any;
+declare const IosPwaWelcomeCard: any;
 declare const JournalAudioBlock: any;
 declare const JournalBlockView: any;
 declare const JournalCardMenu: any;
@@ -180,6 +180,7 @@ declare const SRCH_GROUP_META: any;
 declare const SRCH_KIND_LABEL: any;
 declare const SRCH_QUICK_PICKS: any;
 declare const STUDY_ABBREVS: any;
+declare const Safari7DayModal: any;
 declare const ScreenLayout: any;
 declare const Screens: any;
 declare const ScriptureGenre: any;
@@ -193,7 +194,6 @@ declare const SelectionToolbar: any;
 declare const SettingsRow: any;
 declare const SettingsScreen: any;
 declare const Sheets: any;
-declare const Safari7DayModal: any;
 declare const SrchCard: any;
 declare const SrchGroup: any;
 declare const SrchSnippet: any;

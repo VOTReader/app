@@ -102,6 +102,7 @@ import { useAppShellEffects } from '../hooks/use-app-shell-effects.js';
 import { useStorageInfo } from '../hooks/use-storage-info.js';
 import { formatBytes } from '../utils/format-bytes.js';
 import { StorageHealth } from '../utils/storage-health.js';
+import { registerServiceWorker } from '../utils/sw-register.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -216,3 +217,6 @@ Object.assign(window, {
 // like JournalCardMenu, jrnRenderInline, JournalBlockView that other
 // modules in the cluster reference via bare name in the classic world).
 Object.assign(window, HubScreen, ViewerScreen, EditorScreen);
+
+// ── Service worker (W3) — web-only, gated by PlatformBridge ────────────
+registerServiceWorker();

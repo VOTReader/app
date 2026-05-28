@@ -58,6 +58,10 @@
  * @property {() => string} getCrashLog
  */
 
+/**
+ * @typedef {PlatformBridgeShape & { isAndroid: boolean }} PlatformBridgeExport
+ */
+
 // ── Detection ── only place this expression appears in the codebase ───
 const isAndroid = !!(typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge);
 
@@ -667,6 +671,7 @@ const webImpl = {
  * load time based on `window.AndroidBridge` presence. Consumers always
  * see the same shape (PlatformBridgeShape).
  *
- * @type {PlatformBridgeShape}
+ * @type {PlatformBridgeExport}
  */
-export const PlatformBridge = isAndroid ? androidImpl : webImpl;
+export const PlatformBridge = /** @type {PlatformBridgeExport} */ (isAndroid ? androidImpl : webImpl);
+PlatformBridge.isAndroid = isAndroid;
