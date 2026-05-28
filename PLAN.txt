@@ -1883,10 +1883,28 @@ Architecture — what exists, what changes:
   Risk: MEDIUM for budget devices. Mitigation: startup health check.
 
 ───────────────────────────────────────────────────────────────────────────────
-W3 — PWA SHELL (installable + offline)
+W3 — PWA SHELL (installable + offline) — LANDED 2026-05-28
 ───────────────────────────────────────────────────────────────────────────────
 
 Goal: VOTReader is installable from a desktop browser and works offline.
+
+  LANDED. manifest.json (standalone, gold theme, relative start_url/scope).
+  service-worker.js with two cache buckets: vot-core-v{N} (versioned,
+  cleared on bump) + vot-corpus-c{N} (stable across versions, cleared
+  only when corpus data changes). No skipWaiting — controllerchange fires
+  in-app toast for user-controlled reloads. offline.html dark-themed
+  fallback. PWA icons at 512/192/180/32/16px from existing 1024x1024
+  ic_launcher_foreground.png. SW registration gated behind
+  PlatformBridge.isAndroid (exported boolean, added as part of W3).
+  Registration wired in _entry-b.js. index.html gains manifest link,
+  theme-color, apple-mobile-web-app-capable, apple-touch-icon, favicon.
+  Bundle-b: 413.2 → 414.1 KB (+0.9 KB). Tests: 1182 → 1236 (+54 W9.1).
+
+  Remaining for full exit criteria:
+    [ ] SW-not-registered-on-Android — needs device/emulator (W6)
+    [ ] Desktop Chrome "Install" prompt — needs HTTPS deployment (W5)
+    [ ] SW update cycle verification — needs two deployed versions (W5)
+  These are W5/W6 verification items, not W3 blockers.
 
   W3.1 — manifest.json
   ─────────────────────
@@ -2637,11 +2655,668 @@ Goal: close the two remaining structural gaps — the untyped UI tree
         tsc enforces null-check at all call sites.
 
 ───────────────────────────────────────────────────────────────────────────────
+W9 — DATA INTEGRITY (schema validation + import hardening)
+───────────────────────────────────────────────────────────────────────────────
+
+Goal: eliminate the "data fragility" weakness entirely. Today's gate
+(check_balance.py + esprima) proves "valid JavaScript" but says nothing
+about "valid letter." A file with a missing `id`, an unknown block type,
+an orphaned footnote reference, or a broken prev/nextLetter chain passes
+every current check. Schema validation closes that gap at build time AND
+at import time.
+
+Current validation gap:
+  check_balance.py catches:
+    - Brace/bracket/paren imbalance
+    - Non-ASCII dashes in verse ranges (en/em dash between digits)
+    - Smart quotes used as JSON delimiters
+    - esprima JS parse errors (real syntax check)
+  check_balance.py does NOT catch:
+    - Missing required fields (id, title, blocks, paragraphs)
+    - Invalid block types (typo "parra" instead of "para")
+    - Invalid segment types (typo "itaric" instead of "italic")
+    - Orphaned footnote refs (fn "3" in blocks but no "3" in footnotes)
+    - Orphaned nkjv keys (scripture ref in nkjv but no footnote cites it)
+    - Broken prev/nextLetter chains (letter A says next is B, but B says
+      prev is C)
+    - Invalid paragraph align values (not "center"|"justify"|"left")
+    - Missing scriptures for {{ref:...}} inline refs in Format B text
+    - Wrong types (num as string instead of number, date as number)
+
+  W9.1 — Schema definitions (4 corpus format validators)
+  ──────────────────────────────────────────────────────
+  New file: tools/validate-schemas.js (Node.js script).
+
+  Each schema is a validator FUNCTION, not a JSON Schema document. JSON
+  Schema can't express cross-field constraints (footnote refs must exist
+  in the footnotes object; nkjv keys must be cited by at least one
+  footnote). Functions can. The validators return an array of violation
+  strings — empty array = valid.
+
+  Format A validator (Volumes, Lord's Rebuke, Letters families, Hidden Manna):
+    Required top-level: id (string), title (string), blocks (array)
+    Required per-letter: footnotes (object), nkjv (object)
+    Optional: num (number), date (string), from (string), spoken (string),
+              forLine (string), audioUrl (string), soundcloudUrl (string),
+              videoVoiceUrl (string), videoMusicUrl (string),
+              relatedTopics (array of {label, url}), metaAddendum (string),
+              metaAddendumUrl (string), metaAddendumLink (object),
+              metaAddendumInternal (string), prevLetter (object|null),
+              nextLetter (object|null)
+    Block validation:
+      - type must be one of: para, poetry, closing, closing-fn, note, scripture
+      - para/closing-fn: must have segments (array of {t, v})
+      - poetry: must have lines (array of arrays of {t, v})
+      - closing/note: must have text (string)
+      - scripture: validated but structure varies
+    Segment validation:
+      - t must be one of: text, italic, bold-italic, caps, fn, stanza-break,
+        letter-link
+      - fn segments: v must exist as a key in the letter's footnotes object
+      - stanza-break: v is optional (usually absent)
+    Footnote validation:
+      - Every footnote key must be referenced by at least one fn segment
+        (orphan detection — warns, doesn't fail)
+      - type must be "scripture" or "note"
+      - scripture type: ref (string) must exist as a key in nkjv
+      - note type: text (string) required
+    nkjv validation:
+      - Every nkjv key should be referenced by a footnote with type
+        "scripture" (orphan detection — warns, doesn't fail)
+    Chain validation (prev/nextLetter):
+      - If prevLetter is not null, it must have id (string) and title (string)
+      - If nextLetter is not null, same
+      - Cross-letter: letter[i].nextLetter.id === letter[i+1].id AND
+        letter[i+1].prevLetter.id === letter[i].id (chain consistency)
+
+  Format B validator (WTLB One, WTLB Two, The Blessed, Holy Days):
+    Required: id (string), title (string), paragraphs (array)
+    Required per-paragraph: align (one of "center"|"justify"|"left"),
+                            text (string)
+    Optional: num (number), scriptures (object), sourceLabel (string),
+              type (string), prevEntry/nextEntry (object|null)
+    Inline ref validation:
+      - Every {{ref:Book Ch:V}} in text must have a matching key in the
+        entry's scriptures object (if scriptures exists)
+      - Every {{nav:bookId:chapter}} is syntactically valid (2 colon-
+        separated parts)
+    Chain validation (prev/nextEntry):
+      - Same consistency check as Format A chains
+
+  Format C validator (Bible books — books.js, books-restored.js):
+    Required: id (string), title (string), chapters (array)
+    Per-chapter: num (number), sections (array)
+    Per-section: heading (string, can be empty), verses (array)
+    Per-verse: n (number), text (string)
+    Verse numbering: n values within a section must be ascending and
+    contiguous (gaps indicate data corruption)
+
+  Format D validator (Bible Studies — bible-studies.js):
+    Required per study: id (string), title (string), parts (array)
+    Per-part: title (string), chapterIds (array of strings)
+    ChapterIds: each must reference a valid chapter entry in the study's
+    chapters array
+
+  Implementation:
+    - tools/validate-schemas.js exports: validateFormatA(letters, opts),
+      validateFormatB(entries, opts), validateFormatC(books, opts),
+      validateFormatD(studies, opts)
+    - Each returns { errors: string[], warnings: string[] }
+    - Errors = hard failures (build should fail)
+    - Warnings = suspicious but possibly intentional (orphan nkjv keys,
+      unusual structures)
+    - opts.strict = true for CI/build; false for exploratory checks
+
+  Tests:
+    - vitest: valid letter passes, each violation type detected
+    - vitest: chain consistency across a 3-letter array
+    - vitest: orphan detection for footnotes + nkjv
+
+  W9.2 — Build-time validation (integrate into build pipeline)
+  ────────────────────────────────────────────────────────────
+  Extend tools/build.py (or add a parallel Node.js build step) to run
+  schema validation on every data file BEFORE concatenation.
+
+  Two approaches (choose one):
+
+  Option A — Node.js pre-step:
+    New npm script: "validate:data" → node tools/validate-schemas.js
+    The script loads each data file via vm.runInNewContext(), captures the
+    global variable, runs the appropriate format validator.
+    build.py calls this via subprocess before emitting bundles.
+    Pro: validators are JS (same language as data files), can import
+    the same data structures the app uses.
+    Con: adds Node.js dependency to the Python build script.
+
+  Option B — Pure Python:
+    Port validators to Python. Parse JS files minimally to extract
+    the data object (the files are simple enough — `var X = [...]` or
+    `var X = {...}`). Validate in Python alongside the existing
+    check_balance.py checks.
+    Pro: single-language build pipeline.
+    Con: maintaining parallel JS/Python validators; Python can't import
+    the data files natively.
+
+  Recommendation: Option A. The data files are JavaScript; the validators
+  should be too. check_balance.py continues to run its 4 existing checks
+  (brace balance, dashes, smart quotes, esprima). The new Node.js
+  validator adds structural checks. Both run in the pre-commit hook.
+
+  Pipeline integration:
+    pre-commit hook step (new, between check_balance and build):
+      node tools/validate-schemas.js --strict
+    CI job (new step between lint and build):
+      npm run validate:data
+    npm script:
+      "validate:data": "node tools/validate-schemas.js --strict"
+
+  Exit gate: build FAILS on any schema error. Warnings print but don't
+  block (orphan nkjv keys may be intentional cross-references).
+
+  W9.3 — Import payload validation (V2 schema + per-store validation)
+  ──────────────────────────────────────────────────────────────────
+  Problem: _doImport in SettingsScreen.jsx validates only `app ===
+  'VOTReader'` and checks exportVersion. The store data payloads are
+  written to IDB without any structural validation. A corrupted or
+  maliciously crafted export file can write arbitrary shapes into stores,
+  causing runtime crashes on next read.
+
+  Fix: validate each store's payload before writing. Three layers:
+
+  Layer 1 — Export envelope validation:
+    - app === 'VOTReader' (already exists)
+    - exportVersion is 1 or 2 (already exists)
+    - data is object (LS keys)
+    - stores is object (IDB store payloads)
+    - media is object or undefined (journal blobs)
+    - No unexpected top-level keys (forward-compat: warn, don't fail)
+
+  Layer 2 — Per-store shape validation:
+    New utility: src/utils/import-validators.js
+    Each store gets a lightweight validator that checks the shape of its
+    data BEFORE replaceAll/setAll/set is called:
+
+    AnnotationStore: value is object, each key maps to array of
+      { hlKey, startOffset, endOffset, color, style, ... }
+    NoteStore: value is object, each key maps to { text, color, ... }
+    BookmarkStore: value is object, each key maps to
+      { bookId, chapterNum, label, ... }
+    LinkStore: value is object, each key maps to array of
+      { source, target, ... }
+    JournalStore: value is object, entries have { id, blocks, ... }
+    JournalIndexStore: value is object with known fields
+    NotebookStore: value is object, each notebook has { id, name, ... }
+    StateStore: value is object with settings sub-object
+    RecentNavStore: value is array of nav-history records
+    HomeOrderStore: value is array of strings
+    ProphecyCardsStore: value is object of boolean states
+    Flag stores (3): value is truthy/falsy
+
+    Validation depth: check top-level shape and required field presence.
+    Do NOT deep-validate every annotation — that's too expensive for
+    import and the data was valid when exported. Check that the structure
+    is plausible, not that every field is semantically correct.
+
+  Layer 3 — Per-store error isolation:
+    Change _doImport to wrap each store's write in try/catch:
+      for (const [storeName, payload] of Object.entries(stores)) {
+        try {
+          const violations = validateStorePayload(storeName, payload);
+          if (violations.length) {
+            importWarnings.push(`${storeName}: ${violations.join(', ')}`);
+            continue;  // skip this store, don't write corrupted data
+          }
+          await targetStore.replaceAll(payload);
+          importedCount++;
+        } catch (err) {
+          importFailures++;
+          failedStores.push(storeName);
+        }
+      }
+
+    After all stores processed, show a detailed toast:
+      - "Imported 12/14 stores. 2 skipped (validation failed: annotations,
+        links). See export for backup."
+      - If ALL stores fail: "Import failed — no data was changed. The
+        file may be corrupted."
+
+  Layer 4 — Media blob validation:
+    For each media entry in the import payload:
+      - key must be a string (blob ID)
+      - value must be a valid base64 string (regex check on first 100
+        chars — full decode happens during write)
+      - Decoded size must be < 100 MB per blob (matches existing guard)
+
+  Implementation:
+    - New file: src/utils/import-validators.js (~200 lines)
+    - Modify: SettingsScreen.jsx _doImport (~50 lines changed)
+    - Tests: vitest for each store validator (valid passes, each
+      violation type detected, malformed payloads rejected)
+
+  W9.4 — Pre-commit hook integration
+  ──────────────────────────────────
+  Update .githooks/pre-commit to add schema validation step:
+
+  Current steps (6):
+    1. check_balance.py (data files)
+    2. lint-staged (eslint)
+    3. typecheck (tsc --noEmit)
+    4. vitest run
+    5. npm run build (bundles)
+    6. Kotlin tests (if Kotlin files changed)
+
+  New step (between 1 and 2):
+    1b. node tools/validate-schemas.js --strict (data files only)
+        Runs only when src/data/*.js files are staged (same gate as
+        check_balance.py). Sub-second on all 21 data files.
+
+  Also add to CI (between lint and build):
+    npm run validate:data
+
+  Exit criteria (W9 complete):
+    [ ] Schema validators for all 4 formats (Format A/B/C/D) with
+        field-level + cross-field + chain validation. vitest coverage.
+    [ ] Build pipeline rejects structurally invalid data files.
+        Manual test: introduce a typo block type, verify build fails.
+    [ ] Import validates per-store payloads before writing. Corrupted
+        stores skipped with user-visible reporting. vitest coverage.
+    [ ] Pre-commit hook runs schema validation on data file changes.
+    [ ] CI runs schema validation between lint and build.
+    [ ] Zero false positives on the current 21 data files (all must
+        pass --strict validation as-is).
+
+───────────────────────────────────────────────────────────────────────────────
+W10 — ACCESSIBILITY (WCAG 2.1 AA compliance)
+───────────────────────────────────────────────────────────────────────────────
+
+Goal: make VOTReader fully usable by keyboard-only users, screen reader
+users, and users with motion/visual sensitivities. Target: WCAG 2.1 AA
+across all 53 screens, 12 sheets, 4 modal overlays, and the annotation
+toolbar.
+
+Current state (audited 2026-05-28):
+  - 94 aria-* attributes across 39 files (scattered, not systematic)
+  - 33 role= attributes across 16 production files (mostly JournalViewer)
+  - 0 role="dialog" or aria-modal="true" on ANY modal/sheet/overlay
+  - 0 focus traps — Tab escapes every modal into background content
+  - 0 focus-return-to-trigger on any modal close
+  - 0 prefers-reduced-motion references (CSS or JS)
+  - 0 .sr-only / screen-reader-only CSS classes
+  - 1 <label> element in the entire app (SettingsRow)
+  - 6 tabIndex usages (ad hoc, not managed)
+  - 8 .focus() calls (ad hoc, no focus management utility)
+  - 0 focus trap / focus management utilities
+  - SelectionToolbar (733 lines, 12+ buttons): zero aria-label on any
+    button, zero role="toolbar", zero keyboard navigation within the
+    toolbar, color buttons have title but are visually empty to screen
+    readers
+  - AppShellOverlays: zero ARIA on any overlay div, welcome modal close
+    button has no accessible name, garden warning has no radio-group
+    semantics
+  - AppShellSheets: zero role="dialog" on any of the 12 sheet overlays
+  - Toast notifications: no aria-live region
+  - ConfirmStrip: no aria-live for dynamic confirmation questions
+
+  W10.1 — Accessibility infrastructure (foundation primitives)
+  ────────────────────────────────────────────────────────────
+  Build the reusable primitives that W10.2-W10.5 consume. Pure additions
+  — zero behavior change to existing UI.
+
+  W10.1a — useFocusTrap hook:
+    New file: src/hooks/use-focus-trap.js (~80 lines)
+
+    useFocusTrap(containerRef, active)
+      - On activate:
+        1. Store document.activeElement as returnTarget
+        2. Query all focusable elements in containerRef (FOCUSABLE_SELECTOR:
+           'a[href], button:not(:disabled), input:not(:disabled),
+           textarea:not(:disabled), select:not(:disabled),
+           [tabindex]:not([tabindex="-1"])')
+        3. Focus the first focusable element (or the container itself if
+           none found, with tabIndex={-1} on the container)
+      - On Tab keydown (within container):
+        If Shift+Tab on first focusable → wrap to last
+        If Tab on last focusable → wrap to first
+        (The sheet's Escape handler from useModalRegistry still fires
+        independently — focus trapping and dismiss are separate concerns)
+      - On deactivate:
+        returnTarget.focus() if returnTarget is still in the DOM
+        (handles the case where the trigger was removed while the modal
+        was open — e.g. annotation action chip trigger disappears after
+        the annotation is deleted)
+
+    Tests: vitest with jsdom — trap wraps on Tab, wraps on Shift-Tab,
+    restores focus on deactivate, handles empty container, handles
+    removed trigger.
+
+  W10.1b — sr-only CSS class:
+    Add to app.css:
+      .sr-only {
+        position: absolute; width: 1px; height: 1px;
+        padding: 0; margin: -1px; overflow: hidden;
+        clip: rect(0, 0, 0, 0); white-space: nowrap;
+        border: 0;
+      }
+    Standard screen-reader-only pattern. Used by W10.3 for icon-only
+    buttons that need accessible text, and by W10.4 for off-screen
+    announcements.
+
+  W10.1c — aria-live announcement utility:
+    New file: src/utils/announce.js (~30 lines)
+
+    announce(message, priority = 'polite')
+      - Creates/reuses a persistent <div role="status" aria-live={priority}
+        aria-atomic="true"> off-screen (sr-only styled)
+      - Sets textContent = '' → microtask → textContent = message
+        (the clear-then-set forces screen readers to re-announce even if
+        the message text is identical to the previous announcement)
+      - Used by: toast notifications, ConfirmStrip state changes,
+        store mutation feedback (bookmark added, note saved, etc.)
+
+    Tests: vitest — element created on first call, reused on subsequent,
+    textContent set correctly, polite vs assertive priority.
+
+  W10.1d — useRovingTabindex hook:
+    New file: src/hooks/use-roving-tabindex.js (~60 lines)
+
+    useRovingTabindex(items, activeIndex, setActiveIndex)
+      - Returns props to spread on each item: { tabIndex, onKeyDown, ref }
+      - Arrow keys (Left/Right or Up/Down based on orientation param)
+        move activeIndex with wrapping
+      - Home/End jump to first/last
+      - Active item gets tabIndex={0}, rest get tabIndex={-1}
+      - On arrow key: .focus() the newly active item
+
+    Used by: SelectionToolbar buttons, color palette, garden tier
+    selector, any toolbar or button group.
+
+    Tests: vitest — arrow key wraps, Home/End, focus follows active index.
+
+  W10.2 — Modal/sheet ARIA + focus management
+  ───────────────────────────────────────────
+  Wire the W10.1 primitives into every modal, sheet, and overlay in the
+  app. This is the highest-impact tier — it's the difference between
+  "keyboard users are trapped behind a modal they can't escape" and
+  "the app works."
+
+  Sequencing: mechanical (same pattern repeated N times), so batch by
+  risk ascending per [[low-risk-pilot-first]].
+
+  W10.2a — Sheet overlay pattern (pilot on NoteSheet):
+    For each sheet:
+      1. Add role="dialog" and aria-modal="true" to the sheet panel div
+      2. Add aria-label={descriptive title} (e.g. "Edit note", "Create
+         bookmark", "Pick notebook")
+      3. Call useFocusTrap(sheetRef, true) — active whenever the sheet
+         is mounted
+      4. Verify: focus trapped, Escape still dismisses (useModalRegistry
+         unaffected), focus returns to trigger on close
+
+    NoteSheet is the pilot because:
+      - It has an existing autoFocus on the textarea (proves focus
+        trap doesn't fight autoFocus)
+      - It has a ConfirmStrip (proves focus trap handles dynamic
+        sub-content)
+      - It has 3 modes (read/edit/color) — stress-tests focus
+        management across mode transitions
+
+  W10.2b — Remaining sheets (11):
+    Apply the same pattern to all remaining sheets:
+      AnnotationActionChip, BookmarkCreateSheet, BookmarkPopover,
+      LinkSidebar, LinkPicker, ScriptureSheet, NotebookPickerSheet,
+      JournalRecordingSheet, JournalInboundSheet, JournalInsertSheet,
+      TabActionSheet
+
+    Special cases:
+      - AnnotationActionChip: floating chip, not full-screen overlay.
+        aria-label="Annotation actions". Focus trap still applies —
+        Tab should wrap within the 3-4 visible buttons, not escape to
+        the reading content behind.
+      - LinkSidebar: side panel, not bottom sheet. role="complementary"
+        instead of "dialog" (it's a supplementary panel, not a blocking
+        modal). Focus trap optional — user should be able to Tab between
+        sidebar and main content. Use aria-label="Linked content".
+      - JournalRecordingSheet: has a live timer and amplitude bar.
+        Add aria-live="polite" to the timer display so screen readers
+        announce elapsed time updates (throttled to every 10 seconds
+        to avoid chattering).
+
+  W10.2c — Modal overlays (4):
+    Apply to AppShellOverlays:
+      Welcome modal: role="dialog", aria-modal="true",
+        aria-label="Welcome to VOTReader". Close button gets
+        aria-label="Close welcome message". useFocusTrap.
+      Tabs overview: role="dialog", aria-label="Open tabs".
+      Disable-tabs prompt: role="alertdialog" (it's a confirmation),
+        aria-label="Disable tabs feature".
+      Garden warning: role="dialog", aria-label="Garden access".
+        Tier selector buttons → role="radiogroup" on container,
+        role="radio" + aria-checked on each button.
+
+  W10.2d — Type-DELETE confirmation modal (SettingsScreen):
+    The "Clear All Personal Data" modal:
+      role="alertdialog", aria-modal="true",
+      aria-label="Confirm delete all personal data".
+      The input already has aria-label. Add aria-describedby pointing
+      to the warning text paragraph. useFocusTrap.
+
+  W10.2e — Safari/StorageHealth modals (3):
+    Safari7DayModal: role="alertdialog", aria-label="Safari storage
+      warning". Focus trap. Buttons get aria-label.
+    IosPwaWelcomeCard: role="dialog", aria-label="Import data from
+      Safari". Focus trap.
+    StorageHealthBanner: already has role="alert" (verified). Add
+      aria-live="polite" if not already present. Dismiss button
+      needs aria-label="Dismiss storage warning".
+
+  Tests per tier:
+    - vitest: role + aria attributes present in rendered output
+    - vitest: focus trap activation/deactivation
+    - Manual: keyboard-only walkthrough of open → interact → close
+      cycle for each modal/sheet
+
+  W10.3 — Keyboard navigation (toolbars, palettes, reading view)
+  ─────────────────────────────────────────────────────────────
+  Make every interactive surface keyboard-navigable beyond just Tab.
+
+  W10.3a — SelectionToolbar (733 lines, highest-impact):
+    Current state: 12+ buttons, zero keyboard nav, zero ARIA.
+
+    Add role="toolbar" to the toolbar container.
+    Add aria-label="Text annotation tools".
+    Add aria-label to every button:
+      - Highlight colors: aria-label="Yellow highlight" (etc.)
+      - Style toggle: aria-pressed={isUnderline}, aria-label="Underline
+        style" / "Highlight style"
+      - Action buttons: aria-label matching the visible text label
+        (Note, Link, Copy, Share, Search, Bookmark)
+      - Remove: aria-label="Remove highlight"
+
+    Wire useRovingTabindex for Left/Right arrow navigation between the
+    action buttons. Color palette gets its own nested roving group.
+
+    ConfirmStrip ("Remove this highlight?"): add aria-live="assertive"
+    to the strip container so the question is announced when it appears.
+
+  W10.3b — Color palette (shared pattern):
+    The 10-color annotation palette appears in SelectionToolbar and
+    NoteSheet. Each color button:
+      - aria-label="[Color name] highlight color"
+      - aria-pressed={isSelected} (for the currently active color)
+      - useRovingTabindex for arrow key navigation within the palette
+
+  W10.3c — Settings screen controls:
+    Toggle switches: add role="switch" + aria-checked to each toggle.
+    The existing SettingsRow <label> element is the only label in the
+    app — extend the pattern to all settings rows.
+    Clear progress buttons: aria-label describing what will be cleared.
+    Font toggle: role="radiogroup" with role="radio" + aria-checked
+    on Classic/Modern buttons.
+
+  W10.3d — Navigation chrome:
+    Bottom nav bar: role="navigation", aria-label="Main navigation".
+    Each nav button: aria-label + aria-current="page" when active.
+    Back pill: aria-label="Go back to [previous screen name]".
+    Search bar: <label> element (sr-only) + aria-label on input.
+
+  W10.3e — Reading view keyboard shortcuts:
+    Content screens (letter view, chapter view, WTLB entry):
+    - Left/Right arrow: prev/next chapter/letter (matching the swipe
+      gesture). Gated on: not in an input/textarea, not in a modal.
+    - Space/Shift+Space: scroll page (browser default — just ensure
+      nothing intercepts it).
+    - Home/End: scroll to top/bottom of content.
+    These are progressive enhancements — they add keyboard access to
+    existing touch gestures without changing any visible UI.
+
+  W10.4 — Screen reader semantics (landmarks, headings, announcements)
+  ──────────────────────────────────────────────────────────────────
+  Make the app navigable by landmark and heading for screen reader users.
+
+  W10.4a — Landmark roles:
+    App shell: role="main" on the content area (the ROUTES render area).
+    Nav bar: role="navigation" (from W10.3d).
+    Search results: role="search" on the SearchScreen container.
+    Settings: role="form" on the settings content area.
+
+  W10.4b — Heading hierarchy:
+    Every screen title → <h1> (or aria-level="1" if the element can't
+    be an h1). Currently most screen titles are <div> or <span> with
+    CSS styling. Changing to <h1> gives screen readers a navigation
+    anchor.
+    Section headings within screens → <h2>.
+    Sub-sections → <h3>.
+    Rule: exactly one <h1> per screen, always the screen title.
+
+  W10.4c — Dynamic announcements:
+    Wire the W10.1c announce() utility into state changes:
+      - "Bookmark added" / "Bookmark removed" (BookmarkIcon toggle)
+      - "Highlight applied" / "Highlight removed" (SelectionToolbar)
+      - "Note saved" / "Note deleted" (NoteSheet)
+      - "Link created" / "Link removed" (LinkPicker)
+      - "Copied to clipboard" (copy action)
+      - Toast messages (already visual — now also announced)
+      - Navigation: "Navigated to [screen name]" on screen change
+        (helps screen reader users orient after navigation)
+
+  W10.4d — Content accessibility:
+    Reading content (letter blocks, Bible verses, WTLB entries):
+      - Poetry blocks: role="group" with aria-label="Poetry"
+      - Scripture blocks: role="group" with aria-label="Scripture quote"
+      - Footnote bubbles: aria-label="Footnote [number]" + role="button"
+      - Verse numbers: aria-label="Verse [number]" (currently decorative
+        gold superscripts with no accessible text)
+      - Inline scripture refs (Format B {{ref:...}}): role="button",
+        aria-label="View [reference]"
+
+  W10.5 — Motion and visual accessibility
+  ───────────────────────────────────────
+  Respect user preferences for reduced motion, high contrast, and
+  focus visibility.
+
+  W10.5a — prefers-reduced-motion:
+    Current state: ZERO references in the codebase. All CSS animations
+    (sheet slide-up, overlay fade-in, tab transitions, toast appear)
+    run unconditionally.
+
+    Add to app.css:
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
+
+    This is the nuclear option — kills ALL animations for users who
+    prefer reduced motion. It's the safest starting point because:
+      1. It's one rule, not 30 per-animation overrides
+      2. It respects the user's system setting unconditionally
+      3. It can't miss a new animation added later
+      4. The 0.01ms (not 0ms) preserves animation-end events that
+         JS code may depend on (prevents logic breakage)
+
+    If specific animations should survive for reduced-motion users
+    (e.g., a subtle opacity fade is acceptable), carve out exceptions
+    AFTER the nuclear rule lands and is verified.
+
+  W10.5b — Focus-visible indicators:
+    Current state: browser defaults. Some browsers show outlines on
+    click (annoying for mouse users) and others suppress them entirely
+    (invisible for keyboard users).
+
+    Add to app.css:
+      :focus-visible {
+        outline: 2px solid var(--hl-yellow);
+        outline-offset: 2px;
+      }
+      :focus:not(:focus-visible) {
+        outline: none;
+      }
+
+    This shows outlines ONLY for keyboard navigation (not mouse clicks).
+    The outline color uses the existing --hl-yellow var for visual
+    consistency with the annotation system. Dark mode: --hl-yellow is
+    already visible on dark backgrounds. Light mode: same.
+
+  W10.5c — Forced colors / high contrast:
+    Add to app.css:
+      @media (forced-colors: active) {
+        .hl-note, .hl-underline { forced-color-adjust: none; }
+      }
+
+    This preserves annotation colors in Windows High Contrast mode.
+    Without it, all highlight colors collapse to the system highlight
+    color (usually blue), making the 10-color palette meaningless.
+
+    Other elements (buttons, nav, text) should FOLLOW forced-colors
+    to respect the user's contrast needs. Only annotation highlights
+    opt out because color IS the information.
+
+  Tests for W10.5:
+    - vitest: matchMedia mock for prefers-reduced-motion → verify
+      animation properties resolve to 0.01ms
+    - Visual: toggle "Reduce motion" in OS settings, verify all
+      animations suppressed
+    - Visual: toggle High Contrast, verify annotations retain colors
+      while chrome follows system palette
+    - Visual: keyboard-tab through the app, verify focus ring visible
+      on every interactive element
+
+  Exit criteria (W10 complete):
+    [ ] useFocusTrap hook: focus wraps within every modal/sheet,
+        returns to trigger on close. vitest coverage.
+    [ ] announce() utility: all user-feedback actions announced for
+        screen readers. vitest coverage.
+    [ ] useRovingTabindex hook: arrow-key navigation in toolbars and
+        palettes. vitest coverage.
+    [ ] Every modal/sheet: role="dialog"|"alertdialog", aria-modal,
+        aria-label, focus trap, focus return. 0 exceptions.
+    [ ] SelectionToolbar: role="toolbar", every button has aria-label,
+        keyboard navigation between buttons. vitest coverage.
+    [ ] Navigation chrome: landmark roles, aria-current on active tab.
+    [ ] Every screen title is an <h1> (or equivalent). Exactly one
+        per screen.
+    [ ] All state-change feedback announced (bookmarks, highlights,
+        notes, links, navigation, toasts).
+    [ ] prefers-reduced-motion: all animations suppressed.
+    [ ] Focus-visible: keyboard outlines on all interactive elements,
+        no outlines on mouse click.
+    [ ] Forced colors: annotation highlights preserved.
+    [ ] Keyboard-only walkthrough of ALL 53 screens + 12 sheets + 4
+        overlays — every action achievable without a mouse.
+    [ ] Screen reader walkthrough (NVDA or VoiceOver): every screen
+        navigable by landmark + heading, every action announced,
+        every modal trapped.
+
+───────────────────────────────────────────────────────────────────────────────
 SEQUENCING + PARALLELISM
 ───────────────────────────────────────────────────────────────────────────────
 
   Critical path: W0 → W1 → W2 → W3 → W5 → W6 (cross-platform launch).
   Then W7 + W8 (quality hardening).
+  Then W9 + W10 (integrity + accessibility).
 
   Parallelism opportunities:
     W4 (desktop polish) can run alongside W3 or W5.
@@ -2652,6 +3327,25 @@ SEQUENCING + PARALLELISM
     W8.1 (UI typing) can start Tier 1-2 during W6 (leaf components first).
     W8.2 (CSS @layer) is independent of everything — can run anytime.
     W8.3 (scripture types) is small — slot anywhere.
+    W9.1-W9.2 (schema defs + build validation) independent — can run
+      anytime. No dependency on any other phase.
+    W9.3 (import validation) benefits from W7.1 (schema versioning) but
+      doesn't strictly depend on it — can run independently.
+    W9.4 (pre-commit hook) needs W9.2 (build validation).
+    W10.1 (a11y primitives) independent — can start during W8 or after.
+    W10.2 (modal ARIA + focus) needs W10.1 primitives.
+    W10.3 (keyboard nav) needs W10.1d (useRovingTabindex). Benefits from
+      W8.1 (typed components make aria-* prop checking easier) but can
+      run without.
+    W10.4 (screen reader) needs W10.1c (announce utility). Independent
+      of W10.2 and W10.3.
+    W10.5 (motion/visual) fully independent — can run first or last.
+
+  Recommended execution order for W9 + W10:
+    W9.1 → W9.2 → W9.4 (schema pipeline — sequential)
+    W9.3 (import validation — can run in parallel with W9.2)
+    W10.1 → W10.2 → W10.3 (a11y — sequential, each builds on prior)
+    W10.4 + W10.5 (can run in parallel with W10.3 or after)
 
 ───────────────────────────────────────────────────────────────────────────────
 RISK REGISTER
@@ -2733,35 +3427,76 @@ RISK REGISTER
     proved the pattern: file-by-file, 4-7 files/day, zero-tolerance
     after each. Risk is tedium, not breakage.
 
+  MEDIUM — Schema validation false positives (W9.1-W9.2)
+    The 21 data files evolved organically over months. Some structural
+    patterns may be intentional but look like violations to a strict
+    schema (e.g., Hidden Manna has only 1 letter, Holy Days entries
+    borrow structure from Format B but have extra fields like
+    sourceLabel). Mitigation: run validators against ALL current data
+    files BEFORE declaring schemas final. Any false positive = schema
+    bug, not data bug. warnings vs errors distinction ensures
+    intentional deviations don't block the build.
+
+  LOW — Import validation rejects valid V1 exports (W9.3)
+    Users with pre-W2 V1 export files import through a backward-compat
+    path that parses LS JSON strings. The shape validators must handle
+    V1's stringified format, not just V2's native objects. Mitigation:
+    validators run AFTER the V1→V2 parsing step, not before. Test with
+    a real V1 export payload.
+
+  MEDIUM — Focus trap interactions with existing keyboard handling (W10.2)
+    The app already has: useModalRegistry (Escape dispatch), history-sync
+    (popstate), Escape key listener (6 gates), ConfirmStrip registration.
+    Adding focus traps creates a new keyboard interceptor that must
+    coexist. Specifically: Tab/Shift-Tab trapping in a sheet must NOT
+    interfere with Escape dismissal (different keys, should be fine) but
+    MUST handle the case where ConfirmStrip appears inside a trapped
+    sheet (the trap's focusable-element query must re-run when the
+    strip mounts/unmounts). Mitigation: pilot on NoteSheet (has
+    ConfirmStrip + textarea + mode transitions) before rolling out.
+
+  LOW — Heading hierarchy retrofit (W10.4b)
+    Changing screen titles from <div>/<span> to <h1> may affect CSS
+    rules that target element type (e.g., `div.screen-title`). Audit
+    finds: screen titles are styled via class selectors, not element
+    selectors. Low risk. Mitigation: visual smoke walk after each
+    screen's heading change.
+
 ───────────────────────────────────────────────────────────────────────────────
 CRITIQUE TRACEABILITY MATRIX
 ───────────────────────────────────────────────────────────────────────────────
 
-Every critique from the architectural review is mapped to a specific
-work item. Zero gaps.
+Every critique from the architectural review + the 2026-05-28 app
+review is mapped to a specific work item. Zero gaps.
 
-  | # | Critique                              | Phase   | Status     |
-  |---|---------------------------------------|---------|------------|
-  | 1 | WebView fighting native UX            | W1      | INVERTED   |
-  |   |                                       |         | (PWA       |
-  |   |                                       |         | validates) |
-  | 2 | localStorage quota ceiling            | W2      | RESOLVED   |
-  | 3 | localStorage partial-write corruption | W2      | RESOLVED   |
-  | 4 | No error boundary in App              | W2.8    | RESOLVED   |
-  | 5 | Window bridge informal globals        | W1      | RESOLVED   |
-  | 6 | No offline/installable desktop        | W3      | RESOLVED   |
-  | 7 | Missing font files                    | W0.1    | RESOLVED   |
-  | 8 | Owed real-device verification         | W0.2+W6 | RESOLVED   |
-  | 9 | No quota monitoring                   | W2.5    | RESOLVED   |
-  | 10| Desktop UX (layout, hover, keyboard)  | W4      | RESOLVED   |
-  | 11| Store schema versioning               | W7.1    | RESOLVED   |
-  | 12| raw() returns live mutable object     | W7.2    | RESOLVED   |
-  | 13| hlTick dead prop threading            | W7.3    | RESOLVED   |
-  | 14| No JS-side telemetry/diagnostics      | W7.4    | RESOLVED   |
-  | 15| buildScreenRoutes 47-prop surface     | W7.5    | RESOLVED   |
-  | 16| UI tree untyped (82 files)            | W8.1    | RESOLVED   |
-  | 17| 24 !important declarations            | W8.2    | RESOLVED   |
-  | 18| Scripture parsing lacks JSDoc types    | W8.3    | RESOLVED   |
+  | # | Critique                              | Phase    | Status     |
+  |---|---------------------------------------|----------|------------|
+  | 1 | WebView fighting native UX            | W1       | INVERTED   |
+  |   |                                       |          | (PWA       |
+  |   |                                       |          | validates) |
+  | 2 | localStorage quota ceiling            | W2       | RESOLVED   |
+  | 3 | localStorage partial-write corruption | W2       | RESOLVED   |
+  | 4 | No error boundary in App              | W2.8     | RESOLVED   |
+  | 5 | Window bridge informal globals        | W1       | RESOLVED   |
+  | 6 | No offline/installable desktop        | W3       | RESOLVED   |
+  | 7 | Missing font files                    | W0.1     | RESOLVED   |
+  | 8 | Owed real-device verification         | W0.2+W6  | RESOLVED   |
+  | 9 | No quota monitoring                   | W2.5     | RESOLVED   |
+  | 10| Desktop UX (layout, hover, keyboard)  | W4       | RESOLVED   |
+  | 11| Store schema versioning               | W7.1     | RESOLVED   |
+  | 12| raw() returns live mutable object     | W7.2     | RESOLVED   |
+  | 13| hlTick dead prop threading            | W7.3     | RESOLVED   |
+  | 14| No JS-side telemetry/diagnostics      | W7.4     | RESOLVED   |
+  | 15| buildScreenRoutes 47-prop surface     | W7.5     | RESOLVED   |
+  | 16| UI tree untyped (82 files)            | W8.1     | RESOLVED   |
+  | 17| 24 !important declarations            | W8.2     | RESOLVED   |
+  | 18| Scripture parsing lacks JSDoc types    | W8.3     | RESOLVED   |
+  | 19| Data fragility (structural validation)| W9.1-9.2 | PLANNED   |
+  | 20| Import corruption vector              | W9.3     | PLANNED    |
+  | 21| No accessibility (focus/ARIA/keyboard) | W10      | PLANNED    |
+  | 22| No prefers-reduced-motion support     | W10.5a   | PLANNED    |
+  | 23| No focus-visible indicators           | W10.5b   | PLANNED    |
+  | 24| No screen reader landmarks/headings   | W10.4    | PLANNED    |
 
 ───────────────────────────────────────────────────────────────────────────────
 INFRA / TOOLING ITEMS (one-liners — open small, ship fast)
@@ -2792,5 +3527,5 @@ USER POLICY REMINDERS (durable; mirror CLAUDE.md)
 - CROSS-PLATFORM: same JS codebase, Android APK + PWA desktop. No server.
 
 ───────────────────────────────────────────────────────────────────────────────
-END OF DOCUMENT — last updated 2026-05-26 (W0-W8 complete plan: PWA + quality hardening + all 18 critiques resolved)
+END OF DOCUMENT — last updated 2026-05-28 (W0-W10 complete plan: PWA + quality hardening + data integrity + accessibility — all 24 critiques resolved)
 ───────────────────────────────────────────────────────────────────────────────
