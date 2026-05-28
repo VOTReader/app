@@ -1622,8 +1622,8 @@
   }
 
   // app/src/main/assets/src/ui/components/NavButtons.jsx
-  function NavButtons2({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey: _journalRefKey, journalRefLabel: _journalRefLabel }) {
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "settings-gear-btn", onClick: onSettings, title: "Settings" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))), /* @__PURE__ */ React.createElement("button", { className: reading ? "nav-search-btn nav-history-reading" : "nav-search-btn", onClick: onHistory, title: "History" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polyline", { points: "1 4 1 10 7 10" }), /* @__PURE__ */ React.createElement("path", { d: "M3.51 15a9 9 0 1 0 .49-5.01" }))), /* @__PURE__ */ React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))), chapterBookmark && /* @__PURE__ */ React.createElement(ChapterBookmarkBtn, { chapterBookmark, hlTick }), /* @__PURE__ */ React.createElement(ThemeBtn, { theme, onThemeChange }));
+  function NavButtons2({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, journalRefKey: _journalRefKey, journalRefLabel: _journalRefLabel }) {
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "settings-gear-btn", onClick: onSettings, title: "Settings" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "3" }), /* @__PURE__ */ React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" }))), /* @__PURE__ */ React.createElement("button", { className: reading ? "nav-search-btn nav-history-reading" : "nav-search-btn", onClick: onHistory, title: "History" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("polyline", { points: "1 4 1 10 7 10" }), /* @__PURE__ */ React.createElement("path", { d: "M3.51 15a9 9 0 1 0 .49-5.01" }))), /* @__PURE__ */ React.createElement("button", { className: "nav-search-btn", onClick: onSearch, title: "Search" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.6" }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" }))), chapterBookmark && /* @__PURE__ */ React.createElement(ChapterBookmarkBtn, { chapterBookmark }), /* @__PURE__ */ React.createElement(ThemeBtn, { theme, onThemeChange }));
   }
 
   // app/src/main/assets/src/ui/components/ProphecyExpandToggle.jsx
@@ -1966,7 +1966,7 @@
   }
 
   // app/src/main/assets/src/ui/components/LinkCard.jsx
-  function LinkCard2({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
+  function LinkCard2({ lnk, hlKey, isBlockScope, onNavigate }) {
     const [expanded, setExpanded] = React.useState(false);
     const [confirmRemove, setConfirmRemove] = React.useState(false);
     const matchesSide = (k) => isBlockScope ? k === hlKey || k.startsWith(hlKey + ":") : k === hlKey;
@@ -1983,7 +1983,7 @@
     const doRemove = (e) => {
       e.stopPropagation();
       LinkStore.remove(lnk.id);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
     };
     return /* @__PURE__ */ React.createElement("div", { className: "link-card", onClick: confirmRemove ? void 0 : (() => onNavigate && onNavigate(other)) }, /* @__PURE__ */ React.createElement("div", { className: "link-card-header" }, /* @__PURE__ */ React.createElement("div", { className: "link-card-ref" }, /* @__PURE__ */ React.createElement("span", { className: "link-card-direction" }, isOutbound ? "to " : "from "), other.label), chainSvg), /* @__PURE__ */ React.createElement("div", { className: "link-card-cat" }, other.type === "bible" ? bookCategory(other.bookId) : other.type === "study" ? "Matthew Study Bible" : other.type === "study-letter" ? other.collection || "Bible Study" : other.type === "letter" ? other.collection || "Letter" : other.type === "wtlb" ? other.collection || "Words To Live By" : other.type === "blessed" ? "The Blessed" : other.type === "holy-days" ? "Holy Days" : ""), lnk.created && /* @__PURE__ */ React.createElement("div", { className: "link-card-date" }, relativeDate(lnk.created)), /* @__PURE__ */ React.createElement(
       "div",
@@ -2453,9 +2453,6 @@
 
   // app/src/main/assets/src/ui/components/AppShellSheets.jsx
   function AppShellSheets2({
-    // Highlight tick — shared bus for re-rendering after annotation changes
-    hlTick,
-    setHlTick,
     // Selection toolbar handlers
     openLinkPicker,
     openNoteSheet,
@@ -2556,8 +2553,6 @@
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
       SelectionToolbar,
       {
-        hlTick,
-        setHlTick,
         onLinkRequest: openLinkPicker,
         onNoteRequest: openNoteSheet,
         onBookmarkRequest: function(_bkm) {
@@ -2567,7 +2562,6 @@
       AnnotationActionChip,
       {
         chip: annChip,
-        setHlTick,
         onClose: () => setAnnChip(null),
         onNoteRequest: openNoteSheet
       }
@@ -2575,8 +2569,6 @@
       LinkSidebar,
       {
         hlKey: linkSidebarKey,
-        hlTick,
-        setHlTick,
         onClose: closeLinkSidebar,
         onNavigate: navigateToLink
       }
@@ -2588,8 +2580,6 @@
         sourceStart: linkPickerSource.start,
         sourceEnd: linkPickerSource.end,
         sourceText: linkPickerSource.text,
-        hlTick,
-        setHlTick,
         onClose: closeLinkPicker,
         onRequestRefine: setLinkRefineRequest,
         lastCreatedLink: lastLinkCreated,
@@ -2609,7 +2599,6 @@
         sourceStart: linkPickerSource.start,
         sourceEnd: linkPickerSource.end,
         sourceText: linkPickerSource.text,
-        setHlTick,
         returnTargetInsteadOfLink: !!linkPickerMode,
         onClose: (result) => {
           if (linkPickerMode) {
@@ -2634,7 +2623,6 @@
         sourceStart: linkPickerSource.start,
         sourceEnd: linkPickerSource.end,
         sourceText: linkPickerSource.text,
-        setHlTick,
         returnTargetInsteadOfLink: !!linkPickerMode,
         onClose: (result) => {
           if (linkPickerMode) {
@@ -2656,8 +2644,6 @@
         key: noteSheetTarget.groupId + ":" + (noteSheetTarget.startInEditMode ? "edit" : "read"),
         groupId: noteSheetTarget.groupId,
         startInEditMode: noteSheetTarget.startInEditMode,
-        hlTick,
-        setHlTick,
         onClose: closeNoteSheet,
         onOpenNotebookPicker: (gid) => setNotebookPickerTarget(gid)
       }
@@ -2665,8 +2651,6 @@
       NotebookPickerSheet,
       {
         groupId: notebookPickerTarget,
-        hlTick,
-        setHlTick,
         onClose: () => setNotebookPickerTarget(null)
       }
     ), multiNotePayload && /* @__PURE__ */ React.createElement(
@@ -2690,7 +2674,9 @@
           setBookmarkPopoverPayload(null);
           if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: "Bookmark" });
         },
-        onDeleteDone: () => setHlTick((t) => t + 1),
+        onDeleteDone: () => {
+          if (window.__bumpHlTick) window.__bumpHlTick();
+        },
         onClose: () => setBookmarkPopoverPayload(null)
       }
     ), inboundJournalPayload && typeof JournalInboundSheet !== "undefined" && /* @__PURE__ */ React.createElement(
@@ -2727,12 +2713,12 @@
             });
           }
           setBookmarkCreatePending(null);
-          setHlTick((t) => t + 1);
+          if (window.__bumpHlTick) window.__bumpHlTick();
         },
         onDelete: (editId) => {
           if (editId && typeof BookmarkStore !== "undefined") BookmarkStore.remove(editId);
           setBookmarkCreatePending(null);
-          setHlTick((t) => t + 1);
+          if (window.__bumpHlTick) window.__bumpHlTick();
         },
         onOpen: (editId) => {
           if (!editId) return;
@@ -2780,8 +2766,6 @@
     setSettings,
     toggleSetting,
     updateSetting,
-    hlTick,
-    setHlTick,
     titleFocusHidden,
     setTitleFocusHidden,
     headingsFocusHidden,
@@ -2942,7 +2926,6 @@
       surpriseAnchor,
       onInAppLink: openInAppLetter,
       backHint,
-      hlTick,
       onLinkOpen: openLinkSidebar,
       onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
       markAsReadEnabled: settings.markAsRead,
@@ -3106,7 +3089,6 @@
           onHistory: goHistory,
           onSettings: goSettings,
           historyEnabled: settings.historyEnabled !== false,
-          hlTick,
           theme,
           onThemeChange: setTheme
         }
@@ -3126,8 +3108,6 @@
           onSearch: goSearch,
           onHistory: goHistory,
           historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
           theme,
           onThemeChange: setTheme
         }
@@ -3144,8 +3124,6 @@
           onSearch: goSearch,
           onHistory: goHistory,
           historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
           theme,
           onThemeChange: setTheme
         }
@@ -3173,8 +3151,6 @@
           onSearch: goSearch,
           onHistory: goHistory,
           historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
           theme,
           onThemeChange: setTheme
         }
@@ -3189,8 +3165,6 @@
           onSearch: goSearch,
           onHistory: goHistory,
           historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
           theme,
           onThemeChange: setTheme
         }
@@ -3211,8 +3185,6 @@
           onSearch: goSearch,
           onHistory: goHistory,
           historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
           theme,
           onThemeChange: setTheme
         }
@@ -3238,8 +3210,6 @@
           onSearch: goSearch,
           onHistory: goHistory,
           historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
           theme,
           onThemeChange: setTheme
         }
@@ -3259,8 +3229,6 @@
           onSearch: goSearch,
           onHistory: goHistory,
           historyEnabled: settings.historyEnabled !== false,
-          hlTick,
-          setHlTick,
           theme,
           onThemeChange: setTheme
         }
@@ -3422,7 +3390,6 @@
             surpriseAnchor,
             backHint,
             onTapThroughBack: tapThroughBack,
-            hlTick,
             onLinkOpen: openLinkSidebar
           }
         );
@@ -3471,7 +3438,6 @@
             surpriseAnchor,
             backHint,
             tapThroughBack,
-            hlTick,
             openLinkSidebar
           }
         );
@@ -3569,7 +3535,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/LetterView.jsx
-  function LetterView2({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, hlTick, onLinkOpen: _onLinkOpen }) {
+  function LetterView2({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen }) {
     const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
     const [highlightedFn, setHighlightedFn] = React.useState(null);
     const [sheetFn, setSheetFn] = React.useState(null);
@@ -3703,8 +3669,7 @@
             reading: true,
             chapterBookmark: letter ? { hlKey: "letter:" + letter.id, label: letter.title || "Letter bookmark" } : null,
             journalRefKey: typeof jrnRefKeyForLetterByLabel === "function" ? jrnRefKeyForLetterByLabel(volumeLabel || "Volume Two", letter && letter.id) : null,
-            journalRefLabel: letter && letter.title,
-            hlTick
+            journalRefLabel: letter && letter.title
           }
         ))
       },
@@ -3824,7 +3789,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/WtlbEntryView.jsx
-  function WtlbEntryView2({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, hlTick, onLinkOpen: _onLinkOpen, onInAppLink }) {
+  function WtlbEntryView2({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink }) {
     const [scriptureRef, setScriptureRef] = React.useState(null);
     const [scriptureText, setScriptureText] = React.useState(null);
     const [highlightedFn, setHighlightedFn] = React.useState(null);
@@ -4008,8 +3973,7 @@
             theme,
             onThemeChange,
             reading: true,
-            chapterBookmark: entry ? { hlKey: "wtlb:" + entry.id, label: entry.title || (partLabel ? partLabel + " \u2014 Entry " + entry.num : "Bookmark") } : null,
-            hlTick
+            chapterBookmark: entry ? { hlKey: "wtlb:" + entry.id, label: entry.title || (partLabel ? partLabel + " \u2014 Entry " + entry.num : "Bookmark") } : null
           }
         ))
       },
@@ -4051,7 +4015,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/BibleChapterView.jsx
-  function BibleChapterView2({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, hlTick, onLinkOpen, backHint, onTapThroughBack }) {
+  function BibleChapterView2({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack }) {
     const [highlightedVerses, setHighlightedVerses] = React.useState([]);
     const restoredCh = restoredNames && typeof BOOKS_RESTORED !== "undefined" && BOOKS_RESTORED[book.id] && BOOKS_RESTORED[book.id].chapters.find((c) => c.num === chapter.num) || null;
     const displayChapterTitle = restoredCh && restoredCh.title || chapter.title;
@@ -4113,8 +4077,7 @@
             reading: true,
             chapterBookmark: book && chapter ? { hlKey: "bible:" + book.id + ":" + chapter.num, label: (book.title || book.id) + " " + chapter.num } : null,
             journalRefKey: book && chapter && typeof jrnRefKeyForChapter === "function" ? jrnRefKeyForChapter(book.id, chapter.num) : null,
-            journalRefLabel: book && chapter ? (book.title || book.id) + " " + chapter.num : null,
-            hlTick
+            journalRefLabel: book && chapter ? (book.title || book.id) + " " + chapter.num : null
           }
         ))
       },
@@ -4172,7 +4135,7 @@
         const renderVerse = (v, vi) => {
           const vHlKey = bibleHlKey(book.id, chapter.num, v.n);
           const vText = translateVerse(book.id, chapter.num, v, translation);
-          return /* @__PURE__ */ React.createElement("span", { key: vi, id: `v-${v.n}`, className: `verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}` }, /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n), /* @__PURE__ */ React.createElement(HighlightableText, { text: vText, hlKey: vHlKey, hlTick }), /* @__PURE__ */ React.createElement(LinkIcon, { hlKey: vHlKey, hlTick, onClick: onLinkOpen }), /* @__PURE__ */ React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick }), " ");
+          return /* @__PURE__ */ React.createElement("span", { key: vi, id: `v-${v.n}`, className: `verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}` }, /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n), /* @__PURE__ */ React.createElement(HighlightableText, { text: vText, hlKey: vHlKey }), /* @__PURE__ */ React.createElement(LinkIcon, { hlKey: vHlKey, onClick: onLinkOpen }), /* @__PURE__ */ React.createElement(BookmarkIcon, { hlKey: vHlKey }), " ");
         };
         if (!headingsVisible) {
           const allVerses = chapter.sections.flatMap((s) => s.verses);
@@ -4203,7 +4166,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/ChapterView.jsx
-  function ChapterView2({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, hlTick, onLinkOpen, backHint, onTapThroughBack }) {
+  function ChapterView2({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack }) {
     const [activeScripRef, setActiveScripRef] = React.useState(null);
     const [highlightedVerses, setHighlightedVerses] = React.useState([]);
     React.useEffect(() => {
@@ -4271,8 +4234,7 @@
             theme,
             onThemeChange,
             reading: true,
-            chapterBookmark: chapter ? { hlKey: "study:matthew-" + chapter.num, label: "Matthew " + chapter.num + " (Study)" } : null,
-            hlTick
+            chapterBookmark: chapter ? { hlKey: "study:matthew-" + chapter.num, label: "Matthew " + chapter.num + " (Study)" } : null
           }
         ))
       },
@@ -4311,7 +4273,7 @@
         /* ── PDF MODE: clean flowing verse text + study panels below ── */
         /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "verses-block" }, verses.map((v, vi) => {
           const vHlKey = studyHlKey(book.id + "-" + chapter.num, v.n);
-          return /* @__PURE__ */ React.createElement("span", { key: vi, id: `v-${v.n}`, className: `verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}` }, /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n), /* @__PURE__ */ React.createElement(HighlightableText, { text: v.text, hlKey: vHlKey, hlTick: typeof hlTick !== "undefined" ? hlTick : 0 }), /* @__PURE__ */ React.createElement(LinkIcon, { hlKey: vHlKey, hlTick, onClick: onLinkOpen }), /* @__PURE__ */ React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick }), " ");
+          return /* @__PURE__ */ React.createElement("span", { key: vi, id: `v-${v.n}`, className: `verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}` }, /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n), /* @__PURE__ */ React.createElement(HighlightableText, { text: v.text, hlKey: vHlKey }), /* @__PURE__ */ React.createElement(LinkIcon, { hlKey: vHlKey, onClick: onLinkOpen }), /* @__PURE__ */ React.createElement(BookmarkIcon, { hlKey: vHlKey }), " ");
         })), showStudy && /* @__PURE__ */ React.createElement(
           StudyPanels,
           {
@@ -4328,7 +4290,7 @@
           const echoes = showEchoes ? getEchoesForVerse(chapter, v.n) : { scriptures: [], votNotes: [] };
           const hasEchoes = echoes.scriptures.length > 0 || echoes.votNotes.length > 0;
           const vHlKey = studyHlKey(book.id + "-" + chapter.num, v.n);
-          return /* @__PURE__ */ React.createElement("div", { key: vi, id: `v-${v.n}`, className: `verse-row${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "verse-line" }, /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n), /* @__PURE__ */ React.createElement(HighlightableText, { text: v.text, hlKey: vHlKey, hlTick: typeof hlTick !== "undefined" ? hlTick : 0 }), /* @__PURE__ */ React.createElement(LinkIcon, { hlKey: vHlKey, hlTick, onClick: onLinkOpen }), /* @__PURE__ */ React.createElement(BookmarkIcon, { hlKey: vHlKey, hlTick })), showStudy && (scriptures.length > 0 || votNotes.length > 0) && /* @__PURE__ */ React.createElement(InlineNotes, { scriptures, votNotes, onScriptureClick: setActiveScripRef, onVotLetterClick }), showStudy && hasEchoes && /* @__PURE__ */ React.createElement(InlineEcho, { scriptures: echoes.scriptures, votNotes: echoes.votNotes }));
+          return /* @__PURE__ */ React.createElement("div", { key: vi, id: `v-${v.n}`, className: `verse-row${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "verse-line" }, /* @__PURE__ */ React.createElement("span", { className: "verse-num" }, v.n), /* @__PURE__ */ React.createElement(HighlightableText, { text: v.text, hlKey: vHlKey }), /* @__PURE__ */ React.createElement(LinkIcon, { hlKey: vHlKey, onClick: onLinkOpen }), /* @__PURE__ */ React.createElement(BookmarkIcon, { hlKey: vHlKey })), showStudy && (scriptures.length > 0 || votNotes.length > 0) && /* @__PURE__ */ React.createElement(InlineNotes, { scriptures, votNotes, onScriptureClick: setActiveScripRef, onVotLetterClick }), showStudy && hasEchoes && /* @__PURE__ */ React.createElement(InlineEcho, { scriptures: echoes.scriptures, votNotes: echoes.votNotes }));
         }))
       ), /* @__PURE__ */ React.createElement("div", { className: "reading-end" }), showStudy && hasLinks && /* @__PURE__ */ React.createElement("div", { className: "study-panel-group", style: { marginTop: "2rem" } }, /* @__PURE__ */ React.createElement("div", { className: "study-panel-group-title" }, "Further Study"), /* @__PURE__ */ React.createElement("div", { className: "study-links" }, chapter.links.map((link, i) => /* @__PURE__ */ React.createElement("a", { key: i, href: link.url, target: "_blank", rel: "noopener noreferrer", className: "study-link" }, link.label)))), /* @__PURE__ */ React.createElement("div", { className: "ornament-divider" }, /* @__PURE__ */ React.createElement("div", { className: "ornament-divider-line" }), /* @__PURE__ */ React.createElement("div", { className: "ornament-divider-symbol" }, "\u2726"), /* @__PURE__ */ React.createElement("div", { className: "ornament-divider-line" })), /* @__PURE__ */ React.createElement("div", { className: "bottom-nav" }, prevCh ? /* @__PURE__ */ React.createElement("button", { className: "bottom-nav-card", onClick: () => onNavigate(prevCh.num) }, /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-label" }, "\u2039 Previous"), /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-title" }, "Matthew ", prevCh.num)) : prevBoundary ? /* @__PURE__ */ React.createElement("button", { className: "bottom-nav-card", onClick: onPrevBoundary }, /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-label" }, "\u2039 Previous Book"), /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-title" }, prevBoundary.title)) : /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-card placeholder" }, /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-label" }, "\u2039 Previous"), /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-title" }, "\u2014")), nextCh ? /* @__PURE__ */ React.createElement("button", { className: "bottom-nav-card next", onClick: () => onNavigate(nextCh.num) }, /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-label" }, "Next \u203A"), /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-title" }, "Matthew ", nextCh.num)) : nextBoundary ? /* @__PURE__ */ React.createElement("button", { className: "bottom-nav-card next", onClick: onNextBoundary }, /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-label" }, "Next Book \u203A"), /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-title" }, nextBoundary.title)) : /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-card next placeholder" }, /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-label" }, "Next \u203A"), /* @__PURE__ */ React.createElement("div", { className: "bottom-nav-title" }, "\u2014"))))),
       /* @__PURE__ */ React.createElement(ScriptureSheet, { activeRef: activeScripRef, onClose: () => setActiveScripRef(null) })
@@ -4440,7 +4402,7 @@
   }
 
   // app/src/main/assets/src/ui/screens/NotesIndexScreen.jsx
-  function NotesIndexScreen2({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+  function NotesIndexScreen2({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
     React.useSyncExternalStore(
       React.useCallback((cb) => NoteStore.subscribe(cb), []),
       () => NoteStore.getVersion()
@@ -4517,7 +4479,7 @@
       const trimmed = newNbName.trim();
       if (!trimmed) return;
       NotebookStore.add(trimmed);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setNewNbName("");
       setNewNbInline(false);
     };
@@ -4532,14 +4494,14 @@
       const trimmed = renameValue.trim();
       if (trimmed && drilledNb) {
         NotebookStore.rename(drilledNb.id, trimmed);
-        setHlTick((t) => t + 1);
+        if (window.__bumpHlTick) window.__bumpHlTick();
       }
       setRenaming(false);
     };
     const deleteCurrent = () => {
       if (!drilledNb) return;
       NotebookStore.remove(drilledNb.id);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setConfirmDeleteNb(false);
       setDrilledNbId(null);
     };
@@ -6625,7 +6587,6 @@ Continue?`
     surpriseAnchor,
     backHint,
     tapThroughBack,
-    hlTick,
     openLinkSidebar
   }) {
     if (!chapter) return null;
@@ -6672,7 +6633,6 @@ Continue?`
         onVotLetterClick: goToLetterFromMatthew,
         backHint,
         onTapThroughBack: tapThroughBack,
-        hlTick,
         onLinkOpen: openLinkSidebar
       }
     ), /* @__PURE__ */ React.createElement(ModeToggle, { mode, onChange: setMode, showStudy, onShowStudyChange: setShowStudy }));
@@ -7063,7 +7023,6 @@ Continue?`
     var onBack = props.onBack;
     var onNavigateToSource = props.onNavigateToSource;
     var onNavigateToTarget = props.onNavigateToTarget;
-    var setHlTick = props.setHlTick;
     var theme = props.theme;
     var onThemeChange = props.onThemeChange;
     var onSearch = props.onSearch;
@@ -7139,9 +7098,7 @@ Continue?`
       }
     };
     var onDeleteFromSheet = function() {
-      if (typeof setHlTick === "function") setHlTick(function(t) {
-        return t + 1;
-      });
+      if (window.__bumpHlTick) window.__bumpHlTick();
     };
     var navChildren = LibraryNav({
       onBack,
@@ -7546,7 +7503,6 @@ Continue?`
   function BookmarksScreen2(props) {
     var onBack = props.onBack;
     var onNavigateToSource = props.onNavigateToSource;
-    var setHlTick = props.setHlTick;
     var theme = props.theme;
     var onThemeChange = props.onThemeChange;
     var onSearch = props.onSearch;
@@ -7612,15 +7568,11 @@ Continue?`
       }
     };
     var onDeleteDone = function() {
-      if (typeof setHlTick === "function") setHlTick(function(t) {
-        return t + 1;
-      });
+      if (window.__bumpHlTick) window.__bumpHlTick();
     };
     var onEditSave = function(id, newLabel) {
       BookmarkStore.update(id, { label: newLabel });
-      if (typeof setHlTick === "function") setHlTick(function(t) {
-        return t + 1;
-      });
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setEditingId(null);
     };
     var navChildren = LibraryNav({
@@ -7691,9 +7643,7 @@ Continue?`
           setActionTarget(null);
         },
         onEditThought: function() {
-          if (setHlTick) setHlTick(function(t) {
-            return t + 1;
-          });
+          if (window.__bumpHlTick) window.__bumpHlTick();
         },
         onDelete: onDeleteDone
       }
@@ -8183,7 +8133,7 @@ Continue?`
   }
 
   // app/src/main/assets/src/ui/sheets/NotebookPickerSheet.jsx
-  function NotebookPickerSheet2({ groupId, setHlTick, onClose }) {
+  function NotebookPickerSheet2({ groupId, onClose }) {
     React.useSyncExternalStore(
       React.useCallback((cb) => NoteStore.subscribe(cb), []),
       () => NoteStore.getVersion()
@@ -8205,17 +8155,17 @@ Continue?`
       const nb = NotebookStore.add(trimmed);
       if (nb) {
         NoteStore.toggleNotebook(groupId, nb.id);
-        setHlTick((t) => t + 1);
+        if (window.__bumpHlTick) window.__bumpHlTick();
         setNewName("");
       }
     };
     const toggle = (nbId) => {
       NoteStore.toggleNotebook(groupId, nbId);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
     };
     const deleteNb = (nbId) => {
       NotebookStore.remove(nbId);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setConfirmDeleteNb(null);
     };
     return /* @__PURE__ */ React.createElement("div", { className: "nb-picker-overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker-header" }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-title" }, memberIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")), /* @__PURE__ */ React.createElement("div", { className: "nb-picker-new" }, /* @__PURE__ */ React.createElement(
@@ -8284,7 +8234,7 @@ Continue?`
   }
 
   // app/src/main/assets/src/ui/sheets/NoteSheet.jsx
-  function NoteSheet2({ groupId, startInEditMode, setHlTick, onClose, onOpenNotebookPicker }) {
+  function NoteSheet2({ groupId, startInEditMode, onClose, onOpenNotebookPicker }) {
     React.useSyncExternalStore(
       React.useCallback((cb) => NoteStore.subscribe(cb), []),
       () => NoteStore.getVersion()
@@ -8316,7 +8266,7 @@ Continue?`
     const truncatedAnchor = anchor.length > 220 ? anchor.slice(0, 220) + "\u2026" : anchor;
     const save = () => {
       NoteStore.update(groupId, { body });
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
     };
     const cancelEdit = () => {
@@ -8324,7 +8274,7 @@ Continue?`
       if (startInEditMode && !note.body) {
         AnnotationStore.convertGroup(groupId, "highlight");
         NoteStore.remove(groupId);
-        setHlTick((t) => t + 1);
+        if (window.__bumpHlTick) window.__bumpHlTick();
         onClose();
         return;
       }
@@ -8333,14 +8283,14 @@ Continue?`
     const recolor = (c) => {
       AnnotationStore.recolorGroup(groupId, c);
       NoteStore.update(groupId, { color: c });
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setShowColors(false);
       setMenuOpen(false);
     };
     const remove = () => {
       AnnotationStore.removeGroup(groupId);
       NoteStore.remove(groupId);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
     };
     const share = () => {
@@ -8465,7 +8415,7 @@ Continue?`
   }
 
   // app/src/main/assets/src/ui/sheets/LetterExcerptPickerScreen.jsx
-  function LetterExcerptPickerScreen2({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
+  function LetterExcerptPickerScreen2({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink }) {
     const target = refineRequest.target;
     const item = refineRequest.item;
     const bodyRef = React.useRef(null);
@@ -8553,9 +8503,9 @@ Continue?`
       }
       const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
       const newLink = persistLink(sourceEndpoint, refinedTarget);
-      if (newLink) setHlTick((t) => t + 1);
+      if (newLink && window.__bumpHlTick) window.__bumpHlTick();
       onClose(newLink || null);
-    }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink]);
+    }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink]);
     if (!entry) {
       return /* @__PURE__ */ React.createElement("div", { className: "picker-screen" }, /* @__PURE__ */ React.createElement("div", { className: "picker-header" }, /* @__PURE__ */ React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"), /* @__PURE__ */ React.createElement("span", { className: "picker-title" }, "Select Text to Link")), /* @__PURE__ */ React.createElement("div", { className: "picker-empty" }, "Letter not found."));
     }
@@ -8596,7 +8546,7 @@ Continue?`
   }
 
   // app/src/main/assets/src/ui/sheets/VersePickerScreen.jsx
-  function VersePickerScreen2({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
+  function VersePickerScreen2({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink }) {
     const target = refineRequest.target;
     const item = refineRequest.item;
     const isStudy = target.type === "study";
@@ -8725,9 +8675,9 @@ Continue?`
       }
       const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
       const newLink = persistLink(sourceEndpoint, refinedTarget);
-      if (newLink) setHlTick((t) => t + 1);
+      if (newLink && window.__bumpHlTick) window.__bumpHlTick();
       onClose(newLink || null);
-    }, [selInfo, captureSelectionSync, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink]);
+    }, [selInfo, captureSelectionSync, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink]);
     if (!chapter) {
       return /* @__PURE__ */ React.createElement("div", { className: "picker-screen" }, /* @__PURE__ */ React.createElement("div", { className: "picker-header" }, /* @__PURE__ */ React.createElement("button", { className: "picker-back", onClick: () => onClose(null), "aria-label": "Back" }, "\u2190"), /* @__PURE__ */ React.createElement("span", { className: "picker-title" }, "Select Verse")), /* @__PURE__ */ React.createElement("div", { className: "picker-empty" }, "Chapter not found."));
     }
@@ -8783,7 +8733,7 @@ Continue?`
   }
 
   // app/src/main/assets/src/ui/sheets/LinkPicker.jsx
-  function LinkPicker2({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, hlTick: _hlTick, setHlTick, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
+  function LinkPicker2({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
     const [input, setInput] = React.useState("");
     const inputRef = React.useRef(null);
     const [, setRecentTick] = React.useState(0);
@@ -8830,11 +8780,11 @@ Continue?`
       const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
       const newLink = persistLink(sourceEndpoint, target);
       if (newLink) {
-        setHlTick((t) => t + 1);
+        if (window.__bumpHlTick) window.__bumpHlTick();
         bumpRecent();
         onLinkCreated(newLink);
       }
-    }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, bumpRecent, onLinkCreated, mode, onPickTarget, onRequestRefine]);
+    }, [sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, bumpRecent, onLinkCreated, mode, onPickTarget, onRequestRefine]);
     const renderItemRow = (item, key) => /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -8884,7 +8834,7 @@ Continue?`
   }
 
   // app/src/main/assets/src/ui/sheets/LinkSidebar.jsx
-  function LinkSidebar2({ hlKey, setHlTick, onClose, onNavigate }) {
+  function LinkSidebar2({ hlKey, onClose, onNavigate }) {
     React.useSyncExternalStore(
       React.useCallback((cb) => LinkStore.subscribe(cb), []),
       () => LinkStore.getVersion()
@@ -8901,11 +8851,11 @@ Continue?`
     }, [hlKey, onClose]);
     if (!hlKey) return null;
     const countStr = links.length === 0 ? "No links" : links.length === 1 ? "1 link" : links.length + " links";
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-overlay", onClick: onClose }), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar" }, /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-header" }, /* @__PURE__ */ React.createElement("button", { className: "link-sidebar-close", onClick: onClose, title: "Close" }, "\xD7"), /* @__PURE__ */ React.createElement("span", { className: "link-sidebar-title" }, "Links")), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-date" }, countStr), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-body" }, links.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-empty" }, "No links yet"), links.map((lnk) => /* @__PURE__ */ React.createElement(LinkCard, { key: lnk.id, lnk, hlKey, isBlockScope, onNavigate, setHlTick })))));
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-overlay", onClick: onClose }), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar" }, /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-header" }, /* @__PURE__ */ React.createElement("button", { className: "link-sidebar-close", onClick: onClose, title: "Close" }, "\xD7"), /* @__PURE__ */ React.createElement("span", { className: "link-sidebar-title" }, "Links")), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-date" }, countStr), /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-body" }, links.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "link-sidebar-empty" }, "No links yet"), links.map((lnk) => /* @__PURE__ */ React.createElement(LinkCard, { key: lnk.id, lnk, hlKey, isBlockScope, onNavigate })))));
   }
 
   // app/src/main/assets/src/ui/sheets/SelectionToolbar.jsx
-  function SelectionToolbar2({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onBookmarkRequest }) {
+  function SelectionToolbar2({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
     const [visible, setVisible] = React.useState(false);
     const [pos, setPos] = React.useState({ x: 0, y: 0 });
     const [selInfo, setSelInfo] = React.useState(null);
@@ -9146,7 +9096,7 @@ Continue?`
         document.removeEventListener("touchend", onPointerUp);
         document.removeEventListener("contextmenu", onContextMenu);
       };
-    }, [computeOffset, findHlContainer, hlTick]);
+    }, [computeOffset, findHlContainer]);
     const applyHighlight = React.useCallback((color) => {
       if (!selInfo) return;
       if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
@@ -9219,11 +9169,11 @@ Continue?`
       }
       window.getSelection().removeAllRanges();
       setVisible(false);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setTimeout(() => {
         suppressRef.current = false;
       }, 300);
-    }, [selInfo, activeStyle, setHlTick, computeOffset]);
+    }, [selInfo, activeStyle, computeOffset]);
     const removeHighlight = React.useCallback(() => {
       if (!selInfo) return;
       suppressRef.current = true;
@@ -9247,11 +9197,11 @@ Continue?`
       });
       window.getSelection().removeAllRanges();
       setVisible(false);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setTimeout(() => {
         suppressRef.current = false;
       }, 300);
-    }, [selInfo, setHlTick, computeOffset]);
+    }, [selInfo, computeOffset]);
     const copyText = React.useCallback(() => {
       if (!selInfo) return;
       navigator.clipboard.writeText(selInfo.text).catch(() => {
@@ -9363,13 +9313,13 @@ Continue?`
       });
       window.getSelection().removeAllRanges();
       setVisible(false);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       onNoteRequest && onNoteRequest(
         groupId,
         /*startInEditMode=*/
         true
       );
-    }, [selInfo, setHlTick, onNoteRequest, computeOffset]);
+    }, [selInfo, onNoteRequest, computeOffset]);
     const handleShare = React.useCallback(() => {
       if (!selInfo) return;
       const text = selInfo.text;
@@ -9457,12 +9407,10 @@ Continue?`
           created: Date.now(),
           updated: Date.now()
         });
-        if (typeof setHlTick === "function") setHlTick(function(t) {
-          return t + 1;
-        });
+        if (window.__bumpHlTick) window.__bumpHlTick();
       }
       if (typeof onBookmarkRequest === "function") onBookmarkRequest(storedKey);
-    }, [selInfo, setHlTick, onBookmarkRequest]);
+    }, [selInfo, onBookmarkRequest]);
     if (!visible || !selInfo) return null;
     var mv = selInfo.multiVerse;
     var mvCanHighlight = mv && selInfo.multiContainers && selInfo.multiContainers.length > 0;
@@ -9535,7 +9483,7 @@ Continue?`
   }
 
   // app/src/main/assets/src/ui/sheets/AnnotationActionChip.jsx
-  function AnnotationActionChip2({ chip, setHlTick, onClose, onNoteRequest }) {
+  function AnnotationActionChip2({ chip, onClose, onNoteRequest }) {
     const [mode, setMode] = React.useState("main");
     const lastGroupRef = React.useRef(null);
     React.useEffect(() => {
@@ -9557,13 +9505,13 @@ Continue?`
     const remove = () => {
       AnnotationStore.removeGroup(groupId);
       NoteStore.remove(groupId);
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
     };
     const recolor = (color) => {
       AnnotationStore.recolorGroup(groupId, color);
       if (kind === "note") NoteStore.update(groupId, { color });
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
     };
     const convertToNote = () => {
@@ -9572,7 +9520,7 @@ Continue?`
       const fullText = segs.map((s) => s.ann.text || "").join(" \u2026 ");
       const keys = [...new Set(segs.map((s) => s.key))];
       NoteStore.set(groupId, { color: ann.color, fullText, keys, body: "" });
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
       if (onNoteRequest) onNoteRequest(
         groupId,
@@ -9888,8 +9836,7 @@ Continue?`
       bookId,
       chapterNum,
       studyId,
-      studyChapterId,
-      setHlTick
+      studyChapterId
     });
     useEffect(() => {
       if (!window.visualViewport) return;
@@ -10262,7 +10209,6 @@ Continue?`
       setJournalEntryId
     });
     const { createAndEditJournal } = useJournalMutations({
-      setHlTick,
       setJournalEntryId,
       setScreen
     });
@@ -10493,8 +10439,6 @@ Continue?`
       setSettings,
       toggleSetting,
       updateSetting,
-      hlTick,
-      setHlTick,
       titleFocusHidden,
       setTitleFocusHidden,
       headingsFocusHidden,
@@ -10636,8 +10580,6 @@ Continue?`
     ), /* @__PURE__ */ React.createElement(ErrorBoundary, { key: screen }, ROUTES[screen]?.() ?? null), /* @__PURE__ */ React.createElement(
       AppShellSheets,
       {
-        hlTick,
-        setHlTick,
         openLinkPicker,
         openNoteSheet,
         closeNoteSheet,

@@ -101,13 +101,11 @@
  *   chapterNum: number | null,
  *   studyId: string | null,
  *   studyChapterId: string | null,
- *   setHlTick: (updater: any) => void
  * }} args
  * @returns {any}
  */
 export function useSheetOrchestration({
   screen, letterId, bookId, chapterNum, studyId, studyChapterId,
-  setHlTick,
 }) {
   // ── State slots ────────────────────────────────────────────────────────
   const [annChip, setAnnChip] = React.useState(null);                  // { x, y, hlKey, groupId } or null
@@ -162,7 +160,7 @@ export function useSheetOrchestration({
       : { key: hlKey, label, start: selInfo.start, end: selInfo.end, text: selInfo.text };
     setLinkPickerSource(src);
   }, []);
-  const closeLinkPicker = React.useCallback(() => { setLinkPickerSource(null); setLinkRefineRequest(null); setLastLinkCreated(null); setLinkPickerMode(null); linkPickerOnPickRef.current = null; setHlTick(t => t + 1); }, [setHlTick]);
+  const closeLinkPicker = React.useCallback(() => { setLinkPickerSource(null); setLinkRefineRequest(null); setLastLinkCreated(null); setLinkPickerMode(null); linkPickerOnPickRef.current = null; if (window.__bumpHlTick) window.__bumpHlTick(); }, []);
   // Picker mode — Journal calls this to open LinkPicker as a target picker.
   //   mode: 'card'    → return target after the first item is chosen (no
   //                     verse/excerpt prompt). Used for "Insert Card".

@@ -10,7 +10,6 @@ export function JournalEditorScreen(props) {
 
   var entryId = props.entryId;
   var onBack = props.onBack;
-  var setHlTick = props.setHlTick;
 
   var initial = useMemo(function() {
     return entryId ? JournalStore.get(entryId) : null;
@@ -111,10 +110,10 @@ export function JournalEditorScreen(props) {
     var t = setTimeout(function() {
       JournalStore.update(entryId, { title: title, blocks: blocks, mood: mood });
       setSavedLabel('Saved');
-      if (setHlTick) setHlTick(function(tx) { return tx + 1; });
+      if (window.__bumpHlTick) window.__bumpHlTick();
     }, 1200);
     return function() { clearTimeout(t); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSavedLabel is a tuple-unpacked useState setter (identity-stable); setHlTick is a prop from App() whose origin is useState (identity-stable per React invariant). Effect intent is debounced-save on content change, not on setter-identity churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSavedLabel is a tuple-unpacked useState setter (identity-stable). Effect intent is debounced-save on content change, not on setter-identity churn.
   }, [entryId, title, blocks, mood]);
 
   // Final flush on real unmount. Reads from refs so the latest state
@@ -133,7 +132,7 @@ export function JournalEditorScreen(props) {
     if (!entryId) return;
     JournalStore.update(entryId, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
     setSavedLabel('Saved');
-    if (setHlTick) setHlTick(function(t) { return t + 1; });
+    if (window.__bumpHlTick) window.__bumpHlTick();
   }
 
   function scheduleSave() {

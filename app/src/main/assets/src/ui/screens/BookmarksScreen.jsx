@@ -385,7 +385,6 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
 export function BookmarksScreen(props) {
   var onBack = props.onBack;
   var onNavigateToSource = props.onNavigateToSource;
-  var setHlTick = props.setHlTick;
   var theme = props.theme;
   var onThemeChange = props.onThemeChange;
   var onSearch = props.onSearch;
@@ -469,12 +468,12 @@ export function BookmarksScreen(props) {
   };
 
   var onDeleteDone = function() {
-    if (typeof setHlTick === 'function') setHlTick(function(t) { return t + 1; });
+    if (window.__bumpHlTick) window.__bumpHlTick();
   };
 
   var onEditSave = function(id, newLabel) {
     BookmarkStore.update(id, { label: newLabel });
-    if (typeof setHlTick === 'function') setHlTick(function(t) { return t + 1; });
+    if (window.__bumpHlTick) window.__bumpHlTick();
     setEditingId(null);
   };
 
@@ -555,7 +554,7 @@ export function BookmarksScreen(props) {
             onClose={function() { setActionTarget(null); }}
             onNavigate={function(bkm) { navigateToBookmark(bkm); setActionTarget(null); }}
             onEditLabel={function(id) { setEditingId(id); setActionTarget(null); }}
-            onEditThought={function() { if (setHlTick) setHlTick(function(t){ return t + 1; }); }}
+            onEditThought={function() { if (window.__bumpHlTick) window.__bumpHlTick(); }}
             onDelete={onDeleteDone}
           />
         )}

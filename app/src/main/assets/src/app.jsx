@@ -123,7 +123,6 @@ function App() {
     inboundJournalPayload, setInboundJournalPayload,
   } = useSheetOrchestration({
     screen, letterId, bookId, chapterNum, studyId, studyChapterId,
-    setHlTick,
   });
 
   /* navigateToLink — the cross-app deep-linking router (the _navToLinkRef
@@ -529,7 +528,7 @@ function App() {
   });
 
   const { createAndEditJournal } = useJournalMutations({
-    setHlTick, setJournalEntryId, setScreen,
+    setJournalEntryId, setScreen,
   });
 
   /* Reading-chain boundary navigation (P7i). Cross-volume chain
@@ -719,7 +718,6 @@ function App() {
     genreId, surpriseAnchor, setSurpriseAnchor,
     theme, setTheme,
     settings, setSettings, toggleSetting, updateSetting,
-    hlTick, setHlTick,
     titleFocusHidden, setTitleFocusHidden,
     headingsFocusHidden, setHeadingsFocusHidden,
     activeReadKey, setActiveReadKey,
@@ -817,7 +815,6 @@ function App() {
               (always mounted; each is internally gated on its own state
               slot). See AppShellSheets.jsx. ── */}
       <AppShellSheets
-        hlTick={hlTick} setHlTick={setHlTick}
         openLinkPicker={openLinkPicker} openNoteSheet={openNoteSheet} closeNoteSheet={closeNoteSheet}
         annChip={annChip} setAnnChip={setAnnChip}
         linkSidebarKey={linkSidebarKey} closeLinkSidebar={closeLinkSidebar} navigateToLink={navigateToLink}

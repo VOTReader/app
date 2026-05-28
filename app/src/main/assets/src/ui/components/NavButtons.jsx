@@ -2,7 +2,7 @@
    NavButtons — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hlTick, journalRefKey: _journalRefKey, journalRefLabel: _journalRefLabel }) {
+export function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, journalRefKey: _journalRefKey, journalRefLabel: _journalRefLabel }) {
   return (
     <>
       <button className="settings-gear-btn" onClick={onSettings} title="Settings">
@@ -23,7 +23,7 @@ export function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChan
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
       </button>
-      {chapterBookmark && <ChapterBookmarkBtn chapterBookmark={chapterBookmark} hlTick={hlTick} />}
+      {chapterBookmark && <ChapterBookmarkBtn chapterBookmark={chapterBookmark} />}
       <ThemeBtn theme={theme} onThemeChange={onThemeChange} />
     </>
   );

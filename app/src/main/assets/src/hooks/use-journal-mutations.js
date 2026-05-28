@@ -51,13 +51,12 @@
  * would land here too.
  *
  * @param {{
- *   setHlTick: (updater: (prev: number) => number) => void,
  *   setJournalEntryId: (v: any) => void,
  *   setScreen: (v: any) => void
  * }} args
  * @returns {{ createAndEditJournal: () => void }}
  */
-export function useJournalMutations({ setHlTick, setJournalEntryId, setScreen }) {
+export function useJournalMutations({ setJournalEntryId, setScreen }) {
   const createAndEditJournal = () => {
     if (typeof JournalStore === 'undefined') return;
     if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
@@ -68,7 +67,7 @@ export function useJournalMutations({ setHlTick, setJournalEntryId, setScreen })
         newMilestones.forEach((m) => jrnShowMilestoneToast(m));
       }
     }
-    setHlTick((t) => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     setJournalEntryId(e.id);
     setScreen('journal-editor');
   };

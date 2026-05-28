@@ -175,7 +175,6 @@ export function LinksScreen(props) {
   var onBack = props.onBack;
   var onNavigateToSource = props.onNavigateToSource;
   var onNavigateToTarget = props.onNavigateToTarget;
-  var setHlTick = props.setHlTick;
   var theme = props.theme;
   var onThemeChange = props.onThemeChange;
   var onSearch = props.onSearch;
@@ -270,7 +269,7 @@ export function LinksScreen(props) {
   };
 
   var onDeleteFromSheet = function() {
-    if (typeof setHlTick === 'function') setHlTick(function(t) { return t + 1; });
+    if (window.__bumpHlTick) window.__bumpHlTick();
   };
 
   // Standard app-wide Library nav (back + Home left, icon cluster right).

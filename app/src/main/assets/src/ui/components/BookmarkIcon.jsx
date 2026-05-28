@@ -4,8 +4,7 @@
 
 export function BookmarkIcon({ hlKey }) {
   // Subscribe to BookmarkStore mutations — re-renders this component
-  // whenever a bookmark is added / removed / updated. Replaces the
-  // legacy hlTick cache-bust prop.
+  // whenever a bookmark is added / removed / updated.
   React.useSyncExternalStore(
     React.useCallback((cb) => BookmarkStore.subscribe(cb), []),
     () => BookmarkStore.getVersion()

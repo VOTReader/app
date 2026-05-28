@@ -25,8 +25,6 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function AppShellSheets({
-  // Highlight tick — shared bus for re-rendering after annotation changes
-  hlTick, setHlTick,
   // Selection toolbar handlers
   openLinkPicker, openNoteSheet, closeNoteSheet,
   // Annotation action chip
@@ -116,21 +114,20 @@ export function AppShellSheets({
   return (
     <>
       <SelectionToolbar
-        hlTick={hlTick} setHlTick={setHlTick}
         onLinkRequest={openLinkPicker}
         onNoteRequest={openNoteSheet}
         onBookmarkRequest={function(_bkm) { /* bookmark created; icon injected via applyDOMBookmarks */ }}
       />
       {annChip && (
         <AnnotationActionChip
-          chip={annChip} setHlTick={setHlTick}
+          chip={annChip}
           onClose={() => setAnnChip(null)}
           onNoteRequest={openNoteSheet}
         />
       )}
       {linkSidebarKey && (
         <LinkSidebar
-          hlKey={linkSidebarKey} hlTick={hlTick} setHlTick={setHlTick}
+          hlKey={linkSidebarKey}
           onClose={closeLinkSidebar} onNavigate={navigateToLink}
         />
       )}
@@ -139,7 +136,7 @@ export function AppShellSheets({
           sourceKey={linkPickerSource.key} sourceLabel={linkPickerSource.label}
           sourceStart={linkPickerSource.start} sourceEnd={linkPickerSource.end}
           sourceText={linkPickerSource.text}
-          hlTick={hlTick} setHlTick={setHlTick} onClose={closeLinkPicker}
+          onClose={closeLinkPicker}
           onRequestRefine={setLinkRefineRequest}
           lastCreatedLink={lastLinkCreated} onLinkCreated={setLastLinkCreated}
           mode={linkPickerMode}
@@ -158,7 +155,6 @@ export function AppShellSheets({
           sourceKey={linkPickerSource.key} sourceLabel={linkPickerSource.label}
           sourceStart={linkPickerSource.start} sourceEnd={linkPickerSource.end}
           sourceText={linkPickerSource.text}
-          setHlTick={setHlTick}
           returnTargetInsteadOfLink={!!linkPickerMode}
           // Link mode: confirm passes new link object; back passes null.
           // Picker mode: confirm passes refined target → hand to onPick + close.
@@ -179,7 +175,6 @@ export function AppShellSheets({
           sourceKey={linkPickerSource.key} sourceLabel={linkPickerSource.label}
           sourceStart={linkPickerSource.start} sourceEnd={linkPickerSource.end}
           sourceText={linkPickerSource.text}
-          setHlTick={setHlTick}
           returnTargetInsteadOfLink={!!linkPickerMode}
           onClose={(result) => {
             if (linkPickerMode) {
@@ -202,14 +197,13 @@ export function AppShellSheets({
           key={noteSheetTarget.groupId + ':' + (noteSheetTarget.startInEditMode ? 'edit' : 'read')}
           groupId={noteSheetTarget.groupId}
           startInEditMode={noteSheetTarget.startInEditMode}
-          hlTick={hlTick} setHlTick={setHlTick} onClose={closeNoteSheet}
+          onClose={closeNoteSheet}
           onOpenNotebookPicker={(gid) => setNotebookPickerTarget(gid)}
         />
       )}
       {notebookPickerTarget && (
         <NotebookPickerSheet
           groupId={notebookPickerTarget}
-          hlTick={hlTick} setHlTick={setHlTick}
           onClose={() => setNotebookPickerTarget(null)}
         />
       )}
@@ -238,7 +232,7 @@ export function AppShellSheets({
             setBookmarkPopoverPayload(null);
             if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: 'Bookmark' });
           }}
-          onDeleteDone={() => setHlTick(t => t + 1)}
+          onDeleteDone={() => { if (window.__bumpHlTick) window.__bumpHlTick(); }}
           onClose={() => setBookmarkPopoverPayload(null)}
         />
       )}
@@ -282,12 +276,12 @@ export function AppShellSheets({
               });
             }
             setBookmarkCreatePending(null);
-            setHlTick(t => t + 1);
+            if (window.__bumpHlTick) window.__bumpHlTick();
           }}
           onDelete={(editId) => {
             if (editId && typeof BookmarkStore !== 'undefined') BookmarkStore.remove(editId);
             setBookmarkCreatePending(null);
-            setHlTick(t => t + 1);
+            if (window.__bumpHlTick) window.__bumpHlTick();
           }}
           onOpen={(editId) => {
             if (!editId) return;

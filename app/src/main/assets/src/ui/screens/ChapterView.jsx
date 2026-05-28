@@ -2,7 +2,7 @@
    ChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, hlTick, onLinkOpen, backHint, onTapThroughBack }) {
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
 
@@ -72,7 +72,6 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             onThemeChange={onThemeChange}
             reading={true}
             chapterBookmark={chapter ? { hlKey: 'study:matthew-' + chapter.num, label: 'Matthew ' + chapter.num + ' (Study)' } : null}
-            hlTick={hlTick}
           />
         </>
       }
@@ -136,9 +135,9 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
                   return (
                     <span key={vi} id={`v-${v.n}`} className={`verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}`}>
                       <span className="verse-num">{v.n}</span>
-                      <HighlightableText text={v.text} hlKey={vHlKey} hlTick={typeof hlTick !== 'undefined' ? hlTick : 0} />
-                      <LinkIcon hlKey={vHlKey} hlTick={hlTick} onClick={onLinkOpen} />
-                      <BookmarkIcon hlKey={vHlKey} hlTick={hlTick} />
+                      <HighlightableText text={v.text} hlKey={vHlKey} />
+                      <LinkIcon hlKey={vHlKey} onClick={onLinkOpen} />
+                      <BookmarkIcon hlKey={vHlKey} />
                       {' '}
                     </span>
                   );
@@ -165,9 +164,9 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
                   <div key={vi} id={`v-${v.n}`} className={`verse-row${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}`}>
                     <div className="verse-line">
                       <span className="verse-num">{v.n}</span>
-                      <HighlightableText text={v.text} hlKey={vHlKey} hlTick={typeof hlTick !== 'undefined' ? hlTick : 0} />
-                      <LinkIcon hlKey={vHlKey} hlTick={hlTick} onClick={onLinkOpen} />
-                      <BookmarkIcon hlKey={vHlKey} hlTick={hlTick} />
+                      <HighlightableText text={v.text} hlKey={vHlKey} />
+                      <LinkIcon hlKey={vHlKey} onClick={onLinkOpen} />
+                      <BookmarkIcon hlKey={vHlKey} />
                     </div>
                     {showStudy && (scriptures.length > 0 || votNotes.length > 0) && (
                       <InlineNotes scriptures={scriptures} votNotes={votNotes} onScriptureClick={setActiveScripRef} onVotLetterClick={onVotLetterClick} />

@@ -41,9 +41,9 @@ function annMarkClass(ann, isFirst, isLast) {
    inner = i=N-1; CSS cascade gives "more-specific overrides broader"). */
 export function HighlightableText({ text, hlKey }) {
   // Subscribe to AnnotationStore mutations so this component re-renders
-  // whenever any annotation is added / removed / recolored. Replaces the
-  // legacy hlTick cache-bust prop. The snapshot return value is unused;
-  // the act of subscribing is what triggers the React 18 re-render.
+  // whenever any annotation is added / removed / recolored. The snapshot
+  // return value is unused; the act of subscribing is what triggers the
+  // React 18 re-render.
   React.useSyncExternalStore(
     React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
     () => AnnotationStore.getVersion()

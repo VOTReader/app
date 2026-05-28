@@ -4698,8 +4698,7 @@
     bookId,
     chapterNum,
     studyId,
-    studyChapterId,
-    setHlTick
+    studyChapterId
   }) {
     const [annChip, setAnnChip] = React.useState(null);
     const [linkSidebarKey, setLinkSidebarKey] = React.useState(null);
@@ -4746,8 +4745,8 @@
       setLastLinkCreated(null);
       setLinkPickerMode(null);
       linkPickerOnPickRef.current = null;
-      setHlTick((t) => t + 1);
-    }, [setHlTick]);
+      if (window.__bumpHlTick) window.__bumpHlTick();
+    }, []);
     const openLinkPickerForTarget = React.useCallback((mode, onPick) => {
       linkPickerOnPickRef.current = typeof onPick === "function" ? onPick : null;
       setLinkPickerSource({ key: null, label: null, picker: true });
@@ -6230,7 +6229,7 @@
   }
 
   // app/src/main/assets/src/hooks/use-journal-mutations.js
-  function useJournalMutations({ setHlTick, setJournalEntryId, setScreen }) {
+  function useJournalMutations({ setJournalEntryId, setScreen }) {
     const createAndEditJournal = () => {
       if (typeof JournalStore === "undefined") return;
       if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
@@ -6241,7 +6240,7 @@
           newMilestones.forEach((m) => jrnShowMilestoneToast(m));
         }
       }
-      setHlTick((t) => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setJournalEntryId(e.id);
       setScreen("journal-editor");
     };
@@ -8607,7 +8606,6 @@
     var onOpenEntry = props.onOpenEntry;
     var onEditEntry = props.onEditEntry;
     var onCreateEntry = props.onCreateEntry;
-    var setHlTick = props.setHlTick;
     React.useSyncExternalStore(
       React.useCallback(function(cb) {
         return JournalStore.subscribe(cb);
@@ -8630,9 +8628,7 @@
     var setMenuEntry = _menuEntry[1];
     var allEntries = JournalStore.all();
     function bump() {
-      if (setHlTick) setHlTick(function(t) {
-        return t + 1;
-      });
+      if (window.__bumpHlTick) window.__bumpHlTick();
     }
     function deleteEntry(id) {
       JournalStore.remove(id);
@@ -9172,7 +9168,6 @@
     var onNavigateToLink = props.onNavigateToLink;
     var onOpenJournalEntry = props.onOpenJournalEntry;
     var onOpenNotebook = props.onOpenNotebook;
-    var setHlTick = props.setHlTick;
     React.useSyncExternalStore(
       React.useCallback(function(cb) {
         return JournalStore.subscribe(cb);
@@ -9189,9 +9184,7 @@
     var typedDelete = _typedDelete[0];
     var setTypedDelete = _typedDelete[1];
     function bump() {
-      if (setHlTick) setHlTick(function(t) {
-        return t + 1;
-      });
+      if (window.__bumpHlTick) window.__bumpHlTick();
     }
     function startDelete() {
       setConfirmStep(1);
@@ -9376,7 +9369,6 @@
     var useMemo = React.useMemo;
     var entryId = props.entryId;
     var onBack = props.onBack;
-    var setHlTick = props.setHlTick;
     var initial = useMemo(function() {
       return entryId ? JournalStore.get(entryId) : null;
     }, [entryId]);
@@ -9453,9 +9445,7 @@
       var t = setTimeout(function() {
         JournalStore.update(entryId, { title, blocks, mood });
         setSavedLabel("Saved");
-        if (setHlTick) setHlTick(function(tx) {
-          return tx + 1;
-        });
+        if (window.__bumpHlTick) window.__bumpHlTick();
       }, 1200);
       return function() {
         clearTimeout(t);
@@ -9473,9 +9463,7 @@
       if (!entryId) return;
       JournalStore.update(entryId, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
       setSavedLabel("Saved");
-      if (setHlTick) setHlTick(function(t) {
-        return t + 1;
-      });
+      if (window.__bumpHlTick) window.__bumpHlTick();
     }
     function scheduleSave() {
       setSavedLabel("Saving\u2026");

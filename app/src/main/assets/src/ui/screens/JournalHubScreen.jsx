@@ -108,7 +108,6 @@ export function JournalHubScreen(props) {
   var onOpenEntry = props.onOpenEntry;
   var onEditEntry = props.onEditEntry;
   var onCreateEntry = props.onCreateEntry;
-  var setHlTick = props.setHlTick;
 
   // Subscribe to JournalStore — hub re-renders on any entry mutation.
   React.useSyncExternalStore(
@@ -130,7 +129,7 @@ export function JournalHubScreen(props) {
 
   var allEntries = JournalStore.all();
 
-  function bump() { if (setHlTick) setHlTick(function(t) { return t + 1; }); }
+  function bump() { if (window.__bumpHlTick) window.__bumpHlTick(); }
 
   function deleteEntry(id) { JournalStore.remove(id); bump(); }
   function togglePin(id) { JournalStore.togglePin(id); bump(); }

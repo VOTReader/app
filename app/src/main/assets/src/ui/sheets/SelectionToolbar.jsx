@@ -2,7 +2,7 @@
    SelectionToolbar — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteRequest, onBookmarkRequest }) {
+export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
   const [pos, setPos] = React.useState({ x: 0, y: 0 });
   const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, existingHl, multiVerse }
@@ -238,7 +238,7 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
       document.removeEventListener('touchend', onPointerUp);
       document.removeEventListener('contextmenu', onContextMenu);
     };
-  }, [computeOffset, findHlContainer, hlTick]);
+  }, [computeOffset, findHlContainer]);
 
   const applyHighlight = React.useCallback((color) => {
     if (!selInfo) return;
@@ -310,9 +310,9 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
     }
     window.getSelection().removeAllRanges();
     setVisible(false);
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     setTimeout(() => { suppressRef.current = false; }, 300);
-  }, [selInfo, activeStyle, setHlTick, computeOffset]);
+  }, [selInfo, activeStyle, computeOffset]);
 
   const removeHighlight = React.useCallback(() => {
     if (!selInfo) return;
@@ -344,9 +344,9 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
     });
     window.getSelection().removeAllRanges();
     setVisible(false);
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     setTimeout(() => { suppressRef.current = false; }, 300);
-  }, [selInfo, setHlTick, computeOffset]);
+  }, [selInfo, computeOffset]);
 
   const copyText = React.useCallback(() => {
     if (!selInfo) return;
@@ -470,9 +470,9 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
     });
     window.getSelection().removeAllRanges();
     setVisible(false);
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     onNoteRequest && onNoteRequest(groupId, /*startInEditMode=*/true);
-  }, [selInfo, setHlTick, onNoteRequest, computeOffset]);
+  }, [selInfo, onNoteRequest, computeOffset]);
 
   const handleShare = React.useCallback(() => {
     if (!selInfo) return;
@@ -593,10 +593,10 @@ export function SelectionToolbar({ hlTick, setHlTick, onLinkRequest, onNoteReque
         hlKey: storedKey, label: labelText, thought: '',
         created: Date.now(), updated: Date.now()
       });
-      if (typeof setHlTick === 'function') setHlTick(function(t) { return t + 1; });
+      if (window.__bumpHlTick) window.__bumpHlTick();
     }
     if (typeof onBookmarkRequest === 'function') onBookmarkRequest(storedKey);
-  }, [selInfo, setHlTick, onBookmarkRequest]);
+  }, [selInfo, onBookmarkRequest]);
 
   if (!visible || !selInfo) return null;
 

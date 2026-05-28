@@ -2,7 +2,7 @@
    LinkSidebar — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function LinkSidebar({ hlKey, setHlTick, onClose, onNavigate }) {
+export function LinkSidebar({ hlKey, onClose, onNavigate }) {
   // Subscribe to LinkStore — sidebar re-renders when any link is created
   // or removed.
   React.useSyncExternalStore(
@@ -38,7 +38,7 @@ export function LinkSidebar({ hlKey, setHlTick, onClose, onNavigate }) {
         <div className="link-sidebar-date">{countStr}</div>
         <div className="link-sidebar-body">
           {links.length === 0 && <div className="link-sidebar-empty">No links yet</div>}
-          {links.map(lnk => <LinkCard key={lnk.id} lnk={lnk} hlKey={hlKey} isBlockScope={isBlockScope} onNavigate={onNavigate} setHlTick={setHlTick} />)}
+          {links.map(lnk => <LinkCard key={lnk.id} lnk={lnk} hlKey={hlKey} isBlockScope={isBlockScope} onNavigate={onNavigate} />)}
         </div>
       </div>
     </>

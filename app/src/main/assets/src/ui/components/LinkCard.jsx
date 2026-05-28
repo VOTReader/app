@@ -2,7 +2,7 @@
    LinkCard — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
+export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
   const [expanded, setExpanded] = React.useState(false);
   // confirmRemove: false | true — governs the tap-confirm strip (§11.1: no instant delete).
   const [confirmRemove, setConfirmRemove] = React.useState(false);
@@ -30,7 +30,7 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, setHlTick }) {
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
   );
-  const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); setHlTick(t => t + 1); };
+  const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); if (window.__bumpHlTick) window.__bumpHlTick(); };
   return (
     <div className="link-card" onClick={confirmRemove ? undefined : (() => onNavigate && onNavigate(other))}>
       <div className="link-card-header">

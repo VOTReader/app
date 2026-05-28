@@ -2,7 +2,7 @@
    NotesIndexScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, setHlTick, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to NoteStore + NotebookStore mutations so the index re-renders
   // on any add/remove/rename/membership change.
   React.useSyncExternalStore(
@@ -98,7 +98,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
     const trimmed = newNbName.trim();
     if (!trimmed) return;
     NotebookStore.add(trimmed);
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     setNewNbName('');
     setNewNbInline(false);
   };
@@ -115,14 +115,14 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
     const trimmed = renameValue.trim();
     if (trimmed && drilledNb) {
       NotebookStore.rename(drilledNb.id, trimmed);
-      setHlTick(t => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
     }
     setRenaming(false);
   };
   const deleteCurrent = () => {
     if (!drilledNb) return;
     NotebookStore.remove(drilledNb.id);
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     setConfirmDeleteNb(false);
     setDrilledNbId(null);
   };

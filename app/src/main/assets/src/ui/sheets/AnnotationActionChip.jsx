@@ -2,7 +2,7 @@
    AnnotationActionChip — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }) {
+export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   const [mode, setMode] = React.useState('main'); // 'main' | 'confirm' | 'colors'
   // Reset mode whenever a fresh chip opens (different group)
   const lastGroupRef = React.useRef(null);
@@ -28,14 +28,14 @@ export function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }
   const remove = () => {
     AnnotationStore.removeGroup(groupId);
     NoteStore.remove(groupId);
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     onClose();
   };
 
   const recolor = (color) => {
     AnnotationStore.recolorGroup(groupId, color);
     if (kind === 'note') NoteStore.update(groupId, { color });
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     onClose();
   };
 
@@ -46,7 +46,7 @@ export function AnnotationActionChip({ chip, setHlTick, onClose, onNoteRequest }
     const fullText = segs.map(s => s.ann.text || '').join(' … ');
     const keys = [...new Set(segs.map(s => s.key))];
     NoteStore.set(groupId, { color: ann.color, fullText, keys, body: '' });
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     onClose();
     if (onNoteRequest) onNoteRequest(groupId, /*startInEditMode=*/true);
   };

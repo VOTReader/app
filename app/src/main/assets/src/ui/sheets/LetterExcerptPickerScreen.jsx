@@ -2,7 +2,7 @@
    LetterExcerptPickerScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
+export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink }) {
   const target = refineRequest.target;
   const item = refineRequest.item;
   const bodyRef = React.useRef(null);
@@ -117,9 +117,9 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     }
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
     const newLink = persistLink(sourceEndpoint, refinedTarget);
-    if (newLink) setHlTick(t => t + 1);
+    if (newLink && window.__bumpHlTick) window.__bumpHlTick();
     onClose(newLink || null);
-  }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink]);
+  }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink]);
 
   if (!entry) {
     return (

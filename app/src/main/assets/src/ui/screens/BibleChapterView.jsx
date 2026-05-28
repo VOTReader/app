@@ -2,7 +2,7 @@
    BibleChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, hlTick, onLinkOpen, backHint, onTapThroughBack }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack }) {
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // Restored-Name chrome lookup. When settings.restoredNames is on and
   // books-restored.js has an entry for this chapter, swap the chrome.
@@ -66,7 +66,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
             chapterBookmark={(book && chapter) ? { hlKey: 'bible:' + book.id + ':' + chapter.num, label: (book.title || book.id) + ' ' + chapter.num } : null}
             journalRefKey={(book && chapter && typeof jrnRefKeyForChapter === 'function') ? jrnRefKeyForChapter(book.id, chapter.num) : null}
             journalRefLabel={(book && chapter) ? ((book.title || book.id) + ' ' + chapter.num) : null}
-            hlTick={hlTick}
           />
         </>
       }
@@ -144,9 +143,9 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
               return (
                 <span key={vi} id={`v-${v.n}`} className={`verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}`}>
                   <span className="verse-num">{v.n}</span>
-                  <HighlightableText text={vText} hlKey={vHlKey} hlTick={hlTick} />
-                  <LinkIcon hlKey={vHlKey} hlTick={hlTick} onClick={onLinkOpen} />
-                  <BookmarkIcon hlKey={vHlKey} hlTick={hlTick} />
+                  <HighlightableText text={vText} hlKey={vHlKey} />
+                  <LinkIcon hlKey={vHlKey} onClick={onLinkOpen} />
+                  <BookmarkIcon hlKey={vHlKey} />
                   {' '}
                 </span>
               );

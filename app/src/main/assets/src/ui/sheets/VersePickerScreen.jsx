@@ -2,7 +2,7 @@
    VersePickerScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink }) {
+export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink }) {
   const target = refineRequest.target;
   const item = refineRequest.item;
   const isStudy = target.type === 'study';
@@ -169,9 +169,9 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     }
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
     const newLink = persistLink(sourceEndpoint, refinedTarget);
-    if (newLink) setHlTick(t => t + 1);
+    if (newLink && window.__bumpHlTick) window.__bumpHlTick();
     onClose(newLink || null);
-  }, [selInfo, captureSelectionSync, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, setHlTick, onClose, returnTargetInsteadOfLink]);
+  }, [selInfo, captureSelectionSync, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink]);
 
   if (!chapter) {
     return (

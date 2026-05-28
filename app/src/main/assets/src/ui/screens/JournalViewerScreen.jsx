@@ -455,7 +455,6 @@ export function JournalViewerScreen(props) {
   var onNavigateToLink = props.onNavigateToLink;
   var onOpenJournalEntry = props.onOpenJournalEntry;
   var onOpenNotebook = props.onOpenNotebook;
-  var setHlTick = props.setHlTick;
 
   // Subscribe to JournalStore — viewer re-renders when entry mutates.
   React.useSyncExternalStore(
@@ -469,7 +468,7 @@ export function JournalViewerScreen(props) {
   var _typedDelete = useState('');
   var typedDelete = _typedDelete[0]; var setTypedDelete = _typedDelete[1];
 
-  function bump() { if (setHlTick) setHlTick(function(t) { return t + 1; }); }
+  function bump() { if (window.__bumpHlTick) window.__bumpHlTick(); }
 
   function startDelete() { setConfirmStep(1); setTypedDelete(''); }
   function nextDeleteStep() {

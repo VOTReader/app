@@ -37,7 +37,6 @@ export function buildScreenRoutes({
   // ── Theme + settings + display ──
   theme, setTheme,
   settings, setSettings, toggleSetting, updateSetting,
-  hlTick, setHlTick,
   titleFocusHidden, setTitleFocusHidden,
   headingsFocusHidden, setHeadingsFocusHidden,
   // ── Read progress + history ──
@@ -128,7 +127,7 @@ export function buildScreenRoutes({
   const sharedViewProps = {
     onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
     theme, onThemeChange: setTheme, surpriseAnchor,
-    onInAppLink: openInAppLetter, backHint, hlTick,
+    onInAppLink: openInAppLetter, backHint,
     onLinkOpen: openLinkSidebar,
     onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
     markAsReadEnabled: settings.markAsRead, showProgressBar: settings.showProgressBar,
@@ -331,7 +330,6 @@ export function buildScreenRoutes({
         onHistory={goHistory}
         onSettings={goSettings}
         historyEnabled={settings.historyEnabled !== false}
-        hlTick={hlTick}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -349,7 +347,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
-        hlTick={hlTick} setHlTick={setHlTick}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -364,7 +361,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
-        hlTick={hlTick} setHlTick={setHlTick}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -393,7 +389,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
-        hlTick={hlTick} setHlTick={setHlTick}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -406,7 +401,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
-        hlTick={hlTick} setHlTick={setHlTick}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -425,7 +419,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
-        hlTick={hlTick} setHlTick={setHlTick}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -449,7 +442,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
-        hlTick={hlTick} setHlTick={setHlTick}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -467,7 +459,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
-        hlTick={hlTick} setHlTick={setHlTick}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -598,7 +589,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
         surpriseAnchor={surpriseAnchor}
         backHint={backHint} onTapThroughBack={tapThroughBack}
-        hlTick={hlTick} onLinkOpen={openLinkSidebar}
+        onLinkOpen={openLinkSidebar}
       />
       );
       // Q8: BOOKS not loaded yet — trigger lazy-load + show loading state.
@@ -633,7 +624,7 @@ export function buildScreenRoutes({
           goToLetterFromMatthew={goToLetterFromMatthew}
           theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
           backHint={backHint} tapThroughBack={tapThroughBack}
-          hlTick={hlTick} openLinkSidebar={openLinkSidebar}
+          openLinkSidebar={openLinkSidebar}
         />
       );
     },

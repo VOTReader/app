@@ -36,7 +36,7 @@ export function MatthewChapterView({
   // Visual + linking
   theme, setTheme, surpriseAnchor,
   backHint, tapThroughBack,
-  hlTick, openLinkSidebar,
+  openLinkSidebar,
 }) {
   if (!chapter) return null;
   // Chain-aware boundaries: when entered via Studies (fromStudies=true),
@@ -72,7 +72,6 @@ export function MatthewChapterView({
         surpriseAnchor={surpriseAnchor}
         onVotLetterClick={goToLetterFromMatthew}
         backHint={backHint} onTapThroughBack={tapThroughBack}
-        hlTick={hlTick}
         onLinkOpen={openLinkSidebar}
       />
       <ModeToggle mode={mode} onChange={setMode} showStudy={showStudy} onShowStudyChange={setShowStudy} />

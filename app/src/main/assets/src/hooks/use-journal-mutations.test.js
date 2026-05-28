@@ -45,8 +45,19 @@ afterEach(() => {
   window.jrnShowMilestoneToast = _prevToast;
 });
 
+let _prevBumpHlTick;
+
+beforeEach(() => {
+  _prevBumpHlTick = window.__bumpHlTick;
+  window.__bumpHlTick = vi.fn();
+});
+
+afterEach(() => {
+  if (_prevBumpHlTick === undefined) delete window.__bumpHlTick;
+  else window.__bumpHlTick = _prevBumpHlTick;
+});
+
 const makeSetters = () => ({
-  setHlTick: vi.fn(),
   setJournalEntryId: vi.fn(),
   setScreen: vi.fn(),
 });
@@ -58,26 +69,14 @@ const setup = () => {
 };
 
 describe('useJournalMutations — createAndEditJournal', () => {
-  it('happy path: adds an entry, bumps hlTick, sets entryId, nav to editor', () => {
+  it('happy path: adds an entry, bumps hlTick via bridge, sets entryId, nav to editor', () => {
     const { result, setters } = setup();
     act(() => { result.current.createAndEditJournal(); });
 
     expect(window.JournalStore.add).toHaveBeenCalledTimes(1);
-    expect(setters.setHlTick).toHaveBeenCalledTimes(1);
+    expect(window.__bumpHlTick).toHaveBeenCalledTimes(1);
     expect(setters.setJournalEntryId).toHaveBeenCalledWith('jrn-1');
     expect(setters.setScreen).toHaveBeenCalledWith('journal-editor');
-  });
-
-  it('setHlTick receives an updater function (not a literal value)', () => {
-    // The contract is `setHlTick(t => t + 1)` — a functional updater
-    // so the bump is correct under concurrent rendering. Asserting
-    // shape protects against a refactor that switches to a literal.
-    const { result, setters } = setup();
-    act(() => { result.current.createAndEditJournal(); });
-    const arg = setters.setHlTick.mock.calls[0][0];
-    expect(typeof arg).toBe('function');
-    expect(arg(0)).toBe(1);
-    expect(arg(99)).toBe(100);
   });
 
   it('records milestone via JournalStatsStore.recordNewEntry with entry.created ts', () => {
@@ -119,7 +118,7 @@ describe('useJournalMutations — createAndEditJournal', () => {
     delete window.JournalStore;
     const { result, setters } = setup();
     act(() => { result.current.createAndEditJournal(); });
-    expect(setters.setHlTick).not.toHaveBeenCalled();
+    expect(window.__bumpHlTick).not.toHaveBeenCalled();
     expect(setters.setJournalEntryId).not.toHaveBeenCalled();
     expect(setters.setScreen).not.toHaveBeenCalled();
   });

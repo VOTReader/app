@@ -2,7 +2,7 @@
    NotebookPickerSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function NotebookPickerSheet({ groupId, setHlTick, onClose }) {
+export function NotebookPickerSheet({ groupId, onClose }) {
   // Subscribe to both stores. The note's notebookIds list is in NoteStore;
   // the available notebooks list is in NotebookStore.
   React.useSyncExternalStore(
@@ -29,19 +29,19 @@ export function NotebookPickerSheet({ groupId, setHlTick, onClose }) {
     if (nb) {
       // Auto-add the note to the freshly-created notebook
       NoteStore.toggleNotebook(groupId, nb.id);
-      setHlTick(t => t + 1);
+      if (window.__bumpHlTick) window.__bumpHlTick();
       setNewName('');
     }
   };
 
   const toggle = (nbId) => {
     NoteStore.toggleNotebook(groupId, nbId);
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
   };
 
   const deleteNb = (nbId) => {
     NotebookStore.remove(nbId);
-    setHlTick(t => t + 1);
+    if (window.__bumpHlTick) window.__bumpHlTick();
     setConfirmDeleteNb(null);
   };
 
