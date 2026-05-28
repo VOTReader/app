@@ -99,6 +99,8 @@ import { useReadingPositionNav } from '../hooks/use-reading-position-nav.js';
 import { useReadingChainNav } from '../hooks/use-reading-chain-nav.js';
 import { useSurprise } from '../hooks/use-surprise.js';
 import { useAppShellEffects } from '../hooks/use-app-shell-effects.js';
+import { useStorageInfo } from '../hooks/use-storage-info.js';
+import { formatBytes } from '../utils/format-bytes.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
 import { JournalHelpers } from '../data/journal-helpers.js';
@@ -187,6 +189,8 @@ Object.assign(window, {
   useReadingChainNav,
   useSurprise,
   useAppShellEffects,
+  useStorageInfo,
+  formatBytes,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,

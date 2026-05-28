@@ -4845,6 +4845,23 @@
     const _BOOKS_READY = typeof BOOKS !== "undefined" && !!BOOKS;
     const _VOT_READY = typeof window.__votCorpus !== "undefined" ? window.__votCorpus.loaded : false;
     const [openSections, setOpenSections] = React.useState(/* @__PURE__ */ new Set());
+    const storageInfo = useStorageInfo();
+    const storageDisplayText = (() => {
+      if (storageInfo.status === "loading") return "Checking\u2026";
+      if (storageInfo.status === "unavailable") return "Storage info unavailable on this browser.";
+      if (storageInfo.usage == null || storageInfo.quota == null) {
+        return "Storage info partially unavailable.";
+      }
+      return "Approximately " + formatBytes(storageInfo.usage) + " of " + formatBytes(storageInfo.quota) + " used.";
+    })();
+    const protectionDisplayText = (() => {
+      if (storageInfo.status === "loading") return "Checking\u2026";
+      if (storageInfo.status === "unavailable") return "Persistence API unavailable on this browser.";
+      if (storageInfo.persisted) return "Active \u2014 your data is protected from automatic browser cleanup.";
+      if (storageInfo.persistDenied) return "Browser denied protection. Export regularly as a backup.";
+      return 'Not active \u2014 tap "Protect now" to request protection from automatic browser cleanup.';
+    })();
+    const showProtectButton = storageInfo.status === "ready" && !storageInfo.persisted && !storageInfo.persistDenied;
     const [wipeConfirm, setWipeConfirm] = React.useState(false);
     const [wipeText, setWipeText] = React.useState("");
     const [diagnosticLog, setDiagnosticLog] = React.useState([]);
@@ -5156,11 +5173,23 @@
         } catch (e) {
           console.warn("media export failed", e);
         }
+        let storageQuota = null;
+        let storageUsed = null;
+        try {
+          if (typeof navigator !== "undefined" && navigator.storage && typeof navigator.storage.estimate === "function") {
+            const est = await navigator.storage.estimate();
+            if (est && typeof est.quota === "number") storageQuota = est.quota;
+            if (est && typeof est.usage === "number") storageUsed = est.usage;
+          }
+        } catch (_e) {
+        }
         const payload = {
           app: "VOTReader",
           exportVersion: 2,
           exportDate: (/* @__PURE__ */ new Date()).toISOString(),
           diagnosticLog,
+          storageQuota,
+          storageUsed,
           data,
           stores,
           media
@@ -5548,7 +5577,10 @@ Continue?`
           })),
           onChange: (v) => onSetting("gardenTier", v)
         }
-      )), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Export Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, "Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as a single JSON file. No credentials or login info \u2014 just your data. Save the file anywhere you control.")), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
+      )), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Storage"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, storageDisplayText))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Protection"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, protectionDisplayText)), showProtectButton && /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
+        e.stopPropagation();
+        storageInfo.requestPersist();
+      } }, "Protect now")), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Export Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, "Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as a single JSON file. No credentials or login info \u2014 just your data. Save the file anywhere you control.")), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
         e.stopPropagation();
         exportPersonalData();
       } }, "Export")), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Import from Backup"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, "Restore a previously exported JSON file. Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten.")), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {

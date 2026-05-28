@@ -107,6 +107,29 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const _VOT_READY = (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.loaded : false;
 
   const [openSections, setOpenSections] = React.useState(new Set());
+
+  // W2.5 — navigator.storage estimate + persist. The hook reads once
+  // on mount; the derived display strings below pick the right text
+  // for each (status, persisted, persistDenied) combination.
+  const storageInfo = useStorageInfo();
+  const storageDisplayText = (() => {
+    if (storageInfo.status === 'loading') return 'Checking…';
+    if (storageInfo.status === 'unavailable') return 'Storage info unavailable on this browser.';
+    if (storageInfo.usage == null || storageInfo.quota == null) {
+      return 'Storage info partially unavailable.';
+    }
+    return 'Approximately ' + formatBytes(storageInfo.usage) + ' of ' + formatBytes(storageInfo.quota) + ' used.';
+  })();
+  const protectionDisplayText = (() => {
+    if (storageInfo.status === 'loading') return 'Checking…';
+    if (storageInfo.status === 'unavailable') return 'Persistence API unavailable on this browser.';
+    if (storageInfo.persisted) return 'Active — your data is protected from automatic browser cleanup.';
+    if (storageInfo.persistDenied) return 'Browser denied protection. Export regularly as a backup.';
+    return 'Not active — tap "Protect now" to request protection from automatic browser cleanup.';
+  })();
+  const showProtectButton = storageInfo.status === 'ready'
+    && !storageInfo.persisted
+    && !storageInfo.persistDenied;
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
   // NK5c: diagnostic-log snapshot for the "Your Data" section. The bridge
@@ -436,11 +459,28 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         /* proceed with structured data only */
       }
 
+      // W2.5 — storageQuota + storageUsed diagnostic fields. Raw
+      // bytes (not formatted) so a future Settings → Your Data
+      // history view can plot them over time. Feature-detected
+      // (some browsers don't expose navigator.storage); null when
+      // unavailable.
+      let storageQuota = null;
+      let storageUsed = null;
+      try {
+        if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.estimate === 'function') {
+          const est = await navigator.storage.estimate();
+          if (est && typeof est.quota === 'number') storageQuota = est.quota;
+          if (est && typeof est.usage === 'number') storageUsed = est.usage;
+        }
+      } catch (_e) { /* best-effort diagnostic; null on failure */ }
+
       const payload = {
         app: 'VOTReader',
         exportVersion: 2,
         exportDate: new Date().toISOString(),
         diagnosticLog: diagnosticLog,
+        storageQuota: storageQuota,
+        storageUsed: storageUsed,
         data: data,
         stores: stores,
         media: media,
@@ -850,6 +890,24 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         <div className="settings-section">
           <div className="settings-section-label">Your Data</div>
+          {/* W2.5 — navigator.storage estimate + persist surfaced here.
+              Renders once on mount; W2.7 will add periodic re-assessment
+              + write-failure-driven refresh. */}
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <div className="settings-row-label">Storage</div>
+              <div className="settings-row-desc">{storageDisplayText}</div>
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <div className="settings-row-label">Protection</div>
+              <div className="settings-row-desc">{protectionDisplayText}</div>
+            </div>
+            {showProtectButton && (
+              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); storageInfo.requestPersist(); }}>Protect now</button>
+            )}
+          </div>
           <div className="settings-row">
             <div className="settings-row-text">
               <div className="settings-row-label">Export Your Data</div>

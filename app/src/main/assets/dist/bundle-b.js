@@ -6635,6 +6635,99 @@
     return { showWelcome, setShowWelcome, isOnline, dismissWelcome };
   }
 
+  // app/src/main/assets/src/hooks/use-storage-info.js
+  function useStorageInfo() {
+    const [state, setState] = React.useState(() => ({
+      status: (
+        /** @type {'loading' | 'ready' | 'unavailable'} */
+        "loading"
+      ),
+      quota: (
+        /** @type {number | null} */
+        null
+      ),
+      usage: (
+        /** @type {number | null} */
+        null
+      ),
+      persisted: (
+        /** @type {boolean | null} */
+        null
+      ),
+      persistDenied: false
+    }));
+    const apiRef = React.useRef(
+      /** @type {StorageManager | null} */
+      null
+    );
+    React.useEffect(() => {
+      const nav = typeof navigator !== "undefined" ? navigator : null;
+      const storage = nav && nav.storage;
+      if (!storage || typeof storage.estimate !== "function") {
+        setState((prev) => ({ ...prev, status: "unavailable" }));
+        return;
+      }
+      apiRef.current = storage;
+      let cancelled = false;
+      const fetchEstimate = storage.estimate();
+      const fetchPersisted = typeof storage.persisted === "function" ? storage.persisted() : Promise.resolve(false);
+      Promise.all([fetchEstimate.catch(() => null), fetchPersisted.catch(() => false)]).then(([estimate, persisted]) => {
+        if (cancelled) return;
+        const quota = estimate && typeof estimate.quota === "number" ? estimate.quota : null;
+        const usage = estimate && typeof estimate.usage === "number" ? estimate.usage : null;
+        setState((prev) => ({
+          ...prev,
+          status: "ready",
+          quota,
+          usage,
+          persisted: !!persisted
+        }));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, []);
+    const requestPersist = React.useCallback(async () => {
+      const storage = apiRef.current;
+      if (!storage || typeof storage.persist !== "function") {
+        setState((prev) => ({ ...prev, persistDenied: true }));
+        return;
+      }
+      try {
+        const granted = await storage.persist();
+        setState((prev) => ({
+          ...prev,
+          persisted: !!granted,
+          persistDenied: !granted
+        }));
+      } catch (_e) {
+        setState((prev) => ({ ...prev, persistDenied: true }));
+      }
+    }, []);
+    return {
+      status: state.status,
+      quota: state.quota,
+      usage: state.usage,
+      persisted: state.persisted,
+      persistDenied: state.persistDenied,
+      requestPersist
+    };
+  }
+
+  // app/src/main/assets/src/utils/format-bytes.js
+  function formatBytes(bytes) {
+    if (bytes == null || typeof bytes !== "number" || !isFinite(bytes) || bytes < 0) return "?";
+    if (bytes < 1024) return bytes + " B";
+    const kb = bytes / 1024;
+    if (kb < 1024) return kb.toFixed(1) + " KB";
+    const mb = kb / 1024;
+    if (mb < 1024) return mb.toFixed(1) + " MB";
+    const gb = mb / 1024;
+    if (gb < 1024) return gb.toFixed(1) + " GB";
+    const tb = gb / 1024;
+    return tb.toFixed(1) + " TB";
+  }
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -9607,6 +9700,8 @@
     useReadingChainNav,
     useSurprise,
     useAppShellEffects,
+    useStorageInfo,
+    formatBytes,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
