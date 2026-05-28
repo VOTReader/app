@@ -1750,10 +1750,14 @@ Architecture — what exists, what changes:
     (Brave: values marked "approximate")
 
   Implementation order:
-    W2.7a — StorageHealth module + vitest (detection engine, no UI)
+    W2.7a — LANDED 2026-05-27. StorageHealth module (src/utils/
+            storage-health.js, ~320 lines) + 79 vitest tests. Detection
+            engine, tier computation, risk flags, write-path API,
+            periodic refresh, Safari gate, dismissal state. Wired into
+            bundle-b. Bundle-b 402 → 413 KB. Tests 980 → 1059.
     W2.7b — StorageHealthBanner component (subscribes, renders banners)
     W2.7c — Write-path integration (_save + JournalMediaStore.put)
-    W2.7d — Settings → Your Data integration
+    W2.7d — Settings → Your Data integration (rewire useStorageInfo)
     W2.7e — Safari-specific flows (7-day modal + iOS welcome card)
 
   W2.8 — Error boundary in App

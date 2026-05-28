@@ -571,7 +571,7 @@
       e.name = "AbortError";
       return e;
     }
-    function _resetForTests() {
+    function _resetForTests2() {
       _dbPromise = null;
     }
     const _self = {
@@ -586,7 +586,7 @@
       isQuotaError,
       _putOnce,
       _wrapRequest: wrapRequest,
-      _resetForTests
+      _resetForTests: _resetForTests2
     };
     return _self;
   })();
@@ -6732,6 +6732,342 @@
     return tb.toFixed(1) + " TB";
   }
 
+  // app/src/main/assets/src/utils/storage-health.js
+  var REFRESH_INTERVAL_MS = 3e5;
+  var STALE_THRESHOLD_MS = 6e4;
+  var CAUTION_PERCENT = 0.5;
+  var WARNING_PERCENT = 0.8;
+  var CRITICAL_PERCENT = 0.95;
+  var LOW_QUOTA_BYTES = 100 * 1024 * 1024;
+  var CRITICAL_QUOTA_BYTES = 50 * 1024 * 1024;
+  var PRIVATE_SAFARI_QUOTA_HEURISTIC = 120 * 1024 * 1024;
+  var TIER = Object.freeze({
+    HEALTHY: "healthy",
+    CAUTION: "caution",
+    WARNING: "warning",
+    CRITICAL: "critical",
+    READONLY: "readonly"
+  });
+  var PLATFORM = Object.freeze({
+    ANDROID_WEBVIEW: "android-webview",
+    SAFARI_TAB: "safari-tab",
+    SAFARI_PWA: "safari-pwa",
+    FIREFOX: "firefox",
+    CHROME: "chrome",
+    EDGE: "edge",
+    UNKNOWN: "unknown"
+  });
+  var RISK = Object.freeze({
+    SAFARI_7DAY: "safari-7day",
+    IOS_PWA_ISOLATE: "ios-pwa-isolate",
+    LOW_QUOTA: "low-quota",
+    CRITICAL_QUOTA: "critical-quota",
+    NOT_PERSISTED: "not-persisted",
+    PRIVATE_MODE: "private-mode",
+    WRITE_FAILED: "write-failed",
+    QUOTA_DECLINING: "quota-declining"
+  });
+  var _DEFAULT_REPORT = Object.freeze({
+    tier: TIER.HEALTHY,
+    platform: PLATFORM.UNKNOWN,
+    quota: null,
+    usage: null,
+    persisted: null,
+    percentUsed: null,
+    remaining: null,
+    risks: [],
+    privateModeLikely: false,
+    lastAssessedAt: 0,
+    writeFailedThisSession: false
+  });
+  var _report = null;
+  var _version = 0;
+  var _listeners = null;
+  var _platform = null;
+  var _writeFailedThisSession = false;
+  var _sessionDismissals = /* @__PURE__ */ new Set();
+  var _refreshIntervalId = null;
+  var _lastAssessedAt = 0;
+  var _safariWarningShownThisSession = false;
+  var _assessInFlight = null;
+  var _visibilityHandler = null;
+  var _storageApiOverride = null;
+  function _bump() {
+    _version += 1;
+    if (!_listeners) return;
+    for (const cb of _listeners) {
+      try {
+        cb();
+      } catch (e) {
+        console.warn("StorageHealth subscriber threw", e);
+      }
+    }
+  }
+  function _getStorageApi() {
+    if (_storageApiOverride) return _storageApiOverride;
+    var nav = typeof navigator !== "undefined" ? navigator : null;
+    return nav && nav.storage || null;
+  }
+  function _detectPlatform(uaOverride) {
+    if (typeof window === "undefined") return PLATFORM.UNKNOWN;
+    if (typeof /** @type {any} */
+    window.AndroidBridge !== "undefined") return PLATFORM.ANDROID_WEBVIEW;
+    var ua = uaOverride || (typeof navigator !== "undefined" && navigator.userAgent || "");
+    var isSafari = /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua);
+    if (isSafari) {
+      if (
+        /** @type {any} */
+        navigator.standalone === true
+      ) return PLATFORM.SAFARI_PWA;
+      return PLATFORM.SAFARI_TAB;
+    }
+    if (/Edg\//.test(ua)) return PLATFORM.EDGE;
+    if (/Firefox\//.test(ua)) return PLATFORM.FIREFOX;
+    if (/Chrome\//.test(ua)) return PLATFORM.CHROME;
+    return PLATFORM.UNKNOWN;
+  }
+  function _computeTier(quota, usage, persisted, platform, writeFailed, privateModeLikely) {
+    if (writeFailed) return TIER.READONLY;
+    var pct = quota != null && usage != null && quota > 0 ? usage / quota : null;
+    if (pct != null && pct >= CRITICAL_PERCENT) return TIER.CRITICAL;
+    if (quota != null && quota < CRITICAL_QUOTA_BYTES) return TIER.CRITICAL;
+    if (privateModeLikely) return TIER.CRITICAL;
+    if (pct != null && pct >= WARNING_PERCENT) return TIER.WARNING;
+    if (quota != null && quota < LOW_QUOTA_BYTES) return TIER.WARNING;
+    if (pct != null && pct >= CAUTION_PERCENT) return TIER.CAUTION;
+    if (persisted === false) return TIER.CAUTION;
+    if (platform === PLATFORM.SAFARI_TAB) return TIER.CAUTION;
+    return TIER.HEALTHY;
+  }
+  function _computeRisks(platform, persisted, quota, writeFailed, privateModeLikely, prevQuota) {
+    var risks = [];
+    if (platform === PLATFORM.SAFARI_TAB) risks.push(RISK.SAFARI_7DAY);
+    if (platform === PLATFORM.SAFARI_PWA) risks.push(RISK.IOS_PWA_ISOLATE);
+    if (quota != null && quota < LOW_QUOTA_BYTES) risks.push(RISK.LOW_QUOTA);
+    if (quota != null && quota < CRITICAL_QUOTA_BYTES) risks.push(RISK.CRITICAL_QUOTA);
+    if (persisted === false) risks.push(RISK.NOT_PERSISTED);
+    if (privateModeLikely) risks.push(RISK.PRIVATE_MODE);
+    if (writeFailed) risks.push(RISK.WRITE_FAILED);
+    if (prevQuota != null && quota != null && quota < prevQuota) risks.push(RISK.QUOTA_DECLINING);
+    return risks;
+  }
+  async function _assess() {
+    if (_assessInFlight) return _assessInFlight;
+    var p = _assessImpl();
+    _assessInFlight = p;
+    try {
+      return await p;
+    } finally {
+      _assessInFlight = null;
+    }
+  }
+  async function _assessImpl() {
+    var storage = _getStorageApi();
+    var platform = _getPlatform();
+    if (!storage || typeof storage.estimate !== "function") {
+      var fallbackRisks = _writeFailedThisSession ? [RISK.WRITE_FAILED] : [];
+      var fallback = (
+        /** @type {StorageHealthReport} */
+        {
+          tier: _writeFailedThisSession ? TIER.READONLY : TIER.HEALTHY,
+          platform,
+          quota: null,
+          usage: null,
+          persisted: null,
+          percentUsed: null,
+          remaining: null,
+          risks: fallbackRisks,
+          privateModeLikely: false,
+          lastAssessedAt: Date.now(),
+          writeFailedThisSession: _writeFailedThisSession
+        }
+      );
+      _report = fallback;
+      _lastAssessedAt = Date.now();
+      _bump();
+      return fallback;
+    }
+    var estimate = null;
+    var persisted = null;
+    try {
+      estimate = await storage.estimate();
+    } catch (_e) {
+    }
+    try {
+      persisted = typeof storage.persisted === "function" ? await storage.persisted() : false;
+    } catch (_e) {
+      persisted = false;
+    }
+    var quota = estimate && typeof estimate.quota === "number" ? estimate.quota : null;
+    var usage = estimate && typeof estimate.usage === "number" ? estimate.usage : null;
+    var pct = quota != null && usage != null && quota > 0 ? usage / quota : null;
+    var remaining = quota != null && usage != null ? quota - usage : null;
+    var persistedBool = persisted === true;
+    var privateModeLikely = (platform === PLATFORM.SAFARI_TAB || platform === PLATFORM.SAFARI_PWA) && quota != null && quota < PRIVATE_SAFARI_QUOTA_HEURISTIC;
+    var prevQuota = _report ? _report.quota : null;
+    var tier = _computeTier(quota, usage, persistedBool, platform, _writeFailedThisSession, privateModeLikely);
+    var risks = _computeRisks(platform, persistedBool, quota, _writeFailedThisSession, privateModeLikely, prevQuota);
+    var report = {
+      tier,
+      platform,
+      quota,
+      usage,
+      persisted: persisted != null ? !!persisted : null,
+      percentUsed: pct,
+      remaining,
+      risks,
+      privateModeLikely,
+      lastAssessedAt: Date.now(),
+      writeFailedThisSession: _writeFailedThisSession
+    };
+    _report = report;
+    _lastAssessedAt = Date.now();
+    _bump();
+    return report;
+  }
+  function _getReport() {
+    return _report || _DEFAULT_REPORT;
+  }
+  function _subscribe(callback) {
+    if (!_listeners) _listeners = /* @__PURE__ */ new Set();
+    _listeners.add(callback);
+    return function() {
+      if (_listeners) _listeners.delete(callback);
+    };
+  }
+  function _getVersion() {
+    return _version;
+  }
+  function _getPlatform() {
+    if (!_platform) _platform = _detectPlatform();
+    return _platform;
+  }
+  function _checkBeforeWrite(bytes) {
+    if (_writeFailedThisSession) return { ok: false, reason: "write-failed" };
+    var r = _report;
+    if (!r || r.quota == null || r.usage == null || r.quota <= 0) return { ok: true };
+    var afterPercent = (r.usage + bytes) / r.quota;
+    if (afterPercent >= CRITICAL_PERCENT) return { ok: false, reason: "critical" };
+    if (afterPercent >= WARNING_PERCENT) return { ok: true, reason: "warning" };
+    return { ok: true };
+  }
+  function _onWriteFailure(_err) {
+    _writeFailedThisSession = true;
+    if (_report) {
+      var risks = _report.risks.includes(RISK.WRITE_FAILED) ? _report.risks : _report.risks.concat(RISK.WRITE_FAILED);
+      _report = {
+        tier: TIER.READONLY,
+        platform: _report.platform,
+        quota: _report.quota,
+        usage: _report.usage,
+        persisted: _report.persisted,
+        percentUsed: _report.percentUsed,
+        remaining: _report.remaining,
+        risks,
+        privateModeLikely: _report.privateModeLikely,
+        lastAssessedAt: _report.lastAssessedAt,
+        writeFailedThisSession: true
+      };
+    }
+    _bump();
+    _assess();
+  }
+  function _onWriteSuccess() {
+    if (!_writeFailedThisSession) return;
+    _writeFailedThisSession = false;
+    return _assess();
+  }
+  function _reassessIfCautious() {
+    if (!_report || _report.tier === TIER.HEALTHY) return;
+    _assess();
+  }
+  async function _requestPersistence() {
+    var storage = _getStorageApi();
+    if (!storage || typeof storage.persist !== "function") return false;
+    try {
+      var granted = await storage.persist();
+      if (granted) _assess();
+      return !!granted;
+    } catch (_e) {
+      return false;
+    }
+  }
+  function _checkFirstDataCreation() {
+    var platform = _getPlatform();
+    if (platform !== PLATFORM.SAFARI_TAB) return { shouldBlock: false };
+    if (_safariWarningShownThisSession) return { shouldBlock: false };
+    if (_sessionDismissals.has("safari-7day")) return { shouldBlock: false };
+    _safariWarningShownThisSession = true;
+    return { shouldBlock: true, reason: "safari-7day" };
+  }
+  function _dismissScenario(scenarioId) {
+    _sessionDismissals.add(scenarioId);
+    _bump();
+  }
+  function _isDismissed(scenarioId) {
+    return _sessionDismissals.has(scenarioId);
+  }
+  function _start() {
+    if (_refreshIntervalId) return;
+    _assess();
+    _refreshIntervalId = setInterval(function() {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      _assess();
+    }, REFRESH_INTERVAL_MS);
+    if (typeof document !== "undefined") {
+      _visibilityHandler = function() {
+        if (document.visibilityState !== "visible") return;
+        if (Date.now() - _lastAssessedAt > STALE_THRESHOLD_MS) _assess();
+      };
+      document.addEventListener("visibilitychange", _visibilityHandler);
+    }
+  }
+  function _stop() {
+    if (_refreshIntervalId) {
+      clearInterval(_refreshIntervalId);
+      _refreshIntervalId = null;
+    }
+    if (_visibilityHandler && typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", _visibilityHandler);
+      _visibilityHandler = null;
+    }
+  }
+  function _resetForTests(opts) {
+    _stop();
+    _report = null;
+    _version = 0;
+    _listeners = null;
+    _platform = opts && opts.platform || null;
+    _writeFailedThisSession = false;
+    _sessionDismissals = /* @__PURE__ */ new Set();
+    _lastAssessedAt = 0;
+    _safariWarningShownThisSession = false;
+    _assessInFlight = null;
+    _storageApiOverride = opts && opts.storageApi || null;
+  }
+  var StorageHealth = {
+    assess: _assess,
+    getReport: _getReport,
+    subscribe: _subscribe,
+    getVersion: _getVersion,
+    getPlatform: _getPlatform,
+    checkBeforeWrite: _checkBeforeWrite,
+    onWriteFailure: _onWriteFailure,
+    onWriteSuccess: _onWriteSuccess,
+    reassessIfCautious: _reassessIfCautious,
+    requestPersistence: _requestPersistence,
+    checkFirstDataCreation: _checkFirstDataCreation,
+    dismissScenario: _dismissScenario,
+    isDismissed: _isDismissed,
+    start: _start,
+    stop: _stop,
+    _resetForTests,
+    _detectPlatform,
+    TIER,
+    PLATFORM,
+    RISK
+  };
+
   // app/src/main/assets/src/data/journal-helpers.js
   var JournalHelpers2 = /* @__PURE__ */ (function() {
     function blockId() {
@@ -9706,6 +10042,7 @@
     useAppShellEffects,
     useStorageInfo,
     formatBytes,
+    StorageHealth,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,
