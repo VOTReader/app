@@ -1755,10 +1755,11 @@ Architecture — what exists, what changes:
             engine, tier computation, risk flags, write-path API,
             periodic refresh, Safari gate, dismissal state. Wired into
             bundle-b. Bundle-b 402 → 413 KB. Tests 980 → 1059.
-    W2.7b — StorageHealthBanner component (subscribes, renders banners)
-    W2.7c — Write-path integration (_save + JournalMediaStore.put)
-    W2.7d — Settings → Your Data integration (rewire useStorageInfo)
-    W2.7e — Safari-specific flows (7-day modal + iOS welcome card)
+    W2.7b — LANDED. StorageHealthBanner + 23 tests. 8-scenario priority.
+    W2.7c — LANDED. CachedStore._save + JournalRecordingSheet + JournalEditor wiring.
+    W2.7d — LANDED. useStorageInfo rewired to StorageHealth. Platform row. 12 tests.
+    W2.7e — LANDED. Safari7DayModal + IosPwaWelcomeCard + gesture gates. 17 tests.
+            Tests 1059 → 1099. Bundle-b 413 KB. Bundle-d 555.6 → 566.2 KB.
 
   W2.8 — Error boundary in App
   ────────────────────────────
@@ -1859,16 +1860,16 @@ Architecture — what exists, what changes:
     [ ] Import restores journal media + structured data
     [ ] Round-trip: export → clear all → import → all data intact
         including audio playback + image display
-    [ ] StorageHealth module with full vitest (every tier, platform,
-        risk flag, write-failure cycle, periodic refresh)
-    [ ] Banner renders correct message for each of 8 scenarios
-    [ ] Safari 7-day modal fires on first data-creating gesture
-    [ ] iOS PWA welcome card fires on empty-storage boot
-    [ ] Write failures surface immediately with actionable guidance
-    [ ] checkBeforeWrite warns BEFORE recording starts (not just save)
-    [ ] Private browsing detected and warned permanently
-    [ ] Budget device (<50 MB) warned at boot
-    [ ] All warnings have correct dismissal behavior (see table)
+    [x] StorageHealth module with full vitest (every tier, platform,
+        risk flag, write-failure cycle, periodic refresh) — W2.7a 83 tests
+    [x] Banner renders correct message for each of 8 scenarios — W2.7b 23 tests
+    [x] Safari 7-day modal fires on first data-creating gesture — W2.7e
+    [x] iOS PWA welcome card fires on empty-storage boot — W2.7e
+    [x] Write failures surface immediately with actionable guidance — W2.7c
+    [x] checkBeforeWrite warns BEFORE recording starts (not just save) — W2.7c
+    [x] Private browsing detected and warned permanently — W2.7a+b
+    [x] Budget device (<50 MB) warned at boot — W2.7a+b
+    [x] All warnings have correct dismissal behavior (see table) — W2.7b+e
     [ ] No warnings when storage is healthy (Scenario 1)
     [ ] Error boundary catches render crashes
     [ ] localStorage < 5 KB post-migration (theme shim only)
