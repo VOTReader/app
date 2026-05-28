@@ -22,6 +22,46 @@
       }
       body.light .hydration-loading { background: #f7f2e8; }
 
+      /* Generic .vot-toast — bottom-of-screen transient notification.
+         Used by the showToast utility (src/utils/toast.js) for the
+         W2.6 export/import success + failure messages. The pattern
+         mirrors the existing .jrn-milestone-toast aesthetic: gold
+         border on a near-black sheet, Cinzel uppercase, fades in/out
+         via the .show class.
+
+         Callers using showToast({className: 'vot-toast', ...}) inherit
+         this styling. Specialized toasts (milestones, root-exit) keep
+         their own classes for visual differentiation. */
+      .vot-toast {
+        position: fixed;
+        z-index: 9998;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+        max-width: min(92%, 32rem);
+        background: rgba(20,20,24,0.94);
+        color: #f0e6d2;
+        border: 1px solid rgba(255,215,140,0.35);
+        border-radius: 12px;
+        padding: 14px 20px;
+        font-family: var(--font-cinzel, Georgia, serif);
+        font-size: 0.82rem;
+        letter-spacing: 0.04em;
+        line-height: 1.45;
+        text-align: center;
+        box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 220ms ease-out;
+      }
+      .vot-toast.show { opacity: 1; }
+      body.light .vot-toast {
+        background: rgba(247,242,232,0.96);
+        color: #2a2018;
+        border-color: rgba(176,144,56,0.5);
+        box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+      }
+
       :root {
         --bg:          #000000;
         --bg2:         #06060e;

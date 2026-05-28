@@ -167,6 +167,18 @@ export var JournalIndexStore = extendStore(
       this._cache = {};
       this._save();
       this._bump();
+    },
+
+    /**
+     * Replace the entire reverse-index map (W2.6 import path).
+     * @param {JournalIndexData | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      this._cache = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
+      this._save();
+      this._bump();
     }
   }
 );

@@ -200,6 +200,23 @@ export const LinkStore = extendStore(
       this._cache = this._load().filter(l => l.id !== linkId);
       this._save();
       this._bump();
+    },
+
+    /**
+     * Replace the entire link list (W2.6 import path). Imported data
+     * is presumed to be in the post-migration {source, target} shape;
+     * any half-migrated records get repaired by _normalize on the
+     * next read (the post-hydration subscriber doesn't re-fire on
+     * replaceAll, so we run normalize inline after the write).
+     * @param {Link[] | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      this._cache = Array.isArray(data) ? data.slice() : [];
+      this._normalize();
+      this._save();
+      this._bump();
     }
   }
 );

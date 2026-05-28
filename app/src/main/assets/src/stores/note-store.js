@@ -135,6 +135,18 @@ export const NoteStore = extendStore(
      * @param {string} notebookId
      * @returns {void}
      */
+    /**
+     * Replace the entire note map (W2.6 import path).
+     * @param {Record<string, Note> | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      this._cache = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
+      this._save();
+      this._bump();
+    },
+
     pruneNotebook(notebookId) {
       if (this._shouldDefer('pruneNotebook', notebookId)) return;
       const data = this._load();

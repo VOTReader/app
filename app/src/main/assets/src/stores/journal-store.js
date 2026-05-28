@@ -505,6 +505,22 @@ export var JournalStore = extendStore(
       this._save();
       this._bump();
       if (typeof JournalIndexStore !== 'undefined') JournalIndexStore.clear();
+    },
+
+    /**
+     * Replace the entire journal-entry list (W2.6 import path). The
+     * imported payload is presumed self-consistent — index rebuild
+     * happens at the import-handler layer after every store is
+     * written, not per-store.
+     * @param {JournalStoreData | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      var list = (data && typeof data === 'object' && Array.isArray(data.list)) ? data.list : [];
+      this._cache = /** @type {any} */ ({ list: list });
+      this._save();
+      this._bump();
     }
   }
 );
@@ -582,6 +598,19 @@ export var JournalNotebookStore = extendStore(
       this._save();
       this._bump();
       if (typeof JournalStore !== 'undefined') JournalStore.pruneNotebook(id);
+    },
+
+    /**
+     * Replace the entire journal-notebook list (W2.6 import path).
+     * @param {JournalNotebookStoreData | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      var list = (data && typeof data === 'object' && Array.isArray(data.list)) ? data.list : [];
+      this._cache = /** @type {any} */ ({ list: list });
+      this._save();
+      this._bump();
     }
   }
 );

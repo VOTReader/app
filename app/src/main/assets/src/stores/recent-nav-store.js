@@ -70,6 +70,19 @@ export const RecentNavStore = extendStore(
       this._cache = data;
       this._save();
       this._bump();
+    },
+
+    /**
+     * Replace the entire recent-nav list (W2.6 import path). Trims
+     * to the 30-entry cap that add() enforces.
+     * @param {NavItemRecord[] | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      this._cache = Array.isArray(data) ? data.slice(0, 30) : [];
+      this._save();
+      this._bump();
     }
   }
 );

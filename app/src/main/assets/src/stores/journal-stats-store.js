@@ -31,6 +31,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { showToast } from '../utils/toast.js';
 
 /**
  * On-disk shape.
@@ -198,6 +199,27 @@ export var JournalStatsStore = extendStore(
     },
 
     /**
+     * Replace the entire stats object (W2.6 import path). Defaults
+     * fill in any missing fields so a partial payload doesn't break
+     * downstream readers that expect every field present.
+     * @param {Partial<JournalStatsData> | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      var d = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
+      this._cache = /** @type {any} */ ({
+        totalEntries: d.totalEntries || 0,
+        currentStreak: d.currentStreak || 0,
+        longestStreak: d.longestStreak || 0,
+        lastEntryDate: d.lastEntryDate || null,
+        milestonesUnlocked: Array.isArray(d.milestonesUnlocked) ? d.milestonesUnlocked : []
+      });
+      this._save();
+      this._bump();
+    },
+
+    /**
      * Check every milestone def against the current stats; add newly-
      * met ones to unlocked. Returns the just-added defs (caller fires
      * toasts).
@@ -241,24 +263,19 @@ JournalStatsStore.recomputeFromLoad();
 
 /**
  * Pop a small in-app toast at the top of the screen when a milestone
- * unlocks. The toast element is auto-created on first use; subsequent
- * calls reuse + retrigger the same DOM node. Stores its dismiss timer
- * on the function itself (`jrnShowMilestoneToast._t`).
+ * unlocks. Delegates DOM lifecycle to the generic `showToast` utility
+ * (W2.6 consolidation); milestone-specific concern is just the HTML
+ * payload + the existing `.jrn-milestone-toast` CSS class.
  *
  * @param {MilestoneDef | { label?: string, key?: string } | null | undefined} milestone
  * @returns {void}
  */
 export function jrnShowMilestoneToast(milestone) {
   if (!milestone) return;
-  var toast = document.getElementById('jrn-milestone-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'jrn-milestone-toast';
-    toast.className = 'jrn-milestone-toast';
-    document.body.appendChild(toast);
-  }
-  toast.innerHTML = '<span style="font-size:14px">✦</span><span>Milestone: ' + (milestone.label || milestone.key) + '</span>';
-  toast.classList.add('show');
-  clearTimeout(/** @type {any} */ (jrnShowMilestoneToast)._t);
-  /** @type {any} */ (jrnShowMilestoneToast)._t = setTimeout(function() { /** @type {HTMLElement} */ (toast).classList.remove('show'); }, 3000);
+  showToast({
+    id: 'jrn-milestone-toast',
+    className: 'jrn-milestone-toast',
+    html: '<span style="font-size:14px">✦</span><span>Milestone: ' + (milestone.label || milestone.key) + '</span>',
+    durationMs: 3000,
+  });
 }

@@ -151,6 +151,18 @@ export const BookmarkStore = extendStore(
       this._cache = this._load().filter(function(b) { return b.id !== id; });
       this._save();
       this._bump();
+    },
+
+    /**
+     * Replace the entire bookmark list (W2.6 import path).
+     * @param {Bookmark[] | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      this._cache = Array.isArray(data) ? data.slice() : [];
+      this._save();
+      this._bump();
     }
   }
 );

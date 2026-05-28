@@ -293,6 +293,20 @@ export const AnnotationStore = extendStore(
       const arr = this.get(key);
       const hit = arr.find(h => h.start <= start && h.end >= end);
       return hit || null;
+    },
+
+    /**
+     * Replace the entire annotation map (W2.6 import path). Coerces
+     * non-object input to `{}` so a malformed payload doesn't write
+     * a bad shape into the cache.
+     * @param {AnnotationData | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      this._cache = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
+      this._save();
+      this._bump();
     }
   }
 );

@@ -1073,6 +1073,49 @@
     );
   }
 
+  // app/src/main/assets/src/utils/toast.js
+  var _hideTimers = /* @__PURE__ */ new Map();
+  function showToast(opts) {
+    if (typeof document === "undefined") return;
+    const id = opts && opts.id;
+    if (!id) return;
+    const html = opts && opts.html != null ? opts.html : "";
+    const className = opts && opts.className || id;
+    const durationMs = opts && opts.durationMs != null ? opts.durationMs : 3e3;
+    const ariaLive = opts && opts.ariaLive || "polite";
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement("div");
+      el.id = id;
+      el.className = className;
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", ariaLive);
+      document.body.appendChild(el);
+    }
+    el.innerHTML = html;
+    void el.offsetHeight;
+    el.classList.add("show");
+    const prev = _hideTimers.get(id);
+    if (prev != null) clearTimeout(prev);
+    if (durationMs > 0) {
+      _hideTimers.set(id, setTimeout(function() {
+        hideToast(id);
+      }, durationMs));
+    } else {
+      _hideTimers.delete(id);
+    }
+  }
+  function hideToast(id) {
+    if (typeof document === "undefined" || !id) return;
+    const el = document.getElementById(id);
+    if (el) el.classList.remove("show");
+    const prev = _hideTimers.get(id);
+    if (prev != null) {
+      clearTimeout(prev);
+      _hideTimers.delete(id);
+    }
+  }
+
   // app/src/main/assets/src/stores/app-flag-stores.js
   function buildFlagStore(key) {
     return extendStore(
@@ -1627,6 +1670,22 @@
         const arr = this.get(key);
         const hit = arr.find((h) => h.start <= start && h.end >= end);
         return hit || null;
+      },
+      /**
+       * Replace the entire annotation map (W2.6 import path). Coerces
+       * non-object input to `{}` so a malformed payload doesn't write
+       * a bad shape into the cache.
+       * @param {AnnotationData | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        this._cache = data && typeof data === "object" && !Array.isArray(data) ? data : (
+          /** @type {any} */
+          {}
+        );
+        this._save();
+        this._bump();
       }
     }
   );
@@ -1751,6 +1810,20 @@
        * @param {string} notebookId
        * @returns {void}
        */
+      /**
+       * Replace the entire note map (W2.6 import path).
+       * @param {Record<string, Note> | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        this._cache = data && typeof data === "object" && !Array.isArray(data) ? data : (
+          /** @type {any} */
+          {}
+        );
+        this._save();
+        this._bump();
+      },
       pruneNotebook(notebookId) {
         if (this._shouldDefer("pruneNotebook", notebookId)) return;
         const data = this._load();
@@ -1849,6 +1922,20 @@
         this._save();
         this._bump();
         NoteStore2.pruneNotebook(id);
+      },
+      /**
+       * Replace the entire notebook list (W2.6 import path). Coerces to
+       * the wrapped `{ list: [] }` shape; non-object input → empty.
+       * @param {NotebookStoreData | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        const list = data && typeof data === "object" && Array.isArray(data.list) ? data.list : [];
+        this._cache = /** @type {any} */
+        { list };
+        this._save();
+        this._bump();
       }
     }
   );
@@ -1894,6 +1981,18 @@
         data.unshift({ ...item, ts: Date.now() });
         data = data.slice(0, 30);
         this._cache = data;
+        this._save();
+        this._bump();
+      },
+      /**
+       * Replace the entire recent-nav list (W2.6 import path). Trims
+       * to the 30-entry cap that add() enforces.
+       * @param {NavItemRecord[] | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        this._cache = Array.isArray(data) ? data.slice(0, 30) : [];
         this._save();
         this._bump();
       }
@@ -2046,6 +2145,22 @@
         this._cache = this._load().filter((l) => l.id !== linkId);
         this._save();
         this._bump();
+      },
+      /**
+       * Replace the entire link list (W2.6 import path). Imported data
+       * is presumed to be in the post-migration {source, target} shape;
+       * any half-migrated records get repaired by _normalize on the
+       * next read (the post-hydration subscriber doesn't re-fire on
+       * replaceAll, so we run normalize inline after the write).
+       * @param {Link[] | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        this._cache = Array.isArray(data) ? data.slice() : [];
+        this._normalize();
+        this._save();
+        this._bump();
       }
     }
   );
@@ -2179,6 +2294,17 @@
         this._cache = this._load().filter(function(b) {
           return b.id !== id;
         });
+        this._save();
+        this._bump();
+      },
+      /**
+       * Replace the entire bookmark list (W2.6 import path).
+       * @param {Bookmark[] | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        this._cache = Array.isArray(data) ? data.slice() : [];
         this._save();
         this._bump();
       }
@@ -2677,6 +2803,30 @@
         this._save();
       },
       /**
+       * Replace the entire stats object (W2.6 import path). Defaults
+       * fill in any missing fields so a partial payload doesn't break
+       * downstream readers that expect every field present.
+       * @param {Partial<JournalStatsData> | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        var d = data && typeof data === "object" && !Array.isArray(data) ? data : (
+          /** @type {any} */
+          {}
+        );
+        this._cache = /** @type {any} */
+        {
+          totalEntries: d.totalEntries || 0,
+          currentStreak: d.currentStreak || 0,
+          longestStreak: d.longestStreak || 0,
+          lastEntryDate: d.lastEntryDate || null,
+          milestonesUnlocked: Array.isArray(d.milestonesUnlocked) ? d.milestonesUnlocked : []
+        };
+        this._save();
+        this._bump();
+      },
+      /**
        * Check every milestone def against the current stats; add newly-
        * met ones to unlocked. Returns the just-added defs (caller fires
        * toasts).
@@ -2714,22 +2864,12 @@
   })();
   function jrnShowMilestoneToast2(milestone) {
     if (!milestone) return;
-    var toast = document.getElementById("jrn-milestone-toast");
-    if (!toast) {
-      toast = document.createElement("div");
-      toast.id = "jrn-milestone-toast";
-      toast.className = "jrn-milestone-toast";
-      document.body.appendChild(toast);
-    }
-    toast.innerHTML = '<span style="font-size:14px">\u2726</span><span>Milestone: ' + (milestone.label || milestone.key) + "</span>";
-    toast.classList.add("show");
-    clearTimeout(
-      /** @type {any} */
-      jrnShowMilestoneToast2._t
-    );
-    jrnShowMilestoneToast2._t = setTimeout(function() {
-      toast.classList.remove("show");
-    }, 3e3);
+    showToast({
+      id: "jrn-milestone-toast",
+      className: "jrn-milestone-toast",
+      html: '<span style="font-size:14px">\u2726</span><span>Milestone: ' + (milestone.label || milestone.key) + "</span>",
+      durationMs: 3e3
+    });
   }
 
   // app/src/main/assets/src/stores/journal-index-store.js
@@ -2856,6 +2996,20 @@
       clear() {
         if (this._shouldDefer("clear")) return;
         this._cache = {};
+        this._save();
+        this._bump();
+      },
+      /**
+       * Replace the entire reverse-index map (W2.6 import path).
+       * @param {JournalIndexData | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        this._cache = data && typeof data === "object" && !Array.isArray(data) ? data : (
+          /** @type {any} */
+          {}
+        );
         this._save();
         this._bump();
       }
@@ -3279,6 +3433,22 @@
         this._save();
         this._bump();
         if (typeof JournalIndexStore !== "undefined") JournalIndexStore.clear();
+      },
+      /**
+       * Replace the entire journal-entry list (W2.6 import path). The
+       * imported payload is presumed self-consistent — index rebuild
+       * happens at the import-handler layer after every store is
+       * written, not per-store.
+       * @param {JournalStoreData | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        var list = data && typeof data === "object" && Array.isArray(data.list) ? data.list : [];
+        this._cache = /** @type {any} */
+        { list };
+        this._save();
+        this._bump();
       }
     }
   );
@@ -3367,6 +3537,19 @@
         this._save();
         this._bump();
         if (typeof JournalStore2 !== "undefined") JournalStore2.pruneNotebook(id);
+      },
+      /**
+       * Replace the entire journal-notebook list (W2.6 import path).
+       * @param {JournalNotebookStoreData | null | undefined} data
+       * @returns {void}
+       */
+      replaceAll(data) {
+        if (this._shouldDefer("replaceAll", data)) return;
+        var list = data && typeof data === "object" && Array.isArray(data.list) ? data.list : [];
+        this._cache = /** @type {any} */
+        { list };
+        this._save();
+        this._bump();
       }
     }
   );
@@ -9353,6 +9536,8 @@
     hasAnyPendingStores,
     clearLegacyLs,
     LS_SKIP_LIST,
+    showToast,
+    hideToast,
     IDBAdapter,
     WelcomedFlagStore,
     AboutSeenFlagStore: AboutSeenFlagStore2,

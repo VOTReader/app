@@ -112,6 +112,20 @@ export const NotebookStore = extendStore(
       this._bump();
       // Cascade: strip the deleted notebook from every note that referenced it
       NoteStore.pruneNotebook(id);
+    },
+
+    /**
+     * Replace the entire notebook list (W2.6 import path). Coerces to
+     * the wrapped `{ list: [] }` shape; non-object input → empty.
+     * @param {NotebookStoreData | null | undefined} data
+     * @returns {void}
+     */
+    replaceAll(data) {
+      if (this._shouldDefer('replaceAll', data)) return;
+      const list = (data && typeof data === 'object' && Array.isArray(data.list)) ? data.list : [];
+      this._cache = /** @type {any} */ ({ list: list });
+      this._save();
+      this._bump();
     }
   }
 );
