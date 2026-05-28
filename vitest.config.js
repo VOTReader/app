@@ -18,7 +18,10 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.js'],
-    include: ['app/src/main/assets/src/**/*.test.{js,jsx}'],
+    include: [
+      'app/src/main/assets/src/**/*.test.{js,jsx}',
+      'tools/**/*.test.{js,jsx}',
+    ],
     // Default reporter ('default') is fine for v1. Add 'json' / 'junit'
     // when CI reporting needs structured output.
 

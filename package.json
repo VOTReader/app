@@ -17,7 +17,8 @@
     "smoke-lite": "node tools/smoke-lite.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "validate:data": "node tools/validate-schemas.js --strict"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
