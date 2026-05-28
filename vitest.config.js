@@ -146,15 +146,29 @@ export default defineConfig({
       // both documented data-loss vectors. Gate floors advance:
       // statements 40→42, branches 30→32, functions 42→43, lines 42→44.
       //
+      // W2 audit + store-coverage sprint baseline (980 tests, 8 new
+      // store test files + 17 migrateAnnotations tests):
+      //   statements 53.57 (2284/4263) | branches 43.31 (1315/3036)
+      //   functions  59.32 (506/853)   | lines    57.70 (1849/3204)
+      // +230 tests covering: bookmark, journal cascade/prune, journal-
+      // stats streak/milestones, history pruneDay, notebook dedup/
+      // cascade, home-order schema validation, journal-media blob
+      // round-trip/pruneOrphans, replaceAll across 14 stores,
+      // migrateAnnotations legacy transformation. Per-store coverage
+      // now 84-96% on every CachedStore-backed store except journal-
+      // store (46% — search + scan paths still untested) and recent-
+      // nav-store + thumb-store (untouched). Gate floors advance:
+      // statements 42→53, branches 32→43, functions 43→59, lines 44→57.
+      //
       // Each future test commit either:
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
       thresholds: {
-        statements: 42,
-        branches: 32,
-        functions: 43,
-        lines: 44,
+        statements: 53,
+        branches: 43,
+        functions: 59,
+        lines: 57,
       },
     },
   },

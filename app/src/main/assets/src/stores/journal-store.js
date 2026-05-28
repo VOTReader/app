@@ -409,7 +409,7 @@ export var JournalStore = extendStore(
         e.notebookIds = e.notebookIds.filter(function(n) { return n !== notebookId; });
         if (e.notebookIds.length !== before) { e.updated = Date.now(); changed = true; }
       }
-      if (changed) this._save(); this._bump();
+      if (changed) { this._save(); this._bump(); }
     },
 
     /**

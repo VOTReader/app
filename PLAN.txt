@@ -1764,6 +1764,82 @@ Architecture — what exists, what changes:
   + diagnostic info. Same UX as the native renderer-crash retry-view
   (N1.3) but for React errors.
 
+  W2 audit + test-coverage sprint (LANDED 2026-05-27, post-W2.8)
+  ──────────────────────────────────────────────────────────────
+  5-agent sweep of the entire storage layer surfaced 12 candidate
+  findings across idb-adapter, CachedStore, 11 stores, export/import,
+  and HydrationGate. Of these, 4 shipped (the real correctness bugs);
+  8 polish/defensive items were rejected as out-of-scope per the
+  "don't add code beyond what the task requires" discipline. Plus
+  230 new vitest tests across 8 new test files + 17 migrateAnnotations
+  tests appended to annotation-store.test.js.
+
+  SHIPPED fixes:
+    * journal-store.js:412 + journal-index-store.js:136 missing braces
+      (`if (changed) this._save(); this._bump();`) — `_bump()` was
+      firing unconditionally on every notebook deletion / entry
+      removal because the `if (changed)` only guarded `_save()`.
+    * idb-adapter.js `del()` gains `tx.onerror` + `tx.onabort`;
+      `getAll()` gains `tx.onabort` — prevents promise hang if a
+      transaction aborts without request-level error propagation
+      (e.g. concurrent versionchange during cursor walk).
+
+  REJECTED audit findings (intentionally not shipped — listed for the
+  next agent to know they were considered):
+    * journal-stats-store.js missing `_bump()` in recordNewEntry /
+      recomputeFromLoad / recordDeletion. (Hub display reactivity
+      gap — current behavior: reads pick up changes via tab-switch.)
+    * idb-adapter.js `get()` tx.onabort handler. (Read path; window
+      is much shorter than getAll's cursor walk.)
+    * cached-store.js `_backgroundRetry` MAX_RETRIES cap. (Permanent
+      IDB failure is rare; CachedStore stays in degraded state and
+      keeps trying without unbounded harm.)
+    * cached-store.js stale header comment fix.
+    * SettingsScreen.jsx per-blob 50 MB OOM guard, `_ioBusy` export/
+      import concurrency flag, `_exportableStores` coupling comment.
+    * NotebookStore.add returning the notebook during deferred state.
+    * BookmarkStore.add spread-copy before stamping.
+    * Toast API `text` parameter (textContent alongside innerHTML),
+      persist button `persistPending` disable state, `useStorageInfo`
+      persistPending field.
+
+  Test coverage (230 new tests):
+    bookmark-store.test.js (27) — CRUD + key-lookup false-positive
+      guards (verse :1 vs :10, cross-book, separator discipline)
+    journal-store.test.js (12) — remove() cascade + pruneNotebook
+    journal-stats-store.test.js (33) — streak math + DST + milestones
+    history-store.test.js (27) — add cap + pruneDay month-indexing pin
+    notebook-store.test.js (18) — case-insensitive dedup + cascade
+    home-order-store.test.js (13) — schema validation fallback
+    journal-media-store.test.js (20) — blob round-trip + pruneOrphans
+    replace-all.test.js (64) — all 14 importable stores
+    annotation-store.test.js (+17) — migrateAnnotations legacy upgrade
+
+  Two test-infra gotchas pinned as memory notes:
+    * JournalStatsStore registers a module-load subscriber that
+      clobbers streak on stale lastEntryDate. Tests must anchor
+      timestamps to today, not literal dates.
+    * jsdom Blob is incompatible with fake-indexeddb's structured-
+      clone shim. Tests must replace globalThis.Blob with Node's
+      native Blob before importing fake-indexeddb. JournalMediaStore's
+      compressImage (Canvas) + objectUrl (URL.createObjectURL) remain
+      untested — deferred until real-browser test infra lands.
+
+  Coverage ratchet:
+    Tests: 750 → 980 (+230). Test files: 29 → 37.
+    Aggregate: statements 42.24 → 53.57, branches 32.33 → 43.31,
+    functions 43.21 → 59.32, lines 44.84 → 57.70. Gates advanced:
+    42→53 / 32→43 / 43→59 / 44→57.
+    Per-store: bookmark 88.6, cached 89.2, history 89.5, home-order
+    91.7, journal-index 92.6, journal-stats 90.9, note 90, notebook
+    90.4, prophecy-cards 84, state 87.5. Outliers: idb-adapter 78.8
+    (legacy WebView fallback paths), journal-store 46.5 (search +
+    scan paths still untested), journal-media 52.2 (compressImage +
+    objectUrl deferred), recent-nav + thumb 0/0 (no tests yet).
+
+  Bundle delta: bundle-b unchanged (~402 KB); bundle-d 555.6 KB
+  unchanged.
+
   Exit criteria:
     [ ] idb-adapter.js committed with full vitest coverage (CRUD +
         schema upgrade + QuotaExceededError + fallback)

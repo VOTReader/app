@@ -133,7 +133,7 @@ export var JournalIndexStore = extendStore(
           if (list.length === 0) delete data[k];
         }
       }
-      if (changed) this._save(); this._bump();
+      if (changed) { this._save(); this._bump(); }
     },
 
     /**

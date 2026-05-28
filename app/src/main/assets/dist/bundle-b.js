@@ -2966,8 +2966,10 @@
             if (list.length === 0) delete data[k];
           }
         }
-        if (changed) this._save();
-        this._bump();
+        if (changed) {
+          this._save();
+          this._bump();
+        }
       },
       /**
        * Slow-path reverse lookup: which refKeys does this entry contribute
@@ -3340,8 +3342,10 @@
             changed = true;
           }
         }
-        if (changed) this._save();
-        this._bump();
+        if (changed) {
+          this._save();
+          this._bump();
+        }
       },
       /**
        * Case-insensitive substring search across entry title, block text,
