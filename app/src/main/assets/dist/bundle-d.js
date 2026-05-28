@@ -10146,7 +10146,7 @@
         setSettings,
         setScreen
       }
-    ), ROUTES[screen]?.() ?? null, /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement(ErrorBoundary, { key: screen }, ROUTES[screen]?.() ?? null), /* @__PURE__ */ React.createElement(
       AppShellSheets,
       {
         hlTick,

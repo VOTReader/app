@@ -792,8 +792,26 @@ function App() {
       />
 
       {/* Per-screen render slot \u2014 dispatch table built right above the
-          return; renders the active screen (or null if no route matches). */}
-      {ROUTES[screen]?.() ?? null}
+          return; renders the active screen (or null if no route matches).
+
+          W2.8: wrapped in an inner ErrorBoundary so a render crash in
+          the active screen (e.g. corrupted IDB data from a future
+          import path) doesn't take down the entire app via the outer
+          boundary. The outer boundary still catches anything that
+          escapes (chrome, sheets, overlays). The `key={screen}` makes
+          the boundary remount on navigation \u2014 React's normal
+          screen-component-type change already causes a full remount
+          of the route subtree, so the keyed boundary adds no extra
+          work, but it auto-clears the error state so the user can
+          recover by tapping a different screen in the header chrome.
+
+          This is the load-bearing safety net for the W2.6 import
+          path: a malformed v2 backup that writes unexpected types
+          into a store could crash on the next render. Without the
+          inner boundary, the only recovery is reload. With it, the
+          user can navigate away to a working screen and either clear
+          the bad data via Settings or re-import a good backup. */}
+      <ErrorBoundary key={screen}>{ROUTES[screen]?.() ?? null}</ErrorBoundary>
 
       {/* ── 12 annotation / link / journal / bookmark sheets and popovers
               (always mounted; each is internally gated on its own state
