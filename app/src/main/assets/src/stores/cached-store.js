@@ -83,6 +83,7 @@ const _idbStoreRegistry = new Set();
  * @typedef {{
  *   _cache: T | null,
  *   _pendingCache: T | null,
+ *   _defaultRef: T | null,
  *   _idb: boolean,
  *   _idbStoreName: string,
  *   _idbLsShim: ((full: T | null) => any) | null,
@@ -185,6 +186,13 @@ export function CachedStore(storageKey, defaultVal, opts) {
   const inst = {
     _cache: null,
     _pendingCache: null,
+    /**
+     * Stable defaults reference used during pending/degraded states.
+     * Lazy-allocated on first _load(); cleared by _rebaseAndPromote +
+     * _resetForTests so a re-entered pending state allocates fresh.
+     * @type {T | null}
+     */
+    _defaultRef: null,
     /** Internal mirror of useIdb so tests / consumers can ask. */
     _idb: useIdb,
     _idbStoreName: idbStoreName,
@@ -208,7 +216,17 @@ export function CachedStore(storageKey, defaultVal, opts) {
       if (useIdb && this._state !== 'loaded') {
         // Pending or degraded — surface the queue overlay if any.
         if (this._pendingCache !== null) return /** @type {T} */ (this._pendingCache);
-        return /** @type {T} */ (copyDefault());
+        // Memoize the default reference so `useSyncExternalStore`
+        // consumers don't see a fresh `[]` / `{}` per getSnapshot call.
+        // Without this, a degraded-state store (hydration timeout, no
+        // user writes yet → _pendingCache null) returns a new
+        // reference on every render, and `Object.is` comparison in
+        // useSyncExternalStore triggers an infinite re-render loop on
+        // any subscribing component (reachable in production on a
+        // budget device where IDB is slow enough to time out). Cleared
+        // in `_rebaseAndPromote` once the real cache takes over.
+        if (!this._defaultRef) this._defaultRef = /** @type {any} */ (copyDefault());
+        return /** @type {T} */ (this._defaultRef);
       }
       try { this._cache = JSON.parse(localStorage.getItem(storageKey) || JSON.stringify(defaultVal)); }
       catch (_e) { this._cache = /** @type {any} */ (copyDefault()); }
@@ -449,6 +467,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
       this._cache = /** @type {any} */ ((loadedData !== undefined && loadedData !== null) ? loadedData : copyDefault());
       this._state = 'loaded';
       this._pendingCache = null;
+      this._defaultRef = null;
       this._replayQueueOnto();
       // Flush the rebased state (single batched save).
       this._save();
@@ -503,6 +522,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _resetForTests(opts) {
       this._cache = null;
       this._pendingCache = null;
+      this._defaultRef = null;
       this._queue = [];
       this._replaying = false;
       this._applyingPending = false;

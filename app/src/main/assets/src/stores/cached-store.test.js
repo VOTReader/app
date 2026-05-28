@@ -227,13 +227,22 @@ describe('CachedStore W2.2 — initial state machine', () => {
     expect(store.all()).toEqual([]);
   });
 
-  it('_load() during pending returns a FRESH copy each call (not shared)', () => {
+  it('_load() during pending returns a STABLE reference (memoized defaults via _defaultRef)', () => {
+    // Previously this test asserted different references on each call —
+    // which was the LATENT BUG that caused infinite useSyncExternalStore
+    // loops in degraded state on budget devices. The correct invariant
+    // is reference stability so React's Object.is comparison doesn't
+    // trigger a re-render storm. The defaults object is shared across
+    // consumers during the brief pending window; this is safe because
+    // (a) hooks treat it as read-only, (b) the recursive overlay-apply
+    // in _shouldDefer swaps to _pendingCache (a separate ref) before
+    // any mutation, and (c) _defaultRef is cleared by _rebaseAndPromote
+    // so post-hydration the real _cache takes over.
     const store = createTestStore('vot-test-w22-init', { idb: true });
     const a = store.all();
     const b = store.all();
-    expect(a).not.toBe(b); // different array references
+    expect(a).toBe(b); // SAME reference — stability invariant
     expect(a).toEqual([]);
-    expect(b).toEqual([]);
   });
 });
 
@@ -826,6 +835,72 @@ describe('CachedStore W2.3 Tier 1 — registry + hydrateAllStores', () => {
     expect(hasAnyPendingStores()).toBe(true);
     await hydrateAllStores();
     expect(hasAnyPendingStores()).toBe(false);
+  });
+});
+
+describe('CachedStore — _defaultRef stability during pending/degraded', () => {
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  it('_load returns the SAME reference on consecutive calls during pending (no _pendingCache writes)', () => {
+    vi.spyOn(IDBAdapter, 'get').mockReturnValue(new Promise(() => {})); // hangs
+    const store = createTestStore('vot-test-defaultref-pending', { idb: true });
+    store._hydrate();
+    // No writes performed → _pendingCache stays null → _load falls
+    // through to the defaults branch. The reference must be stable
+    // across calls or useSyncExternalStore will infinite-loop.
+    const r1 = store._load();
+    const r2 = store._load();
+    const r3 = store._load();
+    expect(r1).toBe(r2);
+    expect(r2).toBe(r3);
+    expect(Array.isArray(r1)).toBe(true);
+    expect(r1.length).toBe(0);
+  });
+
+  it('_load returns the SAME reference on consecutive calls during degraded (regression for infinite-loop bug)', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(IDBAdapter, 'get').mockReturnValue(new Promise(() => {}));
+    const store = createTestStore('vot-test-defaultref-degraded', { idb: true });
+    const p = store._hydrate();
+    vi.advanceTimersByTime(3000);
+    await p;
+    expect(store.getState()).toBe('degraded');
+    // Critical invariant: getSnapshot returns stable reference in degraded.
+    const r1 = store._load();
+    const r2 = store._load();
+    const r3 = store._load();
+    expect(r1).toBe(r2);
+    expect(r2).toBe(r3);
+  });
+
+  it('_rebaseAndPromote clears _defaultRef so future hydration cycles allocate fresh', async () => {
+    // Start hanging, time out, then resolve.
+    /** @type {(v: any) => void} */
+    let resolveGet = () => {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(() => new Promise((r) => { resolveGet = r; }));
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-defaultref-clear', { idb: true });
+    const p = store._hydrate();
+    // Consume the defaults ref by calling _load() during pending.
+    const pendingRef = store._load();
+    expect(store._defaultRef).toBe(pendingRef);
+    // Resolve hydration → cache populated, _defaultRef cleared.
+    resolveGet([{ id: 'x' }]);
+    await p;
+    expect(store._defaultRef).toBeNull();
+    expect(store.getState()).toBe('loaded');
+    expect(store._load()).toEqual([{ id: 'x' }]);
+  });
+
+  it('_resetForTests clears _defaultRef', () => {
+    vi.spyOn(IDBAdapter, 'get').mockReturnValue(new Promise(() => {}));
+    const store = createTestStore('vot-test-defaultref-reset', { idb: true });
+    store._hydrate();
+    store._load(); // populates _defaultRef
+    expect(store._defaultRef).not.toBeNull();
+    store._resetForTests();
+    expect(store._defaultRef).toBeNull();
   });
 });
 

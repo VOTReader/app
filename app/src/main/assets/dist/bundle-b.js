@@ -614,6 +614,13 @@
     const inst = {
       _cache: null,
       _pendingCache: null,
+      /**
+       * Stable defaults reference used during pending/degraded states.
+       * Lazy-allocated on first _load(); cleared by _rebaseAndPromote +
+       * _resetForTests so a re-entered pending state allocates fresh.
+       * @type {T | null}
+       */
+      _defaultRef: null,
       /** Internal mirror of useIdb so tests / consumers can ask. */
       _idb: useIdb,
       _idbStoreName: idbStoreName,
@@ -644,9 +651,11 @@
             /** @type {T} */
             this._pendingCache
           );
+          if (!this._defaultRef) this._defaultRef = /** @type {any} */
+          copyDefault();
           return (
             /** @type {T} */
-            copyDefault()
+            this._defaultRef
           );
         }
         try {
@@ -900,6 +909,7 @@
         loadedData !== void 0 && loadedData !== null ? loadedData : copyDefault();
         this._state = "loaded";
         this._pendingCache = null;
+        this._defaultRef = null;
         this._replayQueueOnto();
         this._save();
         this._version += 1;
@@ -952,6 +962,7 @@
       _resetForTests(opts2) {
         this._cache = null;
         this._pendingCache = null;
+        this._defaultRef = null;
         this._queue = [];
         this._replaying = false;
         this._applyingPending = false;
@@ -1380,15 +1391,16 @@
        */
       add(key, ann) {
         if (this._shouldDefer("add", key, ann)) return;
-        if (!ann.groupId) ann.groupId = ann.id;
-        if (!ann.kind) ann.kind = "highlight";
-        if (!ann.created) ann.created = Date.now();
-        ann.updated = Date.now();
+        const stamped = { ...ann };
+        if (!stamped.groupId) stamped.groupId = stamped.id;
+        if (!stamped.kind) stamped.kind = "highlight";
+        if (!stamped.created) stamped.created = Date.now();
+        stamped.updated = Date.now();
         const data = this._load();
         if (!data[key]) data[key] = [];
         data[key].push(
           /** @type {Annotation} */
-          ann
+          stamped
         );
         this._save();
         this._bump();

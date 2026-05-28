@@ -144,18 +144,21 @@ export const AnnotationStore = extendStore(
      */
     add(key, ann) {
       if (this._shouldDefer('add', key, ann)) return;
-      // Default-stamping happens AFTER the defer guard so the deferred
-      // queue entry isn't pre-mutated by side-effect on the caller's
-      // ann object. On replay (or recursive overlay apply via
-      // _applyToPendingCache), these run at the actual write site so
-      // ann.updated reflects the write time, not the first-attempt time.
-      if (!ann.groupId) ann.groupId = ann.id;
-      if (!ann.kind) ann.kind = 'highlight';
-      if (!ann.created) ann.created = Date.now();
-      ann.updated = Date.now();
+      // Spread-copy first so the stamps don't mutate the caller's ann
+      // reference. Symmetric with HistoryStore.add (history-store.js)
+      // which constructs `const stamped = { ...entry, key, ts }`. The
+      // stored record carries the stamps; the caller's literal stays
+      // pristine. Default-stamping runs AFTER _shouldDefer so deferred
+      // queue entries aren't pre-mutated and the stamps reflect the
+      // actual write time, not the first-attempt time.
+      const stamped = { ...ann };
+      if (!stamped.groupId) stamped.groupId = stamped.id;
+      if (!stamped.kind) stamped.kind = 'highlight';
+      if (!stamped.created) stamped.created = Date.now();
+      stamped.updated = Date.now();
       const data = this._load();
       if (!data[key]) data[key] = [];
-      data[key].push(/** @type {Annotation} */ (ann));
+      data[key].push(/** @type {Annotation} */ (stamped));
       this._save();
       this._bump();
     },

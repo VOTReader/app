@@ -371,6 +371,26 @@ describe('_validateTabState — 13 coercion rules', () => {
       expect(result.current.tabs).toEqual([{ screen: 'home' }]);
     });
 
+    it('steady-state read: post-hydration, pulls live cache from StateStore (no LS parse)', () => {
+      // The production-steady-state path: after first hydration, _cache
+      // is populated and useSavedState reads it directly. Seed _cache
+      // here (NOT localStorage) so the test exercises the same code
+      // path a returning user hits on every boot after their first.
+      StateStore._cache = /** @type {any} */ ({
+        screen: 'home',
+        theme: 'dark',
+        settings: { fontStyle: 'modern', historyEnabled: true },
+        tabs: [{ screen: 'bible-ch', chapterNum: 1, bookId: 'genesis' }],
+      });
+
+      const { result } = renderHook(() => useSavedState());
+
+      expect(result.current.screen).toBe('home');
+      expect(result.current.theme).toBe('dark');
+      expect(result.current.settings).toEqual({ fontStyle: 'modern', historyEnabled: true });
+      expect(result.current.tabs).toEqual([{ screen: 'bible-ch', chapterNum: 1, bookId: 'genesis' }]);
+    });
+
     it('coerces stale screens at BOTH top-level AND inside tabs[]', () => {
       // The critical silent-loss case: a tab persisted with screen:
       // 'search' (unrestoreable) should be coerced to 'home', but
