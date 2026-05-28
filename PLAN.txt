@@ -2086,8 +2086,23 @@ W4 makes it feel at home on desktop WITHOUT breaking the mobile layout.
   Risk: LOW (CSS + event listeners, no architecture changes).
 
 ───────────────────────────────────────────────────────────────────────────────
-W5 — HOSTING + CI (ship it)
+W5 — HOSTING + CI (ship it) — LANDED 2026-05-28 (021e94a)
 ───────────────────────────────────────────────────────────────────────────────
+
+  LANDED. deploy-web.yml publishes the web-facing asset subtree to GitHub
+  Pages via the official Pages actions (push-to-main + manual dispatch);
+  rsync excludes src/, *.d.ts, *.lnk. CSP simplified to 'self'-only
+  (Option B — verified in preview: app renders, 0 console errors, 0 CSP
+  violations). Version single-sourced from package.json via
+  tools/sync-sw-version.js (build:sw), so the deployed SW CACHE_VERSION is
+  always correct. ci.yml bundle-match verify now also covers
+  service-worker.js. No base-path rewriting needed (all paths relative,
+  SW/manifest ./ scope, app never changes the URL path).
+
+  Owed: (1) repo owner must set Settings → Pages → Source → "GitHub
+  Actions" (configure-pages attempts auto-enablement on first deploy);
+  (2) APK versionName ← package.json (Gradle-task side of W5.4) deferred —
+  only the SW side is wired; (3) live-URL verification rolls into W6.
 
   W5.1 — GitHub Pages deployment
   ──────────────────────────────
@@ -2150,11 +2165,17 @@ W5 — HOSTING + CI (ship it)
   build.py template substitution).
 
   Exit criteria:
-    [ ] GitHub Pages serving at public URL
-    [ ] CSP works on both Android + web without changes per platform
-    [ ] CI builds and deploys on push to main
-    [ ] Service worker version matches APK version
-    [ ] Web deploy verified: fresh browser → install PWA → works offline
+    [~] GitHub Pages serving at public URL — workflow wired; awaits the
+        repo-owner Pages-source flip + first deploy run
+    [x] CSP works on both Android + web without changes per platform —
+        single 'self' policy; preview-verified for web (0 violations);
+        Android works since 'self' = the WebViewAssetLoader origin
+    [~] CI builds and deploys on push to main — deploy-web.yml created;
+        unverified until first run on origin
+    [~] Service worker version matches package.json — SW side wired
+        (build:sw); APK versionName ← package.json (Gradle task) deferred
+    [ ] Web deploy verified: fresh browser → install PWA → works offline —
+        rolls into W6 (needs the live URL)
 
   Risk: LOW (infrastructure, no app changes).
 
