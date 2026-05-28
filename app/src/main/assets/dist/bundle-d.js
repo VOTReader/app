@@ -5051,80 +5051,34 @@
       return keys;
     };
     const exportPersonalData = () => {
-      try {
-        const data = {};
-        _collectVotKeys().forEach((k) => {
-          data[k] = localStorage.getItem(k);
-        });
-        const payload = {
-          app: "VOTReader",
-          exportVersion: 1,
-          exportDate: (/* @__PURE__ */ new Date()).toISOString(),
-          diagnosticLog,
-          data
-        };
-        const json = JSON.stringify(payload, null, 2);
-        const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-        const filename = `votreader-backup-${stamp}.json`;
-        const result = PlatformBridge.saveToDownloads(filename, json);
-        if (result === "ok") {
-          alert("Backup saved to your Downloads folder.");
-        } else {
-          console.warn("saveToDownloads error:", result);
-          alert("Export failed. Please try again.");
-        }
-      } catch (e) {
-        console.warn("export failed", e);
-        alert("Export failed. See console for details.");
-      }
+      alert(
+        "Export is temporarily unavailable.\n\nThe storage layer is mid-upgrade \u2014 your data has moved from browser-local storage to a more durable on-device database, and the export format is being updated to match. Until that lands in the next update, the existing export would produce an incomplete file.\n\nYour data is safe and untouched on this device. No action needed. Please wait for the next update before exporting."
+      );
     };
     const importPersonalData = () => {
-      const _doImport = (jsonText) => {
-        try {
-          const parsed = JSON.parse(jsonText);
-          if (!parsed || parsed.app !== "VOTReader" || !parsed.data || typeof parsed.data !== "object") {
-            alert("This file does not look like a VOTReader backup.");
-            return;
-          }
-          const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : "unknown date";
-          const proceed = window.confirm(
-            "Importing the backup from " + dateLabel + " will REPLACE all your current notes, highlights, notebooks, journal entries, bookmarks, links, reading progress, history, tabs, and settings on this device. This cannot be undone.\n\nContinue?"
-          );
-          if (!proceed) return;
-          _collectVotKeys().forEach((k) => {
-            try {
-              localStorage.removeItem(k);
-            } catch (_e) {
-            }
-          });
-          Object.keys(parsed.data).forEach((k) => {
-            if (k.indexOf("vot-") === 0 && typeof parsed.data[k] === "string") {
-              try {
-                localStorage.setItem(k, parsed.data[k]);
-              } catch (e) {
-                console.warn("import: localStorage write failed for", k, e);
-              }
-            }
-          });
-          alert("Import complete. The app will now reload.");
-          window.location.reload();
-        } catch (err) {
-          console.warn("import failed", err);
-          alert("Import failed: " + (err && err.message ? err.message : "invalid file"));
-        }
-      };
-      window.__onImportFile = (b64OrNull) => {
-        window.__onImportFile = null;
-        if (!b64OrNull) return;
-        try {
-          _doImport(atob(b64OrNull));
-        } catch (_e) {
-          alert("Import failed: could not decode file.");
-        }
-      };
-      PlatformBridge.openFilePicker();
+      alert(
+        "Import is temporarily unavailable.\n\nThe storage layer is mid-upgrade. Importing a pre-upgrade backup file right now would overwrite your current data with the older format and lose anything created since the last backup. Import will be restored in the next update with full IDB + media support."
+      );
     };
-    const clearAllPersonalData = () => {
+    const _deleteIdbDatabase = (name, critical) => new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      };
+      try {
+        const req = indexedDB.deleteDatabase(name);
+        req.onsuccess = finish;
+        req.onerror = finish;
+        req.onblocked = finish;
+        setTimeout(finish, critical ? 3e3 : 1e3);
+      } catch (_e) {
+        finish();
+      }
+    });
+    const clearAllPersonalData = async () => {
       try {
         _collectVotKeys().forEach((k) => {
           try {
@@ -5132,22 +5086,12 @@
           } catch (_e) {
           }
         });
-        try {
-          indexedDB.deleteDatabase("votreader");
-        } catch (_e) {
-        }
-        try {
-          indexedDB.deleteDatabase("vot-journal-media");
-        } catch (_e) {
-        }
-        try {
-          indexedDB.deleteDatabase("vot-thumbs");
-        } catch (_e) {
-        }
-        try {
-          indexedDB.deleteDatabase("vot-search-cache");
-        } catch (_e) {
-        }
+        await Promise.all([
+          _deleteIdbDatabase("votreader", true),
+          _deleteIdbDatabase("vot-journal-media", true),
+          _deleteIdbDatabase("vot-thumbs", false),
+          _deleteIdbDatabase("vot-search-cache", false)
+        ]);
         alert("All personal data cleared. The app will now reload.");
         window.location.reload();
       } catch (e) {

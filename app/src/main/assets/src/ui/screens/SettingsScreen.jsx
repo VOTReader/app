@@ -280,92 +280,93 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     }
     return keys;
   };
+  // ════════════════════════════════════════════════════════════════
+  // INTERIM EXPORT/IMPORT GUARD (W2.4-hotfix → removed in W2.6)
+  // ════════════════════════════════════════════════════════════════
+  // After W2.3/W2.3b/W2.4, the actual user data lives in IDB. The
+  // pre-W2 export iterates localStorage — which now holds only the
+  // vot-state reduced shim + vot-ann-migrated boot gate (per W2.4's
+  // LS_SKIP_LIST). Running the old export right now produces a
+  // backup file that looks valid but contains almost no data, and
+  // running the old import would overwrite the user's IDB-resident
+  // data with near-nothing.
+  //
+  // The proper fix is W2.6: export v2 schema with IDB stores + media
+  // blobs, V1↔V2 forward/backward compat, async toast UX. Until that
+  // ships, both functions show an explanatory alert and exit — safer
+  // than letting a user accidentally destroy their data with a stale
+  // backup file. The alerts will be replaced with the real
+  // implementations in W2.6.
   const exportPersonalData = () => {
-    try {
-      const data = {};
-      _collectVotKeys().forEach((k) => { data[k] = localStorage.getItem(k); });
-      // NK5c: include the BoundedLogTree's WARN+ tail (already
-      // sanitized — content URIs + absolute paths redacted). Importer
-      // ignores this field; it's purely informational so the user
-      // can share a failure trail without writing anything to disk
-      // first. Empty array on debug builds / no bridge / no entries.
-      const payload = {
-        app: 'VOTReader',
-        exportVersion: 1,
-        exportDate: new Date().toISOString(),
-        diagnosticLog: diagnosticLog,
-        data: data
-      };
-      const json = JSON.stringify(payload, null, 2);
-      const stamp = new Date().toISOString().slice(0, 10);
-      const filename = `votreader-backup-${stamp}.json`;
-      // W1.2 Tier B.2: bridge owns the platform branch. Android = native
-      // MediaStore.Downloads; web = Blob + anchor click. Both return
-      // 'ok' / 'error:<reason>' per the unified contract from [[consolidate-dont-duplicate]].
-      const result = PlatformBridge.saveToDownloads(filename, json);
-      if (result === 'ok') {
-        alert('Backup saved to your Downloads folder.');
-      } else {
-        console.warn('saveToDownloads error:', result);
-        alert('Export failed. Please try again.');
-      }
-    } catch (e) {
-      console.warn('export failed', e);
-      alert('Export failed. See console for details.');
-    }
+    alert(
+      'Export is temporarily unavailable.\n\n' +
+      'The storage layer is mid-upgrade — your data has moved from ' +
+      'browser-local storage to a more durable on-device database, ' +
+      'and the export format is being updated to match. Until that ' +
+      'lands in the next update, the existing export would produce ' +
+      'an incomplete file.\n\n' +
+      'Your data is safe and untouched on this device. No action ' +
+      'needed. Please wait for the next update before exporting.'
+    );
   };
   const importPersonalData = () => {
-    const _doImport = (jsonText) => {
-      try {
-        const parsed = JSON.parse(jsonText);
-        if (!parsed || parsed.app !== 'VOTReader' || !parsed.data || typeof parsed.data !== 'object') {
-          alert('This file does not look like a VOTReader backup.');
-          return;
-        }
-        const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
-        const proceed = window.confirm(
-          'Importing the backup from ' + dateLabel + ' will REPLACE all your current notes, highlights, notebooks, journal entries, bookmarks, links, reading progress, history, tabs, and settings on this device. This cannot be undone.\n\nContinue?'
-        );
-        if (!proceed) return;
-        _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
-        Object.keys(parsed.data).forEach((k) => {
-          if (k.indexOf('vot-') === 0 && typeof parsed.data[k] === 'string') {
-            try { localStorage.setItem(k, parsed.data[k]); } catch (e) {
-              console.warn('import: localStorage write failed for', k, e);
-            }
-          }
-        });
-        alert('Import complete. The app will now reload.');
-        window.location.reload();
-      } catch (err) {
-        console.warn('import failed', err);
-        alert('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
-      }
-    };
-    // W1.2 Tier B.2: bridge owns both platforms' file pickers. Install the
-    // window.__onImportFile callback (preserves the Android contract per
-    // [[preserve-callback-contracts]]); web bridge fires the same callback
-    // from FileReader.onload with base64 just like Android's AppInterface
-    // fires it from the picker activity result.
-    window.__onImportFile = (b64OrNull) => {
-      window.__onImportFile = null;
-      if (!b64OrNull) return;
-      try { _doImport(atob(b64OrNull)); } catch (_e) { alert('Import failed: could not decode file.'); }
-    };
-    PlatformBridge.openFilePicker();
+    alert(
+      'Import is temporarily unavailable.\n\n' +
+      'The storage layer is mid-upgrade. Importing a pre-upgrade ' +
+      'backup file right now would overwrite your current data ' +
+      'with the older format and lose anything created since the ' +
+      'last backup. Import will be restored in the next update ' +
+      'with full IDB + media support.'
+    );
   };
-  const clearAllPersonalData = () => {
+
+  /**
+   * Wrap `indexedDB.deleteDatabase(name)` in a Promise that resolves
+   * on success, error, blocked, or timeout. Critical deletes get a
+   * longer timeout because hanging on those is worse than hanging
+   * on a cache database.
+   *
+   * @param {string} name
+   * @param {boolean} critical
+   * @returns {Promise<void>}
+   */
+  const _deleteIdbDatabase = (name, critical) => new Promise((resolve) => {
+    let settled = false;
+    const finish = () => { if (!settled) { settled = true; resolve(); } };
+    try {
+      const req = indexedDB.deleteDatabase(name);
+      req.onsuccess = finish;
+      req.onerror = finish;
+      req.onblocked = finish; // open connections — our IDBAdapter handles
+                              // versionchange but a stuck listener could
+                              // block; proceed anyway.
+      // Timeout fallback so a stuck deletion doesn't block the UI
+      // forever. 3s for user-data DBs, 1s for caches.
+      setTimeout(finish, critical ? 3000 : 1000);
+    } catch (_e) { finish(); }
+  });
+
+  const clearAllPersonalData = async () => {
     try {
       _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
-      // W2.4: Clear ALL user-data IDB databases too — the bulk of
-      // user data now lives in IDB, not LS. Without this, "Clear All
-      // Personal Data" would leave annotations, bookmarks, journal
-      // entries, history, and tab state intact while only wiping the
-      // boot-script shim — a user-trust failure.
-      try { indexedDB.deleteDatabase('votreader'); } catch (_e) { /* IDB op — best-effort */ }
-      try { indexedDB.deleteDatabase('vot-journal-media'); } catch (_e) { /* IDB op — best-effort */ }
-      try { indexedDB.deleteDatabase('vot-thumbs'); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
-      try { indexedDB.deleteDatabase('vot-search-cache'); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
+      // W2.4 + W2.4-hotfix: Clear ALL user-data IDB databases. The
+      // pre-hotfix version fired deleteDatabase() then reloaded
+      // immediately — the deletion is async and the reload raced
+      // ahead. If the new page's IDBAdapter.open() beat the
+      // deletion, the database survived and "Clear All" silently
+      // failed.
+      //
+      // Fix: await the critical deletions (votreader = 19 stores of
+      // user data; vot-journal-media = audio + images) before
+      // reload. Each delete has a 3s timeout fallback so a stuck
+      // onblocked never hangs the UI; vot-thumbs + vot-search-cache
+      // are caches and get a 1s timeout each.
+      await Promise.all([
+        _deleteIdbDatabase('votreader', true),
+        _deleteIdbDatabase('vot-journal-media', true),
+        _deleteIdbDatabase('vot-thumbs', false),
+        _deleteIdbDatabase('vot-search-cache', false),
+      ]);
       alert('All personal data cleared. The app will now reload.');
       window.location.reload();
     } catch (e) {
