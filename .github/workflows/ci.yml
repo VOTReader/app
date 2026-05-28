@@ -87,13 +87,14 @@ jobs:
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build
 
-      - name: Verify committed bundles match source
-        # After `npm run build` regenerates dist/, the working tree's
-        # dist/ should be byte-identical to the committed copy. Any
-        # diff = the committed bundles are stale relative to source
-        # (someone bypassed the pre-commit hook, or built with a
-        # different esbuild). Catches every scenario the hook misses.
-        run: git diff --exit-code app/src/main/assets/dist/
+      - name: Verify committed bundles + SW version match source
+        # After `npm run build` regenerates dist/ and syncs the SW
+        # CACHE_VERSION from package.json (build:sw), the working tree
+        # should be byte-identical to the committed copies. Any diff =
+        # committed dist/ bundles or service-worker.js are stale relative
+        # to source (bundle not rebuilt, esbuild drift, or a package.json
+        # version bump without `npm run build`). Catches what the hook misses.
+        run: git diff --exit-code app/src/main/assets/dist/ app/src/main/assets/service-worker.js
 
       - name: Syntax-check every src/ module
         run: |

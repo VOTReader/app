@@ -1,14 +1,15 @@
 {
   "name": "votreader-build",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Build pipeline for VOTReader's WebView assets (Objective G â€” bundler + ES modules).",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "python tools/build.py && npm run build:b && npm run build:c && npm run build:d",
+    "build": "python tools/build.py && npm run build:b && npm run build:c && npm run build:d && npm run build:sw",
     "build:b": "esbuild app/src/main/assets/src/stores/_entry-b.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-b.js",
     "build:c": "esbuild app/src/main/assets/src/renderer/_entry.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-c.js",
     "build:d": "esbuild app/src/main/assets/src/ui/_entry-d.js --bundle --format=iife --outfile=app/src/main/assets/dist/bundle-d.js",
+    "build:sw": "node tools/sync-sw-version.js",
     "typecheck": "tsc --noEmit",
     "jsx-progress": "python tools/jsx-progress.py",
     "lint:globals": "python tools/gen-eslint-globals.py",

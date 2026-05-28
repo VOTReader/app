@@ -1,0 +1,90 @@
+name: Deploy Web (PWA → GitHub Pages)
+
+# W5.1 — publish the web-facing asset subtree to GitHub Pages.
+#
+# The app is static files; there is no server. Only app/src/main/assets/
+# is web-facing, and within it these are NOT runtime assets and are
+# excluded from the deploy:
+#   src/        — ES module sources (the dist/ bundles contain all runtime code)
+#   *.d.ts      — TypeScript ambient declarations (type-check only)
+#   *.lnk       — Windows shortcuts (developer convenience junk)
+# dist/, fonts/, icons/, and every root file (vendor libs, images, css,
+# index.html, manifest.json, service-worker.js, offline.html) ship as-is.
+#
+# All in-app asset paths are relative (dist/bundle-a.js, fonts/..., etc.),
+# and the SW + manifest use ./ scope, so serving from the
+# /VOTReader-studio/ subpath works with no base-path rewriting. The app
+# never changes the URL path (history.pushState({}, '', '') only adds
+# back-button entries), so no SPA 404 fallback is needed.
+#
+# ONE-TIME SETUP (repo owner): Settings → Pages → Source → "GitHub Actions".
+# configure-pages (enablement: true) attempts this automatically; the manual
+# flip is the fallback if the workflow token cannot enable Pages.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; let in-flight deploys finish (don't cancel).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Set up Python (tools/build.py emits bundle-a)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies (npm ci — exact lockfile)
+        run: npm ci
+
+      - name: Build bundles + sync SW version
+        # `npm run build` regenerates dist/ and syncs the SW CACHE_VERSION
+        # from package.json (build:sw), so the deployed SW always carries
+        # the right version regardless of the committed state.
+        run: npm run build
+
+      - name: Stage web-facing files into _site/
+        run: |
+          mkdir -p _site
+          rsync -a \
+            --exclude='src' \
+            --exclude='*.d.ts' \
+            --exclude='*.lnk' \
+            app/src/main/assets/ _site/
+          echo "Staged file count: $(find _site -type f | wc -l)"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

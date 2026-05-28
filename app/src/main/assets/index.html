@@ -3,21 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <!-- CSP — defensive containment. All script/style/data is self-hosted; the
-       Garden View loads images from GitHub raw user-content. No external API
-       calls anywhere. unsafe-inline is required because all script and style
-       lives inline in this single-file build. blob: on script-src supports
+  <!-- CSP — defensive containment. 'self' resolves to the serving origin on
+       BOTH targets — appassets.androidplatform.net (Android WebViewAssetLoader)
+       and the GitHub Pages origin (web PWA) — so a single policy covers both
+       with no per-platform branching (W5.2; the explicit Android host was
+       redundant with 'self' there and irrelevant on the web). All script/style/
+       data is self-hosted; the Garden View loads images from GitHub raw
+       user-content; the only network request is an optional connectivity ping
+       to thevolumesoftruth.com. unsafe-inline is required because all script and
+       style lives inline in this single-file build. blob: on script-src supports
        Export "Download as JSON" via Blob URL. media-src blob: is required for
        journal voice-memo playback — recordings are captured locally and played
        back from a Blob object URL; without it every <audio> src is rejected by
        the URL safety check (no network media is unlocked — blob: only). -->
   <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self' https://appassets.androidplatform.net;
-    script-src 'self' https://appassets.androidplatform.net 'unsafe-inline' blob:;
-    style-src 'self' https://appassets.androidplatform.net 'unsafe-inline';
-    img-src 'self' https://appassets.androidplatform.net data: blob: https://raw.githubusercontent.com https://github.com;
-    font-src 'self' https://appassets.androidplatform.net data:;
-    connect-src 'self' https://appassets.androidplatform.net https://www.thevolumesoftruth.com;
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' blob:;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: blob: https://raw.githubusercontent.com https://github.com;
+    font-src 'self' data:;
+    connect-src 'self' https://www.thevolumesoftruth.com;
     media-src blob:;
     object-src 'none';
     frame-src 'none';
