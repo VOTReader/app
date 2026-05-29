@@ -55,7 +55,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
   - `bundle-b.js` 414.1 KB — stores + components + hooks + journal + scripture-resolution + letter-linking + W1.5 modal registry + history-sync + W1 platform-bridge + W2.7 StorageHealth + W3 SW registration (esbuild IIFE)
   - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
   - `bundle-d.js` 565.8 KB — screens + sheets + components + utils + late stores + screen-routes + App() + W1.5 AppShell registrations + W2.7 StorageHealthBanner + SafariFlows (esbuild IIFE)
-- **1236 vitest tests** across 46 files.
+- **1248 vitest tests** across 48 files.
 
 ### Q3 ESLint — CLOSED 2026-05-24
 
