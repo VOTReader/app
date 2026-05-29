@@ -1,0 +1,22 @@
+# Normalize line endings. Store LF in the repo AND check out LF in the
+# working tree everywhere (eol=lf), so Windows and Linux/CI agree
+# byte-for-byte. This keeps the content-hash SW cache version (build:sw)
+# stable cross-platform and ends the "LF will be replaced by CRLF" warnings.
+* text=auto eol=lf
+
+# Binary assets — never apply text/EOL normalization (would corrupt them).
+*.jar      binary
+*.woff2    binary
+*.ttf      binary
+*.otf      binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.webp     binary
+*.ico      binary
+*.pdf      binary
+*.zip      binary
+*.keystore binary
+*.jks      binary
+*.lnk      binary
