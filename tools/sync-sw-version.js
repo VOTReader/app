@@ -1,44 +1,74 @@
 /**
- * W5.4 — sync the service worker's CACHE_VERSION from package.json.
+ * Derive the service worker's CACHE_VERSION from a content hash of the
+ * core-cached assets — so the core cache auto-busts whenever any of those
+ * assets actually changes, with no manual version bump.
  *
- * package.json "version" is the single source of truth for the app
- * version. This rewrites the `const CACHE_VERSION = 'vX.Y.Z'` line in
- * service-worker.js to match, so a version bump busts the core cache on
- * the next deploy. CORPUS_VERSION is independent (bump only when the
- * lazy corpus bundles change) and is left untouched.
+ * CACHE_VERSION = `v{package.version}-{hash}` where {hash} is a short
+ * SHA-256 over the contents of every file in the SW's own CORE_ASSETS list
+ * (index.html, app.css, the dist bundles, vendor libs, fonts, icons,
+ * images, offline page). The package.json version is kept only as a
+ * human-readable prefix (handy in DevTools / for the APK) — it no longer
+ * needs bumping for users to receive an update; the hash does that.
  *
- * Idempotent: no write if already in sync. Wired into `npm run build`
- * (build:sw), so every build — including the deploy workflow's — keeps
- * the deployed SW version correct.
+ * CORPUS_VERSION is intentionally NOT touched here. The ~10 MB lazy corpus
+ * bundles change only on scripture/letter DATA edits (rare), and a 10 MB
+ * re-download for every installed client should be a DELIBERATE act — bump
+ * CORPUS_VERSION by hand when corpus data changes.
+ *
+ * Wired into `npm run build` (build:sw), runs LAST so the bundles it hashes
+ * are already rebuilt. Idempotent: no write when the hash is unchanged.
  */
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { createHash } from 'crypto';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const pkgPath = resolve(root, 'package.json');
-const swPath = resolve(root, 'app/src/main/assets/service-worker.js');
+const assetsDir = resolve(root, 'app/src/main/assets');
+const swPath = resolve(assetsDir, 'service-worker.js');
 
-const version = JSON.parse(readFileSync(pkgPath, 'utf-8')).version;
-if (!version) {
-  console.error('[sync-sw-version] package.json has no "version" field');
-  process.exit(1);
-}
-
-const target = `v${version}`;
+const version = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8')).version || '0';
 const sw = readFileSync(swPath, 'utf-8');
-const re = /const CACHE_VERSION = '[^']*';/;
 
-if (!re.test(sw)) {
-  console.error('[sync-sw-version] could not find a CACHE_VERSION line in service-worker.js');
+// Pull the CORE_ASSETS paths straight from the SW — single source of truth
+// for what the core cache holds, so the hash always covers exactly that set.
+const block = sw.match(/const CORE_ASSETS = \[([\s\S]*?)\];/);
+if (!block) {
+  console.error('[sw-version] could not find the CORE_ASSETS array in service-worker.js');
   process.exit(1);
 }
+const paths = [...block[1].matchAll(/'([^']+)'/g)]
+  .map((m) => m[1])
+  .filter((p) => p !== './'); // the directory index is served by index.html
 
+const hash = createHash('sha256');
+let counted = 0;
+for (const p of paths.sort()) {
+  const fp = resolve(assetsDir, p.replace(/^\.\//, ''));
+  if (existsSync(fp)) {
+    hash.update(p);            // path, so add/remove/rename also shifts the hash
+    // Strip CR bytes so the hash is identical whether the file is checked
+    // out LF (Linux CI) or CRLF (Windows autocrlf) — otherwise the committed
+    // hash wouldn't match CI's rebuild and the SW verify gate would fail.
+    // Binary assets rarely contain 0x0D and it's stripped consistently on
+    // both platforms, so the fingerprint stays deterministic either way.
+    hash.update(readFileSync(fp).filter((b) => b !== 0x0d));
+    counted++;
+  }
+}
+const digest = hash.digest('hex').slice(0, 10);
+const target = `v${version}-${digest}`;
+
+const re = /const CACHE_VERSION = '[^']*';/;
+if (!re.test(sw)) {
+  console.error('[sw-version] could not find a CACHE_VERSION line in service-worker.js');
+  process.exit(1);
+}
 const next = sw.replace(re, `const CACHE_VERSION = '${target}';`);
 if (next === sw) {
-  console.log(`[sync-sw-version] CACHE_VERSION already '${target}' — no change.`);
+  console.log(`[sw-version] CACHE_VERSION already '${target}' (${counted} core assets) — no change.`);
 } else {
   writeFileSync(swPath, next);
-  console.log(`[sync-sw-version] CACHE_VERSION -> '${target}'.`);
+  console.log(`[sw-version] CACHE_VERSION -> '${target}' (hashed ${counted} core assets).`);
 }

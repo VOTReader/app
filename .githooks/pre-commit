@@ -193,14 +193,17 @@ if [ -n "$src_changed" ]; then
   echo ""
 fi
 
-# ─── Step 5: bundle rebuild ─────────────────────────────────────────
-# Any change to a bundled source file means dist/bundle-*.js is stale.
-# Rebuild + stage the regenerated bundles so the commit lands with
-# bundles in sync. Source files for the 4 clusters:
+# ─── Step 5: bundle rebuild + SW cache version ──────────────────────
+# Any change to a bundled source OR a core-cached asset (app.css,
+# index.html) means dist/bundle-*.js and/or the SW's content-hash
+# CACHE_VERSION is stale. `npm run build` rebuilds the bundles AND
+# re-derives CACHE_VERSION from the core-asset hash (build:sw), so we
+# re-stage the bundles + service-worker.js together. Triggers:
 #   - app/src/main/assets/src/**/*.{js,jsx}  (all extracted modules)
 #   - search.js, search-data.js, flexsearch.min.js
 #   - react.min.js, react-dom.min.js, html2canvas.min.js
-bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js)$' || true)
+#   - app.css, index.html  (core-cached → feed the SW content hash)
+bundle_source_changed=$(echo "$staged" | grep -E '^app/src/main/assets/(src/.*\.js|src/.*\.jsx|search\.js|search-data\.js|flexsearch\.min\.js|react\.min\.js|react-dom\.min\.js|html2canvas\.min\.js|app\.css|index\.html)$' || true)
 
 if [ -n "$bundle_source_changed" ]; then
   echo "[pre-commit] Bundle source files changed — rebuilding dist/bundle-*.js..."
@@ -246,12 +249,14 @@ if [ -n "$bundle_source_changed" ]; then
     echo "---------------------------------------------------------------"
     exit 1
   fi
-  # Stage the regenerated bundles so this commit includes them.
+  # Stage the regenerated bundles + the re-versioned SW so the commit
+  # lands with everything in sync.
   git add app/src/main/assets/dist/bundle-a.js \
           app/src/main/assets/dist/bundle-b.js \
           app/src/main/assets/dist/bundle-c.js \
-          app/src/main/assets/dist/bundle-d.js
-  echo "[pre-commit] Bundles regenerated and staged."
+          app/src/main/assets/dist/bundle-d.js \
+          app/src/main/assets/service-worker.js
+  echo "[pre-commit] Bundles + SW cache version regenerated and staged."
 fi
 
 # ─── Step 6: gradle test (NK1) ──────────────────────────────────────
