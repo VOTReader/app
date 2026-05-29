@@ -2121,7 +2121,7 @@ W5 — HOSTING + CI (ship it) — LANDED 2026-05-28 (021e94a)
       3. Deploy to gh-pages branch via peaceiris/actions-gh-pages
          (or equivalent)
 
-  URL: https://corbinlythgoe.github.io/VOTReader-studio/
+  URL: https://VOTReader.github.io/VOTReader-studio/
   (Or a custom domain if desired later.)
 
   W5.2 — CSP update for web hosting

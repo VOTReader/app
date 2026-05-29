@@ -64,7 +64,7 @@ export function getGardenTier(id) {
  */
 export function gardenUrl(n, tierId) {
   const tier = getGardenTier(tierId);
-  return `https://github.com/corbinlythgoe/votreader-assets/releases/download/${tier.tag}/garden_${String(n).padStart(3, "0")}.jpg`;
+  return `https://github.com/VOTReader/votreader-assets/releases/download/${tier.tag}/garden_${String(n).padStart(3, "0")}.jpg`;
 }
 
 /**

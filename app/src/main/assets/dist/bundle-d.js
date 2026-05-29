@@ -60,7 +60,7 @@
   }
   function gardenUrl2(n, tierId) {
     const tier = getGardenTier2(tierId);
-    return `https://github.com/corbinlythgoe/votreader-assets/releases/download/${tier.tag}/garden_${String(n).padStart(3, "0")}.jpg`;
+    return `https://github.com/VOTReader/votreader-assets/releases/download/${tier.tag}/garden_${String(n).padStart(3, "0")}.jpg`;
   }
   function gardenCacheKey2(n, tierId) {
     return `${tierId}:${n}`;
