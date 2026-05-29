@@ -2017,12 +2017,28 @@ Goal: VOTReader is installable from a desktop browser and works offline.
   Risk: LOW (additive, no existing code changes).
 
 ───────────────────────────────────────────────────────────────────────────────
-W4 — DESKTOP POLISH (optimize the desktop experience)
+W4 — DESKTOP POLISH (optimize the desktop experience) — LANDED 2026-05-28
 ───────────────────────────────────────────────────────────────────────────────
 
 The app was designed for mobile. On a 1440px monitor, the full-width
 layout wastes space and text lines are too long for comfortable reading.
 W4 makes it feel at home on desktop WITHOUT breaking the mobile layout.
+
+LANDED. W4.1 (centered 760px column ≥768px) · W4.2 (useDesktopKeyboard:
+/ + Ctrl/Cmd+F → search, Left/Right → chapter arrows; web-only) · W4.3
+(inline-ref + interactive :hover via @media (hover: hover)) · W4.6
+(useDocumentTitle per screen). W4.4 (right-click context menu) + W4.5
+(mouse-drag selection) were VERIFY-ONLY — no new code: SelectionToolbar's
+mount-time effect already listens for pointerdown/pointerup (unified
+mouse+touch+pen) + contextmenu (right-click + Android long-press), so
+desktop mouse-drag and right-click flow through the SAME handlers mobile
+already used. Confirmed live in a desktop-width preview: drag-select →
+toolbar with full color row + actions; right-click on a selection →
+native menu suppressed + toolbar; right-click on a highlight mark →
+suppressed + routed to __showAnnChip with correct hlKey/groupId. Locked
+with 7 vitest cases in ui/sheets/SelectionToolbar.test.jsx (the
+component's first test; ui/ is outside the coverage-measured scope so the
+55/46/60/60 floor is unaffected).
 
   W4.1 — Max-width container + centered layout
   ─────────────────────────────────────────────
@@ -2074,14 +2090,16 @@ W4 makes it feel at home on desktop WITHOUT breaking the mobile layout.
   VOTReader", etc. Helps with browser tab identification + history.
 
   Exit criteria:
-    [ ] Max-width layout on wide screens (centered, readable line length)
-    [ ] Keyboard shortcuts working (Escape, arrows, Ctrl+F, /)
-    [ ] Hover states on all interactive elements
-    [ ] Right-click context menu for annotation/bookmark actions
-    [ ] Mouse-drag text selection triggers annotation toolbar
-    [ ] Document title updates on navigation
-    [ ] All desktop polish is behind `@media (hover: hover)` or
-        `!isAndroid` guards — mobile layout unchanged
+    [x] Max-width layout on wide screens (centered, readable line length)
+    [x] Keyboard shortcuts working (Escape, arrows, Ctrl+F, /)
+    [x] Hover states on all interactive elements
+    [x] Right-click context menu for annotation/bookmark actions
+    [x] Mouse-drag text selection triggers annotation toolbar
+    [x] Document title updates on navigation
+    [x] All desktop polish is behind `@media (hover: hover)` or
+        `!isAndroid` guards — mobile layout unchanged (W4.4/W4.5 add no
+        desktop-only code — the unified pointer/contextmenu handlers are
+        platform-agnostic, so mobile is untouched by construction)
 
   Risk: LOW (CSS + event listeners, no architecture changes).
 
