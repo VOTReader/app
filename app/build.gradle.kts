@@ -141,6 +141,21 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     executionData.setFrom(testExecFile)
     classDirectories.setFrom(coveredClassFiles())
     sourceDirectories.setFrom(files("src/main/java", "src/main/kotlin"))
+    // Guard against a SILENT zero-coverage pass: coveredClassFiles() points
+    // at an AGP-internal path that can move between AGP versions (AGP 10 is
+    // on the horizon). If it resolves to nothing, the rule below would pass
+    // vacuously — measuring zero classes while reporting "OK". Fail loud
+    // instead so a stale path is impossible to miss.
+    doFirst {
+        if (classDirectories.files.isEmpty()) {
+            throw GradleException(
+                "JaCoCo found no covered .class files — the AGP class path likely moved " +
+                "(see `coveredClassFiles` in app/build.gradle.kts; AGP 9 uses " +
+                "intermediates/built_in_kotlinc/...). Coverage was about to pass without " +
+                "measuring anything. Fix the path before trusting this gate."
+            )
+        }
+    }
     violationRules {
         rule {
             limit {
