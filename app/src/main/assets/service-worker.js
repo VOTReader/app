@@ -15,7 +15,7 @@
  *   No skipWaiting — user controls the reload timing.
  */
 
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v1.0.1';
 const CORPUS_VERSION = 'c1';
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -61,12 +61,36 @@ const CORPUS_BUNDLES = new Set([
   'bundle-a-vot.js',
 ]);
 
-// ── Install: pre-cache critical assets ──────────────────────────
+// Lazy corpus bundles pre-cached on install so the WHOLE reader works
+// offline — not just the sections a user happened to open while online.
+// Relative to scope; resolves identically to the page's lazy-loader
+// script.src so the cached entry is hit on later offline loads.
+const CORPUS_PRECACHE = [
+  './dist/bundle-a-bible.js',
+  './dist/bundle-a-matthew.js',
+  './dist/bundle-a-vot.js',
+];
+
+// ── Install: pre-cache critical shell + full corpus ─────────────
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CORE_CACHE).then((cache) => cache.addAll(CORE_ASSETS))
-  );
+  event.waitUntil((async () => {
+    // Core shell — must all succeed (small, the critical path).
+    const core = await caches.open(CORE_CACHE);
+    await core.addAll(CORE_ASSETS);
+
+    // Full corpus into the STABLE corpus cache, so an app-version bump
+    // won't re-download ~10 MB (only a CORPUS_VERSION bump will). Best-
+    // effort: a miss (e.g. the user went offline mid-install) must NOT
+    // fail the install — corpusFirst still caches it on first use. Skip-
+    // if-present so a re-install never re-fetches what's already there.
+    const corpus = await caches.open(CORPUS_CACHE);
+    await Promise.allSettled(
+      CORPUS_PRECACHE.map(async (url) => {
+        if (!(await corpus.match(url))) await corpus.add(url);
+      })
+    );
+  })());
 });
 
 // ── Activate: clean old versioned caches ────────────────────────
