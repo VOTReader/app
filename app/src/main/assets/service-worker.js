@@ -127,6 +127,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   if (event.request.method !== 'GET') return;
+  // Same-origin only. Cross-origin requests (Garden images on github.com,
+  // the connectivity ping) pass straight to the network — the SW caches
+  // nothing for them and shouldn't proxy opaque cross-origin responses.
+  if (url.origin !== self.location.origin) return;
 
   const filename = url.pathname.split('/').pop();
   if (CORPUS_BUNDLES.has(filename)) {

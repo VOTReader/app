@@ -24,6 +24,17 @@ name: Deploy Web (PWA → GitHub Pages)
 on:
   push:
     branches: [main]
+    # Only deploy when something that affects the published output changes.
+    # Skips docs / Kotlin / hook / CI-only commits (no point redeploying
+    # identical web content). workflow_dispatch is always available for a
+    # manual redeploy.
+    paths:
+      - 'app/src/main/assets/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tools/build.py'
+      - 'tools/sync-sw-version.js'
+      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
 
 permissions:
