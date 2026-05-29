@@ -10,6 +10,9 @@ import {
   validateFormatC,
   validateFormatD,
   validateAgainstReference,
+  validateTranslationMap,
+  validateScriptureDict,
+  validateStudyBible,
 } from './validate-schemas.js';
 
 // ── helpers ──────────────────────────────────────────────────────
@@ -1066,5 +1069,334 @@ describe('validateAgainstReference', () => {
     // book has only ch1; reference also only ch1 here — a ref-only ch2 must not error
     const ref = { ephesians: { '1': [{ n: 1 }], '2': [{ n: 1 }, { n: 2 }] } };
     expect(validateAgainstReference(bookWith([1]), ref).errors).toEqual([]);
+  });
+});
+
+// ── Format E: validateTranslationMap (bible-*.js verse maps) ─────
+
+/** Minimal valid translation verse map. */
+function validMap(overrides = {}) {
+  return {
+    genesis: {
+      '1': [{ n: 1, text: 'In the beginning...' }, { n: 2, text: 'And the earth...' }],
+      '2': [{ n: 1, text: 'Thus the heavens...' }],
+    },
+    ...overrides,
+  };
+}
+
+describe('validateTranslationMap', () => {
+  it('valid map produces zero errors and warnings', () => {
+    const r = validateTranslationMap(validMap());
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('empty map is vacuously valid', () => {
+    expect(validateTranslationMap({}).errors).toEqual([]);
+  });
+
+  it('rejects an array (not an object of books)', () => {
+    const r = validateTranslationMap([]);
+    expect(r.errors.length).toBeGreaterThan(0);
+    expect(r.errors[0]).toContain('expected an object');
+  });
+
+  it('rejects non-objects', () => {
+    expect(validateTranslationMap('nope').errors.length).toBeGreaterThan(0);
+    expect(validateTranslationMap(null).errors.length).toBeGreaterThan(0);
+  });
+
+  it('detects a book that is not an object of chapters', () => {
+    const r = validateTranslationMap({ genesis: [1, 2, 3] });
+    expect(r.errors.some((e) => e.includes('not an object of chapters'))).toBe(true);
+  });
+
+  it('detects a chapter value that is not an array', () => {
+    const r = validateTranslationMap({ genesis: { '1': { n: 1 } } });
+    expect(r.errors.some((e) => e.includes('not an array of verses'))).toBe(true);
+  });
+
+  it('warns on a non-numeric chapter key', () => {
+    const r = validateTranslationMap({ genesis: { intro: [{ n: 1, text: 'x' }] } });
+    expect(r.warnings.some((w) => w.includes('not a positive-integer string'))).toBe(true);
+  });
+
+  it('detects a verse missing n', () => {
+    const r = validateTranslationMap({ genesis: { '1': [{ text: 'x' }] } });
+    expect(r.errors.some((e) => e.includes('missing "n"'))).toBe(true);
+  });
+
+  it('detects a verse missing text', () => {
+    const r = validateTranslationMap({ genesis: { '1': [{ n: 1 }] } });
+    expect(r.errors.some((e) => e.includes('missing "text"'))).toBe(true);
+  });
+
+  it('treats non-ascending verse numbering as an error', () => {
+    const r = validateTranslationMap({ genesis: { '1': [{ n: 2, text: 'a' }, { n: 1, text: 'b' }] } });
+    expect(r.errors.some((e) => e.includes('not ascending'))).toBe(true);
+  });
+
+  it('treats a repeated verse number as an error', () => {
+    const r = validateTranslationMap({ genesis: { '1': [{ n: 1, text: 'a' }, { n: 1, text: 'b' }] } });
+    expect(r.errors.some((e) => e.includes('not ascending'))).toBe(true);
+  });
+
+  it('treats a verse gap as a warning, not an error (versification differences)', () => {
+    const r = validateTranslationMap({ acts: { '8': [{ n: 36, text: 'a' }, { n: 38, text: 'b' }] } });
+    expect(r.errors).toEqual([]);
+    expect(r.warnings.some((w) => w.includes('verse gap'))).toBe(true);
+  });
+
+  it('names the book and file in the message context', () => {
+    const r = validateTranslationMap({ genesis: { '1': [{ n: 1 }] } }, { fileName: 'bible-asv.js' });
+    expect(r.errors[0]).toContain('bible-asv.js');
+    expect(r.errors[0]).toContain('genesis');
+  });
+
+  it('detects a non-object verse', () => {
+    const r = validateTranslationMap({ genesis: { '1': ['nope'] } });
+    expect(r.errors.some((e) => e.includes('not an object'))).toBe(true);
+  });
+});
+
+// ── Format E: validateScriptureDict (matthew-nkjv.js ref->text) ──
+
+describe('validateScriptureDict', () => {
+  it('valid ref->text dict produces zero errors', () => {
+    const r = validateScriptureDict({ 'John 3:16': 'For God so loved...', 'Acts 2:23': 'Him being...' });
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('accepts compound values with | and em-dash separators', () => {
+    const r = validateScriptureDict({
+      'Daniel 7:9; Revelation 1:14-16': 'Daniel 7:9 — I watched... | Revelation 1:14-16 — His head...',
+    });
+    expect(r.errors).toEqual([]);
+  });
+
+  it('empty dict is vacuously valid', () => {
+    expect(validateScriptureDict({}).errors).toEqual([]);
+  });
+
+  it('rejects an array', () => {
+    const r = validateScriptureDict([]);
+    expect(r.errors.length).toBeGreaterThan(0);
+    expect(r.errors[0]).toContain('expected an object');
+  });
+
+  it('rejects non-objects', () => {
+    expect(validateScriptureDict(null).errors.length).toBeGreaterThan(0);
+    expect(validateScriptureDict(42).errors.length).toBeGreaterThan(0);
+  });
+
+  it('detects a non-string value', () => {
+    const r = validateScriptureDict({ 'John 3:16': 123 });
+    expect(r.errors.some((e) => e.includes('is not a string'))).toBe(true);
+  });
+
+  it('detects a null value', () => {
+    const r = validateScriptureDict({ 'John 3:16': null });
+    expect(r.errors.some((e) => e.includes('is not a string'))).toBe(true);
+  });
+
+  it('warns on an empty-string value', () => {
+    const r = validateScriptureDict({ 'John 3:16': '' });
+    expect(r.errors).toEqual([]);
+    expect(r.warnings.some((w) => w.includes('empty text'))).toBe(true);
+  });
+
+  it('names the offending ref in the message', () => {
+    const r = validateScriptureDict({ 'John 3:16': 5 });
+    expect(r.errors[0]).toContain('John 3:16');
+  });
+});
+
+// ── Format E: validateStudyBible (matthew.js MATTHEW) ───────────
+
+/** Minimal valid Study Bible. */
+function validMatthew(overrides = {}) {
+  return {
+    id: 'matthew',
+    title: 'Matthew',
+    subtitle: 'The Gospel According to Matthew',
+    votEdition: true,
+    _dataVersion: '2026-05-03',
+    preface: {
+      title: 'Preface',
+      blocks: [
+        { type: 'heading', level: 1, text: 'THE VOLUMES OF TRUTH' },
+        { type: 'para', segments: [{ t: 'text', v: 'Hello.' }] },
+        { type: 'poetry', lines: [[{ t: 'italic', v: 'A line.' }], [{ t: 'text', v: '— Psalm 1' }]] },
+      ],
+    },
+    chapters: [
+      {
+        num: 1,
+        title: 'The Genealogy',
+        verses: [{ n: 1, text: 'The book...' }, { n: 2, text: 'Abraham...' }],
+        scriptures: [{ ref: '1:21', cite: 'Psalm 118:14' }],
+        votNotes: [{ ref: '1:18-21', vol: 'Volume Two', letter: 'A Letter', excerpt: 'Some text.' }],
+        links: [{ label: 'The Messiah', url: 'https://example.com' }],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+describe('validateStudyBible', () => {
+  it('valid study produces zero errors and warnings', () => {
+    const r = validateStudyBible(validMatthew());
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('accepts votNotes.vol === null (non-volume source)', () => {
+    const study = validMatthew();
+    study.chapters[0].votNotes.push({
+      ref: '5:1-11', vol: null,
+      letter: 'The Blessed: More Declarations of Blessedness', excerpt: 'A blessing.',
+    });
+    expect(validateStudyBible(study).errors).toEqual([]);
+  });
+
+  it('accepts a study with no preface', () => {
+    const study = validMatthew();
+    delete study.preface;
+    expect(validateStudyBible(study).errors).toEqual([]);
+  });
+
+  it('accepts chapters without optional annotation layers', () => {
+    const study = validMatthew({ chapters: [{ num: 1, verses: [{ n: 1, text: 'x' }] }] });
+    expect(validateStudyBible(study).errors).toEqual([]);
+  });
+
+  it('ignores unknown top-level fields', () => {
+    expect(validateStudyBible(validMatthew({ extra: 'whatever', _foo: 1 })).errors).toEqual([]);
+  });
+
+  it('rejects non-objects', () => {
+    expect(validateStudyBible([]).errors[0]).toContain('expected a study object');
+    expect(validateStudyBible(null).errors.length).toBeGreaterThan(0);
+  });
+
+  describe('top-level fields', () => {
+    it('detects missing id', () => {
+      const s = validMatthew(); delete s.id;
+      expect(validateStudyBible(s).errors.some((e) => e.includes('"id"'))).toBe(true);
+    });
+    it('detects missing title', () => {
+      const s = validMatthew(); delete s.title;
+      expect(validateStudyBible(s).errors.some((e) => e.includes('"title"'))).toBe(true);
+    });
+    it('detects a non-string subtitle', () => {
+      expect(validateStudyBible(validMatthew({ subtitle: 7 })).errors.some((e) => e.includes('subtitle'))).toBe(true);
+    });
+    it('detects a non-boolean votEdition', () => {
+      expect(validateStudyBible(validMatthew({ votEdition: 'yes' })).errors.some((e) => e.includes('votEdition'))).toBe(true);
+    });
+    it('detects missing chapters', () => {
+      const s = validMatthew(); delete s.chapters;
+      expect(validateStudyBible(s).errors.some((e) => e.includes('chapters'))).toBe(true);
+    });
+    it('detects non-array chapters', () => {
+      expect(validateStudyBible(validMatthew({ chapters: {} })).errors.some((e) => e.includes('chapters'))).toBe(true);
+    });
+  });
+
+  describe('preface', () => {
+    it('detects a non-object preface', () => {
+      expect(validateStudyBible(validMatthew({ preface: 'nope' })).errors.some((e) => e.includes('preface'))).toBe(true);
+    });
+    it('detects missing blocks', () => {
+      expect(validateStudyBible(validMatthew({ preface: { title: 'P' } })).errors.some((e) => e.includes('blocks'))).toBe(true);
+    });
+    it('detects an invalid block type', () => {
+      const r = validateStudyBible(validMatthew({ preface: { blocks: [{ type: 'bogus' }] } }));
+      expect(r.errors.some((e) => e.includes('invalid block type'))).toBe(true);
+    });
+    it('detects a heading missing level', () => {
+      const r = validateStudyBible(validMatthew({ preface: { blocks: [{ type: 'heading', text: 'X' }] } }));
+      expect(r.errors.some((e) => e.includes('level'))).toBe(true);
+    });
+    it('detects a heading missing text', () => {
+      const r = validateStudyBible(validMatthew({ preface: { blocks: [{ type: 'heading', level: 1 }] } }));
+      expect(r.errors.some((e) => e.includes('text'))).toBe(true);
+    });
+    it('detects a para missing segments', () => {
+      const r = validateStudyBible(validMatthew({ preface: { blocks: [{ type: 'para' }] } }));
+      expect(r.errors.some((e) => e.includes('segments'))).toBe(true);
+    });
+    it('detects an invalid segment type in a para (reuses the Format A segment check)', () => {
+      const r = validateStudyBible(validMatthew({ preface: { blocks: [{ type: 'para', segments: [{ t: 'bogus', v: 'x' }] }] } }));
+      expect(r.errors.some((e) => e.includes('invalid segment type'))).toBe(true);
+    });
+    it('detects a poetry line that is not an array', () => {
+      const r = validateStudyBible(validMatthew({ preface: { blocks: [{ type: 'poetry', lines: ['nope'] }] } }));
+      expect(r.errors.some((e) => e.includes('must be an array'))).toBe(true);
+    });
+    it('detects poetry missing lines', () => {
+      const r = validateStudyBible(validMatthew({ preface: { blocks: [{ type: 'poetry' }] } }));
+      expect(r.errors.some((e) => e.includes('lines'))).toBe(true);
+    });
+  });
+
+  describe('chapters', () => {
+    it('detects a chapter missing num', () => {
+      const r = validateStudyBible(validMatthew({ chapters: [{ verses: [{ n: 1, text: 'x' }] }] }));
+      expect(r.errors.some((e) => e.includes('num'))).toBe(true);
+    });
+    it('detects a chapter missing verses', () => {
+      const r = validateStudyBible(validMatthew({ chapters: [{ num: 1 }] }));
+      expect(r.errors.some((e) => e.includes('verses'))).toBe(true);
+    });
+    it('treats non-ascending verses as an error', () => {
+      const r = validateStudyBible(validMatthew({ chapters: [{ num: 1, verses: [{ n: 3, text: 'a' }, { n: 2, text: 'b' }] }] }));
+      expect(r.errors.some((e) => e.includes('not ascending'))).toBe(true);
+    });
+    it('treats a verse gap as a warning', () => {
+      const r = validateStudyBible(validMatthew({ chapters: [{ num: 1, verses: [{ n: 1, text: 'a' }, { n: 3, text: 'b' }] }] }));
+      expect(r.errors).toEqual([]);
+      expect(r.warnings.some((w) => w.includes('verse gap'))).toBe(true);
+    });
+    it('detects a non-string chapter title', () => {
+      const r = validateStudyBible(validMatthew({ chapters: [{ num: 1, title: 9, verses: [{ n: 1, text: 'x' }] }] }));
+      expect(r.errors.some((e) => e.includes('title'))).toBe(true);
+    });
+  });
+
+  describe('annotation layers', () => {
+    const base = () => validMatthew().chapters[0];
+    it('detects a scriptures entry missing ref', () => {
+      const ch = base(); ch.scriptures = [{ cite: 'x' }];
+      const r = validateStudyBible(validMatthew({ chapters: [ch] }));
+      expect(r.errors.some((e) => e.includes('scriptures') && e.includes('ref'))).toBe(true);
+    });
+    it('detects a votNotes entry missing letter', () => {
+      const ch = base(); ch.votNotes = [{ ref: '1:1', vol: 'V2', excerpt: 'e' }];
+      const r = validateStudyBible(validMatthew({ chapters: [ch] }));
+      expect(r.errors.some((e) => e.includes('votNotes') && e.includes('letter'))).toBe(true);
+    });
+    it('rejects a non-string, non-null votNotes.vol', () => {
+      const ch = base(); ch.votNotes = [{ ref: '1:1', vol: 7, letter: 'L', excerpt: 'e' }];
+      const r = validateStudyBible(validMatthew({ chapters: [ch] }));
+      expect(r.errors.some((e) => e.includes('vol') && e.includes('string or null'))).toBe(true);
+    });
+    it('detects a links entry missing url', () => {
+      const ch = base(); ch.links = [{ label: 'X' }];
+      const r = validateStudyBible(validMatthew({ chapters: [ch] }));
+      expect(r.errors.some((e) => e.includes('links') && e.includes('url'))).toBe(true);
+    });
+    it('detects an annotation layer that is not an array', () => {
+      const ch = base(); ch.scriptures = { ref: '1:1', cite: 'x' };
+      const r = validateStudyBible(validMatthew({ chapters: [ch] }));
+      expect(r.errors.some((e) => e.includes('must be an array'))).toBe(true);
+    });
+    it('detects a non-object annotation record', () => {
+      const ch = base(); ch.votNotes = ['nope'];
+      const r = validateStudyBible(validMatthew({ chapters: [ch] }));
+      expect(r.errors.some((e) => e.includes('not an object'))).toBe(true);
+    });
   });
 });

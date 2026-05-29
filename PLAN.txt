@@ -2989,12 +2989,13 @@ Current validation gap:
   Exit criteria (W9 complete):
     [x] Schema validators for all 4 formats (Format A/B/C/D) with
         field-level + cross-field + chain validation. vitest coverage.
-        (A + B + Holy-Days-hybrid + C + D all landed; 106 vitest cases.
-        Holy Days is a hybrid album — each entry dispatches to the Format A
-        or Format B per-item validator on entry.type. Deferred to a future
-        Format-E pass: matthew.js Study Bible, matthew-nkjv.js ref→text
-        dict, bible-*.js translation verse maps — distinct shapes that
-        postdate this spec.)
+        (A + B + Holy-Days-hybrid + C + D all landed; Holy Days is a hybrid
+        album — each entry dispatches to the Format A or Format B per-item
+        validator on entry.type. Format E LANDED 2026-05-29:
+        validateTranslationMap (7 bible-*.js verse maps), validateStudyBible
+        (matthew.js), validateScriptureDict (matthew-nkjv.js ref→text dict)
+        — the distinct shapes that postdate this spec, all wired into the
+        CLI + --strict gate. 171 vitest cases.)
     [x] Build pipeline rejects structurally invalid data files.
         Manual test: introduce a typo block type, verify build fails.
         (validate:data --strict now covers all formats; gate proven in W9.2.)
@@ -3007,9 +3008,11 @@ Current validation gap:
     [x] Pre-commit hook runs schema validation on data file changes.
     [x] CI runs schema validation between lint and build.
     [x] Zero false positives on the current data files (all pass --strict;
-        0 errors / 869 items). Warnings are legitimate: 2 orphaned note
-        footnotes (volume-one, letters-timothy) + 3 verse-gap flags in
-        books.js Hebrews — see finding below.
+        0 errors / 1531 items incl. Format E). Warnings are legitimate:
+        2 orphaned note footnotes (volume-one, letters-timothy) + 36
+        cross-translation verse-gap flags = critical-text omissions present
+        only in ASV/BSB/WEB (Acts 8:37, Rom 16:24, Mark 9:44/46, etc.).
+        (books.js Hebrews gaps from the finding below are now resolved.)
 
   FINDING — RESOLVED (validator's first real catch, 2026-05-29): books.js
   was missing Hebrews verses. The contiguity check caught the internal gaps
@@ -3028,7 +3031,8 @@ Current validation gap:
      versification noise.)
 
   W9 COMPLETE (2026-05-29) — all exit criteria met; Hebrews data restored +
-  the cross-reference validator hardens against recurrence.
+  the cross-reference validator hardens against recurrence; Format E (the 7
+  bible-*.js translations + matthew.js + matthew-nkjv.js) now schema-gated.
 
 ───────────────────────────────────────────────────────────────────────────────
 W10 — ACCESSIBILITY (WCAG 2.1 AA compliance)

@@ -1,15 +1,22 @@
 /**
- * W9.1 Format A data schema validator
+ * VOTReader data schema validators (Formats A-E + cross-reference)
  *
- * Validates the rich JSON-style letter format used by:
- *   Volumes 1-7, Lord's Rebuke, Letters to Flock,
- *   Letters from Timothy, Hidden Manna.
+ * Validates every structured data shape under src/data/:
+ *   A  letters         volumes 1-7, Lord's Rebuke, Flock, Timothy, Hidden Manna
+ *   B  WTLB / Blessed  simple paragraph entries
+ *   C  Bible books     books.js, matthew-plain.js, books-restored.js (chrome)
+ *   D  Bible Studies   bible-studies.js
+ *   E  translations    bible-*.js verse maps; matthew.js Study Bible;
+ *                      matthew-nkjv.js ref->text dict
+ *   + cross-reference  Format C verse counts vs the complete KJV
  *
  * Usage:
  *   node tools/validate-schemas.js [--strict]
  *
- * Exports:
- *   validateFormatA(letters, opts) => { errors: string[], warnings: string[] }
+ * Exports: validateFormatA / validateFormatB / validateHolyDays /
+ *   validateFormatC / validateFormatD / validateAgainstReference /
+ *   validateTranslationMap / validateScriptureDict / validateStudyBible
+ *   — each => { errors: string[], warnings: string[] }.
  */
 
 import { readFileSync } from 'fs';
@@ -774,6 +781,304 @@ export function validateFormatD(studies, opts = {}) {
   return { errors, warnings };
 }
 
+// ── Format E (translations / Study Bible / ref dicts) ───────────
+// Three distinct shapes that postdate the original A-D spec, all now
+// web-served — so a malformed one is a black-screen risk to web clients,
+// not just an APK-bundle concern.
+
+const VALID_STUDY_BLOCK_TYPES = new Set(['heading', 'para', 'poetry']);
+
+/**
+ * Validate a flat verse array [{ n, text }] — shared by the Format E
+ * translation maps and the Study Bible's sectionless chapters. (Format C's
+ * verses live under sections and keep their own inline check, whose message
+ * contract is pinned by tests.) Non-ascending n is an ERROR (structural
+ * corruption); a gap is a WARNING (legitimate versification differences).
+ * @param {any[]} verses
+ * @param {string} prefix
+ * @param {string[]} errors
+ * @param {string[]} warnings
+ */
+function validateVerseArray(verses, prefix, errors, warnings) {
+  let lastN = null;
+  for (let vi = 0; vi < verses.length; vi++) {
+    const v = verses[vi];
+    const vp = `${prefix} verse[${vi}]`;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) {
+      errors.push(`${vp}: not an object`);
+      continue;
+    }
+    if (typeof v.n !== 'number') {
+      errors.push(`${vp}: missing "n" (number)`);
+      continue;
+    }
+    if (typeof v.text !== 'string') {
+      errors.push(`${vp}: missing "text" (string)`);
+    }
+    if (lastN !== null) {
+      if (v.n <= lastN) {
+        errors.push(`${prefix}: verse numbering not ascending — n=${v.n} follows n=${lastN}`);
+      } else if (v.n > lastN + 1) {
+        warnings.push(`${prefix}: verse gap — n jumps from ${lastN} to ${v.n}`);
+      }
+    }
+    lastN = v.n;
+  }
+}
+
+/**
+ * Format E — translation verse map (bible-asv/bsb/hnv/kjv/lsv/web/ylt).
+ * Shape: { bookId: { "<chapNum>": [ { n: number, text: string } ] } }
+ * @param {object} map
+ * @param {{ strict?: boolean, fileName?: string }} [opts]
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validateTranslationMap(map, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || '(unknown)';
+
+  if (!map || typeof map !== 'object' || Array.isArray(map)) {
+    errors.push(`${fileName}: expected an object of books, got ${Array.isArray(map) ? 'array' : typeof map}`);
+    return { errors, warnings };
+  }
+
+  for (const [bookId, book] of Object.entries(map)) {
+    const bp = `${fileName}: book "${bookId}"`;
+    if (bookId.length === 0) {
+      errors.push(`${fileName}: empty book id key`);
+    }
+    if (!book || typeof book !== 'object' || Array.isArray(book)) {
+      errors.push(`${bp}: not an object of chapters`);
+      continue;
+    }
+    for (const [chapKey, verses] of Object.entries(book)) {
+      const cp = `${bp} chapter "${chapKey}"`;
+      if (!/^\d+$/.test(chapKey)) {
+        warnings.push(`${cp}: chapter key is not a positive-integer string`);
+      }
+      if (!Array.isArray(verses)) {
+        errors.push(`${cp}: chapter value is not an array of verses`);
+        continue;
+      }
+      validateVerseArray(verses, cp, errors, warnings);
+    }
+  }
+
+  return { errors, warnings };
+}
+
+/**
+ * Format E — ref->text scripture dict (matthew-nkjv.js, and any { ref: text }
+ * lookup). Keys are scripture refs; values are verse text. Compound values
+ * (multiple refs joined with " | " and em-dashes) are legitimate per the
+ * project's permanent rules, so only the top-level value type is constrained.
+ * @param {object} dict
+ * @param {{ strict?: boolean, fileName?: string }} [opts]
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validateScriptureDict(dict, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || '(unknown)';
+
+  if (!dict || typeof dict !== 'object' || Array.isArray(dict)) {
+    errors.push(`${fileName}: expected an object of ref->text, got ${Array.isArray(dict) ? 'array' : typeof dict}`);
+    return { errors, warnings };
+  }
+
+  for (const [ref, text] of Object.entries(dict)) {
+    if (ref.length === 0) {
+      errors.push(`${fileName}: empty ref key`);
+    }
+    if (typeof text !== 'string') {
+      errors.push(`${fileName}: ref "${ref}" value is not a string`);
+    } else if (text.length === 0) {
+      warnings.push(`${fileName}: ref "${ref}" has empty text`);
+    }
+  }
+
+  return { errors, warnings };
+}
+
+/**
+ * Format E — Study Bible (matthew.js MATTHEW). A single annotated book: a
+ * preface (heading/para/poetry blocks) plus sectionless chapters (verses live
+ * directly on the chapter; scriptures/votNotes/links are the annotation
+ * layers).
+ * @param {object} study
+ * @param {{ strict?: boolean, fileName?: string }} [opts]
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validateStudyBible(study, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || '(unknown)';
+
+  if (!study || typeof study !== 'object' || Array.isArray(study)) {
+    errors.push(`${fileName}: expected a study object, got ${Array.isArray(study) ? 'array' : typeof study}`);
+    return { errors, warnings };
+  }
+
+  if (typeof study.id !== 'string' || study.id.length === 0) {
+    errors.push(`${fileName}: missing or empty "id" (string)`);
+  }
+  if (typeof study.title !== 'string' || study.title.length === 0) {
+    errors.push(`${fileName}: missing or empty "title" (string)`);
+  }
+  for (const optStr of ['subtitle', '_dataVersion']) {
+    if (study[optStr] !== undefined && typeof study[optStr] !== 'string') {
+      errors.push(`${fileName}: "${optStr}" must be a string if present`);
+    }
+  }
+  if (study.votEdition !== undefined && typeof study.votEdition !== 'boolean') {
+    errors.push(`${fileName}: "votEdition" must be a boolean if present`);
+  }
+
+  // ── preface (optional) ──
+  if (study.preface !== undefined) {
+    const pf = study.preface;
+    const pp = `${fileName}: preface`;
+    if (!pf || typeof pf !== 'object' || Array.isArray(pf)) {
+      errors.push(`${pp}: must be an object`);
+    } else {
+      if (pf.title !== undefined && typeof pf.title !== 'string') {
+        errors.push(`${pp}: "title" must be a string if present`);
+      }
+      if (!Array.isArray(pf.blocks)) {
+        errors.push(`${pp}: missing or non-array "blocks"`);
+      } else {
+        validateStudyBlocks(pf.blocks, pp, errors);
+      }
+    }
+  }
+
+  // ── chapters (required) ──
+  if (!Array.isArray(study.chapters)) {
+    errors.push(`${fileName}: missing or non-array "chapters"`);
+    return { errors, warnings };
+  }
+  for (let ci = 0; ci < study.chapters.length; ci++) {
+    const ch = study.chapters[ci];
+    const cp = `${fileName}: chapter[${ci}]`;
+    if (!ch || typeof ch !== 'object' || Array.isArray(ch)) {
+      errors.push(`${cp}: not an object`);
+      continue;
+    }
+    if (typeof ch.num !== 'number') {
+      errors.push(`${cp}: missing "num" (number)`);
+    }
+    if (ch.title !== undefined && typeof ch.title !== 'string') {
+      errors.push(`${cp}: "title" must be a string if present`);
+    }
+    const cpn = typeof ch.num === 'number' ? `${fileName}: chapter ${ch.num}` : cp;
+    if (!Array.isArray(ch.verses)) {
+      errors.push(`${cp}: missing or non-array "verses"`);
+    } else {
+      validateVerseArray(ch.verses, cpn, errors, warnings);
+    }
+    // annotation layers — all optional. votNotes.vol is nullable (non-volume sources).
+    validateAnnotationArray(ch.scriptures, 'scriptures', { ref: 'string', cite: 'string' }, cp, errors);
+    validateAnnotationArray(ch.votNotes, 'votNotes', { ref: 'string', vol: 'string?', letter: 'string', excerpt: 'string' }, cp, errors);
+    validateAnnotationArray(ch.links, 'links', { label: 'string', url: 'string' }, cp, errors);
+  }
+
+  return { errors, warnings };
+}
+
+/**
+ * Validate a Study Bible preface block list (heading / para / poetry).
+ * Reuses the Format A segment validator — the preface's segment vocabulary
+ * (text / italic / letter-link) is a subset of VALID_SEGMENT_TYPES.
+ * @param {any[]} blocks
+ * @param {string} prefix
+ * @param {string[]} errors
+ */
+function validateStudyBlocks(blocks, prefix, errors) {
+  const sink = new Set();   // fn segments never appear in the preface; throwaway
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const block = blocks[bi];
+    const bp = `${prefix} block[${bi}]`;
+    if (!block || typeof block !== 'object') {
+      errors.push(`${bp}: not an object`);
+      continue;
+    }
+    if (!VALID_STUDY_BLOCK_TYPES.has(block.type)) {
+      errors.push(`${bp}: invalid block type "${block.type}"`);
+      continue;
+    }
+    switch (block.type) {
+      case 'heading':
+        if (typeof block.level !== 'number') {
+          errors.push(`${bp}: type="heading" requires "level" (number)`);
+        }
+        if (typeof block.text !== 'string') {
+          errors.push(`${bp}: type="heading" requires "text" (string)`);
+        }
+        break;
+      case 'para':
+        if (!Array.isArray(block.segments)) {
+          errors.push(`${bp}: type="para" requires "segments" array`);
+        } else {
+          validateSegments(block.segments, bp, errors, sink);
+        }
+        break;
+      case 'poetry':
+        if (!Array.isArray(block.lines)) {
+          errors.push(`${bp}: type="poetry" requires "lines" array`);
+        } else {
+          for (let li = 0; li < block.lines.length; li++) {
+            const line = block.lines[li];
+            if (!Array.isArray(line)) {
+              errors.push(`${bp} lines[${li}]: must be an array`);
+            } else {
+              validateSegments(line, `${bp} lines[${li}]`, errors, sink);
+            }
+          }
+        }
+        break;
+    }
+  }
+}
+
+/**
+ * Validate an optional array of annotation records. `spec` maps each field to
+ * its kind: 'string' = required non-empty string; 'string?' = optional, and if
+ * present must be a string or null. (votNotes.vol is null when the source is a
+ * non-volume collection whose name is already carried in `letter` — e.g. "The
+ * Blessed".) Shared by the Study Bible's scriptures / votNotes / links layers.
+ * @param {any} arr
+ * @param {string} fieldName
+ * @param {Record<string, 'string'|'string?'>} spec
+ * @param {string} prefix
+ * @param {string[]} errors
+ */
+function validateAnnotationArray(arr, fieldName, spec, prefix, errors) {
+  if (arr === undefined) return;
+  if (!Array.isArray(arr)) {
+    errors.push(`${prefix}: "${fieldName}" must be an array if present`);
+    return;
+  }
+  for (let i = 0; i < arr.length; i++) {
+    const rec = arr[i];
+    const rp = `${prefix} ${fieldName}[${i}]`;
+    if (!rec || typeof rec !== 'object' || Array.isArray(rec)) {
+      errors.push(`${rp}: not an object`);
+      continue;
+    }
+    for (const [f, kind] of Object.entries(spec)) {
+      const val = rec[f];
+      if (kind === 'string?') {
+        if (val !== undefined && val !== null && typeof val !== 'string') {
+          errors.push(`${rp}: "${f}" must be a string or null if present`);
+        }
+      } else if (typeof val !== 'string' || val.length === 0) {
+        errors.push(`${rp}: missing or empty "${f}" (string)`);
+      }
+    }
+  }
+}
+
 // ── Cross-translation verse-count check ─────────────────────────
 
 /** Compress an ascending number list to a range string: [1,2,3,5] → "1-3, 5". */
@@ -901,11 +1206,20 @@ const FORMAT_D_FILES = [
   { file: 'bible-studies.js', arrayVar: 'BIBLE_STUDIES' },
 ];
 
-// Intentionally NOT covered by the A/B/C/D validators — each is a distinct
-// shape that postdates the W9.1 spec, deferred to a future Format-E pass:
-//   matthew.js       — Study Bible (preface + sectionless annotated chapters)
-//   matthew-nkjv.js  — ref→text scripture dict
-//   bible-*.js       — translation verse maps (book → chapterNum → verses[])
+// Format E — distinct shapes from A-D, all now web-served. The translation
+// verse maps share one shape (table below); matthew.js (MATTHEW Study Bible)
+// and matthew-nkjv.js (ref->text dict) are single objects handled inline in
+// the CLI Format E section.
+/** @type {Array<{file: string, varName: string}>} */
+const FORMAT_E_TRANSLATIONS = [
+  { file: 'bible-asv.js', varName: 'BIBLE_ASV' },
+  { file: 'bible-bsb.js', varName: 'BIBLE_BSB' },
+  { file: 'bible-hnv.js', varName: 'BIBLE_HNV' },
+  { file: 'bible-kjv.js', varName: 'BIBLE_KJV' },
+  { file: 'bible-lsv.js', varName: 'BIBLE_LSV' },
+  { file: 'bible-web.js', varName: 'BIBLE_WEB' },
+  { file: 'bible-ylt.js', varName: 'BIBLE_YLT' },
+];
 
 /**
  * Load a Format A data file via vm.runInNewContext and return the
@@ -1027,6 +1341,48 @@ function runCli() {
     const result = validateFormatD(studies, { strict, fileName: label });
     add(result, studies.length);
     emit(result, label, studies.length, 'studies', '');
+  }
+
+  // ── Format E (translations / Study Bible / ref dicts) ──
+  console.log('\nFormat E (translations / Study Bible / ref dicts):');
+  for (const entry of FORMAT_E_TRANSLATIONS) {
+    const label = basename(entry.file);
+    let map;
+    try { map = loadVar(resolve(dataDir, entry.file), entry.varName); }
+    catch (e) { loadErr(label, e.message); continue; }
+    if (!map || typeof map !== 'object' || Array.isArray(map)) { loadErr(label, `variable "${entry.varName}" is not an object`); continue; }
+    const result = validateTranslationMap(map, { strict, fileName: label });
+    const nBooks = Object.keys(map).length;
+    add(result, nBooks);
+    emit(result, label, nBooks, 'books', '');
+  }
+  {
+    const label = 'matthew.js';
+    let study;
+    try { study = loadVar(resolve(dataDir, 'matthew.js'), 'MATTHEW'); }
+    catch (e) { loadErr(label, e.message); study = undefined; }
+    if (study && typeof study === 'object' && !Array.isArray(study)) {
+      const result = validateStudyBible(study, { strict, fileName: label });
+      const nCh = Array.isArray(study.chapters) ? study.chapters.length : 0;
+      add(result, nCh);
+      emit(result, label, nCh, 'chapters', '');
+    } else if (study !== undefined) {
+      loadErr(label, 'variable "MATTHEW" is not an object');
+    }
+  }
+  {
+    const label = 'matthew-nkjv.js';
+    let dict;
+    try { dict = loadVar(resolve(dataDir, 'matthew-nkjv.js'), 'MATTHEW_NKJV'); }
+    catch (e) { loadErr(label, e.message); dict = undefined; }
+    if (dict && typeof dict === 'object' && !Array.isArray(dict)) {
+      const result = validateScriptureDict(dict, { strict, fileName: label });
+      const nRefs = Object.keys(dict).length;
+      add(result, nRefs);
+      emit(result, label, nRefs, 'refs', '');
+    } else if (dict !== undefined) {
+      loadErr(label, 'variable "MATTHEW_NKJV" is not an object');
+    }
   }
 
   // ── Cross-reference (Format C verse counts vs the complete KJV) ──
