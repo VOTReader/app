@@ -521,7 +521,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     const _doImport = async (jsonText) => {
       try {
         const parsed = JSON.parse(jsonText);
-        if (!parsed || parsed.app !== 'VOTReader' || typeof parsed.data !== 'object') {
+        const envelopeErrors = validateImportEnvelope(parsed);
+        if (envelopeErrors.length) {
+          console.warn('import envelope invalid:', envelopeErrors);
           _showToast('This file does not look like a VOTReader backup.');
           return;
         }
@@ -573,6 +575,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         }
 
         let importFailures = 0;
+        // Stores whose payload failed shape validation — skipped (not
+        // written) so a corrupt section can't overwrite good data or, for
+        // the non-coercing stores (state, home-order), persist garbage.
+        const skippedStores = [];
 
         // (1) Clear the legacy + shim LS keys and re-seed from data.
         ['vot-state', 'vot-ann-migrated'].forEach((k) => {
@@ -590,6 +596,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
           for (const name of Object.keys(storesMap)) {
             if (!(name in parsed.stores)) continue;
+            const violations = validateStorePayload(name, parsed.stores[name]);
+            if (violations.length) {
+              skippedStores.push(name);
+              console.warn('skipping store with invalid payload:', name, violations);
+              continue;
+            }
             const { store, method } = storesMap[name];
             try { store[method](parsed.stores[name]); }
             catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
@@ -608,6 +620,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             if (typeof raw !== 'string') continue;
             try {
               const obj = JSON.parse(raw);
+              const violations = validateStorePayload(name, obj);
+              if (violations.length) {
+                skippedStores.push(name);
+                console.warn('skipping V1 store with invalid payload:', name, violations);
+                continue;
+              }
               const { store, method } = storesMap[name];
               store[method](obj);
             } catch (e) { importFailures += 1; console.warn('V1 import parse failed for', name, e); }
@@ -628,7 +646,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           } catch (e) { console.warn('clear existing media failed', e); }
           for (const id of Object.keys(parsed.media)) {
             const record = parsed.media[id];
-            if (!record || typeof record !== 'object' || typeof record.data !== 'string') continue;
+            const mediaViolations = validateMediaRecord(id, record);
+            if (mediaViolations.length) {
+              importFailures += 1;
+              console.warn('skipping invalid media record:', id, mediaViolations);
+              continue;
+            }
             try {
               const blob = _base64ToBlob(record.data, record.mime);
               await JournalMediaStore.put({
@@ -642,8 +665,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         }
 
         hideToast(_TOAST_ID);
-        if (importFailures > 0) {
-          _showToast(`Import completed with ${importFailures} error${importFailures > 1 ? 's' : ''} (check console). Reloading…`, 0);
+        const problems = [];
+        if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? 's' : ''}`);
+        if (skippedStores.length > 0) {
+          problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? 's' : ''} skipped (invalid: ${skippedStores.join(', ')})`);
+        }
+        if (problems.length) {
+          _showToast(`Import completed — ${problems.join('; ')} (check console). Reloading…`, 0);
         } else {
           _showToast('Import complete. Reloading…', 0);
         }

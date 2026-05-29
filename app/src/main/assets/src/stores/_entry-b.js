@@ -106,6 +106,7 @@ import { useDesktopKeyboard } from '../hooks/use-desktop-keyboard.js';
 import { useStorageInfo } from '../hooks/use-storage-info.js';
 import { formatBytes } from '../utils/format-bytes.js';
 import { StorageHealth } from '../utils/storage-health.js';
+import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from '../utils/import-validators.js';
 import { registerServiceWorker } from '../utils/sw-register.js';
 
 // ── Data ────────────────────────────────────────────────────────────────
@@ -202,6 +203,7 @@ Object.assign(window, {
   useStorageInfo,
   formatBytes,
   StorageHealth,
+  validateStorePayload, validateImportEnvelope, validateMediaRecord,
   // Data
   JournalHelpers,
   COLLECTIONS, COL_BY_KEY, COL_BY_CARD, COL_BY_LETTER_SC, COL_BY_INDEX_SC,

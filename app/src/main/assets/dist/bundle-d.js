@@ -5356,7 +5356,9 @@
       const _doImport = async (jsonText) => {
         try {
           const parsed = JSON.parse(jsonText);
-          if (!parsed || parsed.app !== "VOTReader" || typeof parsed.data !== "object") {
+          const envelopeErrors = validateImportEnvelope(parsed);
+          if (envelopeErrors.length) {
+            console.warn("import envelope invalid:", envelopeErrors);
             _showToast("This file does not look like a VOTReader backup.");
             return;
           }
@@ -5392,6 +5394,7 @@ Continue?`
             return;
           }
           let importFailures = 0;
+          const skippedStores = [];
           ["vot-state", "vot-ann-migrated"].forEach((k) => {
             try {
               localStorage.removeItem(k);
@@ -5412,6 +5415,12 @@ Continue?`
           if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === "object") {
             for (const name of Object.keys(storesMap)) {
               if (!(name in parsed.stores)) continue;
+              const violations = validateStorePayload(name, parsed.stores[name]);
+              if (violations.length) {
+                skippedStores.push(name);
+                console.warn("skipping store with invalid payload:", name, violations);
+                continue;
+              }
               const { store, method } = storesMap[name];
               try {
                 store[method](parsed.stores[name]);
@@ -5437,6 +5446,12 @@ Continue?`
               if (typeof raw !== "string") continue;
               try {
                 const obj = JSON.parse(raw);
+                const violations = validateStorePayload(name, obj);
+                if (violations.length) {
+                  skippedStores.push(name);
+                  console.warn("skipping V1 store with invalid payload:", name, violations);
+                  continue;
+                }
                 const { store, method } = storesMap[name];
                 store[method](obj);
               } catch (e) {
@@ -5459,7 +5474,12 @@ Continue?`
             }
             for (const id of Object.keys(parsed.media)) {
               const record = parsed.media[id];
-              if (!record || typeof record !== "object" || typeof record.data !== "string") continue;
+              const mediaViolations = validateMediaRecord(id, record);
+              if (mediaViolations.length) {
+                importFailures += 1;
+                console.warn("skipping invalid media record:", id, mediaViolations);
+                continue;
+              }
               try {
                 const blob = _base64ToBlob(record.data, record.mime);
                 await JournalMediaStore.put({
@@ -5480,8 +5500,13 @@ Continue?`
             }
           }
           hideToast(_TOAST_ID);
-          if (importFailures > 0) {
-            _showToast(`Import completed with ${importFailures} error${importFailures > 1 ? "s" : ""} (check console). Reloading\u2026`, 0);
+          const problems = [];
+          if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? "s" : ""}`);
+          if (skippedStores.length > 0) {
+            problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? "s" : ""} skipped (invalid: ${skippedStores.join(", ")})`);
+          }
+          if (problems.length) {
+            _showToast(`Import completed \u2014 ${problems.join("; ")} (check console). Reloading\u2026`, 0);
           } else {
             _showToast("Import complete. Reloading\u2026", 0);
           }

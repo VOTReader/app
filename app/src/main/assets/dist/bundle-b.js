@@ -7173,6 +7173,122 @@
     RISK
   };
 
+  // app/src/main/assets/src/utils/import-validators.js
+  function isPlainObject(v) {
+    return v !== null && typeof v === "object" && !Array.isArray(v);
+  }
+  function typeName(v) {
+    if (v === null) return "null";
+    if (Array.isArray(v)) return "array";
+    return typeof v;
+  }
+  var STORE_SHAPES = {
+    "vot-annotations": "objectOfArrays",
+    // hlKey → annotation[]
+    "vot-journal-index": "objectOfArrays",
+    // refKey → entryId[]
+    "vot-notes": "objectOfObjects",
+    // groupId → note
+    "vot-prophecy-cards": "object",
+    // "id:idx:type" → boolean
+    "vot-journal-stats": "object",
+    // {totalEntries, currentStreak, …}
+    "vot-state": "object",
+    // {tabs?, settings?, …} — store does NOT coerce
+    "vot-bookmarks": "array",
+    "vot-links": "array",
+    "vot-recent-nav": "array",
+    "vot-history": "array",
+    "vot-home-order": "stringArray",
+    // tile-id[] — store does NOT coerce
+    "vot-notebooks": "listObject",
+    "vot-journal": "listObject",
+    "vot-journal-notebooks": "listObject"
+  };
+  function validateStorePayload(name, payload) {
+    const shape = STORE_SHAPES[name];
+    if (!shape) return [];
+    const errs = [];
+    switch (shape) {
+      case "objectOfArrays":
+        if (!isPlainObject(payload)) {
+          errs.push(`${name}: expected an object, got ${typeName(payload)}`);
+          break;
+        }
+        for (const k of Object.keys(payload)) {
+          if (!Array.isArray(payload[k])) errs.push(`${name}: value for "${k}" must be an array`);
+        }
+        break;
+      case "objectOfObjects":
+        if (!isPlainObject(payload)) {
+          errs.push(`${name}: expected an object, got ${typeName(payload)}`);
+          break;
+        }
+        for (const k of Object.keys(payload)) {
+          if (!isPlainObject(payload[k])) errs.push(`${name}: value for "${k}" must be an object`);
+        }
+        break;
+      case "object":
+        if (!isPlainObject(payload)) errs.push(`${name}: expected an object, got ${typeName(payload)}`);
+        break;
+      case "listObject":
+        if (!isPlainObject(payload)) {
+          errs.push(`${name}: expected an object, got ${typeName(payload)}`);
+          break;
+        }
+        if (!Array.isArray(payload.list)) errs.push(`${name}: "list" must be an array`);
+        break;
+      case "array":
+        if (!Array.isArray(payload)) errs.push(`${name}: expected an array, got ${typeName(payload)}`);
+        break;
+      case "stringArray":
+        if (!Array.isArray(payload)) {
+          errs.push(`${name}: expected an array, got ${typeName(payload)}`);
+          break;
+        }
+        if (!payload.every((x) => typeof x === "string")) errs.push(`${name}: all entries must be strings`);
+        break;
+      default:
+        break;
+    }
+    return errs;
+  }
+  function validateImportEnvelope(parsed) {
+    const errs = [];
+    if (!isPlainObject(parsed)) {
+      errs.push("backup is not an object");
+      return errs;
+    }
+    if (parsed.app !== "VOTReader") errs.push('not a VOTReader backup (missing app="VOTReader")');
+    const ver = parsed.exportVersion === void 0 ? 1 : parsed.exportVersion;
+    if (typeof ver !== "number" || ver < 1) errs.push(`invalid exportVersion ${JSON.stringify(parsed.exportVersion)}`);
+    if (!isPlainObject(parsed.data)) errs.push('"data" must be an object');
+    if (parsed.stores !== void 0 && !isPlainObject(parsed.stores)) errs.push('"stores" must be an object');
+    if (parsed.media !== void 0 && !isPlainObject(parsed.media)) errs.push('"media" must be an object');
+    return errs;
+  }
+  var BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+  var MEDIA_MAX_BYTES = 100 * 1024 * 1024;
+  function validateMediaRecord(id, record, maxBytes = MEDIA_MAX_BYTES) {
+    const errs = [];
+    if (!isPlainObject(record)) {
+      errs.push(`media "${id}": not an object`);
+      return errs;
+    }
+    if (typeof record.data !== "string" || record.data.length === 0) {
+      errs.push(`media "${id}": missing base64 "data"`);
+      return errs;
+    }
+    if (!BASE64_RE.test(record.data.slice(0, 100))) {
+      errs.push(`media "${id}": "data" is not valid base64`);
+    }
+    const approxBytes = Math.floor(record.data.length * 3 / 4);
+    if (approxBytes > maxBytes) {
+      errs.push(`media "${id}": decoded size ~${approxBytes} bytes exceeds the limit`);
+    }
+    return errs;
+  }
+
   // app/src/main/assets/src/utils/sw-register.js
   var TOAST_ID2 = "vot-toast-sw-update";
   var prompted = false;
@@ -10195,6 +10311,9 @@
     useStorageInfo,
     formatBytes,
     StorageHealth: StorageHealth2,
+    validateStorePayload,
+    validateImportEnvelope,
+    validateMediaRecord,
     // Data
     JournalHelpers: JournalHelpers2,
     COLLECTIONS: COLLECTIONS2,

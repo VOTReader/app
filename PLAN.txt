@@ -2967,8 +2967,12 @@ Current validation gap:
     [x] Build pipeline rejects structurally invalid data files.
         Manual test: introduce a typo block type, verify build fails.
         (validate:data --strict now covers all formats; gate proven in W9.2.)
-    [ ] Import validates per-store payloads before writing. Corrupted
-        stores skipped with user-visible reporting. vitest coverage. (W9.3)
+    [x] Import validates per-store payloads before writing. Corrupted
+        stores skipped with user-visible reporting. vitest coverage. (W9.3 —
+        src/utils/import-validators.js: validateStorePayload (14 store shapes)
+        + validateImportEnvelope + validateMediaRecord; wired into
+        SettingsScreen._doImport, V2 + V1 paths skip invalid sections and
+        report them in the toast. 37 vitest cases + runtime-global verified.)
     [x] Pre-commit hook runs schema validation on data file changes.
     [x] CI runs schema validation between lint and build.
     [x] Zero false positives on the current data files (all pass --strict;
@@ -2984,7 +2988,8 @@ Current validation gap:
   can be legitimate critical-text variants). Tracked for a data-sourcing
   fix (needs correct NKJV text from a trusted source — do NOT fabricate).
 
-  Only W9.3 (import payload validation) remains for W9 to close.
+  W9 COMPLETE (2026-05-29) — all exit criteria met. (The Hebrews data gap
+  above is tracked as a separate data-sourcing fix, not a W9 blocker.)
 
 ───────────────────────────────────────────────────────────────────────────────
 W10 — ACCESSIBILITY (WCAG 2.1 AA compliance)

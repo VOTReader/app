@@ -180,11 +180,18 @@ export default defineConfig({
       //   - Maintains these (a new test that covers proportional ground), OR
       //   - Bumps these upward in the SAME commit (a test that covers more
       //     than its share of new lines).
+      //
+      // W9.3 baseline (+ import-validators, 37 tests — the W9.3 util is in
+      // the measured utils/ scope and is ~fully covered):
+      //   statements 58.04 (2709/4667) | branches 48.08 (1623/3375)
+      //   functions  62.54 (561/897)   | lines    62.15 (2181/3509)
+      // Floors advance: statements 55→58, branches 46→48, functions 60→62,
+      // lines 60→62.
       thresholds: {
-        statements: 55,
-        branches: 46,
-        functions: 60,
-        lines: 60,
+        statements: 58,
+        branches: 48,
+        functions: 62,
+        lines: 62,
       },
     },
   },
