@@ -2564,12 +2564,16 @@ after W6. But they MUST land before the project is called done.
   Exit criteria (W7 complete):
     [x] JaCoCo class-dir fileTree fails loud when empty — no silent
         zero-coverage pass. (#4, landed 2026-05-29.)
-    [ ] Schema versioning: every IDB store has a version integer + a
-        run-once, failure-safe migration chain (framework dormant at v1 for
-        all stores). Legacy migrations RETIRED, not ported (see W7.1 DECISION
-        above) — migrateAnnotations deleted, LinkStore._normalize slimmed to a
-        malformed-record guard. vitest coverage. [retirement DONE 2026-05-29;
-        framework pending.]
+    [x] Schema versioning (W7.1b DONE 2026-05-29): CachedStore declares a
+        per-store schemaVersion (default 1) + an optional migrations map; on
+        hydration, _migrateIfNeeded runs the chain once when the meta-tracked
+        version trails, committing data + version atomically via
+        IDBAdapter.commitMigration (one multi-store tx). FAILURE-SAFE:
+        clone-before-migrate + abort-on-throw / missing-step / commit-fail
+        leaves data intact and the version un-advanced (retries next boot);
+        fully dormant (zero IDB reads) at v1. Legacy migrations RETIRED, not
+        ported (W7.1 DECISION above). 14 vitest cases incl. throw-midway,
+        clone-isolation, missing-step, commit-fail, empty-stamp, no-downgrade.
     [x] raw() freeze (W7.2): raw() returns a shallow-FROZEN COPY, NOT the
         live cache — freezing _load()'s live return would freeze _cache and
         break in-place mutations. All 1426 vitest pass; +5 cases pin the

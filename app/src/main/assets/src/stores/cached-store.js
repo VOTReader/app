@@ -52,6 +52,8 @@ const _idbStoreRegistry = new Set();
  *   lsShim?: (full: any) => any,
  *   hydrationTimeoutMs?: number,
  *   legacyLsKey?: string | null,
+ *   schemaVersion?: number,
+ *   migrations?: Record<number, (old: any) => any>,
  * }} CachedStoreOpts
  */
 
@@ -89,6 +91,9 @@ const _idbStoreRegistry = new Set();
  *   _idbLsShim: ((full: T | null) => any) | null,
  *   _idbHydrationTimeoutMs: number,
  *   _backgroundRetryDelays: number[],
+ *   _schemaVersion: number,
+ *   _migrations: Record<number, (old: any) => any>,
+ *   _schemaMetaKey: string,
  *   _state: StoreState,
  *   _queue: Array<{ op: string, args: any[] }>,
  *   _replaying: boolean,
@@ -106,6 +111,7 @@ const _idbStoreRegistry = new Set();
  *   isReady(): boolean,
  *   getState(): StoreState,
  *   _shouldDefer(opName: string, ...args: any[]): boolean,
+ *   _migrateIfNeeded(loadedData: T | null | undefined): Promise<T | null | undefined>,
  *   _hydrate(): Promise<void>,
  *   _replayQueueOnto(): void,
  *   _rebaseAndPromote(loadedData: T | undefined | null): void,
@@ -168,6 +174,21 @@ export function CachedStore(storageKey, defaultVal, opts) {
    * bulk-migration step.
    */
   const legacyLsKey = (opts.legacyLsKey === null) ? null : (opts.legacyLsKey || storageKey);
+  /**
+   * Per-store data schema version (W7.1b). Default 1. When a store's persisted
+   * data shape changes, bump this and register a transform under `migrations`
+   * keyed by the NEW version. The framework is fully DORMANT while this stays
+   * 1 — `_migrateIfNeeded` short-circuits before any IDB read.
+   */
+  const schemaVersion = (typeof opts.schemaVersion === 'number' && opts.schemaVersion >= 1) ? opts.schemaVersion : 1;
+  /**
+   * Migration chain: `{ <toVersion>: (oldData) => newData, ... }`. Each entry
+   * is a PURE transform, run once and in ascending order during hydration when
+   * the persisted version trails `schemaVersion`. See `_migrateIfNeeded`.
+   */
+  const migrations = (opts.migrations && typeof opts.migrations === 'object') ? opts.migrations : {};
+  /** Meta-store key holding this store's persisted schema version. */
+  const schemaMetaKey = 'schema:' + idbStoreName;
   /** Linear-backoff schedule (ms) for background IDB retries when
    *  degraded. Exposed via `_backgroundRetryDelays` for test control. */
   const backgroundRetryDelays = [5000, 10000, 30000, 60000];
@@ -201,6 +222,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _idbLsShim: lsShim,
     _idbHydrationTimeoutMs: hydrationTimeoutMs,
     _backgroundRetryDelays: backgroundRetryDelays,
+    _schemaVersion: schemaVersion,
+    _migrations: migrations,
+    _schemaMetaKey: schemaMetaKey,
     _state: /** @type {StoreState} */ (useIdb ? 'pending' : 'loaded'),
     _queue: [],
     _replaying: false,
@@ -410,6 +434,79 @@ export function CachedStore(storageKey, defaultVal, opts) {
     },
 
     /**
+     * Schema-migration gate (W7.1b), run during hydration BEFORE the loaded
+     * blob is promoted to the live cache. Reads the store's recorded schema
+     * version from `meta` (absent ⇒ 1 = oldest); if it trails the declared
+     * `_schemaVersion`, runs the registered chain (`_migrations[from+1] …
+     * [target]`) and commits the result.
+     *
+     * Failure-safe by construction:
+     *   - DORMANT short-circuit: `_schemaVersion <= 1` returns immediately
+     *     with NO IDB read — the framework costs nothing until a real
+     *     migration is declared.
+     *   - The chain runs on a deep CLONE, so a migration that mutates its
+     *     input and then throws cannot corrupt the original blob.
+     *   - Any throw (or a missing step) ABORTS: the original blob is returned
+     *     unchanged and the version is NOT advanced, so the next boot retries.
+     *     Half-migrated data is never promoted or persisted.
+     *   - On success, data + new version commit in ONE atomic transaction
+     *     (`IDBAdapter.commitMigration`) — never data-advanced-but-version-
+     *     stale (would re-run a migration on migrated data) nor the inverse.
+     *   - A version NEWER than the app's (downgrade) is left as-is + warned.
+     *
+     * @param {T | null | undefined} loadedData
+     * @returns {Promise<T | null | undefined>} the data to promote
+     */
+    async _migrateIfNeeded(loadedData) {
+      if (!useIdb) return loadedData;
+      const target = this._schemaVersion;
+      if (target <= 1) return loadedData;   // dormant — no migration possible
+      let persisted;
+      try { persisted = await IDBAdapter.get('meta', this._schemaMetaKey); }
+      catch (e) { console.warn('schema-version read failed for', storageKey, e); return loadedData; }
+      const from = (typeof persisted === 'number' && persisted >= 1) ? persisted : 1;
+      if (from >= target) {
+        if (from > target) {
+          console.warn('store', storageKey, 'has schema v' + from + ' > app v' + target + '; using as-is (no downgrade)');
+        }
+        return loadedData;
+      }
+      // A migration is due (from < target).
+      if (loadedData === undefined || loadedData === null) {
+        // No data to transform — stamp the current version so a later write
+        // (already in the current shape) isn't later mistaken for old data.
+        try { await IDBAdapter.put('meta', this._schemaMetaKey, target); }
+        catch (e) { console.warn('schema-version stamp failed for', storageKey, e); }
+        return loadedData;
+      }
+      // Clone so a throwing/mutating migration can't corrupt the original.
+      let working;
+      try { working = JSON.parse(JSON.stringify(loadedData)); }
+      catch (e) {
+        console.warn('schema migration clone failed for', storageKey, '— keeping data at v' + from, e);
+        return loadedData;
+      }
+      try {
+        for (let v = from + 1; v <= target; v++) {
+          const fn = this._migrations[v];
+          if (typeof fn !== 'function') throw new Error('no migration registered for v' + v);
+          working = fn(working);
+        }
+      } catch (e) {
+        console.warn('schema migration v' + from + '->v' + target + ' failed for', storageKey, '— data left at v' + from + ', will retry next boot', e);
+        return loadedData;   // original untouched; version NOT advanced
+      }
+      // Success — commit migrated data + new version atomically.
+      try {
+        await IDBAdapter.commitMigration(idbStoreName, working, target);
+      } catch (e) {
+        console.warn('schema migration commit failed for', storageKey, '— data left at v' + from + ', will retry next boot', e);
+        return loadedData;   // atomic: neither data nor version advanced
+      }
+      return working;
+    },
+
+    /**
      * Begin async hydration. Idempotent — returns the same in-flight
      * promise if already running. Resolves when state transitions to
      * 'loaded' or 'degraded'. No-op for LS-only stores (resolves
@@ -467,8 +564,17 @@ export function CachedStore(storageKey, defaultVal, opts) {
               }
             } catch (e) { console.warn('legacy LS parse failed for', storageKey, e); }
           }
-          self._rebaseAndPromote(/** @type {any} */ (loadedData));
-          settle();
+          self._migrateIfNeeded(/** @type {any} */ (loadedData)).then(function (finalData) {
+            if (self._state === 'loaded') { settle(); return; }
+            self._rebaseAndPromote(/** @type {any} */ (finalData));
+            settle();
+          }, function (err) {
+            // _migrateIfNeeded resolves on all internal failures; this guards
+            // an unexpected rejection — promote the un-migrated data.
+            console.warn('schema migration rejected unexpectedly for', storageKey, err);
+            if (self._state !== 'loaded') self._rebaseAndPromote(/** @type {any} */ (loadedData));
+            settle();
+          });
         }).catch(function (err) {
           clearTimeout(timeoutId);
           if (self._state === 'loaded') { settle(); return; }
@@ -586,7 +692,10 @@ export function CachedStore(storageKey, defaultVal, opts) {
               }
             } catch (_e) { /* unparseable — fall through with empty data */ }
           }
-          self._rebaseAndPromote(/** @type {any} */ (loadedData));
+          self._migrateIfNeeded(/** @type {any} */ (loadedData)).then(function (finalData) {
+            if (self._state === 'loaded') return;
+            self._rebaseAndPromote(/** @type {any} */ (finalData));
+          });
         }).catch(function () {
           attempt += 1;
           var idx = Math.min(attempt, self._backgroundRetryDelays.length - 1);

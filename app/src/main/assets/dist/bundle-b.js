@@ -552,6 +552,54 @@
         });
       });
     }
+    function commitMigration(storeName, dataValue, version) {
+      if (!STORE_SET.has(storeName)) {
+        return Promise.reject(new Error("Unknown IDB store: " + storeName));
+      }
+      return open().then(function(db) {
+        return new Promise(function(resolve, reject) {
+          let settled = false;
+          const settle = function(action) {
+            if (!settled) {
+              settled = true;
+              action();
+            }
+          };
+          let tx;
+          try {
+            tx = db.transaction([storeName, "meta"], "readwrite");
+          } catch (e) {
+            settle(function() {
+              reject(e);
+            });
+            return;
+          }
+          tx.oncomplete = function() {
+            settle(function() {
+              resolve(void 0);
+            });
+          };
+          tx.onerror = function() {
+            settle(function() {
+              reject(tx.error || _makeAbortError());
+            });
+          };
+          tx.onabort = function() {
+            settle(function() {
+              reject(tx.error || _makeAbortError());
+            });
+          };
+          try {
+            tx.objectStore(storeName).put(dataValue, "v");
+            tx.objectStore("meta").put(version, "schema:" + storeName);
+          } catch (e) {
+            settle(function() {
+              reject(e);
+            });
+          }
+        });
+      });
+    }
     function isQuotaError(err) {
       if (!err) return false;
       const e = (
@@ -585,6 +633,7 @@
       put,
       delete: del,
       getAll,
+      commitMigration,
       isQuotaError,
       _putOnce,
       _wrapRequest: wrapRequest,
@@ -602,6 +651,9 @@
     const lsShim = opts.lsShim || null;
     const hydrationTimeoutMs = opts.hydrationTimeoutMs != null ? opts.hydrationTimeoutMs : 3e3;
     const legacyLsKey = opts.legacyLsKey === null ? null : opts.legacyLsKey || storageKey;
+    const schemaVersion = typeof opts.schemaVersion === "number" && opts.schemaVersion >= 1 ? opts.schemaVersion : 1;
+    const migrations = opts.migrations && typeof opts.migrations === "object" ? opts.migrations : {};
+    const schemaMetaKey = "schema:" + idbStoreName;
     const backgroundRetryDelays = [5e3, 1e4, 3e4, 6e4];
     function copyDefault() {
       if (Array.isArray(defaultVal)) return (
@@ -630,6 +682,9 @@
       _idbLsShim: lsShim,
       _idbHydrationTimeoutMs: hydrationTimeoutMs,
       _backgroundRetryDelays: backgroundRetryDelays,
+      _schemaVersion: schemaVersion,
+      _migrations: migrations,
+      _schemaMetaKey: schemaMetaKey,
       _state: (
         /** @type {StoreState} */
         useIdb ? "pending" : "loaded"
@@ -858,6 +913,81 @@
         }
       },
       /**
+       * Schema-migration gate (W7.1b), run during hydration BEFORE the loaded
+       * blob is promoted to the live cache. Reads the store's recorded schema
+       * version from `meta` (absent ⇒ 1 = oldest); if it trails the declared
+       * `_schemaVersion`, runs the registered chain (`_migrations[from+1] …
+       * [target]`) and commits the result.
+       *
+       * Failure-safe by construction:
+       *   - DORMANT short-circuit: `_schemaVersion <= 1` returns immediately
+       *     with NO IDB read — the framework costs nothing until a real
+       *     migration is declared.
+       *   - The chain runs on a deep CLONE, so a migration that mutates its
+       *     input and then throws cannot corrupt the original blob.
+       *   - Any throw (or a missing step) ABORTS: the original blob is returned
+       *     unchanged and the version is NOT advanced, so the next boot retries.
+       *     Half-migrated data is never promoted or persisted.
+       *   - On success, data + new version commit in ONE atomic transaction
+       *     (`IDBAdapter.commitMigration`) — never data-advanced-but-version-
+       *     stale (would re-run a migration on migrated data) nor the inverse.
+       *   - A version NEWER than the app's (downgrade) is left as-is + warned.
+       *
+       * @param {T | null | undefined} loadedData
+       * @returns {Promise<T | null | undefined>} the data to promote
+       */
+      async _migrateIfNeeded(loadedData) {
+        if (!useIdb) return loadedData;
+        const target = this._schemaVersion;
+        if (target <= 1) return loadedData;
+        let persisted;
+        try {
+          persisted = await IDBAdapter.get("meta", this._schemaMetaKey);
+        } catch (e) {
+          console.warn("schema-version read failed for", storageKey, e);
+          return loadedData;
+        }
+        const from = typeof persisted === "number" && persisted >= 1 ? persisted : 1;
+        if (from >= target) {
+          if (from > target) {
+            console.warn("store", storageKey, "has schema v" + from + " > app v" + target + "; using as-is (no downgrade)");
+          }
+          return loadedData;
+        }
+        if (loadedData === void 0 || loadedData === null) {
+          try {
+            await IDBAdapter.put("meta", this._schemaMetaKey, target);
+          } catch (e) {
+            console.warn("schema-version stamp failed for", storageKey, e);
+          }
+          return loadedData;
+        }
+        let working;
+        try {
+          working = JSON.parse(JSON.stringify(loadedData));
+        } catch (e) {
+          console.warn("schema migration clone failed for", storageKey, "\u2014 keeping data at v" + from, e);
+          return loadedData;
+        }
+        try {
+          for (let v = from + 1; v <= target; v++) {
+            const fn = this._migrations[v];
+            if (typeof fn !== "function") throw new Error("no migration registered for v" + v);
+            working = fn(working);
+          }
+        } catch (e) {
+          console.warn("schema migration v" + from + "->v" + target + " failed for", storageKey, "\u2014 data left at v" + from + ", will retry next boot", e);
+          return loadedData;
+        }
+        try {
+          await IDBAdapter.commitMigration(idbStoreName, working, target);
+        } catch (e) {
+          console.warn("schema migration commit failed for", storageKey, "\u2014 data left at v" + from + ", will retry next boot", e);
+          return loadedData;
+        }
+        return working;
+      },
+      /**
        * Begin async hydration. Idempotent — returns the same in-flight
        * promise if already running. Resolves when state transitions to
        * 'loaded' or 'degraded'. No-op for LS-only stores (resolves
@@ -909,11 +1039,27 @@
                 console.warn("legacy LS parse failed for", storageKey, e);
               }
             }
-            self._rebaseAndPromote(
+            self._migrateIfNeeded(
               /** @type {any} */
               loadedData
-            );
-            settle();
+            ).then(function(finalData) {
+              if (self._state === "loaded") {
+                settle();
+                return;
+              }
+              self._rebaseAndPromote(
+                /** @type {any} */
+                finalData
+              );
+              settle();
+            }, function(err) {
+              console.warn("schema migration rejected unexpectedly for", storageKey, err);
+              if (self._state !== "loaded") self._rebaseAndPromote(
+                /** @type {any} */
+                loadedData
+              );
+              settle();
+            });
           }).catch(function(err) {
             clearTimeout(timeoutId);
             if (self._state === "loaded") {
@@ -1030,10 +1176,16 @@
               } catch (_e) {
               }
             }
-            self._rebaseAndPromote(
+            self._migrateIfNeeded(
               /** @type {any} */
               loadedData
-            );
+            ).then(function(finalData) {
+              if (self._state === "loaded") return;
+              self._rebaseAndPromote(
+                /** @type {any} */
+                finalData
+              );
+            });
           }).catch(function() {
             attempt += 1;
             var idx = Math.min(attempt, self._backgroundRetryDelays.length - 1);

@@ -445,3 +445,22 @@ describe('IDBAdapter — put retry on AbortError', () => {
     }
   });
 });
+
+describe('IDBAdapter — commitMigration (W7.1b: atomic data + version)', () => {
+  it('writes the data blob (key "v") and the schema version (meta) together', async () => {
+    await IDBAdapter.commitMigration('vot-bookmarks', [{ id: 'b1' }], 2);
+    expect(await IDBAdapter.get('vot-bookmarks', 'v')).toEqual([{ id: 'b1' }]);
+    expect(await IDBAdapter.get('meta', 'schema:vot-bookmarks')).toBe(2);
+  });
+
+  it('overwrites prior data + version on a later migration', async () => {
+    await IDBAdapter.commitMigration('vot-bookmarks', [{ id: 'old' }], 2);
+    await IDBAdapter.commitMigration('vot-bookmarks', [{ id: 'new' }], 3);
+    expect(await IDBAdapter.get('vot-bookmarks', 'v')).toEqual([{ id: 'new' }]);
+    expect(await IDBAdapter.get('meta', 'schema:vot-bookmarks')).toBe(3);
+  });
+
+  it('rejects an unknown store name (validated before the transaction)', async () => {
+    await expect(IDBAdapter.commitMigration('not-a-store', [], 2)).rejects.toThrow(/Unknown IDB store/);
+  });
+});

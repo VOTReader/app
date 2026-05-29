@@ -15,6 +15,7 @@
      IDBAdapter.put(storeName, key, value)      → Promise<void>
      IDBAdapter.delete(storeName, key)          → Promise<void>
      IDBAdapter.getAll(storeName)               → Promise<Record<string, any>>
+     IDBAdapter.commitMigration(store,data,ver) → Promise<void>  (W7.1b, atomic)
      IDBAdapter.isQuotaError(err)               → boolean
      IDBAdapter.STORE_NAMES                     → readonly string[]
      IDBAdapter.DB_NAME, IDBAdapter.DB_VERSION  → constants
@@ -320,6 +321,44 @@ export const IDBAdapter = (function () {
   }
 
   /**
+   * Atomically write a store's migrated data blob AND its new schema version
+   * in ONE transaction spanning the data store + the `meta` store. Either both
+   * commit or neither — so a crash mid-commit can never leave data advanced
+   * past its recorded version (which would re-run a non-idempotent migration
+   * on already-migrated data) nor the inverse (version advanced past stale
+   * data). The data blob lives under key 'v'; the version under meta key
+   * 'schema:<storeName>'. Used by CachedStore's versioned-migration framework
+   * (W7.1b).
+   *
+   * @param {StoreName} storeName
+   * @param {any} dataValue   the migrated data blob
+   * @param {number} version  the new schema version
+   * @returns {Promise<void>}
+   */
+  function commitMigration(storeName, dataValue, version) {
+    if (!STORE_SET.has(storeName)) {
+      return Promise.reject(new Error('Unknown IDB store: ' + storeName));
+    }
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        let settled = false;
+        const settle = function (action) { if (!settled) { settled = true; action(); } };
+        let tx;
+        try {
+          tx = db.transaction([storeName, 'meta'], 'readwrite');
+        } catch (e) { settle(function () { reject(e); }); return; }
+        tx.oncomplete = function () { settle(function () { resolve(undefined); }); };
+        tx.onerror = function () { settle(function () { reject(tx.error || _makeAbortError()); }); };
+        tx.onabort = function () { settle(function () { reject(tx.error || _makeAbortError()); }); };
+        try {
+          tx.objectStore(storeName).put(dataValue, 'v');
+          tx.objectStore('meta').put(version, 'schema:' + storeName);
+        } catch (e) { settle(function () { reject(e); }); }
+      });
+    });
+  }
+
+  /**
    * True iff the error is a quota-exceeded error. Checks both `name`
    * (DOM-spec standard) and legacy numeric `code` for older WebViews.
    *
@@ -364,6 +403,7 @@ export const IDBAdapter = (function () {
     put: put,
     delete: del,
     getAll: getAll,
+    commitMigration: commitMigration,
     isQuotaError: isQuotaError,
     _putOnce: _putOnce,
     _wrapRequest: wrapRequest,

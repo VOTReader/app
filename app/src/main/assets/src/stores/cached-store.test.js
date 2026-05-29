@@ -1195,3 +1195,178 @@ describe('CachedStore — W7.2 raw() immutability (frozen copy)', () => {
     expect(CachedStore('w72-num', 0).raw()).toBe(0);
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+   PART 4 — W7.1b versioned-migration framework (failure-safety).
+   ═══════════════════════════════════════════════════════════════════
+   The make-or-break: a migration that throws (or has a missing step, or
+   whose commit fails) must leave the original data intact and NOT advance
+   the version, so the next boot retries. On success, data + version commit
+   atomically. The framework is fully dormant (zero IDB reads) at v1. */
+
+describe('CachedStore W7.1b — versioned migration framework', () => {
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  /** Mock IDBAdapter reads: serve the data blob (key 'v') + the meta version. */
+  function mockReads(dataVal, metaVal) {
+    const getSpy = vi.spyOn(IDBAdapter, 'get').mockImplementation(async function (s, key) {
+      if (s === 'meta') return metaVal;
+      if (key === 'v') return dataVal;
+      return undefined;
+    });
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+    return { getSpy, putSpy };
+  }
+
+  /** Cache as any[] so assertions can read migration-added fields. */
+  const items = (store) => /** @type {any[]} */ (store.all());
+
+  it('is fully dormant at schemaVersion 1 — never reads the meta version, never commits', async () => {
+    const { getSpy } = mockReads([{ id: 'a', label: 'A' }], undefined);
+    const commitSpy = vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-w71-dormant', { idb: true });  // schemaVersion defaults to 1
+    await store._hydrate();
+    expect(store.all()).toEqual([{ id: 'a', label: 'A' }]);
+    expect(getSpy.mock.calls.filter(([s]) => s === 'meta').length).toBe(0);  // no version read
+    expect(commitSpy).not.toHaveBeenCalled();
+  });
+
+  it('runs a single v1→v2 migration and commits data + version atomically', async () => {
+    mockReads([{ id: 'a', label: 'A' }], undefined);  // version absent → from 1
+    const commitSpy = vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-w71-v2', {
+      idb: true,
+      schemaVersion: 2,
+      migrations: { 2: (arr) => arr.map((x) => ({ ...x, v: 2 })) },
+    });
+    await store._hydrate();
+    expect(items(store)).toEqual([{ id: 'a', label: 'A', v: 2 }]);
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    const [storeName, data, version] = commitSpy.mock.calls[0];
+    expect(storeName).toBe('vot-test-w71-v2');
+    expect(data).toEqual([{ id: 'a', label: 'A', v: 2 }]);
+    expect(version).toBe(2);
+  });
+
+  it('runs the chain in ascending order (v1→v3)', async () => {
+    mockReads([{ id: 'a', tags: [] }], undefined);
+    vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-w71-chain', {
+      idb: true,
+      schemaVersion: 3,
+      migrations: {
+        2: (arr) => arr.map((x) => ({ ...x, tags: [...x.tags, '2'] })),
+        3: (arr) => arr.map((x) => ({ ...x, tags: [...x.tags, '3'] })),
+      },
+    });
+    await store._hydrate();
+    expect(items(store)[0].tags).toEqual(['2', '3']);  // v2 before v3
+  });
+
+  it('resumes from the persisted version (v2→v3 runs only step 3)', async () => {
+    mockReads([{ id: 'a' }], 2);  // persisted version 2
+    vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const step2 = vi.fn((arr) => arr);
+    const store = createTestStore('vot-test-w71-resume', {
+      idb: true,
+      schemaVersion: 3,
+      migrations: { 2: step2, 3: (arr) => arr.map((x) => ({ ...x, three: true })) },
+    });
+    await store._hydrate();
+    expect(step2).not.toHaveBeenCalled();      // already past v2
+    expect(items(store)[0].three).toBe(true);  // only step 3 ran
+  });
+
+  it('does nothing when the persisted version already equals schemaVersion', async () => {
+    mockReads([{ id: 'a', label: 'A' }], 2);
+    const commitSpy = vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const mig = vi.fn((arr) => arr);
+    const store = createTestStore('vot-test-w71-current', { idb: true, schemaVersion: 2, migrations: { 2: mig } });
+    await store._hydrate();
+    expect(mig).not.toHaveBeenCalled();
+    expect(commitSpy).not.toHaveBeenCalled();
+    expect(store.all()).toEqual([{ id: 'a', label: 'A' }]);
+  });
+
+  // ── failure-safety (the make-or-break) ──
+
+  it('a migration that THROWS midway leaves the original data + version intact', async () => {
+    mockReads([{ id: 'a', label: 'A' }], undefined);  // from 1
+    const commitSpy = vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-w71-throw', {
+      idb: true,
+      schemaVersion: 3,
+      migrations: {
+        2: (arr) => arr.map((x) => ({ ...x, two: true })),
+        3: () => { throw new Error('boom'); },
+      },
+    });
+    await store._hydrate();
+    // Aborted: cache is the ORIGINAL (not the v2-transformed), version NOT advanced.
+    expect(store.all()).toEqual([{ id: 'a', label: 'A' }]);
+    expect(commitSpy).not.toHaveBeenCalled();
+  });
+
+  it('clone isolation — a migration that mutates its input then throws cannot corrupt the data', async () => {
+    mockReads([{ id: 'a', label: 'A' }], undefined);
+    vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-w71-clone', {
+      idb: true,
+      schemaVersion: 2,
+      migrations: { 2: (arr) => { arr[0].label = 'CORRUPTED'; throw new Error('boom'); } },
+    });
+    await store._hydrate();
+    // The mutation hit the CLONE; the promoted data is the pristine original.
+    expect(store.all()).toEqual([{ id: 'a', label: 'A' }]);
+  });
+
+  it('a missing migration step aborts (loud) and leaves data at the old version', async () => {
+    mockReads([{ id: 'a' }], undefined);  // from 1; needs steps 2 AND 3
+    const commitSpy = vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const store = createTestStore('vot-test-w71-missing', {
+      idb: true,
+      schemaVersion: 3,
+      migrations: { 3: (arr) => arr },  // step 2 missing → chain throws
+    });
+    await store._hydrate();
+    expect(store.all()).toEqual([{ id: 'a' }]);
+    expect(commitSpy).not.toHaveBeenCalled();
+  });
+
+  it('a failed atomic commit leaves the data un-migrated (retry next boot)', async () => {
+    mockReads([{ id: 'a', label: 'A' }], undefined);
+    const commitSpy = vi.spyOn(IDBAdapter, 'commitMigration').mockRejectedValue(new Error('quota'));
+    const store = createTestStore('vot-test-w71-commitfail', {
+      idb: true, schemaVersion: 2, migrations: { 2: (arr) => arr.map((x) => ({ ...x, v: 2 })) },
+    });
+    await store._hydrate();
+    expect(commitSpy).toHaveBeenCalledTimes(1);            // attempted
+    expect(store.all()).toEqual([{ id: 'a', label: 'A' }]);  // commit failed atomically → original promoted
+  });
+
+  it('stamps the version (no commit) for an empty store that trails', async () => {
+    const { putSpy } = mockReads(undefined, undefined);  // no data, version absent → from 1, target 2
+    const commitSpy = vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const mig = vi.fn((arr) => arr);
+    const store = createTestStore('vot-test-w71-empty', { idb: true, schemaVersion: 2, migrations: { 2: mig } });
+    await store._hydrate();
+    expect(mig).not.toHaveBeenCalled();        // nothing to transform
+    expect(commitSpy).not.toHaveBeenCalled();
+    expect(store.all()).toEqual([]);           // default
+    const stamp = putSpy.mock.calls.find(([s, k]) => s === 'meta' && k === 'schema:vot-test-w71-empty');
+    expect(stamp).toBeTruthy();
+    expect(stamp[2]).toBe(2);                   // version stamped to current
+  });
+
+  it('does not downgrade when the stored version is newer than the app', async () => {
+    mockReads([{ id: 'a', label: 'A' }], 5);  // stored v5, app v2
+    const commitSpy = vi.spyOn(IDBAdapter, 'commitMigration').mockResolvedValue(undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = createTestStore('vot-test-w71-newer', { idb: true, schemaVersion: 2, migrations: { 2: (arr) => arr } });
+    await store._hydrate();
+    expect(store.all()).toEqual([{ id: 'a', label: 'A' }]);  // used as-is, no transform
+    expect(commitSpy).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();  // warned about the newer-than-app version
+  });
+});
