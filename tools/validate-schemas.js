@@ -774,6 +774,96 @@ export function validateFormatD(studies, opts = {}) {
   return { errors, warnings };
 }
 
+// ── Cross-translation verse-count check ─────────────────────────
+
+/** Compress an ascending number list to a range string: [1,2,3,5] → "1-3, 5". */
+function compressRanges(nums) {
+  if (nums.length === 0) return '';
+  const sorted = [...nums].sort((a, b) => a - b);
+  const out = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === prev + 1) { prev = sorted[i]; } else {
+      out.push(start === prev ? `${start}` : `${start}-${prev}`);
+      start = prev = sorted[i];
+    }
+  }
+  out.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return out.join(', ');
+}
+
+/**
+ * Compare a Format C structure's verse NUMBERS per chapter against a complete
+ * reference translation. Catches MISSING verses that validateFormatC's
+ * per-file contiguity check structurally cannot — it only flags internal
+ * jumps, not a chapter that stops early (trailing gap) or starts late. This
+ * is the check that would have caught the Hebrews 10/12 trailing gaps on the
+ * first pass instead of via a manual audit.
+ *
+ * @param {object|object[]} books - Format C (object-of-books / single book / array)
+ * @param {object} reference - translation map { bookId: { chapNum: [{n,…}] } } (e.g. BIBLE_KJV)
+ * @param {{ fileName?: string, exceptions?: string[], singleBookId?: string }} [opts]
+ *   opts.singleBookId - reference key for a single-book input (e.g. "matthew-plain")
+ *   opts.exceptions  - "<bookId> <chap>" entries to skip (known versification
+ *                      differences, e.g. apocryphal additions present in one
+ *                      text but not the other)
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validateAgainstReference(books, reference, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || '(unknown)';
+  const exceptions = new Set(opts.exceptions || []);
+
+  if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+    warnings.push(`${fileName}: no reference translation available — cross-check skipped`);
+    return { errors, warnings };
+  }
+
+  /** @type {Array<[string, any]>} */
+  let bookList;
+  if (Array.isArray(books)) {
+    bookList = books.map((b) => [b && b.id, b]);
+  } else if (books && typeof books === 'object' && Array.isArray(books.chapters)) {
+    bookList = [[opts.singleBookId || books.id, books]];
+  } else if (books && typeof books === 'object') {
+    bookList = Object.entries(books);
+  } else {
+    errors.push(`${fileName}: expected an object or array of Format C books`);
+    return { errors, warnings };
+  }
+
+  for (const [bookId, book] of bookList) {
+    if (!book || !Array.isArray(book.chapters)) continue;
+    const refBook = reference[bookId];
+    if (!refBook || typeof refBook !== 'object') {
+      warnings.push(`${fileName}: book "${bookId}" absent from reference — cross-check skipped`);
+      continue;
+    }
+    for (const ch of book.chapters) {
+      if (!ch || typeof ch.num !== 'number') continue;
+      const refVerses = refBook[String(ch.num)];
+      if (!Array.isArray(refVerses)) continue;          // reference lacks this chapter
+      if (exceptions.has(`${bookId} ${ch.num}`)) continue;
+      const have = new Set();
+      for (const sec of (ch.sections || [])) {
+        for (const v of (sec && Array.isArray(sec.verses) ? sec.verses : [])) {
+          if (v && typeof v.n === 'number') have.add(v.n);
+        }
+      }
+      const missing = [];
+      for (const rv of refVerses) {
+        if (rv && typeof rv.n === 'number' && !have.has(rv.n)) missing.push(rv.n);
+      }
+      if (missing.length) {
+        errors.push(`${fileName}: ${bookId} ${ch.num} missing verse(s) ${compressRanges(missing)} — have ${have.size}, reference has ${refVerses.length}`);
+      }
+    }
+  }
+  return { errors, warnings };
+}
+
 // ── CLI runner ───────────────────────────────────────────────────
 
 /** @type {Array<{file: string, arrayVar: string, prefaceVar?: string}>} */
@@ -937,6 +1027,34 @@ function runCli() {
     const result = validateFormatD(studies, { strict, fileName: label });
     add(result, studies.length);
     emit(result, label, studies.length, 'studies', '');
+  }
+
+  // ── Cross-reference (Format C verse counts vs the complete KJV) ──
+  // Catches MISSING verses the per-file contiguity check can't (trailing /
+  // leading gaps). Errors here count toward the strict-mode exit.
+  console.log('\nCross-reference (verse counts vs KJV):');
+  {
+    let reference = null;
+    try { reference = loadVar(resolve(dataDir, 'bible-kjv.js'), 'BIBLE_KJV'); }
+    catch (e) { console.warn(`  WARN:  bible-kjv.js failed to load — cross-check skipped: ${e.message}`); totals.warnings++; }
+    if (reference) {
+      const xrefTargets = [
+        { file: 'books.js',         arrayVar: 'BOOKS',         opts: {} },
+        { file: 'matthew-plain.js', arrayVar: 'MATTHEW_PLAIN', opts: { singleBookId: 'matthew-plain' } },
+      ];
+      for (const t of xrefTargets) {
+        const label = basename(t.file);
+        let data;
+        try { data = loadVar(resolve(dataDir, t.file), t.arrayVar); }
+        catch (e) { loadErr(label, e.message); continue; }
+        const result = validateAgainstReference(data, reference, { fileName: label, ...t.opts });
+        add(result, 0);
+        for (const e of result.errors) console.error(`  ERROR: ${e}`);
+        for (const w of result.warnings) console.warn(`  WARN:  ${w}`);
+        const status = result.errors.length === 0 ? 'OK' : 'FAIL';
+        console.log(`  ${label}: vs KJV — ${status} (${result.errors.length} errors, ${result.warnings.length} warnings)`);
+      }
+    }
   }
 
   console.log(`\n=== TOTALS: ${totals.items} items validated, ${totals.errors} errors, ${totals.warnings} warnings ===`);

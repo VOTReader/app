@@ -3011,16 +3011,24 @@ Current validation gap:
         footnotes (volume-one, letters-timothy) + 3 verse-gap flags in
         books.js Hebrews — see finding below.
 
-  FINDING (validator's first real catch, 2026-05-29): books.js is missing
-  Hebrews verses — Heb 10:15-18, Heb 11:12-31 (20 verses of the faith
-  chapter), Heb 13:18-19 (26 verses total). The data jumps section-to-
-  section past them; invisible to check_balance.py. Surfaced as verse-gap
-  WARNINGS (gaps stay warnings, not errors, since single-verse omissions
-  can be legitimate critical-text variants). Tracked for a data-sourcing
-  fix (needs correct NKJV text from a trusted source — do NOT fabricate).
+  FINDING — RESOLVED (validator's first real catch, 2026-05-29): books.js
+  was missing Hebrews verses. The contiguity check caught the internal gaps
+  (10:15-18, 11:12-31, 13:18-19); a cross-translation verse-count audit then
+  caught TRAILING gaps it can't see (10:26-39, 12:16-29). All 54 NKJV verses
+  restored from user-provided text. Two follow-ons landed from this:
+   - bible-kjv.js regenerated (tools/regen-kjv.js) from the clean eBible
+     eng-kjv — the old one had inline glosses + Esther-10 apocrypha.
+   - The cross-translation check is now a first-class validator:
+     validateAgainstReference(books, reference) compares Format C verse-sets
+     against the complete KJV (books.js + matthew-plain.js vs BIBLE_KJV),
+     wired into the CLI + the --strict gate. Catches the trailing/leading
+     missing-verse class the per-file contiguity check structurally cannot.
+     (Scope: verse-level within declared chapters; a whole-missing-chapter
+     check is deferred — chapter-count diffs between translations are common
+     versification noise.)
 
-  W9 COMPLETE (2026-05-29) — all exit criteria met. (The Hebrews data gap
-  above is tracked as a separate data-sourcing fix, not a W9 blocker.)
+  W9 COMPLETE (2026-05-29) — all exit criteria met; Hebrews data restored +
+  the cross-reference validator hardens against recurrence.
 
 ───────────────────────────────────────────────────────────────────────────────
 W10 — ACCESSIBILITY (WCAG 2.1 AA compliance)

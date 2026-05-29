@@ -9,6 +9,7 @@ import {
   validateHolyDays,
   validateFormatC,
   validateFormatD,
+  validateAgainstReference,
 } from './validate-schemas.js';
 
 // ── helpers ──────────────────────────────────────────────────────
@@ -992,5 +993,78 @@ describe('validateFormatD', () => {
 
   it('rejects non-array input', () => {
     expect(validateFormatD('nope').errors[0]).toContain('expected an array');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Cross-translation verse-count check
+// ═══════════════════════════════════════════════════════════════
+
+/** Single Format C book "ephesians" whose chapter 1 has the given verse #s. */
+function bookWith(verseNums) {
+  return {
+    id: 'ephesians',
+    title: 'Ephesians',
+    chapters: [{ num: 1, sections: [{ heading: 'h', verses: verseNums.map((n) => ({ n, text: 'x' })) }] }],
+  };
+}
+/** Reference map with Ephesians 1 having `count` verses. */
+function refWith(count) {
+  const verses = [];
+  for (let n = 1; n <= count; n++) verses.push({ n, text: 'r' });
+  return { ephesians: { '1': verses } };
+}
+
+describe('validateAgainstReference', () => {
+  it('passes when the book has every reference verse', () => {
+    expect(validateAgainstReference(bookWith([1, 2, 3]), refWith(3)).errors).toEqual([]);
+  });
+
+  it('flags a trailing gap', () => {
+    const r = validateAgainstReference(bookWith([1, 2, 3]), refWith(5));
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0]).toContain('missing verse(s) 4-5');
+  });
+
+  it('flags an internal gap', () => {
+    expect(validateAgainstReference(bookWith([1, 3]), refWith(3)).errors[0]).toContain('missing verse(s) 2');
+  });
+
+  it('compresses non-contiguous missing verses into ranges', () => {
+    expect(validateAgainstReference(bookWith([1, 5]), refWith(7)).errors[0]).toContain('missing verse(s) 2-4, 6-7');
+  });
+
+  it('accepts an object-of-books input', () => {
+    expect(validateAgainstReference({ ephesians: bookWith([1, 2, 3]) }, refWith(3)).errors).toEqual([]);
+  });
+
+  it('maps a single book via singleBookId', () => {
+    const book = { id: 'x', title: 'M', chapters: [{ num: 1, sections: [{ verses: [{ n: 1, text: 'a' }] }] }] };
+    const ref = { 'matthew-plain': { '1': [{ n: 1 }, { n: 2 }] } };
+    const r = validateAgainstReference(book, ref, { singleBookId: 'matthew-plain' });
+    expect(r.errors[0]).toContain('missing verse(s) 2');
+  });
+
+  it('warns (no error) when the book is absent from the reference', () => {
+    const r = validateAgainstReference(bookWith([1, 2, 3]), { genesis: { '1': [{ n: 1 }] } });
+    expect(r.errors).toEqual([]);
+    expect(r.warnings[0]).toContain('absent from reference');
+  });
+
+  it('skips a chapter listed in exceptions', () => {
+    const r = validateAgainstReference(bookWith([1, 2]), refWith(3), { exceptions: ['ephesians 1'] });
+    expect(r.errors).toEqual([]);
+  });
+
+  it('warns (no error) when no reference is provided', () => {
+    const r = validateAgainstReference(bookWith([1]), null);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings[0]).toContain('no reference translation');
+  });
+
+  it('ignores reference chapters the book does not declare (no false missing)', () => {
+    // book has only ch1; reference also only ch1 here — a ref-only ch2 must not error
+    const ref = { ephesians: { '1': [{ n: 1 }], '2': [{ n: 1 }, { n: 2 }] } };
+    expect(validateAgainstReference(bookWith([1]), ref).errors).toEqual([]);
   });
 });
