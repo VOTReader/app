@@ -8,14 +8,14 @@
  *     NOT cleared on version bump (corpus data rarely changes).
  *     Only cleared when CORPUS_VERSION changes.
  *
- * Update lifecycle:
- *   New SW installs in background → waits for old SW to release.
- *   App detects 'controllerchange' → shows "Update available" toast.
- *   User taps → page reloads with new SW active.
- *   No skipWaiting — user controls the reload timing.
+ * Update lifecycle (no skipWaiting on install — user controls timing):
+ *   New SW installs in background → goes to "waiting".
+ *   Page detects the waiting worker → shows "update available" toast.
+ *   User taps → page posts SKIP_WAITING → this SW skipWaiting()s → it
+ *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-7b25e28ee3';
+const CACHE_VERSION = 'v1.0.2-ad1da1f816';
 const CORPUS_VERSION = 'c1';
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -109,6 +109,16 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+});
+
+// ── Message: page-triggered activation (one-tap update) ────────
+// The page posts { type: 'SKIP_WAITING' } when the user taps the
+// "update available" toast. We deliberately do NOT skipWaiting on
+// install — the user opts in here, so they keep control of reload timing.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // ── Fetch: cache-first for core, cache-on-use for corpus ────────

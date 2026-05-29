@@ -7046,25 +7046,48 @@
 
   // app/src/main/assets/src/utils/sw-register.js
   var TOAST_ID2 = "vot-toast-sw-update";
+  var prompted = false;
   function registerServiceWorker() {
     if (PlatformBridge.isAndroid) return;
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("./service-worker.js").catch((err) => {
-      console.warn("SW registration failed", err);
-    });
     let refreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (refreshing) return;
       refreshing = true;
-      showToast2({
-        id: TOAST_ID2,
-        html: "New version available \u2014 <b>tap to update</b>",
-        className: "vot-toast-sw-update",
-        durationMs: 0
-      });
-      var el = document.getElementById(TOAST_ID2);
-      if (el) el.addEventListener("click", () => window.location.reload(), { once: true });
+      window.location.reload();
     });
+    navigator.serviceWorker.register("./service-worker.js").then((reg) => {
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        promptUpdate(reg.waiting);
+      }
+      reg.addEventListener("updatefound", () => {
+        const incoming = reg.installing;
+        if (!incoming) return;
+        incoming.addEventListener("statechange", () => {
+          if (incoming.state === "installed" && navigator.serviceWorker.controller) {
+            promptUpdate(incoming);
+          }
+        });
+      });
+    }).catch((err) => {
+      console.warn("SW registration failed", err);
+    });
+  }
+  function promptUpdate(worker) {
+    if (prompted) return;
+    prompted = true;
+    showToast2({
+      id: TOAST_ID2,
+      html: "New version available \u2014 <b>tap to update</b>",
+      className: "vot-toast-sw-update",
+      durationMs: 0
+    });
+    const el = document.getElementById(TOAST_ID2);
+    if (el) {
+      el.addEventListener("click", () => {
+        worker.postMessage({ type: "SKIP_WAITING" });
+      }, { once: true });
+    }
   }
 
   // app/src/main/assets/src/data/journal-helpers.js
