@@ -187,6 +187,17 @@ export default defineConfig({
       //   functions  62.54 (561/897)   | lines    62.15 (2181/3509)
       // Floors advance: statements 55→58, branches 46→48, functions 60→62,
       // lines 60→62.
+      //
+      // W7.1a (1426 tests — retire legacy migrations, then recover the floor):
+      //   statements 58.53 | branches 48.60 | functions 62.65 | lines 62.64
+      // Retiring migrateAnnotations + the legacy link {a,b} conversion removed
+      // ~80 lines of ABOVE-AVERAGE-covered dead code (and their tests), which
+      // mathematically dips the global mean ~0.4% — it briefly fell under the
+      // floor. Per "never lower," recovered by covering real untested in-scope
+      // logic instead: link-store's query/mutation API (getForKey /
+      // getForKeyPrefix / add / remove / replaceAll) + utils/dates.js
+      // (relativeDate / timeAgo, previously 0%). Floors HELD at 58/48/62/62,
+      // margin restored.
       thresholds: {
         statements: 58,
         branches: 48,

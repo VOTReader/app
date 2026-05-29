@@ -156,6 +156,79 @@ describe('LinkStore._normalize — malformed-record guard', () => {
   });
 });
 
+describe('LinkStore — query + mutation API', () => {
+  const mk = (/** @type {string} */ id, /** @type {string} */ srcKey, /** @type {string} */ tgtKey) => ({
+    id,
+    source: { type: 'bible', key: srcKey, label: srcKey },
+    target: { type: 'letter', key: tgtKey, label: tgtKey },
+    created: 1,
+  });
+
+  it('getForKey returns links touching the key on either endpoint', () => {
+    localStorage.setItem('vot-links', JSON.stringify([
+      mk('l1', 'bible:genesis:1:1', 'letter:a:0'),
+      mk('l2', 'bible:exodus:2:2', 'bible:genesis:1:1'),  // genesis on the TARGET side
+      mk('l3', 'bible:psalms:1:1', 'letter:b:0'),         // no genesis
+    ]));
+    expect(LinkStore.getForKey('bible:genesis:1:1').map(l => l.id).sort()).toEqual(['l1', 'l2']);
+    expect(LinkStore.getForKey('bible:nomatch:9:9')).toEqual([]);
+  });
+
+  it('getForKeyPrefix matches exact, descendant, and ancestor keys on either endpoint', () => {
+    localStorage.setItem('vot-links', JSON.stringify([
+      mk('exact', 'bible:genesis:1:1', 'letter:a:0'),         // key === prefix
+      mk('descend', 'bible:genesis:1:1:5-9', 'letter:b:0'),   // key startsWith prefix+':'
+      mk('ancestor', 'bible:genesis', 'letter:c:0'),          // prefix startsWith key+':'
+      mk('tgtside', 'letter:z:0', 'bible:genesis:1:1'),       // matches via TARGET endpoint
+      mk('nomatch', 'bible:exodus:2:2', 'letter:d:0'),
+    ]));
+    expect(LinkStore.getForKeyPrefix('bible:genesis:1:1').map(l => l.id).sort())
+      .toEqual(['ancestor', 'descend', 'exact', 'tgtside']);
+  });
+
+  it('getForKeyPrefix skips a record missing an endpoint key (internal guard)', () => {
+    localStorage.setItem('vot-links', JSON.stringify([mk('good', 'bible:genesis:1:1', 'letter:a:0')]));
+    LinkStore.all();  // load (clean record)
+    // Inject a malformed record AFTER load so _normalize didn't drop it — the
+    // guard inside getForKeyPrefix is the belt-and-suspenders this exercises.
+    LinkStore._load().push(/** @type {any} */ ({ id: 'bad', source: { key: '' }, target: null }));
+    expect(LinkStore.getForKeyPrefix('bible:genesis').map(l => l.id)).toEqual(['good']);
+  });
+
+  it('add appends a link; all() reflects it', () => {
+    expect(LinkStore.all().length).toBe(0);
+    LinkStore.add(/** @type {any} */ (mk('a1', 'bible:gen:1:1', 'letter:x:0')));
+    expect(LinkStore.all().map(l => l.id)).toEqual(['a1']);
+  });
+
+  it('remove deletes by id and is idempotent', () => {
+    localStorage.setItem('vot-links', JSON.stringify([
+      mk('keep', 'bible:gen:1:1', 'letter:x:0'),
+      mk('drop', 'bible:gen:2:2', 'letter:y:0'),
+    ]));
+    LinkStore.all();
+    LinkStore.remove('drop');
+    expect(LinkStore.all().map(l => l.id)).toEqual(['keep']);
+    LinkStore.remove('drop');  // already gone — no-op
+    expect(LinkStore.all().map(l => l.id)).toEqual(['keep']);
+  });
+
+  it('replaceAll swaps the whole list and drops malformed entries', () => {
+    LinkStore.replaceAll(/** @type {any} */ ([
+      mk('r1', 'bible:gen:1:1', 'letter:x:0'),
+      { id: 'r_bad' },  // malformed → dropped by _normalize
+    ]));
+    expect(LinkStore.all().map(l => l.id)).toEqual(['r1']);
+  });
+
+  it('replaceAll with null/undefined yields an empty list', () => {
+    localStorage.setItem('vot-links', JSON.stringify([mk('pre', 'bible:gen:1:1', 'letter:x:0')]));
+    LinkStore.all();
+    LinkStore.replaceAll(/** @type {any} */ (null));
+    expect(LinkStore.all()).toEqual([]);
+  });
+});
+
 describe('LinkStore — persistLink dedup contract', () => {
   it('returns the new link on first persist', () => {
     const source = ep({ type: 'bible', key: 'bible:gen:1:1', label: 'Gen 1:1' });
