@@ -9840,6 +9840,7 @@ Continue?`
     });
     useKeyboardInset();
     useDocumentTitle({ activeTab });
+    useDesktopKeyboard();
     useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget, setNoteSheetTarget });
     const [tabsOverviewOpen, setTabsOverviewOpen] = useState(false);
     const [lastReadChapters, setLastReadChapters] = useState(saved.lastReadChapters || {});

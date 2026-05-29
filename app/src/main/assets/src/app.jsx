@@ -140,6 +140,8 @@ function App() {
   useKeyboardInset();
   // Keep the tab/window title in sync with the active screen (W4.6).
   useDocumentTitle({ activeTab });
+  // Desktop keyboard shortcuts (web only): / + Ctrl+F search, arrows = chapter nav (W4.2).
+  useDesktopKeyboard();
   /* __bookmarkCreate, inboundJournalPayload, __openJournalInbound,
      __bookmarkEdit, auto-dismiss effect → src/hooks/use-sheet-orchestration.js (P6h) */
   /* DOM annotation re-apply layer — the post-render apply* passes

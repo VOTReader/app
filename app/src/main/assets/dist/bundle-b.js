@@ -6743,6 +6743,43 @@
     }, [title]);
   }
 
+  // app/src/main/assets/src/hooks/use-desktop-keyboard.js
+  function useDesktopKeyboard() {
+    React.useEffect(() => {
+      if (PlatformBridge.isAndroid) return;
+      const onKey = (e) => {
+        const el = (
+          /** @type {any} */
+          e.target
+        );
+        const tag = el && el.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || el && el.isContentEditable) return;
+        if (e.key === "/" || (e.ctrlKey || e.metaKey) && (e.key === "f" || e.key === "F")) {
+          if (typeof window.__goSearch === "function") {
+            e.preventDefault();
+            window.__goSearch();
+          }
+          return;
+        }
+        if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+          const nav = document.querySelector(".chapter-nav-sticky");
+          if (!nav) return;
+          const arrows = nav.querySelectorAll(".chapter-nav-sticky-arrow");
+          const btn = (
+            /** @type {any} */
+            e.key === "ArrowLeft" ? arrows[0] : arrows[1]
+          );
+          if (btn && !btn.disabled) {
+            e.preventDefault();
+            btn.click();
+          }
+        }
+      };
+      document.addEventListener("keydown", onKey);
+      return () => document.removeEventListener("keydown", onKey);
+    }, []);
+  }
+
   // app/src/main/assets/src/hooks/use-storage-info.js
   function useStorageInfo() {
     const [persistDenied, setPersistDenied] = React.useState(false);
@@ -10154,6 +10191,7 @@
     useDomAnnotationSync,
     useKeyboardInset,
     useDocumentTitle,
+    useDesktopKeyboard,
     useStorageInfo,
     formatBytes,
     StorageHealth: StorageHealth2,
