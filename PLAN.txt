@@ -2165,17 +2165,20 @@ W5 — HOSTING + CI (ship it) — LANDED 2026-05-28 (021e94a)
   build.py template substitution).
 
   Exit criteria:
-    [~] GitHub Pages serving at public URL — workflow wired; awaits the
-        repo-owner Pages-source flip + first deploy run
+    [x] GitHub Pages serving at public URL — LIVE at
+        https://votreader.github.io/VOTReader-studio/ (repo public, account
+        renamed corbinlythgoe→VOTReader; Pages enabled build_type=workflow —
+        configure-pages auto-enable failed first-run, manual/gh once)
     [x] CSP works on both Android + web without changes per platform —
         single 'self' policy; preview-verified for web (0 violations);
         Android works since 'self' = the WebViewAssetLoader origin
-    [~] CI builds and deploys on push to main — deploy-web.yml created;
-        unverified until first run on origin
+    [x] CI builds and deploys on push to main — deploy-web.yml ran green;
+        all assets serve 200; PWA installs in Chrome (passed installability)
     [~] Service worker version matches package.json — SW side wired
         (build:sw); APK versionName ← package.json (Gradle task) deferred
-    [ ] Web deploy verified: fresh browser → install PWA → works offline —
-        rolls into W6 (needs the live URL)
+    [x] Web deploy verified: install PWA + works offline — SW now pre-caches
+        the full corpus on install (v1.0.1 fix); offline Bible was the one gap
+        found on first install. SW update-cycle + real-device = W6.
 
   Risk: LOW (infrastructure, no app changes).
 
