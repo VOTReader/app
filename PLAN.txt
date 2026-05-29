@@ -2237,6 +2237,22 @@ regression testing for the migration surfaces.
   Not required for launch but valuable for regression prevention.
   Covers: boot → navigate screens → annotate → search → export.
 
+  W6.4 — Owed native fixes (implement here — they need a device to verify)
+  ────────────────────────────────────────────────────────────────────────
+  Verified accurate against the Kotlin 2026-05-29:
+    #1 Export on Android 8/9 (minSdk=26) — HIGH value. StorageManager
+       .writeJsonToDownloads returns Failure("requires_android_10") below
+       API 29, so Android 8/9 users CANNOT export — and export is the only
+       backup (allowBackup=false), i.e. real data-loss exposure for
+       in-target devices. Add a Storage Access Framework fallback
+       (Intent.ACTION_CREATE_DOCUMENT, API 19+) via an Activity-result
+       callback like the import picker already uses.
+    #2 Screenshot async — optional polish. captureScreenshot does
+       runBlocking on a binder thread (2s-capped). Make the JS side a
+       Promise resolved via evaluateJavascript when PixelCopy finishes.
+       LOW urgency: bounded, not concurrent, and the sync contract was a
+       deliberate N1.7 choice ([[explicit-async-decision]]).
+
   Exit criteria:
     [ ] Android 287-item walk: all PASS
     [ ] Chrome desktop walk: all PASS
@@ -2244,6 +2260,7 @@ regression testing for the migration surfaces.
     [ ] Firefox desktop walk: all PASS
     [ ] Data migrated correctly on both platforms
     [ ] Zero regressions from pre-migration baseline
+    [ ] Android 8/9 export works via the SAF fallback (#1)
 
   Risk: LOW (verification, not implementation).
 
@@ -2511,7 +2528,21 @@ after W6. But they MUST land before the project is called done.
   memo sizes of 50-500 KB), the optimization isn't worth the Worker
   complexity + Safari risk. Build only if profiling justifies it.
 
+  W7.x — JaCoCo class-path robustness (build hardening)
+  ─────────────────────────────────────────────────────
+  app/build.gradle.kts points JaCoCo classDirectories at the AGP-internal
+  path intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes (a
+  comment already notes older AGPs used tmp/kotlin-classes/debug). The risk
+  is SILENT: if AGP (10 on the horizon) moves the path, the fileTree
+  resolves to zero classes → the coverage gate passes while measuring
+  nothing. Minimal fix: a doFirst guard that FAILS LOUD if the class
+  fileTree is empty. Full Kover migration deferred (its AGP-9 support
+  isn't confirmed stable). Device-independent; can land any time. (#4,
+  verified accurate 2026-05-29.)
+
   Exit criteria (W7 complete):
+    [ ] JaCoCo class-dir fileTree fails loud when empty — no silent
+        zero-coverage pass. (#4)
     [ ] Schema versioning: every IDB store has a version integer +
         migration chain. Existing migrations (annotations, links)
         ported to the versioned system. vitest coverage.
@@ -3351,6 +3382,13 @@ Current state (audited 2026-05-28):
       on every interactive element
 
   Exit criteria (W10 complete):
+    [ ] Native renderer-crash retry view (MainActivity): move the
+        "Tap to reload" string to strings.xml + announceForAccessibility()
+        on show, so a screen-reader user hears the crash-recovery prompt.
+        (#3, verified 2026-05-29 — refines the proposal: a contentDescription
+        on a TextView is redundant since its visible text is already its
+        accessible name; the real gap is the view isn't ANNOUNCED when the
+        WebView process dies.)
     [ ] useFocusTrap hook: focus wraps within every modal/sheet,
         returns to trigger on close. vitest coverage.
     [ ] announce() utility: all user-feedback actions announced for
