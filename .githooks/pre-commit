@@ -281,7 +281,16 @@ if [ -n "$bundle_source_changed" ]; then
   fi
   # Stage the regenerated bundles + the re-versioned SW so the commit
   # lands with everything in sync.
+  # Stage ALL seven bundles, incl. the lazy corpus bundles (a-bible /
+  # a-matthew / a-vot) — a data-file edit (books.js, matthew.js, a VOT
+  # corpus) regenerates those, and they're tracked, so they must be
+  # re-staged or the committed bundle goes stale (CI bundle-match fails +
+  # the app ships old data). `git add` of an unchanged bundle is a no-op,
+  # so listing them is safe on non-corpus commits.
   git add app/src/main/assets/dist/bundle-a.js \
+          app/src/main/assets/dist/bundle-a-bible.js \
+          app/src/main/assets/dist/bundle-a-matthew.js \
+          app/src/main/assets/dist/bundle-a-vot.js \
           app/src/main/assets/dist/bundle-b.js \
           app/src/main/assets/dist/bundle-c.js \
           app/src/main/assets/dist/bundle-d.js \
