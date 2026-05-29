@@ -15,7 +15,7 @@
  *   No skipWaiting — user controls the reload timing.
  */
 
-const CACHE_VERSION = 'v1.0.1';
+const CACHE_VERSION = 'v1.0.2';
 const CORPUS_VERSION = 'c1';
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
