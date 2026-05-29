@@ -1,13 +1,15 @@
 #!/bin/sh
 # pre-commit hook — six pre-flight checks gated on what's staged:
 #
-#   1. check_balance.py + validate-schemas.js   when corpus data files change
-#      check_balance.py catches black-screen failure modes that brace-
-#      balance alone misses: esprima parse errors, smart-quote delimiters,
-#      non-ASCII dashes in verse ranges. validate-schemas.js --strict
-#      (W9.1) then checks the Format A schema: required fields, block /
-#      segment types, footnote<->nkjv integrity, prev/next chain — the
-#      "valid JS but invalid letter" class that check_balance.py can't see.
+#   1. check_balance.py        when corpus data files change
+#      Catches black-screen failure modes that brace-balance alone misses:
+#      esprima parse errors, smart-quote delimiters, non-ASCII dashes in
+#      verse ranges.
+#   1b. validate-schemas.js --strict   when data files OR the validator change
+#      (W9.1) Checks the Format A/B/C/D + Holy Days schemas: required
+#      fields, block/segment/align types, footnote<->nkjv integrity,
+#      prev/next chains, study chapterId resolution — the "valid JS but
+#      invalid letter" class that check_balance.py can't see.
 #
 #   2. lint-staged (Q3.5)    when any .js/.jsx source file changes
 #      Runs `eslint --max-warnings 0` ONLY on staged source files.
@@ -64,6 +66,10 @@ staged=$(git diff --cached --name-only "$against")
 
 # ─── Step 1: corpus data file validation ────────────────────────────
 data_changed=$(echo "$staged" | grep '^app/src/main/assets/src/data/' || true)
+# Also run the schema validator when the validator OR its tests change, so a
+# regression in tools/validate-schemas.js is caught even on a commit that
+# stages no data file.
+schema_tool_changed=$(echo "$staged" | grep -E '^tools/validate-schemas' || true)
 
 if [ -n "$data_changed" ]; then
   echo "[pre-commit] Data files changed — running check_balance.py..."
@@ -82,13 +88,16 @@ if [ -n "$data_changed" ]; then
   fi
   echo "[pre-commit] All data files OK."
   echo ""
+fi
 
-  # ─── Step 1b: Format A schema validation (W9.1) ───────────────────
-  # node tools/validate-schemas.js --strict exits nonzero on any schema
-  # error (missing field, bad block/segment type, orphaned footnote ref,
-  # broken prev/next chain). Node may not be on the inherited PATH on
-  # Windows (winget install) — probe the known install dirs, same pattern
-  # as the bundle-rebuild step below.
+# ─── Step 1b: schema validation (W9.1 — Format A/B/C/D + Holy Days) ──
+# node tools/validate-schemas.js --strict exits nonzero on any schema
+# error (missing field, bad block/segment/align type, orphaned footnote
+# ref, broken prev/next chain, unresolved study chapterId, …). Runs on
+# data changes AND validator changes. Node may not be on the inherited
+# PATH on Windows (winget install) — probe known install dirs, same
+# pattern as the bundle-rebuild step below.
+if [ -n "$data_changed" ] || [ -n "$schema_tool_changed" ]; then
   if ! command -v node >/dev/null 2>&1; then
     for candidate in \
         "/c/Program Files/nodejs" \
@@ -101,7 +110,7 @@ if [ -n "$data_changed" ]; then
       fi
     done
   fi
-  echo "[pre-commit] Validating Format A schema — node tools/validate-schemas.js --strict..."
+  echo "[pre-commit] Validating data schemas — node tools/validate-schemas.js --strict..."
   node tools/validate-schemas.js --strict
   status=$?
   if [ $status -ne 0 ]; then
@@ -109,8 +118,8 @@ if [ -n "$data_changed" ]; then
     echo "---------------------------------------------------------------"
     echo "Schema validation FAILED — see errors above."
     echo "A data file has a structural error the parser can't catch:"
-    echo "missing field, bad block/segment type, orphaned footnote ref,"
-    echo "or a broken prev/next chain."
+    echo "missing field, bad block/segment/align type, orphaned footnote"
+    echo "ref, broken prev/next chain, or an unresolved study chapterId."
     echo "Fix the errors, re-stage the file(s), then retry the commit."
     echo "Emergency bypass (not recommended): git commit --no-verify"
     echo "---------------------------------------------------------------"

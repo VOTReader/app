@@ -3,7 +3,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateFormatA } from './validate-schemas.js';
+import {
+  validateFormatA,
+  validateFormatB,
+  validateHolyDays,
+  validateFormatC,
+  validateFormatD,
+} from './validate-schemas.js';
 
 // ── helpers ──────────────────────────────────────────────────────
 
@@ -633,5 +639,358 @@ describe('validateFormatA', () => {
       // Second entry missing label and url
       expect(result.errors.length).toBe(2);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Format B (WTLB One/Two, The Blessed)
+// ═══════════════════════════════════════════════════════════════
+
+/** Minimal valid Format B entry. */
+function validEntry(overrides = {}) {
+  return {
+    id: 'test-entry',
+    num: 1,
+    title: 'Test Entry',
+    paragraphs: [{ align: 'center', text: 'Some text.' }],
+    ...overrides,
+  };
+}
+
+describe('validateFormatB', () => {
+  it('valid minimal entry produces zero errors', () => {
+    const result = validateFormatB([validEntry()]);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('accepts all valid align values', () => {
+    const entry = validEntry({
+      paragraphs: [
+        { align: 'center', text: 'a' },
+        { align: 'justify', text: 'b' },
+        { align: 'left', text: 'c' },
+      ],
+    });
+    expect(validateFormatB([entry]).errors).toEqual([]);
+  });
+
+  it('detects missing id', () => {
+    const e = validEntry(); delete e.id;
+    const result = validateFormatB([e]);
+    expect(result.errors[0]).toContain('id');
+  });
+
+  it('detects missing title', () => {
+    const e = validEntry(); delete e.title;
+    expect(validateFormatB([e]).errors[0]).toContain('title');
+  });
+
+  it('detects missing paragraphs', () => {
+    const e = validEntry(); delete e.paragraphs;
+    expect(validateFormatB([e]).errors[0]).toContain('paragraphs');
+  });
+
+  it('detects invalid align', () => {
+    const e = validEntry({ paragraphs: [{ align: 'centre', text: 'x' }] });
+    const result = validateFormatB([e]);
+    expect(result.errors[0]).toContain('invalid align');
+  });
+
+  it('detects paragraph missing text', () => {
+    const e = validEntry({ paragraphs: [{ align: 'center' }] });
+    expect(validateFormatB([e]).errors[0]).toContain('text');
+  });
+
+  it('detects num wrong type', () => {
+    expect(validateFormatB([validEntry({ num: 'one' })]).errors[0]).toContain('num');
+  });
+
+  it('rejects non-array input', () => {
+    expect(validateFormatB('nope').errors[0]).toContain('expected an array');
+  });
+
+  it('rejects non-object scriptures', () => {
+    expect(validateFormatB([validEntry({ scriptures: [] })]).errors[0]).toContain('scriptures');
+  });
+
+  describe('inline refs', () => {
+    it('accepts a well-formed nav link', () => {
+      const e = validEntry({ paragraphs: [{ align: 'center', text: 'See {{nav:esther:7}}.' }] });
+      expect(validateFormatB([e]).errors).toEqual([]);
+    });
+
+    it('detects a malformed nav link (missing chapter)', () => {
+      const e = validEntry({ paragraphs: [{ align: 'center', text: '{{nav:esther}}' }] });
+      expect(validateFormatB([e]).errors[0]).toContain('malformed nav link');
+    });
+
+    it('detects a malformed nav link (non-numeric chapter)', () => {
+      const e = validEntry({ paragraphs: [{ align: 'center', text: '{{nav:esther:vii}}' }] });
+      expect(validateFormatB([e]).errors[0]).toContain('malformed nav link');
+    });
+
+    it('detects an empty ref', () => {
+      const e = validEntry({ paragraphs: [{ align: 'center', text: 'x {{ref:}} y' }] });
+      expect(validateFormatB([e]).errors[0]).toContain('empty inline ref');
+    });
+
+    it('warns when a ref is absent from a non-empty scriptures dict', () => {
+      const e = validEntry({ paragraphs: [{ align: 'center', text: 'See {{ref:John 3:16}}.' }] });
+      const result = validateFormatB([e], { scriptures: { 'Matthew 4:4': 'text' } });
+      expect(result.errors).toEqual([]);
+      expect(result.warnings[0]).toContain('not found in scriptures');
+    });
+
+    it('passes when a ref exists in the scriptures dict', () => {
+      const e = validEntry({ paragraphs: [{ align: 'center', text: 'See {{ref:John 3:16}}.' }] });
+      const result = validateFormatB([e], { scriptures: { 'John 3:16': 'text' } });
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('does not warn on refs when no scriptures dict is provided', () => {
+      const e = validEntry({ paragraphs: [{ align: 'center', text: '{{ref:John 3:16}}' }] });
+      expect(validateFormatB([e]).warnings).toEqual([]);
+    });
+
+    it('matches compound ref keys verbatim', () => {
+      const e = validEntry({ paragraphs: [{ align: 'center', text: '{{ref:Isaiah 40:13; Romans 11:34}}' }] });
+      const result = validateFormatB([e], { scriptures: { 'Isaiah 40:13; Romans 11:34': 'text' } });
+      expect(result.warnings).toEqual([]);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Holy Days (hybrid album)
+// ═══════════════════════════════════════════════════════════════
+
+describe('validateHolyDays', () => {
+  function wtlbEntry(overrides = {}) {
+    return { id: 'hd-w', num: 1, title: 'HD WTLB', type: 'wtlb',
+      paragraphs: [{ align: 'center', text: 'x' }], scriptures: {}, ...overrides };
+  }
+  function letterEntry(overrides = {}) {
+    return { id: 'hd-l', num: 2, title: 'HD Letter', type: 'letter',
+      blocks: [{ type: 'para', segments: [{ t: 'text', v: 'x' }] }],
+      footnotes: {}, nkjv: {}, ...overrides };
+  }
+
+  it('accepts a valid wtlb-type entry', () => {
+    expect(validateHolyDays([wtlbEntry()]).errors).toEqual([]);
+  });
+
+  it('accepts a valid letter-type entry', () => {
+    expect(validateHolyDays([letterEntry()]).errors).toEqual([]);
+  });
+
+  it('detects an invalid type', () => {
+    expect(validateHolyDays([wtlbEntry({ type: 'bogus' })]).errors[0]).toContain('invalid or missing "type"');
+  });
+
+  it('detects a missing type', () => {
+    const e = wtlbEntry(); delete e.type;
+    expect(validateHolyDays([e]).errors[0]).toContain('type');
+  });
+
+  it('delegates letter-type block validation to Format A', () => {
+    const e = letterEntry({ blocks: [{ type: 'bogus' }] });
+    expect(validateHolyDays([e]).errors[0]).toContain('invalid block type');
+  });
+
+  it('delegates wtlb-type paragraph validation to Format B', () => {
+    const e = wtlbEntry({ paragraphs: [{ align: 'sideways', text: 'x' }] });
+    expect(validateHolyDays([e]).errors[0]).toContain('invalid align');
+  });
+
+  it('passes a consistent prevEntry/nextEntry chain', () => {
+    const entries = [
+      wtlbEntry({ id: 'a', title: 'A', prevEntry: null, nextEntry: { id: 'b', title: 'B' } }),
+      letterEntry({ id: 'b', title: 'B', prevEntry: { id: 'a', title: 'A' }, nextEntry: null }),
+    ];
+    const result = validateHolyDays(entries);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('detects a broken nextEntry chain', () => {
+    const entries = [
+      wtlbEntry({ id: 'a', title: 'A', prevEntry: null, nextEntry: { id: 'wrong', title: 'W' } }),
+      wtlbEntry({ id: 'b', title: 'B', prevEntry: { id: 'a', title: 'A' }, nextEntry: null }),
+    ];
+    const result = validateHolyDays(entries);
+    expect(result.errors[0]).toContain('nextEntry.id');
+    expect(result.errors[0]).toContain('wrong');
+  });
+
+  it('rejects non-array input', () => {
+    expect(validateHolyDays('nope').errors[0]).toContain('expected an array');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Format C (Bible books)
+// ═══════════════════════════════════════════════════════════════
+
+/** Minimal valid Format C book. */
+function validBook(overrides = {}) {
+  return {
+    id: 'ephesians',
+    title: 'Ephesians',
+    chapters: [
+      { num: 1, title: 'Ch1', sections: [
+        { heading: 'Greeting', verses: [{ n: 1, text: 'Paul...' }, { n: 2, text: 'Grace...' }] },
+      ] },
+    ],
+    ...overrides,
+  };
+}
+
+describe('validateFormatC', () => {
+  it('valid single book produces zero errors', () => {
+    expect(validateFormatC(validBook()).errors).toEqual([]);
+  });
+
+  it('valid object-of-books produces zero errors', () => {
+    expect(validateFormatC({ ephesians: validBook(), john: validBook({ id: 'john', title: 'John' }) }).errors).toEqual([]);
+  });
+
+  it('valid array of books produces zero errors', () => {
+    expect(validateFormatC([validBook()]).errors).toEqual([]);
+  });
+
+  it('detects missing chapters', () => {
+    const b = validBook(); delete b.chapters;
+    expect(validateFormatC(b).errors[0]).toContain('chapters');
+  });
+
+  it('detects chapter missing num', () => {
+    const b = validBook({ chapters: [{ sections: [] }] });
+    expect(validateFormatC(b).errors[0]).toContain('num');
+  });
+
+  it('detects section missing verses', () => {
+    const b = validBook({ chapters: [{ num: 1, sections: [{ heading: 'x' }] }] });
+    expect(validateFormatC(b).errors[0]).toContain('verses');
+  });
+
+  it('detects verse missing n', () => {
+    const b = validBook({ chapters: [{ num: 1, sections: [{ heading: 'x', verses: [{ text: 'no n' }] }] }] });
+    expect(validateFormatC(b).errors[0]).toContain('"n"');
+  });
+
+  it('detects verse missing text', () => {
+    const b = validBook({ chapters: [{ num: 1, sections: [{ heading: 'x', verses: [{ n: 1 }] }] }] });
+    expect(validateFormatC(b).errors[0]).toContain('text');
+  });
+
+  it('detects non-ascending verse numbering', () => {
+    const b = validBook({ chapters: [{ num: 1, sections: [{ heading: 'x', verses: [{ n: 5, text: 'a' }, { n: 3, text: 'b' }] }] }] });
+    expect(validateFormatC(b).errors[0]).toContain('not ascending');
+  });
+
+  it('ascends across sections within a chapter', () => {
+    const b = validBook({ chapters: [{ num: 1, sections: [
+      { heading: 's1', verses: [{ n: 1, text: 'a' }, { n: 2, text: 'b' }] },
+      { heading: 's2', verses: [{ n: 3, text: 'c' }] },
+    ] }] });
+    expect(validateFormatC(b).errors).toEqual([]);
+  });
+
+  it('warns on a verse gap', () => {
+    const b = validBook({ chapters: [{ num: 1, sections: [{ heading: 'x', verses: [{ n: 1, text: 'a' }, { n: 5, text: 'b' }] }] }] });
+    const result = validateFormatC(b);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings[0]).toContain('verse gap');
+  });
+
+  it('rejects non-object input', () => {
+    expect(validateFormatC(42).errors[0]).toContain('expected an object');
+  });
+
+  describe('chromeOnly mode', () => {
+    it('does not require per-book id/title', () => {
+      const chrome = { ephesians: { chapters: [{ num: 1, sections: [{ heading: 'Greeting' }] }] } };
+      expect(validateFormatC(chrome, { chromeOnly: true }).errors).toEqual([]);
+    });
+
+    it('does not require verses', () => {
+      const chrome = { ephesians: { chapters: [{ num: 1, sections: [{ heading: 'h' }] }] } };
+      expect(validateFormatC(chrome, { chromeOnly: true }).errors).toEqual([]);
+    });
+
+    it('still flags a non-array verses field if present', () => {
+      const chrome = { ephesians: { chapters: [{ num: 1, sections: [{ heading: 'h', verses: 'bad' }] }] } };
+      expect(validateFormatC(chrome, { chromeOnly: true }).errors[0]).toContain('verses');
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Format D (Bible Studies)
+// ═══════════════════════════════════════════════════════════════
+
+/** Minimal valid Format D study. */
+function validStudy(overrides = {}) {
+  return {
+    id: 'study-1',
+    title: 'A Study',
+    chapters: [
+      { id: 'study-1-ch1', num: 1, title: 'Ch1', blocks: [] },
+      { id: 'study-1-ch2', num: 2, title: 'Ch2', blocks: [] },
+    ],
+    ...overrides,
+  };
+}
+
+describe('validateFormatD', () => {
+  it('valid study (chapters only) produces zero errors', () => {
+    expect(validateFormatD([validStudy()]).errors).toEqual([]);
+  });
+
+  it('valid multi-part study with resolving chapterIds produces zero errors', () => {
+    const study = validStudy({
+      parts: [{ num: 1, title: 'Part 1', chapterIds: ['study-1-ch1', 'study-1-ch2'] }],
+    });
+    expect(validateFormatD([study]).errors).toEqual([]);
+  });
+
+  it('detects missing chapters', () => {
+    const s = validStudy(); delete s.chapters;
+    expect(validateFormatD([s]).errors[0]).toContain('chapters');
+  });
+
+  it('detects chapter missing id', () => {
+    const s = validStudy({ chapters: [{ num: 1, title: 'x' }] });
+    expect(validateFormatD([s]).errors[0]).toContain('id');
+  });
+
+  it('detects part missing title', () => {
+    const s = validStudy({ parts: [{ chapterIds: ['study-1-ch1'] }] });
+    expect(validateFormatD([s]).errors[0]).toContain('title');
+  });
+
+  it('detects part missing chapterIds', () => {
+    const s = validStudy({ parts: [{ title: 'Part 1' }] });
+    expect(validateFormatD([s]).errors[0]).toContain('chapterIds');
+  });
+
+  it('detects an unresolvable chapterId', () => {
+    const s = validStudy({ parts: [{ title: 'P', chapterIds: ['study-1-ch99'] }] });
+    const result = validateFormatD([s]);
+    expect(result.errors[0]).toContain('does not match any chapter');
+  });
+
+  it('accepts a singlePage study with no parts', () => {
+    const s = validStudy({ singlePage: true });
+    expect(validateFormatD([s]).errors).toEqual([]);
+  });
+
+  it('detects singlePage wrong type', () => {
+    expect(validateFormatD([validStudy({ singlePage: 'yes' })]).errors[0]).toContain('singlePage');
+  });
+
+  it('rejects non-array input', () => {
+    expect(validateFormatD('nope').errors[0]).toContain('expected an array');
   });
 });

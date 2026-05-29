@@ -2956,16 +2956,35 @@ Current validation gap:
     npm run validate:data
 
   Exit criteria (W9 complete):
-    [ ] Schema validators for all 4 formats (Format A/B/C/D) with
+    [x] Schema validators for all 4 formats (Format A/B/C/D) with
         field-level + cross-field + chain validation. vitest coverage.
-    [ ] Build pipeline rejects structurally invalid data files.
+        (A + B + Holy-Days-hybrid + C + D all landed; 106 vitest cases.
+        Holy Days is a hybrid album — each entry dispatches to the Format A
+        or Format B per-item validator on entry.type. Deferred to a future
+        Format-E pass: matthew.js Study Bible, matthew-nkjv.js ref→text
+        dict, bible-*.js translation verse maps — distinct shapes that
+        postdate this spec.)
+    [x] Build pipeline rejects structurally invalid data files.
         Manual test: introduce a typo block type, verify build fails.
+        (validate:data --strict now covers all formats; gate proven in W9.2.)
     [ ] Import validates per-store payloads before writing. Corrupted
-        stores skipped with user-visible reporting. vitest coverage.
-    [ ] Pre-commit hook runs schema validation on data file changes.
-    [ ] CI runs schema validation between lint and build.
-    [ ] Zero false positives on the current 21 data files (all must
-        pass --strict validation as-is).
+        stores skipped with user-visible reporting. vitest coverage. (W9.3)
+    [x] Pre-commit hook runs schema validation on data file changes.
+    [x] CI runs schema validation between lint and build.
+    [x] Zero false positives on the current data files (all pass --strict;
+        0 errors / 869 items). Warnings are legitimate: 2 orphaned note
+        footnotes (volume-one, letters-timothy) + 3 verse-gap flags in
+        books.js Hebrews — see finding below.
+
+  FINDING (validator's first real catch, 2026-05-29): books.js is missing
+  Hebrews verses — Heb 10:15-18, Heb 11:12-31 (20 verses of the faith
+  chapter), Heb 13:18-19 (26 verses total). The data jumps section-to-
+  section past them; invisible to check_balance.py. Surfaced as verse-gap
+  WARNINGS (gaps stay warnings, not errors, since single-verse omissions
+  can be legitimate critical-text variants). Tracked for a data-sourcing
+  fix (needs correct NKJV text from a trusted source — do NOT fabricate).
+
+  Only W9.3 (import payload validation) remains for W9 to close.
 
 ───────────────────────────────────────────────────────────────────────────────
 W10 — ACCESSIBILITY (WCAG 2.1 AA compliance)
