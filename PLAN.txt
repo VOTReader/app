@@ -2551,12 +2551,15 @@ after W6. But they MUST land before the project is called done.
   Non-urgent but hard-dated; do before 2026-09-16.
 
   Exit criteria (W7 complete):
-    [ ] JaCoCo class-dir fileTree fails loud when empty — no silent
-        zero-coverage pass. (#4)
+    [x] JaCoCo class-dir fileTree fails loud when empty — no silent
+        zero-coverage pass. (#4, landed 2026-05-29.)
     [ ] Schema versioning: every IDB store has a version integer +
         migration chain. Existing migrations (annotations, links)
         ported to the versioned system. vitest coverage.
-    [ ] raw() freeze: Object.freeze on raw() return. All vitest pass.
+    [x] raw() freeze (W7.2): raw() returns a shallow-FROZEN COPY, NOT the
+        live cache — freezing _load()'s live return would freeze _cache and
+        break in-place mutations. All 1426 vitest pass; +5 cases pin the
+        contract incl. the don't-freeze-the-live-cache regression.
     [ ] hlTick: ZERO references in production code (grep confirms).
         All annotation/note/bookmark/link re-renders work via
         useSyncExternalStore. All vitest pass. Smoke walk confirms.

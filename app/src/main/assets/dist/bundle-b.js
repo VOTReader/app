@@ -710,8 +710,37 @@
           console.warn("localStorage write failed for", storageKey, e);
         }
       },
+      /**
+       * Public read accessor — returns a shallow-FROZEN COPY of the cache,
+       * NOT the live object (W7.2 mutation safety). Attempting to mutate the
+       * result throws a TypeError (ES modules run in strict mode), so the only
+       * write path is the store's named methods (add/remove/update/set), which
+       * call `_save()` + `_bump()`.
+       *
+       * Why a copy, not `Object.freeze(this._load())`: `_load()` returns the
+       * LIVE `_cache`, and stores mutate it in place (`this._load().push(...)`,
+       * etc.). Freezing it directly would freeze the working object and break
+       * every subsequent mutation. Freezing a *copy* isolates the guard from
+       * the live cache. Shallow only — nested objects/arrays are shared refs
+       * (named methods are the write path; deep-freeze is unnecessary cost).
+       * Primitive-valued stores return the value as-is.
+       *
+       * Cost: O(top-level keys), not O(bytes) — and raw() has no render-path
+       * callers (reactive reads go through subscribe()+getVersion() + named
+       * getters). Treat the result as a snapshot, not a live reactive view.
+       */
       raw() {
-        return this._load();
+        const d = this._load();
+        if (d === null || typeof d !== "object") return d;
+        const anyD = (
+          /** @type {any} */
+          d
+        );
+        const copy = Array.isArray(anyD) ? anyD.slice() : { ...anyD };
+        return (
+          /** @type {T} */
+          Object.freeze(copy)
+        );
       },
       /* ─── React 18 reactivity contract (subscribe + getSnapshot) ─── */
       _version: 0,

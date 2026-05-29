@@ -1121,3 +1121,77 @@ describe('CachedStore W2.2 — getState / isReady reflect transitions', () => {
     expect(store.getState()).toBe('loaded');
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+   PART 3 — W7.2 raw() immutability (frozen-copy mutation safety).
+   ═══════════════════════════════════════════════════════════════════
+   raw() must return a shallow-FROZEN COPY, never the live `_cache`. The
+   regression these tests pin: a naive `Object.freeze(this._load())` would
+   freeze the live cache (since _load() returns it) and break the store's
+   own in-place mutations. Freezing a copy isolates the guard. */
+
+describe('CachedStore — W7.2 raw() immutability (frozen copy)', () => {
+  beforeEach(() => {
+    if (typeof localStorage === 'undefined') {
+      /** @type {any} */ const data = {};
+      globalThis.localStorage = /** @type {any} */ ({
+        get length() { return Object.keys(data).length; },
+        clear() { for (const k in data) delete data[k]; },
+        key(i) { return Object.keys(data)[i] ?? null; },
+        getItem(k) { return data[k] ?? null; },
+        setItem(k, v) { data[k] = String(v); },
+        removeItem(k) { delete data[k]; },
+      });
+    } else {
+      localStorage.clear?.();
+    }
+  });
+
+  it('returns a frozen object; adding/reassigning/deleting a top-level key throws', () => {
+    const s = CachedStore('w72-obj', /** @type {Record<string, number>} */ ({ x: 1 }));
+    const r = s.raw();
+    expect(Object.isFrozen(r)).toBe(true);
+    expect(r).toEqual({ x: 1 });
+    expect(() => { r.y = 2; }).toThrow();
+    expect(() => { r.x = 9; }).toThrow();
+    expect(() => { delete r.x; }).toThrow();
+  });
+
+  it('returns a frozen COPY — does NOT freeze the live cache (the regression)', () => {
+    const s = CachedStore('w72-live', /** @type {Record<string, number>} */ ({}));
+    s._load().a = 1;              // simulate a named-method in-place write
+    const snap = s.raw();         // frozen COPY of the current cache
+    // The live cache must stay mutable. If raw() had frozen the live
+    // `_cache` (the naive Object.freeze(this._load()) form), this throws.
+    expect(() => { s._load().b = 2; }).not.toThrow();
+    expect(s._load().b).toBe(2);
+    // The earlier snapshot is frozen and unaffected by the later write.
+    expect(Object.isFrozen(snap)).toBe(true);
+    expect('b' in snap).toBe(false);
+  });
+
+  it('is a point-in-time snapshot — later writes do not appear in an earlier raw()', () => {
+    const s = CachedStore('w72-snap', /** @type {Record<string, number>} */ ({}));
+    s._load().a = 1;
+    const r1 = s.raw();
+    s._load().b = 2;
+    expect('b' in r1).toBe(false);      // r1 captured before the write
+    expect('b' in s.raw()).toBe(true);  // a fresh raw() sees it
+  });
+
+  it('on an array-shaped store returns a frozen array copy; live array stays mutable', () => {
+    const s = CachedStore('w72-arr', /** @type {string[]} */ ([]));
+    s._load().push('a');
+    const r = s.raw();
+    expect(Array.isArray(r)).toBe(true);
+    expect(r).toEqual(['a']);
+    expect(Object.isFrozen(r)).toBe(true);
+    expect(() => r.push('b')).toThrow();
+    expect(() => s._load().push('c')).not.toThrow();   // live cache untouched
+  });
+
+  it('on a primitive-valued store returns the value as-is (no wrapping, no throw)', () => {
+    expect(CachedStore('w72-bool', false).raw()).toBe(false);
+    expect(CachedStore('w72-num', 0).raw()).toBe(0);
+  });
+});
