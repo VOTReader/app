@@ -305,6 +305,27 @@
       .screen-scroll::-webkit-scrollbar-track { background: transparent; }
       .screen-scroll::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 2px; }
       @media (hover: hover) { .screen-scroll::-webkit-scrollbar-thumb:hover { background: var(--gold); } }
+
+      /* ── W4.1 DESKTOP COLUMN ──
+         On wide screens, constrain the app to a centered phone-like column
+         so line length stays readable and the layout doesn't sprawl. The
+         mobile flex layout below 768px is untouched. .screen-layout is the
+         flex shell (nav + scroll in one column), so centering IT centers
+         everything inside; .sh-banner is position:fixed, so it's re-centered
+         to match the column width. */
+      @media (min-width: 768px) {
+        .screen-layout {
+          max-width: 760px;
+          margin: 0 auto;
+          border-left: 1px solid var(--gold-border);
+          border-right: 1px solid var(--gold-border);
+        }
+        .sh-banner {
+          left: 50%; right: auto;
+          transform: translateX(-50%);
+          width: 100%; max-width: 760px;
+        }
+      }
       .top-nav {
         flex-shrink: 0; z-index: 100;
         display: flex; align-items: center; gap: 0.25rem;
