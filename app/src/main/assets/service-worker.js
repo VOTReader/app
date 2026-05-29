@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-8614976090';
+const CACHE_VERSION = 'v1.0.2-e39de8a46b';
 const CORPUS_VERSION = 'c1';
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -45,6 +45,8 @@ const CORE_ASSETS = [
   './fonts/eb-garamond-latin-wght-italic.woff2',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './icons/icon-192-maskable.png',
+  './icons/icon-512-maskable.png',
   './splash.jpg',
   './study-cover-mtam.jpg',
   './study-cover-lamb.jpg',
