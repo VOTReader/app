@@ -1,5 +1,17 @@
 name: CI
 
+# ── MAINTENANCE: Node 24 Actions migration (do before 2026-09-16) ──
+# GitHub is retiring the Node 20 Actions runtime — runs are forced to
+# Node 24 on 2026-06-16, and Node 20 is removed from runners 2026-09-16.
+# The actions pinned below (checkout@v4, setup-node@v4, setup-python@v5,
+# setup-java@v4, gradle/actions/setup-gradle@v4, upload-artifact@v4) run
+# on Node 20 and emit a deprecation warning every run; after 2026-09-16
+# they WILL fail. Fix: bump every `uses:` HERE and in deploy-web.yml to
+# its current Node-24 major (verify latest at fix time — e.g.
+# checkout/setup-node -> v5, setup-python -> v6). Warning only today, so
+# non-urgent — but it is a hard deadline.
+# Ref: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+
 # CI pipeline:
 #   Q1   — build all 4 bundles, verify committed dist/ matches source, syntax-check src/
 #   Q3.4 — lint gate: 0 errors enforced by eslint's default (any error → nonzero exit),

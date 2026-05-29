@@ -2540,6 +2540,16 @@ after W6. But they MUST land before the project is called done.
   isn't confirmed stable). Device-independent; can land any time. (#4,
   verified accurate 2026-05-29.)
 
+  STANDING MAINTENANCE (not a W7 gate) — Node 24 Actions migration:
+  GitHub retires the Node 20 Actions runtime (runs forced to Node 24 on
+  2026-06-16; Node 20 removed from runners 2026-09-16). ci.yml +
+  deploy-web.yml pin their actions on Node 20 (checkout@v4, setup-node@v4,
+  setup-python@v5, setup-java@v4, setup-gradle@v4, upload-*) — each emits
+  a deprecation warning every CI run today and WILL fail CI after
+  2026-09-16. Fix = bump every `uses:` to its current Node-24 major.
+  Dated point-of-fix comments live at the top of both workflow files.
+  Non-urgent but hard-dated; do before 2026-09-16.
+
   Exit criteria (W7 complete):
     [ ] JaCoCo class-dir fileTree fails loud when empty — no silent
         zero-coverage pass. (#4)
