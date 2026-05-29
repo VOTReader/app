@@ -1992,6 +1992,9 @@
     .inline-scrip-ref.active { color:var(--tap-ref-active); border-bottom-color:var(--tap-ref); background:var(--gold-faint); }
     .letter-link-ref { color:var(--tap-ref); font-style:italic; cursor:pointer; border-bottom:1px dotted var(--tap-ref-sub); padding-bottom:0.02em; }
     .letter-link-ref:active { color:var(--tap-ref-active); border-bottom-color:var(--tap-ref); }
+    /* W4.3: desktop hover feedback for the inline tappable refs (they had
+       only :active). Mirrors the active state — brightens text + border. */
+    @media (hover: hover) { .inline-scrip-ref:hover, .letter-link-ref:hover { color:var(--tap-ref-active); border-bottom-color:var(--tap-ref); } }
 
     /* ── TABS: nav button ─────────────────────────────────────────── */
     .tabs-nav-btn {
