@@ -3,11 +3,13 @@ name: Deploy Web (PWA → GitHub Pages)
 # W5.1 — publish the web-facing asset subtree to GitHub Pages.
 #
 # The app is static files; there is no server. Only app/src/main/assets/
-# is web-facing, and within it these are NOT runtime assets and are
-# excluded from the deploy:
-#   src/        — ES module sources (the dist/ bundles contain all runtime code)
-#   *.d.ts      — TypeScript ambient declarations (type-check only)
-#   *.lnk       — Windows shortcuts (developer convenience junk)
+# is web-facing. Within it, src/ (ES module sources), *.d.ts, and *.lnk are
+# NOT runtime assets and are excluded — with ONE exception: the alternate
+# Bible translations + bible-studies.js (src/data/bible-*.js). Those are
+# loaded at runtime via <script src="src/data/bible-*.js"> (loadTranslation /
+# loadBibleStudies) and are NOT bundled into dist/, so they must ship; the
+# staging step copies them back in after the broad src/ exclusion. (The main
+# corpus IS in the dist/ bundles, so the rest of src/ stays out.)
 # dist/, fonts/, icons/, and every root file (vendor libs, images, css,
 # index.html, manifest.json, service-worker.js, offline.html) ship as-is.
 #
@@ -84,7 +86,13 @@ jobs:
             --exclude='*.d.ts' \
             --exclude='*.lnk' \
             app/src/main/assets/ _site/
+          # The alternate translations + bible-studies.js are loaded at
+          # runtime from src/data/ (not bundled), so copy just those back in
+          # after the blanket src/ exclusion above — the rest of src/ stays out.
+          mkdir -p _site/src/data
+          cp app/src/main/assets/src/data/bible-*.js _site/src/data/
           echo "Staged file count: $(find _site -type f | wc -l)"
+          echo "Translations staged into src/data: $(ls _site/src/data/ | wc -l)"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
