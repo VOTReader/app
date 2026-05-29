@@ -138,6 +138,8 @@ function App() {
   // input-owning overlays lift above the IME. Mount-only → extracted to
   // src/hooks/use-keyboard-inset.js (P11).
   useKeyboardInset();
+  // Keep the tab/window title in sync with the active screen (W4.6).
+  useDocumentTitle({ activeTab });
   /* __bookmarkCreate, inboundJournalPayload, __openJournalInbound,
      __bookmarkEdit, auto-dismiss effect → src/hooks/use-sheet-orchestration.js (P6h) */
   /* DOM annotation re-apply layer — the post-render apply* passes

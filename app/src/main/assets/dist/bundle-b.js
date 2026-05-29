@@ -6729,6 +6729,20 @@
     }, []);
   }
 
+  // app/src/main/assets/src/hooks/use-document-title.js
+  var APP_NAME = "VOTReader";
+  function useDocumentTitle({ activeTab }) {
+    let title = APP_NAME;
+    try {
+      const d = describeTab(activeTab || { screen: "home" });
+      if (d && d.title && d.title !== "Home") title = `${d.title} \u2014 ${APP_NAME}`;
+    } catch (_e) {
+    }
+    React.useEffect(() => {
+      document.title = title;
+    }, [title]);
+  }
+
   // app/src/main/assets/src/hooks/use-storage-info.js
   function useStorageInfo() {
     const [persistDenied, setPersistDenied] = React.useState(false);
@@ -10139,6 +10153,7 @@
     useAppShellEffects,
     useDomAnnotationSync,
     useKeyboardInset,
+    useDocumentTitle,
     useStorageInfo,
     formatBytes,
     StorageHealth: StorageHealth2,

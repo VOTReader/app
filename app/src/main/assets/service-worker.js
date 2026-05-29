@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-dd3dca6e85';
+const CACHE_VERSION = 'v1.0.2-5a7351175c';
 const CORPUS_VERSION = 'c1';
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;

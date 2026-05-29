@@ -9839,6 +9839,7 @@ Continue?`
       studyChapterId
     });
     useKeyboardInset();
+    useDocumentTitle({ activeTab });
     useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget, setNoteSheetTarget });
     const [tabsOverviewOpen, setTabsOverviewOpen] = useState(false);
     const [lastReadChapters, setLastReadChapters] = useState(saved.lastReadChapters || {});

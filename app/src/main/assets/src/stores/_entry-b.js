@@ -101,6 +101,7 @@ import { useSurprise } from '../hooks/use-surprise.js';
 import { useAppShellEffects } from '../hooks/use-app-shell-effects.js';
 import { useDomAnnotationSync } from '../hooks/use-dom-annotation-sync.js';
 import { useKeyboardInset } from '../hooks/use-keyboard-inset.js';
+import { useDocumentTitle } from '../hooks/use-document-title.js';
 import { useStorageInfo } from '../hooks/use-storage-info.js';
 import { formatBytes } from '../utils/format-bytes.js';
 import { StorageHealth } from '../utils/storage-health.js';
@@ -195,6 +196,7 @@ Object.assign(window, {
   useAppShellEffects,
   useDomAnnotationSync,
   useKeyboardInset,
+  useDocumentTitle,
   useStorageInfo,
   formatBytes,
   StorageHealth,
