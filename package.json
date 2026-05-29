@@ -19,7 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "validate:data": "node tools/validate-schemas.js --strict"
+    "validate:data": "node tools/validate-schemas.js --strict",
+    "check:app-size": "node tools/check-app-size.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

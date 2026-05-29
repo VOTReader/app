@@ -9838,76 +9838,8 @@ Continue?`
       studyId,
       studyChapterId
     });
-    useEffect(() => {
-      if (!window.visualViewport) return;
-      const vv = window.visualViewport;
-      const root = document.documentElement;
-      const update = () => {
-        const diff = Math.max(0, window.innerHeight - vv.height);
-        const kh = diff > 80 ? diff : 0;
-        root.style.setProperty("--keyboard-height", kh + "px");
-      };
-      vv.addEventListener("resize", update);
-      vv.addEventListener("scroll", update);
-      update();
-      return () => {
-        vv.removeEventListener("resize", update);
-        vv.removeEventListener("scroll", update);
-        root.style.setProperty("--keyboard-height", "0px");
-      };
-    }, []);
-    useEffect(() => {
-      const t = setTimeout(() => {
-        try {
-          applyDOMHighlights();
-        } catch (e) {
-          console.error("applyDOMHighlights failed", e);
-        }
-        try {
-          applyDOMLinks();
-        } catch (e) {
-          console.error("applyDOMLinks failed", e);
-        }
-        try {
-          applyDOMBookmarks();
-        } catch (e) {
-          console.error("applyDOMBookmarks failed", e);
-        }
-        try {
-          applyNoteIcons();
-        } catch (e) {
-          console.error("applyNoteIcons failed", e);
-        }
-        try {
-          applyActiveNoteState();
-        } catch (e) {
-          console.error("applyActiveNoteState failed", e);
-        }
-        if (window.__pendingOpenNote) {
-          const gid = window.__pendingOpenNote;
-          window.__pendingOpenNote = null;
-          setTimeout(() => {
-            if (NoteStore.get(gid)) setNoteSheetTarget({ groupId: gid, startInEditMode: false });
-          }, 60);
-        }
-        if (window.__pendingScrollHlKey) {
-          const sk = window.__pendingScrollHlKey;
-          window.__pendingScrollHlKey = null;
-          setTimeout(() => {
-            try {
-              const el = document.querySelector('[data-hl-key="' + sk.replace(/"/g, '\\"') + '"]');
-              if (el) el.scrollIntoView({ block: "center" });
-            } catch (_e) {
-            }
-          }, 70);
-        }
-      }, 0);
-      return () => clearTimeout(t);
-    }, [hlTick, screen, letterId]);
-    useEffect(() => {
-      window.__activeNoteGroup = noteSheetTarget ? noteSheetTarget.groupId : null;
-      applyActiveNoteState();
-    }, [noteSheetTarget, hlTick]);
+    useKeyboardInset();
+    useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget, setNoteSheetTarget });
     const [tabsOverviewOpen, setTabsOverviewOpen] = useState(false);
     const [lastReadChapters, setLastReadChapters] = useState(saved.lastReadChapters || {});
     const [lastReadLetterMap, setLastReadLetterMap] = useState(() => {

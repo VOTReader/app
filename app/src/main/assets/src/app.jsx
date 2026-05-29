@@ -134,86 +134,18 @@ function App() {
   /* bridge effects (__openLinkSidebar, __showAnnChip, __showMultiNote,
      __openBookmarkPopover) → src/hooks/use-sheet-orchestration.js (P6h) */
   /* __bumpHlTick bridge → src/hooks/use-app-shell-effects.js (P7k, called below). */
-  // Track soft-keyboard height via the visualViewport API and expose it
-  // to CSS as `--keyboard-height`. Overlays that own inputs/textareas
-  // (BookmarkCreateSheet, LinkPicker, NoteSheet) use this variable as
-  // padding-bottom so the sheet lifts above the keyboard when it opens
-  // and settles back down when it closes — works the same on any
-  // Android version, any keyboard app, and PWA-mode browsers. The
-  // Kotlin-side `--inset-bottom` covers system bars / camera cutout;
-  // this covers IME specifically and is independent of WebView quirks.
-  useEffect(() => {
-    if (!window.visualViewport) return;
-    const vv = window.visualViewport;
-    const root = document.documentElement;
-    const update = () => {
-      // Difference between layout viewport and visual viewport ≈ keyboard.
-      // Some browsers (notably older Android WebViews) report a small
-      // residual diff (~1-3px) even when the keyboard is closed — clamp
-      // anything under 80px to 0 so we don't shift overlays for noise.
-      const diff = Math.max(0, window.innerHeight - vv.height);
-      const kh = diff > 80 ? diff : 0;
-      root.style.setProperty('--keyboard-height', kh + 'px');
-    };
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    update();
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      root.style.setProperty('--keyboard-height', '0px');
-    };
-  }, []);
+  // Soft-keyboard height → --keyboard-height CSS var (visualViewport), so
+  // input-owning overlays lift above the IME. Mount-only → extracted to
+  // src/hooks/use-keyboard-inset.js (P11).
+  useKeyboardInset();
   /* __bookmarkCreate, inboundJournalPayload, __openJournalInbound,
      __bookmarkEdit, auto-dismiss effect → src/hooks/use-sheet-orchestration.js (P6h) */
-  useEffect(() => {
-    const t = setTimeout(() => {
-      // Each annotation layer is isolated: this pipeline mutates the DOM
-      // imperatively AFTER React renders, so rapid prev/next on a heavily
-      // annotated page can leave stale/detached nodes mid-pass. A throw
-      // here would propagate to React and trip the ErrorBoundary, forcing
-      // a full reload. Degrade gracefully instead — a missed icon recovers
-      // on the next hlTick; a crash does not.
-      try { applyDOMHighlights(); } catch (e) { console.error('applyDOMHighlights failed', e); }
-      try { applyDOMLinks(); } catch (e) { console.error('applyDOMLinks failed', e); }
-      try { applyDOMBookmarks(); } catch (e) { console.error('applyDOMBookmarks failed', e); }
-      try { applyNoteIcons(); } catch (e) { console.error('applyNoteIcons failed', e); }
-      try { applyActiveNoteState(); } catch (e) { console.error('applyActiveNoteState failed', e); }
-      // If we navigated here from the Notes index by tapping a row, the
-      // groupId of the note to open was stashed on the window. Consume it
-      // and open the NoteSheet now that the source page is rendered.
-      if (window.__pendingOpenNote) {
-        const gid = window.__pendingOpenNote;
-        window.__pendingOpenNote = null;
-        // Defer one more tick so DOM marks are in place for the active-state
-        setTimeout(() => {
-          if (NoteStore.get(gid)) setNoteSheetTarget({ groupId: gid, startInEditMode: false });
-        }, 60);
-      }
-      // Opened from Library (bookmark/note/highlight/underline) → jump
-      // straight to that mark's block. Instant (no smooth behavior) so the
-      // page opens already at the position rather than animating there.
-      if (window.__pendingScrollHlKey) {
-        const sk = window.__pendingScrollHlKey;
-        window.__pendingScrollHlKey = null;
-        setTimeout(() => {
-          try {
-            const el = document.querySelector('[data-hl-key="' + sk.replace(/"/g, '\\"') + '"]');
-            if (el) el.scrollIntoView({ block: 'center' });
-          } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
-        }, 70);
-      }
-    }, 0);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setNoteSheetTarget is a useState setter from useSheetOrchestration() (identity-stable per React invariant; eslint can't trace through hook-return destructuring at line 114).
-  }, [hlTick, screen, letterId]);
-  // Toggle .is-active on every mark/icon belonging to the open note's group.
-  // Default state: notes show only the trailing 📝 icon (no tint, no ribbon).
-  // When NoteSheet opens, the anchored text lights up; closing reverts.
-  useEffect(() => {
-    window.__activeNoteGroup = noteSheetTarget ? noteSheetTarget.groupId : null;
-    applyActiveNoteState();
-  }, [noteSheetTarget, hlTick]);
+  /* DOM annotation re-apply layer — the post-render apply* passes
+     (highlights/links/bookmarks/note-icons + active-note tint) plus the
+     __pendingOpenNote / __pendingScrollHlKey hand-offs → extracted verbatim
+     to src/hooks/use-dom-annotation-sync.js (P11). Called here so it follows
+     useSheetOrchestration: noteSheetTarget + setNoteSheetTarget are params. */
+  useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget, setNoteSheetTarget });
 
   /* TAB MANAGEMENT — openNewTab / switchToTab / closeTab / closeOtherTabs
      / closeTabsToTheRight / closeAllTabs / deduplicateTabs + the 4 tab-UI
