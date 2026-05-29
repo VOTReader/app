@@ -327,7 +327,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   //     data: {                            (v1+v2: LS boot-shim ONLY in v2;
   //                                         v1 had FULL state here)
   //       'vot-state': '<reduced JSON>',
-  //       'vot-ann-migrated': '1',
   //     },
   //     stores: { ... },                   (v2 ONLY: IDB-backed stores)
   //     media: { id: { type, mime, ..., data: base64 } }  (v2 ONLY)
@@ -421,7 +420,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // (a) data: LS boot-shim only. V1 clients reading this file see
       //     just theme + fontStyle restored (intentional limitation).
       const data = {};
-      for (const k of ['vot-state', 'vot-ann-migrated']) {
+      for (const k of ['vot-state']) {
         const v = localStorage.getItem(k);
         if (v != null) data[k] = v;
       }
@@ -581,7 +580,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         const skippedStores = [];
 
         // (1) Clear the legacy + shim LS keys and re-seed from data.
-        ['vot-state', 'vot-ann-migrated'].forEach((k) => {
+        ['vot-state'].forEach((k) => {
           try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
         });
         Object.keys(parsed.data || {}).forEach((k) => {

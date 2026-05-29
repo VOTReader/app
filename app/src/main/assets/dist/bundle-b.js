@@ -339,7 +339,6 @@
       "vot-welcomed",
       "vot-about-seen",
       "vot-garden-warning-acked",
-      "vot-ann-migrated",
       "vot-recent-nav",
       "vot-prophecy-cards",
       "vot-journal",
@@ -1062,7 +1061,7 @@
     }
     return false;
   }
-  var LS_SKIP_LIST = Object.freeze(["vot-state", "vot-ann-migrated"]);
+  var LS_SKIP_LIST = Object.freeze(["vot-state"]);
   var LS_MIGRATION_FLAG_KEY = "migrated-v1";
   async function clearLegacyLs() {
     let alreadyDone;
@@ -1455,75 +1454,6 @@
   );
 
   // app/src/main/assets/src/stores/annotation-store.js
-  function migrateAnnotations() {
-    try {
-      if (localStorage.getItem("vot-ann-migrated") === "1") return;
-      const oldRaw = localStorage.getItem("vot-highlights");
-      if (oldRaw) {
-        const old = JSON.parse(oldRaw);
-        const newAnn = {};
-        const newNotes = {};
-        Object.keys(old).forEach(function(key) {
-          const segs = old[key] || [];
-          const byGroup = /* @__PURE__ */ new Map();
-          segs.forEach(function(s) {
-            const gid = s.groupId || s.id;
-            if (!byGroup.has(gid)) byGroup.set(gid, []);
-            byGroup.get(gid).push(s);
-          });
-          const out = [];
-          byGroup.forEach(function(entries, gid) {
-            const hasNote = entries.some(function(e) {
-              return e.note && e.note.trim();
-            });
-            const kind = (
-              /** @type {'highlight' | 'underline' | 'note'} */
-              hasNote ? "note" : entries[0].style === "underline" ? "underline" : "highlight"
-            );
-            entries.forEach(function(e) {
-              out.push({
-                id: e.id,
-                groupId: gid,
-                kind,
-                color: e.color || "yellow",
-                start: e.start,
-                end: e.end,
-                text: e.text || "",
-                created: e.created || Date.now(),
-                updated: e.created || Date.now()
-              });
-            });
-            if (hasNote) {
-              const bodySrc = entries.reduce(function(acc, e) {
-                const t = (e.note || "").trim();
-                return t.length > acc.length ? t : acc;
-              }, "");
-              const fullText = entries.map(function(e) {
-                return e.text || "";
-              }).join(" \u2026 ");
-              newNotes[gid] = {
-                groupId: gid,
-                notebookIds: [],
-                body: bodySrc,
-                color: entries[0].color || "yellow",
-                fullText,
-                keys: [key],
-                created: entries[0].created || Date.now(),
-                updated: entries[0].created || Date.now()
-              };
-            }
-          });
-          if (out.length) newAnn[key] = out;
-        });
-        localStorage.setItem("vot-annotations", JSON.stringify(newAnn));
-        localStorage.setItem("vot-notes", JSON.stringify(newNotes));
-      }
-      localStorage.setItem("vot-ann-migrated", "1");
-    } catch (e) {
-      console.warn("annotation migration failed; will retry next launch", e);
-    }
-  }
-  migrateAnnotations();
   var AnnotationStore2 = extendStore(
     CachedStore(
       "vot-annotations",
@@ -2058,15 +1988,13 @@
        *      DO NOT read localStorage here; the CachedStore base owns the
        *      legacy-LS-fallback path inside _hydrate, and reading LS
        *      directly here would side-channel the W2.2 state machine.
-       *   3. LS-mode initial load → read LS + normalize (legacy {a,b} →
-       *      {source,target} migration). After migration, _normalize
-       *      flushes via _save.
+       *   3. LS-mode initial load → read LS + _normalize (drop malformed
+       *      records). _normalize flushes via _save only if it dropped any.
        *
        * The post-hydration normalization for IDB mode is wired below the
        * extendStore call via a one-shot subscribe — when the store
        * transitions to 'loaded' the first time, _normalize runs against
-       * the IDB-loaded cache (which may itself have been seeded from the
-       * legacy LS key by the W2.2 fallback).
+       * the IDB-loaded cache to drop any malformed records.
        *
        * @returns {Link[]}
        */
@@ -2087,43 +2015,32 @@
         return this._cache;
       },
       /**
-       * Apply the legacy {a,b} → {source,target} migration to `this._cache`.
-       * Idempotent — once data is in the new shape, the filter is a no-op.
-       * Drops records that can't be salvaged (both endpoints missing keys).
-       * Flushes via _save when a migration actually happened so the next
-       * boot reads pre-normalized data. _bump fires regardless so any
-       * subscriber sees the post-normalize state.
+       * Validate `this._cache`, dropping malformed records — any non-object, or
+       * any link missing a `source.key` or `target.key`. Idempotent: clean data
+       * passes through untouched. Persists + bumps only when records were
+       * actually dropped.
+       *
+       * (W7.1 retired the legacy {a,b} → {source,target} conversion this method
+       * used to also perform. Live data is already in the {source,target} shape;
+       * any ancient {a,b}-only record that surfaced via an old import now lacks
+       * source/target keys and is simply dropped as malformed. This guard is the
+       * real-data protection that survives the retirement — it is NOT a legacy
+       * shim.)
        *
        * @returns {void}
        */
       _normalize() {
         if (!Array.isArray(this._cache)) return;
-        let migrated = false;
+        const before = this._cache.length;
         this._cache = this._cache.filter(function(lnk) {
           if (!lnk || typeof lnk !== "object") return false;
-          if (!lnk.source && lnk.a) {
-            lnk.source = lnk.a;
-            migrated = true;
-          }
-          if (!lnk.target && lnk.b) {
-            lnk.target = lnk.b;
-            migrated = true;
-          }
-          if (lnk.a) {
-            delete lnk.a;
-            migrated = true;
-          }
-          if (lnk.b) {
-            delete lnk.b;
-            migrated = true;
-          }
           if (!lnk.source || !lnk.source.key || !lnk.target || !lnk.target.key) {
-            console.warn("[LinkStore] dropping malformed record (incomplete endpoints):", lnk.id);
+            console.warn("[LinkStore] dropping malformed record (incomplete endpoints):", lnk && lnk.id);
             return false;
           }
           return true;
         });
-        if (migrated) {
+        if (this._cache.length !== before) {
           this._save();
           this._bump();
         }
@@ -10273,7 +10190,6 @@
     HistoryStore,
     HomeOrderStore,
     DEFAULT_HOME_ORDER,
-    migrateAnnotations,
     AnnotationStore: AnnotationStore2,
     HighlightStore,
     NoteStore: NoteStore2,

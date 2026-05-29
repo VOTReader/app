@@ -1,10 +1,13 @@
 /* ══════════════════════════════════════════════════════════════════════
-   AnnotationStore (+ HighlightStore alias) + one-time migration
+   AnnotationStore (+ HighlightStore alias)
    ══════════════════════════════════════════════════════════════════════
    Global-scope module. Bundled into bundle-b via _entry-b.js.
-   Depends on: CachedStore (loaded first). Runs migrateAnnotations()
-   at module load, exactly once per browser profile (gated by the
-   vot-ann-migrated localStorage flag).
+   Depends on: CachedStore (loaded first).
+
+   (The pre-W2 vot-highlights → vot-annotations/vot-notes bootstrap migration
+   was retired in W7.1. Live data is already in the current shape; future
+   shape changes go through the CachedStore versioned-migration framework,
+   not an ad-hoc one-shot.)
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
@@ -33,86 +36,6 @@ import { CachedStore, extendStore } from './cached-store.js';
  * @typedef {Record<string, Annotation[]>} AnnotationData
  */
 
-/* ── One-time migration: vot-highlights → vot-annotations + vot-notes ──
-   Old shape (per-segment): { id, groupId?, color, style:'highlight'|'underline',
-     text, note?, start, end, created }
-   New shape (per-segment): { id, groupId, kind:'highlight'|'underline'|'note',
-     color, text, start, end, created, updated }
-   Notes split off into vot-notes keyed by groupId:
-     { groupId, notebookIds:[], body, color, fullText, keys[], created, updated }
-   The old key vot-highlights is left in place as a backup. */
-
-/**
- * Migrate legacy `vot-highlights` records into the current shape. No-op
- * after the first successful run (idempotent via the `vot-ann-migrated`
- * flag). Catches all errors and logs — a failed migration retries on the
- * next launch instead of crashing the app.
- *
- * @returns {void}
- */
-export function migrateAnnotations() {
-  try {
-    if (localStorage.getItem('vot-ann-migrated') === '1') return;
-    const oldRaw = localStorage.getItem('vot-highlights');
-    if (oldRaw) {
-      /** @type {Record<string, any[]>} */
-      const old = JSON.parse(oldRaw);
-      /** @type {AnnotationData} */
-      const newAnn = {};
-      /** @type {Record<string, any>} */
-      const newNotes = {};
-      Object.keys(old).forEach(function(key) {
-        const segs = old[key] || [];
-        // Group orphan singles by id so they each get their own groupId
-        /** @type {Map<string, any[]>} */
-        const byGroup = new Map();
-        segs.forEach(function(s) {
-          const gid = s.groupId || s.id;
-          if (!byGroup.has(gid)) byGroup.set(gid, []);
-          /** @type {any[]} */ (byGroup.get(gid)).push(s);
-        });
-        /** @type {Annotation[]} */
-        const out = [];
-        byGroup.forEach(function(entries, gid) {
-          // Determine kind for the whole group: any entry with a non-empty
-          // note promotes the entire group to kind:'note'.
-          const hasNote = entries.some(function(e) { return e.note && e.note.trim(); });
-          const kind = /** @type {'highlight' | 'underline' | 'note'} */ (
-            hasNote ? 'note' : (entries[0].style === 'underline' ? 'underline' : 'highlight')
-          );
-          entries.forEach(function(e) {
-            out.push({
-              id: e.id, groupId: gid, kind: kind, color: e.color || 'yellow',
-              start: e.start, end: e.end, text: e.text || '',
-              created: e.created || Date.now(), updated: e.created || Date.now()
-            });
-          });
-          if (hasNote) {
-            // Pull the longest non-empty note as the canonical body
-            const bodySrc = entries.reduce(function(acc, e) {
-              const t = (e.note || '').trim();
-              return t.length > acc.length ? t : acc;
-            }, '');
-            const fullText = entries.map(function(e) { return e.text || ''; }).join(' … ');
-            newNotes[gid] = {
-              groupId: gid, notebookIds: [], body: bodySrc,
-              color: entries[0].color || 'yellow', fullText: fullText,
-              keys: [key], created: entries[0].created || Date.now(),
-              updated: entries[0].created || Date.now()
-            };
-          }
-        });
-        if (out.length) newAnn[key] = out;
-      });
-      localStorage.setItem('vot-annotations', JSON.stringify(newAnn));
-      localStorage.setItem('vot-notes', JSON.stringify(newNotes));
-    }
-    localStorage.setItem('vot-ann-migrated', '1');
-  } catch (e) {
-    console.warn('annotation migration failed; will retry next launch', e);
-  }
-}
-migrateAnnotations();
 
 /* AnnotationStore — segment-level records. Aliased as HighlightStore for
    back-compat with existing call sites. Every entry has a kind field

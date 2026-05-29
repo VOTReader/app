@@ -45,7 +45,7 @@ import { ProphecyCardsStore } from './prophecy-cards-store.js';
 import { StateStore } from './state-store.js';
 import { HistoryStore } from './history-store.js';
 import { HomeOrderStore, DEFAULT_HOME_ORDER } from './home-order-store.js';
-import { migrateAnnotations, AnnotationStore, HighlightStore } from './annotation-store.js';
+import { AnnotationStore, HighlightStore } from './annotation-store.js';
 import { NoteStore } from './note-store.js';
 import { NotebookStore } from './notebook-store.js';
 import { RecentNavStore } from './recent-nav-store.js';
@@ -155,7 +155,7 @@ Object.assign(window, {
   StateStore,
   HistoryStore,
   HomeOrderStore, DEFAULT_HOME_ORDER,
-  migrateAnnotations, AnnotationStore, HighlightStore,
+  AnnotationStore, HighlightStore,
   NoteStore, NotebookStore, RecentNavStore,
   hlId, lnkId, LinkStore, persistLink,
   bkmId, BookmarkStore,

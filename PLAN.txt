@@ -2275,6 +2275,17 @@ after W6. But they MUST land before the project is called done.
 
   W7.1 — Store schema versioning
   ──────────────────────────────
+  DECISION (2026-05-29, revises the original "port the migrations" plan):
+  the two existing "migrations" are RETIRED, not ported. migrateAnnotations
+  was a pre-W2 vot-highlights bootstrap (different keys, pre-IDB) — DELETED,
+  with its orphaned vot-ann-migrated flag/store/skip-list/export plumbing.
+  LinkStore._normalize's {a,b}→{source,target} conversion — STRIPPED (its
+  malformed-record drop kept as a real-data guard). Rationale (user): live
+  data is already in the current shape, so a clean foundation beats carrying
+  old-shape compat nobody has. The framework below then lands as a DORMANT,
+  zero-behavior-change addition (all stores v1) — the tracked path for the
+  NEXT real shape change, not a retrofit of dead ones.
+
   Problem: W2 adds a one-time localStorage → IndexedDB migration, but
   there is no per-store schema version. If the annotation shape changes
   again (it already changed once — migrateAnnotations), there's no
@@ -2553,9 +2564,12 @@ after W6. But they MUST land before the project is called done.
   Exit criteria (W7 complete):
     [x] JaCoCo class-dir fileTree fails loud when empty — no silent
         zero-coverage pass. (#4, landed 2026-05-29.)
-    [ ] Schema versioning: every IDB store has a version integer +
-        migration chain. Existing migrations (annotations, links)
-        ported to the versioned system. vitest coverage.
+    [ ] Schema versioning: every IDB store has a version integer + a
+        run-once, failure-safe migration chain (framework dormant at v1 for
+        all stores). Legacy migrations RETIRED, not ported (see W7.1 DECISION
+        above) — migrateAnnotations deleted, LinkStore._normalize slimmed to a
+        malformed-record guard. vitest coverage. [retirement DONE 2026-05-29;
+        framework pending.]
     [x] raw() freeze (W7.2): raw() returns a shallow-FROZEN COPY, NOT the
         live cache — freezing _load()'s live return would freeze _cache and
         break in-place mutations. All 1426 vitest pass; +5 cases pin the

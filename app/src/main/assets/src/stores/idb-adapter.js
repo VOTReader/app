@@ -47,11 +47,15 @@ export const IDBAdapter = (function () {
   const DB_NAME = 'votreader';
   // Schema versions:
   //   1 — initial W2.1 schema (17 vot-* stores + meta).
-  //   2 — W2.3b.4 added vot-home-order. New installs get all 19
-  //       stores at once; existing v1 installs get vot-home-order
-  //       added via the onupgradeneeded guard (the existing
-  //       objectStoreNames.contains check skips already-created
-  //       stores, so the bump is additive only).
+  //   2 — W2.3b.4 added vot-home-order. New installs get all stores at
+  //       once; existing v1 installs get vot-home-order added via the
+  //       onupgradeneeded guard (objectStoreNames.contains skips already-
+  //       created stores, so the bump is additive only).
+  // W7.1 dropped 'vot-ann-migrated' from STORE_NAMES (its only consumer,
+  // the pre-W2 annotation bootstrap migration, was deleted). Deliberately
+  // NOT a version bump: fresh installs simply skip it; a pre-existing empty
+  // store on older installs is orphaned + harmless (never accessed, since
+  // STORE_SET no longer lists it).
   const DB_VERSION = 2;
 
   /**
@@ -69,7 +73,6 @@ export const IDBAdapter = (function () {
     'vot-welcomed',
     'vot-about-seen',
     'vot-garden-warning-acked',
-    'vot-ann-migrated',
     'vot-recent-nav',
     'vot-prophecy-cards',
     'vot-journal',

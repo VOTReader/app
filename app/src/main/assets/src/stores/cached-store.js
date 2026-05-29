@@ -668,18 +668,17 @@ export function _resetStoreRegistry() {
    would null those reads and produce empty IDB stores for pre-W2.4
    users (catastrophic — looks like a wipe).
 
-   SKIP_LIST: two keys stay in LS permanently:
-     'vot-state'         — reduced theme+fontStyle shim for the sync
-                           boot-script read at index.html:73. Cannot
-                           wait on async IDB.
-     'vot-ann-migrated'  — legacy annotation-migration gate read at
-                           annotation-store.js module load before any
-                           IDB store opens.
+   SKIP_LIST: one key stays in LS permanently:
+     'vot-state'  — reduced theme+fontStyle shim for the sync boot-script
+                    read at index.html:73. Cannot wait on async IDB.
+   (W7.1 retired the second exception, 'vot-ann-migrated' — its only reader,
+   the pre-W2 annotation bootstrap migration, was deleted, so W2.4 now
+   clears the orphaned flag like any other legacy vot-* key.)
    ═══════════════════════════════════════════════════════════════════ */
 
 /** localStorage keys NOT cleared by W2.4. Frozen + exported so tests
  *  + the Settings export path can reference the canonical list. */
-export const LS_SKIP_LIST = Object.freeze(['vot-state', 'vot-ann-migrated']);
+export const LS_SKIP_LIST = Object.freeze(['vot-state']);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
 const LS_MIGRATION_FLAG_KEY = 'migrated-v1';

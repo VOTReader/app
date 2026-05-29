@@ -63,17 +63,17 @@ describe('IDBAdapter — open + schema', () => {
     expect(Object.isFrozen(IDBAdapter.STORE_NAMES)).toBe(true);
   });
 
-  it('STORE_NAMES contains the 18 vot-* keys plus meta (W2.3b.4 added vot-home-order)', () => {
+  it('STORE_NAMES contains the 17 vot-* keys plus meta (W7.1 dropped vot-ann-migrated)', () => {
     const expected = new Set([
       'vot-welcomed', 'vot-about-seen', 'vot-garden-warning-acked',
-      'vot-ann-migrated', 'vot-recent-nav', 'vot-prophecy-cards',
+      'vot-recent-nav', 'vot-prophecy-cards',
       'vot-journal', 'vot-journal-notebooks', 'vot-journal-index',
       'vot-journal-stats', 'vot-bookmarks', 'vot-notebooks',
       'vot-history', 'vot-state', 'vot-annotations', 'vot-notes',
       'vot-links', 'vot-home-order', 'meta',
     ]);
     expect(new Set(IDBAdapter.STORE_NAMES)).toEqual(expected);
-    expect(IDBAdapter.STORE_NAMES.length).toBe(19);
+    expect(IDBAdapter.STORE_NAMES.length).toBe(18);
   });
 
   it('DB_NAME is "votreader" — separate from vot-journal-media and vot-thumbs', () => {

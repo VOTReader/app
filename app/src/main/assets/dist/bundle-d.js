@@ -5264,7 +5264,7 @@
       try {
         _showToast("Preparing export\u2026", 0);
         const data = {};
-        for (const k of ["vot-state", "vot-ann-migrated"]) {
+        for (const k of ["vot-state"]) {
           const v = localStorage.getItem(k);
           if (v != null) data[k] = v;
         }
@@ -5395,7 +5395,7 @@ Continue?`
           }
           let importFailures = 0;
           const skippedStores = [];
-          ["vot-state", "vot-ann-migrated"].forEach((k) => {
+          ["vot-state"].forEach((k) => {
             try {
               localStorage.removeItem(k);
             } catch (_e) {

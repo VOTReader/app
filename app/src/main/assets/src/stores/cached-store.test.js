@@ -913,10 +913,10 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('LS_SKIP_LIST exports the two permanent LS exceptions', () => {
+  it('LS_SKIP_LIST exports the one permanent LS exception (vot-state)', () => {
     expect(LS_SKIP_LIST).toContain('vot-state');
-    expect(LS_SKIP_LIST).toContain('vot-ann-migrated');
-    expect(LS_SKIP_LIST.length).toBe(2);
+    expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');  // W7.1 retired this exception
+    expect(LS_SKIP_LIST.length).toBe(1);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 
@@ -926,7 +926,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     localStorage.setItem('vot-history', '[]');
     localStorage.setItem('vot-home-order', '[]');
     localStorage.setItem('vot-state', '{"theme":"dark"}');           // skip
-    localStorage.setItem('vot-ann-migrated', '1');                    // skip
+    localStorage.setItem('vot-ann-migrated', '1');                    // W7.1: no longer skipped → cleared
     localStorage.setItem('other-non-vot-key', 'untouched');           // not vot-* prefix
 
     // Mock IDB so the flag round-trip works
@@ -941,13 +941,13 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
 
     await clearLegacyLs();
 
-    // Cleared:
+    // Cleared (incl. vot-ann-migrated — W7.1 removed it from the skip list):
     expect(localStorage.getItem('vot-bookmarks')).toBeNull();
     expect(localStorage.getItem('vot-history')).toBeNull();
     expect(localStorage.getItem('vot-home-order')).toBeNull();
+    expect(localStorage.getItem('vot-ann-migrated')).toBeNull();
     // Preserved:
     expect(localStorage.getItem('vot-state')).toBe('{"theme":"dark"}');
-    expect(localStorage.getItem('vot-ann-migrated')).toBe('1');
     expect(localStorage.getItem('other-non-vot-key')).toBe('untouched');
     // Flag set:
     expect(idbMeta['migrated-v1']).toBe(true);
