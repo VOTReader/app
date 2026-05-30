@@ -7,9 +7,12 @@ by scanning all sources of window-attached globals.
   boundary globals as `any` so the in-scope Q4 layers — utils/stores/hooks —
   can typecheck without declaring 330 individual ambient types).
 
-Runs as part of `npm run lint` (chained before eslint), and via the
-pre-commit hook (when source files are staged). Belt-and-suspenders so
-the globals list cannot go stale relative to the bundles.
+Runs as part of `npm run lint` (chained before eslint) and is diff-checked
+by `npm run smoke-lite` (checkGlobalsMirror regenerates + `git diff
+--exit-code`). NOTE: the pre-commit hook does NOT run this — its Step 2
+runs eslint per-file via lint-staged, not `npm run lint`. So after adding a
+window-globalized export, run `npm run lint:globals` and stage the
+regenerated files yourself; CI's smoke-lite gate fails on a stale copy.
 
 Sources scanned:
   1. _entry-b.js / _entry.js / _entry-d.js — Object.assign(window, {...})
