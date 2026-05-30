@@ -4847,7 +4847,6 @@
       setLastLinkCreated(null);
       setLinkPickerMode(null);
       linkPickerOnPickRef.current = null;
-      if (window.__bumpHlTick) window.__bumpHlTick();
     }, []);
     const openLinkPickerForTarget = React.useCallback((mode, onPick) => {
       linkPickerOnPickRef.current = typeof onPick === "function" ? onPick : null;
@@ -6342,7 +6341,6 @@
           newMilestones.forEach((m) => jrnShowMilestoneToast(m));
         }
       }
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setJournalEntryId(e.id);
       setScreen("journal-editor");
     };
@@ -6715,13 +6713,7 @@
   }
 
   // app/src/main/assets/src/hooks/use-app-shell-effects.js
-  function useAppShellEffects({ setHlTick, setNavOrigin, setScreen }) {
-    React.useEffect(() => {
-      window.__bumpHlTick = () => setHlTick((t) => t + 1);
-      return () => {
-        delete window.__bumpHlTick;
-      };
-    }, []);
+  function useAppShellEffects({ setNavOrigin, setScreen }) {
     const [showWelcome, setShowWelcome] = React.useState(() => !WelcomedFlagStore.is());
     const [isOnline, setIsOnline] = React.useState(false);
     React.useEffect(() => {
@@ -6750,7 +6742,27 @@
   }
 
   // app/src/main/assets/src/hooks/use-dom-annotation-sync.js
-  function useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget, setNoteSheetTarget }) {
+  function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNoteSheetTarget }) {
+    const annV = React.useSyncExternalStore(
+      React.useCallback((cb) => typeof AnnotationStore !== "undefined" ? AnnotationStore.subscribe(cb) : () => {
+      }, []),
+      () => typeof AnnotationStore !== "undefined" ? AnnotationStore.getVersion() : 0
+    );
+    const noteV = React.useSyncExternalStore(
+      React.useCallback((cb) => typeof NoteStore !== "undefined" ? NoteStore.subscribe(cb) : () => {
+      }, []),
+      () => typeof NoteStore !== "undefined" ? NoteStore.getVersion() : 0
+    );
+    const linkV = React.useSyncExternalStore(
+      React.useCallback((cb) => typeof LinkStore !== "undefined" ? LinkStore.subscribe(cb) : () => {
+      }, []),
+      () => typeof LinkStore !== "undefined" ? LinkStore.getVersion() : 0
+    );
+    const bkmV = React.useSyncExternalStore(
+      React.useCallback((cb) => typeof BookmarkStore !== "undefined" ? BookmarkStore.subscribe(cb) : () => {
+      }, []),
+      () => typeof BookmarkStore !== "undefined" ? BookmarkStore.getVersion() : 0
+    );
     React.useEffect(() => {
       const t = setTimeout(() => {
         try {
@@ -6798,11 +6810,11 @@
         }
       }, 0);
       return () => clearTimeout(t);
-    }, [hlTick, screen, letterId]);
+    }, [annV, noteV, linkV, bkmV, screen, letterId]);
     React.useEffect(() => {
       window.__activeNoteGroup = noteSheetTarget ? noteSheetTarget.groupId : null;
       applyActiveNoteState();
-    }, [noteSheetTarget, hlTick]);
+    }, [noteSheetTarget]);
   }
 
   // app/src/main/assets/src/hooks/use-keyboard-inset.js
@@ -9020,16 +9032,11 @@
     var menuEntry = _menuEntry[0];
     var setMenuEntry = _menuEntry[1];
     var allEntries = JournalStore.all();
-    function bump() {
-      if (window.__bumpHlTick) window.__bumpHlTick();
-    }
     function deleteEntry(id) {
       JournalStore.remove(id);
-      bump();
     }
     function togglePin(id) {
       JournalStore.togglePin(id);
-      bump();
     }
     function renderCard(entry) {
       var title = JournalHelpers.entryDisplayTitle(entry);
@@ -9576,9 +9583,6 @@
     var _typedDelete = useState2("");
     var typedDelete = _typedDelete[0];
     var setTypedDelete = _typedDelete[1];
-    function bump() {
-      if (window.__bumpHlTick) window.__bumpHlTick();
-    }
     function startDelete() {
       setConfirmStep(1);
       setTypedDelete("");
@@ -9670,11 +9674,9 @@
     };
     function togglePin() {
       JournalStore.togglePin(entry.id);
-      bump();
     }
     function doDelete() {
       JournalStore.remove(entry.id);
-      bump();
       onBack && onBack();
     }
     var navExtras = /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
@@ -9838,7 +9840,6 @@
       var t = setTimeout(function() {
         JournalStore.update(entryId, { title, blocks, mood });
         setSavedLabel("Saved");
-        if (window.__bumpHlTick) window.__bumpHlTick();
       }, 1200);
       return function() {
         clearTimeout(t);
@@ -9856,7 +9857,6 @@
       if (!entryId) return;
       JournalStore.update(entryId, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
       setSavedLabel("Saved");
-      if (window.__bumpHlTick) window.__bumpHlTick();
     }
     function scheduleSave() {
       setSavedLabel("Saving\u2026");

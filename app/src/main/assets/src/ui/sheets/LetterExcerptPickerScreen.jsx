@@ -117,7 +117,6 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     }
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
     const newLink = persistLink(sourceEndpoint, refinedTarget);
-    if (newLink && window.__bumpHlTick) window.__bumpHlTick();
     onClose(newLink || null);
   }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink]);
 

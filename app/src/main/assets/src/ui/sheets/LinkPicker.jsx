@@ -76,7 +76,6 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
     const newLink = persistLink(sourceEndpoint, target);
     if (newLink) {
-      if (window.__bumpHlTick) window.__bumpHlTick();
       bumpRecent();
       onLinkCreated(newLink);
     }

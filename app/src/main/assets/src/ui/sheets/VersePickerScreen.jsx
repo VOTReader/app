@@ -160,7 +160,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     refinedTarget.preview = info.text || (v1Obj && v1Obj.text) || '';
 
     // Two call patterns:
-    //   • Link mode (default): persist + bump hlTick + signal LinkPicker.
+    //   • Link mode (default): persist + signal LinkPicker.
     //   • Journal/return mode: hand the refined target back to the caller
     //     via onClose so the Journal can create a verse-block from it.
     if (returnTargetInsteadOfLink) {
@@ -169,7 +169,6 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     }
     const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
     const newLink = persistLink(sourceEndpoint, refinedTarget);
-    if (newLink && window.__bumpHlTick) window.__bumpHlTick();
     onClose(newLink || null);
   }, [selInfo, captureSelectionSync, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink]);
 

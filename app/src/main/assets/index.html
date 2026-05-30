@@ -163,9 +163,9 @@ const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
 /* ═══════════════════════════════════════════════════════════════
    HIGHLIGHT & LINK STORAGE
-   Persistent stores backed by localStorage. Components read via
-   .get()/.getForKey() and write via .add()/.remove(). A global
-   hlTick state (incremented on every mutation) triggers re-renders.
+   Persistent stores backed by IndexedDB (W2). Components read via
+   .get()/.getForKey() and write via .add()/.remove(); each store's
+   _bump() notifies useSyncExternalStore subscribers to re-render (W7.3).
 ═══════════════════════════════════════════════════════════════ */
 /* Saturated highlight palette. Yellow first (the OG highlighter). Brown
    and gray included for low-emphasis annotations. Order matters — the
@@ -658,8 +658,8 @@ const SCRIPTURE_GENRES = {
    on reading screens. When `chapterBookmark = { hlKey, label }` is provided,
    the button checks BookmarkStore to determine if this chapter is already
    bookmarked, renders a bright vs dim flag accordingly, and toggles on tap:
-     - Not bookmarked → creates a chapter-level bookmark (no :start-end suffix)
-       and bumps hlTick so inline icons re-render. The user sees the same
+     - Not bookmarked → creates a chapter-level bookmark (no :start-end suffix);
+       BookmarkStore._bump() re-applies the inline icons. The user sees the same
        creation-pulse animation as the SelectionToolbar bookmark flow.
      - Already bookmarked → opens the BookmarkPopover for that bookmark via
        the existing window.__openBookmarkPopover bridge (offers Open /

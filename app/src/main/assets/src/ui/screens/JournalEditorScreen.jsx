@@ -15,8 +15,8 @@ export function JournalEditorScreen(props) {
     return entryId ? JournalStore.get(entryId) : null;
   }, [entryId]);
 
-  // Local working state — we don't re-derive from JournalStore on hlTick
-  // because that would clobber in-progress edits.
+  // Local working state — we don't re-derive from JournalStore on every
+  // render because that would clobber in-progress edits.
   var _title = useState((initial && initial.title) || '');
   var title = _title[0]; var setTitle = _title[1];
 
@@ -110,7 +110,6 @@ export function JournalEditorScreen(props) {
     var t = setTimeout(function() {
       JournalStore.update(entryId, { title: title, blocks: blocks, mood: mood });
       setSavedLabel('Saved');
-      if (window.__bumpHlTick) window.__bumpHlTick();
     }, 1200);
     return function() { clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setSavedLabel is a tuple-unpacked useState setter (identity-stable). Effect intent is debounced-save on content change, not on setter-identity churn.
@@ -132,7 +131,6 @@ export function JournalEditorScreen(props) {
     if (!entryId) return;
     JournalStore.update(entryId, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
     setSavedLabel('Saved');
-    if (window.__bumpHlTick) window.__bumpHlTick();
   }
 
   function scheduleSave() {

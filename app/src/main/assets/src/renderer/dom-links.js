@@ -4,8 +4,8 @@
    Global-scope module. Concatenates with index.html; no import/export.
    Depends on: LinkStore (defined in src/stores/link-store.js).
 
-   applyDOMLinks() is called from the post-render useEffect in App()
-   after every hlTick change. It:
+   applyDOMLinks() is called from the post-render useEffect in
+   useDomAnnotationSync whenever the annotation stores change (W7.3). It:
      1. Removes any existing .inline-link-icon elements
      2. Finds all links that touch each [data-hl-dom] container
      3. Inserts a chain icon at (or near) each linked text range endpoint
@@ -24,7 +24,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 /* Inject inline chain icons at the end of each linked text range inside
-   [data-hl-dom] containers. Re-runs on every hlTick. Click → onLinkOpen(blockKey)
+   [data-hl-dom] containers. Re-runs on store changes. Click → onLinkOpen(blockKey)
    which opens the sidebar showing all links touching that block. */
 /* Inline link icons — placed at (or as close as possible to) the END
    of each linked text range. The icon "slides off" three kinds of bad

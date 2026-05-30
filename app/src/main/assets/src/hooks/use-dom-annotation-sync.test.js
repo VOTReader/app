@@ -11,7 +11,7 @@ const APPLY = ['applyDOMHighlights', 'applyDOMLinks', 'applyDOMBookmarks', 'appl
 const DEFERRED_ONLY = ['applyDOMHighlights', 'applyDOMLinks', 'applyDOMBookmarks', 'applyNoteIcons'];
 
 const baseProps = (over) => ({
-  hlTick: 0, screen: 'home', letterId: null,
+  screen: 'home', letterId: null,
   noteSheetTarget: null, setNoteSheetTarget: vi.fn(),
   ...over,
 });
@@ -19,7 +19,14 @@ const baseProps = (over) => ({
 beforeEach(() => {
   vi.useFakeTimers();
   APPLY.forEach((n) => { window[n] = vi.fn(); });
-  window.NoteStore = { get: vi.fn(() => ({ groupId: 'g1' })) };
+  // The hook subscribes to four stores via useSyncExternalStore (W7.3); stub
+  // each with the subscribe/getVersion contract. NoteStore also needs get().
+  const sub = () => () => {};
+  const ver = () => 0;
+  window.AnnotationStore = { subscribe: sub, getVersion: ver };
+  window.LinkStore = { subscribe: sub, getVersion: ver };
+  window.BookmarkStore = { subscribe: sub, getVersion: ver };
+  window.NoteStore = { get: vi.fn(() => ({ groupId: 'g1' })), subscribe: sub, getVersion: ver };
   window.__pendingOpenNote = null;
   window.__pendingScrollHlKey = null;
   window.__activeNoteGroup = undefined;
@@ -28,6 +35,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   APPLY.forEach((n) => { delete window[n]; });
+  delete window.AnnotationStore;
+  delete window.LinkStore;
+  delete window.BookmarkStore;
   delete window.NoteStore;
   delete window.__pendingOpenNote;
   delete window.__pendingScrollHlKey;
@@ -64,7 +74,7 @@ describe('useDomAnnotationSync — apply pass', () => {
   });
 
   it('does not open a NoteSheet when the stashed group no longer exists', () => {
-    window.NoteStore = { get: vi.fn(() => null) };
+    window.NoteStore.get = vi.fn(() => null);
     window.__pendingOpenNote = 'gone';
     const props = baseProps();
     renderHook(() => useDomAnnotationSync(props));

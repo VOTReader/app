@@ -232,7 +232,7 @@ export function AppShellSheets({
             setBookmarkPopoverPayload(null);
             if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: 'Bookmark' });
           }}
-          onDeleteDone={() => { if (window.__bumpHlTick) window.__bumpHlTick(); }}
+          onDeleteDone={() => {}}
           onClose={() => setBookmarkPopoverPayload(null)}
         />
       )}
@@ -253,8 +253,8 @@ export function AppShellSheets({
       {/* BookmarkCreateSheet — pre-commit form for new bookmarks. Opens
           from SelectionToolbar's Bookmark action and from the chapter-
           bookmark NavButton (both via window.__bookmarkCreate). Saving
-          commits to BookmarkStore + bumps hlTick so the inline icon
-          pulse fires on the source passage. */}
+          commits to BookmarkStore; the inline icon re-applies via the
+          store subscription in useDomAnnotationSync. */}
       {bookmarkCreatePending && (
         <BookmarkCreateSheet
           pending={bookmarkCreatePending}
@@ -276,12 +276,10 @@ export function AppShellSheets({
               });
             }
             setBookmarkCreatePending(null);
-            if (window.__bumpHlTick) window.__bumpHlTick();
           }}
           onDelete={(editId) => {
             if (editId && typeof BookmarkStore !== 'undefined') BookmarkStore.remove(editId);
             setBookmarkCreatePending(null);
-            if (window.__bumpHlTick) window.__bumpHlTick();
           }}
           onOpen={(editId) => {
             if (!editId) return;

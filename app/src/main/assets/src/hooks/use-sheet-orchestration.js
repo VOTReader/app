@@ -27,10 +27,7 @@
      - auto-dismiss effect (clears note/chip/multi/bookmark on nav change)
 
    DOES NOT OWN:
-     - hlTick / setHlTick — stays in App(); setHlTick received as a param
-       (closeLinkPicker calls setHlTick(t => t + 1) to re-trigger DOM apply)
      - _navToLinkRef + navigateToLink — P6j territory; not touched here
-     - __bumpHlTick effect — belongs with hlTick in App()
      - visualViewport keyboard-height effect — owns no sheet state
      - apply-DOM effects (applyDOMHighlights, applyDOMLinks, etc.) — fenced
      - _allBooks, findEntryContext, JournalStore, JournalHelpers,
@@ -43,9 +40,6 @@
        navigation position (useTabs via tabField) — deps of the
        auto-dismiss effect so floating overlays clear whenever the active
        reading position changes.
-     setHlTick — App()-local useState setter; closeLinkPicker calls
-       setHlTick(t => t + 1) to force the apply-DOM effects to re-run
-       after the picker closes.
 
    RETURNS: {
      annChip, setAnnChip,
@@ -160,7 +154,7 @@ export function useSheetOrchestration({
       : { key: hlKey, label, start: selInfo.start, end: selInfo.end, text: selInfo.text };
     setLinkPickerSource(src);
   }, []);
-  const closeLinkPicker = React.useCallback(() => { setLinkPickerSource(null); setLinkRefineRequest(null); setLastLinkCreated(null); setLinkPickerMode(null); linkPickerOnPickRef.current = null; if (window.__bumpHlTick) window.__bumpHlTick(); }, []);
+  const closeLinkPicker = React.useCallback(() => { setLinkPickerSource(null); setLinkRefineRequest(null); setLastLinkCreated(null); setLinkPickerMode(null); linkPickerOnPickRef.current = null; }, []);
   // Picker mode — Journal calls this to open LinkPicker as a target picker.
   //   mode: 'card'    → return target after the first item is chosen (no
   //                     verse/excerpt prompt). Used for "Insert Card".
@@ -254,8 +248,8 @@ export function useSheetOrchestration({
   // noteSheetTarget keeps the NoteSheet visible over an unrelated
   // page after the user navigates via letter arrows or hardware back.
   // Also clears the AnnotationActionChip and MultiNote popover for the
-  // same reason. annChip + multiNote already had partial cleanup in
-  // hlTick reset paths; this consolidates the policy in one place.
+  // same reason — this consolidates the auto-dismiss-on-navigation
+  // policy for all floating overlays in one place.
   React.useEffect(() => {
     if (typeof window.__hideSelectionToolbar === 'function') window.__hideSelectionToolbar();
     setNoteSheetTarget(null);

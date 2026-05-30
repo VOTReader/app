@@ -98,7 +98,6 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
     const trimmed = newNbName.trim();
     if (!trimmed) return;
     NotebookStore.add(trimmed);
-    if (window.__bumpHlTick) window.__bumpHlTick();
     setNewNbName('');
     setNewNbInline(false);
   };
@@ -115,14 +114,12 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
     const trimmed = renameValue.trim();
     if (trimmed && drilledNb) {
       NotebookStore.rename(drilledNb.id, trimmed);
-      if (window.__bumpHlTick) window.__bumpHlTick();
     }
     setRenaming(false);
   };
   const deleteCurrent = () => {
     if (!drilledNb) return;
     NotebookStore.remove(drilledNb.id);
-    if (window.__bumpHlTick) window.__bumpHlTick();
     setConfirmDeleteNb(false);
     setDrilledNbId(null);
   };

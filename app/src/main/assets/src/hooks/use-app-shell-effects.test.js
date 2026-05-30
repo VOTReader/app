@@ -14,7 +14,6 @@ beforeEach(() => {
   // and 'loaded' state (forceLoaded skips the async hydration path).
   WelcomedFlagStore._resetForTests({ forceLoaded: true });
   AboutSeenFlagStore._resetForTests({ forceLoaded: true });
-  delete window.__bumpHlTick;
   _prevFetch = window.fetch;
   // Default: online (favicon fetch resolves). Cast through `any` —
   // the production code uses `mode: 'no-cors'` so the response is
@@ -24,25 +23,11 @@ beforeEach(() => {
 
 afterEach(() => {
   window.fetch = _prevFetch;
-  delete window.__bumpHlTick;
 });
 
 const baseProps = () => ({
-  setHlTick: vi.fn(),
   setNavOrigin: vi.fn(),
   setScreen: vi.fn(),
-});
-
-describe('useAppShellEffects — __bumpHlTick bridge', () => {
-  it('binds window.__bumpHlTick to a setHlTick incrementer', () => {
-    const props = baseProps();
-    renderHook(() => useAppShellEffects(props));
-    expect(typeof window.__bumpHlTick).toBe('function');
-    window.__bumpHlTick();
-    expect(props.setHlTick).toHaveBeenCalledTimes(1);
-    const updater = props.setHlTick.mock.calls[0][0];
-    expect(updater(7)).toBe(8);
-  });
 });
 
 describe('useAppShellEffects — showWelcome init', () => {

@@ -129,10 +129,8 @@ export function JournalHubScreen(props) {
 
   var allEntries = JournalStore.all();
 
-  function bump() { if (window.__bumpHlTick) window.__bumpHlTick(); }
-
-  function deleteEntry(id) { JournalStore.remove(id); bump(); }
-  function togglePin(id) { JournalStore.togglePin(id); bump(); }
+  function deleteEntry(id) { JournalStore.remove(id); }
+  function togglePin(id) { JournalStore.togglePin(id); }
 
   // ─── Entry card render ─────────────────────────────────────
   function renderCard(entry) {

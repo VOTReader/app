@@ -1606,7 +1606,6 @@
           created: Date.now(),
           updated: Date.now()
         });
-        if (window.__bumpHlTick) window.__bumpHlTick();
       }
     };
     return /* @__PURE__ */ React.createElement(
@@ -1983,7 +1982,6 @@
     const doRemove = (e) => {
       e.stopPropagation();
       LinkStore.remove(lnk.id);
-      if (window.__bumpHlTick) window.__bumpHlTick();
     };
     return /* @__PURE__ */ React.createElement("div", { className: "link-card", onClick: confirmRemove ? void 0 : (() => onNavigate && onNavigate(other)) }, /* @__PURE__ */ React.createElement("div", { className: "link-card-header" }, /* @__PURE__ */ React.createElement("div", { className: "link-card-ref" }, /* @__PURE__ */ React.createElement("span", { className: "link-card-direction" }, isOutbound ? "to " : "from "), other.label), chainSvg), /* @__PURE__ */ React.createElement("div", { className: "link-card-cat" }, other.type === "bible" ? bookCategory(other.bookId) : other.type === "study" ? "Matthew Study Bible" : other.type === "study-letter" ? other.collection || "Bible Study" : other.type === "letter" ? other.collection || "Letter" : other.type === "wtlb" ? other.collection || "Words To Live By" : other.type === "blessed" ? "The Blessed" : other.type === "holy-days" ? "Holy Days" : ""), lnk.created && /* @__PURE__ */ React.createElement("div", { className: "link-card-date" }, relativeDate(lnk.created)), /* @__PURE__ */ React.createElement(
       "div",
@@ -2675,7 +2673,6 @@
           if (endpoint) navigateToLink(endpoint, { sourceLetterTitle: "Bookmark" });
         },
         onDeleteDone: () => {
-          if (window.__bumpHlTick) window.__bumpHlTick();
         },
         onClose: () => setBookmarkPopoverPayload(null)
       }
@@ -2713,12 +2710,10 @@
             });
           }
           setBookmarkCreatePending(null);
-          if (window.__bumpHlTick) window.__bumpHlTick();
         },
         onDelete: (editId) => {
           if (editId && typeof BookmarkStore !== "undefined") BookmarkStore.remove(editId);
           setBookmarkCreatePending(null);
-          if (window.__bumpHlTick) window.__bumpHlTick();
         },
         onOpen: (editId) => {
           if (!editId) return;
@@ -4479,7 +4474,6 @@
       const trimmed = newNbName.trim();
       if (!trimmed) return;
       NotebookStore.add(trimmed);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setNewNbName("");
       setNewNbInline(false);
     };
@@ -4494,14 +4488,12 @@
       const trimmed = renameValue.trim();
       if (trimmed && drilledNb) {
         NotebookStore.rename(drilledNb.id, trimmed);
-        if (window.__bumpHlTick) window.__bumpHlTick();
       }
       setRenaming(false);
     };
     const deleteCurrent = () => {
       if (!drilledNb) return;
       NotebookStore.remove(drilledNb.id);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setConfirmDeleteNb(false);
       setDrilledNbId(null);
     };
@@ -7123,7 +7115,6 @@ Continue?`
       }
     };
     var onDeleteFromSheet = function() {
-      if (window.__bumpHlTick) window.__bumpHlTick();
     };
     var navChildren = LibraryNav({
       onBack,
@@ -7593,11 +7584,9 @@ Continue?`
       }
     };
     var onDeleteDone = function() {
-      if (window.__bumpHlTick) window.__bumpHlTick();
     };
     var onEditSave = function(id, newLabel) {
       BookmarkStore.update(id, { label: newLabel });
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setEditingId(null);
     };
     var navChildren = LibraryNav({
@@ -7668,7 +7657,6 @@ Continue?`
           setActionTarget(null);
         },
         onEditThought: function() {
-          if (window.__bumpHlTick) window.__bumpHlTick();
         },
         onDelete: onDeleteDone
       }
@@ -8180,17 +8168,14 @@ Continue?`
       const nb = NotebookStore.add(trimmed);
       if (nb) {
         NoteStore.toggleNotebook(groupId, nb.id);
-        if (window.__bumpHlTick) window.__bumpHlTick();
         setNewName("");
       }
     };
     const toggle = (nbId) => {
       NoteStore.toggleNotebook(groupId, nbId);
-      if (window.__bumpHlTick) window.__bumpHlTick();
     };
     const deleteNb = (nbId) => {
       NotebookStore.remove(nbId);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setConfirmDeleteNb(null);
     };
     return /* @__PURE__ */ React.createElement("div", { className: "nb-picker-overlay", onClick: onClose }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "nb-picker-header" }, /* @__PURE__ */ React.createElement("span", { className: "nb-picker-title" }, memberIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"), /* @__PURE__ */ React.createElement("button", { className: "nb-picker-close", onClick: onClose, "aria-label": "Close" }, "\xD7")), /* @__PURE__ */ React.createElement("div", { className: "nb-picker-new" }, /* @__PURE__ */ React.createElement(
@@ -8291,7 +8276,6 @@ Continue?`
     const truncatedAnchor = anchor.length > 220 ? anchor.slice(0, 220) + "\u2026" : anchor;
     const save = () => {
       NoteStore.update(groupId, { body });
-      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
     };
     const cancelEdit = () => {
@@ -8299,7 +8283,6 @@ Continue?`
       if (startInEditMode && !note.body) {
         AnnotationStore.convertGroup(groupId, "highlight");
         NoteStore.remove(groupId);
-        if (window.__bumpHlTick) window.__bumpHlTick();
         onClose();
         return;
       }
@@ -8308,14 +8291,12 @@ Continue?`
     const recolor = (c) => {
       AnnotationStore.recolorGroup(groupId, c);
       NoteStore.update(groupId, { color: c });
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setShowColors(false);
       setMenuOpen(false);
     };
     const remove = () => {
       AnnotationStore.removeGroup(groupId);
       NoteStore.remove(groupId);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
     };
     const share = () => {
@@ -8528,7 +8509,6 @@ Continue?`
       }
       const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
       const newLink = persistLink(sourceEndpoint, refinedTarget);
-      if (newLink && window.__bumpHlTick) window.__bumpHlTick();
       onClose(newLink || null);
     }, [selInfo, captureSelectionSync, target, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink]);
     if (!entry) {
@@ -8700,7 +8680,6 @@ Continue?`
       }
       const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
       const newLink = persistLink(sourceEndpoint, refinedTarget);
-      if (newLink && window.__bumpHlTick) window.__bumpHlTick();
       onClose(newLink || null);
     }, [selInfo, captureSelectionSync, target, item, isStudy, verses, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink]);
     if (!chapter) {
@@ -8805,7 +8784,6 @@ Continue?`
       const sourceEndpoint = buildSourceEndpoint(sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText);
       const newLink = persistLink(sourceEndpoint, target);
       if (newLink) {
-        if (window.__bumpHlTick) window.__bumpHlTick();
         bumpRecent();
         onLinkCreated(newLink);
       }
@@ -9194,7 +9172,6 @@ Continue?`
       }
       window.getSelection().removeAllRanges();
       setVisible(false);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setTimeout(() => {
         suppressRef.current = false;
       }, 300);
@@ -9222,7 +9199,6 @@ Continue?`
       });
       window.getSelection().removeAllRanges();
       setVisible(false);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setTimeout(() => {
         suppressRef.current = false;
       }, 300);
@@ -9338,7 +9314,6 @@ Continue?`
       });
       window.getSelection().removeAllRanges();
       setVisible(false);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       onNoteRequest && onNoteRequest(
         groupId,
         /*startInEditMode=*/
@@ -9432,7 +9407,6 @@ Continue?`
           created: Date.now(),
           updated: Date.now()
         });
-        if (window.__bumpHlTick) window.__bumpHlTick();
       }
       if (typeof onBookmarkRequest === "function") onBookmarkRequest(storedKey);
     }, [selInfo, onBookmarkRequest]);
@@ -9530,13 +9504,11 @@ Continue?`
     const remove = () => {
       AnnotationStore.removeGroup(groupId);
       NoteStore.remove(groupId);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
     };
     const recolor = (color) => {
       AnnotationStore.recolorGroup(groupId, color);
       if (kind === "note") NoteStore.update(groupId, { color });
-      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
     };
     const convertToNote = () => {
@@ -9545,7 +9517,6 @@ Continue?`
       const fullText = segs.map((s) => s.ann.text || "").join(" \u2026 ");
       const keys = [...new Set(segs.map((s) => s.key))];
       NoteStore.set(groupId, { color: ann.color, fullText, keys, body: "" });
-      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
       if (onNoteRequest) onNoteRequest(
         groupId,
@@ -9825,7 +9796,6 @@ Continue?`
     const [_translationTick, setTranslationTick] = useState(0);
     const [_studiesTick, setStudiesTick] = useState(0);
     const [studiesLoading, setStudiesLoading] = useState(false);
-    const [hlTick, setHlTick] = useState(0);
     const {
       annChip,
       setAnnChip,
@@ -9866,7 +9836,7 @@ Continue?`
     useKeyboardInset();
     useDocumentTitle({ activeTab });
     useDesktopKeyboard();
-    useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget, setNoteSheetTarget });
+    useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNoteSheetTarget });
     const [tabsOverviewOpen, setTabsOverviewOpen] = useState(false);
     const [lastReadChapters, setLastReadChapters] = useState(saved.lastReadChapters || {});
     const [lastReadLetterMap, setLastReadLetterMap] = useState(() => {
@@ -9937,7 +9907,6 @@ Continue?`
     const [fromWtlb, setFromWtlb] = tabField("fromWtlb");
     const [navOrigin, setNavOrigin] = tabField("navOrigin");
     const { showWelcome, setShowWelcome, isOnline, dismissWelcome } = useAppShellEffects({
-      setHlTick,
       setNavOrigin,
       setScreen
     });

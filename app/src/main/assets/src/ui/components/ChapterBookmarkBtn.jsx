@@ -51,7 +51,6 @@ export function ChapterBookmarkBtn({ chapterBookmark }) {
         created: Date.now(),
         updated: Date.now()
       });
-      if (window.__bumpHlTick) window.__bumpHlTick();
     }
   };
 

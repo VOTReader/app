@@ -467,13 +467,10 @@ export function BookmarksScreen(props) {
     }
   };
 
-  var onDeleteDone = function() {
-    if (window.__bumpHlTick) window.__bumpHlTick();
-  };
+  var onDeleteDone = function() {};
 
   var onEditSave = function(id, newLabel) {
     BookmarkStore.update(id, { label: newLabel });
-    if (window.__bumpHlTick) window.__bumpHlTick();
     setEditingId(null);
   };
 
@@ -554,7 +551,7 @@ export function BookmarksScreen(props) {
             onClose={function() { setActionTarget(null); }}
             onNavigate={function(bkm) { navigateToBookmark(bkm); setActionTarget(null); }}
             onEditLabel={function(id) { setEditingId(id); setActionTarget(null); }}
-            onEditThought={function() { if (window.__bumpHlTick) window.__bumpHlTick(); }}
+            onEditThought={function() {}}
             onDelete={onDeleteDone}
           />
         )}

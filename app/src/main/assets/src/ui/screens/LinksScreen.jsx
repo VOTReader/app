@@ -268,9 +268,7 @@ export function LinksScreen(props) {
     }
   };
 
-  var onDeleteFromSheet = function() {
-    if (window.__bumpHlTick) window.__bumpHlTick();
-  };
+  var onDeleteFromSheet = function() {};
 
   // Standard app-wide Library nav (back + Home left, icon cluster right).
   var navChildren = LibraryNav({

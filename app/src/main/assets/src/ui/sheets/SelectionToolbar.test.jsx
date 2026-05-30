@@ -87,7 +87,6 @@ beforeEach(() => {
   window.__showAnnChip = vi.fn();
   window.__openNote = vi.fn();
   window.__showMultiNote = vi.fn();
-  window.__bumpHlTick = vi.fn();
 });
 
 afterEach(() => {

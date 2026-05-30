@@ -468,8 +468,6 @@ export function JournalViewerScreen(props) {
   var _typedDelete = useState('');
   var typedDelete = _typedDelete[0]; var setTypedDelete = _typedDelete[1];
 
-  function bump() { if (window.__bumpHlTick) window.__bumpHlTick(); }
-
   function startDelete() { setConfirmStep(1); setTypedDelete(''); }
   function nextDeleteStep() {
     if (confirmStep < 3) setConfirmStep(confirmStep + 1);
@@ -566,11 +564,9 @@ export function JournalViewerScreen(props) {
 
   function togglePin() {
     JournalStore.togglePin(entry.id);
-    bump();
   }
   function doDelete() {
     JournalStore.remove(entry.id);
-    bump();
     onBack && onBack();
   }
 

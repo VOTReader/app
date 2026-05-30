@@ -9,25 +9,36 @@
    globals). This hook owns the two effects that drive that pass — extracted
    verbatim from App() so the composition root stays under its line budget.
 
+   RE-APPLY TRIGGER (W7.3): the apply pass re-runs whenever any of the four
+   stores it paints from changes. Each store exposes the React 18
+   useSyncExternalStore contract (subscribe + getVersion) and calls _bump()
+   from its own mutation methods, so subscribing here means a mutation
+   anywhere — add a highlight, recolor a note, drop a link, toggle a bookmark
+   — re-runs the apply pass with no manual signal. This REPLACES the old
+   hlTick / window.__bumpHlTick cache-bust: the stores are now the single
+   source of truth for "annotations changed," and consumers no longer poke a
+   global counter after every mutation.
+
    OWNS:
-     1. The post-render re-apply effect (deps: hlTick, screen, letterId).
-        Runs the five apply* passes inside a 0ms timeout (so it fires after
-        React's commit), each guarded so one layer's failure can't trip the
-        ErrorBoundary. Also drains two window hand-offs:
+     1. The post-render re-apply effect (deps: the four store versions +
+        screen + letterId). Runs the five apply* passes inside a 0ms timeout
+        (so it fires after React's commit), each guarded so one layer's
+        failure can't trip the ErrorBoundary. Also drains two window hand-offs:
           - __pendingOpenNote   → open the NoteSheet for a tapped Notes-index row
           - __pendingScrollHlKey → scroll a Library-opened mark into view
-     2. The active-note toggle effect (deps: noteSheetTarget, hlTick).
-        Sets window.__activeNoteGroup + re-runs applyActiveNoteState so the
-        open note's anchored text lights up (and reverts on close).
+     2. The active-note toggle effect (deps: noteSheetTarget). Sets
+        window.__activeNoteGroup + re-runs applyActiveNoteState so the open
+        note's anchored text lights up (and reverts on close). Store-driven
+        re-applies of the active tint are already covered by effect #1, which
+        also calls applyActiveNoteState on every store change — so this effect
+        only needs to fire when the OPEN note itself changes.
 
    DOES NOT OWN:
-     - hlTick / screen / letterId / noteSheetTarget — App-local nav + sheet
-       state, passed in.
+     - screen / letterId / noteSheetTarget — App-local nav + sheet state, in.
      - The apply* functions themselves — renderer cluster (bundle-c globals).
-     - NoteStore — global store (bundle-b), read bare as elsewhere.
+     - The stores — global singletons (bundle-b), subscribed to here.
 
    PARAMS:
-     hlTick             cache-bust counter; bumps re-run the apply pass.
      screen, letterId   nav keys; a screen/letter change re-applies.
      noteSheetTarget    the open note ({ groupId } | null) for the active toggle.
      setNoteSheetTarget useState setter (from useSheetOrchestration) used to
@@ -43,7 +54,6 @@
 
 /**
  * @param {{
- *   hlTick: number,
  *   screen: string,
  *   letterId: string | null,
  *   noteSheetTarget: { groupId: string } | null,
@@ -51,7 +61,29 @@
  * }} args
  * @returns {void}
  */
-export function useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget, setNoteSheetTarget }) {
+export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNoteSheetTarget }) {
+  // Reactive versions of the four stores the DOM layer paints from. Any
+  // store's _bump() (fired by its own mutation methods) changes its version,
+  // re-renders App, and re-runs the apply pass below — the W7.3 replacement
+  // for the old hlTick/__bumpHlTick cache-bust. The typeof guards keep the
+  // hook safe if a store global isn't defined yet (cold boot / test isolation).
+  const annV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.subscribe(cb) : () => {}, []),
+    () => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.getVersion() : 0
+  );
+  const noteV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof NoteStore !== 'undefined') ? NoteStore.subscribe(cb) : () => {}, []),
+    () => (typeof NoteStore !== 'undefined') ? NoteStore.getVersion() : 0
+  );
+  const linkV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof LinkStore !== 'undefined') ? LinkStore.subscribe(cb) : () => {}, []),
+    () => (typeof LinkStore !== 'undefined') ? LinkStore.getVersion() : 0
+  );
+  const bkmV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, []),
+    () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
+  );
+
   React.useEffect(() => {
     const t = setTimeout(() => {
       // Each annotation layer is isolated: this pipeline mutates the DOM
@@ -59,7 +91,7 @@ export function useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget
       // annotated page can leave stale/detached nodes mid-pass. A throw
       // here would propagate to React and trip the ErrorBoundary, forcing
       // a full reload. Degrade gracefully instead — a missed icon recovers
-      // on the next hlTick; a crash does not.
+      // on the next store mutation / re-render; a crash does not.
       try { applyDOMHighlights(); } catch (e) { console.error('applyDOMHighlights failed', e); }
       try { applyDOMLinks(); } catch (e) { console.error('applyDOMLinks failed', e); }
       try { applyDOMBookmarks(); } catch (e) { console.error('applyDOMBookmarks failed', e); }
@@ -92,13 +124,15 @@ export function useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget
     }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setNoteSheetTarget is a useState setter passed in as a param (identity-stable per React invariant; eslint can't trace it through the destructured hook-return at the call site).
-  }, [hlTick, screen, letterId]);
+  }, [annV, noteV, linkV, bkmV, screen, letterId]);
 
   // Toggle .is-active on every mark/icon belonging to the open note's group.
   // Default state: notes show only the trailing 📝 icon (no tint, no ribbon).
   // When NoteSheet opens, the anchored text lights up; closing reverts.
+  // Keyed on noteSheetTarget alone — store-driven re-applies are handled by
+  // the apply pass above (which also calls applyActiveNoteState).
   React.useEffect(() => {
     window.__activeNoteGroup = noteSheetTarget ? noteSheetTarget.groupId : null;
     applyActiveNoteState();
-  }, [noteSheetTarget, hlTick]);
+  }, [noteSheetTarget]);
 }

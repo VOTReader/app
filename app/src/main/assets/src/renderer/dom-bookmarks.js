@@ -4,8 +4,9 @@
    Global-scope module. Concatenates with index.html; no import/export.
    Depends on: BookmarkStore (defined in src/stores/bookmark-store.js).
 
-   applyDOMBookmarks() is called from the post-render useEffect in App()
-   after every hlTick change (same effect that calls applyDOMLinks).
+   applyDOMBookmarks() is called from the post-render useEffect in
+   useDomAnnotationSync on any annotation-store change (same effect that
+   calls applyDOMLinks).
    It:
      1. Removes any existing .inline-bookmark-icon elements
      2. Finds all bookmarks that touch each [data-hl-dom] container

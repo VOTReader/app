@@ -14,9 +14,8 @@
         this entry). Both paths exist; tested separately.
 
      C) The setter ordering matters semantically:
-          setHlTick FIRST (so memos refresh)
-          setJournalEntryId NEXT (so editor knows what to render)
-          setScreen LAST (so route happens after state is ready)
+          setJournalEntryId FIRST (so editor knows what to render)
+          setScreen NEXT (so route happens after state is ready)
         A reorder would still produce a visible editor in practice
         (React batches), but the per-setter assertions guarantee the
         contract documented in the hook header.
@@ -45,18 +44,6 @@ afterEach(() => {
   window.jrnShowMilestoneToast = _prevToast;
 });
 
-let _prevBumpHlTick;
-
-beforeEach(() => {
-  _prevBumpHlTick = window.__bumpHlTick;
-  window.__bumpHlTick = vi.fn();
-});
-
-afterEach(() => {
-  if (_prevBumpHlTick === undefined) delete window.__bumpHlTick;
-  else window.__bumpHlTick = _prevBumpHlTick;
-});
-
 const makeSetters = () => ({
   setJournalEntryId: vi.fn(),
   setScreen: vi.fn(),
@@ -69,12 +56,11 @@ const setup = () => {
 };
 
 describe('useJournalMutations — createAndEditJournal', () => {
-  it('happy path: adds an entry, bumps hlTick via bridge, sets entryId, nav to editor', () => {
+  it('happy path: adds an entry, sets entryId, nav to editor', () => {
     const { result, setters } = setup();
     act(() => { result.current.createAndEditJournal(); });
 
     expect(window.JournalStore.add).toHaveBeenCalledTimes(1);
-    expect(window.__bumpHlTick).toHaveBeenCalledTimes(1);
     expect(setters.setJournalEntryId).toHaveBeenCalledWith('jrn-1');
     expect(setters.setScreen).toHaveBeenCalledWith('journal-editor');
   });
@@ -118,7 +104,6 @@ describe('useJournalMutations — createAndEditJournal', () => {
     delete window.JournalStore;
     const { result, setters } = setup();
     act(() => { result.current.createAndEditJournal(); });
-    expect(window.__bumpHlTick).not.toHaveBeenCalled();
     expect(setters.setJournalEntryId).not.toHaveBeenCalled();
     expect(setters.setScreen).not.toHaveBeenCalled();
   });

@@ -100,11 +100,10 @@ function App() {
   const [studiesLoading, setStudiesLoading] = useState(false);
 
   /* ═══════════════════════════════════════════════════════════════
-     HIGHLIGHT & LINK STATE
-     hlTick forces re-renders when highlights/links are mutated.
-     Overlay state tracks which sheets/sidebars are open.
+     SHEET / OVERLAY STATE — tracks which sheets/sidebars are open.
+     (W7.3 removed the hlTick counter; the imperative DOM annotation
+     layer now re-applies off store subscriptions in useDomAnnotationSync.)
   ═══════════════════════════════════════════════════════════════ */
-  const [hlTick, setHlTick] = useState(0);
   /* useSheetOrchestration — modal/sheet/overlay open-state + the
      window.__open* bridges + auto-dismiss-on-navigation.
      Extracted to src/hooks/use-sheet-orchestration.js (P6h). */
@@ -133,7 +132,6 @@ function App() {
 
   /* bridge effects (__openLinkSidebar, __showAnnChip, __showMultiNote,
      __openBookmarkPopover) → src/hooks/use-sheet-orchestration.js (P6h) */
-  /* __bumpHlTick bridge → src/hooks/use-app-shell-effects.js (P7k, called below). */
   // Soft-keyboard height → --keyboard-height CSS var (visualViewport), so
   // input-owning overlays lift above the IME. Mount-only → extracted to
   // src/hooks/use-keyboard-inset.js (P11).
@@ -149,7 +147,7 @@ function App() {
      __pendingOpenNote / __pendingScrollHlKey hand-offs → extracted verbatim
      to src/hooks/use-dom-annotation-sync.js (P11). Called here so it follows
      useSheetOrchestration: noteSheetTarget + setNoteSheetTarget are params. */
-  useDomAnnotationSync({ hlTick, screen, letterId, noteSheetTarget, setNoteSheetTarget });
+  useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNoteSheetTarget });
 
   /* TAB MANAGEMENT — openNewTab / switchToTab / closeTab / closeOtherTabs
      / closeTabsToTheRight / closeAllTabs / deduplicateTabs + the 4 tab-UI
@@ -264,9 +262,9 @@ function App() {
   const [navOrigin, setNavOrigin] = tabField('navOrigin');
 
   /* AppShell-level leftover effects + small state (P7k — closes Phase 1).
-     __bumpHlTick window bridge + showWelcome/isOnline/dismissWelcome. */
+     showWelcome / isOnline / dismissWelcome. */
   const { showWelcome, setShowWelcome, isOnline, dismissWelcome } = useAppShellEffects({
-    setHlTick, setNavOrigin, setScreen,
+    setNavOrigin, setScreen,
   });
 
   // App-global: read history shared across all tabs.

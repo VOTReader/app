@@ -310,7 +310,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     }
     window.getSelection().removeAllRanges();
     setVisible(false);
-    if (window.__bumpHlTick) window.__bumpHlTick();
     setTimeout(() => { suppressRef.current = false; }, 300);
   }, [selInfo, activeStyle, computeOffset]);
 
@@ -344,7 +343,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     });
     window.getSelection().removeAllRanges();
     setVisible(false);
-    if (window.__bumpHlTick) window.__bumpHlTick();
     setTimeout(() => { suppressRef.current = false; }, 300);
   }, [selInfo, computeOffset]);
 
@@ -470,7 +468,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     });
     window.getSelection().removeAllRanges();
     setVisible(false);
-    if (window.__bumpHlTick) window.__bumpHlTick();
     onNoteRequest && onNoteRequest(groupId, /*startInEditMode=*/true);
   }, [selInfo, onNoteRequest, computeOffset]);
 
@@ -593,7 +590,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         hlKey: storedKey, label: labelText, thought: '',
         created: Date.now(), updated: Date.now()
       });
-      if (window.__bumpHlTick) window.__bumpHlTick();
     }
     if (typeof onBookmarkRequest === 'function') onBookmarkRequest(storedKey);
   }, [selInfo, onBookmarkRequest]);

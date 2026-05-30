@@ -2578,9 +2578,14 @@ after W6. But they MUST land before the project is called done.
         live cache — freezing _load()'s live return would freeze _cache and
         break in-place mutations. All 1426 vitest pass; +5 cases pin the
         contract incl. the don't-freeze-the-live-cache regression.
-    [ ] hlTick: ZERO references in production code (grep confirms).
-        All annotation/note/bookmark/link re-renders work via
-        useSyncExternalStore. All vitest pass. Smoke walk confirms.
+    [x] hlTick (W7.3 DONE 2026-05-29): ZERO production refs (grep confirms;
+        only W7.3 explanatory comments + the annotation-store.test.js
+        historical marker remain). useDomAnnotationSync subscribes to the
+        Annotation/Note/Link/Bookmark stores via useSyncExternalStore, so a
+        store's own _bump() drives the imperative DOM re-apply — the hlTick
+        useState + the window.__bumpHlTick bridge + ~36 call sites are all
+        deleted (31 files). Live smoke: a real AnnotationStore.add re-ran
+        applyDOMHighlights with the bridge absent. vitest 1440 → 1439, green.
     [ ] DiagnosticLog: JS-side ring buffer, sanitized, wired into
         stores/corpus/SW/ErrorBoundary. Surfaced in Settings export.
         vitest coverage.

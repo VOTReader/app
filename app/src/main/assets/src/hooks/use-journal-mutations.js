@@ -7,8 +7,7 @@
    inline. createAndEditJournal is the entry-point that the journal-hub
    "New entry" button calls: it adds a journal entry via JournalStore,
    records the create event in JournalStatsStore (with milestone toast
-   side-effect), bumps the hlTick so annotation memos refresh, and
-   navigates to the editor for the new entry.
+   side-effect), and navigates to the editor for the new entry.
 
    OWNS:
      - createAndEditJournal()    creates a JournalStore entry, fires any
@@ -24,10 +23,6 @@
      - The journal editor screen — render tree, stays in ui/screens/.
 
    PARAMS:
-     setHlTick           App() useState setter. Bumps a cache-bust
-                         counter so highlight/note/bookmark memos
-                         re-read after the new entry exists (the
-                         entry's media slots become reachable).
      setJournalEntryId   App() useState setter. Tells the editor which
                          entry to render.
      setScreen           Nav setter. Routes to 'journal-editor'.
@@ -67,7 +62,6 @@ export function useJournalMutations({ setJournalEntryId, setScreen }) {
         newMilestones.forEach((m) => jrnShowMilestoneToast(m));
       }
     }
-    if (window.__bumpHlTick) window.__bumpHlTick();
     setJournalEntryId(e.id);
     setScreen('journal-editor');
   };

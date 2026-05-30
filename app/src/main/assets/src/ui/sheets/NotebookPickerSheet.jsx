@@ -29,19 +29,16 @@ export function NotebookPickerSheet({ groupId, onClose }) {
     if (nb) {
       // Auto-add the note to the freshly-created notebook
       NoteStore.toggleNotebook(groupId, nb.id);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       setNewName('');
     }
   };
 
   const toggle = (nbId) => {
     NoteStore.toggleNotebook(groupId, nbId);
-    if (window.__bumpHlTick) window.__bumpHlTick();
   };
 
   const deleteNb = (nbId) => {
     NotebookStore.remove(nbId);
-    if (window.__bumpHlTick) window.__bumpHlTick();
     setConfirmDeleteNb(null);
   };
 

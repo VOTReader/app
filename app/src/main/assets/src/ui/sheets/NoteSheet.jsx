@@ -5,7 +5,8 @@
 export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPicker }) {
   // Subscribe to NoteStore + AnnotationStore mutations. Each store's _bump
   // triggers a re-render of this component via useSyncExternalStore.
-  // Mutations also call window.__bumpHlTick() to refresh DOM highlights.
+  // The imperative DOM highlight layer re-applies off the same store
+  // subscriptions (useDomAnnotationSync), so no manual refresh is needed.
   React.useSyncExternalStore(
     React.useCallback((cb) => NoteStore.subscribe(cb), []),
     () => NoteStore.getVersion()
@@ -42,7 +43,6 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
 
   const save = () => {
     NoteStore.update(groupId, { body });
-    if (window.__bumpHlTick) window.__bumpHlTick();
     onClose();
   };
 
@@ -53,7 +53,6 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
       // so the selection the user made is preserved on screen.
       AnnotationStore.convertGroup(groupId, 'highlight');
       NoteStore.remove(groupId);
-      if (window.__bumpHlTick) window.__bumpHlTick();
       onClose();
       return;
     }
@@ -63,7 +62,6 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
   const recolor = (c) => {
     AnnotationStore.recolorGroup(groupId, c);
     NoteStore.update(groupId, { color: c });
-    if (window.__bumpHlTick) window.__bumpHlTick();
     setShowColors(false);
     setMenuOpen(false);
   };
@@ -71,7 +69,6 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
   const remove = () => {
     AnnotationStore.removeGroup(groupId);
     NoteStore.remove(groupId);
-    if (window.__bumpHlTick) window.__bumpHlTick();
     onClose();
   };
 

@@ -28,14 +28,12 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   const remove = () => {
     AnnotationStore.removeGroup(groupId);
     NoteStore.remove(groupId);
-    if (window.__bumpHlTick) window.__bumpHlTick();
     onClose();
   };
 
   const recolor = (color) => {
     AnnotationStore.recolorGroup(groupId, color);
     if (kind === 'note') NoteStore.update(groupId, { color });
-    if (window.__bumpHlTick) window.__bumpHlTick();
     onClose();
   };
 
@@ -46,7 +44,6 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
     const fullText = segs.map(s => s.ann.text || '').join(' … ');
     const keys = [...new Set(segs.map(s => s.key))];
     NoteStore.set(groupId, { color: ann.color, fullText, keys, body: '' });
-    if (window.__bumpHlTick) window.__bumpHlTick();
     onClose();
     if (onNoteRequest) onNoteRequest(groupId, /*startInEditMode=*/true);
   };
