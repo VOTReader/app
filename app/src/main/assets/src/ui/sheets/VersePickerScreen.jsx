@@ -54,8 +54,8 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     const range = sel.getRangeAt(0);
     const startN = range.startContainer;
     const endN = range.endContainer;
-    const startVerseEl = (startN.nodeType === 3 ? startN.parentElement : startN).closest('[data-verse]');
-    const endVerseEl = (endN.nodeType === 3 ? endN.parentElement : endN).closest('[data-verse]');
+    const startVerseEl = /** @type {Element} */ (startN.nodeType === 3 ? startN.parentElement : startN).closest('[data-verse]');
+    const endVerseEl = /** @type {Element} */ (endN.nodeType === 3 ? endN.parentElement : endN).closest('[data-verse]');
     if (!startVerseEl || !endVerseEl) return null;
     if (!bodyRef.current || !bodyRef.current.contains(startVerseEl) || !bodyRef.current.contains(endVerseEl)) return null;
     const startVerse = parseInt(startVerseEl.getAttribute('data-verse'), 10);

@@ -90,8 +90,8 @@ describe('Safari7DayModal', () => {
     var { container } = render(<Safari7DayModal />);
     var btns = container.querySelectorAll('.sh-modal-btn');
     var riskBtn = Array.from(btns).find((b) => b.textContent.includes('I understand'));
-    act(() => { riskBtn.click(); });
-    expect(globalThis.StorageHealth.dismissScenario).toHaveBeenCalledWith('safari-7day');
+    act(() => { /** @type {HTMLElement} */ (riskBtn).click(); });
+    expect(/** @type {any} */ (globalThis).StorageHealth.dismissScenario).toHaveBeenCalledWith('safari-7day');
   });
 
   it('"How to add to Home Screen" shows instructions', () => {
@@ -101,14 +101,14 @@ describe('Safari7DayModal', () => {
       (b) => b.textContent.includes('How to add')
     );
     expect(container.querySelector('.sh-modal-instructions')).toBeNull();
-    act(() => { howBtn.click(); });
+    act(() => { /** @type {HTMLElement} */ (howBtn).click(); });
     expect(container.querySelector('.sh-modal-instructions')).not.toBeNull();
   });
 
   it('registers with useModalRegistry', () => {
     _report = _makeReport({ safariGateBlocked: true });
     render(<Safari7DayModal />);
-    expect(globalThis.useModalRegistry).toHaveBeenCalledWith(
+    expect(/** @type {any} */ (globalThis).useModalRegistry).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'safari-7day-modal', active: true })
     );
   });
@@ -148,8 +148,8 @@ describe('IosPwaWelcomeCard', () => {
     var skipBtn = Array.from(container.querySelectorAll('.sh-modal-btn')).find(
       (b) => b.textContent.includes('skip')
     );
-    act(() => { skipBtn.click(); });
-    expect(globalThis.StateStore.set).toHaveBeenCalledWith('ios-pwa-welcomed', true);
+    act(() => { /** @type {HTMLElement} */ (skipBtn).click(); });
+    expect(/** @type {any} */ (globalThis).StateStore.set).toHaveBeenCalledWith('ios-pwa-welcomed', true);
     expect(container.querySelector('.sh-welcome-card')).toBeNull();
   });
 
@@ -160,15 +160,15 @@ describe('IosPwaWelcomeCard', () => {
     var importBtn = Array.from(container.querySelectorAll('.sh-modal-btn')).find(
       (b) => b.textContent.includes('import')
     );
-    act(() => { importBtn.click(); });
-    expect(globalThis.StateStore.set).toHaveBeenCalledWith('ios-pwa-welcomed', true);
+    act(() => { /** @type {HTMLElement} */ (importBtn).click(); });
+    expect(/** @type {any} */ (globalThis).StateStore.set).toHaveBeenCalledWith('ios-pwa-welcomed', true);
     expect(nav).toHaveBeenCalled();
   });
 
   it('registers with useModalRegistry when visible', () => {
     _report = _makeReport({ platform: 'safari-pwa' });
     render(<IosPwaWelcomeCard onNavigateSettings={() => {}} />);
-    expect(globalThis.useModalRegistry).toHaveBeenCalledWith(
+    expect(/** @type {any} */ (globalThis).useModalRegistry).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'ios-pwa-welcome', active: true })
     );
   });

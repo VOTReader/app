@@ -58,6 +58,9 @@ export function jrnRenderInline(text, callbacks) {
   return nodes;
 }
 
+/**
+ * @param {{ key?: any, block: any, callbacks: any, entryId: any, blockIndex: any }} props
+ */
 export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (!block) return null;
   callbacks = callbacks || {};

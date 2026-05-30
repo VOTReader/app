@@ -16,10 +16,13 @@
     "app/src/main/assets/src/utils/**/*",
     "app/src/main/assets/src/stores/**/*",
     "app/src/main/assets/src/hooks/**/*",
-    "app/src/main/assets/src/renderer/**/*"
+    "app/src/main/assets/src/renderer/**/*",
+    "app/src/main/assets/src/ui/**/*",
+    "app/src/main/assets/src/components/**/*"
   ],
   "exclude": [
     "app/src/main/assets/src/stores/_entry-b.js",
-    "app/src/main/assets/src/renderer/_entry.js"
+    "app/src/main/assets/src/renderer/_entry.js",
+    "app/src/main/assets/src/ui/_entry-d.js"
   ]
 }

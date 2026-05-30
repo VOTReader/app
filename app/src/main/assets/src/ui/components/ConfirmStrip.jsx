@@ -31,6 +31,9 @@
        : <button onClick={() => setConfirming(true)}>Delete</button>;
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * @param {{ question: any, yesLabel?: any, onCancel: any, onConfirm: any, className?: any, style?: any }} props
+ */
 export function ConfirmStrip({ question, yesLabel, onCancel, onConfirm, className, style }) {
   const cls = className ? 'ann-chip-confirm ' + className : 'ann-chip-confirm';
   // W1.5(a.2) — per-instance UNIQUE registry ID via React.useId(). ConfirmStrip

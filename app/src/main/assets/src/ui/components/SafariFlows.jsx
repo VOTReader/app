@@ -8,9 +8,6 @@
       Guides user to import data from Safari.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/**
- * @param {{ onNavigateSettings: () => void }} props
- */
 export function Safari7DayModal() {
   React.useSyncExternalStore(StorageHealth.subscribe, StorageHealth.getVersion);
   var report = StorageHealth.getReport();

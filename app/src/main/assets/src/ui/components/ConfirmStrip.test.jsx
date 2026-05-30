@@ -80,7 +80,7 @@ describe('ConfirmStrip', () => {
     const { container } = render(
       <ConfirmStrip question="Q?" onCancel={() => {}} onConfirm={() => {}} />
     );
-    const root = container.firstChild;
+    const root = /** @type {HTMLElement} */ (container.firstChild);
     expect(root.className).toBe('ann-chip-confirm');
   });
 
@@ -88,7 +88,7 @@ describe('ConfirmStrip', () => {
     const { container } = render(
       <ConfirmStrip question="Q?" className="my-extra" onCancel={() => {}} onConfirm={() => {}} />
     );
-    const root = container.firstChild;
+    const root = /** @type {HTMLElement} */ (container.firstChild);
     expect(root.className).toContain('ann-chip-confirm');
     expect(root.className).toContain('my-extra');
   });
@@ -97,7 +97,7 @@ describe('ConfirmStrip', () => {
     const { container } = render(
       <ConfirmStrip question="Q?" style={{ padding: '14px 12px' }} onCancel={() => {}} onConfirm={() => {}} />
     );
-    const root = container.firstChild;
+    const root = /** @type {HTMLElement} */ (container.firstChild);
     expect(root.style.padding).toBe('14px 12px');
   });
 

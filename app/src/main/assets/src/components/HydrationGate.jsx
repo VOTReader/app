@@ -33,7 +33,7 @@ const { useState, useEffect } = React;
  * Wrap the app root. Awaits hydrateAllStores() exactly once at mount;
  * shows a centered "VOTReader" splash until the promise settles.
  *
- * @param {{ children: React.ReactNode }} props
+ * @param {{ children?: import('react').ReactNode }} props
  */
 export function HydrationGate({ children }) {
   const [hydrated, setHydrated] = useState(false);

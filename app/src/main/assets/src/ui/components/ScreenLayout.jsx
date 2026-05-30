@@ -3,7 +3,16 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn }) {
-  const ref = React.useCallback((el) => {__scrollEl = el;}, []);
+  const ref = React.useCallback((el) => {
+    // __scrollEl is a mutable `let` GLOBAL declared in index.html (line ~515),
+    // read by use-scroll-memory + use-thumbnails. It is a lexical global, NOT a
+    // window property, so it must be assigned by bare name (window.__scrollEl
+    // would be a different binding the readers never see). The auto-generated
+    // globals.d.ts declares every global `const`, so this legitimate
+    // reassignment trips a false TS2588 — suppress just this line.
+    // @ts-expect-error -- generated-globals const-vs-let mismatch (see above)
+    __scrollEl = el;
+  }, []);
 
   React.useEffect(() => {
     if (!showProgress) return;

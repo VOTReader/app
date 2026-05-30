@@ -8471,9 +8471,16 @@ Continue?`
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
       const range = sel.getRangeAt(0);
       const startNode = range.startContainer;
-      const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest("[data-block-key]") : startNode.closest && startNode.closest("[data-block-key]");
+      const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest("[data-block-key]") : (
+        /** @type {Element} */
+        startNode.closest && /** @type {Element} */
+        startNode.closest("[data-block-key]")
+      );
       if (!blockEl || !bodyRef.current || !bodyRef.current.contains(blockEl)) return null;
-      const blockKey = blockEl.dataset.blockKey;
+      const blockKey = (
+        /** @type {HTMLElement} */
+        blockEl.dataset.blockKey
+      );
       const fullText = blockEl.textContent;
       const preRange = document.createRange();
       preRange.selectNodeContents(blockEl);
@@ -8584,8 +8591,14 @@ Continue?`
       const range = sel.getRangeAt(0);
       const startN = range.startContainer;
       const endN = range.endContainer;
-      const startVerseEl = (startN.nodeType === 3 ? startN.parentElement : startN).closest("[data-verse]");
-      const endVerseEl = (endN.nodeType === 3 ? endN.parentElement : endN).closest("[data-verse]");
+      const startVerseEl = (
+        /** @type {Element} */
+        (startN.nodeType === 3 ? startN.parentElement : startN).closest("[data-verse]")
+      );
+      const endVerseEl = (
+        /** @type {Element} */
+        (endN.nodeType === 3 ? endN.parentElement : endN).closest("[data-verse]")
+      );
       if (!startVerseEl || !endVerseEl) return null;
       if (!bodyRef.current || !bodyRef.current.contains(startVerseEl) || !bodyRef.current.contains(endVerseEl)) return null;
       const startVerse = parseInt(startVerseEl.getAttribute("data-verse"), 10);
@@ -8882,7 +8895,7 @@ Continue?`
     const toolbarRef = React.useRef(null);
     const suppressRef = React.useRef(false);
     const computeOffset = React.useCallback((container, node, offset) => {
-      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
       let charPos = 0;
       while (walker.nextNode()) {
         if (walker.currentNode === node) return charPos + offset;

@@ -57,6 +57,9 @@ export function _epSearchText(ep) {
 }
 
 /* ── LinkRow component ───────────────────────────────────────────── */
+/**
+ * @param {{ key?: any, lnk: any, onNavigateSource: any, onNavigateTarget: any, onLongPress: any }} props
+ */
 export function LinkRow({ lnk, onNavigateSource, onNavigateTarget, onLongPress }) {
   var src = lnk.source;
   var tgt = lnk.target;

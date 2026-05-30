@@ -73,9 +73,9 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
     const range = sel.getRangeAt(0);
     const startNode = range.startContainer;
-    const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest('[data-block-key]') : startNode.closest && startNode.closest('[data-block-key]');
+    const blockEl = startNode.nodeType === 3 ? startNode.parentElement.closest('[data-block-key]') : /** @type {Element} */ (startNode).closest && /** @type {Element} */ (startNode).closest('[data-block-key]');
     if (!blockEl || !bodyRef.current || !bodyRef.current.contains(blockEl)) return null;
-    const blockKey = blockEl.dataset.blockKey;
+    const blockKey = /** @type {HTMLElement} */ (blockEl).dataset.blockKey;
     const fullText = blockEl.textContent;
     const preRange = document.createRange();
     preRange.selectNodeContents(blockEl);

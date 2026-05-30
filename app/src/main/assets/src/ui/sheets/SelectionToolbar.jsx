@@ -31,7 +31,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
   // Compute character offset of a node+offset within a data-hl-key container's text
   const computeOffset = React.useCallback((container, node, offset) => {
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
     let charPos = 0;
     while (walker.nextNode()) {
       if (walker.currentNode === node) return charPos + offset;

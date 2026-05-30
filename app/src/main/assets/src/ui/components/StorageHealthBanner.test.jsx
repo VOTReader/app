@@ -13,8 +13,8 @@ import { StorageHealthBanner, useStorageHealth } from './StorageHealthBanner.jsx
 import { renderHook, act } from '@testing-library/react';
 
 beforeEach(() => {
-  globalThis.StorageHealth = StorageHealth;
-  globalThis.formatBytes = formatBytes;
+  /** @type {any} */ (globalThis).StorageHealth = StorageHealth;
+  /** @type {any} */ (globalThis).formatBytes = formatBytes;
   StorageHealth._resetForTests({
     platform: 'chrome',
     storageApi: {
@@ -166,7 +166,7 @@ describe('StorageHealthBanner — scenario 6 (warning)', () => {
       { tier: StorageHealth.TIER.WARNING, remaining: 30e6 },
       { onNavigateSettings: spy },
     );
-    container.querySelector('.sh-banner-btn').click();
+    /** @type {HTMLElement} */ (container.querySelector('.sh-banner-btn')).click();
     expect(spy).toHaveBeenCalledOnce();
   });
 });

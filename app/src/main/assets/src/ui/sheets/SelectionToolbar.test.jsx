@@ -35,7 +35,7 @@ function readingContainer(hlKey, html) {
 /** Stub window.getSelection. Pass a real Range for a non-collapsed selection,
     or null/undefined for a collapsed (empty) selection. */
 function stubSelection(range) {
-  window.getSelection = () => ({
+  window.getSelection = () => /** @type {any} */ ({
     isCollapsed: !range,
     rangeCount: range ? 1 : 0,
     getRangeAt: () => range,
@@ -48,11 +48,11 @@ function stubSelection(range) {
     layout engine, so Range.getBoundingClientRect is unimplemented — stub it
     (the component only reads it to position the toolbar, cosmetic in tests). */
 function rangeOver(el, start, end) {
-  const tn = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false).nextNode();
+  const tn = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null).nextNode();
   const r = document.createRange();
   r.setStart(tn, start);
   r.setEnd(tn, end);
-  r.getBoundingClientRect = () => ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+  r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
   return r;
 }
 
@@ -138,7 +138,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     const c = readingContainer('bible:test:1:2', 'who bore witness to the word of God');
     mount();
     stubSelection(rangeOver(c, 0, 14)); // "who bore witne"
-    let ev;
+    /** @type {any} */ let ev;
     await act(async () => {
       ev = fire(c, 'contextmenu', { clientX: 20, clientY: 20 });
       await new Promise((r) => setTimeout(r, 150)); // past the 80ms computeAndShow
@@ -155,7 +155,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     const mark = c.querySelector('mark.hl-mark');
     mount();
     stubSelection(null);
-    let ev;
+    /** @type {any} */ let ev;
     act(() => { ev = fire(mark, 'contextmenu', { clientX: 100, clientY: 200 }); });
     expect(ev.defaultPrevented).toBe(true);
     expect(window.__showAnnChip).toHaveBeenCalledWith(100, 200, 'bible:test:1:2', 'g1');
@@ -171,7 +171,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     const mark = c.querySelector('mark.hl-mark');
     mount();
     stubSelection(null);
-    let ev;
+    /** @type {any} */ let ev;
     act(() => { ev = fire(mark, 'contextmenu', { clientX: 10, clientY: 10 }); });
     expect(ev.defaultPrevented).toBe(true);
     expect(window.__openNote).toHaveBeenCalledWith('g2');
@@ -186,7 +186,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     const icon = c.querySelector('.hl-note-icon');
     mount();
     stubSelection(null);
-    let ev;
+    /** @type {any} */ let ev;
     act(() => { ev = fire(icon, 'contextmenu', { clientX: 10, clientY: 10 }); });
     expect(ev.defaultPrevented).toBe(true);
     expect(window.__openNote).toHaveBeenCalledWith('g3');
@@ -198,7 +198,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     document.body.appendChild(outside);
     mount();
     stubSelection(null);
-    let ev;
+    /** @type {any} */ let ev;
     await act(async () => {
       ev = fire(outside, 'contextmenu', { clientX: 5, clientY: 5 });
       await new Promise((r) => setTimeout(r, 120));
