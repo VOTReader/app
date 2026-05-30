@@ -14,6 +14,8 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
     __scrollEl = el;
   }, []);
 
+  const notchRef = React.useRef(null);
+
   React.useEffect(() => {
     if (!showProgress) return;
     const onScroll = () => {
@@ -48,6 +50,35 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
     };
   }, [showProgress]);
 
+  React.useEffect(() => {
+    const marker = notchRef.current;
+    if (!marker) return;
+    const update = () => {
+      const el = __scrollEl;
+      if (!el || !document.body.classList.contains('scroll-notch')) {
+        marker.style.opacity = '0';
+        return;
+      }
+      const sentinel = el.querySelector('.reading-end');
+      if (!sentinel || el.scrollHeight <= el.clientHeight) {
+        marker.style.opacity = '0';
+        return;
+      }
+      const scrollRect = el.getBoundingClientRect();
+      const sentinelOffset = sentinel.getBoundingClientRect().top - scrollRect.top + el.scrollTop;
+      const pct = sentinelOffset / el.scrollHeight;
+      marker.style.top = (scrollRect.top + pct * scrollRect.height) + 'px';
+      marker.style.opacity = '0.5';
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (__scrollEl) ro.observe(__scrollEl);
+    const poll = setInterval(() => {
+      if (__scrollEl) { ro.observe(__scrollEl); update(); }
+    }, 500);
+    return () => { ro.disconnect(); clearInterval(poll); };
+  }, []);
+
   return (
     <div className="screen-layout">
       <nav className="top-nav">
@@ -57,6 +88,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
       <div className="screen-scroll" ref={ref}>
         {children}
       </div>
+      <div className="scroll-notch-marker" ref={notchRef} />
     </div>
   );
 }

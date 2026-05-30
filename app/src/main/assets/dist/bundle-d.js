@@ -1430,6 +1430,7 @@
     const ref = React.useCallback((el) => {
       __scrollEl = el;
     }, []);
+    const notchRef = React.useRef(null);
     React.useEffect(() => {
       if (!showProgress) return;
       const onScroll = () => {
@@ -1463,7 +1464,41 @@
         if (el) el.removeEventListener("scroll", onScroll);
       };
     }, [showProgress]);
-    return /* @__PURE__ */ React.createElement("div", { className: "screen-layout" }, /* @__PURE__ */ React.createElement("nav", { className: "top-nav" }, navChildren, hideTabsBtn ? null : /* @__PURE__ */ React.createElement(TabsNavBtn, null)), /* @__PURE__ */ React.createElement("div", { className: "screen-scroll", ref }, children));
+    React.useEffect(() => {
+      const marker = notchRef.current;
+      if (!marker) return;
+      const update = () => {
+        const el = __scrollEl;
+        if (!el || !document.body.classList.contains("scroll-notch")) {
+          marker.style.opacity = "0";
+          return;
+        }
+        const sentinel = el.querySelector(".reading-end");
+        if (!sentinel || el.scrollHeight <= el.clientHeight) {
+          marker.style.opacity = "0";
+          return;
+        }
+        const scrollRect = el.getBoundingClientRect();
+        const sentinelOffset = sentinel.getBoundingClientRect().top - scrollRect.top + el.scrollTop;
+        const pct = sentinelOffset / el.scrollHeight;
+        marker.style.top = scrollRect.top + pct * scrollRect.height + "px";
+        marker.style.opacity = "0.5";
+      };
+      update();
+      const ro = new ResizeObserver(update);
+      if (__scrollEl) ro.observe(__scrollEl);
+      const poll = setInterval(() => {
+        if (__scrollEl) {
+          ro.observe(__scrollEl);
+          update();
+        }
+      }, 500);
+      return () => {
+        ro.disconnect();
+        clearInterval(poll);
+      };
+    }, []);
+    return /* @__PURE__ */ React.createElement("div", { className: "screen-layout" }, /* @__PURE__ */ React.createElement("nav", { className: "top-nav" }, navChildren, hideTabsBtn ? null : /* @__PURE__ */ React.createElement(TabsNavBtn, null)), /* @__PURE__ */ React.createElement("div", { className: "screen-scroll", ref }, children), /* @__PURE__ */ React.createElement("div", { className: "scroll-notch-marker", ref: notchRef }));
   }
 
   // app/src/main/assets/src/ui/components/ModeToggle.jsx
@@ -5638,6 +5673,14 @@ Continue?`
           desc: "In the Matthew Study Bible's inline mode, when a reference spans multiple verse ranges (e.g. verses 1-5 and 10-15), show a compact echo pill at the end of each additional range that scrolls back to the full note. Helps you see what references relate to as you read.",
           checked: settings.showInlineEchoes !== false,
           onToggle: () => onToggle("showInlineEchoes")
+        }
+      ), /* @__PURE__ */ React.createElement(
+        SettingsRow,
+        {
+          label: "Scrollbar Content Marker",
+          desc: "A small notch on the scrollbar showing where the reading content ends and the footnotes or navigation area begins.",
+          checked: !!settings.showScrollNotch,
+          onToggle: () => onToggle("showScrollNotch")
         }
       ), /* @__PURE__ */ React.createElement(
         SettingsRow,

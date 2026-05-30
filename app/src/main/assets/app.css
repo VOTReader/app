@@ -293,6 +293,7 @@
       /* ── TOP NAV ── */
       /* ── SCREEN LAYOUT (nav stays put, content scrolls) ── */
       .screen-layout {
+        position: relative;
         display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
       }
       .screen-scroll {
@@ -305,6 +306,12 @@
       .screen-scroll::-webkit-scrollbar-track { background: transparent; }
       .screen-scroll::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 2px; }
       @media (hover: hover) { .screen-scroll::-webkit-scrollbar-thumb:hover { background: var(--gold); } }
+
+      .scroll-notch-marker {
+        position: absolute; right: 0; width: 10px; height: 3px;
+        pointer-events: none; z-index: 5; opacity: 0;
+        background: var(--gold); border-radius: 1px 0 0 1px;
+      }
 
       /* ── W4.1 DESKTOP COLUMN ──
          On wide screens, constrain the app to a centered phone-like column

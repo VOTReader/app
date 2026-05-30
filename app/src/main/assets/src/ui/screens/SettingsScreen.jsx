@@ -844,6 +844,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             onToggle={() => onToggle("showInlineEchoes")}
           />
           <SettingsRow
+            label="Scrollbar Content Marker"
+            desc="A small notch on the scrollbar showing where the reading content ends and the footnotes or navigation area begins."
+            checked={!!settings.showScrollNotch}
+            onToggle={() => onToggle("showScrollNotch")}
+          />
+          <SettingsRow
             label="Reading Position Dot"
             desc="A pulsing gold dot in the upper right that takes you back to where you were last reading."
             checked={settings.showReadingDot}

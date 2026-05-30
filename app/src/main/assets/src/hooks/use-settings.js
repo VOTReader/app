@@ -111,6 +111,7 @@ export function useSettings({ savedSettings, theme }) {
       tabsEnabled: false,
       searchEnabled: true, historyEnabled: true,
       historyInNav: false,
+      showScrollNotch: false,
       arrowLayout: "split", // "split" | "right" | "left" | "nav" | "off"
       ...savedS,
       ...migrated // migration wins over stale saved values
@@ -145,6 +146,7 @@ export function useSettings({ savedSettings, theme }) {
     document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');
     document.body.classList.toggle("arrows-off", settings.arrowLayout === 'off');
+    document.body.classList.toggle("scroll-notch", !!settings.showScrollNotch);
     // Font style — "classic" (default) disables the @font-face style block
     // so all 260 font-family declarations in app.css fall back to system serif.
     // "modern" enables Cinzel + EB Garamond. The boot script in index.html

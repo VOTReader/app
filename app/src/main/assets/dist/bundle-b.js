@@ -4831,6 +4831,7 @@
         searchEnabled: true,
         historyEnabled: true,
         historyInNav: false,
+        showScrollNotch: false,
         arrowLayout: "split",
         // "split" | "right" | "left" | "nav" | "off"
         ...savedS,
@@ -4850,6 +4851,7 @@
       document.body.classList.toggle("arrows-left", settings.arrowLayout === "left");
       document.body.classList.toggle("arrows-nav", settings.arrowLayout === "nav");
       document.body.classList.toggle("arrows-off", settings.arrowLayout === "off");
+      document.body.classList.toggle("scroll-notch", !!settings.showScrollNotch);
       const customFontsEl = (
         /** @type {HTMLStyleElement | null} */
         document.getElementById("custom-fonts")
