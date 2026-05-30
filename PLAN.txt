@@ -2447,8 +2447,12 @@ after W6. But they MUST land before the project is called done.
     - vitest: concurrent writes don't corrupt (port BoundedLogTree's
       concurrency test pattern)
 
-  W7.5 — buildScreenRoutes domain-scoped prop groups
+  W7.5 — buildScreenRoutes domain-scoped prop groups  — RESOLVED (NO-BUILD) 2026-05-29
   ──────────────────────────────────────────────────
+  (Outcome: AFFIRMED the explicit signature; bundling rejected. See the
+  exit-criteria [x] below + screen-routes.jsx header for the rationale.
+  Note: the "47 properties" premise below is stale — the real count is ~130.)
+
   Problem: buildScreenRoutes takes a flat destructure of 47 properties.
   While intentionally explicit (per design comment at lines 6-14), it's
   a maintenance surface — adding a new screen requires threading a prop
@@ -2513,8 +2517,11 @@ after W6. But they MUST land before the project is called done.
     - tsc --noEmit passes
     - Full 53-screen smoke walk
 
-  W7.6 — OPFS upgrade for JournalMediaStore (perf optimization)
+  W7.6 — OPFS upgrade for JournalMediaStore (perf optimization)  — RESOLVED (DEFERRED) 2026-05-29
   ─────────────────────────────────────────────────────────────
+  (Outcome: DEFERRED with profiling data — IDB writes are ~100x under the
+  build threshold. See the exit-criteria [x] below for the numbers + reasoning.)
+
   Problem: JournalMediaStore uses IndexedDB Blob storage (correct,
   GB-scale, works on all platforms). But IDB Blob writes for 100 MB
   payloads take ~850 ms vs ~90 ms with OPFS. For power users with
@@ -2598,11 +2605,32 @@ after W6. But they MUST land before the project is called done.
         path. Surfaced in Settings row + export (auto-populate). 100% covered, 24
         vitest + 4 net platform-bridge merge tests; live-smoke verified. Floor
         ratcheted 58/48/62/62 → 59/49/62/63 (functions held). tests 1439 → 1467.
-    [ ] buildScreenRoutes: 47 flat props → 5 domain bundles. All
-        vitest + tsc pass. 53-screen smoke walk.
-    [ ] OPFS: profiled + built if justified, OR explicitly deferred
-        with profiling data showing IDB is sufficient.
-    [ ] Zero critiques remaining from the architectural review.
+    [x] buildScreenRoutes (W7.5 RESOLVED 2026-05-29 — NO-BUILD, deliberate):
+        re-evaluated the "group ~130 flat props into bundles" proposal and
+        AFFIRMED the explicit signature. Bundling does not reduce the factory's
+        coupling (it needs every input regardless of packaging — grouping only
+        relabels the same dependency graph), and the flat list self-compile-
+        checks (a missing prop is an undefined reference). The plan's proposed
+        navState/navHandlers split was itself a shape grouping ([[dont-group-by-
+        shape]]). The signature is the honest receipt of clean App() extraction,
+        not a debt. Any genuinely-cohesive cluster gets revisited during W8
+        typing only if it makes the typedefs cleaner. Decision recorded in
+        screen-routes.jsx's header comment. (User-ratified.)
+    [x] OPFS (W7.6 RESOLVED 2026-05-29 — DEFERRED, with data): profiled
+        JournalMediaStore.put() end-to-end in the preview across 50KB–20MB,
+        empty + 30-record populated store. Typical memo range (50KB–1MB)
+        p90 = ~1.6–1.9 ms; 20MB p90 = ~10 ms; populated store no slower —
+        ALL ~100× under the 200 ms threshold that would justify OPFS, and
+        ~10× under it even at a pessimistic 10× budget-device penalty. OPFS's
+        two advantages are moot here: writes are already ~2 ms, and the app
+        never loads media into JS heap (blob URLs → <audio>/<img>), so the
+        partial-read win doesn't apply. Building it would add the known Safari
+        data-loss bug (WebKit #250495) + Worker complexity for zero practical
+        gain — contra "user data is paramount." Stay on IDB Blobs.
+    [x] Zero critiques remaining: the 5 architectural-review code critiques
+        (schema versioning, raw(), hlTick, JS telemetry, buildScreenRoutes
+        surface) are all addressed — built (W7.1–7.4) or evaluated-and-affirmed
+        (W7.5). W7 COMPLETE.
 
 ───────────────────────────────────────────────────────────────────────────────
 W8 — TYPE COVERAGE + CSS ARCHITECTURE (final quality bar)

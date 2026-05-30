@@ -14,6 +14,15 @@
    decision (per [[expose-full-surface]] + 'props are explicit, not
    spread') was the heavy explicit signature.
 
+   Re-evaluated at W7.5 (2026-05-29) and AFFIRMED -- bundling does NOT
+   reduce the factory's coupling (it needs every input regardless of how
+   the props are packaged; grouping only relabels the same dependency),
+   and the flat list self-compile-checks (see next paragraph). The plan's
+   proposed nav-state / nav-handlers split was also a shape grouping
+   ([[dont-group-by-shape]]). The explicit signature stays; a genuinely-
+   cohesive cluster only gets revisited during W8 typing, and only if it
+   makes the typedefs cleaner -- never as a standalone rearrangement.
+
    When a new prop is needed by a route entry, it must be added in BOTH
    this file's destructure AND the App-side call site. The signature
    compile-checks itself: missing props become undefined references.
