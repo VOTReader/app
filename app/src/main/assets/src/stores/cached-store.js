@@ -277,6 +277,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
         if (cacheToWrite !== null) {
           IDBAdapter.put(idbStoreName, 'v', cacheToWrite).catch(function (err) {
             console.error('IDB write failed for', idbStoreName, err);
+            // W7.4: bare-global (typeof) guard mirrors the StorageHealth line
+            // below — cached-store deliberately holds no imports (see header).
+            if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB write failed: ' + idbStoreName + ' — ' + ((err && err.name) || err));
             if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
           });
         }
@@ -289,7 +292,10 @@ export function CachedStore(storageKey, defaultVal, opts) {
         return;
       }
       try { localStorage.setItem(storageKey, JSON.stringify(this._cache)); }
-      catch (e) { console.warn('localStorage write failed for', storageKey, e); }
+      catch (e) {
+        console.warn('localStorage write failed for', storageKey, e);
+        if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'localStorage write failed: ' + storageKey + ' — ' + ((e && e.name) || e));
+      }
     },
 
     /**

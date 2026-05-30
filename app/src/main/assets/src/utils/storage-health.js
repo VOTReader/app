@@ -46,6 +46,11 @@
      StorageHealth.stop()                    → void
    ═══════════════════════════════════════════════════════════════════════ */
 
+// W7.4: degraded-tier transitions are recorded to the JS DiagnosticLog so
+// quota pressure shows up in the diagnostic export. Clean one-way import —
+// diagnostic-log.js is a zero-dependency leaf in the same bundle.
+import { DiagnosticLog } from './diagnostic-log.js';
+
 /* ─── Constants ─────────────────────────────────────────────────────── */
 
 const REFRESH_INTERVAL_MS = 300000;
@@ -251,6 +256,22 @@ function _computeRisks(platform, persisted, quota, writeFailed, privateModeLikel
   return risks;
 }
 
+/**
+ * Emit a DiagnosticLog 'quota' warning when the tier worsens into a degraded
+ * state (W7.4). Transition-gated (newTier !== prevTier) and degraded-only
+ * (WARNING/CRITICAL/READONLY) so a healthy session logs nothing and a steady
+ * degraded tier is not re-logged on every 5-minute re-assess.
+ *
+ * @param {string | null} prevTier
+ * @param {string} newTier
+ * @param {number | null} pct
+ */
+function _logTierTransition(prevTier, newTier, pct) {
+  if (newTier === prevTier) return;
+  if (newTier !== TIER.WARNING && newTier !== TIER.CRITICAL && newTier !== TIER.READONLY) return;
+  DiagnosticLog.warn('quota', 'storage tier → ' + newTier + (pct != null ? ' (' + Math.round(pct * 100) + '% used)' : ''));
+}
+
 /* ─── Public functions ──────────────────────────────────────────────── */
 
 /**
@@ -271,6 +292,7 @@ async function _assess() {
 async function _assessImpl() {
   var storage = _getStorageApi();
   var platform = _getPlatform();
+  var prevTier = _report ? _report.tier : null;
 
   if (!storage || typeof storage.estimate !== 'function') {
     var fallbackRisks = _writeFailedThisSession ? [RISK.WRITE_FAILED] : [];
@@ -290,6 +312,7 @@ async function _assessImpl() {
     });
     _report = fallback;
     _lastAssessedAt = Date.now();
+    _logTierTransition(prevTier, fallback.tier, null);
     _bump();
     return fallback;
   }
@@ -336,6 +359,7 @@ async function _assessImpl() {
 
   _report = report;
   _lastAssessedAt = Date.now();
+  _logTierTransition(prevTier, tier, pct);
   _bump();
   return report;
 }

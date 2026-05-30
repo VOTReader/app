@@ -22,6 +22,7 @@
 
 import { PlatformBridge } from './platform-bridge.js';
 import { showToast } from './toast.js';
+import { DiagnosticLog } from './diagnostic-log.js';
 
 const TOAST_ID = 'vot-toast-sw-update';
 let prompted = false;
@@ -58,6 +59,7 @@ export function registerServiceWorker() {
     });
   }).catch((err) => {
     console.warn('SW registration failed', err);
+    DiagnosticLog.warn('sw', 'registration failed: ' + ((err && err.message) || err));
   });
 }
 

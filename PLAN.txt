@@ -2401,8 +2401,10 @@ after W6. But they MUST land before the project is called done.
   Risk: MEDIUM (W7.3a requires careful effect-dep analysis; W7.3b is
   mechanical but touches 39 files).
 
-  W7.4 — JS-side diagnostic log (web telemetry)
+  W7.4 — JS-side diagnostic log (web telemetry)  — DONE 2026-05-29
   ──────────────────────────────────────────────
+  (See the exit-criteria [x] below + CLAUDE.md's W7 bullet for what landed.)
+
   Problem: BoundedLogTree (Kotlin) captures WARN+ logs on Android with
   sanitization. On web, there's nothing. You can't see annotation churn,
   lazy-load timings, store write failures, or quota warnings.
@@ -2586,9 +2588,16 @@ after W6. But they MUST land before the project is called done.
         useState + the window.__bumpHlTick bridge + ~36 call sites are all
         deleted (31 files). Live smoke: a real AnnotationStore.add re-ran
         applyDOMHighlights with the bridge absent. vitest 1440 → 1439, green.
-    [ ] DiagnosticLog: JS-side ring buffer, sanitized, wired into
-        stores/corpus/SW/ErrorBoundary. Surfaced in Settings export.
-        vitest coverage.
+    [x] DiagnosticLog (W7.4 DONE 2026-05-29): src/utils/diagnostic-log.js —
+        200-entry FIFO ring buffer mirroring Kotlin BoundedLogTree ({t,lvl,tag,
+        msg} shape + content://·file://·/storage|data path redaction; in-memory,
+        cleared on refresh). PlatformBridge.getCrashLog merges native+JS sorted
+        by t on Android, returns toJSON() on web. Wired into cached-store _save
+        (store), storage-health degraded-tier transitions (quota), __makeLazyLoader
+        (corpus timing), sw-register (sw), ErrorBoundary (render) + the WakeLock
+        path. Surfaced in Settings row + export (auto-populate). 100% covered, 24
+        vitest + 4 net platform-bridge merge tests; live-smoke verified. Floor
+        ratcheted 58/48/62/62 → 59/49/62/63 (functions held). tests 1439 → 1467.
     [ ] buildScreenRoutes: 47 flat props → 5 domain bundles. All
         vitest + tsc pass. 53-screen smoke walk.
     [ ] OPFS: profiled + built if justified, OR explicitly deferred

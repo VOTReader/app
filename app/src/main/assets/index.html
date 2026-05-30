@@ -100,8 +100,9 @@
        time) + notifies subscribers + resolves.
 
        Used by:
-         __bibleCorpus  / __loadBibleCorpus   (Q8.1) — books.js
+         __bibleCorpus   / __loadBibleCorpus   (Q8.1) — books.js
          __matthewCorpus / __loadMatthewCorpus (Q8.2) — matthew.js (Study)
+         __votCorpus     / __loadVotCorpus     (Q8.3) — 14 VOT corpora
        -->
   <script>
   window.__makeLazyLoader = function(name, bundlePath, finishFnName) {
@@ -116,6 +117,7 @@
     var load = function() {
       if (corpus._promise) return corpus._promise;
       corpus._promise = new Promise(function(resolve, reject) {
+        var t0 = Date.now();
         var script = document.createElement('script');
         script.src = bundlePath;
         script.async = false;
@@ -123,6 +125,12 @@
           try {
             if (typeof window[finishFnName] === 'function') window[finishFnName]();
             corpus._notify();
+            // W7.4: record the lazy-load duration (download + parse + finishInit)
+            // to the JS DiagnosticLog. Guarded — bundle-b (which defines it) has
+            // loaded long before any user-triggered lazy load, but be safe.
+            if (window.DiagnosticLog && typeof window.DiagnosticLog.timing === 'function') {
+              try { window.DiagnosticLog.timing('corpus', name, Date.now() - t0); } catch (_e) {}
+            }
             resolve();
           } catch (e) { reject(e); }
         };

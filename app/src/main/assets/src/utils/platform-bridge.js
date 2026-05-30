@@ -34,6 +34,11 @@
    detection variants (`_abc`, `_ab`, `_ab2`, `AB`, raw `isAndroid` locals).
    ═══════════════════════════════════════════════════════════════════════ */
 
+// W7.4: getCrashLog merges the JS-side DiagnosticLog with the native log.
+// diagnostic-log.js is a zero-dependency leaf in the same bundle (bundle-b),
+// so this import is a clean one-way edge — no cycle.
+import { DiagnosticLog } from './diagnostic-log.js';
+
 /**
  * @typedef {Object} PlatformBridgeShape
  * @property {(light: boolean) => void} setLightStatusBar
@@ -65,6 +70,28 @@
 // ── Detection ── only place this expression appears in the codebase ───
 const isAndroid = !!(typeof window !== 'undefined' && /** @type {any} */ (window).AndroidBridge);
 
+// ── getCrashLog merge (W7.4) ──────────────────────────────────────────
+// On Android, window.AndroidBridge.getCrashLog() returns the Kotlin
+// BoundedLogTree as a JSON array string. We parse it, concat the JS-side
+// DiagnosticLog entries, and sort by timestamp so the export reads as one
+// chronological stream. Both sides emit the same { t, lvl, tag, msg } shape
+// (see diagnostic-log.js / BoundedLogTree.kt) — no per-entry reshaping. A
+// malformed native log falls back to JS-only rather than throwing.
+/**
+ * @param {string} nativeJson  the Kotlin BoundedLogTree JSON array string
+ * @returns {string} merged JSON array string, sorted ascending by `t`
+ */
+function mergeCrashLog(nativeJson) {
+  let native = [];
+  try {
+    const parsed = JSON.parse(nativeJson || '[]');
+    if (Array.isArray(parsed)) native = parsed;
+  } catch (_e) { /* malformed native log — fall back to JS-only */ }
+  const merged = native.concat(DiagnosticLog.entries());
+  merged.sort((a, b) => ((a && a.t) || 0) - ((b && b.t) || 0));
+  return JSON.stringify(merged);
+}
+
 // ── Android impl: pure passthrough to window.AndroidBridge ────────────
 // Each method delegates 1:1 to the native bridge.
 // The /** @type {any} */ cast on window is needed because TS doesn't know
@@ -94,7 +121,8 @@ const androidImpl = {
   takeScreenshot: async (top, max, q) => /** @type {any} */ (window).AndroidBridge.takeScreenshot(top, max, q),
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToDownloads: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToDownloads(name, content),
-  getCrashLog: () => /** @type {any} */ (window).AndroidBridge.getCrashLog(),
+  // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
+  getCrashLog: () => mergeCrashLog(/** @type {any} */ (window).AndroidBridge.getCrashLog()),
 };
 
 // ── Web impl: placeholders (W1.3 / W1.4 / W1.5 fill in actual behavior) ─
@@ -123,8 +151,8 @@ const notYetImplemented = (name) => () => {
 // Web WakeLock — keepScreenOn impl (W1.2 Tier B.1). Per [[explicit-async-decision]]
 // this is FIRE-AND-FORGET (return void): caller fires from a settings-toggle
 // effect; UI shouldn't block on wake-lock requests, and a request failure
-// isn't worth surfacing to the user. Internal Promise rejection is caught
-// and logged via console.warn (W7.4 will migrate this to DiagnosticLog.warn).
+// isn't worth surfacing to the user. Internal Promise rejection is caught,
+// recorded to the DiagnosticLog (W7.4), and logged via console.warn.
 //
 // Semantic note: Android's setKeepScreenOn sets a window flag the OS respects
 // until the app is backgrounded. The Web WakeLock API auto-releases the
@@ -140,11 +168,13 @@ const notYetImplemented = (name) => () => {
 /** @type {boolean} */ let _webWakeLockRequestInFlight = false;
 /** @type {string | null} */ let _webWakeLockLastWarnedReason = null;
 function _warnWakeLock(/** @type {string} */ tag, /** @type {any} */ e) {
-  if (typeof console === 'undefined' || !console.warn) return;
   const reason = (e && e.message) || String(e);
   if (reason === _webWakeLockLastWarnedReason) return;  // de-dup repeat failures
   _webWakeLockLastWarnedReason = reason;
-  console.warn(`[PlatformBridge] setKeepScreenOn(${tag}) failed:`, reason);
+  DiagnosticLog.warn('wakelock', `setKeepScreenOn(${tag}) failed: ${reason}`);
+  if (typeof console !== 'undefined' && console.warn) {
+    console.warn(`[PlatformBridge] setKeepScreenOn(${tag}) failed:`, reason);
+  }
 }
 /** @param {boolean} enabled */
 function webSetKeepScreenOn(enabled) {
@@ -643,7 +673,8 @@ const webImpl = {
 
   // Category 2 — safe defaults
   getZoomScale: () => 1.0,
-  getCrashLog: () => '[]',           // W7.4 will populate the JS DiagnosticLog
+  // W7.4: the JS DiagnosticLog IS the web crash log (no native log to merge).
+  getCrashLog: () => DiagnosticLog.toJSON(),
 
   // Category 3 — real web impls
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)

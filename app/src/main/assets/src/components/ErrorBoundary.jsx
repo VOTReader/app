@@ -6,9 +6,16 @@
    "Something went wrong" panel with the error message + Reload button.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { DiagnosticLog } from '../utils/diagnostic-log.js';
+
 export class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
   static getDerivedStateFromError(err) { return { error: err }; }
+  // W7.4: record render crashes to the DiagnosticLog so they reach the
+  // Settings export. Wrapped so logging can never break the boundary itself.
+  componentDidCatch(error) {
+    try { DiagnosticLog.error('render', String(error)); } catch (_e) { /* swallow */ }
+  }
   render() {
     if (!this.state.error) return this.props.children;
     return (

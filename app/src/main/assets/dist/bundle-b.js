@@ -745,6 +745,7 @@
           if (cacheToWrite !== null) {
             IDBAdapter.put(idbStoreName, "v", cacheToWrite).catch(function(err) {
               console.error("IDB write failed for", idbStoreName, err);
+              if (typeof DiagnosticLog !== "undefined") DiagnosticLog.warn("store", "IDB write failed: " + idbStoreName + " \u2014 " + (err && err.name || err));
               if (typeof StorageHealth !== "undefined") StorageHealth.onWriteFailure(err);
             });
           }
@@ -762,6 +763,7 @@
           localStorage.setItem(storageKey, JSON.stringify(this._cache));
         } catch (e) {
           console.warn("localStorage write failed for", storageKey, e);
+          if (typeof DiagnosticLog !== "undefined") DiagnosticLog.warn("store", "localStorage write failed: " + storageKey + " \u2014 " + (e && e.name || e));
         }
       },
       /**
@@ -3705,6 +3707,50 @@
     window.JrnExpandable = ExpandableText;
   }
 
+  // app/src/main/assets/src/utils/diagnostic-log.js
+  var CAPACITY = 200;
+  var SENSITIVE_URI = /(?:content|file):\/\/\S+/g;
+  var SENSITIVE_PATH = /\/(?:storage|data|sdcard|cache|system|mnt|root)\/[\w./-]*/g;
+  function sanitize(s) {
+    return String(s).replace(SENSITIVE_URI, "[uri]").replace(SENSITIVE_PATH, "[path]");
+  }
+  var _buffer = [];
+  function _push(lvl, tag, msg) {
+    _buffer.push({ t: Date.now(), lvl, tag: String(tag), msg: sanitize(String(msg)) });
+    if (_buffer.length > CAPACITY) _buffer.shift();
+  }
+  function _warn(tag, message) {
+    _push("W", tag, message);
+  }
+  function _error(tag, message) {
+    _push("E", tag, message);
+  }
+  function _timing(tag, label, durationMs) {
+    const ms = Number.isFinite(durationMs) ? Math.round(durationMs) : 0;
+    _push("I", tag, String(label) + " " + ms + "ms");
+  }
+  function _entries() {
+    return _buffer.map((e) => ({ t: e.t, lvl: e.lvl, tag: e.tag, msg: e.msg }));
+  }
+  function _toJSON() {
+    return JSON.stringify(_buffer);
+  }
+  function _clear() {
+    _buffer = [];
+  }
+  var DiagnosticLog2 = {
+    warn: _warn,
+    error: _error,
+    timing: _timing,
+    entries: _entries,
+    toJSON: _toJSON,
+    clear: _clear,
+    CAPACITY,
+    // Exposed for direct unit testing of the redaction (mirrors
+    // BoundedLogTree.sanitize being `internal` for its same-module tests).
+    _sanitize: sanitize
+  };
+
   // app/src/main/assets/src/components/ErrorBoundary.jsx
   var ErrorBoundary = class extends React.Component {
     constructor(props) {
@@ -3713,6 +3759,14 @@
     }
     static getDerivedStateFromError(err) {
       return { error: err };
+    }
+    // W7.4: record render crashes to the DiagnosticLog so they reach the
+    // Settings export. Wrapped so logging can never break the boundary itself.
+    componentDidCatch(error) {
+      try {
+        DiagnosticLog2.error("render", String(error));
+      } catch (_e) {
+      }
     }
     render() {
       if (!this.state.error) return this.props.children;
@@ -3764,6 +3818,17 @@
   // app/src/main/assets/src/utils/platform-bridge.js
   var isAndroid = !!(typeof window !== "undefined" && /** @type {any} */
   window.AndroidBridge);
+  function mergeCrashLog(nativeJson) {
+    let native = [];
+    try {
+      const parsed = JSON.parse(nativeJson || "[]");
+      if (Array.isArray(parsed)) native = parsed;
+    } catch (_e) {
+    }
+    const merged = native.concat(DiagnosticLog2.entries());
+    merged.sort((a, b) => (a && a.t || 0) - (b && b.t || 0));
+    return JSON.stringify(merged);
+  }
   var androidImpl = {
     setLightStatusBar: (light) => (
       /** @type {any} */
@@ -3844,7 +3909,8 @@
       /** @type {any} */
       window.AndroidBridge.saveToDownloads(name, content)
     ),
-    getCrashLog: () => (
+    // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
+    getCrashLog: () => mergeCrashLog(
       /** @type {any} */
       window.AndroidBridge.getCrashLog()
     )
@@ -3859,11 +3925,13 @@
   var _webWakeLockRequestInFlight = false;
   var _webWakeLockLastWarnedReason = null;
   function _warnWakeLock(tag, e) {
-    if (typeof console === "undefined" || !console.warn) return;
     const reason = e && e.message || String(e);
     if (reason === _webWakeLockLastWarnedReason) return;
     _webWakeLockLastWarnedReason = reason;
-    console.warn(`[PlatformBridge] setKeepScreenOn(${tag}) failed:`, reason);
+    DiagnosticLog2.warn("wakelock", `setKeepScreenOn(${tag}) failed: ${reason}`);
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn(`[PlatformBridge] setKeepScreenOn(${tag}) failed:`, reason);
+    }
   }
   function webSetKeepScreenOn(enabled) {
     try {
@@ -4289,8 +4357,8 @@
     },
     // Category 2 — safe defaults
     getZoomScale: () => 1,
-    getCrashLog: () => "[]",
-    // W7.4 will populate the JS DiagnosticLog
+    // W7.4: the JS DiagnosticLog IS the web crash log (no native log to merge).
+    getCrashLog: () => DiagnosticLog2.toJSON(),
     // Category 3 — real web impls
     takeScreenshot: webTakeScreenshot,
     // Tier A (html2canvas)
@@ -7054,6 +7122,11 @@
     if (prevQuota != null && quota != null && quota < prevQuota) risks.push(RISK.QUOTA_DECLINING);
     return risks;
   }
+  function _logTierTransition(prevTier, newTier, pct) {
+    if (newTier === prevTier) return;
+    if (newTier !== TIER.WARNING && newTier !== TIER.CRITICAL && newTier !== TIER.READONLY) return;
+    DiagnosticLog2.warn("quota", "storage tier \u2192 " + newTier + (pct != null ? " (" + Math.round(pct * 100) + "% used)" : ""));
+  }
   async function _assess() {
     if (_assessInFlight) return _assessInFlight;
     var p = _assessImpl();
@@ -7067,6 +7140,7 @@
   async function _assessImpl() {
     var storage = _getStorageApi();
     var platform = _getPlatform();
+    var prevTier = _report ? _report.tier : null;
     if (!storage || typeof storage.estimate !== "function") {
       var fallbackRisks = _writeFailedThisSession ? [RISK.WRITE_FAILED] : [];
       var fallback = (
@@ -7088,6 +7162,7 @@
       );
       _report = fallback;
       _lastAssessedAt = Date.now();
+      _logTierTransition(prevTier, fallback.tier, null);
       _bump();
       return fallback;
     }
@@ -7127,6 +7202,7 @@
     };
     _report = report;
     _lastAssessedAt = Date.now();
+    _logTierTransition(prevTier, tier, pct);
     _bump();
     return report;
   }
@@ -7426,6 +7502,7 @@
       });
     }).catch((err) => {
       console.warn("SW registration failed", err);
+      DiagnosticLog2.warn("sw", "registration failed: " + (err && err.message || err));
     });
   }
   function promptUpdate(worker) {
@@ -10408,6 +10485,7 @@
     useStorageInfo,
     formatBytes,
     StorageHealth: StorageHealth2,
+    DiagnosticLog: DiagnosticLog2,
     validateStorePayload,
     validateImportEnvelope,
     validateMediaRecord,

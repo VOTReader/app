@@ -145,10 +145,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
   // NK5c: diagnostic-log snapshot for the "Your Data" section. The bridge
-  // (W1.2 Tier B.2) always exposes getCrashLog: Android release builds
-  // return BoundedLogTree JSON; debug builds + web return '[]'; W7.4 will
-  // populate the JS-side DiagnosticLog on web. Read once on mount; the
-  // count is a static snapshot of "what would be exported now."
+  // (W1.2 Tier B.2) always exposes getCrashLog: Android merges the native
+  // BoundedLogTree with the JS-side DiagnosticLog; web returns the JS
+  // DiagnosticLog alone (W7.4). Empty on a clean session. Read once on
+  // mount; the count is a static snapshot of "what would be exported now."
   const [diagnosticLog, setDiagnosticLog] = React.useState([]);
   React.useEffect(() => {
     try {
@@ -982,15 +982,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); importPersonalData(); }}>Import</button>
           </div>
           {/* Diagnostic-log status row. Renders only when entries exist
-              (Android release with BoundedLogTree; web post-W7.4 with the
-              JS-side DiagnosticLog populated). Empty-state hidden on debug
-              builds + pre-W7.4 web to reduce UI noise. */}
+              (Android: native BoundedLogTree merged with the JS DiagnosticLog;
+              web: the JS DiagnosticLog). Hidden on a clean session to reduce
+              UI noise. */}
           {diagnosticLog.length > 0 && (
             <div className="settings-row">
               <div className="settings-row-text">
                 <div className="settings-row-label">Diagnostic Log</div>
                 <div className="settings-row-desc">
-                  {`${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? 'entry' : 'entries'} captured (warnings and errors only, content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`}
+                  {`${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? 'entry' : 'entries'} captured (warnings, errors, and timings; content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`}
                 </div>
               </div>
             </div>

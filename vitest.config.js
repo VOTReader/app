@@ -198,11 +198,22 @@ export default defineConfig({
       // getForKeyPrefix / add / remove / replaceAll) + utils/dates.js
       // (relativeDate / timeAgo, previously 0%). Floors HELD at 58/48/62/62,
       // margin restored.
+      //
+      // W7.4 baseline (+ diagnostic-log, 1467 tests — the new JS-side ring
+      // buffer is in the measured utils/ scope and is 100% covered; the
+      // platform-bridge getCrashLog merge added branch coverage too):
+      //   statements 59.11 (2804/4743) | branches 49.07 (1679/3421)
+      //   functions  63.02 (583/925)   | lines    63.32 (2262/3572)
+      // Floors advance statements 58→59, branches 48→49, lines 62→63.
+      // functions HELD at 62: actual 63.02 leaves only a 0.02 margin over a
+      // 63 floor — far tighter than any prior ratchet (the repo's tightest was
+      // statements 0.04 at W9.3) — so a 63 floor would fail CI on the next
+      // unrelated uncovered function. Not lowered; just not ratcheted this step.
       thresholds: {
-        statements: 58,
-        branches: 48,
+        statements: 59,
+        branches: 49,
         functions: 62,
-        lines: 62,
+        lines: 63,
       },
     },
   },

@@ -142,7 +142,8 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     // Promise<string> shape (web returns html2canvas's genuine Promise).
     ['takeScreenshot', [0, 1024, 80], 'data:image/jpeg;base64,abc'],
     ['saveToDownloads', ['notes.json', '{}'], 'ok'],
-    ['getCrashLog', [], '[{"ts":0,"tag":"x","msg":"y"}]'],
+    // getCrashLog is NO LONGER a pure passthrough — W7.4 merges the native
+    // BoundedLogTree with the JS DiagnosticLog. See its own describe below.
   ];
   it.each(valueCases)('value method %s returns native result and forwards args %o', async (name, args, expected) => {
     let result = bridge[name](...args);
@@ -1014,5 +1015,84 @@ describe('PlatformBridge — detection edge cases', () => {
     /** @type {any} */ (globalThis.window).AndroidBridge = { getZoomScale: () => 2.5 };
     const bridge = await importBridge();
     expect(bridge.getZoomScale()).toBe(2.5);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// getCrashLog — DiagnosticLog merge (W7.4)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('PlatformBridge — getCrashLog (DiagnosticLog merge, W7.4)', () => {
+  /** @type {any} */ let bridge;
+  /** @type {any} */ let DiagnosticLog;
+
+  // Import the bridge AND the DiagnosticLog it uses from the SAME module
+  // generation: vi.resetModules() re-evaluates diagnostic-log.js fresh, so we
+  // import it AFTER the reset (and before any further reset) so the test's
+  // reference is the same singleton the bridge writes through.
+  async function load() {
+    vi.resetModules();
+    const dlMod = await import('./diagnostic-log.js');
+    DiagnosticLog = dlMod.DiagnosticLog;
+    DiagnosticLog.clear();
+    const pbMod = await import('./platform-bridge.js');
+    bridge = pbMod.PlatformBridge;
+  }
+
+  afterEach(() => {
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    if (DiagnosticLog) DiagnosticLog.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('web: returns the JS DiagnosticLog entries as a JSON string', async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    await load();
+    DiagnosticLog.warn('store', 'boom');
+    const parsed = JSON.parse(bridge.getCrashLog());
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({ lvl: 'W', tag: 'store', msg: 'boom' });
+  });
+
+  it('web: empty DiagnosticLog → "[]"', async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    await load();
+    expect(bridge.getCrashLog()).toBe('[]');
+  });
+
+  it('android: merges native BoundedLogTree + JS entries, sorted by timestamp', async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    // Native log: two entries at t=10 and t=30 (Kotlin { t, lvl, tag, msg } shape).
+    const nativeLog = JSON.stringify([
+      { t: 10, lvl: 'W', tag: 'native', msg: 'a' },
+      { t: 30, lvl: 'E', tag: 'native', msg: 'c' },
+    ]);
+    /** @type {any} */ (globalThis.window).AndroidBridge = { getCrashLog: () => nativeLog };
+    await load();
+    // Pin the JS entry to t=20 so the interleave assertion is deterministic.
+    vi.spyOn(Date, 'now').mockReturnValue(20);
+    DiagnosticLog.warn('js', 'b');
+    const merged = JSON.parse(bridge.getCrashLog());
+    expect(merged.map((/** @type {any} */ e) => e.msg)).toEqual(['a', 'b', 'c']);
+    expect(merged.map((/** @type {any} */ e) => e.t)).toEqual([10, 20, 30]);
+  });
+
+  it('android: malformed native log falls back to JS-only (no throw)', async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    /** @type {any} */ (globalThis.window).AndroidBridge = { getCrashLog: () => 'not json{' };
+    await load();
+    DiagnosticLog.warn('js', 'survives');
+    const merged = JSON.parse(bridge.getCrashLog());
+    expect(merged).toHaveLength(1);
+    expect(merged[0].msg).toBe('survives');
+  });
+
+  it('android: non-array native payload is ignored', async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    /** @type {any} */ (globalThis.window).AndroidBridge = { getCrashLog: () => '{"t":1}' };
+    await load();
+    expect(JSON.parse(bridge.getCrashLog())).toEqual([]);
   });
 });
