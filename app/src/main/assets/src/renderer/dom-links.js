@@ -197,8 +197,8 @@ function _insertLinkIconAt(container, hlKey, endPos, count, isSource) {
   // the bug the user reported. With the slide we follow the phrase into
   // the next text node until reaching real whitespace.
   var textNodes = [];
-  var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-  while (w.nextNode()) textNodes.push(w.currentNode);
+  var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+  while (w.nextNode()) textNodes.push(/** @type {Text} */ (w.currentNode));
 
   // Find the text node + local offset for endPos.
   var charPos = 0, nodeIdx = -1, localOffset = 0;
@@ -241,12 +241,12 @@ function _insertLinkIconAt(container, hlKey, endPos, count, isSource) {
   // for icon-placement purposes.
   var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
   function hasBlockBetween(prevTextNode, nextTextNode) {
-    var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null, false);
+    var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null);
     bw.currentNode = prevTextNode;
     var n;
     while ((n = bw.nextNode())) {
       if (n === nextTextNode) return false;
-      if (n.nodeType === 1 && BLOCK_TAGS.test(n.tagName)) return true;
+      if (n.nodeType === 1 && BLOCK_TAGS.test(/** @type {Element} */ (n).tagName)) return true;
     }
     return true;
   }

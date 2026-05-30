@@ -65,6 +65,7 @@ export function HighlightableText({ text, hlKey }) {
   valid.forEach(v => { set.add(v.s); set.add(v.e); });
   const positions = [...set].sort((x, y) => x - y);
   // Compute segments (each with the active annotations)
+  /** @type {Array<{ start: number, end: number, active: any[], noBreakAfter?: boolean }>} */
   const segments = [];
   for (let i = 0; i < positions.length - 1; i++) {
     const ss = positions[i], se = positions[i + 1];
@@ -135,10 +136,10 @@ export function findNoteIconInsertionPoint(mark) {
   const container = mark.closest('[data-hl-key]');
   if (!container) return { kind: 'afterMark' };
   const boundaryRx = /[\s.,;:!?)\]}”’—-]/;
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
   let pastMark = false;
   while (walker.nextNode()) {
-    const tn = walker.currentNode;
+    const tn = /** @type {Text} */ (walker.currentNode);
     if (mark.contains(tn)) { pastMark = true; continue; }
     if (!pastMark) continue;
     const text = tn.nodeValue;
@@ -276,11 +277,11 @@ export function applyDOMHighlights() {
       groupSeen[ann.groupId] = seenIdx + 1;
       var kind = ann.kind || 'highlight';
 
-      var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+      var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
       var textNodes = [];
       var charPos = 0;
       while (walker.nextNode()) {
-        var node = walker.currentNode;
+        var node = /** @type {Text} */ (walker.currentNode);
         textNodes.push({ node: node, start: charPos, end: charPos + node.length });
         charPos += node.length;
       }

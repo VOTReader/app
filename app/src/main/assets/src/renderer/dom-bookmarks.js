@@ -177,8 +177,8 @@ function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds, justCreated) {
 
   // Gather all text nodes in document order.
   var textNodes = [];
-  var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-  while (w.nextNode()) textNodes.push(w.currentNode);
+  var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+  while (w.nextNode()) textNodes.push(/** @type {Text} */ (w.currentNode));
 
   var charPos = 0, nodeIdx = -1, localOffset = 0;
   for (var i = 0; i < textNodes.length; i++) {
@@ -215,12 +215,12 @@ function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds, justCreated) {
 
   var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
   function hasBlockBetween(prev, next) {
-    var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null, false);
+    var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null);
     bw.currentNode = prev;
     var n;
     while ((n = bw.nextNode())) {
       if (n === next) return false;
-      if (n.nodeType === 1 && BLOCK_TAGS.test(n.tagName)) return true;
+      if (n.nodeType === 1 && BLOCK_TAGS.test(/** @type {Element} */ (n).tagName)) return true;
     }
     return true;
   }

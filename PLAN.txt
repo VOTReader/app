@@ -2640,8 +2640,20 @@ Goal: close the two remaining structural gaps — the untyped UI tree
 (40+ screens, 25+ components, 17 sheets) and the 24 load-bearing
 !important declarations that mask a specificity architecture debt.
 
-  W8.1 — UI tree JSDoc typing (screens, sheets, components)
+  W8.1 — UI tree JSDoc typing (screens, sheets, components)  — IN PROGRESS 2026-05-29
   ──────────────────────────────────────────────────────────
+  RECON (2026-05-29): adding ui/ + components/ + renderer/ to tsc yields
+  only ~71 errors (NOT the "flood" feared) — ≈39 in test files, ~32 in
+  shipped source, almost all mechanical: DOM Node→Text/Element casts +
+  the inert createTreeWalker 4th-arg (entityReferenceExpansion, ignored by
+  browsers) + a few component-prop / JSDoc one-offs. Most of the 82 ui/
+  files already typecheck clean (cross-bundle refs are `any` via the
+  generated .d.ts). Doing it in gate-green tiers (add a dir to tsconfig +
+  fix its errors per commit). TIER 1 DONE: renderer/ (21 errors fixed,
+  live-smoke verified). TIER 2 (next): ui/ + components/ (~50 errors,
+  incl. test-mock shapes — kept in scope; tests are typechecked, don't
+  lower that gate).
+
   Problem: tsconfig.json excludes src/ui/ entirely. The 82+ files in
   screens/, sheets/, components/ have no JSDoc types, no @param, no
   @returns. tsc cannot catch prop mismatches, missing props, or wrong

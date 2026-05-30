@@ -89,8 +89,11 @@
       return null;
     }
     var textNodes = [];
-    var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-    while (w.nextNode()) textNodes.push(w.currentNode);
+    var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    while (w.nextNode()) textNodes.push(
+      /** @type {Text} */
+      w.currentNode
+    );
     var charPos = 0, nodeIdx = -1, localOffset = 0;
     for (var i = 0; i < textNodes.length; i++) {
       var nodeEnd = charPos + textNodes[i].length;
@@ -120,12 +123,15 @@
     }
     var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
     function hasBlockBetween(prevTextNode, nextTextNode) {
-      var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null, false);
+      var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null);
       bw.currentNode = prevTextNode;
       var n;
       while (n = bw.nextNode()) {
         if (n === nextTextNode) return false;
-        if (n.nodeType === 1 && BLOCK_TAGS.test(n.tagName)) return true;
+        if (n.nodeType === 1 && BLOCK_TAGS.test(
+          /** @type {Element} */
+          n.tagName
+        )) return true;
       }
       return true;
     }
@@ -285,8 +291,11 @@
       return null;
     }
     var textNodes = [];
-    var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-    while (w.nextNode()) textNodes.push(w.currentNode);
+    var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    while (w.nextNode()) textNodes.push(
+      /** @type {Text} */
+      w.currentNode
+    );
     var charPos = 0, nodeIdx = -1, localOffset = 0;
     for (var i = 0; i < textNodes.length; i++) {
       var nodeEnd = charPos + textNodes[i].length;
@@ -319,12 +328,15 @@
     }
     var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
     function hasBlockBetween(prev, next) {
-      var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null, false);
+      var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null);
       bw.currentNode = prev;
       var n;
       while (n = bw.nextNode()) {
         if (n === next) return false;
-        if (n.nodeType === 1 && BLOCK_TAGS.test(n.tagName)) return true;
+        if (n.nodeType === 1 && BLOCK_TAGS.test(
+          /** @type {Element} */
+          n.tagName
+        )) return true;
       }
       return true;
     }
@@ -461,10 +473,13 @@
     const container = mark.closest("[data-hl-key]");
     if (!container) return { kind: "afterMark" };
     const boundaryRx = /[\s.,;:!?)\]}”’—-]/;
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
     let pastMark = false;
     while (walker.nextNode()) {
-      const tn = walker.currentNode;
+      const tn = (
+        /** @type {Text} */
+        walker.currentNode
+      );
       if (mark.contains(tn)) {
         pastMark = true;
         continue;
@@ -599,11 +614,14 @@
         var isFirst = seenIdx === 0;
         groupSeen[ann.groupId] = seenIdx + 1;
         var kind = ann.kind || "highlight";
-        var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+        var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
         var textNodes = [];
         var charPos = 0;
         while (walker.nextNode()) {
-          var node = walker.currentNode;
+          var node = (
+            /** @type {Text} */
+            walker.currentNode
+          );
           textNodes.push({ node, start: charPos, end: charPos + node.length });
           charPos += node.length;
         }
