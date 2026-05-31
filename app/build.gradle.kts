@@ -1,6 +1,34 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     jacoco
+}
+
+// ── OneDrive build-lock workaround: relocate this module's build outputs ──
+// This `app/` folder is reached by OneDrive through a legacy junction
+// (C:\Users\…\OneDrive\Desktop\VOTReader-studio\app → D:\VOTReader-studio\app),
+// so OneDrive follows the junction, syncs app/build, and stamps cloud/
+// read-only attributes on the .class/.dex outputs. Gradle's Java file deleter
+// then throws AccessDenied on the incremental-build cleanup step, breaking
+// every rebuild in Android Studio. (Removing the junction is denied while
+// OneDrive/Studio hold handles, and would lose the OneDrive source backup.)
+//
+// Fix: if local.properties defines `vot.buildDir`, put this module's build
+// outputs there — OUTSIDE the OneDrive-synced tree — so they're never stamped.
+// All later `layout.buildDirectory` references (JaCoCo paths below) follow
+// automatically. The key is machine-local + gitignored, so CI (which has no
+// such key) keeps the default app/build and is unaffected.
+run {
+    val localProps = rootProject.file("local.properties")
+    if (localProps.exists()) {
+        val props = Properties()
+        localProps.inputStream().use { props.load(it) }
+        val customBuildRoot = props.getProperty("vot.buildDir")?.trim()
+        if (!customBuildRoot.isNullOrEmpty()) {
+            layout.buildDirectory.set(file("$customBuildRoot/app"))
+        }
+    }
 }
 
 android {
