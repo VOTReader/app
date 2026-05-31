@@ -23,8 +23,69 @@ export function snapRangeToWords(text, start, end) {
   return { start, end };
 }
 
-/* Build the className for a mark based on annotation kind. */
-function annMarkClass(ann, isFirst, isLast) {
+/* An annotation's effective VISIBILITY — does it paint anything? A blank
+   highlight (or a legacy kind:'note', which aliases to blank) shows nothing, so
+   it never suppresses a colored annotation beneath it in an overlap: blank is
+   transparent and lets the layer below show. */
+export function annVisible(ann) {
+  if (!ann || ann.kind === 'note') return false;
+  return !!(ann.color && ann.color !== 'blank');
+}
+
+/* Overlap stacking order: the most-recently CREATED annotation wins, with the
+   id as a stable tiebreaker. "a is above b" === a is more recent than b. */
+export function annAbove(a, b) {
+  const ac = a.created || 0, bc = b.created || 0;
+  return ac > bc || (ac === bc && (a.id || '') > (b.id || ''));
+}
+
+/* For a VISIBLE annotation, the merged sub-ranges of [ann.start, ann.end] where
+   a MORE-RECENT visible annotation also covers — i.e. where ann's own paint must
+   be suppressed so the newer one shows cleanly (no alpha blend). The annotation
+   still renders a (transparent) mark there, so its note icon + tap target + data
+   attributes survive — only the paint is dropped. `all` = every annotation on the
+   same key. */
+export function coveredSubRanges(ann, all) {
+  if (!annVisible(ann)) return [];
+  const ivs = [];
+  for (const b of all) {
+    if (b === ann || !annVisible(b) || !annAbove(b, ann)) continue;
+    const s = Math.max(ann.start, b.start), e = Math.min(ann.end, b.end);
+    if (s < e) ivs.push([s, e]);
+  }
+  if (!ivs.length) return [];
+  ivs.sort((x, y) => x[0] - y[0]);
+  const merged = [ivs[0].slice()];
+  for (let i = 1; i < ivs.length; i++) {
+    const top = merged[merged.length - 1];
+    if (ivs[i][0] <= top[1]) top[1] = Math.max(top[1], ivs[i][1]);
+    else merged.push(ivs[i].slice());
+  }
+  return merged;
+}
+
+/* Split [ann.start, ann.end] into contiguous render sub-ranges, each flagged
+   `suppress` where a more-recent visible annotation covers it. A non-overlapped
+   annotation yields a single full-paint range (== today's behavior). */
+export function renderSubRanges(ann, all) {
+  const covered = coveredSubRanges(ann, all);
+  if (!covered.length) return [{ s: ann.start, e: ann.end, suppress: false }];
+  const out = [];
+  let cursor = ann.start;
+  for (const [cs, ce] of covered) {
+    if (cs > cursor) out.push({ s: cursor, e: cs, suppress: false });
+    out.push({ s: Math.max(cs, ann.start), e: Math.min(ce, ann.end), suppress: true });
+    cursor = ce;
+  }
+  if (cursor < ann.end) out.push({ s: cursor, e: ann.end, suppress: false });
+  return out;
+}
+
+/* Build the className for a mark based on annotation kind. When `suppress` is
+   true the paint (background color + underline/squiggle decoration) is dropped
+   to hl-blank — used in an overlap slice where a more-recent annotation wins —
+   while hl-note + first/last-segment are KEPT so the note icon still shows. */
+function annMarkClass(ann, isFirst, isLast, suppress) {
   let kind = ann.kind || 'highlight';
   let color = ann.color;
   // Legacy notes (kind==='note') rendered invisible — alias to a blank
@@ -35,9 +96,11 @@ function annMarkClass(ann, isFirst, isLast) {
   const hasNote = ann.kind === 'note' ||
     (typeof NoteStore !== 'undefined' && !!NoteStore.get(ann.groupId));
   let cls = 'hl-mark';
-  if (kind === 'underline') cls += ' hl-underline';
-  else if (kind === 'squiggle') cls += ' hl-squiggle';
-  cls += (color && color !== 'blank') ? (' hl-' + color) : ' hl-blank';
+  if (!suppress) {
+    if (kind === 'underline') cls += ' hl-underline';
+    else if (kind === 'squiggle') cls += ' hl-squiggle';
+  }
+  cls += (!suppress && color && color !== 'blank') ? (' hl-' + color) : ' hl-blank';
   if (hasNote) {
     cls += ' hl-note';
     if (isFirst) cls += ' first-segment';
@@ -90,7 +153,7 @@ export function HighlightableText({ text, hlKey }) {
     const active = valid
       .filter(v => v.s <= ss && v.e >= se)
       .map(v => v.ann)
-      .sort((a, b) => a.start - b.start || (a.id || '').localeCompare(b.id || ''));
+      .sort((a, b) => (annAbove(a, b) ? 1 : annAbove(b, a) ? -1 : 0));
     segments.push({ start: ss, end: se, active });
   }
   // Track first/last segment per group so the first-segment/last-segment
@@ -123,6 +186,14 @@ export function HighlightableText({ text, hlKey }) {
           }
           return <React.Fragment key={'p' + segIdx}>{segText}</React.Fragment>;
         }
+        // Overlap precedence: among the annotations active in THIS slice, the
+        // most-recent VISIBLE one paints; the rest are suppressed to hl-blank so
+        // its color shows cleanly (no alpha blend). A blank annotation has no
+        // paint to win with, so it never suppresses a color beneath it.
+        let topVisible = null;
+        for (const a of seg.active) {
+          if (annVisible(a) && (!topVisible || annAbove(a, topVisible))) topVisible = a;
+        }
         // Inside-out: reduceRight wraps innermost (i = active.length - 1)
         // first, working outward. Outer element (i = 0) is what React keys
         // off — gets the segment-level key; inner elements get composite keys.
@@ -131,9 +202,10 @@ export function HighlightableText({ text, hlKey }) {
           const isFirst = firstSegByGroup.get(ann.groupId) === segIdx;
           const isLast = lastSegByGroup.get(ann.groupId) === segIdx;
           const isOutermost = i === 0;
+          const suppress = annVisible(ann) && !!topVisible && ann.id !== topVisible.id;
           const props = {
             key: isOutermost ? 'm' + segIdx : 'm' + segIdx + '_' + i,
-            className: annMarkClass(ann, isFirst, isLast),
+            className: annMarkClass(ann, isFirst, isLast, suppress),
             'data-hl-id': ann.id,
             'data-group-id': ann.groupId,
             'data-kind': kind,
@@ -282,9 +354,9 @@ export function applyDOMHighlights() {
     var anns = AnnotationStore.get(hlKey);
     if (!anns.length) return;
 
-    var sorted = anns.slice().sort(function(a, b) { return a.start - b.start; });
-    var groupCounts = {};
-    sorted.forEach(function(a) { groupCounts[a.groupId] = (groupCounts[a.groupId] || 0) + 1; });
+    // Newest LAST so a more-recent annotation nests INNERMOST — it both paints
+    // on top (its mark wraps the text last) and is the natural tap target.
+    var sorted = anns.slice().sort(function(a, b) { return annAbove(a, b) ? 1 : annAbove(b, a) ? -1 : 0; });
     var groupSeen = {};
 
     for (var hi = 0; hi < sorted.length; hi++) {
@@ -300,43 +372,58 @@ export function applyDOMHighlights() {
       var hasNote = ann.kind === 'note' ||
         (typeof NoteStore !== 'undefined' && !!NoteStore.get(ann.groupId));
 
-      var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-      var textNodes = [];
-      var charPos = 0;
-      while (walker.nextNode()) {
-        var node = /** @type {Text} */ (walker.currentNode);
-        textNodes.push({ node: node, start: charPos, end: charPos + node.length });
-        charPos += node.length;
-      }
-      var lastMark = null;
-      for (var ti = 0; ti < textNodes.length; ti++) {
-        var tn = textNodes[ti];
-        var overlapStart = Math.max(ann.start, tn.start);
-        var overlapEnd = Math.min(ann.end, tn.end);
-        if (overlapStart >= overlapEnd) continue;
-        var localStart = overlapStart - tn.start;
-        var localEnd = overlapEnd - tn.start;
-        var tNode = tn.node;
-        if (localEnd < tNode.length) tNode.splitText(localEnd);
-        var midNode = localStart > 0 ? tNode.splitText(localStart) : tNode;
-        var m = document.createElement('mark');
-        var cls = 'hl-mark hl-dom';
-        if (kind === 'underline') cls += ' hl-underline';
-        else if (kind === 'squiggle') cls += ' hl-squiggle';
-        cls += (color && color !== 'blank') ? (' hl-' + color) : ' hl-blank';
-        if (hasNote) {
-          cls += ' hl-note';
-          if (isFirst && ti === textNodes.findIndex(function(x) { return Math.max(ann.start, x.start) < Math.min(ann.end, x.end); })) cls += ' first-segment';
+      // Overlap precedence: split this annotation's range into paint/suppress
+      // sub-ranges. Where a more-recent VISIBLE annotation covers, our paint is
+      // dropped (hl-blank) so the newer color shows cleanly — but the mark (with
+      // hl-note + data attrs) still renders, so the note icon + tap target hold.
+      var subRanges = renderSubRanges(ann, sorted);
+      var annMarks = [];
+      for (var sri = 0; sri < subRanges.length; sri++) {
+        var sub = subRanges[sri];
+        var suppress = sub.suppress;
+        // Re-walk fresh each sub-range: prior splitText/replaceChild mutated the
+        // tree, so global→node offsets must be recomputed.
+        var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+        var textNodes = [];
+        var charPos = 0;
+        while (walker.nextNode()) {
+          var node = /** @type {Text} */ (walker.currentNode);
+          textNodes.push({ node: node, start: charPos, end: charPos + node.length });
+          charPos += node.length;
         }
-        m.className = cls;
-        m.setAttribute('data-hl-id', ann.id);
-        m.setAttribute('data-group-id', ann.groupId);
-        m.setAttribute('data-kind', kind);
-        midNode.parentNode.replaceChild(m, midNode);
-        m.appendChild(midNode);
-        lastMark = m;
+        for (var ti = 0; ti < textNodes.length; ti++) {
+          var tn = textNodes[ti];
+          var overlapStart = Math.max(sub.s, tn.start);
+          var overlapEnd = Math.min(sub.e, tn.end);
+          if (overlapStart >= overlapEnd) continue;
+          var localStart = overlapStart - tn.start;
+          var localEnd = overlapEnd - tn.start;
+          var tNode = tn.node;
+          if (localEnd < tNode.length) tNode.splitText(localEnd);
+          var midNode = localStart > 0 ? tNode.splitText(localStart) : tNode;
+          var m = document.createElement('mark');
+          var cls = 'hl-mark hl-dom';
+          if (!suppress && kind === 'underline') cls += ' hl-underline';
+          else if (!suppress && kind === 'squiggle') cls += ' hl-squiggle';
+          cls += (!suppress && color && color !== 'blank') ? (' hl-' + color) : ' hl-blank';
+          if (hasNote) cls += ' hl-note';
+          m.className = cls;
+          m.setAttribute('data-hl-id', ann.id);
+          m.setAttribute('data-group-id', ann.groupId);
+          m.setAttribute('data-kind', kind);
+          midNode.parentNode.replaceChild(m, midNode);
+          m.appendChild(midNode);
+          annMarks.push(m);
+        }
       }
-      if (hasNote && lastMark) lastMark.classList.add('last-segment');
+      // Note icon anchors: first-segment on this annotation's first mark (only
+      // the first instance of a multi-segment group owns it), last-segment on
+      // its last mark.
+      if (hasNote && annMarks.length) {
+        if (isFirst) annMarks[0].classList.add('first-segment');
+        annMarks[annMarks.length - 1].classList.add('last-segment');
+      }
+      var lastMark = annMarks.length ? annMarks[annMarks.length - 1] : null;
       if (lastMark) {
         var fullText = container.textContent;
         var lastCh = fullText.charAt(ann.end - 1);

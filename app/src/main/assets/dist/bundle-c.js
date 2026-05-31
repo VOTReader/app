@@ -393,7 +393,46 @@
     while (start > 0 && isWord(text[start - 1]) && isWord(text[start])) start--;
     return { start, end };
   }
-  function annMarkClass(ann, isFirst, isLast) {
+  function annVisible(ann) {
+    if (!ann || ann.kind === "note") return false;
+    return !!(ann.color && ann.color !== "blank");
+  }
+  function annAbove(a, b) {
+    const ac = a.created || 0, bc = b.created || 0;
+    return ac > bc || ac === bc && (a.id || "") > (b.id || "");
+  }
+  function coveredSubRanges(ann, all) {
+    if (!annVisible(ann)) return [];
+    const ivs = [];
+    for (const b of all) {
+      if (b === ann || !annVisible(b) || !annAbove(b, ann)) continue;
+      const s = Math.max(ann.start, b.start), e = Math.min(ann.end, b.end);
+      if (s < e) ivs.push([s, e]);
+    }
+    if (!ivs.length) return [];
+    ivs.sort((x, y) => x[0] - y[0]);
+    const merged = [ivs[0].slice()];
+    for (let i = 1; i < ivs.length; i++) {
+      const top = merged[merged.length - 1];
+      if (ivs[i][0] <= top[1]) top[1] = Math.max(top[1], ivs[i][1]);
+      else merged.push(ivs[i].slice());
+    }
+    return merged;
+  }
+  function renderSubRanges(ann, all) {
+    const covered = coveredSubRanges(ann, all);
+    if (!covered.length) return [{ s: ann.start, e: ann.end, suppress: false }];
+    const out = [];
+    let cursor = ann.start;
+    for (const [cs, ce] of covered) {
+      if (cs > cursor) out.push({ s: cursor, e: cs, suppress: false });
+      out.push({ s: Math.max(cs, ann.start), e: Math.min(ce, ann.end), suppress: true });
+      cursor = ce;
+    }
+    if (cursor < ann.end) out.push({ s: cursor, e: ann.end, suppress: false });
+    return out;
+  }
+  function annMarkClass(ann, isFirst, isLast, suppress) {
     let kind = ann.kind || "highlight";
     let color = ann.color;
     if (kind === "note") {
@@ -402,9 +441,11 @@
     }
     const hasNote = ann.kind === "note" || typeof NoteStore !== "undefined" && !!NoteStore.get(ann.groupId);
     let cls = "hl-mark";
-    if (kind === "underline") cls += " hl-underline";
-    else if (kind === "squiggle") cls += " hl-squiggle";
-    cls += color && color !== "blank" ? " hl-" + color : " hl-blank";
+    if (!suppress) {
+      if (kind === "underline") cls += " hl-underline";
+      else if (kind === "squiggle") cls += " hl-squiggle";
+    }
+    cls += !suppress && color && color !== "blank" ? " hl-" + color : " hl-blank";
     if (hasNote) {
       cls += " hl-note";
       if (isFirst) cls += " first-segment";
@@ -440,7 +481,7 @@
     for (let i = 0; i < positions.length - 1; i++) {
       const ss = positions[i], se = positions[i + 1];
       if (ss >= se) continue;
-      const active = valid.filter((v) => v.s <= ss && v.e >= se).map((v) => v.ann).sort((a, b) => a.start - b.start || (a.id || "").localeCompare(b.id || ""));
+      const active = valid.filter((v) => v.s <= ss && v.e >= se).map((v) => v.ann).sort((a, b) => annAbove(a, b) ? 1 : annAbove(b, a) ? -1 : 0);
       segments.push({ start: ss, end: se, active });
     }
     const firstSegByGroup = /* @__PURE__ */ new Map();
@@ -467,14 +508,19 @@
         }
         return /* @__PURE__ */ React.createElement(React.Fragment, { key: "p" + segIdx }, segText);
       }
+      let topVisible = null;
+      for (const a of seg.active) {
+        if (annVisible(a) && (!topVisible || annAbove(a, topVisible))) topVisible = a;
+      }
       return seg.active.reduceRight((child, ann, i) => {
         const kind = ann.kind || "highlight";
         const isFirst = firstSegByGroup.get(ann.groupId) === segIdx;
         const isLast = lastSegByGroup.get(ann.groupId) === segIdx;
         const isOutermost = i === 0;
+        const suppress = annVisible(ann) && !!topVisible && ann.id !== topVisible.id;
         const props = {
           key: isOutermost ? "m" + segIdx : "m" + segIdx + "_" + i,
-          className: annMarkClass(ann, isFirst, isLast),
+          className: annMarkClass(ann, isFirst, isLast, suppress),
           "data-hl-id": ann.id,
           "data-group-id": ann.groupId,
           "data-kind": kind
@@ -616,11 +662,7 @@
       var anns = AnnotationStore.get(hlKey);
       if (!anns.length) return;
       var sorted = anns.slice().sort(function(a, b) {
-        return a.start - b.start;
-      });
-      var groupCounts = {};
-      sorted.forEach(function(a) {
-        groupCounts[a.groupId] = (groupCounts[a.groupId] || 0) + 1;
+        return annAbove(a, b) ? 1 : annAbove(b, a) ? -1 : 0;
       });
       var groupSeen = {};
       for (var hi = 0; hi < sorted.length; hi++) {
@@ -635,48 +677,52 @@
           color = "blank";
         }
         var hasNote = ann.kind === "note" || typeof NoteStore !== "undefined" && !!NoteStore.get(ann.groupId);
-        var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-        var textNodes = [];
-        var charPos = 0;
-        while (walker.nextNode()) {
-          var node = (
-            /** @type {Text} */
-            walker.currentNode
-          );
-          textNodes.push({ node, start: charPos, end: charPos + node.length });
-          charPos += node.length;
-        }
-        var lastMark = null;
-        for (var ti = 0; ti < textNodes.length; ti++) {
-          var tn = textNodes[ti];
-          var overlapStart = Math.max(ann.start, tn.start);
-          var overlapEnd = Math.min(ann.end, tn.end);
-          if (overlapStart >= overlapEnd) continue;
-          var localStart = overlapStart - tn.start;
-          var localEnd = overlapEnd - tn.start;
-          var tNode = tn.node;
-          if (localEnd < tNode.length) tNode.splitText(localEnd);
-          var midNode = localStart > 0 ? tNode.splitText(localStart) : tNode;
-          var m = document.createElement("mark");
-          var cls = "hl-mark hl-dom";
-          if (kind === "underline") cls += " hl-underline";
-          else if (kind === "squiggle") cls += " hl-squiggle";
-          cls += color && color !== "blank" ? " hl-" + color : " hl-blank";
-          if (hasNote) {
-            cls += " hl-note";
-            if (isFirst && ti === textNodes.findIndex(function(x) {
-              return Math.max(ann.start, x.start) < Math.min(ann.end, x.end);
-            })) cls += " first-segment";
+        var subRanges = renderSubRanges(ann, sorted);
+        var annMarks = [];
+        for (var sri = 0; sri < subRanges.length; sri++) {
+          var sub = subRanges[sri];
+          var suppress = sub.suppress;
+          var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+          var textNodes = [];
+          var charPos = 0;
+          while (walker.nextNode()) {
+            var node = (
+              /** @type {Text} */
+              walker.currentNode
+            );
+            textNodes.push({ node, start: charPos, end: charPos + node.length });
+            charPos += node.length;
           }
-          m.className = cls;
-          m.setAttribute("data-hl-id", ann.id);
-          m.setAttribute("data-group-id", ann.groupId);
-          m.setAttribute("data-kind", kind);
-          midNode.parentNode.replaceChild(m, midNode);
-          m.appendChild(midNode);
-          lastMark = m;
+          for (var ti = 0; ti < textNodes.length; ti++) {
+            var tn = textNodes[ti];
+            var overlapStart = Math.max(sub.s, tn.start);
+            var overlapEnd = Math.min(sub.e, tn.end);
+            if (overlapStart >= overlapEnd) continue;
+            var localStart = overlapStart - tn.start;
+            var localEnd = overlapEnd - tn.start;
+            var tNode = tn.node;
+            if (localEnd < tNode.length) tNode.splitText(localEnd);
+            var midNode = localStart > 0 ? tNode.splitText(localStart) : tNode;
+            var m = document.createElement("mark");
+            var cls = "hl-mark hl-dom";
+            if (!suppress && kind === "underline") cls += " hl-underline";
+            else if (!suppress && kind === "squiggle") cls += " hl-squiggle";
+            cls += !suppress && color && color !== "blank" ? " hl-" + color : " hl-blank";
+            if (hasNote) cls += " hl-note";
+            m.className = cls;
+            m.setAttribute("data-hl-id", ann.id);
+            m.setAttribute("data-group-id", ann.groupId);
+            m.setAttribute("data-kind", kind);
+            midNode.parentNode.replaceChild(m, midNode);
+            m.appendChild(midNode);
+            annMarks.push(m);
+          }
         }
-        if (hasNote && lastMark) lastMark.classList.add("last-segment");
+        if (hasNote && annMarks.length) {
+          if (isFirst) annMarks[0].classList.add("first-segment");
+          annMarks[annMarks.length - 1].classList.add("last-segment");
+        }
+        var lastMark = annMarks.length ? annMarks[annMarks.length - 1] : null;
         if (lastMark) {
           var fullText = container.textContent;
           var lastCh = fullText.charAt(ann.end - 1);
