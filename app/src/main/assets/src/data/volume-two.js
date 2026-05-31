@@ -439,7 +439,7 @@ var LETTERS = [
       "Matthew 3:8": "Therefore bear fruits worthy of repentance,",
       "Matthew 16:6": "Then Jesus said to them, \u201cTake heed and beware of the leaven of the Pharisees and the Sadducees.\u201d",
       "Jeremiah 17:10": "\u201cI, the Lord, search the heart, I test the mind, even to give every man according to his ways, according to the fruit of his doings.\u201d",
-      "1 Corinthians 5:7-8": "Therefore purge out the old leaven, that you may be a new lump, since you truly are unleavened. For indeed Christ, our Passover, was sacrificed for us. Therefore let us keep the feast, not with old leaven, nor with the leaven of malice and wickedness, but with the unleavened bread of sincerity and truth.",
+      "1 Corinthians 5:7-8": "7. Therefore purge out the old leaven, that you may be a new lump, since you truly are unleavened. For indeed Christ, our Passover, was sacrificed for us. 8. Therefore let us keep the feast, not with old leaven, nor with the leaven of malice and wickedness, but with the unleavened bread of sincerity and truth.",
     },
     blocks: [
       { type: "intro", segments: [
@@ -582,7 +582,7 @@ var LETTERS = [
     nkjv: {
       "Revelation 1:8": "\u201cI am the Alpha and the Omega, the Beginning and the End,\u201d says the Lord, \u201cwho is and who was and who is to come, the Almighty.\u201d",
       "Jeremiah 23:6": "In His days Judah will be saved, And Israel will dwell safely; Now this is His name by which He will be called: THE LORD OUR RIGHTEOUSNESS.",
-      "John 1:10-11": "He was in the world, and the world was made through Him, and the world did not know Him. He came to His own, and His own did not receive Him.",
+      "John 1:10-11": "10. He was in the world, and the world was made through Him, and the world did not know Him. 11. He came to His own, and His own did not receive Him.",
       "Matthew 24:30": "\u201cThen the sign of the Son of Man will appear in heaven, and then all the tribes of the earth will mourn, and they will see the Son of Man coming on the clouds of heaven with power and great glory.\u201d",
       "Revelation 6:14": "Then the sky receded as a scroll when it is rolled up, and every mountain and island was moved out of its place.",
       "Zechariah 12:10": "\u201cAnd I will pour on the house of David and on the inhabitants of Jerusalem the Spirit of grace and supplication; then they will look on Me whom they pierced. Yes, they will mourn for Him as one mourns for his only son, and grieve for Him as one grieves for a firstborn.",
@@ -689,7 +689,7 @@ var LETTERS = [
       "11": { type: "scripture", ref: "Matthew 7:19" },
     },
     nkjv: {
-      "Proverbs 2:12-18": "To deliver you from the way of evil, from the man who speaks perverse things, from those who leave the paths of uprightness to walk in the ways of darkness; who rejoice in doing evil, and delight in the perversity of the wicked; whose ways are crooked, and who are devious in their paths; to deliver you from the immoral woman, from the seductress who flatters with her words, who forsakes the companion of her youth, and forgets the covenant of her God. For her house leads down to death, and her paths to the dead.",
+      "Proverbs 2:12-18": "12. To deliver you from the way of evil, from the man who speaks perverse things, 13. from those who leave the paths of uprightness to walk in the ways of darkness; 14. who rejoice in doing evil, and delight in the perversity of the wicked; 15. whose ways are crooked, and who are devious in their paths; 16. to deliver you from the immoral woman, from the seductress who flatters with her words, 17. who forsakes the companion of her youth, and forgets the covenant of her God. 18. For her house leads down to death, and her paths to the dead.",
       "Matthew 23:15": "\u201cWoe to you, scribes and Pharisees, hypocrites! For you travel land and sea to win one proselyte, and when he is won, you make him twice as much a son of \u05d2\u05b5\u05d9\u05d0 as yourselves.\u201d",
       "Matthew 12:32 (CJB)": "And whoever says something against the Son of Man will be forgiven; but whoever speaks against the Ruach HaKodesh will not be forgiven, neither in the \u2018olam hazeh nor in the \u2018olam haba.",
       "Matthew 7:13": "\u201cEnter by the narrow gate; for wide is the gate and broad is the way that leads to destruction, and there are many who go in by it.\u201d",
@@ -942,7 +942,7 @@ var LETTERS = [
       "7": { type: "scripture", ref: "John 8:36" },
     },
     nkjv: {
-      "Revelation 13:16-17": "He causes all, both small and great, rich and poor, free and slave, to receive a mark on their right hand or on their foreheads, and that no one may buy or sell except one who has the mark or the name of the beast, or the number of his name.",
+      "Revelation 13:16-17": "16. He causes all, both small and great, rich and poor, free and slave, to receive a mark on their right hand or on their foreheads, 17. and that no one may buy or sell except one who has the mark or the name of the beast, or the number of his name.",
       "Revelation 13:16": "He causes all, both small and great, rich and poor, free and slave, to receive a mark on their right hand or on their foreheads,",
       "Revelation 13:17": "and that no one may buy or sell except one who has the mark or the name of the beast, or the number of his name.",
       "Amos 3:7": "Surely the Lord GOD does nothing, unless He reveals His secret to His servants the prophets.",
@@ -1739,7 +1739,7 @@ var LETTERS = [
       "2": { type: "scripture", ref: "Matthew 12:36" },
     },
     nkjv: {
-      "Psalm 50:3-4": "Our God shall come, and shall not keep silent; a fire shall devour before Him, and it shall be very tempestuous all around Him. He shall call to the heavens from above, and to the earth, that He may judge His people:",
+      "Psalm 50:3-4": "3. Our God shall come, and shall not keep silent; a fire shall devour before Him, and it shall be very tempestuous all around Him. 4. He shall call to the heavens from above, and to the earth, that He may judge His people:",
       "Matthew 12:36": "\u201cBut I say to you that for every idle word men may speak, they will give account of it in the day of judgment.\u201d",
     },
     blocks: [
@@ -1890,9 +1890,9 @@ var LETTERS = [
       "Joel 2:32": "And it shall come to pass that whoever calls on the name of the Lord shall be saved. For in Mount Zion and in Jerusalem there shall be deliverance, as the Lord has said, among the remnant whom the Lord calls.",
       "Jeremiah 6:15": "\u201cWere they ashamed when they had committed abomination? No! They were not at all ashamed; nor did they know how to blush. Therefore they shall fall among those who fall; at the time I punish them, they shall be cast down,\u201d says the Lord.",
       "Malachi 3:6": "\u201cFor I am the Lord, I do not change; therefore you are not consumed, O sons of Jacob.\u201d",
-      "John 15:1-2": "\u201cI am the true vine, and My Father is the vinedresser. Every branch in Me that does not bear fruit He takes away; and every branch that bears fruit He prunes, that it may bear more fruit.\u201d",
+      "John 15:1-2": "1. \u201cI am the true vine, and My Father is the vinedresser. 2. Every branch in Me that does not bear fruit He takes away; and every branch that bears fruit He prunes, that it may bear more fruit.\u201d",
       "Matthew 7:19": "\u201cEvery tree that does not bear good fruit is cut down and thrown into the fire.\u201d",
-      "Revelation 6:16-17": "and said to the mountains and rocks, \u201cFall on us and hide us from the face of Him who sits on the throne and from the wrath of the Lamb! For the great day of His wrath has come, and who is able to stand?\u201d",
+      "Revelation 6:16-17": "16. and said to the mountains and rocks, \u201cFall on us and hide us from the face of Him who sits on the throne and from the wrath of the Lamb! 17. For the great day of His wrath has come, and who is able to stand?\u201d",
       "Proverbs 28:9 (NKJV)": "One who turns away his ear from hearing the law, even his prayer is an abomination.",
       "Jeremiah 17:10": "\u201cI, the Lord, search the heart, I test the mind, even to give every man according to his ways, according to the fruit of his doings.\u201d",
       "John 14:6": "Jesus said to him, \u201cI am the way, the truth, and the life. No one comes to the Father except through Me.\u201d",

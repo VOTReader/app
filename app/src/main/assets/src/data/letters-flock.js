@@ -482,12 +482,12 @@ var LETTERS_FLOCK = [
       },
       "2": {
         "type": "scripture",
-        "ref": "Zechariah 6:9-13 [*In Zechariah 6:11, the original Hebrew word for Joshua is Yahushua (יהושע)]"
+        "ref": "Zechariah 6:9-13"
       }
     },
     "nkjv": {
       "Nehemiah 9:17": "They refused to obey, And they were not mindful of Your wonders That You did among them. But they hardened their necks, And in their rebellion They appointed a leader To return to their bondage. But You are God, Ready to pardon, Gracious and merciful, Slow to anger, Abundant in kindness, And did not forsake them.",
-      "Zechariah 6:9-13 [*In Zechariah 6:11, the original Hebrew word for Joshua is Yahushua (יהושע)]": "9. The word of the LORD came to me, saying, 10. Take of them of the captivity, even of Heldai, of Toviyah, and of Yedayah; and come the same day, and go into the house of Yoshiyahu the son of Tzefanyah, where they have come from Bavel. 11. Yes, take silver and gold, and make crowns, and set them on the head of Yehoshua the son of Yehotzadak, the Kohen Gadol; 12. and speak to him, saying, 'Thus says the LORD of Hosts, \"Behold, the man whose name is the Branch: and he shall grow up out of his place; and he shall build the temple of the LORD; 13. even he shall build the temple of the LORD; and he shall bear the glory, and shall sit and rule on his throne; and he shall be a Kohen on his throne; and the counsel of shalom shall be between them both.\"'"
+      "Zechariah 6:9-13": "9. The word of the LORD came to me, saying, 10. Take of them of the captivity, even of Heldai, of Toviyah, and of Yedayah; and come the same day, and go into the house of Yoshiyahu the son of Tzefanyah, where they have come from Bavel. 11. Yes, take silver and gold, and make crowns, and set them on the head of Yehoshua the son of Yehotzadak, the Kohen Gadol; 12. and speak to him, saying, 'Thus says the LORD of Hosts, \"Behold, the man whose name is the Branch: and he shall grow up out of his place; and he shall build the temple of the LORD; 13. even he shall build the temple of the LORD; and he shall bear the glory, and shall sit and rule on his throne; and he shall be a Kohen on his throne; and the counsel of shalom shall be between them both.\"' [In Zechariah 6:11, the original Hebrew word for Joshua is Yahushua (יהושע)]"
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/all-things-were-ordained-from-the-beginning-no-other-name-is-given-by-which-you-must-be-saved",
     "videoVoiceUrl": "https://www.youtube.com/watch?v=d_lrgFyY4fc&list=PLE8FlkxQPQkMIFKwAICFtCCIxuaoHNJSh&index=4",
@@ -2276,7 +2276,7 @@ var LETTERS_FLOCK = [
       },
       "2": {
         "type": "scripture",
-        "ref": "Deuteronomy 27:16-26 - \"And all the people shall say, ‘Amen!’\""
+        "ref": "Deuteronomy 27:16-26"
       },
       "3": {
         "type": "scripture",
@@ -2293,7 +2293,7 @@ var LETTERS_FLOCK = [
     },
     "nkjv": {
       "Isaiah 40:13": "Who has directed the Spirit of the LORD, Or as His counselor has taught Him?",
-      "Deuteronomy 27:16-26 - \"And all the people shall say, ‘Amen!’\"": "16. ‘Cursed is the one who treats his father or his mother with contempt.’ “And all the people shall say, ‘Amen!’ 17. ‘Cursed is the one who moves his neighbor’s landmark.’ “And all the people shall say, ‘Amen!’ 18. ‘Cursed is the one who makes the blind to wander off the road.’ “And all the people shall say, ‘Amen!’ 19. ‘Cursed is the one who perverts the justice due the stranger, the fatherless, and widow.’ “And all the people shall say, ‘Amen!’ 20. ‘Cursed is the one who lies with his father’s wife, because he has uncovered his father’s bed.’ “And all the people shall say, ‘Amen!’ 21. ‘Cursed is the one who lies with any kind of animal.’ “And all the people shall say, ‘Amen!’ 22. ‘Cursed is the one who lies with his sister, the daughter of his father or the daughter of his mother.’ “And all the people shall say, ‘Amen!’ 23. ‘Cursed is the one who lies with his mother-in-law.’ “And all the people shall say, ‘Amen!’ 24. ‘Cursed is the one who attacks his neighbor secretly.’ “And all the people shall say, ‘Amen!’ 25. ‘Cursed is the one who takes a bribe to slay an innocent person.’ “And all the people shall say, ‘Amen!’ 26. ‘Cursed is the one who does not confirm all the words of this law by observing them.’ “And all the people shall say, ‘Amen!’",
+      "Deuteronomy 27:16-26": "16. ‘Cursed is the one who treats his father or his mother with contempt.’ “And all the people shall say, ‘Amen!’ 17. ‘Cursed is the one who moves his neighbor’s landmark.’ “And all the people shall say, ‘Amen!’ 18. ‘Cursed is the one who makes the blind to wander off the road.’ “And all the people shall say, ‘Amen!’ 19. ‘Cursed is the one who perverts the justice due the stranger, the fatherless, and widow.’ “And all the people shall say, ‘Amen!’ 20. ‘Cursed is the one who lies with his father’s wife, because he has uncovered his father’s bed.’ “And all the people shall say, ‘Amen!’ 21. ‘Cursed is the one who lies with any kind of animal.’ “And all the people shall say, ‘Amen!’ 22. ‘Cursed is the one who lies with his sister, the daughter of his father or the daughter of his mother.’ “And all the people shall say, ‘Amen!’ 23. ‘Cursed is the one who lies with his mother-in-law.’ “And all the people shall say, ‘Amen!’ 24. ‘Cursed is the one who attacks his neighbor secretly.’ “And all the people shall say, ‘Amen!’ 25. ‘Cursed is the one who takes a bribe to slay an innocent person.’ “And all the people shall say, ‘Amen!’ 26. ‘Cursed is the one who does not confirm all the words of this law by observing them.’ “And all the people shall say, ‘Amen!’",
       "Matthew 5:11-12": "11. “Blessed are you when they revile and persecute you, and say all kinds of evil against you falsely for My sake. 12. Rejoice and be exceedingly glad, for great is your reward in heaven, for so they persecuted the prophets who were before you.",
       "Mark 7:20-23, Matthew 15:11": "Mark 7:20-23 — 20. And He said, “What comes out of a man, that defiles a man. 21. For from within, out of the heart of men, proceed evil thoughts, adulteries, fornications, murders, 22. thefts, covetousness, wickedness, deceit, lewdness, an evil eye, blasphemy, pride, foolishness. 23. All these evil things come from within and defile a man.” | Matthew 15:11 — Not what goes into the mouth defiles a man; but what comes out of the mouth, this defiles a man.”",
       "Matthew 5:44": "But I say to you, love your enemies, bless those who curse you, do good to those who hate you, and pray for those who spitefully use you and persecute you,"
@@ -6600,7 +6600,7 @@ var LETTERS_FLOCK = [
       }
     },
     "nkjv": {
-      "2 Peter 1:20-21 (CJB)": "20 First of all, understand this: no prophecy of Scripture is to be interpreted by an individual on his own; 21 for never has a prophecy come as a result of human willing — on the contrary, people moved by the Ruach HaKodesh spoke a message from God."
+      "2 Peter 1:20-21 (CJB)": "20. First of all, understand this: no prophecy of Scripture is to be interpreted by an individual on his own; 21. for never has a prophecy come as a result of human willing — on the contrary, people moved by the Ruach HaKodesh spoke a message from God."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/in-one-accord",
     "videoVoiceUrl": "https://www.youtube.com/user/trumpetcallofgod",
@@ -7155,7 +7155,7 @@ var LETTERS_FLOCK = [
       }
     },
     "nkjv": {
-      "Jeremiah 7:23-24 (ESV)": "23 But this command I gave them: “Obey my voice, and I will be your God, and you shall be my people. And walk in all the way that I command you, that it may be well with you.” 24 But they did not obey or incline their ear, but walked in their own counsels and the stubbornness of their evil hearts, and went backward and not forward.",
+      "Jeremiah 7:23-24 (ESV)": "23. But this command I gave them: “Obey my voice, and I will be your God, and you shall be my people. And walk in all the way that I command you, that it may be well with you.” 24. But they did not obey or incline their ear, but walked in their own counsels and the stubbornness of their evil hearts, and went backward and not forward.",
       "Ecclesiastes 1:9 (NKJV)": "That which has been is what will be, That which is done is what will be done, And there is nothing new under the sun."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/deplorable",

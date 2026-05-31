@@ -16,7 +16,7 @@
  */
 
 const CACHE_VERSION = 'v1.0.2-52a1717368';
-const CORPUS_VERSION = 'c2'; // c1→c2 (2026-05-29): Hebrews verse restoration changed books.js → bundle-a-bible; the stable corpus cache must bust so existing web clients re-fetch it.
+const CORPUS_VERSION = 'c3'; // c2→c3 (2026-05-31): footnote verse-number normalization changed letters/WTLB corpus → bundle-a-vot; bust the stable corpus cache so web clients re-fetch the gold-marker data.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;

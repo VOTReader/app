@@ -4403,7 +4403,7 @@ var LETTERS_V3 = [
     "footnotes": {
       "1": {
         "type": "scripture",
-        "ref": "Zechariah 6:9-13 [*In Zechariah 6:11, the original Hebrew word for Joshua is Yahushua (יהושע)]"
+        "ref": "Zechariah 6:9-13"
       },
       "2": {
         "type": "scripture",
@@ -4420,7 +4420,7 @@ var LETTERS_V3 = [
       }
     },
     "nkjv": {
-      "Zechariah 6:9-13 [*In Zechariah 6:11, the original Hebrew word for Joshua is Yahushua (יהושע)]": "9. The word of the LORD came to me, saying, 10. Take of them of the captivity, even of Heldai, of Toviyah, and of Yedayah; and come the same day, and go into the house of Yoshiyahu the son of Tzefanyah, where they have come from Bavel. 11. Yes, take silver and gold, and make crowns, and set them on the head of Yehoshua the son of Yehotzadak, the Kohen Gadol; 12. and speak to him, saying, 'Thus says the LORD of Hosts, \"Behold, the man whose name is the Branch: and he shall grow up out of his place; and he shall build the temple of the LORD; 13. even he shall build the temple of the LORD; and he shall bear the glory, and shall sit and rule on his throne; and he shall be a Kohen on his throne; and the counsel of shalom shall be between them both.\"'",
+      "Zechariah 6:9-13": "9. The word of the LORD came to me, saying, 10. Take of them of the captivity, even of Heldai, of Toviyah, and of Yedayah; and come the same day, and go into the house of Yoshiyahu the son of Tzefanyah, where they have come from Bavel. 11. Yes, take silver and gold, and make crowns, and set them on the head of Yehoshua the son of Yehotzadak, the Kohen Gadol; 12. and speak to him, saying, 'Thus says the LORD of Hosts, \"Behold, the man whose name is the Branch: and he shall grow up out of his place; and he shall build the temple of the LORD; 13. even he shall build the temple of the LORD; and he shall bear the glory, and shall sit and rule on his throne; and he shall be a Kohen on his throne; and the counsel of shalom shall be between them both.\"' [In Zechariah 6:11, the original Hebrew word for Joshua is Yahushua (יהושע)]",
       "Acts 17:30": "Truly, these times of ignorance God overlooked, but now commands all men everywhere to repent,",
       "Zephaniah 3:9": "“For then I will restore to the peoples a pure language, That they all may call on the name of the LORD, To serve Him with one accord."
     },
@@ -5142,7 +5142,7 @@ var LETTERS_V3 = [
     },
     "nkjv": {
       "Colossians 3:9-10": "9. Do not lie to one another, since you have put off the old man with his deeds, 10. and have put on the new man who is renewed in knowledge according to the image of Him who created him,",
-      "1 Corinthians 6:9-10 (CJB)": "9 Don’t you know that unrighteous people will have no share in the Kingdom of God? Don’t delude yourselves — people who engage in sex before marriage, who worship idols, who engage in sex after marriage with someone other than their spouse, who engage in active or passive homosexuality, 10 who steal, who are greedy, who get drunk, who assail people with contemptuous language, who rob — none of them will share in the Kingdom of God.",
+      "1 Corinthians 6:9-10 (CJB)": "9. Don’t you know that unrighteous people will have no share in the Kingdom of God? Don’t delude yourselves — people who engage in sex before marriage, who worship idols, who engage in sex after marriage with someone other than their spouse, who engage in active or passive homosexuality, 10. who steal, who are greedy, who get drunk, who assail people with contemptuous language, who rob — none of them will share in the Kingdom of God.",
       "Romans 10:4 (CJB)": "For the goal at which the Torah aims is the Messiah, who offers righteousness to everyone who trusts.",
       "John 8:31 (GNT)": "So Jesus said to those who believed in him, “If you obey my teaching, you are really my disciples;”",
       "Romans 3:10": "As it is written: “There is none righteous, no, not one;",
@@ -6008,7 +6008,7 @@ var LETTERS_V3 = [
     "nkjv": {
       "John 16:13-15 (corrected: “It” / “the Spirit of Truth”)": "13. However, when It, the Spirit of Truth, has come, It will guide you into all truth; for It will not speak on Its own authority, but whatever It hears It will speak; and It will tell you things to come. 14. It will glorify Me, for It will take of what is Mine and declare it to you. 15. All things that the Father has are Mine. Therefore I said that It will take of Mine and declare it to you.",
       "John 20:22": "And when He had said this, He breathed on them, and said to them, “Receive the Holy Spirit.",
-      "John 7:37-39 (GNT)": "37 On the last and most important day of the festival Jesus stood up and said in a loud voice, “Whoever is thirsty should come to me, and 38 whoever believes in me should drink. As the scripture says, ‘Streams of life-giving water will pour out from his side.’ 39 Jesus said this about the Spirit, which those who believed in him were going to receive. At that time the Spirit had not yet been given, because Jesus had not been raised to glory.”",
+      "John 7:37-39 (GNT)": "37. On the last and most important day of the festival Jesus stood up and said in a loud voice, “Whoever is thirsty should come to me, and 38. whoever believes in me should drink. As the scripture says, ‘Streams of life-giving water will pour out from his side.’ 39. Jesus said this about the Spirit, which those who believed in him were going to receive. At that time the Spirit had not yet been given, because Jesus had not been raised to glory.”",
       "Colossians 1:19": "For it pleased the Father that in Him all the fullness should dwell,",
       "Matthew 28:20": "teaching them to observe all things that I have commanded you; and lo, I am with you always, even to the end of the age.” Amen.",
       "1 Corinthians 13:12": "For now we see in a mirror, dimly, but then face to face. Now I know in part, but then I shall know just as I also am known."
