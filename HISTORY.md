@@ -4,6 +4,42 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## Overlap-precedence — most-recent annotation wins (2026-05-31)
+
+Commit `c7d37ba`. When annotations overlap, the more-recently-created VISIBLE
+one now shows in the overlap slice — a clean override, not the arbitrary
+alpha-blend the old nesting order produced. Both annotations stay stored; the
+older still paints everywhere it isn't overridden; a note's icon survives even
+where its highlight is fully covered (paint drops to hl-blank, the hl-note
+marker never does — per the user's correction). A blank annotation is
+transparent, so it never suppresses a color beneath it.
+
+**No schema change** — the `created` timestamp already on every annotation
+drives precedence.
+
+- `annotation-engine.jsx`: 4 pure helpers — `annVisible` (does it paint?),
+  `annAbove` (recency order, id tiebreak), `coveredSubRanges` (the sub-ranges
+  where a more-recent visible annotation covers), `renderSubRanges` (split into
+  paint/suppress). Both render paths updated:
+  - HighlightableText (React sweep-line): per overlap slice, only the most-
+    recent visible annotation paints; the rest are suppressed to hl-blank.
+  - applyDOMHighlights (imperative DOM): each annotation's range splits into
+    paint/suppress sub-ranges; newest sorts innermost → paints on top + is the
+    natural tap target. Dropped the dead `groupCounts` tally.
+  Non-overlapping annotations render byte-identically to before.
+- `annotation-engine.test.jsx` (new, 22 cases): the helpers + both render
+  paths, incl. the staggered-overlap trap (a newer annotation starting at a
+  DIFFERENT offset must still win — recency, not text position), blank-is-
+  transparent, and note-icon survival under full coverage.
+
+**Verification.** 1483 → 1505 vitest; typecheck + lint clean. Preview end-to-end
+through the bundle: a real yellow-over-blue overlap on "Hello world" renders
+"Hello" clean yellow (older blue `hl-blank` = transparent there) + " world"
+blue, text intact, both `data-hl-id` present. CSS confirms `hl-blank` computes
+to `rgba(0,0,0,0)`.
+
+---
+
 ## Footnote gold-render pile-strip (2026-05-31)
 
 Commits `078024f` → `66f9aba` → `b0415d4`. Mandate: *every* footnote verse
