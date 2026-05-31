@@ -2302,6 +2302,28 @@
     .hl-underline.hl-brown   { text-decoration-color: var(--hl-brown); }
     .hl-underline.hl-gray    { text-decoration-color: var(--hl-gray); }
     .hl-underline.hl-cyan    { text-decoration-color: var(--hl-teal); }
+    /* Squiggle — a wavy underline, always visible. Same per-color pattern as
+       .hl-underline but with a wavy decoration-style (the look the old
+       .hl-note.is-active state used, now a first-class, always-on style). */
+    .hl-squiggle {
+      background: none !important;
+      text-decoration-line: underline;
+      text-decoration-style: wavy;
+      text-decoration-thickness: 1.6px;
+      text-underline-offset: 3px;
+      text-decoration-skip-ink: none;
+    }
+    .hl-squiggle.hl-yellow  { text-decoration-color: var(--hl-yellow); }
+    .hl-squiggle.hl-green   { text-decoration-color: var(--hl-green); }
+    .hl-squiggle.hl-pink    { text-decoration-color: var(--hl-pink); }
+    .hl-squiggle.hl-red     { text-decoration-color: var(--hl-red); }
+    .hl-squiggle.hl-orange  { text-decoration-color: var(--hl-orange); }
+    .hl-squiggle.hl-blue    { text-decoration-color: var(--hl-blue); }
+    .hl-squiggle.hl-purple  { text-decoration-color: var(--hl-purple); }
+    .hl-squiggle.hl-teal    { text-decoration-color: var(--hl-teal); }
+    .hl-squiggle.hl-brown   { text-decoration-color: var(--hl-brown); }
+    .hl-squiggle.hl-gray    { text-decoration-color: var(--hl-gray); }
+    .hl-squiggle.hl-cyan    { text-decoration-color: var(--hl-teal); }
     .verse-text { position: relative; }
 
     /* ══════════════════════════════════════════════════════════════
@@ -2544,6 +2566,7 @@
       flex-shrink: 0;
     }
     .sel-style-btn-underline { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 2px; }
+    .sel-style-btn-squiggle { text-decoration: underline; text-decoration-style: wavy; text-decoration-thickness: 1.6px; text-underline-offset: 2px; }
     .sel-style-btn.active {
       border-color: var(--gold); background: var(--gold-faint);
       color: var(--gold);
@@ -2589,6 +2612,22 @@
     .sel-color-btn.sel-color-underline[data-color="teal"]   { border-color: var(--hl-teal); }
     .sel-color-btn.sel-color-underline[data-color="brown"]  { border-color: var(--hl-brown); }
     .sel-color-btn.sel-color-underline[data-color="gray"]   { border-color: var(--hl-gray); }
+    /* Squiggle-style colors: show as a ring (like underline) so the picker
+       distinguishes a squiggle from a solid highlight fill. */
+    .sel-color-btn.sel-color-squiggle {
+      background: transparent !important;
+      border-style: dashed; border-width: 3px;
+    }
+    .sel-color-btn.sel-color-squiggle[data-color="yellow"] { border-color: var(--hl-yellow); }
+    .sel-color-btn.sel-color-squiggle[data-color="green"]  { border-color: var(--hl-green); }
+    .sel-color-btn.sel-color-squiggle[data-color="pink"]   { border-color: var(--hl-pink); }
+    .sel-color-btn.sel-color-squiggle[data-color="red"]    { border-color: var(--hl-red); }
+    .sel-color-btn.sel-color-squiggle[data-color="orange"] { border-color: var(--hl-orange); }
+    .sel-color-btn.sel-color-squiggle[data-color="blue"]   { border-color: var(--hl-blue); }
+    .sel-color-btn.sel-color-squiggle[data-color="purple"] { border-color: var(--hl-purple); }
+    .sel-color-btn.sel-color-squiggle[data-color="teal"]   { border-color: var(--hl-teal); }
+    .sel-color-btn.sel-color-squiggle[data-color="brown"]  { border-color: var(--hl-brown); }
+    .sel-color-btn.sel-color-squiggle[data-color="gray"]   { border-color: var(--hl-gray); }
     /* Clear/remove circle (X) at end of color row */
     .sel-color-clear {
       background: transparent; color: var(--cream-dim);

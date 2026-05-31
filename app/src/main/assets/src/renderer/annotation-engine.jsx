@@ -32,6 +32,7 @@ function annMarkClass(ann, isFirst, isLast) {
       (isLast ? ' last-segment' : '');
   }
   if (kind === 'underline') return 'hl-mark hl-underline hl-' + ann.color;
+  if (kind === 'squiggle') return 'hl-mark hl-squiggle hl-' + ann.color;
   return 'hl-mark hl-' + ann.color;
 }
 
@@ -299,6 +300,7 @@ export function applyDOMHighlights() {
         var m = document.createElement('mark');
         var cls = 'hl-mark hl-dom hl-' + ann.color;
         if (kind === 'underline') cls += ' hl-underline';
+        else if (kind === 'squiggle') cls += ' hl-squiggle';
         else if (kind === 'note') {
           cls += ' hl-note';
           if (isFirst && ti === textNodes.findIndex(function(x) { return Math.max(ann.start, x.start) < Math.min(ann.end, x.end); })) cls += ' first-segment';

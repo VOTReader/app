@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-981aa2d2f2';
+const CACHE_VERSION = 'v1.0.2-0b97ef6db8';
 const CORPUS_VERSION = 'c2'; // c1→c2 (2026-05-29): Hebrews verse restoration changed books.js → bundle-a-bible; the stable corpus cache must bust so existing web clients re-fetch it.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;

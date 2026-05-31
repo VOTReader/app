@@ -276,7 +276,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     if (!selInfo) return;
     if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
     suppressRef.current = true;
-    const kind = activeStyle === 'underline' ? 'underline' : 'highlight';
+    const kind = activeStyle === 'underline' ? 'underline'
+      : activeStyle === 'squiggle' ? 'squiggle' : 'highlight';
     if (selInfo.multiVerse) {
       // Multi-container: all spans share ONE groupId so they act as one annotation
       const sel = window.getSelection();
@@ -675,6 +676,13 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             className={"sel-style-btn sel-style-btn-underline" + (activeStyle === 'underline' ? ' active' : '')}
             onClick={() => setActiveStyle('underline')}
             title="Underline"
+          >
+            A
+          </button>
+          <button
+            className={"sel-style-btn sel-style-btn-squiggle" + (activeStyle === 'squiggle' ? ' active' : '')}
+            onClick={() => setActiveStyle('squiggle')}
+            title="Squiggle underline"
           >
             A
           </button>

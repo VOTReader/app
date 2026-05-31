@@ -131,6 +131,27 @@ describe('SelectionToolbar — W4.5 mouse-drag selection', () => {
     });
     expect(document.querySelector('.sel-toolbar')).toBeNull();
   });
+
+  it('applies a kind:"squiggle" annotation when the Squiggle style is selected', async () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
+    mount();
+    stubSelection(rangeOver(c, 0, 13)); // "The Revelation"
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    const squiggleBtn = document.querySelector('.sel-style-btn-squiggle');
+    expect(squiggleBtn).not.toBeNull();
+    act(() => { fire(squiggleBtn, 'click'); });
+    const greenBtn = document.querySelector('.sel-color-btn[data-color="green"]');
+    expect(greenBtn).not.toBeNull();
+    act(() => { fire(greenBtn, 'click'); });
+    expect(/** @type {any} */ (globalThis).AnnotationStore.add).toHaveBeenCalledWith(
+      'bible:test:1:1',
+      expect.objectContaining({ kind: 'squiggle', color: 'green' }),
+    );
+  });
 });
 
 describe('SelectionToolbar — W4.4 right-click context menu', () => {

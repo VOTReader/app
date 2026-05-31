@@ -9160,7 +9160,7 @@ Continue?`
       if (!selInfo) return;
       if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
       suppressRef.current = true;
-      const kind = activeStyle === "underline" ? "underline" : "highlight";
+      const kind = activeStyle === "underline" ? "underline" : activeStyle === "squiggle" ? "squiggle" : "highlight";
       if (selInfo.multiVerse) {
         const sel = window.getSelection();
         const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
@@ -9514,6 +9514,14 @@ Continue?`
           className: "sel-style-btn sel-style-btn-underline" + (activeStyle === "underline" ? " active" : ""),
           onClick: () => setActiveStyle("underline"),
           title: "Underline"
+        },
+        "A"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "sel-style-btn sel-style-btn-squiggle" + (activeStyle === "squiggle" ? " active" : ""),
+          onClick: () => setActiveStyle("squiggle"),
+          title: "Squiggle underline"
         },
         "A"
       ), /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-divider" }), /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-colors" }, HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(

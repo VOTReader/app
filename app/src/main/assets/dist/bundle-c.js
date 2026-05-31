@@ -399,6 +399,7 @@
       return "hl-mark hl-note hl-" + ann.color + (isFirst ? " first-segment" : "") + (isLast ? " last-segment" : "");
     }
     if (kind === "underline") return "hl-mark hl-underline hl-" + ann.color;
+    if (kind === "squiggle") return "hl-mark hl-squiggle hl-" + ann.color;
     return "hl-mark hl-" + ann.color;
   }
   function HighlightableText({ text, hlKey }) {
@@ -639,6 +640,7 @@
           var m = document.createElement("mark");
           var cls = "hl-mark hl-dom hl-" + ann.color;
           if (kind === "underline") cls += " hl-underline";
+          else if (kind === "squiggle") cls += " hl-squiggle";
           else if (kind === "note") {
             cls += " hl-note";
             if (isFirst && ti === textNodes.findIndex(function(x) {
