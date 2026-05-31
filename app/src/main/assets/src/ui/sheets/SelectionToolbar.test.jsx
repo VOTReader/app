@@ -158,9 +158,93 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     /** @type {any} */ let ev;
     act(() => { ev = fire(mark, 'contextmenu', { clientX: 100, clientY: 200 }); });
     expect(ev.defaultPrevented).toBe(true);
+    // chip opens at the default position (the point itself, no offset).
     expect(window.__showAnnChip).toHaveBeenCalledWith(100, 200, 'bible:test:1:2', 'g1');
     expect(window.__openNote).not.toHaveBeenCalled();
     expect(document.querySelector('.sel-toolbar')).toBeNull();
+  });
+
+  // Desktop / non-text taps fire `click`; this opens the chip on a highlight.
+  it('routes a click on a highlight mark to __showAnnChip', () => {
+    const c = readingContainer(
+      'bible:test:1:2',
+      '<mark class="hl-mark" data-group-id="g9" data-kind="highlight">witness</mark> to God',
+    );
+    const mark = c.querySelector('mark.hl-mark');
+    mount();
+    stubSelection(null); // a tap leaves a collapsed selection
+    act(() => { fire(mark, 'click', { clientX: 40, clientY: 60 }); });
+    expect(window.__showAnnChip).toHaveBeenCalledWith(40, 60, 'bible:test:1:2', 'g9');
+  });
+
+  // Android fix: a tap on a highlight (selectable text) does NOT emit a usable
+  // `click` in the WebView, so MainActivity's GestureDetector hit-tests the tap
+  // point through window.__nativeTapAnnotation(cssX, cssY). elementFromPoint is
+  // stubbed because jsdom has no layout engine.
+  it('routes a native tap (__nativeTapAnnotation) on a highlight mark to __showAnnChip', () => {
+    const c = readingContainer(
+      'bible:test:1:2',
+      '<mark class="hl-mark" data-group-id="g7" data-kind="highlight">witness</mark> to God',
+    );
+    const mark = c.querySelector('mark.hl-mark');
+    mount();
+    stubSelection(null);
+    const origEFP = document.elementFromPoint;
+    document.elementFromPoint = () => mark;
+    try {
+      act(() => { window.__nativeTapAnnotation(41, 61); });
+    } finally {
+      document.elementFromPoint = origEFP;
+    }
+    // chip opens at the default position (the tap point itself, no offset).
+    expect(window.__showAnnChip).toHaveBeenCalledWith(41, 61, 'bible:test:1:2', 'g7');
+  });
+
+  // A native tap that lands on a note ICON must be skipped — the icon already
+  // fires `click` on Android and self-routes, so routing it here too would
+  // double-fire (open the note twice).
+  it('native tap skips a note icon (its own click handler routes it)', () => {
+    const c = readingContainer(
+      'bible:test:1:2',
+      'witness<span class="hl-note-icon" data-group-id="g8"></span> to God',
+    );
+    const icon = c.querySelector('.hl-note-icon');
+    mount();
+    stubSelection(null);
+    const origEFP = document.elementFromPoint;
+    document.elementFromPoint = () => icon;
+    try {
+      act(() => { window.__nativeTapAnnotation(40, 60); });
+    } finally {
+      document.elementFromPoint = origEFP;
+    }
+    expect(window.__showAnnChip).not.toHaveBeenCalled();
+    expect(window.__openNote).not.toHaveBeenCalled();
+  });
+
+  // A native tap on plain (non-annotated) text opens nothing.
+  it('native tap on plain text opens nothing', () => {
+    const c = readingContainer('bible:test:1:2', 'plain unmarked verse text');
+    mount();
+    stubSelection(null);
+    const origEFP = document.elementFromPoint;
+    document.elementFromPoint = () => c; // the container has no mark ancestor
+    try {
+      act(() => { window.__nativeTapAnnotation(10, 10); });
+    } finally {
+      document.elementFromPoint = origEFP;
+    }
+    expect(window.__showAnnChip).not.toHaveBeenCalled();
+    expect(window.__openNote).not.toHaveBeenCalled();
+  });
+
+  it('a click on plain (non-annotated) text opens nothing', () => {
+    const c = readingContainer('bible:test:1:2', 'plain unmarked verse text');
+    mount();
+    stubSelection(null);
+    act(() => { fire(c, 'click', { clientX: 10, clientY: 10 }); });
+    expect(window.__showAnnChip).not.toHaveBeenCalled();
+    expect(window.__openNote).not.toHaveBeenCalled();
   });
 
   it('routes a note mark to __openNote', () => {

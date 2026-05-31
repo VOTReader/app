@@ -9046,6 +9046,54 @@ Continue?`
           }, 350);
         }
       };
+      const routeAnnotationTap = (rawTarget, x, y) => {
+        const el = rawTarget && rawTarget.nodeType === 3 ? rawTarget.parentElement : rawTarget;
+        if (!el || !el.closest) return false;
+        const iconEl = el.closest(".hl-note-icon");
+        if (iconEl) {
+          const gids = (iconEl.getAttribute("data-group-ids") || iconEl.getAttribute("data-group-id") || "").split(",").filter(Boolean);
+          if (gids.length > 1 && window.__showMultiNote) {
+            window.__showMultiNote(gids, x, y);
+            return true;
+          }
+          if (gids.length === 1 && window.__openNote) {
+            window.__openNote(gids[0]);
+            return true;
+          }
+        }
+        const markEl = el.closest("mark.hl-mark");
+        if (!markEl) return false;
+        const groupId = markEl.getAttribute("data-group-id") || markEl.getAttribute("data-hl-id");
+        const kind = markEl.getAttribute("data-kind") || "highlight";
+        const containerEl = markEl.closest("[data-hl-key]");
+        const hlKey = containerEl ? containerEl.getAttribute("data-hl-key") : null;
+        if (!groupId || !hlKey) return false;
+        if (kind === "note") {
+          const overlapGids = /* @__PURE__ */ new Set([groupId]);
+          try {
+            document.elementsFromPoint(x, y).forEach(function(n) {
+              if (n.matches && n.matches('mark.hl-note[data-kind="note"]')) {
+                const g = n.getAttribute("data-group-id");
+                if (g) overlapGids.add(g);
+              }
+            });
+          } catch (_e) {
+          }
+          if (overlapGids.size > 1 && window.__showMultiNote) {
+            window.__showMultiNote([...overlapGids], x, y);
+            return true;
+          }
+          if (window.__openNote) {
+            window.__openNote(groupId);
+            return true;
+          }
+        }
+        if (window.__showAnnChip) {
+          window.__showAnnChip(x, y, hlKey, groupId);
+          return true;
+        }
+        return false;
+      };
       const onPointerDown = (e) => {
         if (toolbarRef.current && toolbarRef.current.contains(e.target)) return;
         tapTargetRef.current = e.target;
@@ -9060,100 +9108,52 @@ Continue?`
         const isCollapsed = !sel || sel.isCollapsed;
         const tapTarget = tapTargetRef.current;
         const pos2 = e && e.clientX ? { x: e.clientX, y: e.clientY } : tapPosRef.current;
-        if (isCollapsed && tapTarget) {
-          const el = tapTarget.nodeType === 3 ? tapTarget.parentElement : tapTarget;
-          const iconEl = el && el.closest(".hl-note-icon");
-          if (iconEl) {
-            const gids = (iconEl.getAttribute("data-group-ids") || iconEl.getAttribute("data-group-id") || "").split(",").filter(Boolean);
-            if (gids.length > 1 && window.__showMultiNote) {
-              window.__showMultiNote(gids, pos2.x, pos2.y);
-              return;
-            }
-            if (gids.length === 1 && window.__openNote) {
-              window.__openNote(gids[0]);
-              return;
-            }
-          }
-          const markEl = el && el.closest("mark.hl-mark");
-          if (markEl) {
-            const groupId = markEl.getAttribute("data-group-id") || markEl.getAttribute("data-hl-id");
-            const kind = markEl.getAttribute("data-kind") || "highlight";
-            const containerEl = markEl.closest("[data-hl-key]");
-            const hlKey = containerEl ? containerEl.getAttribute("data-hl-key") : null;
-            if (groupId && hlKey) {
-              if (kind === "note") {
-                const overlapGids = /* @__PURE__ */ new Set([groupId]);
-                try {
-                  const stack = document.elementsFromPoint(pos2.x, pos2.y);
-                  stack.forEach((n) => {
-                    if (n.matches && n.matches('mark.hl-note[data-kind="note"]')) {
-                      const g = n.getAttribute("data-group-id");
-                      if (g) overlapGids.add(g);
-                    }
-                  });
-                } catch (_e) {
-                }
-                if (overlapGids.size > 1 && window.__showMultiNote) {
-                  window.__showMultiNote([...overlapGids], pos2.x, pos2.y);
-                  return;
-                }
-                if (window.__openNote) {
-                  window.__openNote(groupId);
-                  return;
-                }
-              }
-              if (window.__showAnnChip) {
-                window.__showAnnChip(pos2.x, pos2.y + 12, hlKey, groupId);
-                return;
-              }
-            }
-          }
-        }
+        if (isCollapsed && tapTarget && routeAnnotationTap(tapTarget, pos2.x, pos2.y)) return;
         setTimeout(computeAndShow, 150);
       };
       const onContextMenu = (e) => {
         const hlContainer = e.target.closest("[data-hl-key]");
         if (hlContainer) e.preventDefault();
-        const iconEl = e.target.closest(".hl-note-icon");
-        if (iconEl) {
-          const gid = iconEl.getAttribute("data-group-id");
-          if (gid && window.__openNote) {
-            setVisible(false);
-            window.__openNote(gid);
-            return;
+        if (routeAnnotationTap(e.target, e.clientX, e.clientY)) {
+          setVisible(false);
+          try {
+            const s = window.getSelection();
+            if (s) s.removeAllRanges();
+          } catch (_e) {
           }
-        }
-        const mark = e.target.closest("mark.hl-mark");
-        if (mark) {
-          const groupId = mark.getAttribute("data-group-id") || mark.getAttribute("data-hl-id");
-          const kind = mark.getAttribute("data-kind") || "highlight";
-          const container = mark.closest("[data-hl-key]");
-          const hlKey = container ? container.getAttribute("data-hl-key") : null;
-          if (groupId && hlKey) {
-            setVisible(false);
-            if (kind === "note" && window.__openNote) {
-              window.__openNote(groupId);
-              return;
-            }
-            if (window.__showAnnChip) {
-              window.__showAnnChip(e.clientX, e.clientY, hlKey, groupId);
-              return;
-            }
-          }
+          return;
         }
         setTimeout(computeAndShow, 80);
+      };
+      const onClick = (e) => {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) return;
+        routeAnnotationTap(e.target, e.clientX || 0, e.clientY || 0);
+      };
+      window.__nativeTapAnnotation = (x, y) => {
+        try {
+          const el = document.elementFromPoint(x, y);
+          if (!el || !el.closest) return;
+          if (el.closest(".hl-note-icon")) return;
+          const markEl = el.closest("mark.hl-mark");
+          if (markEl) routeAnnotationTap(markEl, x, y);
+        } catch (_e) {
+        }
       };
       document.addEventListener("selectionchange", onSelectionChange);
       document.addEventListener("pointerdown", onPointerDown);
       document.addEventListener("pointerup", onPointerUp);
       document.addEventListener("touchend", onPointerUp);
       document.addEventListener("contextmenu", onContextMenu);
+      document.addEventListener("click", onClick);
       return () => {
         document.removeEventListener("selectionchange", onSelectionChange);
         document.removeEventListener("pointerdown", onPointerDown);
         document.removeEventListener("pointerup", onPointerUp);
         document.removeEventListener("touchend", onPointerUp);
         document.removeEventListener("contextmenu", onContextMenu);
+        document.removeEventListener("click", onClick);
+        window.__nativeTapAnnotation = null;
       };
     }, [computeOffset, findHlContainer]);
     const applyHighlight = React.useCallback((color) => {

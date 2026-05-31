@@ -140,6 +140,49 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       }
     };
 
+    // Shared tap/click routing for an EXISTING annotation: a note icon, a note
+    // mark (-> open note / multi-note popover), or a highlight/underline mark
+    // (-> the Remove/Color/Note action chip). Returns true if it handled the
+    // target. Used by the tap (pointerup), the click fallback (Android), and
+    // the long-press (contextmenu) paths so all three behave identically.
+    const routeAnnotationTap = (rawTarget, x, y) => {
+      const el = rawTarget && rawTarget.nodeType === 3 ? rawTarget.parentElement : rawTarget;
+      if (!el || !el.closest) return false;
+      // Note icon at end of a note span (or merged badge -> multi-note popover).
+      const iconEl = el.closest('.hl-note-icon');
+      if (iconEl) {
+        const gids = (iconEl.getAttribute('data-group-ids') || iconEl.getAttribute('data-group-id') || '').split(',').filter(Boolean);
+        if (gids.length > 1 && window.__showMultiNote) { window.__showMultiNote(gids, x, y); return true; }
+        if (gids.length === 1 && window.__openNote) { window.__openNote(gids[0]); return true; }
+      }
+      const markEl = el.closest('mark.hl-mark');
+      if (!markEl) return false;
+      const groupId = markEl.getAttribute('data-group-id') || markEl.getAttribute('data-hl-id');
+      const kind = markEl.getAttribute('data-kind') || 'highlight';
+      const containerEl = markEl.closest('[data-hl-key]');
+      const hlKey = containerEl ? containerEl.getAttribute('data-hl-key') : null;
+      if (!groupId || !hlKey) return false;
+      if (kind === 'note') {
+        // Look for OTHER overlapping note marks at this exact point.
+        const overlapGids = new Set([groupId]);
+        try {
+          document.elementsFromPoint(x, y).forEach(function(n) {
+            if (n.matches && n.matches('mark.hl-note[data-kind="note"]')) {
+              const g = n.getAttribute('data-group-id');
+              if (g) overlapGids.add(g);
+            }
+          });
+        } catch (_e) { /* DOM access - element may not exist or API unsupported */ }
+        if (overlapGids.size > 1 && window.__showMultiNote) { window.__showMultiNote([...overlapGids], x, y); return true; }
+        if (window.__openNote) { window.__openNote(groupId); return true; }
+      }
+      // Chip opens at its default position (the tap / long-press point). A tap
+      // creates no native selection handles, and the long-press path collapses
+      // the selection before this fires, so no downward offset is needed.
+      if (window.__showAnnChip) { window.__showAnnChip(x, y, hlKey, groupId); return true; }
+      return false;
+    };
+
     // Pointer/touch lifecycle: track drag state and commit on release
     const onPointerDown = (e) => {
       if (toolbarRef.current && toolbarRef.current.contains(e.target)) return;
@@ -159,45 +202,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // Notes route to NoteSheet (read mode); highlights/underlines route
       // to the action chip. Overlapping note marks at the tap point show
       // the multi-note disambiguation popover.
-      if (isCollapsed && tapTarget) {
-        const el = tapTarget.nodeType === 3 ? tapTarget.parentElement : tapTarget;
-        // Note icon at end of a note span — opens note (or multi-note popover
-        // if it's a merged badge icon) directly via the icon's own click handler
-        const iconEl = el && el.closest('.hl-note-icon');
-        if (iconEl) {
-          const gids = (iconEl.getAttribute('data-group-ids') || iconEl.getAttribute('data-group-id') || '').split(',').filter(Boolean);
-          if (gids.length > 1 && window.__showMultiNote) { window.__showMultiNote(gids, pos.x, pos.y); return; }
-          if (gids.length === 1 && window.__openNote) { window.__openNote(gids[0]); return; }
-        }
-        const markEl = el && el.closest('mark.hl-mark');
-        if (markEl) {
-          const groupId = markEl.getAttribute('data-group-id') || markEl.getAttribute('data-hl-id');
-          const kind = markEl.getAttribute('data-kind') || 'highlight';
-          const containerEl = markEl.closest('[data-hl-key]');
-          const hlKey = containerEl ? containerEl.getAttribute('data-hl-key') : null;
-          if (groupId && hlKey) {
-            if (kind === 'note') {
-              // Look for OTHER overlapping note marks at this exact tap point
-              const overlapGids = new Set([groupId]);
-              try {
-                const stack = document.elementsFromPoint(pos.x, pos.y);
-                stack.forEach(n => {
-                  if (n.matches && n.matches('mark.hl-note[data-kind="note"]')) {
-                    const g = n.getAttribute('data-group-id');
-                    if (g) overlapGids.add(g);
-                  }
-                });
-              } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
-              if (overlapGids.size > 1 && window.__showMultiNote) {
-                window.__showMultiNote([...overlapGids], pos.x, pos.y);
-                return;
-              }
-              if (window.__openNote) { window.__openNote(groupId); return; }
-            }
-            if (window.__showAnnChip) { window.__showAnnChip(pos.x, pos.y + 12, hlKey, groupId); return; }
-          }
-        }
-      }
+      if (isCollapsed && tapTarget && routeAnnotationTap(tapTarget, pos.x, pos.y)) return;
       setTimeout(computeAndShow, 150);
     };
 
@@ -205,24 +210,48 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const onContextMenu = (e) => {
       const hlContainer = e.target.closest('[data-hl-key]');
       if (hlContainer) e.preventDefault();
-      const iconEl = e.target.closest('.hl-note-icon');
-      if (iconEl) {
-        const gid = iconEl.getAttribute('data-group-id');
-        if (gid && window.__openNote) { setVisible(false); window.__openNote(gid); return; }
-      }
-      const mark = e.target.closest('mark.hl-mark');
-      if (mark) {
-        const groupId = mark.getAttribute('data-group-id') || mark.getAttribute('data-hl-id');
-        const kind = mark.getAttribute('data-kind') || 'highlight';
-        const container = mark.closest('[data-hl-key]');
-        const hlKey = container ? container.getAttribute('data-hl-key') : null;
-        if (groupId && hlKey) {
-          setVisible(false);
-          if (kind === 'note' && window.__openNote) { window.__openNote(groupId); return; }
-          if (window.__showAnnChip) { window.__showAnnChip(e.clientX, e.clientY, hlKey, groupId); return; }
-        }
+      if (routeAnnotationTap(e.target, e.clientX, e.clientY)) {
+        setVisible(false);
+        // A long-press creates a native text selection (the blue handles) right
+        // under the chip; collapse it so the OS handles don't intersect our
+        // "Remove / Color / Note" menu. The chip operates on the existing
+        // annotation (via hlKey/groupId), so it doesn't need the selection.
+        try { const s = window.getSelection(); if (s) s.removeAllRanges(); } catch (_e) { /* best-effort */ }
+        return;
       }
       setTimeout(computeAndShow, 80);
+    };
+
+    // Tap-to-open the action chip — the path differs by platform because a tap
+    // on a highlight <mark> fires different events on desktop vs Android:
+    //   - DESKTOP (mouse): `click` fires reliably on the mark, so onClick
+    //     routes it.
+    //   - ANDROID WebView: a tap on selectable <mark> text is consumed by the
+    //     native text-selection machinery, which emits NO `click` and NO
+    //     bubbling `touchend` (only a long-press, via the selection ActionMode,
+    //     used to reach the chip — what the user found annoying). So the native
+    //     side (MainActivity's GestureDetector) observes the tap WITHOUT
+    //     consuming it and calls window.__nativeTapAnnotation(cssX, cssY); we
+    //     hit-test that point and route the mark. Note/bookmark/link ICONS are
+    //     non-selectable, so they fire `click` on Android too and self-route —
+    //     the native hit-test skips them so they don't double-fire.
+    const onClick = (e) => {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed) return;  // mid-selection -> leave it to the toolbar
+      routeAnnotationTap(e.target, e.clientX || 0, e.clientY || 0);
+    };
+    // Android single-tap bridge (see onSingleTapUp in MainActivity.kt). Coords
+    // are CSS pixels. elementFromPoint hit-tests the tap: an icon already fires
+    // `click` natively (skip it); otherwise route the highlight/underline/note
+    // MARK to the chip — the case the WebView's selection layer swallows.
+    window.__nativeTapAnnotation = (x, y) => {
+      try {
+        const el = document.elementFromPoint(x, y);
+        if (!el || !el.closest) return;
+        if (el.closest('.hl-note-icon')) return;  // icon → its own click handler routes it
+        const markEl = el.closest('mark.hl-mark');
+        if (markEl) routeAnnotationTap(markEl, x, y);
+      } catch (_e) { /* hit-test best-effort; DOM may be mid-update */ }
     };
 
     document.addEventListener('selectionchange', onSelectionChange);
@@ -230,6 +259,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     document.addEventListener('pointerup', onPointerUp);
     document.addEventListener('touchend', onPointerUp);
     document.addEventListener('contextmenu', onContextMenu);
+    document.addEventListener('click', onClick);
 
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange);
@@ -237,6 +267,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       document.removeEventListener('pointerup', onPointerUp);
       document.removeEventListener('touchend', onPointerUp);
       document.removeEventListener('contextmenu', onContextMenu);
+      document.removeEventListener('click', onClick);
+      window.__nativeTapAnnotation = null;
     };
   }, [computeOffset, findHlContainer]);
 

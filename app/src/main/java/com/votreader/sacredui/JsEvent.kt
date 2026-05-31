@@ -11,9 +11,19 @@ package com.votreader.sacredui
  *   ImportFile            -> SettingsScreen.__onImportFile(b64OrNull)
  *   MicPermissionResult   -> JournalRecordingSheet.__onMicPermissionResult(granted)
  *   NativeRecordingComplete -> JournalRecordingSheet.__onNativeRecordingComplete(b64, durMs, mime)
+ *   AnnotationTap         -> SelectionToolbar.__nativeTapAnnotation(cssX, cssY)
  */
 sealed class JsEvent(val fn: String) {
     data object ImportFile : JsEvent("__onImportFile")
     data object MicPermissionResult : JsEvent("__onMicPermissionResult")
     data object NativeRecordingComplete : JsEvent("__onNativeRecordingComplete")
+
+    // A confirmed single tap on the WebView. Android WebView swallows taps
+    // on selectable <mark> text (the touch is reserved for native text
+    // selection), so a tap on a highlight never reaches the JS click/touch
+    // handlers -- only a long-press did. MainActivity's GestureDetector
+    // observes the tap without consuming it and forwards the CSS-pixel
+    // coordinates here; the JS side hit-tests the point and opens the
+    // annotation action chip. Coordinates are %.f numbers, never strings.
+    data object AnnotationTap : JsEvent("__nativeTapAnnotation")
 }

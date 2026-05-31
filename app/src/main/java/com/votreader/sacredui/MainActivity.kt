@@ -1,6 +1,7 @@
 package com.votreader.sacredui
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -12,7 +13,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import android.view.GestureDetector
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.PixelCopy
 import android.view.ViewGroup
 import android.view.Window
@@ -292,6 +295,11 @@ class MainActivity : AppCompatActivity(), BridgeHost {
      * they attach to a specific WebView; the back-press dispatcher stays in
      * onCreate (Activity-scoped, reads the [webView] field at fire time).
      */
+    // setOnTouchListener (below) feeds a GestureDetector but returns false --
+    // it never consumes the event, so the WebView keeps its own click +
+    // accessibility handling intact, and the ClickableViewAccessibility lint
+    // check (meant for views that swallow touches) doesn't apply here.
+    @SuppressLint("ClickableViewAccessibility")
     private fun createConfiguredWebView(): WebView {
         val wv = WebView(this)
 
@@ -586,6 +594,29 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 }
             }
         )
+
+        // Single-tap → open the annotation action chip. Android WebView routes
+        // a tap on selectable <mark> text into its native text-selection
+        // machinery, which emits NO `click` and NO bubbling `touchend`, so a
+        // plain tap on a highlight never reached the JS chip handler -- only a
+        // long-press (via the selection ActionMode) did, which the user found
+        // annoying. This GestureDetector observes the tap WITHOUT consuming it
+        // (the OnTouchListener returns false), converts device px → CSS px
+        // (zoom is disabled — setSupportZoom(false)/useWideViewPort(false) — so
+        // dividing by display density is exact), and asks the JS side to
+        // hit-test the point and open the chip. Because nothing is consumed,
+        // the existing selection / drag-to-create-highlight / scroll pipeline
+        // is byte-for-byte untouched: this is purely additive.
+        val tapDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                val density = resources.displayMetrics.density
+                if (density > 0f) {
+                    bridge.callOptional(JsEvent.AnnotationTap, e.x / density, e.y / density)
+                }
+                return false  // never consume — the tap still flows to the WebView
+            }
+        })
+        wv.setOnTouchListener { _, ev -> tapDetector.onTouchEvent(ev); false }
 
         return wv
     }
