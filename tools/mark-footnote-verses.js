@@ -73,7 +73,11 @@ function mark(ref, value) {
     const sub = value.slice(from);
     const hit = sub.search(rx);
     if (hit < 0) return null;
-    const pos = from + hit;
+    let pos = from + hit;
+    // The marker goes BEFORE any opening quote the verse begins with, so the
+    // quote stays in the verse's text and the marker stays whitespace-preceded
+    // (Strategy 0's lookbehind is whitespace-only by design).
+    while (pos > 0 && /[“‘"'(]/.test(value[pos - 1])) pos--;
     inserts.push({ pos, n });
     from = pos + 1;
   }

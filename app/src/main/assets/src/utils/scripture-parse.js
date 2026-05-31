@@ -160,7 +160,9 @@ export function splitIntoVerses(text, ref) {
 
   // Strategy 0 — explicit "N. text" markers. Lookbehind accepts any
   // whitespace (not just ". "), because verses often end with ";", ",",
-  // ":", "?" etc. and the fetcher joins them with a single space.
+  // ":", "?" etc. and the fetcher joins them with a single space. Markers
+  // always sit BEFORE any opening quote a verse begins with ("17. “But …"),
+  // so whitespace before the marker is sufficient.
   // Accept the LONGEST PREFIX of markers that matches verseNums in order.
   // Partial prefix handles truncated text (e.g. ExpandableVerse's 130-char
   // preview) correctly — we split on what markers we have instead of

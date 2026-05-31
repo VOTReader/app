@@ -16,7 +16,7 @@
  */
 
 const CACHE_VERSION = 'v1.0.2-52a1717368';
-const CORPUS_VERSION = 'c3'; // c2→c3 (2026-05-31): footnote verse-number normalization changed letters/WTLB corpus → bundle-a-vot; bust the stable corpus cache so web clients re-fetch the gold-marker data.
+const CORPUS_VERSION = 'c4'; // c3→c4 (2026-05-31): Luke 15:11-32 verse markers repositioned BEFORE their opening quotes (markers after a quote weren't detected by Strategy 0 → 17-32 rendered white); re-fetch the corrected corpus.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;

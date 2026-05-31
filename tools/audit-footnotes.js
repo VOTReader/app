@@ -141,5 +141,5 @@ for (const k of ['whiteBadKey', 'whiteFallback']) {
   for (const s of cats[k]) console.log(`  [${s.file}] "${s.ref}"\n      ${s.sample}\n`);
 }
 // Heuristic (render gold but guessed) — refs only for now.
-console.log(`\n=== goldHeuristic (${cats.goldHeuristic.length}) — refs ===`);
-for (const s of cats.goldHeuristic) console.log(`  [${s.file}] "${s.ref}"`);
+console.log(`\n=== goldHeuristic (${cats.goldHeuristic.length}) — FULL ===`);
+for (const s of cats.goldHeuristic) console.log(`  [${s.file}] "${s.ref}"\n      ${s.sample}\n`);
