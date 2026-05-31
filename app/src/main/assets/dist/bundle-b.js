@@ -334,7 +334,7 @@
   // app/src/main/assets/src/stores/idb-adapter.js
   var IDBAdapter = (function() {
     const DB_NAME = "votreader";
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
     const STORE_NAMES = Object.freeze([
       "vot-welcomed",
       "vot-about-seen",
@@ -353,6 +353,7 @@
       "vot-notes",
       "vot-links",
       "vot-home-order",
+      "vot-note-default",
       "meta"
     ]);
     const STORE_SET = new Set(STORE_NAMES);
@@ -1953,6 +1954,48 @@
             data[k] = { ...data[k], notebookIds: ids, updated: ts };
           }
         });
+        this._save();
+        this._bump();
+      }
+    }
+  );
+
+  // app/src/main/assets/src/stores/note-default-store.js
+  var NoteDefaultStore = extendStore(
+    CachedStore(
+      "vot-note-default",
+      /** @type {NoteDefault} */
+      { style: "highlight", color: "blank" },
+      { idb: true }
+    ),
+    {
+      /**
+       * The current note default. Always returns a well-formed shape even if
+       * the cache is empty/partial (cold start → blank highlight).
+       * @returns {NoteDefault}
+       */
+      get() {
+        const d = (
+          /** @type {any} */
+          this._load() || {}
+        );
+        return { style: d.style || "highlight", color: d.color || "blank" };
+      },
+      /**
+       * Replace the note default. Normalizes the pair: a non-highlight style
+       * can't be blank (squiggle/underline are always a visible color), so a
+       * blank color with such a style falls back to 'yellow'.
+       * @param {string} style
+       * @param {string} color
+       * @returns {void}
+       */
+      set(style, color) {
+        if (this._shouldDefer("set", style, color)) return;
+        const s = style || "highlight";
+        let c = color || "blank";
+        if (c === "blank" && s !== "highlight") c = "yellow";
+        this._cache = /** @type {any} */
+        { style: s, color: c };
         this._save();
         this._bump();
       }
@@ -10424,6 +10467,7 @@
     AnnotationStore: AnnotationStore2,
     HighlightStore,
     NoteStore: NoteStore2,
+    NoteDefaultStore,
     NotebookStore: NotebookStore2,
     RecentNavStore,
     hlId,

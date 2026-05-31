@@ -17,7 +17,9 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   const ann = (AnnotationStore.get(hlKey) || []).find(h => h.groupId === groupId);
   if (!ann) return null;
   const kind = ann.kind || 'highlight';
-  const kindLabel = kind === 'underline' ? 'underline' : 'highlight';
+  const kindLabel = kind === 'underline' ? 'underline' : kind === 'squiggle' ? 'squiggle' : 'highlight';
+  // Note-ness is a NoteStore entry, not the kind.
+  const isNote = typeof NoteStore !== 'undefined' && !!NoteStore.get(groupId);
 
   // Width estimate by mode for viewport clamping
   const widthByMode = { main: 200, confirm: 280, colors: 320 };
@@ -33,17 +35,21 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
 
   const recolor = (color) => {
     AnnotationStore.recolorGroup(groupId, color);
-    if (kind === 'note') NoteStore.update(groupId, { color });
+    if (isNote) NoteStore.update(groupId, { color });
     onClose();
   };
 
   const convertToNote = () => {
-    AnnotationStore.convertGroup(groupId, 'note');
-    // Build note record from the group's segments
+    // Attach a note to this mark — keep its current style + color (note-ness
+    // is a NoteStore entry now, so no kind change). Record it as the next
+    // note's default, then open the sheet to write the body.
     const segs = AnnotationStore.getByGroup(groupId);
     const fullText = segs.map(s => s.ann.text || '').join(' … ');
     const keys = [...new Set(segs.map(s => s.key))];
     NoteStore.set(groupId, { color: ann.color, fullText, keys, body: '' });
+    if (typeof NoteDefaultStore !== 'undefined') {
+      NoteDefaultStore.set(kind === 'note' ? 'highlight' : kind, ann.color);
+    }
     onClose();
     if (onNoteRequest) onNoteRequest(groupId, /*startInEditMode=*/true);
   };
@@ -87,7 +93,7 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
               </svg>
               <span>Color</span>
             </button>
-            {kind !== 'note' && (
+            {!isNote && (
               <button
                 className="ann-chip-btn"
                 onClick={convertToNote}

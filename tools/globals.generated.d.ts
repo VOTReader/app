@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 390 distinct identifiers.
+// Total: 391 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -157,6 +157,7 @@ declare const MatthewChapterView: any;
 declare const ModeToggle: any;
 declare const MultiNotePopover: any;
 declare const NavButtons: any;
+declare const NoteDefaultStore: any;
 declare const NoteRow: any;
 declare const NoteSheet: any;
 declare const NoteStore: any;

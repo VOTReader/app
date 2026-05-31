@@ -2327,60 +2327,25 @@
     .verse-text { position: relative; }
 
     /* ══════════════════════════════════════════════════════════════
-       NOTE KIND — distinct visual from highlight/underline.
-       Default appearance: TEXT IS UNADORNED. Only the trailing 📝 icon
-       (.hl-note-icon) marks where a note exists. The text under the
-       note lights up with a colored tint + left ribbon ONLY while the
-       NoteSheet for that note is open (.hl-note.is-active). This keeps
-       the reading surface clean and reveals anchor text on demand.
-       Multi-segment notes share one groupId; first/last segment classes
-       are still rendered so active-state styling has anchor points.
+       NOTE MARKER — .hl-note flags that a mark's group has an attached
+       note. It drives the trailing 📝 icon (applyNoteIcons) and the
+       active-while-open emphasis. A note's VISUAL is now its own style
+       class (hl-underline / hl-squiggle / hl-<color>), or blank (hl-blank)
+       for a note with no visual overhead. While the note's sheet is open
+       (.is-active) the anchor text gets a faint gold wash so you can see
+       which text the open note belongs to — independent of its style.
+       Multi-segment notes share one groupId; first/last-segment classes
+       are still rendered as anchor points.
        ════════════════════════════════════════════════════════════ */
-    .hl-note {
-      color: inherit;
-      transition: text-decoration-color 0.18s ease;
-    }
-    /* Inactive notes are visually plain — text reads normal. The only
-       indicator is the trailing 📝 icon (placed once per group, after
-       the very last segment, by applyNoteIcons). Suppress the .hl-{color}
-       background that would otherwise inherit from the highlight palette. */
-    .hl-note:not(.is-active) {
-      background: transparent !important;
-      border-left: 0 !important;
-      padding-left: 0 !important;
-      text-decoration: none !important;
-    }
-    /* Active state: NoteSheet for this note's groupId is open.
-       Wavy underline in the note's color — clearly distinct from a
-       highlight (solid bg) and from an underline (solid bottom border).
-       Reads as "annotation marker" and shows exactly which text is
-       anchored to the open note. */
+    .hl-note { color: inherit; }
     .hl-note.is-active {
-      background: transparent !important;
-      border-left: 0 !important;
-      padding-left: 0 !important;
-      text-decoration-line: underline !important;
-      text-decoration-style: wavy !important;
-      text-decoration-thickness: 1.6px !important;
-      text-underline-offset: 3px;
-      text-decoration-skip-ink: none;
+      background: var(--gold-faint) !important;
+      border-radius: 2px;
     }
-    /* Per-color rules — longhand-only. !important is NOT needed: the base
-       .hl-note.is-active rule uses longhands (line/style/thickness) not the
-       text-decoration shorthand, so there's no implicit currentColor
-       expansion to override. Per-color specificity (3 classes) beats the
-       base (2 classes) on its own. Empirically verified Q6.8. */
-    .hl-note.is-active.hl-yellow { text-decoration-color: var(--hl-yellow); }
-    .hl-note.is-active.hl-green  { text-decoration-color: var(--hl-green); }
-    .hl-note.is-active.hl-pink   { text-decoration-color: var(--hl-pink); }
-    .hl-note.is-active.hl-red    { text-decoration-color: var(--hl-red); }
-    .hl-note.is-active.hl-orange { text-decoration-color: var(--hl-orange); }
-    .hl-note.is-active.hl-blue   { text-decoration-color: var(--hl-blue); }
-    .hl-note.is-active.hl-purple { text-decoration-color: var(--hl-purple); }
-    .hl-note.is-active.hl-teal   { text-decoration-color: var(--hl-teal); }
-    .hl-note.is-active.hl-brown  { text-decoration-color: var(--hl-brown); }
-    .hl-note.is-active.hl-gray   { text-decoration-color: var(--hl-gray); }
-    .hl-note.is-active.hl-cyan   { text-decoration-color: var(--hl-teal); }
+    /* Blank color — a note (or highlight) with no visual mark at all; only
+       the note icon shows. No background, no decoration (no !important, so
+       the .hl-note.is-active gold wash still shows the anchor when open). */
+    .hl-blank { background: none; }
     /* Trailing note icon — appears once per note group, after the
        last segment. Inline-block so it sits on the baseline; small
        enough not to disrupt line-height. */
@@ -2636,6 +2601,28 @@
       font-size: 14px; font-weight: 600;
     }
     .sel-color-clear:active { background: rgba(244,143,177,0.2); border-color: var(--accent-pink) !important; color: var(--accent-pink); }
+    /* Blank ("no color") swatch — outline circle + diagonal slash (the
+       universal "none" glyph). Shown in the note + chip color rows only when
+       the Highlight style is active; squiggle/underline are always a visible
+       color, so blank never appears there. Distinct from the underline/
+       squiggle rings (no slash) and from solid highlight fills. */
+    .sel-color-btn[data-color="blank"], .ann-chip-color-btn[data-color="blank"] {
+      background: transparent !important;
+      border: 2px solid var(--cream-dim) !important;
+      position: relative; overflow: hidden;
+    }
+    .sel-color-btn[data-color="blank"]::after, .ann-chip-color-btn[data-color="blank"]::after {
+      content: ''; position: absolute; left: 50%; top: 50%;
+      width: 2px; height: 150%; background: var(--cream-dim);
+      transform: translate(-50%, -50%) rotate(45deg);
+    }
+    /* Side-scroll cue — fade the right edge of the color strips so it's clear
+       the palette continues off-screen (the colors overflow horizontally on
+       a phone). Applied to all three color rows for consistency. */
+    .sel-toolbar-colors, .ann-chip-colors, .note-sheet-menu-colors {
+      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+      mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+    }
     /* Action button row: 5 buttons, equal-width grid */
     .sel-toolbar-actions {
       display: grid; grid-template-columns: repeat(5, 1fr);
@@ -3294,11 +3281,12 @@
       padding: 12px 14px;
       flex-wrap: wrap;
     }
-    /* Inline color row — always visible in edit mode so users can pick
-       a color without first tapping the dot then a menu item. */
-    .note-edit-colors {
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    /* Edit-mode style + color picker (mirrors the selection toolbar): the 3
+       style buttons + a divider + the horizontally-scrolling color row. */
+    .note-edit-style-row {
+      display: flex; align-items: center; gap: 6px;
       padding: 4px 16px 10px;
+      min-width: 0;
     }
     /* Notebook row in edit mode — tappable, shows current assignment */
     .note-edit-nb-row {
@@ -3661,11 +3649,14 @@
       margin-left: auto;
       flex-shrink: 0;
     }
+    /* No CSS clamp — short/medium notes show in FULL; only text past the
+       JrnExpandable char threshold (160) collapses behind "Show more". A
+       visual line-clamp here would re-open the "donut hole" (clipped with an
+       ellipsis but under the char threshold, so no Show-more button). */
     .note-row-preview {
       font-family: 'EB Garamond', serif; font-size: 0.95rem;
       color: var(--cream); line-height: 1.4;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-      overflow: hidden;
+      overflow-wrap: break-word; word-break: break-word;
     }
     /* When the preview is wrapped in JrnExpandable, the truncation is
        handled in JS (head + …); revert the line-clamp so the toggle
@@ -3673,12 +3664,13 @@
     .note-row-preview-expandable {
       display: block; -webkit-line-clamp: unset; overflow: visible;
     }
+    /* Same as .note-row-preview — no clamp; the anchor shows in full until
+       the JrnExpandable threshold, then collapses behind "Show more". */
     .note-row-anchor {
       font-family: 'EB Garamond', serif; font-style: italic;
       font-size: 0.82rem; color: var(--cream-muted);
       line-height: 1.4;
-      display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
-      overflow: hidden;
+      overflow-wrap: break-word; word-break: break-word;
     }
     .note-row-anchor-expandable {
       display: block; -webkit-line-clamp: unset; overflow: visible;

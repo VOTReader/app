@@ -276,6 +276,8 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     const mark = c.querySelector('mark.hl-mark');
     mount();
     stubSelection(null);
+    // Note-ness is a NoteStore entry now (not data-kind) — make g2 a note.
+    /** @type {any} */ (globalThis).NoteStore.get = (g) => (g === 'g2' ? { groupId: 'g2' } : null);
     /** @type {any} */ let ev;
     act(() => { ev = fire(mark, 'contextmenu', { clientX: 10, clientY: 10 }); });
     expect(ev.defaultPrevented).toBe(true);

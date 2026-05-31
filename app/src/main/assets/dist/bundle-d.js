@@ -8324,18 +8324,31 @@ Continue?`
     const cancelEdit = () => {
       setBody(note.body || "");
       if (startInEditMode && !note.body) {
-        AnnotationStore.convertGroup(groupId, "highlight");
+        AnnotationStore.removeGroup(groupId);
         NoteStore.remove(groupId);
         onClose();
         return;
       }
       setMode("read");
     };
+    const _segKind = segs[0] && segs[0].ann ? segs[0].ann.kind : "highlight";
+    const curStyle = _segKind === "underline" || _segKind === "squiggle" ? _segKind : "highlight";
     const recolor = (c) => {
       AnnotationStore.recolorGroup(groupId, c);
       NoteStore.update(groupId, { color: c });
+      if (typeof NoteDefaultStore !== "undefined") NoteDefaultStore.set(curStyle, c);
       setShowColors(false);
       setMenuOpen(false);
+    };
+    const setStyle = (style) => {
+      AnnotationStore.convertGroup(groupId, style);
+      let c = color;
+      if (style !== "highlight" && c === "blank") {
+        c = "yellow";
+        AnnotationStore.recolorGroup(groupId, c);
+        NoteStore.update(groupId, { color: c });
+      }
+      if (typeof NoteDefaultStore !== "undefined") NoteDefaultStore.set(style, c);
     };
     const remove = () => {
       AnnotationStore.removeGroup(groupId);
@@ -8385,7 +8398,15 @@ Continue?`
         "aria-label": "Options"
       },
       /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24", fill: "currentColor" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "5", r: "1.7" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "1.7" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "19", r: "1.7" }))
-    )), showColors ? /* @__PURE__ */ React.createElement("div", { className: "note-sheet-menu-colors" }, /* @__PURE__ */ React.createElement("button", { className: "ann-chip-back", onClick: () => setShowColors(false), title: "Back" }, "\u2039"), HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
+    )), showColors ? /* @__PURE__ */ React.createElement("div", { className: "note-sheet-menu-colors" }, /* @__PURE__ */ React.createElement("button", { className: "ann-chip-back", onClick: () => setShowColors(false), title: "Back" }, "\u2039"), curStyle === "highlight" && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ann-chip-color-btn" + (color === "blank" ? " active" : ""),
+        "data-color": "blank",
+        onClick: () => recolor("blank"),
+        title: "No color (icon only)"
+      }
+    ), HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key: c,
@@ -8394,16 +8415,24 @@ Continue?`
         onClick: () => recolor(c),
         title: c
       }
-    ))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "note-sheet-anchor" }, "\u201C", truncatedAnchor, "\u201D"), mode === "read" && (note.updated || note.created) && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-date" }, relativeDate(note.updated || note.created)), mode === "edit" && /* @__PURE__ */ React.createElement("div", { className: "note-edit-colors" }, HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
+    ))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "note-sheet-anchor" }, "\u201C", truncatedAnchor, "\u201D"), mode === "read" && (note.updated || note.created) && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-date" }, relativeDate(note.updated || note.created)), mode === "edit" && /* @__PURE__ */ React.createElement("div", { className: "note-edit-style-row" }, /* @__PURE__ */ React.createElement("button", { className: "sel-style-btn" + (curStyle === "highlight" ? " active" : ""), onClick: () => setStyle("highlight"), title: "Highlight" }, "A"), /* @__PURE__ */ React.createElement("button", { className: "sel-style-btn sel-style-btn-underline" + (curStyle === "underline" ? " active" : ""), onClick: () => setStyle("underline"), title: "Underline" }, "A"), /* @__PURE__ */ React.createElement("button", { className: "sel-style-btn sel-style-btn-squiggle" + (curStyle === "squiggle" ? " active" : ""), onClick: () => setStyle("squiggle"), title: "Squiggle underline" }, "A"), /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-divider" }), /* @__PURE__ */ React.createElement("div", { className: "sel-toolbar-colors" }, curStyle === "highlight" && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "sel-color-btn" + (color === "blank" ? " active" : ""),
+        "data-color": "blank",
+        onClick: () => recolor("blank"),
+        title: "No color (icon only)"
+      }
+    ), HL_COLORS.map((c) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key: c,
-        className: "ann-chip-color-btn" + (color === c ? " active" : ""),
+        className: "sel-color-btn sel-color-" + curStyle + (color === c ? " active" : ""),
         "data-color": c,
         onClick: () => recolor(c),
         title: c
       }
-    ))), mode === "read" && (note.notebookIds || []).length > 0 && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-nb-chips" }, (note.notebookIds || []).map((id) => {
+    )))), mode === "read" && (note.notebookIds || []).length > 0 && /* @__PURE__ */ React.createElement("div", { className: "note-sheet-nb-chips" }, (note.notebookIds || []).map((id) => {
       const nb = NotebookStore.get(id);
       if (!nb) return null;
       return /* @__PURE__ */ React.createElement("span", { key: id, className: "note-sheet-nb-chip" }, /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("path", { d: "M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" }), /* @__PURE__ */ React.createElement("polyline", { points: "15 4 15 9 20 9" })), nb.name);
@@ -9064,17 +9093,17 @@ Continue?`
         const markEl = el.closest("mark.hl-mark");
         if (!markEl) return false;
         const groupId = markEl.getAttribute("data-group-id") || markEl.getAttribute("data-hl-id");
-        const kind = markEl.getAttribute("data-kind") || "highlight";
         const containerEl = markEl.closest("[data-hl-key]");
         const hlKey = containerEl ? containerEl.getAttribute("data-hl-key") : null;
         if (!groupId || !hlKey) return false;
-        if (kind === "note") {
+        const isNote = typeof NoteStore !== "undefined" && !!NoteStore.get(groupId);
+        if (isNote) {
           const overlapGids = /* @__PURE__ */ new Set([groupId]);
           try {
             document.elementsFromPoint(x, y).forEach(function(n) {
-              if (n.matches && n.matches('mark.hl-note[data-kind="note"]')) {
+              if (n.matches && n.matches("mark.hl-note[data-group-id]")) {
                 const g = n.getAttribute("data-group-id");
-                if (g) overlapGids.add(g);
+                if (g && (typeof NoteStore === "undefined" || NoteStore.get(g))) overlapGids.add(g);
               }
             });
           } catch (_e) {
@@ -9279,28 +9308,29 @@ Continue?`
     const handleNote = React.useCallback(() => {
       if (!selInfo) return;
       if (typeof StorageHealth !== "undefined" && StorageHealth.checkFirstDataCreation().shouldBlock) return;
+      const def = typeof NoteDefaultStore !== "undefined" ? NoteDefaultStore.get() : { style: "highlight", color: "blank" };
+      const _hasNote = (gid) => typeof NoteStore !== "undefined" && !!NoteStore.get(gid);
       const sel = window.getSelection();
       const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
       let groupId;
       if (selInfo.multiVerse) {
         const containers = selInfo.multiContainers || (range ? Array.from(document.querySelectorAll("[data-hl-key]")).filter((c) => range.intersectsNode(c)) : []);
-        let convertTarget = null;
+        let attachTarget = null;
         containers.forEach(function(container) {
-          if (convertTarget) return;
+          if (attachTarget) return;
           var hlKey = container.dataset.hlKey;
           var containerLen = container.textContent.length;
           var start = range && container.contains(range.startContainer) ? computeOffset(container, range.startContainer, range.startOffset) : 0;
           var end = range && container.contains(range.endContainer) ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
           AnnotationStore.get(hlKey).forEach(function(h) {
-            if (convertTarget) return;
-            if (h.start < end && h.end > start && h.kind !== "note" && h.groupId) {
-              convertTarget = h.groupId;
+            if (attachTarget) return;
+            if (h.start < end && h.end > start && h.groupId && !_hasNote(h.groupId)) {
+              attachTarget = h.groupId;
             }
           });
         });
-        if (convertTarget) {
-          AnnotationStore.convertGroup(convertTarget, "note");
-          groupId = convertTarget;
+        if (attachTarget) {
+          groupId = attachTarget;
         } else {
           groupId = hlId();
           containers.forEach(function(container) {
@@ -9314,10 +9344,10 @@ Continue?`
             AnnotationStore.add(hlKey, {
               id: hlId(),
               groupId,
-              kind: "note",
+              kind: def.style,
               start: snap.start,
               end: snap.end,
-              color: "yellow",
+              color: def.color,
               text: containerText.slice(snap.start, snap.end),
               created: Date.now()
             });
@@ -9333,10 +9363,9 @@ Continue?`
           return;
         }
         const existing = AnnotationStore.get(selInfo.hlKey).find(
-          (h) => h.start <= snap.start && h.end >= snap.end && h.kind !== "note"
+          (h) => h.start <= snap.start && h.end >= snap.end && h.groupId && !_hasNote(h.groupId)
         );
         if (existing) {
-          AnnotationStore.convertGroup(existing.groupId, "note");
           groupId = existing.groupId;
         } else {
           const id = hlId();
@@ -9344,10 +9373,10 @@ Continue?`
           AnnotationStore.add(selInfo.hlKey, {
             id,
             groupId: id,
-            kind: "note",
+            kind: def.style,
             start: snap.start,
             end: snap.end,
-            color: "yellow",
+            color: def.color,
             text: containerText.slice(snap.start, snap.end),
             created: Date.now()
           });
@@ -9363,7 +9392,7 @@ Continue?`
       const keys = [...new Set(segs.map((s) => s.key))];
       const existingNote = NoteStore.get(groupId);
       NoteStore.set(groupId, {
-        color: segs[0] ? segs[0].ann.color : "yellow",
+        color: segs[0] ? segs[0].ann.color : def.color,
         fullText,
         keys,
         body: existingNote ? existingNote.body : ""
@@ -9560,7 +9589,8 @@ Continue?`
     const ann = (AnnotationStore.get(hlKey) || []).find((h) => h.groupId === groupId);
     if (!ann) return null;
     const kind = ann.kind || "highlight";
-    const kindLabel = kind === "underline" ? "underline" : "highlight";
+    const kindLabel = kind === "underline" ? "underline" : kind === "squiggle" ? "squiggle" : "highlight";
+    const isNote = typeof NoteStore !== "undefined" && !!NoteStore.get(groupId);
     const widthByMode = { main: 200, confirm: 280, colors: 320 };
     const cw = widthByMode[mode] || 200;
     const cx = Math.max(8, Math.min(x - cw / 2, window.innerWidth - cw - 8));
@@ -9572,15 +9602,17 @@ Continue?`
     };
     const recolor = (color) => {
       AnnotationStore.recolorGroup(groupId, color);
-      if (kind === "note") NoteStore.update(groupId, { color });
+      if (isNote) NoteStore.update(groupId, { color });
       onClose();
     };
     const convertToNote = () => {
-      AnnotationStore.convertGroup(groupId, "note");
       const segs = AnnotationStore.getByGroup(groupId);
       const fullText = segs.map((s) => s.ann.text || "").join(" \u2026 ");
       const keys = [...new Set(segs.map((s) => s.key))];
       NoteStore.set(groupId, { color: ann.color, fullText, keys, body: "" });
+      if (typeof NoteDefaultStore !== "undefined") {
+        NoteDefaultStore.set(kind === "note" ? "highlight" : kind, ann.color);
+      }
       onClose();
       if (onNoteRequest) onNoteRequest(
         groupId,
@@ -9623,7 +9655,7 @@ Continue?`
         },
         /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "8" }), /* @__PURE__ */ React.createElement("circle", { cx: "8", cy: "9", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "16", cy: "9", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "17", cy: "14", r: "1.4", fill: "currentColor", stroke: "none" })),
         /* @__PURE__ */ React.createElement("span", null, "Color")
-      ), kind !== "note" && /* @__PURE__ */ React.createElement(
+      ), !isNote && /* @__PURE__ */ React.createElement(
         "button",
         {
           className: "ann-chip-btn",

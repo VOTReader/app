@@ -158,18 +158,21 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const markEl = el.closest('mark.hl-mark');
       if (!markEl) return false;
       const groupId = markEl.getAttribute('data-group-id') || markEl.getAttribute('data-hl-id');
-      const kind = markEl.getAttribute('data-kind') || 'highlight';
       const containerEl = markEl.closest('[data-hl-key]');
       const hlKey = containerEl ? containerEl.getAttribute('data-hl-key') : null;
       if (!groupId || !hlKey) return false;
-      if (kind === 'note') {
+      // Note-ness is a NoteStore entry now, not the kind. A mark whose group
+      // has a note opens the note sheet; a highlight/underline/squiggle WITHOUT
+      // a note falls through to the action chip below.
+      const isNote = typeof NoteStore !== 'undefined' && !!NoteStore.get(groupId);
+      if (isNote) {
         // Look for OTHER overlapping note marks at this exact point.
         const overlapGids = new Set([groupId]);
         try {
           document.elementsFromPoint(x, y).forEach(function(n) {
-            if (n.matches && n.matches('mark.hl-note[data-kind="note"]')) {
+            if (n.matches && n.matches('mark.hl-note[data-group-id]')) {
               const g = n.getAttribute('data-group-id');
-              if (g) overlapGids.add(g);
+              if (g && (typeof NoteStore === 'undefined' || NoteStore.get(g))) overlapGids.add(g);
             }
           });
         } catch (_e) { /* DOM access - element may not exist or API unsupported */ }
@@ -401,21 +404,25 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   const handleNote = React.useCallback(() => {
     if (!selInfo) return;
     if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
-    // Default note color = yellow. If selection sits inside an existing
-    // group, convert that group to a note (preserving color); otherwise
-    // create a new note-kind annotation across the selected range(s).
+    // New notes use the last-used note default (style + color); the cold-start
+    // default is a BLANK highlight (invisible mark + just the icon — a note
+    // with no visual overhead). Note-ness is a NoteStore entry, NOT the kind,
+    // so we never stamp kind:'note' anymore — a note is a highlight/underline/
+    // squiggle (or blank) that ALSO has a NoteStore record.
+    const def = (typeof NoteDefaultStore !== 'undefined')
+      ? NoteDefaultStore.get() : { style: 'highlight', color: 'blank' };
+    const _hasNote = (gid) => typeof NoteStore !== 'undefined' && !!NoteStore.get(gid);
     const sel = window.getSelection();
     const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     let groupId;
     if (selInfo.multiVerse) {
       const containers = selInfo.multiContainers ||
         (range ? Array.from(document.querySelectorAll('[data-hl-key]')).filter(c => range.intersectsNode(c)) : []);
-      // Look for an OVERLAPPING non-note group within the selection range.
-      // If found, convert it (highlight/underline → note). Notes always
-      // stack — never convert an existing note; create a new one alongside.
-      let convertTarget = null;
+      // Attach to an OVERLAPPING group that doesn't already have a note (keeps
+      // its existing style/color); otherwise create a new group at the default.
+      let attachTarget = null;
       containers.forEach(function(container) {
-        if (convertTarget) return;
+        if (attachTarget) return;
         var hlKey = container.dataset.hlKey;
         var containerLen = container.textContent.length;
         var start = range && container.contains(range.startContainer)
@@ -423,15 +430,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         var end = range && container.contains(range.endContainer)
           ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
         AnnotationStore.get(hlKey).forEach(function(h) {
-          if (convertTarget) return;
-          if (h.start < end && h.end > start && h.kind !== 'note' && h.groupId) {
-            convertTarget = h.groupId;
+          if (attachTarget) return;
+          if (h.start < end && h.end > start && h.groupId && !_hasNote(h.groupId)) {
+            attachTarget = h.groupId;
           }
         });
       });
-      if (convertTarget) {
-        AnnotationStore.convertGroup(convertTarget, 'note');
-        groupId = convertTarget;
+      if (attachTarget) {
+        groupId = attachTarget;
       } else {
         groupId = hlId();
         containers.forEach(function(container) {
@@ -445,17 +451,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           var snap = snapRangeToWords(containerText, rawStart, rawEnd);
           if (snap.start >= snap.end) return;
           AnnotationStore.add(hlKey, {
-            id: hlId(), groupId: groupId, kind: 'note',
-            start: snap.start, end: snap.end, color: 'yellow',
+            id: hlId(), groupId: groupId, kind: def.style,
+            start: snap.start, end: snap.end, color: def.color,
             text: containerText.slice(snap.start, snap.end),
             created: Date.now()
           });
         });
       }
     } else {
-      // Single-container: snap to word boundaries, then look for any
-      // OVERLAPPING non-note covering group to convert; otherwise create
-      // new (allowing stacking with existing notes on the same range).
+      // Single-container: snap to word boundaries, then attach to any
+      // OVERLAPPING covering group that lacks a note; otherwise create new
+      // at the default (allowing stacking with existing notes on the range).
       const container = document.querySelector('[data-hl-key="' + selInfo.hlKey.replace(/"/g, '\\"') + '"]');
       const containerText = container ? container.textContent : selInfo.text;
       const snap = snapRangeToWords(containerText, selInfo.start, selInfo.end);
@@ -467,18 +473,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         return;
       }
       const existing = AnnotationStore.get(selInfo.hlKey).find(h =>
-        h.start <= snap.start && h.end >= snap.end && h.kind !== 'note'
+        h.start <= snap.start && h.end >= snap.end && h.groupId && !_hasNote(h.groupId)
       );
       if (existing) {
-        AnnotationStore.convertGroup(existing.groupId, 'note');
         groupId = existing.groupId;
       } else {
         const id = hlId();
         groupId = id;
         AnnotationStore.add(selInfo.hlKey, {
-          id: id, groupId: id, kind: 'note',
+          id: id, groupId: id, kind: def.style,
           start: snap.start, end: snap.end,
-          color: 'yellow', text: containerText.slice(snap.start, snap.end),
+          color: def.color, text: containerText.slice(snap.start, snap.end),
           created: Date.now()
         });
       }
@@ -495,7 +500,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const keys = [...new Set(segs.map(s => s.key))];
     const existingNote = NoteStore.get(groupId);
     NoteStore.set(groupId, {
-      color: segs[0] ? segs[0].ann.color : 'yellow',
+      color: segs[0] ? segs[0].ann.color : def.color,
       fullText, keys,
       body: existingNote ? existingNote.body : ''
     });

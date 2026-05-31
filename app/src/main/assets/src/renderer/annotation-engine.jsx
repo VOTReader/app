@@ -25,15 +25,25 @@ export function snapRangeToWords(text, start, end) {
 
 /* Build the className for a mark based on annotation kind. */
 function annMarkClass(ann, isFirst, isLast) {
-  const kind = ann.kind || 'highlight';
-  if (kind === 'note') {
-    return 'hl-mark hl-note hl-' + ann.color +
-      (isFirst ? ' first-segment' : '') +
-      (isLast ? ' last-segment' : '');
+  let kind = ann.kind || 'highlight';
+  let color = ann.color;
+  // Legacy notes (kind==='note') rendered invisible — alias to a blank
+  // highlight. Note-ness is now a NoteStore entry, NOT the kind: any
+  // highlight/underline/squiggle can carry a note (shows the icon + opens
+  // the sheet), and a note's visual is just its style + color (or blank).
+  if (kind === 'note') { kind = 'highlight'; color = 'blank'; }
+  const hasNote = ann.kind === 'note' ||
+    (typeof NoteStore !== 'undefined' && !!NoteStore.get(ann.groupId));
+  let cls = 'hl-mark';
+  if (kind === 'underline') cls += ' hl-underline';
+  else if (kind === 'squiggle') cls += ' hl-squiggle';
+  cls += (color && color !== 'blank') ? (' hl-' + color) : ' hl-blank';
+  if (hasNote) {
+    cls += ' hl-note';
+    if (isFirst) cls += ' first-segment';
+    if (isLast) cls += ' last-segment';
   }
-  if (kind === 'underline') return 'hl-mark hl-underline hl-' + ann.color;
-  if (kind === 'squiggle') return 'hl-mark hl-squiggle hl-' + ann.color;
-  return 'hl-mark hl-' + ann.color;
+  return cls;
 }
 
 /* HighlightableText renders text with overlap-aware nested marks via a
@@ -48,6 +58,12 @@ export function HighlightableText({ text, hlKey }) {
   React.useSyncExternalStore(
     React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
     () => AnnotationStore.getVersion()
+  );
+  // Also re-render when notes change — a mark's has-note class (the icon +
+  // active marker) depends on whether its group has a NoteStore entry.
+  React.useSyncExternalStore(
+    React.useCallback((cb) => NoteStore.subscribe(cb), []),
+    () => NoteStore.getVersion()
   );
   const annotations = AnnotationStore.get(hlKey);
   if (!text) return null;
@@ -277,6 +293,12 @@ export function applyDOMHighlights() {
       var isFirst = seenIdx === 0;
       groupSeen[ann.groupId] = seenIdx + 1;
       var kind = ann.kind || 'highlight';
+      var color = ann.color;
+      // Legacy notes (kind==='note') rendered invisible — alias to a blank
+      // highlight. Note-ness is now a NoteStore entry, not the kind.
+      if (kind === 'note') { kind = 'highlight'; color = 'blank'; }
+      var hasNote = ann.kind === 'note' ||
+        (typeof NoteStore !== 'undefined' && !!NoteStore.get(ann.groupId));
 
       var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
       var textNodes = [];
@@ -298,10 +320,11 @@ export function applyDOMHighlights() {
         if (localEnd < tNode.length) tNode.splitText(localEnd);
         var midNode = localStart > 0 ? tNode.splitText(localStart) : tNode;
         var m = document.createElement('mark');
-        var cls = 'hl-mark hl-dom hl-' + ann.color;
+        var cls = 'hl-mark hl-dom';
         if (kind === 'underline') cls += ' hl-underline';
         else if (kind === 'squiggle') cls += ' hl-squiggle';
-        else if (kind === 'note') {
+        cls += (color && color !== 'blank') ? (' hl-' + color) : ' hl-blank';
+        if (hasNote) {
           cls += ' hl-note';
           if (isFirst && ti === textNodes.findIndex(function(x) { return Math.max(ann.start, x.start) < Math.min(ann.end, x.end); })) cls += ' first-segment';
         }
@@ -313,7 +336,7 @@ export function applyDOMHighlights() {
         m.appendChild(midNode);
         lastMark = m;
       }
-      if (kind === 'note' && lastMark) lastMark.classList.add('last-segment');
+      if (hasNote && lastMark) lastMark.classList.add('last-segment');
       if (lastMark) {
         var fullText = container.textContent;
         var lastCh = fullText.charAt(ann.end - 1);

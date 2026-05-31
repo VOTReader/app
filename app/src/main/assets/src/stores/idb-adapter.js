@@ -52,12 +52,15 @@ export const IDBAdapter = (function () {
   //       once; existing v1 installs get vot-home-order added via the
   //       onupgradeneeded guard (objectStoreNames.contains skips already-
   //       created stores, so the bump is additive only).
+  //   3 — added vot-note-default (the last-used note style+color default).
+  //       Same additive pattern: the onupgradeneeded guard creates only the
+  //       new store on existing v2 installs; all other data is untouched.
   // W7.1 dropped 'vot-ann-migrated' from STORE_NAMES (its only consumer,
   // the pre-W2 annotation bootstrap migration, was deleted). Deliberately
   // NOT a version bump: fresh installs simply skip it; a pre-existing empty
   // store on older installs is orphaned + harmless (never accessed, since
   // STORE_SET no longer lists it).
-  const DB_VERSION = 2;
+  const DB_VERSION = 3;
 
   /**
    * The 17 vot-* localStorage keys that migrate into IDB, plus the
@@ -88,6 +91,7 @@ export const IDBAdapter = (function () {
     'vot-notes',
     'vot-links',
     'vot-home-order',
+    'vot-note-default',
     'meta',
   ]);
   const STORE_SET = new Set(STORE_NAMES);

@@ -47,6 +47,7 @@ import { HistoryStore } from './history-store.js';
 import { HomeOrderStore, DEFAULT_HOME_ORDER } from './home-order-store.js';
 import { AnnotationStore, HighlightStore } from './annotation-store.js';
 import { NoteStore } from './note-store.js';
+import { NoteDefaultStore } from './note-default-store.js';
 import { NotebookStore } from './notebook-store.js';
 import { RecentNavStore } from './recent-nav-store.js';
 import { hlId, lnkId, LinkStore, persistLink } from './link-store.js';
@@ -157,7 +158,7 @@ Object.assign(window, {
   HistoryStore,
   HomeOrderStore, DEFAULT_HOME_ORDER,
   AnnotationStore, HighlightStore,
-  NoteStore, NotebookStore, RecentNavStore,
+  NoteStore, NoteDefaultStore, NotebookStore, RecentNavStore,
   hlId, lnkId, LinkStore, persistLink,
   bkmId, BookmarkStore,
   JournalMediaStore,

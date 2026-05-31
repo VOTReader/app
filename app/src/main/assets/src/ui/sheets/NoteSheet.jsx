@@ -49,9 +49,11 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
   const cancelEdit = () => {
     setBody(note.body || '');
     if (startInEditMode && !note.body) {
-      // Fresh new note, never saved — convert back to a plain highlight
-      // so the selection the user made is preserved on screen.
-      AnnotationStore.convertGroup(groupId, 'highlight');
+      // Fresh new note, never saved → discard it entirely. (Pre-decouple this
+      // converted it back to a highlight to "preserve the selection", but the
+      // note default can now be a BLANK highlight, which would leave an
+      // invisible, un-removable orphan mark — so remove the whole group.)
+      AnnotationStore.removeGroup(groupId);
       NoteStore.remove(groupId);
       onClose();
       return;
@@ -59,11 +61,30 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
     setMode('read');
   };
 
+  // The note's current visual style (legacy 'note' kind → 'highlight').
+  const _segKind = segs[0] && segs[0].ann ? segs[0].ann.kind : 'highlight';
+  const curStyle = (_segKind === 'underline' || _segKind === 'squiggle') ? _segKind : 'highlight';
+
   const recolor = (c) => {
     AnnotationStore.recolorGroup(groupId, c);
     NoteStore.update(groupId, { color: c });
+    // Whatever you last set a note to becomes the default for the next note.
+    if (typeof NoteDefaultStore !== 'undefined') NoteDefaultStore.set(curStyle, c);
     setShowColors(false);
     setMenuOpen(false);
+  };
+
+  // Switch the note's visual style. Squiggle/underline can't be blank, so a
+  // blank color is promoted to yellow when leaving the highlight style.
+  const setStyle = (style) => {
+    AnnotationStore.convertGroup(groupId, style);
+    let c = color;
+    if (style !== 'highlight' && c === 'blank') {
+      c = 'yellow';
+      AnnotationStore.recolorGroup(groupId, c);
+      NoteStore.update(groupId, { color: c });
+    }
+    if (typeof NoteDefaultStore !== 'undefined') NoteDefaultStore.set(style, c);
   };
 
   const remove = () => {
@@ -126,6 +147,14 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
         {showColors ? (
           <div className="note-sheet-menu-colors">
             <button className="ann-chip-back" onClick={() => setShowColors(false)} title="Back">‹</button>
+            {curStyle === 'highlight' && (
+              <button
+                className={"ann-chip-color-btn" + (color === 'blank' ? ' active' : '')}
+                data-color="blank"
+                onClick={() => recolor('blank')}
+                title="No color (icon only)"
+              />
+            )}
             {HL_COLORS.map(c => (
               <button
                 key={c}
@@ -146,19 +175,36 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
             {mode === 'read' && (note.updated || note.created) && (
               <div className="note-sheet-date">{relativeDate(note.updated || note.created)}</div>
             )}
-            {/* Edit mode: always-visible color row so users can pick a color
-                without needing to open the ⋯ menu first. */}
+            {/* Edit mode: style toggle + color row (mirrors the selection
+                toolbar). Pick a style — Highlight / Underline / Squiggle — and
+                a color; squiggle/underline are always a visible color, while
+                Highlight also offers a blank (invisible) swatch for a note
+                with no visual overhead. */}
             {mode === 'edit' && (
-              <div className="note-edit-colors">
-                {HL_COLORS.map(c => (
-                  <button
-                    key={c}
-                    className={"ann-chip-color-btn" + (color === c ? ' active' : '')}
-                    data-color={c}
-                    onClick={() => recolor(c)}
-                    title={c}
-                  />
-                ))}
+              <div className="note-edit-style-row">
+                <button className={"sel-style-btn" + (curStyle === 'highlight' ? ' active' : '')} onClick={() => setStyle('highlight')} title="Highlight">A</button>
+                <button className={"sel-style-btn sel-style-btn-underline" + (curStyle === 'underline' ? ' active' : '')} onClick={() => setStyle('underline')} title="Underline">A</button>
+                <button className={"sel-style-btn sel-style-btn-squiggle" + (curStyle === 'squiggle' ? ' active' : '')} onClick={() => setStyle('squiggle')} title="Squiggle underline">A</button>
+                <div className="sel-toolbar-divider" />
+                <div className="sel-toolbar-colors">
+                  {curStyle === 'highlight' && (
+                    <button
+                      className={"sel-color-btn" + (color === 'blank' ? ' active' : '')}
+                      data-color="blank"
+                      onClick={() => recolor('blank')}
+                      title="No color (icon only)"
+                    />
+                  )}
+                  {HL_COLORS.map(c => (
+                    <button
+                      key={c}
+                      className={"sel-color-btn sel-color-" + curStyle + (color === c ? ' active' : '')}
+                      data-color={c}
+                      onClick={() => recolor(c)}
+                      title={c}
+                    />
+                  ))}
+                </div>
               </div>
             )}
             {/* Notebook chips (only in read mode and only if any are assigned) */}

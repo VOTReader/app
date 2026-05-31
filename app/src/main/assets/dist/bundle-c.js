@@ -394,18 +394,32 @@
     return { start, end };
   }
   function annMarkClass(ann, isFirst, isLast) {
-    const kind = ann.kind || "highlight";
+    let kind = ann.kind || "highlight";
+    let color = ann.color;
     if (kind === "note") {
-      return "hl-mark hl-note hl-" + ann.color + (isFirst ? " first-segment" : "") + (isLast ? " last-segment" : "");
+      kind = "highlight";
+      color = "blank";
     }
-    if (kind === "underline") return "hl-mark hl-underline hl-" + ann.color;
-    if (kind === "squiggle") return "hl-mark hl-squiggle hl-" + ann.color;
-    return "hl-mark hl-" + ann.color;
+    const hasNote = ann.kind === "note" || typeof NoteStore !== "undefined" && !!NoteStore.get(ann.groupId);
+    let cls = "hl-mark";
+    if (kind === "underline") cls += " hl-underline";
+    else if (kind === "squiggle") cls += " hl-squiggle";
+    cls += color && color !== "blank" ? " hl-" + color : " hl-blank";
+    if (hasNote) {
+      cls += " hl-note";
+      if (isFirst) cls += " first-segment";
+      if (isLast) cls += " last-segment";
+    }
+    return cls;
   }
   function HighlightableText({ text, hlKey }) {
     React.useSyncExternalStore(
       React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
       () => AnnotationStore.getVersion()
+    );
+    React.useSyncExternalStore(
+      React.useCallback((cb) => NoteStore.subscribe(cb), []),
+      () => NoteStore.getVersion()
     );
     const annotations = AnnotationStore.get(hlKey);
     if (!text) return null;
@@ -615,6 +629,12 @@
         var isFirst = seenIdx === 0;
         groupSeen[ann.groupId] = seenIdx + 1;
         var kind = ann.kind || "highlight";
+        var color = ann.color;
+        if (kind === "note") {
+          kind = "highlight";
+          color = "blank";
+        }
+        var hasNote = ann.kind === "note" || typeof NoteStore !== "undefined" && !!NoteStore.get(ann.groupId);
         var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
         var textNodes = [];
         var charPos = 0;
@@ -638,10 +658,11 @@
           if (localEnd < tNode.length) tNode.splitText(localEnd);
           var midNode = localStart > 0 ? tNode.splitText(localStart) : tNode;
           var m = document.createElement("mark");
-          var cls = "hl-mark hl-dom hl-" + ann.color;
+          var cls = "hl-mark hl-dom";
           if (kind === "underline") cls += " hl-underline";
           else if (kind === "squiggle") cls += " hl-squiggle";
-          else if (kind === "note") {
+          cls += color && color !== "blank" ? " hl-" + color : " hl-blank";
+          if (hasNote) {
             cls += " hl-note";
             if (isFirst && ti === textNodes.findIndex(function(x) {
               return Math.max(ann.start, x.start) < Math.min(ann.end, x.end);
@@ -655,7 +676,7 @@
           m.appendChild(midNode);
           lastMark = m;
         }
-        if (kind === "note" && lastMark) lastMark.classList.add("last-segment");
+        if (hasNote && lastMark) lastMark.classList.add("last-segment");
         if (lastMark) {
           var fullText = container.textContent;
           var lastCh = fullText.charAt(ann.end - 1);
