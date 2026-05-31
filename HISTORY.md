@@ -4,6 +4,45 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## Footnote gold-render pile-strip (2026-05-31)
+
+Commits `078024f` → `66f9aba` → `b0415d4`. Mandate: *every* footnote verse
+number must render gold "because that's how the data is, not because a patch
+transforms white→gold" — fix the DATA, not the parser.
+
+**Root cause.** `splitIntoVerses` (scripture-parse.js) turns verse numbers gold
+only when it splits a value on EXPLICIT markers (decimal "N." or Unicode
+superscript). Values without markers fell through to **guessing** strategies
+(sentence-split + genealogy-comma + chunk-distribution) that produced the
+white / duplicated / mis-numbered renders the user screenshotted (2 Peter CJB
+dup, Deuteronomy 27 all-white).
+
+**Fix — strip the pile, mark the data.**
+- **`scripture-parse.js`** — Strategy 1 + Strategy 2 + chunk-distribution
+  DELETED. `splitIntoVerses` keeps only the two explicit-marker strategies; a
+  marker-less multi-verse value degrades to a single start-verse block
+  (graceful, no guessing). Doc comment + tests rewritten for the fallback.
+- **Data** — remaining "N." markers inserted across letters-flock /
+  volume-two / volume-three / wtlb-scriptures via `tools/mark-footnote-verses.js`
+  (sourced from the repo's own NKJV via `tools/nkjv-verses.js`; a byte-for-byte
+  marker-strip assertion guarantees only markers were added). Markers placed
+  BEFORE a leading quote — Strategy 0's whitespace-only lookbehind needs
+  `17. “But`, NOT `“17. But`; placing them after the quote was a Luke 15
+  regression caught + fixed in `66f9aba`. Annotated keys cleaned (Deut 27:16-26,
+  Zech 6:9-13 ×2 — the parenthetical note moved into the verse value).
+- **Gate** — `validateFootnoteMarkers` added to `tools/validate-schemas.js`
+  and wired into the data gate (pre-commit + CI). Flags any multi-verse value
+  whose decimal markers don't fully split (the white eyesore) while tolerating
+  superscript excerpts + marker-less prose. **769 footnote values, 0 errors.**
+
+**Verification.** 1483 vitest (+5 marker-gate cases). validate-schemas strict:
+0 errors. Preview end-to-end: bundled `splitIntoVerses` fully-splits every real
+WTLB case (Luke 15:11-32 → 22 segments, 0 white leftover); `.verse-sup` computes
+to gold `rgb(232,192,80)`. CI green; Deploy-Web green (live PWA). CORPUS_VERSION
+c3→c4→c5. **Owed:** device-verify on Android (no device attached this session).
+
+---
+
 ## W2 polish — storage layer hardening (2026-05-28)
 
 4-tier sweep of the W2 storage layer post-close, plus two adjacent
