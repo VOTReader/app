@@ -9584,7 +9584,7 @@ Continue?`
     const kind = ann.kind || "highlight";
     const kindLabel = kind === "underline" ? "underline" : kind === "squiggle" ? "squiggle" : "highlight";
     const isNote = typeof NoteStore !== "undefined" && !!NoteStore.get(groupId);
-    const widthByMode = { main: 200, confirm: 280, colors: 320 };
+    const widthByMode = { main: 280, confirm: 280, colors: 320, style: 220 };
     const cw = widthByMode[mode] || 200;
     const cx = Math.max(8, Math.min(x - cw / 2, window.innerWidth - cw - 8));
     const cy = Math.max(8, y + 10);
@@ -9596,6 +9596,11 @@ Continue?`
     const recolor = (color) => {
       AnnotationStore.recolorGroup(groupId, color);
       if (isNote) NoteStore.update(groupId, { color });
+      onClose();
+    };
+    const restyle = (newKind) => {
+      AnnotationStore.convertGroup(groupId, newKind);
+      if (isNote && typeof NoteDefaultStore !== "undefined") NoteDefaultStore.set(newKind, ann.color);
       onClose();
     };
     const convertToNote = () => {
@@ -9648,6 +9653,15 @@ Continue?`
         },
         /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "8" }), /* @__PURE__ */ React.createElement("circle", { cx: "8", cy: "9", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "16", cy: "9", r: "1.4", fill: "currentColor", stroke: "none" }), /* @__PURE__ */ React.createElement("circle", { cx: "17", cy: "14", r: "1.4", fill: "currentColor", stroke: "none" })),
         /* @__PURE__ */ React.createElement("span", null, "Color")
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "ann-chip-btn",
+          onClick: () => setMode("style"),
+          title: "Style"
+        },
+        /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 24 24" }, /* @__PURE__ */ React.createElement("line", { x1: "5", y1: "8", x2: "19", y2: "8" }), /* @__PURE__ */ React.createElement("line", { x1: "5", y1: "12", x2: "14", y2: "12" }), /* @__PURE__ */ React.createElement("path", { d: "M4 18q1.5-2.5 3 0t3 0 3 0 3 0" })),
+        /* @__PURE__ */ React.createElement("span", null, "Style")
       ), !isNote && /* @__PURE__ */ React.createElement(
         "button",
         {
@@ -9676,7 +9690,32 @@ Continue?`
           onClick: () => recolor(c),
           title: c
         }
-      )))
+      ))),
+      mode === "style" && /* @__PURE__ */ React.createElement("div", { className: "ann-chip-colors" }, /* @__PURE__ */ React.createElement("button", { className: "ann-chip-back", onClick: () => setMode("main"), title: "Back" }, "\u2039"), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "sel-style-btn" + (kind !== "underline" && kind !== "squiggle" ? " active" : ""),
+          onClick: () => restyle("highlight"),
+          title: "Highlight"
+        },
+        "A"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "sel-style-btn sel-style-btn-underline" + (kind === "underline" ? " active" : ""),
+          onClick: () => restyle("underline"),
+          title: "Underline"
+        },
+        "A"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "sel-style-btn sel-style-btn-squiggle" + (kind === "squiggle" ? " active" : ""),
+          onClick: () => restyle("squiggle"),
+          title: "Squiggle underline"
+        },
+        "A"
+      ))
     ));
   }
 

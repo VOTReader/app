@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
-  const [mode, setMode] = React.useState('main'); // 'main' | 'confirm' | 'colors'
+  const [mode, setMode] = React.useState('main'); // 'main' | 'confirm' | 'colors' | 'style'
   // Reset mode whenever a fresh chip opens (different group)
   const lastGroupRef = React.useRef(null);
   React.useEffect(() => {
@@ -22,7 +22,7 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   const isNote = typeof NoteStore !== 'undefined' && !!NoteStore.get(groupId);
 
   // Width estimate by mode for viewport clamping
-  const widthByMode = { main: 200, confirm: 280, colors: 320 };
+  const widthByMode = { main: 280, confirm: 280, colors: 320, style: 220 };
   const cw = widthByMode[mode] || 200;
   const cx = Math.max(8, Math.min(x - cw / 2, window.innerWidth - cw - 8));
   const cy = Math.max(8, y + 10);
@@ -36,6 +36,15 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   const recolor = (color) => {
     AnnotationStore.recolorGroup(groupId, color);
     if (isNote) NoteStore.update(groupId, { color });
+    onClose();
+  };
+
+  const restyle = (newKind) => {
+    // Change the VISUAL style (highlight / underline / squiggle) of an existing
+    // annotation. Note-ness is unchanged — it's a NoteStore entry, not the kind.
+    AnnotationStore.convertGroup(groupId, newKind);
+    // Mirror the NoteSheet: restyling a note updates the last-used note default.
+    if (isNote && typeof NoteDefaultStore !== 'undefined') NoteDefaultStore.set(newKind, ann.color);
     onClose();
   };
 
@@ -93,6 +102,18 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
               </svg>
               <span>Color</span>
             </button>
+            <button
+              className="ann-chip-btn"
+              onClick={() => setMode('style')}
+              title="Style"
+            >
+              <svg viewBox="0 0 24 24">
+                <line x1="5" y1="8" x2="19" y2="8" />
+                <line x1="5" y1="12" x2="14" y2="12" />
+                <path d="M4 18q1.5-2.5 3 0t3 0 3 0 3 0" />
+              </svg>
+              <span>Style</span>
+            </button>
             {!isNote && (
               <button
                 className="ann-chip-btn"
@@ -130,6 +151,26 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
                 title={c}
               />
             ))}
+          </div>
+        )}
+        {mode === 'style' && (
+          <div className="ann-chip-colors">
+            <button className="ann-chip-back" onClick={() => setMode('main')} title="Back">‹</button>
+            <button
+              className={'sel-style-btn' + (kind !== 'underline' && kind !== 'squiggle' ? ' active' : '')}
+              onClick={() => restyle('highlight')}
+              title="Highlight"
+            >A</button>
+            <button
+              className={'sel-style-btn sel-style-btn-underline' + (kind === 'underline' ? ' active' : '')}
+              onClick={() => restyle('underline')}
+              title="Underline"
+            >A</button>
+            <button
+              className={'sel-style-btn sel-style-btn-squiggle' + (kind === 'squiggle' ? ' active' : '')}
+              onClick={() => restyle('squiggle')}
+              title="Squiggle underline"
+            >A</button>
           </div>
         )}
       </div>
