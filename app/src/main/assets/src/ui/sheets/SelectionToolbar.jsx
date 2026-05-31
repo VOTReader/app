@@ -67,6 +67,27 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     return () => { window.__hideSelectionToolbar = null; };
   }, []);
 
+  // Keep the toolbar fully on-screen. computeAndShow positions x from an
+  // ESTIMATE, but the real width depends on content (style buttons, the
+  // scrolling color row, the action grid) and the CSS max-width. Measure the
+  // rendered width and clamp x so no part runs off either edge — the bug was a
+  // selection near the right margin pushing the toolbar partly off-screen,
+  // leaving the far buttons untappable. Runs in a layout effect so the
+  // correction lands before paint (no visible jump).
+  React.useLayoutEffect(() => {
+    if (!visible) return;
+    const el = toolbarRef.current;
+    if (!el) return;
+    const w = el.offsetWidth;
+    if (!w) return; // jsdom / not yet laid out — nothing to clamp against
+    const margin = 8;
+    const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+    setPos((p) => {
+      const x = Math.min(Math.max(margin, p.x), maxLeft);
+      return x === p.x ? p : { x: x, y: p.y };
+    });
+  }, [visible, selInfo]);
+
   React.useEffect(() => {
     // Compute and show the toolbar from the current selection
     const computeAndShow = () => {
@@ -716,17 +737,20 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       )}
       {/* Action buttons: note only for single-container; link + copy/share/search always */}
       <div className="sel-toolbar-row sel-toolbar-actions">
-        {!mv && (
-          <button className="sel-action-btn" onClick={handleNote} title="Note">
-            <svg viewBox="0 0 24 24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="8" y1="13" x2="16" y2="13" />
-              <line x1="8" y1="17" x2="16" y2="17" />
-            </svg>
-            <span>Note</span>
-          </button>
-        )}
+        {/* Note works for multi-verse / multi-paragraph selections too — the
+            handleNote multiVerse branch spans every [data-hl-key] container in
+            the range, so a whole chapter or letter can become a single note.
+            (Previously gated behind !mv, which made Note vanish the moment a
+            selection crossed a paragraph break or verse boundary.) */}
+        <button className="sel-action-btn" onClick={handleNote} title="Note">
+          <svg viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="8" y1="13" x2="16" y2="13" />
+            <line x1="8" y1="17" x2="16" y2="17" />
+          </svg>
+          <span>Note</span>
+        </button>
         {showColors && (
           <button className="sel-action-btn" onClick={handleLink} title="Link">
             <svg viewBox="0 0 24 24">
