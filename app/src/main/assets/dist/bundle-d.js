@@ -770,14 +770,14 @@
       prefixLen++;
     }
     if (prefixLen > 0) {
-      const segments2 = [];
+      const segments = [];
       for (let i = 0; i < prefixLen; i++) {
         const textStart = markers[i].markerEnd;
         const textEnd = i + 1 < prefixLen ? markers[i + 1].start : text.length;
         const verseText = text.slice(textStart, textEnd).trim();
-        segments2.push({ vNum: markers[i].vNum, text: verseText });
+        segments.push({ vNum: markers[i].vNum, text: verseText });
       }
-      return segments2;
+      return segments;
     }
     const superMap = { "\u2070": 0, "\xB9": 1, "\xB2": 2, "\xB3": 3, "\u2074": 4, "\u2075": 5, "\u2076": 6, "\u2077": 7, "\u2078": 8, "\u2079": 9 };
     function parseSuperNum(s) {
@@ -818,27 +818,7 @@
         return segs;
       }
     }
-    let chunks = text.split(/(?<=[.!?])\s+(?=[A-Z\u201c\u2018])/).filter(Boolean);
-    if (chunks.length < count) {
-      const commaChunks = text.split(/, (?=the )/).filter(Boolean);
-      if (commaChunks.length >= count) {
-        chunks = commaChunks.map((c, i) => i === 0 ? c : "the " + c);
-      }
-    }
-    if (chunks.length < count) {
-      return [{ vNum: range.start, text }];
-    }
-    const perVerse = Math.floor(chunks.length / count);
-    const remainder = chunks.length % count;
-    const segments = [];
-    let idx = 0;
-    for (let v = 0; v < count; v++) {
-      const take = perVerse + (v < remainder ? 1 : 0);
-      const joined = chunks.slice(idx, idx + take).join(", ");
-      segments.push({ vNum: range.start + v, text: joined });
-      idx += take;
-    }
-    return segments;
+    return [{ vNum: range.start, text }];
   }
 
   // app/src/main/assets/src/utils/highlight.jsx

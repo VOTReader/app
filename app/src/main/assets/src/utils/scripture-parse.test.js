@@ -6,12 +6,12 @@
    render at the wrong positions" — visible to readers but not
    loud enough to bug-report.
 
-   splitIntoVerses tries 4 strategies in order:
+   splitIntoVerses reads a value's EXPLICIT verse markers — no guessing:
      0. Explicit "N. text" markers (longest prefix matching verseNums)
      0b. Unicode superscript markers (²when ³if ⁴then)
-     1. Sentence-boundary split
-     2. Comma-chain genealogy ("the X, the Y, the Z" from Luke 3)
-     Fallback: single-element array
+     Fallback: single-element array (a marker-less multi-verse value; gated
+       out of the data by validateFootnoteMarkers, so degraded-only). The
+       old sentence-split + genealogy-comma heuristics were deleted.
 
    The silent-fail modes:
      - Strategy 0 partial prefix not respected → wrong split at the
@@ -241,28 +241,29 @@ describe('splitIntoVerses — multi-strategy chain', () => {
   });
 
   // ── Strategy 1: sentence-boundary split ─────────────────────────
-  describe('Strategy 1 — sentence-boundary split', () => {
-    it('splits on sentence boundaries when no explicit markers are present', () => {
-      // No "N." markers, no superscripts — falls through to Strategy 1.
-      // Text has 3 sentences → 3 segments for a 3-verse ref.
+  describe('marker-less fallback (guessing heuristics removed)', () => {
+    it('returns a single-element fallback when a multi-verse value has no markers', () => {
+      // The old sentence-split / genealogy-comma heuristics were deleted (they
+      // produced the white / mis-numbered footnote renders the data
+      // normalization replaced). A marker-less multi-verse value now degrades
+      // to the whole block under its start verse; real footnote data is gated
+      // to always carry markers (validateFootnoteMarkers in validate-schemas.js).
       const result = splitIntoVerses(
         'First sentence here. Second sentence here. Third sentence here.',
         '5:1-3'
       );
-      expect(result).not.toBeNull();
-      expect(result?.length).toBe(3);
-      expect(result?.[0].vNum).toBe(1);
-      expect(result?.[2].vNum).toBe(3);
+      expect(result).toEqual([
+        { vNum: 1, text: 'First sentence here. Second sentence here. Third sentence here.' },
+      ]);
     });
   });
 
   // ── Strategy 2 + fallback ───────────────────────────────────────
-  describe('Strategy 2 / fallback — too few chunks for count', () => {
-    it('returns a single-element array with start vNum when no strategy can split', () => {
-      // Single short sentence; chunks (1) < count (3). After Strategy 1
-      // fails and Strategy 2 (the comma-chain) also can't get enough
-      // chunks, the implementation returns a single-element fallback
-      // tagged with the start verse number.
+  describe('single-verse fallback (marker-less multi-verse)', () => {
+    it('returns a single-element array tagged with the start vNum', () => {
+      // A marker-less multi-verse value degrades to one block under its start
+      // verse — the guessing strategies that used to try sentence/comma splits
+      // are gone.
       const result = splitIntoVerses('Too short.', '5:7-9');
       expect(result).toEqual([{ vNum: 7, text: 'Too short.' }]);
     });

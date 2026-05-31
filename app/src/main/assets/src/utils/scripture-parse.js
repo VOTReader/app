@@ -136,15 +136,15 @@ export function parseRefRange(ref) {
 }
 
 /**
- * Split a verse-text block into per-verse segments. Tries three strategies
- * in order:
+ * Split a verse-text block into per-verse segments from its EXPLICIT markers:
  *   - Strategy 0: explicit "N. text" markers (accept the longest valid prefix)
  *   - Strategy 0b: Unicode superscript markers (e.g. "²when ³if")
- *   - Strategy 1: sentence-boundary split
- *   - Strategy 2: comma-chain split for genealogies ("the X, the Y, the Z")
- * Returns null when the ref has no parsable range OR the range has only
- * one verse. Returns a single-element array tagged with start verse when
- * heuristics fail to split adequately.
+ * Returns null when the ref has no parsable range OR the range has only one
+ * verse. A multi-verse value with NO markers returns a single-element fallback
+ * tagged with the start verse — degraded only: all footnote data is required to
+ * carry markers (validateFootnoteMarkers in tools/validate-schemas.js gates it),
+ * so the old marker-less guessing heuristics (sentence-split / genealogy-comma)
+ * are deleted.
  *
  * @param {string} text
  * @param {string} ref
@@ -229,32 +229,14 @@ export function splitIntoVerses(text, ref) {
     }
   }
 
-  // Strategy 1 — sentence-boundary split (epistles, prophecy, narrative)
-  let chunks = text.split(/(?<=[.!?])\s+(?=[A-Z\u201c\u2018])/).filter(Boolean);
-
-  // Strategy 2 — comma-chain genealogy (e.g. Luke 3) — split on ", the "
-  if (chunks.length < count) {
-    const commaChunks = text.split(/, (?=the )/).filter(Boolean);
-    if (commaChunks.length >= count) {
-      chunks = commaChunks.map((c, i) => i === 0 ? c : "the " + c);
-    }
-  }
-
-  // Still not enough — label whole block with start verse only
-  if (chunks.length < count) {
-    return [{ vNum: range.start, text }];
-  }
-
-  const perVerse = Math.floor(chunks.length / count);
-  const remainder = chunks.length % count;
-  const segments = [];
-  let idx = 0;
-  for (let v = 0; v < count; v++) {
-    const take = perVerse + (v < remainder ? 1 : 0);
-    const joined = chunks.slice(idx, idx + take).join(", ");
-    segments.push({ vNum: range.start + v, text: joined });
-    idx += take;
-  }
-  return segments;
+  // No explicit markers found. Footnote scripture values are REQUIRED to carry
+  // verse markers ("N. " decimals or Unicode superscripts) — enforced by the
+  // validateFootnoteMarkers gate in tools/validate-schemas.js, so a marker-less
+  // multi-verse value can't ship. If one ever slips through, degrade gracefully
+  // by labeling the whole block with its start verse rather than GUESSING at
+  // boundaries. (The old sentence-split + genealogy-comma heuristics + their
+  // chunk-distribution were deleted — that guessing produced the white /
+  // duplicated / mis-numbered footnote renders the data normalization replaced.)
+  return [{ vNum: range.start, text }];
 }
 

@@ -23,6 +23,7 @@ import { readFileSync } from 'fs';
 import { createContext, runInNewContext } from 'vm';
 import { resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
+import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils/scripture-parse.js';
 
 // ── valid enum sets ──────────────────────────────────────────────
 
@@ -902,6 +903,62 @@ export function validateScriptureDict(dict, opts = {}) {
 }
 
 /**
+ * Footnote verse-marker integrity. Every MULTI-verse footnote scripture value
+ * must render fully gold from its own EXPLICIT markers — splitIntoVerses (the
+ * real renderer path) must return one segment per verse, not the single-element
+ * degraded fallback. A marker-less multi-verse value is an ERROR: it would
+ * render white / duplicated / mis-numbered. The renderer's guessing heuristics
+ * (sentence-split / genealogy-comma) were deleted, so THIS gate is what keeps
+ * footnote data honest going forward.
+ *
+ * `dict` is a ref->text map. Compound values ("Ref A — text | Ref B — text")
+ * are split into parts (mirroring ScriptureVerseText) and each part validated
+ * against its own label-ref.
+ *
+ * @param {Record<string, string>} dict
+ * @param {{ fileName?: string }} [opts]
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validateFootnoteMarkers(dict, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || '(unknown)';
+  if (!dict || typeof dict !== 'object') return { errors, warnings };
+
+  for (const ref of Object.keys(dict)) {
+    const value = dict[ref];
+    if (typeof value !== 'string') continue;
+    // Compound values render as separate parts: split on " | ", label before " — ".
+    const parts = value.includes(' | ')
+      ? value.split(' | ').map((p) => {
+          const i = p.indexOf(' — ');
+          return i >= 0 ? { ref: p.slice(0, i).trim(), text: p.slice(i + 3) } : { ref, text: p };
+        })
+      : [{ ref, text: value }];
+    for (const part of parts) {
+      const range = parseRefRange(part.ref);
+      if (!range) continue; // single-verse / unparseable label → no verse markers needed
+      const count = (range.verses && range.verses.length) || (range.end - range.start + 1);
+      if (count < 2) continue;
+      const segs = splitIntoVerses(part.text, part.ref);
+      if (!segs) continue;
+      if (segs.length < count) {
+        // A short split only renders WHITE if un-consumed DECIMAL markers
+        // ("16. ") remain in the text — the renderer STRIPS Unicode
+        // superscripts (so abbreviated Study-Bible excerpts like Isaiah 53:2-12
+        // render gold-first + clean prose), and marker-less prose just renders
+        // under the start verse with no stray numbers. So flag the decimal case
+        // specifically — that's the visible white / duplicated eyesore.
+        if (/(?:^|[\s“‘"'(])\d+\.\s/.test(part.text)) {
+          errors.push(`${fileName}: "${ref}" — decimal verse markers don't fully split (${segs.length}/${count}); the leftovers render WHITE. Ensure verses ${range.start}..${range.end} each carry an "N. " marker (tools/mark-footnote-verses.js).`);
+        }
+      }
+    }
+  }
+  return { errors, warnings };
+}
+
+/**
  * Format E — Study Bible (matthew.js MATTHEW). A single annotated book: a
  * preface (heading/para/poetry blocks) plus sectionless chapters (verses live
  * directly on the chapter; scriptures/votNotes/links are the annotation
@@ -1412,6 +1469,40 @@ function runCli() {
       }
     }
   }
+
+  // ── Footnote verse markers (every multi-verse value renders gold) ──
+  console.log('\nFootnote verse markers (multi-verse values must carry explicit markers):');
+  let fnErrors = 0;
+  let fnChecked = 0;
+  const checkFn = (dict, label) => {
+    const r = validateFootnoteMarkers(dict, { fileName: label });
+    add(r, 0); // errors/warnings count toward the gate; items already counted above
+    fnChecked += Object.keys(dict || {}).length;
+    fnErrors += r.errors.length;
+    for (const e of r.errors) console.error(`  ERROR: ${e}`);
+    for (const w of r.warnings) console.warn(`  WARN:  ${w}`);
+  };
+  for (const entry of FORMAT_A_FILES) {
+    let data;
+    try { data = loadDataFile(resolve(dataDir, entry.file), entry.arrayVar, entry.prefaceVar); }
+    catch (e) { loadErr(basename(entry.file), e.message); continue; }
+    const all = Array.isArray(data.letters) ? data.letters.slice() : [];
+    if (data.preface && typeof data.preface === 'object') all.push(data.preface);
+    for (const letter of all) {
+      if (letter && letter.nkjv) checkFn(letter.nkjv, `${basename(entry.file)} "${letter.id || letter.title || '?'}"`);
+    }
+  }
+  for (const src of [
+    { file: 'wtlb-scriptures.js', varName: 'WTLB_SCRIPTURES' },
+    { file: 'the-blessed.js', varName: 'THE_BLESSED_SCRIPTURES' },
+    { file: 'matthew-nkjv.js', varName: 'MATTHEW_NKJV' },
+  ]) {
+    let dict;
+    try { dict = loadVar(resolve(dataDir, src.file), src.varName); }
+    catch (e) { loadErr(basename(src.file), e.message); continue; }
+    if (dict) checkFn(dict, basename(src.file));
+  }
+  console.log(`  ${fnChecked} footnote values — ${fnErrors === 0 ? 'OK' : 'FAIL'} (${fnErrors} errors)`);
 
   console.log(`\n=== TOTALS: ${totals.items} items validated, ${totals.errors} errors, ${totals.warnings} warnings ===`);
   if (strict && totals.errors > 0) process.exit(1);

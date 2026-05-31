@@ -18,8 +18,12 @@ const WRITE = process.argv.includes('--write');
 
 const sandbox = {};
 runInNewContext(readFileSync(resolve(dataDir, 'books.js'), 'utf-8'), sandbox);
+runInNewContext(readFileSync(resolve(dataDir, 'matthew-plain.js'), 'utf-8'), sandbox);
 const BOOKS = sandbox.BOOKS;
 const bookList = Array.isArray(BOOKS) ? BOOKS : Object.keys(BOOKS).map((k) => BOOKS[k]);
+// Matthew is served separately (matthew-plain.js), not in books.js.
+const _mp = sandbox.MATTHEW_PLAIN;
+if (_mp) bookList.push(Array.isArray(_mp) ? _mp[0] : _mp);
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 function findBook(name) {
   const alias = { psalm: 'psalms', revelations: 'revelation' };
@@ -37,16 +41,17 @@ function nkjvVerses(book, chap) {
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The marker-less multi-verse footnote values to normalize (NKJV only). */
+// ONLY the still-unmarked cases. The values already marked in earlier runs are
+// excluded — re-running over them would DOUBLE-mark (the safety check strips
+// just one marker per number). Luke 3:23-38 (genealogy, divergent name
+// spellings) and Revelation 14:1-4 (NLT, non-NKJV) won't align to books.js and
+// are marked by hand separately.
 const WORKLIST = {
   'volume-two.js': [
-    'Proverbs 2:12-18', 'Revelation 13:16-17', '1 Corinthians 5:7-8', 'John 1:10-11',
-    '1 Corinthians 3:13-15', 'Psalm 50:3-4', 'John 15:1-2', 'Revelation 6:16-17',
-    'Matthew 16:24-26', 'Matthew 10:37-38', 'Luke 3:23-38',
+    '1 Corinthians 3:13-15', 'Matthew 16:24-26', 'Matthew 10:37-38',
   ],
   'wtlb-scriptures.js': [
-    'Luke 15:11-32', 'Genesis 2:21-24', 'Colossians 3:9-10', 'Numbers 6:24-26',
-    'Matthew 18:3-4', 'John 9:6-7', 'Matthew 24:32-34', 'Ecclesiastes 9:2-3',
-    'Matthew 11:28-30', 'Isaiah 26:20-21', 'Psalm 40:7-8',
+    'Matthew 18:3-4', 'Matthew 24:32-34', 'Matthew 11:28-30',
   ],
 };
 

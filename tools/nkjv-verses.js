@@ -12,10 +12,14 @@ import { fileURLToPath } from 'url';
 const dataDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'src', 'main', 'assets', 'src', 'data');
 const sandbox = {};
 runInNewContext(readFileSync(resolve(dataDir, 'books.js'), 'utf-8'), sandbox);
+runInNewContext(readFileSync(resolve(dataDir, 'matthew-plain.js'), 'utf-8'), sandbox);
 const BOOKS = sandbox.BOOKS;
 
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 const list = Array.isArray(BOOKS) ? BOOKS : Object.keys(BOOKS).map((k) => BOOKS[k]);
+// Matthew is served separately (matthew-plain.js), not in books.js.
+const mp = sandbox.MATTHEW_PLAIN;
+if (mp) list.push(Array.isArray(mp) ? mp[0] : mp);
 
 function findBook(name) {
   const want = norm(name);

@@ -12,6 +12,7 @@ import {
   validateAgainstReference,
   validateTranslationMap,
   validateScriptureDict,
+  validateFootnoteMarkers,
   validateStudyBible,
 } from './validate-schemas.js';
 
@@ -1398,5 +1399,32 @@ describe('validateStudyBible', () => {
       const r = validateStudyBible(validMatthew({ chapters: [ch] }));
       expect(r.errors.some((e) => e.includes('not an object'))).toBe(true);
     });
+  });
+});
+
+// ── Footnote verse markers (gold-render gate) ───────────────────
+describe('validateFootnoteMarkers', () => {
+  it('passes a fully-marked multi-verse value', () => {
+    const r = validateFootnoteMarkers({ '2 Peter 1:20-21': '20. knowing this first 21. for prophecy never came' });
+    expect(r.errors).toEqual([]);
+  });
+  it('flags a value whose decimal markers do not fully split (renders white)', () => {
+    // Only verse 1 has a marker for a 3-verse ref → splits 1/3 with the "1."
+    // class of leftover that renders white.
+    const r = validateFootnoteMarkers({ 'Test 1:1-3': '1. first only — verses 2 and 3 carry no marker' });
+    expect(r.errors.length).toBeGreaterThan(0);
+    expect(r.errors[0]).toContain('Test 1:1-3');
+  });
+  it('does NOT flag marker-less prose (renders gold-first, no stray decimal numbers)', () => {
+    const r = validateFootnoteMarkers({ 'Test 1:1-3': 'first clause and second clause and third clause' });
+    expect(r.errors).toEqual([]);
+  });
+  it('does NOT flag a Unicode-superscript excerpt (the renderer strips superscripts)', () => {
+    const r = validateFootnoteMarkers({ 'Isaiah 53:2-12': 'For He shall grow up ³He is despised ⁴Surely ¹²Therefore' });
+    expect(r.errors).toEqual([]);
+  });
+  it('does NOT flag a single-verse value', () => {
+    const r = validateFootnoteMarkers({ 'John 3:16': 'For God so loved the world.' });
+    expect(r.errors).toEqual([]);
   });
 });
