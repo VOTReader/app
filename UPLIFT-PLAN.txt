@@ -367,7 +367,9 @@
    (vitest.config.js); write tests for dom-links + dom-bookmarks + the
    resolution engine (jsdom, like annotation-engine.test.jsx). Ratchet the floor
    to the real new baseline. Optionally add a SECOND informational whole-codebase
-   coverage report so the true denominator is visible.
+   coverage report so the true denominator is visible. Also lift the shallow
+   already-"tested" stores the review flagged — journal-store.js search/scan
+   (~46%), thumb-store, recent-nav-store.
  EXIT: renderer/ + scripture-resolution measured + floored; dom-links/dom-
    bookmarks have real tests.
  VERIFY: test:coverage; CI floor holds.
@@ -419,6 +421,94 @@
  VERIFY: preview SW update cycle; install size; offline Garden behavior.
  RISK: low.
 
+ U19 — LOW-severity ledger: cleanup, robustness, micro-perf       [P3, batch] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ Small items from the review that "add up." Each folds into the parent item
+ noted in [brackets]; do them opportunistically alongside that work so none is
+ lost. The value is cumulative, not individual.
+
+ CLEANUP (cosmetic, zero behavior change):
+  • JournalViewerScreen.jsx:261,287,453 — drop the per-component
+    `var useState = React.useState` redeclarations (stale pre-JSX idiom that
+    survived the JSX conversion). Grep the tree for the same pattern elsewhere.
+  • annotation-engine.jsx:17-24 — comment at snapRangeToWords that it snaps the
+    START only, never the END, by design (rationale currently lives only in
+    dom-links.js).  [near U8/U11]
+  • offline.html — document it's reachable only in a narrow window (index.html
+    is itself cached, so navigations succeed from cache).  [near U18]
+
+ ROBUSTNESS (small correctness, mostly data/import):
+  • Record-level import guard: extend validateStorePayload (import-validators.js)
+    with a shallow presence check on DOM-key fields (id/hlKey/groupId) for the
+    stores whose records DRIVE RENDERING, so a corrupt record can't break a
+    screen post-import.  [near U1/U6]
+  • _base64ToBlob (SettingsScreen.jsx:401-406) — validate base64 before atob;
+    validateMediaRecord only checks the first 100 chars (import-validators.js
+    :158), which gives false confidence.  [near U1]
+  • idb-adapter getAll (idb-adapter.js:319-322) — add the tx.onabort-without-
+    req.error fallback that put/del already have via _makeAbortError.
+  • clearLegacyLs (cached-store.js:781-784) — ASSERT hydrateAllStores resolved
+    before running, not just a call-order comment (pre-W2.4 users get wiped if a
+    future caller reorders).
+  • Native tap coords (MainActivity.kt:663) — comment that e.x/e.y are treated
+    as viewport CSS px (holds only when WebView view origin == viewport origin;
+    breaks under freeform multi-window); ideally pass WebView content scroll/
+    location for robustness.  [near U9]
+  • elementsFromPoint tap z-order (SelectionToolbar.jsx:193,271) can be path-
+    dependent for 3-way overlaps — add a case to U11 asserting the SAME mark
+    wins the tap on both render paths.  [fold into U11]
+
+ MICRO-PERF / NATIVE:
+  • clearCache(true) every cold start (MainActivity.kt:310) — gate on a stored
+    versionCode change; bump versionCode/versionName per release
+    (build.gradle.kts:46, pinned at 1 / "1.0") so an update signal exists.  [near U7]
+  • Cache the Vibrator/VibratorManager (AppInterface.kt:266-272) instead of
+    getSystemService on every haptic() call.
+  • Document the appInterface↔WebView-rebuild contract (MainActivity.kt:126,
+    377,572) — appInterface is intentionally WebView-independent (reads the
+    WebView only via bridge's lazy provider); a comment so a future refactor
+    doesn't silently break the post-crash bridge.
+  • GardenImageCache redirect chain (GardenImageCache.kt:106-111) — cap total
+    redirect wall-time on the background thread.  [fold into U7]
+  • Search docStore (search.js:993,1006) stays resident after build for BOTH
+    corpora — consider teardown when leaving Search to free heap on budget
+    devices.  [near U4]
+  • bible-studies.js (4.3 MB) loads as a raw <script src="src/data/bible-
+    studies.js"> (translations.js:39) — never through esbuild, not precached.
+    Route through esbuild --minify + add to the SW precache.  [fold U2+U4]
+ EXIT: each sub-item closed alongside its parent; a final grep confirms the
+   cleanup patterns are gone.
+ RISK: low individually; cumulative payoff.
+
+ U20 — Platform detection misclassifies non-Safari browsers        [P2] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: _detectPlatform (storage-health.js:184-201) tags anything with
+   "Safari" and not Chrome/Chromium/Edg as Safari — so DuckDuckGo, embedded
+   webviews, and in-app browsers become SAFARI_TAB and get Safari-specific
+   7-day-eviction warnings + first-data-creation gates that don't apply. UA-
+   sniffing driving USER-FACING warnings.
+ FIX: tighten Safari detection (Apple vendor / exclude known non-Safari tokens)
+   or prefer feature-detection; ensure a misclassified browser falls to the
+   conservative-but-SILENT path, not wrong warnings.
+ EXIT: DuckDuckGo / common embedded browsers no longer surface Safari eviction
+   warnings; genuine Safari still does.
+ VERIFY: unit-test _detectPlatform against a table of real UA strings.
+ RISK: low.
+
+ U21 — Connectivity ping hits an external origin                   [P2] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: the connectivity check fetches
+   https://www.thevolumesoftruth.com/favicon.ico (use-app-shell-effects.js:75)
+   — an external egress that (a) contradicts the "self-contained & offline"
+   policy ([[network-egress-minimization]]), (b) is no-cors so it only coarsely
+   detects "network up," not content availability, and (c) contacts a third-
+   party origin the user may not expect. It gates nothing load-bearing.
+ FIX: replace with navigator.onLine (+ SW/cache signals), or drop it; if a real
+   reachability probe is needed, ping a SAME-ORIGIN asset.
+ EXIT: no external-origin fetch for connectivity; online/offline UX still works.
+ VERIFY: preview offline/online toggle; grep confirms no external ping.
+ RISK: low.
+
 ═══════════════════════════════════════════════════════════════════════════
  D-BUCKET — DEFERRED / ARCHITECTURAL (raises ceiling past 8; NOT required for 8)
 ═══════════════════════════════════════════════════════════════════════════
@@ -438,6 +528,12 @@
      _handoff.txt, BUNDLE-LAZY-LOAD-PLAN.md, quality-uplift-plan.txt) into
      HISTORY.md; CLAUDE.md (127 KB) + PLAN.txt (234 KB) are themselves a
      maintenance burden. Single canonical location per fact.
+ D8  use-sheet-orchestration.js (276 lines, ~15 state slots + 18 window-bridge
+     effects) reads more like a "junk drawer" than a domain hook — revisit
+     whether sheet-open-state belongs in a context or per-sheet local state
+     (per [[dont-group-by-shape]]). Same observation applies to use-search (432)
+     / use-reading-chain-nav (339): extracted from App() but not decoupled.
+     Architectural; low priority.
 
 ═══════════════════════════════════════════════════════════════════════════
  SEQUENCING (waves)
@@ -473,4 +569,7 @@
  U16 CI smoke walk ................ TODO  [P2]
  U17 Kotlin/contract tests ........ TODO  [P2]
  U18 PWA hygiene .................. TODO  [P2]
+ U19 LOW ledger (cleanup/robust) .. TODO  [P3]
+ U20 platform-detect misclassify .. TODO  [P2]
+ U21 connectivity ping egress ..... TODO  [P2]
 ═══════════════════════════════════════════════════════════════════════════

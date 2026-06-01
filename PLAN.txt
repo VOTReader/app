@@ -9,7 +9,7 @@ Companions: CLAUDE.md (live status), HISTORY.md (landed work), ARCHITECTURE.md (
 
   ┌─────────────────────────────────────────────────────────────────────┐
   │ ►► ACTIVE WORK 2026-06-01: see UPLIFT-PLAN.txt — the "7/10 → 8/10"   │
-  │ remediation from a deep 7-subsystem review (18 items U0–U18).        │
+  │ remediation from a deep 7-subsystem review (21 items U0–U21).        │
   │ NOTE: the "11.7 MB → 1.03 MB critical path" figures below are        │
   │ bundle-a ONLY; the real cold-boot blocking JS path is ~2.10 MB       │
   │ (a+b+c+d all load blocking). Corrected in UPLIFT-PLAN U0.            │
