@@ -105,6 +105,15 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // above so the two flows never clobber each other's callback.
     private lateinit var micPrepLauncher: ActivityResultLauncher<String>
 
+    // Disk cache for Garden page images (shouldInterceptRequest path). The
+    // GitHub release redirect is no-cache, so without this every page turn
+    // re-downloaded the image + re-did the redirect hop — visible lag on a
+    // phone. Keyed by page number (tier stripped) so a quality change
+    // overwrites rather than accumulating copies. Lazy: built on first use,
+    // survives WebView rebuilds (onRenderProcessGone) since it's Activity-
+    // scoped, not WebView-scoped.
+    private val gardenCache: GardenImageCache by lazy { GardenImageCache(cacheDir) }
+
     // Single conduit for every JS callback this Activity fires. Reads
     // [webView] lazily via the lambda so onRenderProcessGone replacing
     // the WebView instance picks up automatically -- no re-instantiation
@@ -469,7 +478,15 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 view: WebView,
                 request: WebResourceRequest
             ): WebResourceResponse? {
-                return assetLoader.shouldInterceptRequest(request.url)
+                // Local app assets first (the common case — every bundle, CSS,
+                // font, icon served from appassets.androidplatform.net).
+                val asset = assetLoader.shouldInterceptRequest(request.url)
+                if (asset != null) return asset
+                // Garden page images: serve from / populate the disk cache so
+                // navigation is instant on the 2nd+ view and limited-data users
+                // don't re-download. Returns null for any non-Garden URL, so
+                // everything else loads exactly as before.
+                return gardenCache.intercept(request.url.toString())
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
