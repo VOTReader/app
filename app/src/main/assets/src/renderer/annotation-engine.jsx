@@ -338,12 +338,15 @@ export function applyActiveNoteState() {
 }
 
 export function applyDOMHighlights() {
-  document.querySelectorAll('[data-hl-key]').forEach(function(container) {
-    if (container.querySelector('mark.hl-mark[data-hl-id]') || container.childElementCount === 0 && container.textContent && !container.querySelector('mark.hl-dom')) {
-      if (!container.hasAttribute('data-hl-dom')) return;
-    }
-    if (!container.hasAttribute('data-hl-dom')) return;
-
+  // (U8) Scope the sweep to [data-hl-dom] containers at query time — matching
+  // applyDOMLinks / applyDOMBookmarks. This drops a DEAD guard: the previous
+  // code computed a `mark.hl-mark / childElementCount / mark.hl-dom`
+  // querySelector expression, then gated on data-hl-dom TWICE (the inner check
+  // inside the computed branch duplicated the unconditional outer one),
+  // discarding the computed value entirely. Behavior is identical — only
+  // [data-hl-dom] containers were ever processed — but the attribute filter now
+  // happens in the selector, so unannotated containers cost nothing here.
+  document.querySelectorAll('[data-hl-key][data-hl-dom]').forEach(function(container) {
     var hlKey = container.getAttribute('data-hl-key');
     var existing = container.querySelectorAll('mark.hl-dom');
     for (var i = 0; i < existing.length; i++) {

@@ -349,6 +349,25 @@
 
  U8 — applyDOMHighlights: single walk, drop dead guard, scope it    [P2, perf] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ DEAD-GUARD DROP LANDED + heavy refactor DEFERRED WITH DATA 2026-06-01.
+   PROFILED FIRST (preview, shipped bundle): a full applyDOMHighlights sweep
+   over 176 unannotated containers (a long Psalm) = 0.215 ms; ONE container with
+   a 4-way overlap (the per-sub-range re-walk path) = 0.17 ms. Both SUB-
+   MILLISECOND — ~2 ms even at a pessimistic 10× budget-device penalty, far
+   under a 16 ms frame. The real perf wins were U2 (−460 KB), U4 (−31 MB), U5
+   (re-render isolation), already landed; this hot/tricky/U11-guarded code is
+   NOT a measured bottleneck. So — exactly like W7.6 (OPFS profiled + deferred)
+   — the risky refactor (single-walk per annotation, document→container scoping,
+   5-pass unification) is NOT justified by the data and is deferred to D-bucket;
+   document→container scoping also needs store dirty-key tracking (a D4-shaped
+   change U11 doesn't guard). LANDED the one genuine win: the DEAD GUARD is gone
+   — applyDOMHighlights now scopes its query to `[data-hl-key][data-hl-dom]`
+   (matching applyDOMLinks/applyDOMBookmarks) instead of computing a
+   mark/childElementCount querySelector then gating on data-hl-dom twice and
+   discarding it. MEASURED EFFECT: the 176-container sweep dropped 0.215→0.15 ms
+   (~30%). Equivalence preserved — U11's 28-test suite green + preview-verified
+   through the shipped bundle (text intact, newest-wins-overlap, blank-
+   suppression all hold), 0 console errors. bundle-c 14.6→14.5 KB.
  PROBLEM: O(containers × annotations × textNodes) document-wide sweep re-run on
    EVERY store mutation. document.querySelectorAll('[data-hl-key]') over the
    whole doc (annotation-engine.jsx:337) + a fresh TreeWalker PER sub-range PER
@@ -700,7 +719,7 @@
  U5  App() re-render .............. DONE  [P1] (annotation sub → AnnotationDomSync leaf; screen-memo→D4)
  U6  export fail-loud ............. DONE  [P1] (abort on read failure + counts manifest)
  U7  Garden allowlist/cap ......... DONE  [P1, sec] (host allowlist + single-flight + tmp sweep)
- U8  applyDOMHighlights ........... TODO  [P2]
+ U8  applyDOMHighlights ........... DONE  [P2] (dead guard dropped, −30% sweep; heavy refactor deferred — profiled sub-ms, W7.6-style)
  U9  async screenshot ............. TODO  [P2]
  U10 CSP tighten .................. TODO  [P2]
  U11 dual-render equiv tests ...... DONE  [P2] (per-char equivalence, 5 scenarios + tap-winner; +6 tests)
