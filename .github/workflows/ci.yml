@@ -142,6 +142,15 @@ jobs:
           # esbuild run on a tree that has no .jsx files yet.
           find app/src/main/assets/src -name '*.jsx' -print0 | xargs -0 -r -n1 npx esbuild --outfile=/dev/null --log-level=warning
 
+      - name: Smoke render walk (headless — U16)
+        # smoke-lite (above) is structural-only; this runs the REAL 12-screen
+        # render walk + both annotation round-trips (tools/smoke.js) in headless
+        # Chrome against the built bundles, catching the black-screen class no
+        # other gate sees. Puppeteer's Chrome was fetched by `npm ci`;
+        # smoke-ci.js launches it with --no-sandbox (required as the Actions
+        # user) + pre-loads the lazy corpora so every screen has its data.
+        run: npm run smoke:ci
+
   kotlin-tests:
     name: Kotlin unit tests (NK1)
     runs-on: ubuntu-latest

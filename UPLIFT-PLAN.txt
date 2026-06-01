@@ -596,6 +596,17 @@
 
  U16 — smoke.js render-walk in CI (headless)                       [P2, test] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — tools/smoke-ci.js (puppeteer devDep) serves
+   app/src/main/assets, launches headless Chrome (--no-sandbox), waits for app
+   mount, PRE-LOADS the lazy corpora (so the walk's Volumes/Scriptures/Studies
+   screens have data), injects tools/smoke.js via page.evaluate (CDP eval —
+   CSP-exempt, since the U10 hashed CSP blocks an injected inline <script>), runs
+   votSmoke(), and exits nonzero on FAIL. `npm run smoke:ci`; wired as a CI step
+   after the build. VERIFIED LOCALLY: PASS — 12 screens (0 crashed, 0 unreached)
+   + both annotation round-trips + 0 console errors + 0 resource-404s in ~18 s
+   (also the comprehensive regression check after this whole P2 batch). Watching
+   the first CI run to confirm puppeteer's Chrome launches on ubuntu-latest
+   (npm ci fetches it; --no-sandbox is the standard Actions pattern).
  PROBLEM: only smoke-lite (structural) runs in CI; the actual 12-screen render
    walk (smoke.js) is browser-only/manual. CI renders zero screens — the
    black-screen class can slip every gate.
@@ -889,7 +900,7 @@
  U13 html2canvas lazy ............. DONE  [P2] (off boot path: bundle-a −199 KB; lazy <script> on 1st web screenshot; verified)
  U14 AndroidBridge routing ........ DONE  [P2] (4 sites → PlatformBridge.isAndroid; invariant restored; web-verified)
  U15 renderer coverage ............ DONE  [P2] (renderer/ + scripture-resolution measured; +70 tests; floor ratcheted)
- U16 CI smoke walk ................ TODO  [P2]
+ U16 CI smoke walk ................ DONE  [P2] (smoke-ci.js headless 12-screen walk; PASS local; CI step wired — watching first run)
  U17 Kotlin/contract tests ........ DONE  [P2] (BridgeContractTest pins the 20-method bridge surface; JaCoCo-extend measured-infeasible, scoped)
  U18 PWA hygiene .................. DONE  [P2] (hourly+focus reg.update; CORE_ASSETS −6 redundant; offline claim honest+documented)
  U19 LOW ledger (cleanup/robust) .. DONE  [P3] (clearLegacyLs guard + base64 validation landed; rest folded into U9/U17 or deferred-with-reasoning)
