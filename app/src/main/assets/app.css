@@ -2284,6 +2284,10 @@
     body.light .hl-brown   { background: rgba(141,110,99,0.32); }
     body.light .hl-gray    { background: rgba(120,120,120,0.20); }
     body.light .hl-cyan    { background: rgba(0,188,212,0.28); }
+    /* background:none is LOAD-BEARING — it must beat body.light .hl-<color>
+       (specificity 0,2,0), which outranks .hl-underline (0,1,0); without
+       !important a light-mode underline paints a fill under the line. Same
+       reasoning for .hl-squiggle and .hl-note.is-active below. */
     .hl-underline {
       background: none !important;
       text-decoration: underline;
@@ -2306,7 +2310,7 @@
        .hl-underline but with a wavy decoration-style (the look the old
        .hl-note.is-active state used, now a first-class, always-on style). */
     .hl-squiggle {
-      background: none !important;
+      background: none !important;   /* load-bearing — see .hl-underline above */
       text-decoration-line: underline;
       text-decoration-style: wavy;
       text-decoration-thickness: 1.6px;
@@ -2338,6 +2342,10 @@
        are still rendered as anchor points.
        ════════════════════════════════════════════════════════════ */
     .hl-note { color: inherit; }
+    /* !important is LOAD-BEARING — the active gold wash must beat the
+       .hl-underline / .hl-squiggle `background:none !important` on a note that
+       also carries one of those styles (both !important → the higher-specificity
+       rule, this one at 0,2,0, wins). */
     .hl-note.is-active {
       background: var(--gold-faint) !important;
       border-radius: 2px;
@@ -2564,7 +2572,7 @@
     .sel-color-btn[data-color="gray"]   { background: var(--hl-gray); }
     /* Underline-style colors: show as ring instead of solid fill */
     .sel-color-btn.sel-color-underline {
-      background: transparent !important;
+      background: transparent;
       border-style: solid; border-width: 3px;
     }
     .sel-color-btn.sel-color-underline[data-color="yellow"] { border-color: var(--hl-yellow); }
@@ -2580,7 +2588,7 @@
     /* Squiggle-style colors: show as a ring (like underline) so the picker
        distinguishes a squiggle from a solid highlight fill. */
     .sel-color-btn.sel-color-squiggle {
-      background: transparent !important;
+      background: transparent;
       border-style: dashed; border-width: 3px;
     }
     .sel-color-btn.sel-color-squiggle[data-color="yellow"] { border-color: var(--hl-yellow); }
@@ -2596,7 +2604,7 @@
     /* Clear/remove circle (X) at end of color row */
     .sel-color-clear {
       background: transparent; color: var(--cream-dim);
-      border: 2px solid var(--gold-border) !important;
+      border: 2px solid var(--gold-border);
       display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 600;
     }
@@ -2607,8 +2615,8 @@
        color, so blank never appears there. Distinct from the underline/
        squiggle rings (no slash) and from solid highlight fills. */
     .sel-color-btn[data-color="blank"], .ann-chip-color-btn[data-color="blank"] {
-      background: transparent !important;
-      border: 2px solid var(--cream-dim) !important;
+      background: transparent;
+      border: 2px solid var(--cream-dim);
       position: relative; overflow: hidden;
     }
     .sel-color-btn[data-color="blank"]::after, .ann-chip-color-btn[data-color="blank"]::after {
