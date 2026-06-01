@@ -7,6 +7,7 @@ import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 /**
  * GardenImageCache — page-key derivation + clear/size.
@@ -96,5 +97,34 @@ class GardenImageCacheTest {
     @Test
     fun `sizeBytes is zero on a fresh cache`() {
         assertEquals(0L, cache.sizeBytes())
+    }
+
+    // ─── U7: host allowlist (SSRF guard) ───
+
+    @Test
+    fun `hostAllowed accepts the known Garden asset hosts`() {
+        assertTrue(cache.hostAllowed("https://github.com/VOTReader/votreader-assets/releases/download/garden-ultra/garden_042.jpg"))
+        assertTrue(cache.hostAllowed("https://release-assets.githubusercontent.com/x/y?rscd=garden_017.jpg"))
+        assertTrue(cache.hostAllowed("https://objects.githubusercontent.com/anything"))
+    }
+
+    @Test
+    fun `hostAllowed rejects non-allowlisted and look-alike hosts`() {
+        assertFalse(cache.hostAllowed("https://evil.test/garden_001.jpg"))
+        assertFalse(cache.hostAllowed("https://github.com.evil.test/garden_001.jpg"))  // look-alike suffix
+        assertFalse(cache.hostAllowed("https://raw.githubusercontent.com/x/garden_001.jpg"))  // different gh host
+        assertFalse(cache.hostAllowed("not a url"))
+        assertFalse(cache.hostAllowed("file:///etc/passwd"))
+    }
+
+    @Test
+    fun `intercept refuses a garden-pattern URL on a non-allowlisted host and writes nothing`() {
+        // The garden_NNN.jpg regex matches, but the host is not allowlisted, so
+        // intercept must return null (→ WebView + CSP handle it) without fetching
+        // and without writing any cache file. This is the SSRF guard (U7).
+        val gdir = File(tmp, "garden")
+        assertNull(cache.intercept("https://evil.test/garden_001.jpg"))
+        assertEquals(0L, cache.sizeBytes())
+        assertTrue((gdir.listFiles() ?: emptyArray()).none { it.name.startsWith("garden_") })
     }
 }

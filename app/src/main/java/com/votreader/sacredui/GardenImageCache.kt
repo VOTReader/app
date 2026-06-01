@@ -7,6 +7,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * On-disk cache for "A Return to the Garden" page images, sitting in the
@@ -52,6 +53,10 @@ class GardenImageCache(cacheRoot: File) {
     // fetch. Keyed by page number string ("042"). Cheap; at most 209 keys.
     private val locks = ConcurrentHashMap<String, Any>()
 
+    // U7: single-flight guard so concurrent cache misses don't each spawn a
+    // cap-enforcer thread that races the others on the same directory.
+    private val capRunning = AtomicBoolean(false)
+
     /**
      * If [url] is a Garden page image, return a cached/just-fetched
      * response; otherwise null (the caller falls through to the WebView's
@@ -59,6 +64,16 @@ class GardenImageCache(cacheRoot: File) {
      */
     fun intercept(url: String): WebResourceResponse? {
         val name = cacheNameFor(url) ?: return null
+        // U7: only natively fetch from the known Garden asset hosts. The
+        // garden_NNN.jpg regex matches the page token ANYWHERE in the URL, so
+        // without this an injected <img src="https://evil/garden_001.jpg"> would
+        // be fetched with the app's network identity (SSRF-shaped) and returned
+        // with Access-Control-Allow-Origin:*. A non-allowlisted host falls
+        // through to the WebView's own load, which CSP img-src then governs.
+        if (!hostAllowed(url)) {
+            Timber.tag("GardenCache").w("blocked non-allowlisted Garden host: %s", url)
+            return null
+        }
         return try {
             val file = File(dir, name)
             val lock = locks.getOrPut(name) { Any() }
@@ -69,11 +84,17 @@ class GardenImageCache(cacheRoot: File) {
                 val bytes = download(url) ?: return null
                 // Write to a temp file then atomic-rename so a crash mid-write
                 // never leaves a truncated image that would later be served as
-                // "cached". The page-keyed name means a new tier overwrites.
+                // "cached". The page-keyed name means a new tier overwrites. A
+                // failed write (e.g. disk full) must NOT leak the .tmp — serve
+                // the just-downloaded bytes from memory regardless.
                 val tmp = File(dir, "$name.tmp")
-                tmp.writeBytes(bytes)
-                if (!tmp.renameTo(file)) { tmp.delete(); return response(bytes) }
-                enforceCapAsync()
+                try {
+                    tmp.writeBytes(bytes)
+                    if (!tmp.renameTo(file)) tmp.delete() else enforceCapAsync()
+                } catch (e: Exception) {
+                    Timber.tag("GardenCache").w(e, "cache write failed (serving from memory)")
+                    try { tmp.delete() } catch (_: Exception) {}
+                }
                 return response(bytes)
             }
         } catch (e: Exception) {
@@ -89,6 +110,13 @@ class GardenImageCache(cacheRoot: File) {
         val page = pageOf(url) ?: return null
         return "garden_$page.jpg"
     }
+
+    /** True iff [url]'s host is a known Garden asset host. Visible for test.
+     *  U7: gates the native fetch so the garden_NNN.jpg page-token regex can't
+     *  be abused to fetch arbitrary hosts with the app's network identity. */
+    internal fun hostAllowed(url: String): Boolean = try {
+        ALLOWED_HOSTS.contains((URL(url).host ?: "").lowercase())
+    } catch (_: Exception) { false }
 
     /** Extract the zero-padded page token from a Garden image URL, or null. */
     private fun pageOf(url: String): String? {
@@ -149,8 +177,16 @@ class GardenImageCache(cacheRoot: File) {
      * off the request path (fire-and-forget on a daemon thread).
      */
     private fun enforceCapAsync() {
+        // U7: single-flight — if an enforcer is already running, skip. Without
+        // this, a fast page-crawl spawned one thread per cache miss and they
+        // raced on the same directory (double-counting, redundant deletes).
+        if (!capRunning.compareAndSet(false, true)) return
         Thread {
             try {
+                // Sweep orphaned .tmp files first — a failed (e.g. disk-full)
+                // write can leave a *.jpg.tmp that the .jpg-only byte-cap below
+                // never reclaims, so it would leak indefinitely otherwise.
+                dir.listFiles { f -> f.isFile && f.name.endsWith(".tmp") }?.forEach { it.delete() }
                 val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".jpg") } ?: return@Thread
                 var total = 0L
                 for (f in files) total += f.length()
@@ -165,6 +201,8 @@ class GardenImageCache(cacheRoot: File) {
                 }
             } catch (e: Exception) {
                 Timber.tag("GardenCache").w(e, "cap enforcement failed")
+            } finally {
+                capRunning.set(false)
             }
         }.apply { isDaemon = true; name = "garden-cache-cap" }.start()
     }
@@ -187,6 +225,16 @@ class GardenImageCache(cacheRoot: File) {
     }
 
     companion object {
+        // U7: the only hosts the Garden native cache will fetch from — the
+        // github.com release URL and the githubusercontent asset hosts its
+        // 302 redirects to (matching the CSP img-src allowance). Any other host
+        // is refused (intercept returns null → the WebView loads it under CSP).
+        private val ALLOWED_HOSTS = setOf(
+            "github.com",
+            "release-assets.githubusercontent.com",
+            "objects.githubusercontent.com"
+        )
+
         // garden_NNN.jpg — captures the zero-padded page number from either
         // the github.com release path or the redirected asset URL's
         // filename query. Case-insensitive on the extension for safety.

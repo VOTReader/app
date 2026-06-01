@@ -294,6 +294,18 @@
 
  U7 — GardenImageCache: host allowlist + atomic cap + tmp cleanup  [P1, security] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — (a) intercept() now gates on hostAllowed(url) BEFORE
+   fetching: only github.com + release-assets/objects.githubusercontent.com are
+   fetched natively, so the garden_NNN.jpg regex can no longer be abused to
+   fetch an arbitrary host (an injected evil-host URL falls through to WebView +
+   CSP). (b) enforceCapAsync single-flights via an AtomicBoolean so a fast
+   page-crawl can't spawn racing enforcer threads. (c) a failed (disk-full) .tmp
+   write is deleted (not leaked) and the enforcer sweeps orphaned *.tmp first.
+   Kept the auto-redirect (github→githubusercontent are both allowlisted; a
+   manual per-hop rewrite was avoided as device-unverifiable for low marginal
+   value — optional U7b). Verified: :app:testDebugUnitTest GardenImageCacheTest
+   GREEN incl. 3 new host-allowlist cases. OWED: device-verify Garden still loads
+   (cache fails safe — a blocked/failed fetch just falls to the WebView's load).
  PROBLEM: native-privileged fetch with no origin check. intercept() fires on
    every WebView subresource (MainActivity.kt:489); any URL matching
    `garden_NNN.jpg` anywhere in the string triggers a native HttpURLConnection
@@ -641,7 +653,7 @@
  U4  search 31MB load ............. DONE  [P1] (translations load only on cache-miss build)
  U5  App() re-render .............. DONE  [P1] (annotation sub → AnnotationDomSync leaf; screen-memo→D4)
  U6  export fail-loud ............. DONE  [P1] (abort on read failure + counts manifest)
- U7  Garden allowlist/cap ......... TODO  [P1]
+ U7  Garden allowlist/cap ......... DONE  [P1, sec] (host allowlist + single-flight + tmp sweep)
  U8  applyDOMHighlights ........... TODO  [P2]
  U9  async screenshot ............. TODO  [P2]
  U10 CSP tighten .................. TODO  [P2]
