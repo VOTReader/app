@@ -171,6 +171,14 @@
 
  U3 — CORPUS_VERSION enforcement gate                               [P1] [V]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — tools/check-corpus-version.js hashes the 3 lazy corpus
+   bundles (CRLF-normalized, like sync-sw-version) against a committed
+   tools/corpus-version.lock {version, hash}. FAILS if corpus bytes changed
+   without a CORPUS_VERSION bump; auto-updates + stages the lock when bumped.
+   Wired: pre-commit Step 5b (auto mode, stages lock) + CI "Verify CORPUS_VERSION
+   gate" (--check, never writes). Proven by break-and-revert: an unbumped corpus
+   edit FAILS both modes with an actionable "bump CORPUS_VERSION c5->c6" message;
+   passes after revert. Lock initialized at c5/34e7a41a.
  PROBLEM: corpus data lives in bundle-a-vot/bible/matthew.js, served cache-first
    by the SW and busted ONLY by a manual CORPUS_VERSION bump. The content-hash
    CACHE_VERSION EXCLUDES corpus bundles (sync-sw-version.js:13-16 is a comment
@@ -574,7 +582,7 @@
  U0  doc truth-pass ............... IN PROGRESS (this session)
  U1  import durability ............ DONE  [P0] (barrier+guard; device walk + U14 owed)
  U2  minify ....................... DONE  [P1] (−663 KB / −32% crit path; corpus deferred)
- U3  corpus-version gate .......... TODO  [P1]
+ U3  corpus-version gate .......... DONE  [P1] (pre-commit + CI gate; break-tested)
  U4  search 31MB load ............. TODO  [P1]
  U5  App() re-render .............. TODO  [P1]
  U6  export fail-loud ............. TODO  [P1]

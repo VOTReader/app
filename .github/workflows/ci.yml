@@ -116,6 +116,15 @@ jobs:
         # version bump without `npm run build`). Catches what the hook misses.
         run: git diff --exit-code app/src/main/assets/dist/ app/src/main/assets/service-worker.js
 
+      - name: Verify CORPUS_VERSION gate (U3)
+        # The lazy corpus bundles (a-bible/matthew/vot) are SW-cached and busted
+        # ONLY by a manual CORPUS_VERSION bump — CACHE_VERSION excludes them.
+        # This gate (--check, never writes) fails if the committed
+        # tools/corpus-version.lock doesn't match the freshly-built corpus
+        # bundle hash, i.e. corpus DATA changed without bumping CORPUS_VERSION
+        # (which would silently leave existing web clients on stale scripture).
+        run: node tools/check-corpus-version.js --check
+
       - name: Syntax-check every src/ module
         run: |
           # .js — Node's own parser. node --check cannot parse JSX, so
