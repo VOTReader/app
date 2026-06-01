@@ -4,6 +4,62 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## 8/10 UPLIFT — Wave 1 (P0 + P1) + the search-quality fix (2026-06-01)
+
+Commits `6f2615d..a989514`. A deep 7-subsystem review (frontend, storage,
+renderer, native, perf, PWA, testing) rated the app **7/10** and concentrated
+the fixable gaps in data-safety + performance. The full 21-item remediation
+lives in **UPLIFT-PLAN.txt** (the canonical home — per-item problem / file:line
+evidence / fix / exit criteria / verification); this is the chapter-level
+record. Every item below is committed, CI-green, and deployed.
+
+**U0 — doc truth-pass.** Corrected three drifted claims (verified against code
+first): the "minified prod build" that never existed; the "1.03 MB cold boot"
+that's really ~2.10 MB (a+b+c+d all load blocking); the PlatformBridge "ZERO
+`window.AndroidBridge` matches" invariant violated by 4 live sites. (The review's
+"`__bumpHlTick` still live" finding was a FALSE ALARM — verified fully removed,
+left untouched.)
+
+**P0 — U1 import durability.** Import (the only backup) could silently lose
+data: fire-and-forget `_save()` + a blind `setTimeout(reload, 1500)` raced the
+IDB writes. Added `CachedStore.whenSaved()` (a durability barrier), made
+`_doImport` await every store write before reload, and gated the boot
+orphan-media sweep on `JournalStore.isReady()`. 5 unit tests.
+
+**P1 — performance + correctness + security.**
+- **U2** minify b/c/d → boot path 2054→1594 KB (−460 KB / −22%). bundle-a minify
+  was ATTEMPTED then **REVERTED** — esbuild rewrote the concatenated
+  classic-script's top-level `this`→`undefined`, breaking the FlexSearch +
+  html2canvas UMD globals (search engine + web screenshots dead); caught during
+  U4 verification. Lesson: never esbuild-minify a concatenated classic-script
+  bundle of UMD vendors.
+- **U3** CORPUS_VERSION enforcement gate (`tools/check-corpus-version.js` + lock,
+  pre-commit + CI; break-tested) — no more silent stale-scripture deploys.
+- **U4** search no longer loads ~31 MB of alt-translations on a warm index open
+  (`loadAllTranslations` moved into `ensureIndex`'s cache-miss branch).
+- **U5** annotation store-subscription moved into an `<AnnotationDomSync/>` leaf
+  so a highlight/note/link/bookmark tap re-renders only that leaf, not all of
+  App() + the ~90-prop ROUTES tree.
+- **U6** export fails loud on a partial read (no more incomplete-but-valid-
+  looking backup) + a `counts` integrity manifest.
+- **U7** GardenImageCache host allowlist (SSRF guard) + single-flight cap
+  enforcer + orphaned-`.tmp` sweep. 3 new Kotlin tests.
+
+**U22 (user-flagged) — search quality.** Section headings, inline topic breaks,
+and chapter titles dropped from the search index (no `kind:'heading'` /
+`'chapter-title'` docs; the `heading` field un-indexed; `SCHEMA_VERSION` 12→13).
+Verse-text search intact; verified live (0 heading hits, verse results normal).
+
+Verification throughout: tsc + eslint (0/0) + **1527 vitest** + Kotlin
+testDebugUnitTest + JaCoCo + `npm run build` green; votSmoke PASS (12 screens,
+letter + wtlb annotation round-trips, 0 console errors); export payload +
+search result-kinds inspected live in preview. **Owed to device walks:** the
+SAF/import flow (U1) and Garden loading under the new host gate (U7) — both fail
+safe. Remaining for the full 8/10 exit bar: **U8** (apply-pass single-walk perf),
+**U10** (CSP `unsafe-inline`), **U14** (export→import e2e), **U15** (renderer +
+scripture-resolution coverage); rest of P2 (U9, U11–U13, U16–U21) raise
+individual subsystem scores.
+
 ## Overlap-precedence — most-recent annotation wins (2026-05-31)
 
 Commit `c7d37ba`. When annotations overlap, the more-recently-created VISIBLE
