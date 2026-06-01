@@ -998,6 +998,13 @@ async function ensureIndex(code, corpus, options) {
         return cached.db;
       }
       console.log('[VotSearch] cache MISS for ' + corpus + '/' + code + ' — building fresh');
+      // U4: the scriptures index folds in cross-translation wording (KJV/ASV/…),
+      // so the ~31 MB of alt Bible translations must be loaded BEFORE building.
+      // This line is reached ONLY on a cache MISS — a warm index (the common
+      // case) cache-HITs above and returns WITHOUT ever loading the translations.
+      // That's the fix: opening search no longer pulls 31 MB every time (and on
+      // web, no per-session re-download of the alt-translation scripts).
+      if (corpus === 'scriptures') await loadAllTranslations();
       var built = await buildIndex(code, corpus, options);
       dropActive(corpus);
       slot.code = code;
@@ -1059,8 +1066,8 @@ async function loadAllTranslations() {
 
 // Public init — builds BOTH engines for the given translation. Scriptures and
 // Volumes are built in parallel; first search returns whenever its engine is up.
-// Pre-loads all alt translations so the scriptures index can match queries in
-// any translation's wording (KJV phrasing finds the same verse, etc).
+// Alt translations are loaded lazily by ensureIndex ONLY when the scriptures
+// index is (re)built (cache miss) — never on a warm-cache open (U4).
 async function init(options) {
   options = options || {};
   var code = options.translation || 'nkjv';
@@ -1071,15 +1078,15 @@ async function init(options) {
   // deletes superseded keys — the current-signature entries this very init
   // is about to load/build are preserved, so it never forces a rebuild.
   purgeStaleCache(code).catch(function () {});
-  // Load alt translations FIRST if scriptures is in the build. Volumes can
-  // build in parallel with this since they don't depend on bible translations.
-  var translationLoad = corpora.indexOf('scriptures') >= 0 ? loadAllTranslations() : Promise.resolve();
-  var volumeBuild = corpora.indexOf('volumes') >= 0 ? ensureIndex(code, 'volumes', options) : Promise.resolve();
-  // Wait for translations before starting scriptures build (otherwise we'd
-  // index without the cross-translation search corpus).
-  await translationLoad;
-  var scriptureBuild = corpora.indexOf('scriptures') >= 0 ? ensureIndex(code, 'scriptures', options) : Promise.resolve();
-  await Promise.all([volumeBuild, scriptureBuild]);
+  // U4: ensureIndex now loads the alt Bible translations ITSELF, but only on a
+  // cache MISS (the build needs them). So a warm index opens search with ZERO
+  // translation downloads — init() previously pulled ~31 MB unconditionally on
+  // EVERY open (even a cache hit) and, on web, re-downloaded them each session.
+  // Scriptures + Volumes build in parallel; first search returns when its engine is up.
+  var builds = [];
+  if (corpora.indexOf('volumes') >= 0) builds.push(ensureIndex(code, 'volumes', options));
+  if (corpora.indexOf('scriptures') >= 0) builds.push(ensureIndex(code, 'scriptures', options));
+  await Promise.all(builds);
   return true;
 }
 

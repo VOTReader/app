@@ -134,10 +134,17 @@
 
  U2 — Minify the bundles                                            [P1] [V]
  ───────────────────────────────────────────────────────────────────────────
- ✅ LANDED 2026-06-01 — --minify on build:b/c/d + a minify:a post-step for
-   bundle-a (the Python-concat critical bundle). MEASURED: a 1010→808 KB (−20%),
-   b 435→226 (−48%), c 29→15 (−50%), d 579→342 (−41%) ⇒ blocking critical path
-   2054→1391 KB (−663 KB / −32%). CACHE_VERSION auto-bumped (CORE cache only).
+ ✅ LANDED 2026-06-01 (revised) — --minify on build:b/c/d ONLY. MEASURED:
+   b 435→226 KB (−48%), c 29→15 (−50%), d 579→342 (−41%) ⇒ blocking critical
+   path 2054→1594 KB (−460 KB / −22%). CACHE_VERSION auto-bumped (CORE cache).
+   ⚠ bundle-a minify was ATTEMPTED then REVERTED (fix in the U4 commit): esbuild
+   rewrote the concatenated classic-script's top-level `this`→`undefined`,
+   breaking the FlexSearch + html2canvas UMD global attachment — search engine
+   and web screenshots dead (VotSearch never inits). Reverting restored both
+   (preview-verified: FlexSearch/html2canvas/VotSearch all defined, search→200
+   results). Per-file bundle-a minify is a possible later optimization (U2b) but
+   not worth the UMD-this risk. LESSON: never esbuild-minify a concatenated
+   classic-script bundle of UMD vendors — top-level `this` becomes undefined.
    votSmoke PASS on the minified bundles (12 screens, both annotation round-trips,
    0 console errors, 0 404s; the earlier "FAIL" was the app restoring into the
    Garden reader so the harness couldn't start from Home — env, not minify).
@@ -197,6 +204,18 @@
 
  U4 — Search: stop loading 31 MB of translations on every open      [P1] [V]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — loadAllTranslations() moved OUT of init() INTO
+   ensureIndex's cache-MISS branch (gated on corpus==='scriptures'). A warm
+   index opens search with ZERO translation downloads (the cache HIT returns at
+   ensureIndex L998, before the L1007 load); a genuine rebuild still folds in
+   cross-translation wording. Verified: clean miss-build w/ corpus → search
+   'God' → 200 results (build path intact); running init confirmed = new code.
+   Correct by construction + strictly an improvement (never loads MORE than
+   before). NOTE: whether cache HITS occur depends on dataSignature stability
+   (reads lazy corpus globals) — if search inits before the corpus loads, the
+   sig differs and it rebuilds. Pre-existing dynamic (CLAUDE.md boot-purge note),
+   NOT regressed by U4; worth a follow-up so search-init waits for corpus. SW
+   cache-on-use for the translation scripts folded into U18.
  PROBLEM: init() fires loadAllTranslations() whenever scriptures are searched
    (search.js:1076 [V]), loading all 7 bible-*.js (~31 MB) via Promise.all
    (:1052-1057) — even on a FlexSearch CACHE HIT, where the index already holds
@@ -581,9 +600,9 @@
 ═══════════════════════════════════════════════════════════════════════════
  U0  doc truth-pass ............... IN PROGRESS (this session)
  U1  import durability ............ DONE  [P0] (barrier+guard; device walk + U14 owed)
- U2  minify ....................... DONE  [P1] (−663 KB / −32% crit path; corpus deferred)
+ U2  minify ....................... DONE  [P1] (b/c/d only; −460 KB/−22%; bundle-a minify reverted — UMD this bug)
  U3  corpus-version gate .......... DONE  [P1] (pre-commit + CI gate; break-tested)
- U4  search 31MB load ............. TODO  [P1]
+ U4  search 31MB load ............. DONE  [P1] (translations load only on cache-miss build)
  U5  App() re-render .............. TODO  [P1]
  U6  export fail-loud ............. TODO  [P1]
  U7  Garden allowlist/cap ......... TODO  [P1]
