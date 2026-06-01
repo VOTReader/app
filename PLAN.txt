@@ -3153,7 +3153,14 @@ Current validation gap:
 W10 — ACCESSIBILITY (WCAG 2.1 AA compliance)
 ───────────────────────────────────────────────────────────────────────────────
 
-Goal: make VOTReader fully usable by keyboard-only users, screen reader
+  *** SCOPE DECISION (2026-05-31): SHIP W10-LITE, DEFER THE FULL AA SUITE. ***
+  Audience = 20+ readers, all sighted/hearing/able-bodied, some older. The
+  full plan below (W10.1-W10.5) is overwhelmingly screen-reader + keyboard-
+  only work with ZERO in-audience recipients. The audience-matched subset is
+  defined in the W10-LITE block (right after "Current state"): text-size
+  control + motion/visual (W10.5) + contrast/touch-target audits.
+
+Goal (FULL SUITE — DEFERRED 2026-05-31; see W10-LITE below): make VOTReader fully usable by keyboard-only users, screen reader
 users, and users with motion/visual sensitivities. Target: WCAG 2.1 AA
 across all 53 screens, 12 sheets, 4 modal overlays, and the annotation
 toolbar.
@@ -3180,6 +3187,90 @@ Current state (audited 2026-05-28):
   - AppShellSheets: zero role="dialog" on any of the 12 sheet overlays
   - Toast notifications: no aria-live region
   - ConfirmStrip: no aria-live for dynamic confirmation questions
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ W10-LITE — AUDIENCE-MATCHED SCOPE (RECOMMENDED, 2026-05-31)        │
+  │ Ship this. Defer everything in W10.1-W10.5 not listed here.        │
+  └──────────────────────────────────────────────────────────────────┘
+
+  WHY LITE: audience = 20+ readers, all sighted/hearing/able-bodied, some
+  older. Screen-reader semantics (W10.4), modal focus traps (W10.2), and
+  keyboard-only nav + roving tabindex (W10.1d/W10.3) serve populations with
+  ZERO members in this audience — and carry real regression risk on a working
+  app (focus traps fight NoteSheet autofocus + ConfirmStrip; div->h1 shifts
+  CSS; roving tabindex on the 733-line SelectionToolbar is fiddly). The only
+  in-audience need is OLDER READERS: bigger text, stronger contrast, bigger
+  tap targets, less motion. That is an ergonomics project, which W10-as-scoped
+  barely addresses — the #1 item (WL1) isn't even in the original W10 plan.
+
+  WL1 — TEXT-SIZE CONTROL   [the highest-value item; NOT in original W10]
+  ────────────────────────────────────────────────────────────────────
+    Stepped size selector in Settings (Text & Translation section, under
+    "Modern Fonts"). Persist in vot-state.settings.fontScale. Boot script
+    (index.html) applies it pre-mount like fontStyle (no FOUC); use-settings.js
+    mirrors it live on toggle.
+    Mechanism: a --font-scale CSS var multiplied into the root rem (or scale
+    the root font-size directly). Steps e.g. 1.0 / 1.15 / 1.3 / 1.5. This is
+    NOT the 260-declaration font-family migration documented in the FONT
+    TOGGLE section — that migration is for font CHOICE (swapping typefaces);
+    SIZE is a separate axis that only needs the root multiplier.
+
+    COST LOCK (measured 2026-05-31):
+      - app.css: 364 rem font-sizes vs 2 px. Root-scale covers all 364
+        cleanly; fix the 2 px stragglers.
+      - The PRIMARY reading surfaces (letters / Bible chapters / WTLB entries /
+        search results) are all app.css rem -> they scale for free.
+      - BUT two JS-injected style subsystems are 100% px and will NOT scale
+        with a root multiplier (they're injected via R('...') template strings,
+        not app.css):
+          * styles/journal-styles.js        — 87 px font-sizes, 0 rem
+          * ui/screens/HighlightsScreen.jsx — ~14 px font-sizes (its <style>)
+        (+ a journal-stats toast glyph and 4 close/back button glyphs ×/‹ —
+        icon glyphs, leave them.)
+      - To make scaling UNIFORM, convert those ~101 px->rem (÷16) in the two
+        files. Bounded, mechanical, CSS-only, visual-diffable in preview. This
+        is the one non-trivial piece of WL1.
+      - >>> DECISION NEEDED before WL1 impl: convert the two px subsystems
+        (uniform scaling everywhere) OR ship without (reading surfaces scale;
+        Journal + Highlights index stay fixed-size). RECOMMEND: convert — so an
+        older reader doesn't hit two screens that silently ignore their size
+        setting.
+
+  WL2 — MOTION + VISUAL   (= all of W10.5; highest value-per-line in the phase)
+  ────────────────────────────────────────────────────────────────────
+    Take W10.5a/b/c verbatim — all cheap, global, broadly helpful:
+      - prefers-reduced-motion (one nuclear CSS rule; helps vestibular-
+        sensitive older users)
+      - :focus-visible outlines (also helps older mouse users who lose focus)
+      - forced-colors annotation preservation
+
+  WL3 — CONTRAST SPOT-AUDIT
+  ────────────────────────────────────────────────────────────────────
+    Older eyes lose contrast sensitivity. Audit body text + the GOLD accents
+    (verse numbers, chrome, ~#e8c050 on dark) against WCAG AA (4.5:1 body /
+    3:1 large) in BOTH dark + light mode. Gold-on-dark at small sizes is the
+    likely failure. Fix by nudging the gold value or size — not a bandaid rule.
+
+  WL4 — TOUCH-TARGET SPOT-AUDIT
+  ────────────────────────────────────────────────────────────────────
+    Age reduces tap precision even in able-bodied hands. Enforce a 44x44px
+    floor (WCAG 2.5.5) on: bottom-nav buttons, footnote bubbles, color
+    swatches, SelectionToolbar buttons, close/back glyph buttons. Pad the
+    hit-area; visible size can stay the same.
+
+  WL5 — OPTIONAL CHEAP CHERRY-PICK   (low cost; future-proofs if audience broadens)
+  ────────────────────────────────────────────────────────────────────
+    aria-label on icon-only buttons + role="dialog" on modals — LABELS ONLY,
+    no focus-trap machinery, no behavior change. Skip everything else screen-
+    reader-shaped. Grab if cheap; not required for lite.
+
+  DEFERRED (record as a decision, not a silent gap):
+    All of W10.1 (focus trap / announce / roving tabindex), W10.2 (modal focus
+    mgmt), W10.3 (keyboard-only nav), W10.4 (screen-reader semantics), and the
+    native crash-view announceForAccessibility. Reason: no in-audience users.
+    The full suite below stays as the reference if the audience ever broadens.
+
+  ─── FULL SUITE BELOW (W10.1-W10.5) — DEFERRED per the W10-LITE decision ───
 
   W10.1 — Accessibility infrastructure (foundation primitives)
   ────────────────────────────────────────────────────────────
