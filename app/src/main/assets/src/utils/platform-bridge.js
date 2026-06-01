@@ -17,7 +17,7 @@
    W1.2 (NEXT): migrate the call sites in use-settings, use-thumbnails,
      GardenView, JournalRecordingSheet, SettingsScreen. After this commit,
      grep for `window.AndroidBridge` outside this file returns ZERO matches.
-   W1.3: web file I/O — openFilePicker + saveToDownloads via <input
+   W1.3: web file I/O — openFilePicker + saveToFile via <input
      type="file"> / Blob URL. MUST be called from a user-gesture callstack
      (browsers block programmatic .click() outside user-initiated handlers).
    W1.4: web audio recording — CONSOLIDATES the existing MediaRecorder
@@ -59,7 +59,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => void} nativeRecordCancel
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
  * @property {() => void} openFilePicker
- * @property {(filename: string, content: string) => string} saveToDownloads
+ * @property {(suggestedName: string, content: string) => void} saveToFile
  * @property {() => string} getCrashLog
  */
 
@@ -120,7 +120,7 @@ const androidImpl = {
   // both platforms. Web returns html2canvas's genuine async Promise.
   takeScreenshot: async (top, max, q) => /** @type {any} */ (window).AndroidBridge.takeScreenshot(top, max, q),
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
-  saveToDownloads: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToDownloads(name, content),
+  saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
   // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
   getCrashLog: () => mergeCrashLog(/** @type {any} */ (window).AndroidBridge.getCrashLog()),
 };
@@ -302,29 +302,36 @@ function webOpenFilePicker() {
 }
 
 // Web save-to-downloads — Blob + URL.createObjectURL + anchor click (W1.2
-// Tier B.2). Folded in from SettingsScreen.jsx's existing fallback per
-// [[consolidate-dont-duplicate]]. Returns 'ok' or 'error:<reason>'
-// matching the Android contract from AppInterface.kt.
+// Tier B.2). The browser's download manager IS the destination picker
+// (the user's download settings choose the folder, or a "save as" dialog
+// prompts), so this mirrors the SAF flow's outcome. Asynchronous to match
+// the Android saveToFile contract: fires window.__onExportComplete with
+// "ok" / "error:<reason>" instead of returning a value.
 /**
- * @param {string} filename
+ * @param {string} suggestedName
  * @param {string} content
- * @returns {string}
+ * @returns {void}
  */
-function webSaveToDownloads(filename, content) {
+function webSaveToFile(suggestedName, content) {
+  /** @param {string} result */
+  const report = (result) => {
+    const cb = /** @type {any} */ (window).__onExportComplete;
+    if (typeof cb === 'function') cb(result);
+  };
   try {
     const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = suggestedName;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
       try { URL.revokeObjectURL(url); a.remove(); } catch (_e) { /* DOM teardown best-effort */ }
     }, 0);
-    return 'ok';
+    report('ok');
   } catch (e) {
-    return 'error:' + (/** @type {any} */ (e) && /** @type {any} */ (e).message || e);
+    report('error:' + (/** @type {any} */ (e) && /** @type {any} */ (e).message || e));
   }
 }
 
@@ -680,7 +687,7 @@ const webImpl = {
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)
   setKeepScreenOn: webSetKeepScreenOn,       // Tier B.1 (WakeLock + de-dup)
   openFilePicker: webOpenFilePicker,         // Tier B.2 (DOM input + FileReader → __onImportFile)
-  saveToDownloads: webSaveToDownloads,       // Tier B.2 (Blob + URL.createObjectURL + anchor)
+  saveToFile: webSaveToFile,                 // Tier B.2 (Blob + URL.createObjectURL + anchor → __onExportComplete)
   setImmersiveMode: webSetImmersiveMode,     // Tier B.3 (Fullscreen API, best-effort)
   setZoomEnabled: webSetZoomEnabled,         // Tier B.3 (no-op — browsers handle zoom natively)
   resetZoom: webResetZoom,                   // Tier B.3 (no-op — no JS API to reset user pinch-zoom)

@@ -500,15 +500,28 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       const json = JSON.stringify(payload);
       const stamp = new Date().toISOString().slice(0, 10);
       const filename = `votreader-backup-${stamp}.json`;
-      const result = PlatformBridge.saveToDownloads(filename, json);
 
+      // saveToFile is async: the user chooses the destination (Android SAF
+      // create-document picker — folder + filename; the browser download
+      // manager on web), then the outcome arrives via
+      // window.__onExportComplete. Install the one-shot callback BEFORE
+      // launching, mirroring the import flow's window.__onImportFile pattern.
+      window.__onExportComplete = (result) => {
+        window.__onExportComplete = null;
+        hideToast(_TOAST_ID);
+        if (result === 'ok') {
+          _showToast('Backup saved.');
+        } else if (result === 'cancelled') {
+          /* user dismissed the picker — no error, stay quiet */
+        } else {
+          console.warn('export error:', result);
+          _showToast('Export failed. Please try again.');
+        }
+      };
+      // The picker takes over the screen; drop the "Preparing…" toast so it
+      // isn't stranded behind the system UI while the user picks a folder.
       hideToast(_TOAST_ID);
-      if (result === 'ok') {
-        _showToast('Backup saved to your Downloads folder.');
-      } else {
-        console.warn('saveToDownloads error:', result);
-        _showToast('Export failed. Please try again.');
-      }
+      PlatformBridge.saveToFile(filename, json);
     } catch (e) {
       console.warn('export failed', e);
       hideToast(_TOAST_ID);

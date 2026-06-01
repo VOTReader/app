@@ -263,6 +263,7 @@ class JsBridgeTest {
         // If a callback is renamed on one side but not the other, the
         // bridge breaks silently. These pins catch the mismatch.
         assertEquals("__onImportFile", JsEvent.ImportFile.fn)
+        assertEquals("__onExportComplete", JsEvent.ExportComplete.fn)
         assertEquals("__onMicPermissionResult", JsEvent.MicPermissionResult.fn)
         assertEquals("__onNativeRecordingComplete", JsEvent.NativeRecordingComplete.fn)
     }
@@ -274,6 +275,7 @@ class JsBridgeTest {
         // IllegalStateException = require passed + reached WebView.
         for (event in listOf(
             JsEvent.ImportFile,
+            JsEvent.ExportComplete,
             JsEvent.MicPermissionResult,
             JsEvent.NativeRecordingComplete
         )) {

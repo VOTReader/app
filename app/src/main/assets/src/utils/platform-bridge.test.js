@@ -35,7 +35,7 @@ const METHODS = [
   'getZoomScale',
   'takeScreenshot',
   'openFilePicker',
-  'saveToDownloads',
+  'saveToFile',
   'getCrashLog',
   'setImmersiveMode',
   'haptic',
@@ -65,7 +65,7 @@ function mockAndroidBridge() {
     getZoomScale: vi.fn(() => 1.5),
     takeScreenshot: vi.fn(() => 'data:image/jpeg;base64,abc'),
     openFilePicker: vi.fn(),
-    saveToDownloads: vi.fn(() => 'ok'),
+    saveToFile: vi.fn(),
     getCrashLog: vi.fn(() => '[{"ts":0,"tag":"x","msg":"y"}]'),
     setImmersiveMode: vi.fn(),
     haptic: vi.fn(),
@@ -123,6 +123,10 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['nativeRecordStop', []],
     ['nativeRecordCancel', []],
     ['openFilePicker', []],
+    // saveToFile is now fire-and-forget (async SAF picker on Android);
+    // the result arrives via window.__onExportComplete, so the bridge
+    // method itself returns void and just delegates.
+    ['saveToFile', ['notes.json', '{}']],
   ];
   it.each(voidCases)('void method %s delegates with args %o', (name, args) => {
     bridge[name](...args);
@@ -141,7 +145,6 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     // its sync native call in Promise.resolve to give consumers a uniform
     // Promise<string> shape (web returns html2canvas's genuine Promise).
     ['takeScreenshot', [0, 1024, 80], 'data:image/jpeg;base64,abc'],
-    ['saveToDownloads', ['notes.json', '{}'], 'ok'],
     // getCrashLog is NO LONGER a pure passthrough — W7.4 merges the native
     // BoundedLogTree with the JS DiagnosticLog. See its own describe below.
   ];
@@ -213,7 +216,7 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
 
   // Category 3 — notYetImplemented warns but doesn't throw
   // (Most methods now have real impls in their own describe blocks below:
-  //   setKeepScreenOn (Tier B.1), openFilePicker + saveToDownloads (Tier B.2),
+  //   setKeepScreenOn (Tier B.1), openFilePicker + saveToFile (Tier B.2),
   //   takeScreenshot (Tier A), setImmersiveMode + setZoomEnabled + resetZoom
   //   (Tier B.3), recording methods (Tier C). Only haptic remains — its JS
   //   wiring is post-W1; see [[haptic-bridge-ready]].)
@@ -417,10 +420,10 @@ describe('PlatformBridge — Web openFilePicker (DOM input + FileReader)', () =>
 });
 
 // ─────────────────────────────────────────────────────────────────────
-// Web saveToDownloads — Blob + anchor click (W1.2 Tier B.2)
+// Web saveToFile — Blob + anchor click → __onExportComplete (W1.2 Tier B.2)
 // ─────────────────────────────────────────────────────────────────────
 
-describe('PlatformBridge — Web saveToDownloads (Blob + anchor)', () => {
+describe('PlatformBridge — Web saveToFile (Blob + anchor → __onExportComplete)', () => {
   /** @type {any} */ let bridge;
   /** @type {any} */ let createElementSpy;
   /** @type {any} */ let createObjectURLSpy;
@@ -453,19 +456,24 @@ describe('PlatformBridge — Web saveToDownloads (Blob + anchor)', () => {
   afterEach(() => {
     createElementSpy.mockRestore();
     anchorRemoveSpy.mockRestore();
+    delete (/** @type {any} */ (globalThis.window).__onExportComplete);
   });
 
-  it('creates Blob, anchors a download link, clicks it, returns "ok"', () => {
-    const result = bridge.saveToDownloads('backup.json', '{"a":1}');
-    expect(result).toBe('ok');
+  it('creates Blob, anchors a download link, clicks it, reports "ok"', () => {
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onExportComplete = cb;
+    const ret = bridge.saveToFile('backup.json', '{"a":1}');
+    expect(ret).toBeUndefined(); // fire-and-forget: no sync return value
     expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
     expect(anchorEl.download).toBe('backup.json');
     expect(anchorEl.getAttribute('href')).toBe('blob:mock-url');
     expect(anchorClickSpy).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith('ok');
   });
 
   it('revokes the object URL after click (deferred via setTimeout 0)', async () => {
-    bridge.saveToDownloads('backup.json', '{}');
+    /** @type {any} */ (globalThis.window).__onExportComplete = vi.fn();
+    bridge.saveToFile('backup.json', '{}');
     // The setTimeout 0 hasn't fired yet
     expect(revokeObjectURLSpy).not.toHaveBeenCalled();
     await new Promise((r) => setTimeout(r, 0));
@@ -473,13 +481,21 @@ describe('PlatformBridge — Web saveToDownloads (Blob + anchor)', () => {
     expect(anchorRemoveSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('returns "error:<reason>" when Blob construction throws', () => {
+  it('reports "error:<reason>" via __onExportComplete when Blob construction throws', () => {
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onExportComplete = cb;
     const origBlob = globalThis.Blob;
     /** @type {any} */ (globalThis).Blob = function () { throw new Error('quota exceeded'); };
-    const result = bridge.saveToDownloads('backup.json', '{}');
-    expect(result).toMatch(/^error:/);
-    expect(result).toMatch(/quota exceeded/);
+    bridge.saveToFile('backup.json', '{}');
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb.mock.calls[0][0]).toMatch(/^error:/);
+    expect(cb.mock.calls[0][0]).toMatch(/quota exceeded/);
     /** @type {any} */ (globalThis).Blob = origBlob;
+  });
+
+  it('does not throw when __onExportComplete is absent', () => {
+    delete (/** @type {any} */ (globalThis.window).__onExportComplete);
+    expect(() => bridge.saveToFile('backup.json', '{}')).not.toThrow();
   });
 });
 

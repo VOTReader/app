@@ -214,16 +214,18 @@ class AppInterface(
         }
     }
 
-    /** Write [content] (UTF-8 text) to the Downloads folder as [filename].
-     *  Returns "ok" on success or "error:<reason>" on failure. Requires
-     *  Android 10+ (API 29) for the MediaStore Downloads collection; on
-     *  older devices returns "error:requires_android_10". */
+    /** Export [content] (UTF-8 text) to a user-chosen location via the
+     *  system "create document" picker (SAF). Asynchronous: returns
+     *  immediately after launching the picker; the outcome is delivered to
+     *  JS as window.__onExportComplete("ok" | "error:<reason>" |
+     *  "cancelled"). Unlike the old Downloads-collection path this works on
+     *  every supported API level (SAF is API 19+), so Export is reachable
+     *  on Android 8/9 where Downloads writes hard-failed. [suggestedName]
+     *  pre-fills the picker's filename field; the user can override the
+     *  name and folder. */
     @JavascriptInterface
-    fun saveToDownloads(filename: String, content: String): String {
-        return when (val r = vm.storage.writeJsonToDownloads(filename, content)) {
-            is StorageManager.Result.Success -> "ok"
-            is StorageManager.Result.Failure -> "error:${r.reason}"
-        }
+    fun saveToFile(suggestedName: String, content: String) {
+        host.postToUi { host.launchExportPicker(suggestedName, content) }
     }
 
     /**

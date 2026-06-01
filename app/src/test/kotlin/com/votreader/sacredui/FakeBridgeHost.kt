@@ -39,6 +39,9 @@ class FakeBridgeHost(
     var filePickerLaunchCount: Int = 0
     var micPermissionLaunchCount: Int = 0
 
+    /** Records (suggestedName, content) for every launchExportPicker call. */
+    val exportPickerCalls: MutableList<Pair<String, String>> = mutableListOf()
+
     /** Optional exception that launchFilePicker throws when invoked. */
     var filePickerThrowsOnLaunch: Exception? = null
 
@@ -56,6 +59,10 @@ class FakeBridgeHost(
     override fun launchFilePicker() {
         filePickerLaunchCount++
         filePickerThrowsOnLaunch?.let { throw it }
+    }
+
+    override fun launchExportPicker(suggestedName: String, content: String) {
+        exportPickerCalls.add(suggestedName to content)
     }
 
     override fun launchMicPermissionRequest() {

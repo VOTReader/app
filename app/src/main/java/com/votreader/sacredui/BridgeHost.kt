@@ -53,6 +53,16 @@ interface BridgeHost {
     /** Launch the system JSON file picker (Settings import flow). */
     fun launchFilePicker()
 
+    /**
+     * Launch the SAF "create document" picker so the user chooses the
+     * export destination (folder + filename). [content] is the JSON
+     * payload to write once a URI comes back; the host stashes it and
+     * writes it in the picker-result callback, reporting the outcome to
+     * JS via window.__onExportComplete. Works on every supported API
+     * level (SAF is API 19+) and needs no storage permission.
+     */
+    fun launchExportPicker(suggestedName: String, content: String)
+
     /** Launch the proactive RECORD_AUDIO permission request. */
     fun launchMicPermissionRequest()
 

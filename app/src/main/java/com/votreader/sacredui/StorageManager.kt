@@ -1,20 +1,17 @@
 package com.votreader.sacredui
 
-import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Base64
 import timber.log.Timber
 
 /**
  * File I/O surface area for the JS layer: read a picked URI into base64
- * for the import flow, write Export JSON into Downloads, query URI sizes
- * before allocating to avoid OOM. Centralized so the size-cap policy
- * (MAX_IMPORT_SIZE) lives in one place rather than scattered between
- * the picker callback and saveToDownloads.
+ * for the import flow, write Export JSON to a user-chosen URI (from the
+ * SAF create-document picker), query URI sizes before allocating to avoid
+ * OOM. Centralized so the size-cap policy (MAX_IMPORT_SIZE) lives in one
+ * place rather than scattered between the picker callback and the writer.
  *
  * All operations return [Result] -- a sealed interface with Success / Failure.
  * Distinct from kotlin.Result so a Failure can carry a plain string
@@ -54,29 +51,23 @@ class StorageManager(private val context: Context) {
     }
 
     /**
-     * Write [content] (UTF-8) to the system Downloads collection as
-     * [filename]. Requires Android 10+ (the MediaStore Downloads
-     * collection didn't exist before then); older devices return
-     * Failure("requires_android_10").
+     * Write [content] (UTF-8) to an already-chosen SAF document [uri]
+     * (the result of ACTION_CREATE_DOCUMENT, where the user picked the
+     * destination folder + filename). Unlike the old Downloads-collection
+     * writer this works on every supported API level — SAF is API 19+,
+     * so this is the path that makes Export reachable on Android 8/9
+     * (minSdk here is 26), where the MediaStore.Downloads collection
+     * doesn't exist and the previous writer hard-failed. The picker also
+     * needs no storage permission, so nothing is added to the manifest.
      */
-    fun writeJsonToDownloads(filename: String, content: String): Result<Unit> {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return Result.Failure("requires_android_10")
-        }
+    fun writeTextToUri(uri: Uri, content: String): Result<Unit> {
         return try {
-            val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, filename)
-                put(MediaStore.Downloads.MIME_TYPE, "application/json")
-            }
-            val uri = context.contentResolver.insert(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
-            ) ?: return Result.Failure("no_uri")
             context.contentResolver.openOutputStream(uri)?.use { stream ->
                 stream.write(content.toByteArray(Charsets.UTF_8))
             } ?: return Result.Failure("no_output_stream")
             Result.Success(Unit)
         } catch (e: Exception) {
-            Timber.w(e, "saveToDownloads failed")
+            Timber.w(e, "writeTextToUri failed")
             Result.Failure(e.message ?: "write_failed")
         }
     }

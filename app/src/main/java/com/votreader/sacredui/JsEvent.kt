@@ -9,12 +9,20 @@ package com.votreader.sacredui
  *
  * JS-side receivers:
  *   ImportFile            -> SettingsScreen.__onImportFile(b64OrNull)
+ *   ExportComplete        -> SettingsScreen.__onExportComplete("ok"|"error:<reason>"|"cancelled")
  *   MicPermissionResult   -> JournalRecordingSheet.__onMicPermissionResult(granted)
  *   NativeRecordingComplete -> JournalRecordingSheet.__onNativeRecordingComplete(b64, durMs, mime)
  *   AnnotationTap         -> SelectionToolbar.__nativeTapAnnotation(cssX, cssY)
  */
 sealed class JsEvent(val fn: String) {
     data object ImportFile : JsEvent("__onImportFile")
+
+    // Result of the SAF export-document picker (Settings → Your Data →
+    // Export). "ok" when the JSON was written to the user-chosen URI,
+    // "error:<reason>" on a write failure, "cancelled" when the user
+    // dismissed the picker. Mirrors ImportFile's async-callback shape.
+    data object ExportComplete : JsEvent("__onExportComplete")
+
     data object MicPermissionResult : JsEvent("__onMicPermissionResult")
     data object NativeRecordingComplete : JsEvent("__onNativeRecordingComplete")
 

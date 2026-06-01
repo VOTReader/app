@@ -5345,14 +5345,19 @@
         const json = JSON.stringify(payload);
         const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
         const filename = `votreader-backup-${stamp}.json`;
-        const result = PlatformBridge.saveToDownloads(filename, json);
+        window.__onExportComplete = (result) => {
+          window.__onExportComplete = null;
+          hideToast(_TOAST_ID);
+          if (result === "ok") {
+            _showToast("Backup saved.");
+          } else if (result === "cancelled") {
+          } else {
+            console.warn("export error:", result);
+            _showToast("Export failed. Please try again.");
+          }
+        };
         hideToast(_TOAST_ID);
-        if (result === "ok") {
-          _showToast("Backup saved to your Downloads folder.");
-        } else {
-          console.warn("saveToDownloads error:", result);
-          _showToast("Export failed. Please try again.");
-        }
+        PlatformBridge.saveToFile(filename, json);
       } catch (e) {
         console.warn("export failed", e);
         hideToast(_TOAST_ID);

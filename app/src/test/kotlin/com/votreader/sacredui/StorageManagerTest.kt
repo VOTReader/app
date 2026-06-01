@@ -1,18 +1,15 @@
 package com.votreader.sacredui
 
 import android.content.ContentResolver
-import android.content.ContentValues
 import android.content.Context
 import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Base64
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
 import org.junit.After
 import org.junit.Before
@@ -33,16 +30,16 @@ import kotlin.test.assertTrue
  * NK3 — StorageManager tests.
  *
  * Setup: Robolectric brings up the Android framework runtime (so
- * Base64.encodeToString, MediaStore.Downloads.EXTERNAL_CONTENT_URI,
- * MatrixCursor, etc. all behave like real Android instead of throwing
- * "Stub! method not mocked"). The Context + ContentResolver are MockK
- * stubs so each test can dial in the exact CR behaviour it wants.
+ * Base64.encodeToString, Uri.parse, MatrixCursor, etc. all behave like
+ * real Android instead of throwing "Stub! method not mocked"). The
+ * Context + ContentResolver are MockK stubs so each test can dial in the
+ * exact CR behaviour it wants.
  *
- * Class-level @Config pins SDK=Q (API 29) — the floor where
- * writeJsonToDownloads is allowed to work. The single pre-Q test
- * overrides at method level via @Config(sdk = [VERSION_CODES.P]) so
- * the Robolectric runner loads API 28's android-all jar for that case
- * only.
+ * Class-level @Config pins SDK=Q purely to fix the android-all jar
+ * Robolectric loads; nothing here is SDK-gated anymore. The export
+ * writer (writeTextToUri) targets a SAF document URI, which works on
+ * every supported API level — that's the whole point of the SAF switch
+ * (the old MediaStore.Downloads writer hard-failed on Android 8/9).
  *
  * StorageManager only touches `context.contentResolver` (never cacheDir
  * / packageName / resources), so a relaxed Context mock with one stubbed
@@ -246,97 +243,59 @@ class StorageManagerTest {
         assertTrue(decoded.contentEquals(bytes))
     }
 
-    // ─── writeJsonToDownloads ─────────────────────────────────────────
+    // ─── writeTextToUri (SAF export) ──────────────────────────────────
+    // The export writer now targets a user-chosen SAF document URI
+    // (ACTION_CREATE_DOCUMENT) instead of the MediaStore.Downloads
+    // collection. SAF is API 19+, so — unlike the old writer — there is
+    // NO SDK floor; Android 8/9 (minSdk 26) can export. These tests stub
+    // only contentResolver.openOutputStream(uri).
 
     @Test
-    fun `writeJsonToDownloads success on Q+ writes content to inserted Uri`() {
-        val outUri = Uri.parse("content://media/external/downloads/42")
-        val captured = slot<ContentValues>()
+    fun `writeTextToUri success writes content to the chosen Uri`() {
+        val uri = Uri.parse("content://com.android.providers.downloads.documents/document/42")
         val stream = ByteArrayOutputStream()
-        every {
-            cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, capture(captured))
-        } returns outUri
-        every { cr.openOutputStream(outUri) } returns stream
+        every { cr.openOutputStream(uri) } returns stream
 
-        val result = storage.writeJsonToDownloads("VOTReader-export.json", "{\"a\":1}")
+        val result = storage.writeTextToUri(uri, "{\"a\":1}")
         assertIs<StorageManager.Result.Success<Unit>>(result)
-        assertEquals("VOTReader-export.json",
-            captured.captured.getAsString(MediaStore.Downloads.DISPLAY_NAME))
-        assertEquals("application/json",
-            captured.captured.getAsString(MediaStore.Downloads.MIME_TYPE))
         assertEquals("{\"a\":1}", stream.toString(Charsets.UTF_8.name()))
     }
 
     @Test
-    @Config(sdk = [Build.VERSION_CODES.P])
-    fun `writeJsonToDownloads on pre-Q returns requires_android_10`() {
-        // Method-level @Config switches Robolectric to API 28. The early
-        // return fires BEFORE any MediaStore.Downloads access, so the
-        // MediaStore.Downloads class isn't loaded on the pre-Q SDK jar.
-        val result = storage.writeJsonToDownloads("x.json", "{}")
-        assertIs<StorageManager.Result.Failure>(result)
-        assertEquals("requires_android_10", result.reason)
-        // Critically: insert should never have been called.
-        verify(exactly = 0) { cr.insert(any<Uri>(), any()) }
-    }
+    fun `writeTextToUri fails when openOutputStream returns null`() {
+        val uri = Uri.parse("content://test/no-stream")
+        every { cr.openOutputStream(uri) } returns null
 
-    @Test
-    fun `writeJsonToDownloads fails when insert returns null`() {
-        every {
-            cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, any())
-        } returns null
-
-        val result = storage.writeJsonToDownloads("x.json", "{}")
-        assertIs<StorageManager.Result.Failure>(result)
-        assertEquals("no_uri", result.reason)
-        // openOutputStream not invoked when there's no URI to write to.
-        verify(exactly = 0) { cr.openOutputStream(any<Uri>()) }
-    }
-
-    @Test
-    fun `writeJsonToDownloads fails when openOutputStream returns null`() {
-        val outUri = Uri.parse("content://media/external/downloads/42")
-        every {
-            cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, any())
-        } returns outUri
-        every { cr.openOutputStream(outUri) } returns null
-
-        val result = storage.writeJsonToDownloads("x.json", "{}")
+        val result = storage.writeTextToUri(uri, "{}")
         assertIs<StorageManager.Result.Failure>(result)
         assertEquals("no_output_stream", result.reason)
     }
 
     @Test
-    fun `writeJsonToDownloads fails when stream write throws`() {
-        val outUri = Uri.parse("content://media/external/downloads/42")
-        every {
-            cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, any())
-        } returns outUri
-        every { cr.openOutputStream(outUri) } returns object : OutputStream() {
+    fun `writeTextToUri fails when stream write throws`() {
+        val uri = Uri.parse("content://test/full-disk")
+        every { cr.openOutputStream(uri) } returns object : OutputStream() {
             override fun write(b: Int) = throw IOException("quota exceeded")
             override fun write(b: ByteArray) = throw IOException("quota exceeded")
             override fun write(b: ByteArray, off: Int, len: Int) =
                 throw IOException("quota exceeded")
         }
 
-        val result = storage.writeJsonToDownloads("x.json", "{}")
+        val result = storage.writeTextToUri(uri, "{}")
         assertIs<StorageManager.Result.Failure>(result)
         assertEquals("quota exceeded", result.reason)
     }
 
     @Test
-    fun `writeJsonToDownloads encodes content as UTF-8`() {
+    fun `writeTextToUri encodes content as UTF-8`() {
         // The arrow / em-dash / ellipsis test: each is > 1 byte in UTF-8.
         // Confirms toByteArray(Charsets.UTF_8) round-trips correctly.
-        val outUri = Uri.parse("content://media/external/downloads/42")
+        val uri = Uri.parse("content://test/utf8")
         val stream = ByteArrayOutputStream()
-        every {
-            cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, any())
-        } returns outUri
-        every { cr.openOutputStream(outUri) } returns stream
+        every { cr.openOutputStream(uri) } returns stream
 
         val payload = "—…—"  // 3 chars, 9 bytes UTF-8
-        storage.writeJsonToDownloads("export.json", payload)
+        storage.writeTextToUri(uri, payload)
         assertEquals(payload, stream.toString(Charsets.UTF_8.name()))
         assertEquals(9, stream.size())
     }

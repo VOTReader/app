@@ -2240,13 +2240,27 @@ regression testing for the migration surfaces.
   W6.4 — Owed native fixes (implement here — they need a device to verify)
   ────────────────────────────────────────────────────────────────────────
   Verified accurate against the Kotlin 2026-05-29:
-    #1 Export on Android 8/9 (minSdk=26) — HIGH value. StorageManager
-       .writeJsonToDownloads returns Failure("requires_android_10") below
-       API 29, so Android 8/9 users CANNOT export — and export is the only
-       backup (allowBackup=false), i.e. real data-loss exposure for
-       in-target devices. Add a Storage Access Framework fallback
-       (Intent.ACTION_CREATE_DOCUMENT, API 19+) via an Activity-result
-       callback like the import picker already uses.
+    #1 Export on Android 8/9 (minSdk=26) — DONE 2026-05-31 (not a fallback
+       — a full replacement). The old StorageManager.writeJsonToDownloads
+       returned Failure("requires_android_10") below API 29, so Android 8/9
+       users COULD NOT export — and export is the only backup
+       (allowBackup=false), i.e. real data-loss exposure for in-target
+       devices. Replaced the MediaStore.Downloads writer with SAF
+       ACTION_CREATE_DOCUMENT (API 19+, works on every supported device AND
+       lets the user choose the destination folder/filename):
+       AppInterface.saveToFile (async, fire-and-forget) → BridgeHost
+       .launchExportPicker → MainActivity.exportPickerLauncher
+       (ActivityResultContracts.CreateDocument) → StorageManager
+       .writeTextToUri(uri, content); outcome to JS via
+       window.__onExportComplete (new JsEvent.ExportComplete) =
+       "ok"/"error:<reason>"/"cancelled". Web keeps the Blob+anchor
+       download, now also firing __onExportComplete. No new permission
+       (SAF is permission-free). Data completeness + compression were
+       already correct (all stores + all media base64'd; images maxDim
+       1600/q0.8, audio AAC 96k/opus) — left untouched. tsc + 1512 vitest
+       + Kotlin testDebugUnitTest/JaCoCo all green; web path verified
+       end-to-end in preview. OWED: device-verify the picker + cancel on a
+       real Android 8/9 (the case it exists for) — see exit criteria.
     #2 Screenshot async — optional polish. captureScreenshot does
        runBlocking on a binder thread (2s-capped). Make the JS side a
        Promise resolved via evaluateJavascript when PixelCopy finishes.
@@ -2260,7 +2274,8 @@ regression testing for the migration surfaces.
     [ ] Firefox desktop walk: all PASS
     [ ] Data migrated correctly on both platforms
     [ ] Zero regressions from pre-migration baseline
-    [ ] Android 8/9 export works via the SAF fallback (#1)
+    [ ] Android 8/9 export works via the SAF picker (#1) — CODE DONE
+        2026-05-31; device-verify on a genuine API 26-28 device still owed
 
   Risk: LOW (verification, not implementation).
 

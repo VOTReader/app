@@ -3948,9 +3948,9 @@
       /** @type {any} */
       window.AndroidBridge.openFilePicker()
     ),
-    saveToDownloads: (name, content) => (
+    saveToFile: (name, content) => (
       /** @type {any} */
-      window.AndroidBridge.saveToDownloads(name, content)
+      window.AndroidBridge.saveToFile(name, content)
     ),
     // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
     getCrashLog: () => mergeCrashLog(
@@ -4087,13 +4087,20 @@
     };
     input.click();
   }
-  function webSaveToDownloads(filename, content) {
+  function webSaveToFile(suggestedName, content) {
+    const report = (result) => {
+      const cb = (
+        /** @type {any} */
+        window.__onExportComplete
+      );
+      if (typeof cb === "function") cb(result);
+    };
     try {
       const blob = new Blob([content], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = suggestedName;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {
@@ -4103,11 +4110,11 @@
         } catch (_e) {
         }
       }, 0);
-      return "ok";
+      report("ok");
     } catch (e) {
-      return "error:" + /** @type {any} */
+      report("error:" + /** @type {any} */
       (e && /** @type {any} */
-      e.message || e);
+      e.message || e));
     }
   }
   var SCREENSHOT_IGNORE_CLASSES = [
@@ -4409,8 +4416,8 @@
     // Tier B.1 (WakeLock + de-dup)
     openFilePicker: webOpenFilePicker,
     // Tier B.2 (DOM input + FileReader → __onImportFile)
-    saveToDownloads: webSaveToDownloads,
-    // Tier B.2 (Blob + URL.createObjectURL + anchor)
+    saveToFile: webSaveToFile,
+    // Tier B.2 (Blob + URL.createObjectURL + anchor → __onExportComplete)
     setImmersiveMode: webSetImmersiveMode,
     // Tier B.3 (Fullscreen API, best-effort)
     setZoomEnabled: webSetZoomEnabled,

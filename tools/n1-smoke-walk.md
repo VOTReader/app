@@ -214,23 +214,38 @@ Verifies the 50 MB cap on imports and the Q+ Downloads write path.
    Logcat shows `Import rejected: size=62914560 (limit=52428800)`
    from StorageManager.
 
-### Downloads export (N1.10b + NK5)
+### SAF export (saveToFile — replaces the old Downloads-collection path)
+
+The export now goes through the SAF "create document" picker (the user
+chooses folder + filename) instead of writing straight to Downloads.
+This works on every supported API level — the old MediaStore.Downloads
+writer hard-failed on Android 8/9 (minSdk 26), so this is also the fix
+for "Export does nothing on a pre-Android-10 device." **Verify on a
+genuine Android 8 or 9 device/emulator, not just a modern one** — that's
+the case the change exists for.
 
 5. On the device: Settings → "Your Data" → Export.
-6. **Expected:** alert "Backup saved to your Downloads folder."
-7. Verify on device or via adb:
+6. **Expected:** the system "Save to…" document picker appears with the
+   filename `votreader-backup-YYYY-MM-DD.json` pre-filled. Pick any
+   folder (Downloads, Documents, an SD card, a cloud provider — all are
+   offered by SAF) and confirm.
+7. **Expected:** toast "Backup saved." Then verify the file landed where
+   you chose, e.g. for Downloads:
    ```sh
    adb shell ls -la /storage/emulated/0/Download/ | grep votreader-backup
    ```
-   **Expected:** a file named `votreader-backup-YYYY-MM-DD.json` with a
-   non-zero size.
+   **Expected:** a `votreader-backup-YYYY-MM-DD.json` with non-zero size.
 8. Pull and inspect:
    ```sh
    adb pull /storage/emulated/0/Download/votreader-backup-*.json /tmp/
    python -c "import json; d=json.load(open('/tmp/votreader-backup-...json')); print(list(d.keys()))"
    ```
-   **Expected:** prints `['app', 'exportVersion', 'exportDate', 'diagnosticLog', 'data']`
-   — confirming NK5c's payload integration landed in the shipped export.
+   **Expected:** prints the payload keys including `app`, `exportVersion`,
+   `exportDate`, `diagnosticLog`, `data`, `stores`, `media` — confirming
+   the full v2 payload (structured stores + journal media) landed.
+9. **Cancel path:** tap Export, then dismiss the picker with Back.
+   **Expected:** no toast, no error, app unchanged (the "cancelled"
+   branch of `__onExportComplete` stays silent).
 
 ---
 

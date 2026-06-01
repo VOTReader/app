@@ -79,6 +79,16 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // WebView is created so it is ready before any JS calls openFilePicker().
     private lateinit var filePickerLauncher: ActivityResultLauncher<String>
 
+    // Launcher for the SAF "create document" export picker (Settings → Your
+    // Data → Export). Lets the user choose the destination folder + filename,
+    // and — unlike the old MediaStore.Downloads path — works on every
+    // supported API level (SAF is API 19+; minSdk here is 26), so Export is
+    // reachable on Android 8/9 where Downloads-collection writes hard-failed.
+    // The JSON payload is held in pendingExportContent between launch and the
+    // picker result, then written to the chosen URI and cleared.
+    private lateinit var exportPickerLauncher: ActivityResultLauncher<String>
+    private var pendingExportContent: String? = null
+
     // Launcher for the WebChromeClient.onShowFileChooser callback (image
     // inserts via <input type="file"> in the journal editor). The callback
     // is held in fileChooserCallback so the result lands back on the WebView.
@@ -116,6 +126,10 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override fun postToUi(action: () -> Unit) = runOnUiThread(action)
     override fun launchFilePicker() {
         filePickerLauncher.launch("application/json")
+    }
+    override fun launchExportPicker(suggestedName: String, content: String) {
+        pendingExportContent = content
+        exportPickerLauncher.launch(suggestedName)
     }
     override fun launchMicPermissionRequest() {
         micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -175,6 +189,27 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             when (val r = vm.storage.readUriAsBase64(uri)) {
                 is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ImportFile, r.value)
                 is StorageManager.Result.Failure -> bridge.callOptional(JsEvent.ImportFile, null)
+            }
+        }
+
+        // SAF export picker — fires when the user chooses (or cancels) the
+        // export destination. On success writes the stashed JSON to the
+        // chosen URI and reports back to JS via window.__onExportComplete
+        // ("ok" / "error:<reason>" / "cancelled"). pendingExportContent is
+        // ALWAYS cleared first, so a cancelled or failed export never leaves
+        // the (potentially large) payload dangling in memory.
+        exportPickerLauncher = registerForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json")
+        ) { uri ->
+            val content = pendingExportContent
+            pendingExportContent = null
+            when {
+                uri == null -> bridge.callOptional(JsEvent.ExportComplete, "cancelled")
+                content == null -> bridge.callOptional(JsEvent.ExportComplete, "error:no_content")
+                else -> when (val r = vm.storage.writeTextToUri(uri, content)) {
+                    is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ExportComplete, "ok")
+                    is StorageManager.Result.Failure -> bridge.callOptional(JsEvent.ExportComplete, "error:${r.reason}")
+                }
             }
         }
 

@@ -122,38 +122,30 @@ class AppInterfaceTest {
         }
     }
 
-    // ─── Storage delegation ───────────────────────────────────────────
+    // ─── Storage delegation (SAF export) ──────────────────────────────
 
     @Test
-    fun `saveToDownloads success returns ok`() {
-        val vm = mockk<MainViewModel>(relaxed = true)
-        every { vm.storage.writeJsonToDownloads(any(), any()) } returns
-            StorageManager.Result.Success(Unit)
-        val (app, _, _) = newSubject(vm = vm)
-        assertEquals("ok", app.saveToDownloads("export.json", "{}"))
+    fun `saveToFile posts to UI thread and launches the export picker`() {
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
+
+        app.saveToFile("export.json", "{}")
+
+        assertEquals(1, host.postedActions.size, "should hop through postToUi")
+        assertEquals(1, host.exportPickerCalls.size)
     }
 
     @Test
-    fun `saveToDownloads failure returns error reason`() {
-        val vm = mockk<MainViewModel>(relaxed = true)
-        every { vm.storage.writeJsonToDownloads(any(), any()) } returns
-            StorageManager.Result.Failure("no_uri")
-        val (app, _, _) = newSubject(vm = vm)
-        assertEquals("error:no_uri", app.saveToDownloads("export.json", "{}"))
-    }
+    fun `saveToFile forwards suggested name and content verbatim`() {
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
 
-    @Test
-    fun `saveToDownloads forwards filename and content verbatim`() {
-        val vm = mockk<MainViewModel>(relaxed = true)
-        every { vm.storage.writeJsonToDownloads(any(), any()) } returns
-            StorageManager.Result.Success(Unit)
-        val (app, _, _) = newSubject(vm = vm)
+        app.saveToFile("my-export-2026.json", "{\"k\":\"v\"}")
 
-        app.saveToDownloads("my-export-2026.json", "{\"k\":\"v\"}")
-
-        verify(exactly = 1) {
-            vm.storage.writeJsonToDownloads("my-export-2026.json", "{\"k\":\"v\"}")
-        }
+        assertEquals(
+            "my-export-2026.json" to "{\"k\":\"v\"}",
+            host.exportPickerCalls[0]
+        )
     }
 
     // ─── Zoom + screenshot ────────────────────────────────────────────
