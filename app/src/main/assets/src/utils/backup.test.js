@@ -73,6 +73,14 @@ describe('blobToBase64 / base64ToBlob', () => {
     expect(blob.type).toBe('application/octet-stream');
   });
 
+  it('base64ToBlob throws on malformed base64 (U19 — full-string validation)', () => {
+    expect(() => base64ToBlob('not valid base64!@#$')).toThrow(/malformed base64/);
+    expect(() => base64ToBlob('abc')).toThrow(/malformed base64/);      // length not %4
+    expect(() => base64ToBlob(/** @type {any} */ (null))).toThrow(/malformed base64/);
+    // A canonical btoa output still decodes fine (no false positives).
+    expect(base64ToBlob(btoa('hello world')).size).toBeGreaterThan(0);
+  });
+
   it('blobToBase64 handles an empty blob', async () => {
     const b64 = await blobToBase64(new NodeBlob([], { type: 'audio/mp4' }));
     expect(b64).toBe('');

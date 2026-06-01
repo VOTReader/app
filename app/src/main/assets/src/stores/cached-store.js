@@ -848,6 +848,17 @@ export async function clearLegacyLs() {
   }
   if (alreadyDone) return;
 
+  // SAFETY (U19): never wipe legacy LS while any IDB store is still 'pending'.
+  // The per-store legacy-LS fallback reads these vot-* keys DURING hydration to
+  // migrate pre-W2.4 data into IDB — clearing them first would destroy it.
+  // HydrationGate already awaits hydrateAllStores() before calling us; this
+  // turns the "MUST run after hydration" comment into a real guard, so a future
+  // reorder fails SAFE (defers to next boot) instead of wiping un-migrated data.
+  if (hasAnyPendingStores()) {
+    console.warn('clearLegacyLs: hydration still pending; deferring cleanup to next boot');
+    return;
+  }
+
   /** @type {string[]} */
   const toClear = [];
   try {

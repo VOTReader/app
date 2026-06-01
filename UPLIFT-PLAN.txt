@@ -644,6 +644,33 @@
 
  U19 — LOW-severity ledger: cleanup, robustness, micro-perf       [P3, batch] [R]
  ───────────────────────────────────────────────────────────────────────────
+ STATUS 2026-06-01 — the genuine wins landed; the rest evaluated + dispositioned:
+   ✅ DONE: snapRangeToWords START-only comment (U11) · elementsFromPoint tap
+     z-order equivalence (U11) · offline.html "narrow window" doc (U18) ·
+     clearLegacyLs now GUARDS on hasAnyPendingStores() (never wipes legacy LS
+     while a store is still pending — a real data-safety guard, +1 test) ·
+     base64ToBlob validates the FULL base64 string before atob (+1 test) ·
+     idb-adapter getAll already had the tx.onabort fallback (verified present —
+     no-op). SW fetch comment de-referenced the U21-removed ping (U18).
+   ↪ FOLDED into U9/U17 (Kotlin): native tap-coord comment, clearCache-on-cold-
+     start versionCode gate, cache the Vibrator service, appInterface↔WebView-
+     rebuild contract comment, GardenImageCache redirect-wall-time cap.
+   ⏸ DEFERRED (evaluated, deliberately not done — reasoning, à la U8/W7.6):
+     • `var useState = React.useState` redeclarations (17 sites / 11 files) —
+       PURE cosmetic (the alias works); a regex-free local-edit sweep across 11
+       files with the `useState(`-is-a-substring-of-`React.useState(` hazard is
+       disproportionate churn/risk for zero behavior change, and a replace_all
+       sweep conflicts with the "no regex at file scope" rule. Not worth it.
+     • Record-level import DOM-key presence guard — additive nicety; the stores
+       already shape-coerce on replaceAll + validateStorePayload gates top-level
+       shape, so it's defense-in-depth on an already-guarded path. Left for a
+       future pass if a real corrupt-record render-break is ever observed.
+     • search docStore teardown on leaving Search — micro-perf; heap impact is
+       unmeasured/small (cf. the W7.6 + U8 "profile before refactoring" rule).
+     • bible-studies.js minify + SW precache — it's LAZY (Studies-only, off the
+       boot path) so the unminified raw load doesn't hit boot; precaching +4.3 MB
+       has real install cost. Not a boot-path win; deferred deliberately.
+
  Small items from the review that "add up." Each folds into the parent item
  noted in [brackets]; do them opportunistically alongside that work so none is
  lost. The value is cumulative, not individual.
@@ -829,7 +856,7 @@
  U16 CI smoke walk ................ TODO  [P2]
  U17 Kotlin/contract tests ........ TODO  [P2]
  U18 PWA hygiene .................. DONE  [P2] (hourly+focus reg.update; CORE_ASSETS −6 redundant; offline claim honest+documented)
- U19 LOW ledger (cleanup/robust) .. TODO  [P3]
+ U19 LOW ledger (cleanup/robust) .. DONE  [P3] (clearLegacyLs guard + base64 validation landed; rest folded into U9/U17 or deferred-with-reasoning)
  U20 platform-detect misclassify .. DONE  [P2] (AppleWebKit + token-exclusion; CriOS/FxiOS/DDG no longer Safari; +6 tests)
  U21 connectivity ping egress ..... DONE  [P2] (navigator.onLine, no egress; dropped thevolumesoftruth.com from connect-src; +4 tests)
  U22 headings out of search ....... DONE  [P2] (user-flagged; SCHEMA 12→13)

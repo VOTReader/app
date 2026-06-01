@@ -953,6 +953,27 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(idbMeta['migrated-v1']).toBe(true);
   });
 
+  it('U19: defers (does NOT wipe) while any IDB store is still pending', async () => {
+    // A 'pending' store hasn't run its legacy-LS fallback yet, so wiping the
+    // vot-* keys now would destroy pre-W2.4 data. createTestStore(idb) registers
+    // in 'pending' until hydrated; leave it un-hydrated to exercise the guard.
+    createTestStore('vot-test-pending-guard', { idb: true });
+    expect(hasAnyPendingStores()).toBe(true);
+
+    localStorage.setItem('vot-bookmarks', '[{"id":"keep"}]');
+    /** @type {Record<string, any>} */
+    const idbMeta = {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async function (_s, k) { return idbMeta[String(k)]; });
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockImplementation(async function (_s, k, v) { idbMeta[String(k)] = v; });
+
+    await clearLegacyLs();
+
+    // Deferred: LS untouched + the done-flag NOT set (next boot retries).
+    expect(localStorage.getItem('vot-bookmarks')).toBe('[{"id":"keep"}]');
+    expect(idbMeta['migrated-v1']).toBeUndefined();
+    expect(putSpy).not.toHaveBeenCalled();
+  });
+
   it('idempotent: second call is a no-op (flag already set)', async () => {
     /** @type {Record<string, any>} */
     const idbMeta = { 'migrated-v1': true };

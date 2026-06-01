@@ -67,6 +67,14 @@ export async function blobToBase64(blob) {
  * @returns {Blob}
  */
 export function base64ToBlob(b64, mime) {
+  // U19: validate the FULL base64 string up front. validateMediaRecord only
+  // sniffs the first ~100 chars (import-validators), so a record can pass that
+  // yet carry corruption deeper in. atob throws on bad input anyway (the import
+  // media loop catches it), but a precise check gives a clear error + defends
+  // any future caller that doesn't wrap this in try/catch.
+  if (typeof b64 !== 'string' || b64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(b64)) {
+    throw new Error('base64ToBlob: malformed base64 input');
+  }
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
