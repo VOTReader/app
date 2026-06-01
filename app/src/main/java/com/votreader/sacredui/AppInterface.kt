@@ -42,6 +42,19 @@ class AppInterface(
     private val vm: MainViewModel
 ) {
 
+    // (U19) Cache the Vibrator lookup — haptic() can fire on many taps and
+    // getSystemService on every call is wasteful. The service is process-stable
+    // + thread-safe, so a lazy singleton is safe from the binder thread where
+    // @JavascriptInterface methods land.
+    private val vibrator: Vibrator by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (host.activityContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            host.activityContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+
     @JavascriptInterface
     fun setLightStatusBar(light: Boolean) {
         host.postToUi {
@@ -264,12 +277,6 @@ class AppInterface(
      */
     @JavascriptInterface
     fun haptic(style: Int) {
-        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            (host.activityContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            host.activityContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
         val effect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             VibrationEffect.createPredefined(
                 when (style) {

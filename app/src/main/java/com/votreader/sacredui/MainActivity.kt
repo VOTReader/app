@@ -728,51 +728,66 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         topCropDp: Int,
         maxDim: Int,
         jpegQuality: Int
-    ): String = withContext(Dispatchers.Main) {
-        val w = webView.width
-        val h = webView.height
-        if (w <= 0 || h <= 0) return@withContext ""
+    ): String {
+        // (U9) PixelCopy needs the LIVE WebView surface and the zoom bracket is a
+        // WebView API call, so the CAPTURE must run on Main — but ONLY that. The
+        // crop → downscale → JPEG-compress → base64 below is pure CPU work on the
+        // captured bitmap; it was needlessly tying up the UI thread. It now runs
+        // on Dispatchers.Default, freeing Main the moment the surface is copied.
+        //
+        // (The @JavascriptInterface entry still runBlocking()s on the BINDER
+        // thread — NOT Main, so there's no main-thread ANR to "fix" by going
+        // fire-and-forget; the review's premise was overstated [verified against
+        // source]. A window.__onScreenshotComplete async-contract rewrite is a
+        // cross-bridge change needing device verification for marginal gain over
+        // this off-Main encode, so it's deliberately deferred.)
+        val capture: Pair<Bitmap, Int>? = withContext(Dispatchers.Main) {
+            val w = webView.width
+            val h = webView.height
+            if (w <= 0 || h <= 0) return@withContext null
 
-        val originalScale = vm.currentScale
-        val needsZoomReset = originalScale > 0f && abs(originalScale - 1f) > 0.005f
-        if (needsZoomReset) webView.zoomBy(1f / originalScale)
+            val originalScale = vm.currentScale
+            val needsZoomReset = originalScale > 0f && abs(originalScale - 1f) > 0.005f
+            if (needsZoomReset) webView.zoomBy(1f / originalScale)
 
-        try {
-            val density = resources.displayMetrics.density
-            val topCropPx = (topCropDp * density).toInt().coerceIn(0, h - 1)
-            val croppedH = h - topCropPx
-            if (croppedH <= 0) return@withContext ""
+            try {
+                val density = resources.displayMetrics.density
+                val topCropPx = (topCropDp * density).toInt().coerceIn(0, h - 1)
+                if (h - topCropPx <= 0) return@withContext null
 
-            val location = IntArray(2).also { webView.getLocationInWindow(it) }
-            val srcRect = Rect(
-                location[0], location[1],
-                location[0] + w, location[1] + h
-            )
-            val full = createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            val ok = capturePixelCopy(srcRect, full)
-            if (!ok) {
-                full.recycle()
-                return@withContext ""
+                val location = IntArray(2).also { webView.getLocationInWindow(it) }
+                val srcRect = Rect(location[0], location[1], location[0] + w, location[1] + h)
+                val full = createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                val ok = capturePixelCopy(srcRect, full)
+                if (!ok) { full.recycle(); return@withContext null }
+                Pair(full, topCropPx)
+            } finally {
+                // Restore zoom immediately after the capture, still on Main.
+                if (needsZoomReset) webView.zoomBy(originalScale)
             }
+        }
+        if (capture == null) return ""
 
-            val cropped = Bitmap.createBitmap(full, 0, topCropPx, w, croppedH)
-            full.recycle()
-            val longest = max(cropped.width, cropped.height)
-            val scale = if (longest > maxDim) maxDim.toFloat() / longest else 1f
-            val scaled = if (scale < 1f) {
-                val sw = (cropped.width * scale).toInt().coerceAtLeast(1)
-                val sh = (cropped.height * scale).toInt().coerceAtLeast(1)
-                cropped.scale(sw, sh, filter = true).also { cropped.recycle() }
-            } else cropped
-            val stream = ByteArrayOutputStream()
-            scaled.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
-            scaled.recycle()
-            "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-        } catch (e: Exception) {
-            Timber.w(e, "Screenshot capture failed")
-            ""
-        } finally {
-            if (needsZoomReset) webView.zoomBy(originalScale)
+        return withContext(Dispatchers.Default) {
+            val (full, topCropPx) = capture
+            try {
+                val cropped = Bitmap.createBitmap(full, 0, topCropPx, full.width, full.height - topCropPx)
+                if (cropped != full) full.recycle() // createBitmap may return the source for a no-op crop
+                val longest = max(cropped.width, cropped.height)
+                val scale = if (longest > maxDim) maxDim.toFloat() / longest else 1f
+                val scaled = if (scale < 1f) {
+                    val sw = (cropped.width * scale).toInt().coerceAtLeast(1)
+                    val sh = (cropped.height * scale).toInt().coerceAtLeast(1)
+                    cropped.scale(sw, sh, filter = true).also { if (it != cropped) cropped.recycle() }
+                } else cropped
+                val stream = ByteArrayOutputStream()
+                scaled.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
+                scaled.recycle()
+                "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+            } catch (e: Exception) {
+                Timber.w(e, "Screenshot encode failed")
+                ""
+            }
         }
     }
 

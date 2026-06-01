@@ -389,6 +389,21 @@
 
  U9 — Async screenshot bridge                                      [P2, native-High] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ ADDRESSED 2026-06-01 (real fix landed; async rewrite deferred with reasoning).
+   VERIFIED AGAINST SOURCE: the runBlocking is on the BINDER thread, not Main
+   (@JavascriptInterface methods land on a WebView worker thread) — so the "binder
+   blocks the main thread → ANR" premise was OVERSTATED (same lesson as U8). The
+   REAL main-thread cost was that captureScreenshotSuspend ran ENTIRELY in
+   withContext(Main), so the crop → downscale → JPEG-compress → base64 (pure CPU
+   on the captured bitmap) needlessly tied up the UI thread. FIX: split it — only
+   PixelCopy + the zoom-bracket (WebView APIs) stay on Main; the bitmap
+   post-processing moved to Dispatchers.Default, freeing Main the instant the
+   surface is copied. Added a createBitmap-no-op-crop recycle guard. Kotlin
+   compiles; testDebugUnitTest + jacoco green. DEFERRED: the full
+   window.__onScreenshotComplete fire-and-forget contract rewrite — overstated
+   premise + a cross-bridge async change needing device verification for marginal
+   gain over the off-Main encode. OWED: device-verify the capture in the W6 walk
+   (PixelCopy is hardware-dependent — folded into the final smoke walk).
  PROBLEM: takeScreenshot is a SYNC @JavascriptInterface running
    `runBlocking { withTimeoutOrNull(2000){ withContext(Main){...} } }` on the
    binder thread (MainActivity.kt:149-160) — binder blocks up to 2 s on the main
@@ -846,7 +861,7 @@
  U6  export fail-loud ............. DONE  [P1] (abort on read failure + counts manifest)
  U7  Garden allowlist/cap ......... DONE  [P1, sec] (host allowlist + single-flight + tmp sweep)
  U8  applyDOMHighlights ........... DONE  [P2] (dead guard dropped, −30% sweep; heavy refactor deferred — profiled sub-ms, W7.6-style)
- U9  async screenshot ............. TODO  [P2]
+ U9  async screenshot ............. DONE  [P2] (bitmap encode moved off Main → Default; async rewrite deferred — binder≠main; +U19 Vibrator cache)
  U10 CSP tighten .................. DONE  [P2, sec] (script-src sha256 hashes, no unsafe-inline/blob:; web + WebView-69 verified)
  U11 dual-render equiv tests ...... DONE  [P2] (per-char equivalence, 5 scenarios + tap-winner; +6 tests)
  U12 scripture parser ............. DONE  [P2] (en/em-dash normalize + findBook exact-before-prefix; +4 tests)
