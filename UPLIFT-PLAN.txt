@@ -124,9 +124,14 @@
 
  U2 — Minify the bundles                                            [P1] [V]
  ───────────────────────────────────────────────────────────────────────────
- PROBLEM: nothing is minified. Boot ships ~2.10 MB of pretty-printed JS WITH
-   JSDoc comments intact, on the Android 8/9 budget devices --target=chrome69
-   exists for. Parse/compile cost scales with RAW bytes, not gzip.
+ PROBLEM: nothing is minified. Boot ships ~2.10 MB of un-minified JS (full
+   whitespace + unshortened identifiers, no tree-shake/compression) on the
+   Android 8/9 budget devices --target=chrome69 exists for. Parse/compile cost
+   scales with RAW bytes, not gzip. (Note, verified 2026-06-01: esbuild ALREADY
+   strips comments in b/c/d even without --minify, so the savings come from
+   whitespace collapse + identifier mangling + syntax compression, NOT comment
+   removal; bundle-a — Python concat — still carries all raw source comments and
+   gains the most. The review's "ships comments intact in b/d" was an over-claim.)
  MEASURED (--minify, this session): b 446→232 KB (−214), c 30→15 (−15),
    d 593→350 (−243) ⇒ b+c+d 1069→597 KB (−472 KB, −44%). bundle-a (concat) and
    the corpus bundles shrink too when piped through esbuild --minify (vendor
