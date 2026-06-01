@@ -608,6 +608,27 @@
 
  U17 — JS↔Kotlin bridge contract test + extend JaCoCo              [P2, test] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 (the feasible parts; the rest measured-infeasible + scoped).
+   BridgeContractTest.kt (pure-JVM, reflection) pins the window.AndroidBridge
+   surface: it reflects AppInterface's @JavascriptInterface methods (filtered by
+   annotation simple-name, robust to the mockable-android.jar) and asserts the
+   {name → param-count} set equals the documented 20-method contract. A
+   rename/remove/signature-change on the Kotlin side now FAILS the build until
+   platform-bridge.js's androidImpl + the map are updated together; the JS side's
+   existence stays pinned by platform-bridge.test.js — so the two halves can't
+   drift unnoticed. testDebugUnitTest + jacoco green.
+   MEASURED-INFEASIBLE / SCOPED OUT (verify-against-source):
+   • Extend JaCoCo to StorageManager + GardenImageCache — NO. StorageManager runs
+     under Robolectric (sandbox classloader bypasses the JaCoCo agent → shows 0%,
+     documented). GardenImageCache IS pure-JVM but EMPIRICALLY adding it dropped
+     the bundle to 0.59 (< 0.85) — its lines are dominated by HttpURLConnection +
+     cacheDir file-I/O + eviction paths that aren't unit-coverable without heavy
+     network/FS mocking. Both are device-verified (n1-smoke-walk), per the gate's
+     own "measure only where the numbers are honest" doctrine. Gate kept at
+     JsBridge + BoundedLogTree.
+   • Robolectric tests for MainActivity shouldInterceptRequest + tap-coords —
+     deferred: high Robolectric-Activity setup cost; the intercept/tap logic is
+     better device-verified (the WebView security shell is in the smoke walk).
  PROBLEM: the Android side of platform-bridge is a mock tautology (asserts the
    mock returns what it was told). JaCoCo floors only JsBridge + BoundedLogTree
    (14% of native LOC); MainActivity (the WebView security shell — intercept,
@@ -869,7 +890,7 @@
  U14 AndroidBridge routing ........ DONE  [P2] (4 sites → PlatformBridge.isAndroid; invariant restored; web-verified)
  U15 renderer coverage ............ DONE  [P2] (renderer/ + scripture-resolution measured; +70 tests; floor ratcheted)
  U16 CI smoke walk ................ TODO  [P2]
- U17 Kotlin/contract tests ........ TODO  [P2]
+ U17 Kotlin/contract tests ........ DONE  [P2] (BridgeContractTest pins the 20-method bridge surface; JaCoCo-extend measured-infeasible, scoped)
  U18 PWA hygiene .................. DONE  [P2] (hourly+focus reg.update; CORE_ASSETS −6 redundant; offline claim honest+documented)
  U19 LOW ledger (cleanup/robust) .. DONE  [P3] (clearLegacyLs guard + base64 validation landed; rest folded into U9/U17 or deferred-with-reasoning)
  U20 platform-detect misclassify .. DONE  [P2] (AppleWebKit + token-exclusion; CriOS/FxiOS/DDG no longer Safari; +6 tests)

@@ -122,6 +122,13 @@ android {
 
 // Classes under coverage measurement: the two pure-JVM-tested classes.
 // See the jacoco {} doc-comment above for why StorageManager isn't here.
+// U17 (measured + reverted): GardenImageCache was tried here — it IS pure-JVM-
+// tested so JaCoCo instruments it, but its LINE coverage is dominated by the
+// HttpURLConnection fetch + cacheDir file-I/O + eviction-sweep paths that aren't
+// exercisable without heavy network/FS mocking, so adding it dragged the bundle
+// to 0.59 (< 0.85). Like StorageManager (Robolectric artifact), its real
+// coverage is device-verified (the n1-smoke-walk), not the unit gate. Kept the
+// gate to the two classes whose numbers are HONEST at the pure-JVM level.
 val coveredClasses = listOf(
     "com/votreader/sacredui/JsBridge*.class",
     "com/votreader/sacredui/BoundedLogTree*.class"
