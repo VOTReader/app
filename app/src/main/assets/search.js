@@ -38,7 +38,7 @@ var buildError = null;
 // ─── IndexedDB cache ───
 // Bump SCHEMA_VERSION when doc shape changes OR tokenizer config changes;
 // cache is invalidated automatically because the signature includes this.
-var SCHEMA_VERSION = 12;                    // bumped 2026-05-11 — forces rebuild so cached indexes pick up the 54-bug content-fix sweep + back-pill space + handleAndroidBack additions
+var SCHEMA_VERSION = 13;                    // bumped 2026-06-01 (U22) — stop indexing section headings / inline topic breaks / chapter titles (curated editorial metadata, not scripture content); forces cached indexes to rebuild without those docs + the 'heading' field
 var ALT_TRANSLATIONS = ['kjv', 'asv', 'web', 'bsb', 'hnv', 'lsv', 'ylt'];
 
 // ─── Archaic/modern pronoun normalization (bidirectional) ───
@@ -404,47 +404,16 @@ function buildDocs(options) {
     docs.push(doc);
   }
 
-  function pushChapterTitle(bookId, bookTitle, chNum, title) {
-    if (!title) return;
-    docs.push({
-      id: nextId(),
-      kind: 'chapter-title',
-      bookId: bookId,
-      chapterNum: chNum,
-      verseNum: 0,
-      letterId: '',
-      letterNum: 0,
-      volumeId: bookId === 'matthew' ? 'matthew-study' : 'bible',
-      translation: 'nkjv',
-      testament: bookTestament(bookId),
-      genre: bookGenre(bookId),
-      title: title,
-      heading: '',
-      text: title,
-      ref: bookTitle + ' ' + chNum
-    });
-  }
-
-  function pushHeading(bookId, bookTitle, chNum, heading) {
-    if (!heading) return;
-    docs.push({
-      id: nextId(),
-      kind: 'heading',
-      bookId: bookId,
-      chapterNum: chNum,
-      verseNum: 0,
-      letterId: '',
-      letterNum: 0,
-      volumeId: bookId === 'matthew' ? 'matthew-study' : 'bible',
-      translation: 'nkjv',
-      testament: bookTestament(bookId),
-      genre: bookGenre(bookId),
-      title: heading,
-      heading: heading,
-      text: heading,
-      ref: bookTitle + ' ' + chNum
-    });
-  }
+  // U22 (user directive 2026-06-01): chapter titles AND section headings /
+  // inline topic breaks are curated editorial dividers, NOT scripture content,
+  // so they must never be their own search matches. Both are now no-ops — no
+  // `kind:'chapter-title'` or `kind:'heading'` docs are emitted. (The heading
+  // still rides on each verse doc for result-context display; the 'heading'
+  // field is also dropped from the index config so verses don't match on their
+  // section heading either.) Kept as named no-ops so the call sites read
+  // intentionally rather than looking like a deletion bug.
+  function pushChapterTitle() { /* not indexed — see U22 note above */ }
+  function pushHeading() { /* not indexed — see U22 note above */ }
 
   // ─── Matthew Study Bible — VOLUMES ONLY ───
   // The curated study text (YahuShua restored, commentary, votNotes, cross-refs).
@@ -837,7 +806,9 @@ function createDb() {
       index: [
         { field: 'text',    tokenize: 'forward', resolution: 9, encode: kjvEncode },
         { field: 'title',   tokenize: 'forward', resolution: 9, encode: kjvEncode },
-        { field: 'heading', tokenize: 'forward', resolution: 9, encode: kjvEncode },
+        // U22: 'heading' is intentionally NOT indexed — section headings / inline
+        // topic breaks are curated editorial dividers, not scripture content, so
+        // they must not produce matches. (Heading stays in docStore for display.)
         { field: 'ref',     tokenize: 'forward', resolution: 9, encode: kjvEncode }
       ]
     },
@@ -863,7 +834,6 @@ async function buildIndex(code, corpus, options) {
       id: d.id,
       text: d._searchText || d.text || '',
       title: d.title || '',
-      heading: d.heading || '',
       ref: d.ref || ''
     });
     // Strip the index-only field before storing — keeps docStore (and IndexedDB

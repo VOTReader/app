@@ -557,6 +557,22 @@
  VERIFY: preview offline/online toggle; grep confirms no external ping.
  RISK: low.
 
+ U22 — Exclude headings + chapter-titles from the search index   [P2, user-flagged] [V]
+ ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — user observed search returning a large "headings" group
+   (curated section headings / inline topic breaks + chapter titles) alongside
+   real scripture matches. These are editorial dividers, NOT content, so they
+   must not be searchable. Fix (search.js): pushHeading + pushChapterTitle are
+   now no-ops (no kind:'heading'/'chapter-title' docs emitted), and the 'heading'
+   field is dropped from the FlexSearch index config (so verses no longer match
+   on their section heading either). Heading still rides in docStore for result-
+   context display. SCHEMA_VERSION 12→13 forces every cached index to rebuild.
+   Verified (clean preview build): God→200 / beginning→162 verse results with
+   ZERO heading/chapter-title kinds; verse-text search intact (text field
+   untouched). FOLLOW-UP surfaced: search-init can build over an un-loaded corpus
+   (dataSignature/lazy-corpus timing) → sparse index; tracked with U4's note.
+   CORPUS_VERSION not affected (corpus DATA unchanged; only the search SCHEMA).
+
 ═══════════════════════════════════════════════════════════════════════════
  D-BUCKET — DEFERRED / ARCHITECTURAL (raises ceiling past 8; NOT required for 8)
 ═══════════════════════════════════════════════════════════════════════════
@@ -620,4 +636,5 @@
  U19 LOW ledger (cleanup/robust) .. TODO  [P3]
  U20 platform-detect misclassify .. TODO  [P2]
  U21 connectivity ping egress ..... TODO  [P2]
+ U22 headings out of search ....... DONE  [P2] (user-flagged; SCHEMA 12→13)
 ═══════════════════════════════════════════════════════════════════════════
