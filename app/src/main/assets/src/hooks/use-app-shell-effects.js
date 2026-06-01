@@ -66,19 +66,27 @@ export function useAppShellEffects({ setNavOrigin, setScreen }) {
   // the read is sync from the in-memory cache.
   const [showWelcome, setShowWelcome] = React.useState(() => !WelcomedFlagStore.is());
 
-  // Online-status ping. Re-runs when showWelcome flips (so the splash
-  // gets a fresh check at dismissal time; non-welcome paths don't poll).
-  const [isOnline, setIsOnline] = React.useState(false);
+  // Online status from navigator.onLine + the online/offline events (U21).
+  // Was a no-cors fetch of thevolumesoftruth.com/favicon.ico — an EXTERNAL
+  // egress that contradicted the self-contained/offline policy
+  // ([[network-egress-minimization]]), only coarsely detected "network up"
+  // anyway (no-cors), and contacted a third-party origin the user may not
+  // expect. navigator.onLine is the same coarse signal with ZERO egress, and
+  // the events keep it live (the old ping only re-checked on welcome-dismiss).
+  const [isOnline, setIsOnline] = React.useState(
+    () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false)
+  );
   React.useEffect(() => {
-    let cancelled = false;
-    const check = () => {
-      fetch('https://www.thevolumesoftruth.com/favicon.ico', { mode: 'no-cors', cache: 'no-store' }).
-        then(() => { if (!cancelled) setIsOnline(true); }).
-        catch(() => { if (!cancelled) setIsOnline(false); });
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+    const update = () => setIsOnline(typeof navigator === 'undefined' ? true : navigator.onLine !== false);
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
     };
-    check();
-    return () => { cancelled = true; };
-  }, [showWelcome]);
+  }, []);
 
   const dismissWelcome = () => {
     WelcomedFlagStore.set();

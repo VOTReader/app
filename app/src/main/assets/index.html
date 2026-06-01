@@ -8,9 +8,11 @@
        and the GitHub Pages origin (web PWA) — so a single policy covers both
        with no per-platform branching (W5.2; the explicit Android host was
        redundant with 'self' there and irrelevant on the web). All script/style/
-       data is self-hosted; the Garden View loads images from GitHub
-       user-content; the only network request is an optional connectivity ping
-       to thevolumesoftruth.com.
+       data is self-hosted; the only outbound requests are the Garden View's
+       images from GitHub (github.com 302-redirects to *.githubusercontent.com,
+       so img-src keeps github.com — it's the redirect's initial hop). U21
+       removed the old connectivity ping to thevolumesoftruth.com (now
+       navigator.onLine, zero egress), so that host is gone from connect-src.
        SCRIPT-SRC HARDENING (U10): script-src carries NO 'unsafe-inline'. Each
        inline script element below is allowed by the sha256 of its source — the
        'sha256-…' tokens are generated + kept in sync by tools/sync-csp-hashes.js
@@ -33,7 +35,7 @@
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
-    connect-src 'self' https://www.thevolumesoftruth.com https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
+    connect-src 'self' https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     media-src blob:;
     object-src 'none';
     frame-src 'none';

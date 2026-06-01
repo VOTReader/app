@@ -5,8 +5,6 @@ import { renderHook, act } from '@testing-library/react';
 import { useAppShellEffects } from './use-app-shell-effects.js';
 import { WelcomedFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
-let _prevFetch;
-
 beforeEach(() => {
   localStorage.clear();
   // W2.3b: WelcomedFlagStore + AboutSeenFlagStore are now IDB-backed.
@@ -14,16 +12,17 @@ beforeEach(() => {
   // and 'loaded' state (forceLoaded skips the async hydration path).
   WelcomedFlagStore._resetForTests({ forceLoaded: true });
   AboutSeenFlagStore._resetForTests({ forceLoaded: true });
-  _prevFetch = window.fetch;
-  // Default: online (favicon fetch resolves). Cast through `any` —
-  // the production code uses `mode: 'no-cors'` so the response is
-  // opaque; a stub doesn't need real Response shape.
-  window.fetch = /** @type {any} */ (vi.fn(() => Promise.resolve({})));
 });
 
 afterEach(() => {
-  window.fetch = _prevFetch;
+  // U21: drop any per-test navigator.onLine shadow → prototype getter (true).
+  try { delete (/** @type {any} */ (navigator)).onLine; } catch (_e) { /* non-own */ }
 });
+
+// Shadow navigator.onLine's prototype getter with an own property for the test.
+function setOnLine(v) {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => v });
+}
 
 const baseProps = () => ({
   setNavOrigin: vi.fn(),
@@ -66,5 +65,36 @@ describe('useAppShellEffects — dismissWelcome', () => {
     act(() => { result.current.dismissWelcome(); });
     expect(props.setNavOrigin).not.toHaveBeenCalled();
     expect(props.setScreen).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAppShellEffects — isOnline (U21: navigator.onLine, zero egress)', () => {
+  it('initializes from navigator.onLine (online)', () => {
+    setOnLine(true);
+    const { result } = renderHook(() => useAppShellEffects(baseProps()));
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it('reflects offline', () => {
+    setOnLine(false);
+    const { result } = renderHook(() => useAppShellEffects(baseProps()));
+    expect(result.current.isOnline).toBe(false);
+  });
+
+  it('updates live on offline / online events', () => {
+    setOnLine(true);
+    const { result } = renderHook(() => useAppShellEffects(baseProps()));
+    expect(result.current.isOnline).toBe(true);
+    act(() => { setOnLine(false); window.dispatchEvent(new window.Event('offline')); });
+    expect(result.current.isOnline).toBe(false);
+    act(() => { setOnLine(true); window.dispatchEvent(new window.Event('online')); });
+    expect(result.current.isOnline).toBe(true);
+  });
+
+  it('makes NO network request (no external connectivity ping)', () => {
+    const fetchSpy = vi.spyOn(window, 'fetch');
+    renderHook(() => useAppShellEffects(baseProps()));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

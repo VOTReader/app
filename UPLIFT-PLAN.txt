@@ -700,6 +700,18 @@
 
  U21 — Connectivity ping hits an external origin                   [P2] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — the no-cors fetch of thevolumesoftruth.com/favicon.ico is
+   GONE; isOnline now reads navigator.onLine + listens for the online/offline
+   events (zero egress, and live — the old ping only re-checked on welcome-
+   dismiss). Dropped https://www.thevolumesoftruth.com from the CSP connect-src
+   (its only consumer was the ping; verified no other reference). +4 tests incl.
+   an explicit "makes NO network request" egress assertion; preview-verified
+   (app boots, navigator.onLine, 0 console/CSP errors). NOTE — the U10-deferred
+   img/connect-src host-narrowing: github.com STAYS in img-src by necessity —
+   gardenUrl is https://github.com/.../releases/download/garden_NNN.jpg which
+   302-redirects to *.githubusercontent.com, so github.com is the redirect's
+   load-bearing initial hop (dropping it re-breaks Garden on web). The honest
+   narrowing is the thevolumesoftruth.com removal above.
  PROBLEM: the connectivity check fetches
    https://www.thevolumesoftruth.com/favicon.ico (use-app-shell-effects.js:75)
    — an external egress that (a) contradicts the "self-contained & offline"
@@ -790,6 +802,6 @@
  U18 PWA hygiene .................. TODO  [P2]
  U19 LOW ledger (cleanup/robust) .. TODO  [P3]
  U20 platform-detect misclassify .. DONE  [P2] (AppleWebKit + token-exclusion; CriOS/FxiOS/DDG no longer Safari; +6 tests)
- U21 connectivity ping egress ..... TODO  [P2]
+ U21 connectivity ping egress ..... DONE  [P2] (navigator.onLine, no egress; dropped thevolumesoftruth.com from connect-src; +4 tests)
  U22 headings out of search ....... DONE  [P2] (user-flagged; SCHEMA 12→13)
 ═══════════════════════════════════════════════════════════════════════════
