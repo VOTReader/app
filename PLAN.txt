@@ -2259,8 +2259,11 @@ regression testing for the migration surfaces.
        already correct (all stores + all media base64'd; images maxDim
        1600/q0.8, audio AAC 96k/opus) — left untouched. tsc + 1512 vitest
        + Kotlin testDebugUnitTest/JaCoCo all green; web path verified
-       end-to-end in preview. OWED: device-verify the picker + cancel on a
-       real Android 8/9 (the case it exists for) — see exit criteria.
+       end-to-end in preview. DEVICE-VERIFIED 2026-06-01 on an API-28
+       (Android 9) emulator (a6389d0): Export → ACTION_CREATE_DOCUMENT →
+       DocumentsUI picker (pre-filled filename) → SAVE wrote a complete v2
+       payload to /sdcard/Download. (Verifying this is ALSO what surfaced
+       the Android 8/9 black-screen bug — see the WebView-floor note below.)
     #2 Screenshot async — optional polish. captureScreenshot does
        runBlocking on a binder thread (2s-capped). Make the JS side a
        Promise resolved via evaluateJavascript when PixelCopy finishes.
