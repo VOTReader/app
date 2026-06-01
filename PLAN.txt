@@ -3746,6 +3746,121 @@ INFRA / TOOLING ITEMS (one-liners — open small, ship fast)
   build with zero-tolerance. Pre-commit Step 3 mirrors the gate.
 
 ───────────────────────────────────────────────────────────────────────────────
+PROPOSED — GW1: Service-Worker Garden image cache (PWA parity) — DESIGN ONLY, NOT STARTED
+───────────────────────────────────────────────────────────────────────────────
+
+STATUS: architected 2026-05-31, NOT executed. The Android APK already has a
+native per-page Garden disk cache (W6.4 #3 / GardenImageCache.kt, shipped
+9483500). This phase brings the SAME behavior to the INSTALLED PWA (desktop
+Chrome/Edge/Firefox + Android Chrome PWA), which today has no Garden cache —
+it relies on the browser's volatile HTTP/image cache, so a PWA user gets the
+same per-page-turn re-download + redirect-hop the native app used to.
+
+WHY IT'S A SEPARATE PHASE (not just "reuse the native cache"):
+  - The SW only runs in the PWA. sw-register.js:31 hard-returns on Android
+    (PlatformBridge.isAndroid) — the APK bundles assets + uses the native
+    WebView path, never the SW. So this is strictly additive for PWA users;
+    it cannot affect and is not affected by the APK.
+  - The native cache (Kotlin, cacheDir, page-keyed) and the SW cache (JS,
+    CacheStorage, page-keyed) are independent implementations of one policy.
+    Document the shared invariants once (below) so they can't drift.
+
+THE CORE CONSTRAINT (why it's not trivial — same as the native side):
+  GitHub release URLs 302-redirect (Cache-Control: no-cache) to a per-request
+  SIGNED release-assets.githubusercontent.com URL, and the assets carry NO
+  CORS headers. Consequences for a SW:
+    - The SW CAN cache the image as an OPAQUE response (no CORS needed for
+      cache.put of an opaque Response; the <img> tag consumes it fine).
+    - The SW must cache under a NORMALIZED page key, NOT the request URL —
+      the signed URL differs per request AND per tier, so URL-keyed caching
+      would never hit + would store N copies. Use cache.put(Request(pageKey),
+      opaqueResponse) where pageKey = a synthetic same-origin URL like
+      `/__garden/042` derived from the garden_NNN.jpg filename (tier stripped).
+    - Opaque responses have status 0 + unknown size; Cache Storage stores
+      them but they count ~7× their real size against the origin quota in
+      some engines (the "opaque response padding" — important for the cap).
+
+SHARED INVARIANTS (must match GardenImageCache.kt — single policy, two impls):
+  1. KEY BY PAGE NUMBER ONLY (strip the tier). Re-reading at a new quality
+     OVERWRITES the same page → never N copies per tier. Count bounded ≤209.
+  2. Cap sized ABOVE a full Ultra read so a cover-to-cover read of any tier
+     never evicts mid-browse. Native uses 800 MB of real bytes; the SW must
+     account for opaque-padding (a 720 MB real Ultra book may bill as multi-GB
+     against quota) — so the SW cap is in ENTRY COUNT (≤209 + small margin)
+     and/or checks navigator.storage.estimate() pressure, NOT a raw byte cap.
+  3. Eviction = drop the least-recently-served page when over the count cap.
+     Never evict the current ± preload-ahead window (GARDEN_PRELOAD_AHEAD=5).
+  4. Garden cache is APP DATA: a 4th SW cache bucket `vot-garden-<v>`, NEVER
+     cleared by export, NEVER counted in "Your data" (user-data-size.js
+     already excludes it by omission — keep it out of USER_DATA_STORES). It
+     IS counted in "Total app data" (estimate().usage) automatically.
+
+DESIGN:
+  W-GW1.a — SW fetch handler for Garden URLs:
+    In service-worker.js, the fetch listener currently early-returns on
+    cross-origin (line ~135). Add, BEFORE that return, a check: if the URL
+    matches the garden release pattern (github.com/.../releases/download/
+    garden-<tier>/garden_NNN.jpg OR the release-assets redirect carrying
+    garden_NNN in rscd), route to gardenFirst(request, pageNum).
+      gardenFirst:
+        - key = new Request(`${scope}__garden/${pageNum}`)  // normalized
+        - hit = await gardenCache.match(key); if hit → return hit
+        - else: res = await fetch(request)  // follows 302; opaque is fine
+                if (res && (res.ok || res.type === 'opaque'))
+                  gardenCache.put(key, res.clone()); enforceCountCap()
+                return res
+        - catch → return fetch(request) bare (never block the image)
+    Cross-origin opaque caching requires the request reach the SW: the
+    redirect chain does (the initial github.com GET is what the <img> fires).
+    Confirm in the W-GW1 spike that the SW sees garden_NNN before the 302.
+
+  W-GW1.b — count-based eviction (opaque-padding-safe):
+    enforceCountCap(): list gardenCache keys; if > CAP (e.g. 220 — 209 pages
+    + headroom), delete oldest-inserted beyond the cap. Track insertion order
+    via a tiny IDB/meta list or by a timestamp header added to the cached
+    Response (SW can synthesize headers on put). Simpler: since key is
+    page-numbered, on overflow just delete keys not in the live window —
+    but the crawl fills all 209, so prefer LRU-by-insertion. RESOLVE in spike.
+
+  W-GW1.c — cache version + lifecycle:
+    New bucket constant GARDEN_CACHE = `vot-garden-${GARDEN_ASSET_VERSION}`.
+    GARDEN_ASSET_VERSION bumps ONLY if the Garden source images change
+    (rare). The activate handler's existing cleanup loop gains a
+    `vot-garden-` branch to drop old versions. Pre-cache nothing on install
+    (209 Ultra images = ~720 MB — never auto-download; cache-on-view only,
+    exactly like the corpus-cache-on-first-fetch pattern at corpusFirst()).
+
+  W-GW1.d — settings integration (optional, nice-to-have):
+    A "Clear Garden image cache" affordance + a size readout. The SW exposes
+    cache size via postMessage; Settings shows it under "Total app data"
+    detail. LOW priority — the OS already evicts cacheDir/CacheStorage under
+    pressure, and it's regenerable.
+
+RISKS / OPEN QUESTIONS for the spike (resolve BEFORE building):
+  - Does the SW reliably intercept the github.com request BEFORE the 302,
+    given <img> cross-origin loads? (Service workers DO see no-cors <img>
+    subresource requests, but verify the redirect is followed inside the SW
+    fetch, not by the browser opaquely.) If the browser follows the 302
+    before the SW sees a cacheable response, may need to cache the FINAL
+    release-assets URL response instead — still keyed by normalized page.
+  - Opaque response quota padding: confirm 209 Ultra opaque entries don't
+    blow the origin quota on a low-storage desktop. estimate() pressure check
+    is the mitigation.
+  - Interaction with the existing in-memory gardenImageCache + the crawl:
+    the SW is transparent to both (they still fire <img> loads; the SW just
+    serves them faster). No JS change needed in GardenView — same as native.
+
+VERIFICATION (when built): preview/desktop Chrome with SW — navigate Garden,
+confirm 2nd view of a page is served from CacheStorage (DevTools → Application
+→ Cache Storage shows vot-garden-* with /__garden/NNN keys, one per page);
+switch tier, confirm the SAME key is overwritten (count stays ≤209); offline
+reload still shows visited pages. Cross-browser: Chrome + Edge + Firefox.
+
+EFFORT: medium. One file (service-worker.js) + a constant + the activate
+branch + a spike to resolve the redirect-interception question. No native
+code, no bundle change. Independent of everything; ship anytime.
+
+───────────────────────────────────────────────────────────────────────────────
 USER POLICY REMINDERS (durable; mirror CLAUDE.md)
 ───────────────────────────────────────────────────────────────────────────────
 
