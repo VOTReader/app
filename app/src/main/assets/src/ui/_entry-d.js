@@ -118,6 +118,7 @@ import { StorageHealthBanner, useStorageHealth } from './components/StorageHealt
 import { Safari7DayModal, IosPwaWelcomeCard } from './components/SafariFlows.jsx';
 import { AppShellOverlays } from './components/AppShellOverlays.jsx';
 import { AppShellSheets } from './components/AppShellSheets.jsx';
+import { AnnotationDomSync } from './components/AnnotationDomSync.jsx';
 import { buildScreenRoutes } from './screen-routes.jsx';
 
 // ── Screens ─────────────────────────────────────────────────────────────
@@ -217,7 +218,7 @@ Object.assign(window, {
   SettingsRow, SelectField, VolumeLetterIndex, HistoryEntryCard,
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
   StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
-  AppShellOverlays, AppShellSheets,
+  AppShellOverlays, AppShellSheets, AnnotationDomSync,
   buildScreenRoutes,
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,

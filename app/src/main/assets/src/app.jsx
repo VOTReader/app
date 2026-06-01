@@ -142,12 +142,10 @@ function App() {
   useDesktopKeyboard();
   /* __bookmarkCreate, inboundJournalPayload, __openJournalInbound,
      __bookmarkEdit, auto-dismiss effect → src/hooks/use-sheet-orchestration.js (P6h) */
-  /* DOM annotation re-apply layer — the post-render apply* passes
-     (highlights/links/bookmarks/note-icons + active-note tint) plus the
-     __pendingOpenNote / __pendingScrollHlKey hand-offs → extracted verbatim
-     to src/hooks/use-dom-annotation-sync.js (P11). Called here so it follows
-     useSheetOrchestration: noteSheetTarget + setNoteSheetTarget are params. */
-  useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNoteSheetTarget });
+  /* DOM annotation re-apply layer → mounted as <AnnotationDomSync/> in the
+     render tree below (NOT a hook call here) so a store mutation re-renders
+     only that null leaf, not all of App() (U5). It reads noteSheetTarget +
+     setNoteSheetTarget from useSheetOrchestration, passed down as props. */
 
   /* TAB MANAGEMENT — openNewTab / switchToTab / closeTab / closeOtherTabs
      / closeTabsToTheRight / closeAllTabs / deduplicateTabs + the 4 tab-UI
@@ -770,6 +768,8 @@ function App() {
           user can navigate away to a working screen and either clear
           the bad data via Settings or re-import a good backup. */}
       <ErrorBoundary key={screen}>{ROUTES[screen]?.() ?? null}</ErrorBoundary>
+      <AnnotationDomSync screen={screen} letterId={letterId} noteSheetTarget={noteSheetTarget} setNoteSheetTarget={setNoteSheetTarget} />
+
 
       {/* ── 12 annotation / link / journal / bookmark sheets and popovers
               (always mounted; each is internally gated on its own state

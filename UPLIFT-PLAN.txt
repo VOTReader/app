@@ -236,6 +236,18 @@
 
  U5 — Stop App()-wide re-render on annotation mutation              [P1] [V]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — the 4-store useSyncExternalStore subscription moved OUT
+   of App()'s body into a new <AnnotationDomSync/> leaf (renders null; wraps the
+   existing useDomAnnotationSync hook, mounted as a child in App's render tree).
+   A store _bump() (highlight/note/link/bookmark mutation) now re-renders ONLY
+   that leaf + re-runs the imperative apply passes — App() (and its ~90-prop
+   ROUTES rebuild + active-screen reconcile, e.g. 176 verses in a Psalm) no
+   longer re-renders on annotation taps. Verified: votSmoke PASS (12 screens 0
+   crashed, letterAnn + wtlbAnn round-trips ok, 0 console errors); isolation is
+   guaranteed by React semantics (the subscriber is the leaf). globals 394→395;
+   app.jsx 798/800. DEFERRED: React.memo on the reading/index screens needs the
+   ROUTES factory's ~33 inline handler closures stabilized first (else memo is a
+   no-op) — a NavContext-shaped change, folded into D4.
  PROBLEM: useDomAnnotationSync subscribes to 4 stores INSIDE App() (app.jsx:150),
    so every highlight/note/link/bookmark _bump() re-renders all of App(),
    rebuilds the ~90-prop ROUTES object with ~33 fresh closures, and reconciles
@@ -619,7 +631,7 @@
  U2  minify ....................... DONE  [P1] (b/c/d only; −460 KB/−22%; bundle-a minify reverted — UMD this bug)
  U3  corpus-version gate .......... DONE  [P1] (pre-commit + CI gate; break-tested)
  U4  search 31MB load ............. DONE  [P1] (translations load only on cache-miss build)
- U5  App() re-render .............. TODO  [P1]
+ U5  App() re-render .............. DONE  [P1] (annotation sub → AnnotationDomSync leaf; screen-memo→D4)
  U6  export fail-loud ............. TODO  [P1]
  U7  Garden allowlist/cap ......... TODO  [P1]
  U8  applyDOMHighlights ........... TODO  [P2]
