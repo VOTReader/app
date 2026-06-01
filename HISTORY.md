@@ -4,6 +4,74 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## 8/10 UPLIFT — Wave 5 (the full P2 "ceiling" set) (2026-06-01)
+
+Commits `c836686..3c1dda9`. Everything past the 8/10 bar — the P2 items that
+raise individual subsystem scores. Tests 1527 → **1637**; coverage floor
+ratcheted; a new headless CI render-walk gate. All CI-green + deployed. Per-item
+evidence lives in UPLIFT-PLAN.txt; this is the chapter record.
+
+- **U12 scripture-parser robustness.** parseRefRange + parseRefStr now normalize
+  en/em-dash → ASCII hyphen, so a range that slips check_balance.py still renders
+  gold verse numbers instead of collapsing to white. findBook is two-pass
+  (exact title/id/plural before the startsWith fallback) so "Jude" no longer
+  resolves to "Judges". +4 tests; live-verified through the shipped bundle.
+- **U20 platform detection.** _detectPlatform now requires AppleWebKit + Safari +
+  none of a non-Safari token set (CriOS/FxiOS/EdgiOS/DuckDuckGo/in-app webviews)
+  — the old `/Safari/ && !Chrome` even mis-tagged Chrome-iOS/Firefox-iOS as
+  Safari and showed them the wrong 7-day-eviction warning. Misses fall to UNKNOWN
+  (silent). +6 UA-table tests.
+- **U14 (formal) AndroidBridge routing.** The 4 runtime `window.AndroidBridge`
+  bypasses (storage-health, use-history-sync, use-android-back ×2) now read
+  PlatformBridge.isAndroid; the single-source invariant is restored (grep ⇒
+  comments + test fixtures only). Tests updated to set isAndroid; web-verified.
+- **U21 connectivity-ping egress.** Dropped the no-cors fetch of
+  thevolumesoftruth.com/favicon.ico (an external egress contradicting the
+  self-contained policy) for navigator.onLine + the online/offline events;
+  removed that host from connect-src. +4 tests incl. a "no network request"
+  assertion. (github.com stays in img-src — the Garden redirect's load-bearing
+  initial hop.)
+- **U13 html2canvas off the boot path.** Removed from bundle-a's concat
+  (1,034,612 → 835,768 bytes, −199 KB / −19% — pure dead weight on Android,
+  which uses native PixelCopy); platform-bridge lazy-injects it via <script src>
+  on the first web screenshot (CSP 'self'; SW-precached). Preview-verified:
+  absent at boot, 1 script injected on demand, real data URL out.
+- **U18 PWA hygiene.** Hourly + on-visibility reg.update() so idle tabs get the
+  update toast; pruned 6 redundant CORE_ASSETS (react/react-dom/flexsearch/
+  search/search-data are concatenated INTO bundle-a; data-normalize orphaned —
+  html2canvas KEPT as the U13 lazy source); offline claim documented honest
+  (scripture is precached; the Garden's GitHub images are the one online-only
+  feature). Core cache 33→27 entries, verified.
+- **U19 robustness.** clearLegacyLs now guards on hasAnyPendingStores() — it
+  previously relied on a comment, so a reorder could wipe pre-W2.4 users'
+  un-migrated LS keys; now defers. base64ToBlob validates the full base64 string
+  before atob. (idb-adapter getAll already had the tx.onabort fallback; the
+  cosmetic var-useState sweep + a few micro items deferred with reasoning.)
+- **U9 screenshot encode off-main.** Verified against source: the runBlocking is
+  on the BINDER thread, not Main, so the "main-thread ANR" premise was overstated
+  — but captureScreenshotSuspend ran the crop/scale/JPEG/base64 (pure CPU) on
+  Main. Now only PixelCopy + the zoom-bracket stay on Main; the encode moved to
+  Dispatchers.Default. + cached the Vibrator (U19). The full async-contract
+  rewrite deferred with reasoning. Kotlin tests + jacoco green.
+- **U17 bridge contract test.** BridgeContractTest (pure-JVM reflection) pins the
+  20-method @JavascriptInterface surface against a documented {name→param-count}
+  map — a rename/remove now fails the build. The JaCoCo coveredClasses extension
+  was measured-infeasible (StorageManager Robolectric artifact; GardenImageCache
+  I/O dropped the bundle to 0.59) and scoped out with reasoning.
+- **U16 CI render-walk gate.** tools/smoke-ci.js (puppeteer) serves the built
+  assets, launches headless Chrome, pre-loads the lazy corpora, injects
+  tools/smoke.js via CDP eval (CSP-exempt — the U10 hashed CSP blocks an injected
+  inline <script>), runs votSmoke(), and gates on it. PASS locally + GREEN in CI
+  (12 screens, both annotation round-trips, 0 console errors, 0 404s).
+
+**Device walk (API-28 emulator, WebView 69).** The cumulative build boots + fully
+renders (screenshot) with 0 CSP/JS/crash logcat — confirming U10/U13/U9/U14/U21
+all hold on the real old WebView. Still owed (manual/uiautomator feature walks in
+tools/n1-smoke-walk.md): the U1 import file-walk, U7 Garden Ultra crawl, U9
+thumbnail-capture check.
+
+---
+
 ## 8/10 UPLIFT — Wave 4 (the 8/10 exit bar) (2026-06-01)
 
 Commits `a6f3972..bfbeb4b`. The five items between Wave 1 and the 8/10 target.
