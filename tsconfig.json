@@ -18,7 +18,8 @@
     "app/src/main/assets/src/hooks/**/*",
     "app/src/main/assets/src/renderer/**/*",
     "app/src/main/assets/src/ui/**/*",
-    "app/src/main/assets/src/components/**/*"
+    "app/src/main/assets/src/components/**/*",
+    "app/src/main/assets/src/data/scripture-resolution.js"
   ],
   "exclude": [
     "app/src/main/assets/src/stores/_entry-b.js",

@@ -97,6 +97,13 @@ export function _allBooks() { return window.__ALL_BOOKS || (typeof BOOKS !== 'un
 export function _matthew() { return (typeof window !== 'undefined' && window.MATTHEW) || (typeof MATTHEW !== 'undefined' ? MATTHEW : null); }
 export function _studies() { return typeof BIBLE_STUDIES !== 'undefined' ? BIBLE_STUDIES : []; }
 
+/**
+ * Parse a raw reference string into structured parts.
+ * "John 3:16" -> { rawBook:"John", chapter:3, verse:16, verseEnd:null, tag:null }
+ * "1 Cor 13:4-7 (NKJV)" -> { rawBook:"1 Cor", chapter:13, verse:4, verseEnd:7, tag:"NKJV" }
+ * @param {string} str
+ * @returns {{ rawBook: string, chapter: number, verse: number|null, verseEnd: number|null, tag: string|null } | null}
+ */
 export function parseRefStr(str) {
   if (!str) return null;
   const s = str.trim();
@@ -113,6 +120,11 @@ export function parseRefStr(str) {
   };
 }
 
+/**
+ * Resolve a raw book name (or alias / abbreviation) to a canonical book key.
+ * @param {string} rawName
+ * @returns {string | null}
+ */
 export function findBook(rawName) {
   if (rawName == null) return null;
   const books = _allBooks();
@@ -129,6 +141,12 @@ export function findBook(rawName) {
   return null;
 }
 
+/**
+ * Parse + resolve a reference to a book key, display label, and verse text.
+ * "John 3:16" -> { bookId:"john", bookTitle:"John", chapter:3, verse:16, verseEnd:null, label:"John 3:16", text:"..." }
+ * @param {string} str
+ * @returns {{ bookId: string, bookTitle: string, chapter: number, verse: number, verseEnd: number|null, label: string, text: string } | null}
+ */
 export function parseScriptureRef(str) {
   const p = parseRefStr(str);
   if (!p || p.verse == null) return null;
@@ -143,7 +161,12 @@ export function parseScriptureRef(str) {
   return { bookId: bookKey, bookTitle: book.title, chapter: p.chapter, verse: p.verse, verseEnd: p.verseEnd, label, text: v ? v.text : '' };
 }
 
-/* Resolve verse text for a link endpoint */
+/**
+ * Resolve verse text for a saved link endpoint, reading from the BOOKS /
+ * MATTHEW corpora and falling back to the endpoint's saved preview/text.
+ * @param {{ type?: string, bookId?: string, chapter?: number, verse?: number, preview?: string, text?: string }} endpoint
+ * @returns {string}
+ */
 export function resolveVerseText(endpoint) {
   if (endpoint.type === 'bible') {
     const book = _allBooks()[endpoint.bookId];
@@ -220,6 +243,12 @@ export function findEntryContext(id, kindHint) {
   return null;
 }
 
+/**
+ * Look up a verse or verse-range and return concatenated text.
+ * ref: "John 3:16" or "John 3:16-18" (optionally translation-tagged, e.g. "John 3:16 (KJV)").
+ * @param {string} ref
+ * @returns {string | null}
+ */
 export function lookupVersesFromBooks(ref) {
   const p = parseRefStr(ref);
   if (!p || p.verse == null) return null;
