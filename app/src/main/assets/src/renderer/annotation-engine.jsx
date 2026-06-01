@@ -13,7 +13,11 @@
      StaticSubtree                    → React.Component (freeze wrapper)
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Snap an annotation range to whole-word boundaries. */
+/* Snap an annotation's START back to a whole-word boundary — but leave the END
+   EXACTLY where the user released, BY DESIGN. A user can intentionally end a
+   selection mid-word (the note-icon slide-off in dom-links.js compensates so
+   the icon still lands on a boundary); snapping the end here would override that
+   intent. So this only walks `start` left while it sits inside a word. */
 export function snapRangeToWords(text, start, end) {
   if (!text || typeof text !== 'string') return { start, end };
   start = Math.max(0, Math.min(start, text.length));

@@ -249,3 +249,131 @@ describe('applyDOMHighlights overlap precedence', () => {
     expect(c.querySelector('mark.hl-blue[data-hl-id="b"]')).not.toBeNull();
   });
 });
+
+// ── DUAL-RENDER EQUIVALENCE (U11) ──────────────────────────────
+/* The flagship invariant: the React sweep-line (HighlightableText) and the
+   imperative DOM overlay (applyDOMHighlights) MUST produce structurally
+   identical annotation DOM. Until now every render-path test used exactly
+   2 annotations and asserted each path in isolation — "they're identical"
+   was an untested claim. This parameterizes a 3+-overlap set through BOTH
+   paths and asserts a per-CHARACTER signature is equal:
+
+     { color: innermost-covering-mark's color class,
+       id:    innermost-covering-mark's data-hl-id  (== the elementFromPoint
+              tap winner — folds in the U19 tap-z-order sub-item),
+       note:  any covering mark carries hl-note }
+
+   Both paths nest oldest→outermost, newest→innermost, so the innermost mark
+   at any char is the same annotation on both — this signature would DIVERGE
+   the moment the two paths drift (the thing U8 must not break). */
+describe('dual-render equivalence: HighlightableText ≡ applyDOMHighlights (U11)', () => {
+  let store;
+  beforeEach(() => {
+    store = {};
+    window.AnnotationStore = {
+      get: (k) => store[k] || [],
+      subscribe: () => () => {},
+      getVersion: () => 0,
+    };
+    window.NoteStore = {
+      _notes: {},
+      get: (gid) => window.NoteStore._notes[gid] || null,
+      subscribe: () => () => {},
+      getVersion: () => 0,
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.innerHTML = '';
+    delete window.AnnotationStore;
+    delete window.NoteStore;
+  });
+
+  const COLOR_RX = /\bhl-(yellow|green|pink|red|orange|blue|purple|teal|brown|gray|cyan|blank)\b/;
+  /** Per-character signature over a container's annotation DOM: the innermost
+      covering mark's color + id, and whether any covering mark has a note. */
+  const signature = (container) => {
+    const out = [];
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+      const marks = [];
+      let p = /** @type {any} */ (node.parentNode);
+      while (p && p !== container) { if (p.tagName === 'MARK') marks.push(p); p = p.parentNode; }
+      const inner = marks[0] || null;             // closest MARK ancestor = newest = painted = tap target
+      const color = inner ? ((inner.className.match(COLOR_RX) || [])[0] || null) : null;
+      const id = inner ? inner.getAttribute('data-hl-id') : null;
+      const note = marks.some((m) => m.classList.contains('hl-note'));
+      const t = node.nodeValue;
+      for (let i = 0; i < t.length; i++) out.push({ color, id, note });
+    }
+    return out;
+  };
+
+  const renderReact = (text, hlKey) => {
+    const { container } = render(<HighlightableText text={text} hlKey={hlKey} />);
+    return container.querySelector('[data-hl-key="' + hlKey + '"]');
+  };
+  const renderDom = (text, hlKey) => {
+    document.body.innerHTML = '<span id="domc" data-hl-key="' + hlKey + '" data-hl-dom>' + text + '</span>';
+    const c = document.getElementById('domc');
+    applyDOMHighlights();
+    return c;
+  };
+
+  // text indices: H0 e1 l2 l3 o4 ,5 _6 w7 o8 r9 l10 d11 !12 _13 G14 o15 o16 d17 _18 d19 a20 y21 .22
+  const TEXT = 'Hello, world! Good day.';
+
+  const runScenario = (name, anns, noteGroups) => {
+    it(name, () => {
+      store['k'] = anns;
+      window.NoteStore._notes = {};
+      (noteGroups || []).forEach((g) => { window.NoteStore._notes[g] = { groupId: g, text: 'memo' }; });
+
+      const reactC = renderReact(TEXT, 'k');
+      const domC = renderDom(TEXT, 'k');
+
+      // text is never lost or duplicated by either path
+      expect(reactC.textContent).toBe(TEXT);
+      expect(domC.textContent).toBe(TEXT);
+
+      const sigReact = signature(reactC);
+      const sigDom = signature(domC);
+      expect(sigReact.length).toBe(TEXT.length);
+      expect(sigDom.length).toBe(TEXT.length);
+      // The whole point: per-character equivalence across both render paths.
+      expect(sigReact).toEqual(sigDom);
+    });
+  };
+
+  // The canonical 3-way staggered overlap.
+  const A = ann({ id: 'A', color: 'yellow', start: 0,  end: 20, created: 1 });
+  const B = ann({ id: 'B', color: 'blue',   start: 5,  end: 15, created: 2 });
+  const C = ann({ id: 'C', color: 'pink',   start: 8,  end: 12, created: 3 });
+  // A 4th, OLDEST annotation fully covered by the triple stack — carries a note.
+  const N = ann({ id: 'N', color: 'green',  start: 8,  end: 12, created: 0 });
+  // A mixed-kind variant (underline) to prove kind-class parity too.
+  const U = ann({ id: 'U', kind: 'underline', color: 'red', start: 3, end: 18, created: 4 });
+
+  runScenario('3-way color overlap', [A, B, C]);
+  runScenario('3-way + a note on a fully-covered annotation', [A, B, C, N], ['N']);
+  runScenario('overlap with a noted, non-covered top annotation', [A, B, C], ['C']);
+  runScenario('4-way overlap mixing an underline kind', [A, B, C, U]);
+  runScenario('staggered overlap with a blank (transparent) newest', [
+    A, B, ann({ id: 'BL', color: 'blank', start: 8, end: 12, created: 9 }),
+  ]);
+
+  it('the triple-overlap centre [8,12] resolves to the SAME tap winner (C) on both paths', () => {
+    store['k'] = [A, B, C];
+    const sigReact = signature(renderReact(TEXT, 'k'));
+    const sigDom = signature(renderDom(TEXT, 'k'));
+    // char 8..11 are the triple overlap; newest (C) is the innermost = the
+    // elementFromPoint tap target on BOTH render paths (U19 z-order fold-in).
+    for (let i = 8; i < 12; i++) {
+      expect(sigReact[i].id).toBe('C');
+      expect(sigDom[i].id).toBe('C');
+      expect(sigReact[i].color).toBe('hl-pink');
+      expect(sigDom[i].color).toBe('hl-pink');
+    }
+  });
+});

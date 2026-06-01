@@ -402,6 +402,20 @@
 
  U11 — Dual-render equivalence + 3-overlap tests                   [P2, test] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — annotation-engine.test.jsx gained a parameterized
+   dual-render equivalence suite: it renders the SAME overlap set through BOTH
+   paths and asserts a per-CHARACTER signature {innermost-mark color, data-hl-id
+   (== the elementFromPoint tap winner — folds in the U19 z-order sub-item),
+   note-in-chain} is byte-equal across React HighlightableText and imperative
+   applyDOMHighlights, plus textContent parity (no text lost/dup). 5 scenarios:
+   3-way (A 0-20/c1, B 5-15/c2, C 8-12/c3), 3-way + a note on a fully-covered
+   4th, note on the non-covered top, 4-way mixing an underline kind, and a blank
+   (transparent) newest. + an explicit assertion that the triple-overlap centre
+   [8,12] resolves to the SAME tap winner (C) on both paths. Both paths nest
+   oldest→outermost / newest→innermost, so the signature would DIVERGE the moment
+   the paths drift — the regression net U8 needs. 28 tests (was 22; +6). Also
+   documented snapRangeToWords' START-only snap (U19 cleanup). renderer/ enters
+   the coverage gate via U15.
  PROBLEM: the two render paths (React HighlightableText + imperative
    applyDOMHighlights) have NO equivalence test and NO 3+-overlap render test —
    every render-path test uses exactly 2 annotations (annotation-engine.test.jsx).
@@ -529,9 +543,9 @@
   • JournalViewerScreen.jsx:261,287,453 — drop the per-component
     `var useState = React.useState` redeclarations (stale pre-JSX idiom that
     survived the JSX conversion). Grep the tree for the same pattern elsewhere.
-  • annotation-engine.jsx:17-24 — comment at snapRangeToWords that it snaps the
-    START only, never the END, by design (rationale currently lives only in
-    dom-links.js).  [near U8/U11]
+  • ✅ DONE (U11) — annotation-engine.jsx snapRangeToWords now documents that it
+    snaps the START only, never the END, by design (rationale was only in
+    dom-links.js).
   • offline.html — document it's reachable only in a narrow window (index.html
     is itself cached, so navigations succeed from cache).  [near U18]
 
@@ -675,7 +689,7 @@
  U8  applyDOMHighlights ........... TODO  [P2]
  U9  async screenshot ............. TODO  [P2]
  U10 CSP tighten .................. TODO  [P2]
- U11 dual-render equiv tests ...... TODO  [P2]
+ U11 dual-render equiv tests ...... DONE  [P2] (per-char equivalence, 5 scenarios + tap-winner; +6 tests)
  U12 scripture parser ............. TODO  [P2]
  U13 html2canvas lazy ............. TODO  [P2]
  U14 AndroidBridge routing ........ TODO  [P2]
