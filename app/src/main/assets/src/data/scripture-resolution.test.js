@@ -50,6 +50,11 @@ const BOOKS = {
       { num: 23, sections: [{ heading: '', verses: [{ n: 1, text: 'The Lord is my shepherd' }] }] },
     ],
   },
+  // Judges BEFORE Jude on purpose: a single-pass startsWith scan would mis-resolve
+  // "Jude" to "Judges" ('judges'.startsWith('jude')); the U12 two-pass fix must
+  // prefer the exact "Jude" regardless of iteration order.
+  judges: { id: 'judges', title: 'Judges', chapters: [{ num: 1, sections: [{ heading: '', verses: [{ n: 1, text: 'After the death of Joshua' }] }] }] },
+  jude: { id: 'jude', title: 'Jude', chapters: [{ num: 1, sections: [{ heading: '', verses: [{ n: 3, text: 'contend earnestly for the faith' }] }] }] },
 };
 
 const MATTHEW = {
@@ -183,6 +188,10 @@ describe('parseRefStr', () => {
     expect(parseRefStr(null)).toBeNull();
     expect(parseRefStr('not a reference')).toBeNull();
   });
+  it('normalizes en/em-dash ranges to a parsed range — U12', () => {
+    expect(parseRefStr('John 3:16–18')).toMatchObject({ verse: 16, verseEnd: 18 }); // en-dash
+    expect(parseRefStr('John 3:16—18')).toMatchObject({ verse: 16, verseEnd: 18 }); // em-dash
+  });
 });
 
 /* ── findBook ─────────────────────────────────────────────────── */
@@ -202,6 +211,10 @@ describe('findBook', () => {
     expect(findBook('Xyz')).toBeNull();
     expect(findBook('')).toBeNull();
     expect(findBook(null)).toBeNull();
+  });
+  it('prefers an EXACT title over a prefix collision (Jude, not Judges) — U12', () => {
+    expect(findBook('Jude')).toBe('jude');     // exact beats 'judges'.startsWith('jude')
+    expect(findBook('Judges')).toBe('judges');
   });
 });
 
@@ -248,6 +261,11 @@ describe('lookupVersesFromBooks', () => {
     expect(lookupVersesFromBooks('John 99:1')).toBeNull();
     expect(lookupVersesFromBooks('John 3:99')).toBeNull();
     expect(lookupVersesFromBooks('John 3')).toBeNull(); // no verse
+  });
+  it('parses an en-dash range (defense-in-depth) — U12', () => {
+    expect(lookupVersesFromBooks('John 3:16–18')).toBe(
+      '16. For God so loved the world 17. For God did not send His Son to condemn 18. He who believes is not condemned'
+    );
   });
 });
 

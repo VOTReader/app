@@ -121,7 +121,10 @@ export function getEchoesForVerse(chapter, verseNum) {
  * @returns {VerseRange | null}
  */
 export function parseRefRange(ref) {
-  const clean = ref.replace(/\s*\(.*?\)\s*/g, "").trim();
+  // U12: normalize en/em-dash → ASCII hyphen first so a range that slipped the
+  // data gate (e.g. "12:18–20") still splits into gold verse numbers instead of
+  // rendering white (the renderer only inlays verse-sup when the range parses).
+  const clean = ref.replace(/[–—]/g, '-').replace(/\s*\(.*?\)\s*/g, "").trim();
   // Comma-separated verses: "7:7, 9" or "7:7, 9, 11"
   const cm = clean.match(/:(\d+(?:\s*,\s*\d+)+)$/);
   if (cm) {

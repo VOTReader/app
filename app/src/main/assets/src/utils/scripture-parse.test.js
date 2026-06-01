@@ -133,6 +133,11 @@ describe('parseRefRange', () => {
     expect(parseRefRange('5:3-7')).toEqual({ start: 3, end: 7 });
   });
 
+  it('normalizes en/em-dash ranges to a parsed range (U12 defense-in-depth)', () => {
+    expect(parseRefRange('5:3–7')).toEqual({ start: 3, end: 7 }); // en-dash
+    expect(parseRefRange('12:18—20')).toEqual({ start: 18, end: 20 }); // em-dash
+  });
+
   it('parses a comma-form with explicit verse list', () => {
     // "7:7, 9, 11" → start: 7, end: 11, verses: [7, 9, 11]
     const result = parseRefRange('7:7, 9, 11');

@@ -471,6 +471,17 @@
 
  U12 — Scripture parser robustness                                 [P2] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — both parsers now `.replace(/[–—]/g, '-')` the ref first,
+   so an en/em-dash range that slips check_balance.py still parses (renders gold
+   verse-sup) instead of collapsing to a single verse / white text. findBook is
+   now TWO passes — exact title/id/singular-plural FIRST, then the startsWith
+   prefix fallback — so a full name that's also a prefix (the canonical "Jude"
+   vs "Judges") resolves to itself, not whichever sorted first. +4 tests
+   (scripture-resolution: findBook precedence + parseRefStr/lookupVerses dash;
+   scripture-parse: parseRefRange dash). 1625 vitest, tsc clean, coverage holds;
+   data gate still 0 errors (it stays the enforcement layer — this is
+   defense-in-depth). Folds in nothing else; the gold-render data integrity is
+   the win.
  PROBLEM: parseRefRange (scripture-parse.js:131) + parseRefStr (scripture-
    resolution.js:112) only match ASCII hyphen — an en/em-dash that slips the
    data gate silently renders multi-verse footnotes WHITE (no gold numbers).
@@ -745,7 +756,7 @@
  U9  async screenshot ............. TODO  [P2]
  U10 CSP tighten .................. DONE  [P2, sec] (script-src sha256 hashes, no unsafe-inline/blob:; web + WebView-69 verified)
  U11 dual-render equiv tests ...... DONE  [P2] (per-char equivalence, 5 scenarios + tap-winner; +6 tests)
- U12 scripture parser ............. TODO  [P2]
+ U12 scripture parser ............. DONE  [P2] (en/em-dash normalize + findBook exact-before-prefix; +4 tests)
  U13 html2canvas lazy ............. TODO  [P2]
  U14 AndroidBridge routing ........ TODO  [P2]
  U15 renderer coverage ............ DONE  [P2] (renderer/ + scripture-resolution measured; +70 tests; floor ratcheted)

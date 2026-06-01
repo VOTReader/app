@@ -106,7 +106,11 @@ export function _studies() { return typeof BIBLE_STUDIES !== 'undefined' ? BIBLE
  */
 export function parseRefStr(str) {
   if (!str) return null;
-  const s = str.trim();
+  // U12: normalize en/em-dash → ASCII hyphen so a verse range that slipped the
+  // data gate (check_balance.py) still parses as a range instead of silently
+  // collapsing to a single verse. Defense-in-depth; the gate stays the
+  // enforcement layer, but a stray "3:16–18" shouldn't drop the range here.
+  const s = str.trim().replace(/[–—]/g, '-');
   const tagM = s.match(/\s*\(([A-Za-z]+)\)\s*$/);
   const clean = tagM ? s.slice(0, tagM.index).trim() : s;
   const m = clean.match(/^(\d?\s*[A-Za-z][A-Za-z\s]+?)\s+(\d+)(?::(\d+)(?:\s*-\s*(\d+))?)?$/);
@@ -130,13 +134,23 @@ export function findBook(rawName) {
   const books = _allBooks();
   const q = String(rawName).toLowerCase().replace(/\s+/g, '');
   if (!q) return null;
+  // U12: two passes so an EXACT match always beats a prefix hit. A single-pass
+  // startsWith returned the first key that happened to share a prefix — so
+  // "Jude" could resolve to "Judges" (or any "Jo…" to whichever book sorted
+  // first). Pass 1 = exact title / id / singular-plural variant; pass 2 = the
+  // prefix fallback (abbreviations like "Jo" / "1 Cor"), first hit as before.
   for (const k of Object.keys(books)) {
     const b = books[k];
     if (!b || !b.title) continue;
     const t = b.title.toLowerCase().replace(/\s+/g, '');
-    if (t === q || t.startsWith(q) || b.id === q ||
-        t === q + 's' || t.replace(/s$/, '') === q.replace(/s$/, ''))
+    if (t === q || b.id === q || t === q + 's' || t.replace(/s$/, '') === q.replace(/s$/, ''))
       return k;
+  }
+  for (const k of Object.keys(books)) {
+    const b = books[k];
+    if (!b || !b.title) continue;
+    const t = b.title.toLowerCase().replace(/\s+/g, '');
+    if (t.startsWith(q)) return k;
   }
   return null;
 }
