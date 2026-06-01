@@ -294,8 +294,13 @@ if [ -n "$bundle_source_changed" ]; then
           app/src/main/assets/dist/bundle-b.js \
           app/src/main/assets/dist/bundle-c.js \
           app/src/main/assets/dist/bundle-d.js \
+          app/src/main/assets/index.html \
           app/src/main/assets/service-worker.js
-  echo "[pre-commit] Bundles + SW cache version regenerated and staged."
+  # index.html is re-staged because `npm run build` runs build:csp, which
+  # re-derives the CSP script-src sha256 allow-list from index.html's inline
+  # <script> blocks (U10). If an inline script changed, the hashes are rewritten
+  # here — re-stage so the commit lands with the CSP in sync (mirrors bundles/SW).
+  echo "[pre-commit] Bundles + CSP hashes + SW cache version regenerated and staged."
 
   # ─── Step 5b: CORPUS_VERSION gate (U3) ────────────────────────────
   # The lazy corpus bundles (a-bible/matthew/vot) are SW-cached and busted

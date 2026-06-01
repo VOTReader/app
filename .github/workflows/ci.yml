@@ -107,14 +107,21 @@ jobs:
       - name: Build all 4 bundles (tools/build.py + esbuild B/C/D)
         run: npm run build
 
-      - name: Verify committed bundles + SW version match source
-        # After `npm run build` regenerates dist/ and syncs the SW
-        # CACHE_VERSION from package.json (build:sw), the working tree
-        # should be byte-identical to the committed copies. Any diff =
-        # committed dist/ bundles or service-worker.js are stale relative
-        # to source (bundle not rebuilt, esbuild drift, or a package.json
-        # version bump without `npm run build`). Catches what the hook misses.
-        run: git diff --exit-code app/src/main/assets/dist/ app/src/main/assets/service-worker.js
+      - name: Verify committed bundles + SW version + CSP hashes match source
+        # After `npm run build` regenerates dist/, the CSP script-src hashes
+        # (build:csp → index.html), and the SW CACHE_VERSION (build:sw), the
+        # working tree should be byte-identical to the committed copies. Any
+        # diff = committed dist/ bundles, index.html (stale CSP hashes), or
+        # service-worker.js are stale relative to source. Catches what the hook
+        # misses. index.html is included because build:csp may rewrite its CSP.
+        run: git diff --exit-code app/src/main/assets/dist/ app/src/main/assets/index.html app/src/main/assets/service-worker.js
+
+      - name: Verify CSP script-src hashes match inline scripts (U10)
+        # --check (never writes): fails if index.html's committed script-src
+        # sha256 allow-list doesn't match the sha256 of its inline <script>
+        # blocks — i.e. an inline script changed without a re-hash, which would
+        # hard-block that script under CSP (black-screen class) on the live PWA.
+        run: npm run check:csp
 
       - name: Verify CORPUS_VERSION gate (U3)
         # The lazy corpus bundles (a-bible/matthew/vot) are SW-cached and busted

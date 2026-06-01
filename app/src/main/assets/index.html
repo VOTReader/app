@@ -8,17 +8,28 @@
        and the GitHub Pages origin (web PWA) — so a single policy covers both
        with no per-platform branching (W5.2; the explicit Android host was
        redundant with 'self' there and irrelevant on the web). All script/style/
-       data is self-hosted; the Garden View loads images from GitHub raw
+       data is self-hosted; the Garden View loads images from GitHub
        user-content; the only network request is an optional connectivity ping
-       to thevolumesoftruth.com. unsafe-inline is required because all script and
-       style lives inline in this single-file build. blob: on script-src supports
-       Export "Download as JSON" via Blob URL. media-src blob: is required for
-       journal voice-memo playback — recordings are captured locally and played
-       back from a Blob object URL; without it every <audio> src is rejected by
-       the URL safety check (no network media is unlocked — blob: only). -->
+       to thevolumesoftruth.com.
+       SCRIPT-SRC HARDENING (U10): script-src carries NO 'unsafe-inline'. Each
+       inline script element below is allowed by the sha256 of its source — the
+       'sha256-…' tokens are generated + kept in sync by tools/sync-csp-hashes.js
+       (build:csp + pre-commit; CI verifies with --check), so an inline-script
+       edit can't silently drift the policy. Nonces are impossible on static
+       hosting (no server to mint a per-response value); hashes are the only
+       option. The HTML parser normalizes CR/CRLF→LF before hashing, so the same
+       tokens match whether the file is served LF (Pages) or CRLF (a Windows-
+       built APK). blob: was also dropped from script-src — Export uses an <a
+       download> blob HREF, never a blob script (no Worker/eval).
+       style-src KEEPS 'unsafe-inline' by necessity: React style={{}} emits inline
+       style="" attributes app-wide, which have no static hash/nonce path.
+       media-src blob: is required for journal voice-memo playback — recordings
+       are captured locally and played from a Blob object URL; without it every
+       <audio> src is rejected (no network media is unlocked — blob: only).
+       img/connect-src host-narrowing is tracked separately (U21). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'unsafe-inline' blob:;
+    script-src 'self' 'sha256-BiBVmFw3ZhrU/PBwRHXqD0BNSiXHr8TDXQwQFLL9rxo=' 'sha256-Nn+jGCnUTXXk4L8kgvNzRc3gyE3BU0NuwEjS9goTrBA=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-eb7yoHrWRuulBiqUsLf9IEzQErxv2QD45Fkcf+wTmMs=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;

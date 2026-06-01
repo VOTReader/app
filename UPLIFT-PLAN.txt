@@ -404,6 +404,28 @@
 
  U10 — Tighten CSP (drop unsafe-inline)                            [P2, security] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — script-src no longer carries 'unsafe-inline' (or blob:).
+   tools/sync-csp-hashes.js sha256-hashes the 9 inline <script> blocks and writes
+   them into the CSP allow-list (nonces are impossible on STATIC hosting — Pages
+   + the Android asset loader can't mint a per-response value). Wired: build:csp
+   (in `npm run build`, BEFORE build:sw so the SW hash covers the final CSP) +
+   pre-commit (re-stages index.html) + CI (`check:csp` --check + index.html in the
+   bundle-match diff) — so an inline-script edit can't silently drift the policy
+   into a black screen. TWO non-obvious traps handled: (1) hash over CR-STRIPPED
+   content — the HTML parser normalizes CR/CRLF→LF before computing the CSP hash,
+   so the same tokens match whether the file is served LF (Pages) or CRLF (a
+   Windows-built APK); (2) the tool STRIPS HTML comments before extracting scripts
+   (the CSP rationale comment mentions "inline script"/<a download> prose — the
+   browser hashes only real <script> ELEMENTS, never commented text). VERIFIED ON
+   BOTH PLATFORMS: web preview (clean-slate) — all 9 inline scripts execute
+   (polyfill/loader-factory/render), app boots, 0 CSP violations; AND the API-28
+   emulator (WebView 69) — app FULLY RENDERS (screenshot: a complete reading view
+   + the StorageHealthBanner + nav), 0 "Refused to execute inline script" in
+   logcat. style-src KEEPS 'unsafe-inline' BY NECESSITY (React style={{}} emits
+   dynamic inline style="" attributes — no static hash/nonce path; documented).
+   img/connect-src host-narrowing deferred to U21 (those hosts were added
+   deliberately to FIX Garden's github→githubusercontent 302; narrowing them
+   risks re-breaking Garden — belongs with the egress decision).
  PROBLEM: unsafe-inline on script-src AND style-src (index.html:21-22) ⇒ CSP
    gives no XSS protection for an app rendering imported JSON + user journal
    content. img-src/connect-src allow bare https://github.com (over-broad);
@@ -721,7 +743,7 @@
  U7  Garden allowlist/cap ......... DONE  [P1, sec] (host allowlist + single-flight + tmp sweep)
  U8  applyDOMHighlights ........... DONE  [P2] (dead guard dropped, −30% sweep; heavy refactor deferred — profiled sub-ms, W7.6-style)
  U9  async screenshot ............. TODO  [P2]
- U10 CSP tighten .................. TODO  [P2]
+ U10 CSP tighten .................. DONE  [P2, sec] (script-src sha256 hashes, no unsafe-inline/blob:; web + WebView-69 verified)
  U11 dual-render equiv tests ...... DONE  [P2] (per-char equivalence, 5 scenarios + tap-winner; +6 tests)
  U12 scripture parser ............. TODO  [P2]
  U13 html2canvas lazy ............. TODO  [P2]
