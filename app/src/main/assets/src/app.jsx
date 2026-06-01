@@ -237,6 +237,22 @@ function App() {
     loadTranslation(code).then(() => setTranslationTick((v) => v + 1));
   }, [settings.translation]);
 
+  // One-time reclaim of stale search-index cache generations at boot. The
+  // vot-search-cache DB accumulated a fresh ~21 MB serialized index per
+  // dataSignature() change (corpus edit / schema bump / translation switch)
+  // and never evicted the superseded copies — hundreds of MB of dead index
+  // on long-lived installs. purgeStaleCache() is a CHEAP standalone IDB
+  // key-deletion (it does NOT build or load an index), so it runs here at
+  // boot rather than being gated behind VotSearch.init() (which only fires
+  // when the user opens Search — they might not for days). Keeps only the
+  // current-signature entries; idempotent; fire-and-forget.
+  useEffect(() => {
+    if (window.VotSearch && typeof window.VotSearch.purgeStaleCache === 'function') {
+      window.VotSearch.purgeStaleCache(settings.translation || 'nkjv').catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time boot reclaim; deliberately runs once on mount, not per translation change (saveToCache self-evicts thereafter).
+  }, []);
+
   // Lazy-load bible-studies.js the first time the user opens any Studies screen.
   // Covers: Studies home, a study index, or a direct tap-through to a study chapter.
   useEffect(() => {

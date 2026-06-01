@@ -10044,6 +10044,12 @@ Continue?`
       loadTranslation(code).then(() => setTranslationTick((v) => v + 1));
     }, [settings.translation]);
     useEffect(() => {
+      if (window.VotSearch && typeof window.VotSearch.purgeStaleCache === "function") {
+        window.VotSearch.purgeStaleCache(settings.translation || "nkjv").catch(() => {
+        });
+      }
+    }, []);
+    useEffect(() => {
       const needsStudies = screen === "studies-home" || screen === "bible-study-index" || screen === "bible-study-chapter";
       if (!needsStudies) return;
       if (typeof BIBLE_STUDIES !== "undefined") return;
