@@ -65,6 +65,7 @@ import {
 import { normalizeForHighlight, splitWithHighlight, highlightExcerptInDom } from '../utils/highlight.jsx';
 import { renderTextWithScripRefs } from '../utils/render-text.jsx';
 import { srchGroupKey } from '../utils/search.js';
+import { buildExportPayload, applyImportPayload } from '../utils/backup.js';
 
 // ── Late stores + data ──────────────────────────────────────────────────
 import {
@@ -198,6 +199,7 @@ Object.assign(window, {
   normalizeForHighlight, splitWithHighlight, highlightExcerptInDom,
   renderTextWithScripRefs,
   srchGroupKey,
+  buildExportPayload, applyImportPayload,
   // Late stores + data
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
   openThumbDB, idbPut, idbDelete, idbReadAll,

@@ -209,11 +209,20 @@ export default defineConfig({
       // 63 floor — far tighter than any prior ratchet (the repo's tightest was
       // statements 0.04 at W9.3) — so a 63 floor would fail CI on the next
       // unrelated uncovered function. Not lowered; just not ratcheted this step.
+      //
+      // U14 baseline (+ backup.js + backup.test.js, 1545 tests — the export-
+      // payload build + import-apply data plane extracted from SettingsScreen
+      // for the e2e round-trip; backup.js is in the measured utils/ scope at
+      // 86/74/100/91 local):
+      //   statements 60.04 | branches 49.95 | functions 63.87 | lines 64.32
+      // Ratchet functions 62→63 (margin 0.87) + lines 63→64 (margin 0.32),
+      // both comfortable. HOLD statements at 59 (a 60 floor leaves only 0.04,
+      // as thin as the 0.02 case held above) and branches at 49 (49.95 < 50).
       thresholds: {
         statements: 59,
         branches: 49,
-        functions: 62,
-        lines: 63,
+        functions: 63,
+        lines: 64,
       },
     },
   },

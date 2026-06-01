@@ -1,0 +1,495 @@
+// @ts-nocheck — tests construct partial payloads + fake ctx objects
+/* backup.js — export-payload build + import-apply + e2e round-trip (U1/U14).
+   ──────────────────────────────────────────────────────────────────────
+   Export/Import is the ONLY backup mechanism in VOTReader (allowBackup=
+   false, no cloud, no account). The headline test here is the one U1 owed:
+   a REAL end-to-end round-trip against the live stores + a fake IndexedDB —
+
+       populate device A → export → wipe device → import → RELOAD → assert
+
+   The "reload" step is the crux: it drops every in-memory cache + the IDB
+   connection and re-hydrates from disk, proving the imported data was
+   DURABLY written (the U1 barrier), not merely sitting in a JS cache that a
+   page teardown would discard. Before the barrier landed, a large import
+   could be torn down mid-transaction by the reload and silently lost.
+
+   Plus fast unit tests over the pure functions' branches (read-failure
+   abort, media-limit abort, validation-skip, write-failure counting, the
+   V1 fallback) using lightweight fake ctx objects — no real IDB needed.
+
+   Node's Blob (node:buffer) replaces jsdom's BEFORE fake-indexeddb loads,
+   so media blobs survive the structured-clone round-trip with bytes + type
+   intact (same quirk handled in journal-media-store.test.js).
+*/
+
+import { Blob as NodeBlob } from 'node:buffer';
+/** @type {any} */ (globalThis).Blob = NodeBlob;
+
+import 'fake-indexeddb/auto';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+import {
+  blobToBase64, base64ToBlob, buildExportPayload, applyImportPayload,
+  DEFAULT_MEDIA_LIMIT_BYTES,
+} from './backup.js';
+
+import { IDBAdapter } from '../stores/idb-adapter.js';
+import { hydrateAllStores } from '../stores/cached-store.js';
+import { JournalMediaStore } from '../stores/journal-media-store.js';
+import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from './import-validators.js';
+
+import { AnnotationStore } from '../stores/annotation-store.js';
+import { NoteStore } from '../stores/note-store.js';
+import { BookmarkStore } from '../stores/bookmark-store.js';
+import { LinkStore } from '../stores/link-store.js';
+import { NotebookStore } from '../stores/notebook-store.js';
+import { JournalStore, JournalNotebookStore } from '../stores/journal-store.js';
+import { JournalIndexStore } from '../stores/journal-index-store.js';
+import { JournalStatsStore } from '../stores/journal-stats-store.js';
+import { RecentNavStore } from '../stores/recent-nav-store.js';
+import { HistoryStore } from '../stores/history-store.js';
+import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
+import { HomeOrderStore } from '../stores/home-order-store.js';
+import { StateStore } from '../stores/state-store.js';
+import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore } from '../stores/app-flag-stores.js';
+
+/* ─────────────────────────────────────────────────────────────────────
+   PART 1 — codecs
+   ───────────────────────────────────────────────────────────────────── */
+describe('blobToBase64 / base64ToBlob', () => {
+  it('round-trips arbitrary bytes through base64', async () => {
+    const bytes = new Uint8Array([0, 1, 2, 250, 251, 255, 65, 66, 67]);
+    const blob = new NodeBlob([bytes], { type: 'image/jpeg' });
+    const b64 = await blobToBase64(blob);
+    expect(typeof b64).toBe('string');
+    const back = base64ToBlob(b64, 'image/jpeg');
+    expect(back.type).toBe('image/jpeg');
+    const backBytes = new Uint8Array(await back.arrayBuffer());
+    expect(Array.from(backBytes)).toEqual(Array.from(bytes));
+  });
+
+  it('base64ToBlob defaults the mime when omitted', () => {
+    const blob = base64ToBlob(btoa('hi'));
+    expect(blob.type).toBe('application/octet-stream');
+  });
+
+  it('blobToBase64 handles an empty blob', async () => {
+    const b64 = await blobToBase64(new NodeBlob([], { type: 'audio/mp4' }));
+    expect(b64).toBe('');
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+   PART 2 — buildExportPayload (fake ctx; no real IDB)
+   ───────────────────────────────────────────────────────────────────── */
+describe('buildExportPayload', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  /** idbAdapter stub whose get() returns from a backing map (or throws). */
+  function fakeAdapter(values, throwFor) {
+    return {
+      get: async (name) => {
+        if (throwFor && throwFor.has(name)) throw new Error('read boom: ' + name);
+        return Object.prototype.hasOwnProperty.call(values, name) ? values[name] : undefined;
+      },
+    };
+  }
+  const emptyMedia = { allIds: async () => [], get: async () => null };
+  const noEstimate = async () => ({ quota: null, usage: null });
+
+  const storesMap = {
+    'vot-annotations': { store: {}, method: 'replaceAll' },
+    'vot-bookmarks': { store: {}, method: 'replaceAll' },
+    'vot-state': { store: {}, method: 'set' },
+  };
+  const flagMap = { 'vot-welcomed': {} };
+
+  it('produces a V2 payload with a counts manifest', async () => {
+    const res = await buildExportPayload({
+      storesMap, flagMap,
+      idbAdapter: fakeAdapter({
+        'vot-annotations': { 'k1': [{ id: 'a' }], 'k2': [{ id: 'b' }, { id: 'c' }] },
+        'vot-bookmarks': [{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }],
+        'vot-state': { theme: 'dark' },
+        'vot-welcomed': true,
+      }),
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+      nowIso: () => '2026-06-01T00:00:00.000Z',
+    });
+    expect(res.ok).toBe(true);
+    expect(res.payload.app).toBe('VOTReader');
+    expect(res.payload.exportVersion).toBe(2);
+    expect(res.payload.exportDate).toBe('2026-06-01T00:00:00.000Z');
+    // flag coerced to boolean
+    expect(res.payload.stores['vot-welcomed']).toBe(true);
+    // counts manifest: object-of-arrays counts keys, array counts length, primitive=1
+    expect(res.payload.counts['vot-annotations']).toBe(2);
+    expect(res.payload.counts['vot-bookmarks']).toBe(3);
+    expect(res.payload.counts['vot-state']).toBe(1);
+    expect(res.payload.counts['vot-welcomed']).toBe(1);
+    expect(res.payload.counts._media).toBe(0);
+  });
+
+  it('embeds the LS data block + diagnosticLog + storage estimate', async () => {
+    localStorage.setItem('vot-state', '{"theme":"light"}');
+    const res = await buildExportPayload({
+      storesMap: {}, flagMap: {},
+      idbAdapter: fakeAdapter({}), mediaStore: emptyMedia,
+      diagnosticLog: [{ t: 1, lvl: 'W', tag: 'x', msg: 'y' }],
+      storageEstimate: async () => ({ quota: 1000, usage: 200 }),
+    });
+    expect(res.ok).toBe(true);
+    expect(res.payload.data['vot-state']).toBe('{"theme":"light"}');
+    expect(res.payload.diagnosticLog).toEqual([{ t: 1, lvl: 'W', tag: 'x', msg: 'y' }]);
+    expect(res.payload.storageQuota).toBe(1000);
+    expect(res.payload.storageUsed).toBe(200);
+  });
+
+  it('ABORTS loud on a store read failure (U6) — no partial payload', async () => {
+    const res = await buildExportPayload({
+      storesMap, flagMap,
+      idbAdapter: fakeAdapter({ 'vot-annotations': {} }, new Set(['vot-bookmarks'])),
+      mediaStore: emptyMedia, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('read-failure');
+    expect(res.problems).toContain('vot-bookmarks');
+    expect(res.payload).toBeUndefined();
+  });
+
+  it('ABORTS loud when media read throws (journal media in problems)', async () => {
+    const res = await buildExportPayload({
+      storesMap: {}, flagMap: {},
+      idbAdapter: fakeAdapter({}),
+      mediaStore: { allIds: async () => { throw new Error('media boom'); }, get: async () => null },
+      storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('read-failure');
+    expect(res.problems).toContain('journal media');
+  });
+
+  it('ABORTS when media exceeds the limit (media-limit)', async () => {
+    const big = { blob: { size: 5_000_000 }, type: 'image', mime: 'image/jpeg' };
+    const res = await buildExportPayload({
+      storesMap: {}, flagMap: {},
+      idbAdapter: fakeAdapter({}),
+      mediaStore: { allIds: async () => ['m1'], get: async () => big },
+      mediaLimitBytes: 1_000_000, storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('media-limit');
+  });
+
+  it('exposes a sane default media limit', () => {
+    expect(DEFAULT_MEDIA_LIMIT_BYTES).toBe(100 * 1024 * 1024);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+   PART 3 — applyImportPayload (fake ctx; no real IDB)
+   ───────────────────────────────────────────────────────────────────── */
+describe('applyImportPayload', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  /** A fake store recording method calls + a configurable whenSaved. */
+  function fakeStore(method, opts = {}) {
+    const calls = [];
+    return {
+      calls,
+      [method]: (arg) => { if (opts.throws) throw new Error('write boom'); calls.push(arg); },
+      whenSaved: () => Promise.resolve(opts.saved === undefined ? true : opts.saved),
+    };
+  }
+  const okValidate = () => [];
+  const emptyMedia = { allIds: async () => [], delete: async () => {}, put: async () => {} };
+
+  it('applies valid stores + flags and reports clean (0/0/[])', async () => {
+    const ann = fakeStore('replaceAll');
+    const wel = { set: vi.fn(), clear: vi.fn(), whenSaved: () => Promise.resolve(true) };
+    const res = await applyImportPayload(
+      { exportVersion: 2, stores: { 'vot-annotations': { k: [] }, 'vot-welcomed': true } },
+      {
+        storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } },
+        flagMap: { 'vot-welcomed': wel },
+        mediaStore: emptyMedia,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+      },
+    );
+    expect(res).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [] });
+    expect(ann.calls).toEqual([{ k: [] }]);
+    expect(wel.set).toHaveBeenCalledTimes(1);
+    expect(wel.clear).not.toHaveBeenCalled();
+  });
+
+  it('clears a flag whose payload is falsy', async () => {
+    const wel = { set: vi.fn(), clear: vi.fn(), whenSaved: () => Promise.resolve(true) };
+    await applyImportPayload(
+      { exportVersion: 2, stores: { 'vot-welcomed': false } },
+      { storesMap: {}, flagMap: { 'vot-welcomed': wel }, mediaStore: emptyMedia,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate },
+    );
+    expect(wel.clear).toHaveBeenCalledTimes(1);
+    expect(wel.set).not.toHaveBeenCalled();
+  });
+
+  it('SKIPS a store whose payload fails validation (never written)', async () => {
+    const ann = fakeStore('replaceAll');
+    const res = await applyImportPayload(
+      { exportVersion: 2, stores: { 'vot-annotations': { bad: true } } },
+      {
+        storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } },
+        flagMap: {}, mediaStore: emptyMedia,
+        validateStorePayload: () => ['shape violation'], validateMediaRecord: okValidate,
+      },
+    );
+    expect(res.skippedStores).toEqual(['vot-annotations']);
+    expect(ann.calls).toEqual([]); // never written — corrupt section can't clobber good data
+  });
+
+  it('counts importFailures when a store write throws', async () => {
+    const ann = fakeStore('replaceAll', { throws: true });
+    const res = await applyImportPayload(
+      { exportVersion: 2, stores: { 'vot-annotations': { k: [] } } },
+      {
+        storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } },
+        flagMap: {}, mediaStore: emptyMedia,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+      },
+    );
+    expect(res.importFailures).toBe(1);
+  });
+
+  it('counts writeFailures when a store durability barrier resolves false', async () => {
+    const ann = fakeStore('replaceAll', { saved: false });
+    const res = await applyImportPayload(
+      { exportVersion: 2, stores: { 'vot-annotations': { k: [] } } },
+      {
+        storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } },
+        flagMap: {}, mediaStore: emptyMedia,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+      },
+    );
+    expect(res.writeFailures).toBe(1);
+  });
+
+  it('skips an invalid media record (counts importFailures, never put)', async () => {
+    const put = vi.fn(async () => {});
+    const res = await applyImportPayload(
+      { exportVersion: 2, media: { m1: { data: 'x', mime: 'image/jpeg' } } },
+      {
+        storesMap: {}, flagMap: {},
+        mediaStore: { allIds: async () => [], delete: async () => {}, put },
+        validateStorePayload: okValidate, validateMediaRecord: () => ['bad base64'],
+      },
+    );
+    expect(res.importFailures).toBe(1);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('reseeds the LS data block (vot- keys only)', async () => {
+    await applyImportPayload(
+      { exportVersion: 2, data: { 'vot-state': '{"theme":"dark"}', 'evil': 'nope' }, stores: {} },
+      { storesMap: {}, flagMap: {}, mediaStore: emptyMedia,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate },
+    );
+    expect(localStorage.getItem('vot-state')).toBe('{"theme":"dark"}');
+    expect(localStorage.getItem('evil')).toBeNull();
+  });
+
+  it('V1 fallback: parses LS-shape strings in data and applies them', async () => {
+    const bkm = fakeStore('replaceAll');
+    const res = await applyImportPayload(
+      { exportVersion: 1, data: { 'vot-bookmarks': '[{"id":"b1"}]' } },
+      {
+        storesMap: { 'vot-bookmarks': { store: bkm, method: 'replaceAll' } },
+        flagMap: {}, mediaStore: emptyMedia,
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+      },
+    );
+    expect(res.importFailures).toBe(0);
+    expect(bkm.calls).toEqual([[{ id: 'b1' }]]);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+   PART 4 — REAL end-to-end round-trip (the U1 owed verification)
+   ───────────────────────────────────────────────────────────────────── */
+describe('export → wipe → import → reload round-trip (real stores + fake IDB)', () => {
+  const ALL_STORES = [
+    AnnotationStore, NoteStore, BookmarkStore, LinkStore, NotebookStore,
+    JournalStore, JournalNotebookStore, JournalIndexStore, JournalStatsStore,
+    RecentNavStore, HistoryStore, ProphecyCardsStore, HomeOrderStore, StateStore,
+    WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore,
+  ];
+
+  const storesMap = () => ({
+    'vot-annotations':       { store: AnnotationStore,      method: 'replaceAll' },
+    'vot-notes':             { store: NoteStore,            method: 'replaceAll' },
+    'vot-bookmarks':         { store: BookmarkStore,        method: 'replaceAll' },
+    'vot-links':             { store: LinkStore,            method: 'replaceAll' },
+    'vot-notebooks':         { store: NotebookStore,        method: 'replaceAll' },
+    'vot-journal':           { store: JournalStore,         method: 'replaceAll' },
+    'vot-journal-notebooks': { store: JournalNotebookStore, method: 'replaceAll' },
+    'vot-journal-index':     { store: JournalIndexStore,    method: 'replaceAll' },
+    'vot-journal-stats':     { store: JournalStatsStore,    method: 'replaceAll' },
+    'vot-recent-nav':        { store: RecentNavStore,       method: 'replaceAll' },
+    'vot-history':           { store: HistoryStore,         method: 'setAll' },
+    'vot-prophecy-cards':    { store: ProphecyCardsStore,   method: 'setAll' },
+    'vot-home-order':        { store: HomeOrderStore,       method: 'set' },
+    'vot-state':             { store: StateStore,           method: 'set' },
+  });
+  const flagMap = () => ({
+    'vot-welcomed':             WelcomedFlagStore,
+    'vot-about-seen':           AboutSeenFlagStore,
+    'vot-garden-warning-acked': GardenWarningFlagStore,
+  });
+
+  const today = (() => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  })();
+
+  const deleteVotreaderDb = () => new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase('votreader');
+    req.onsuccess = () => resolve(undefined);
+    req.onerror = () => resolve(undefined);
+    req.onblocked = () => resolve(undefined);
+  });
+
+  async function flushAll() {
+    await Promise.all(ALL_STORES.map((s) => s.whenSaved()));
+  }
+
+  beforeEach(async () => {
+    IDBAdapter._resetForTests();
+    await deleteVotreaderDb();
+    localStorage.clear();
+    await JournalMediaStore.pruneOrphans([]);
+    ALL_STORES.forEach((s) => s._resetForTests({ forceLoaded: true }));
+  });
+
+  it('every store + media survives a full backup round-trip across a simulated reload', async () => {
+    // ── device A: populate real user data across every store shape ──
+    const annPayload = {
+      'letter:wide-path:0': [
+        { id: 'ann_1', groupId: 'g1', kind: 'highlight', color: 'yellow', start: 0, end: 10, text: 'hello world', created: 1000, updated: 1000 },
+      ],
+      'bible:genesis:1:1': [
+        { id: 'ann_2', groupId: 'g2', kind: 'underline', color: 'green', start: 5, end: 15, text: 'underlined', created: 2000, updated: 2000 },
+      ],
+    };
+    AnnotationStore.replaceAll(annPayload);
+    NoteStore.replaceAll({
+      g1: { groupId: 'g1', notebookIds: ['nb_a'], body: 'Note A', color: 'yellow', fullText: 'hi', keys: ['letter:wide-path:0'], created: 1, updated: 1 },
+    });
+    BookmarkStore.replaceAll([
+      { id: 'b1', hlKey: 'bible:genesis:1:1', label: 'Beginning', created: 1, updated: 1 },
+      { id: 'b2', hlKey: 'letter:wide-path:2', label: 'Wide Path', created: 2, updated: 2 },
+    ]);
+    LinkStore.replaceAll([
+      { id: 'lnk_1', source: { type: 'bible', key: 'bible:gen:1:1', label: 'Gen 1:1' }, target: { type: 'letter', key: 'letter:foo:0', label: 'Foo' }, created: 1 },
+    ]);
+    NotebookStore.replaceAll({ list: [{ id: 'nb_a', name: 'Devotional', sortIndex: 0, created: 1, updated: 1 }] });
+    JournalStore.replaceAll({ list: [
+      { id: 'j1', title: 'Entry One', blocks: [{ type: 'image', mediaId: 'media_1' }], mood: null, tags: [], notebookIds: ['jnb_a'], pinned: false, created: 1, updated: 1 },
+    ] });
+    JournalNotebookStore.replaceAll({ list: [{ id: 'jnb_a', name: 'Daily', sortIndex: 0, created: 1, updated: 1 }] });
+    JournalIndexStore.replaceAll({ 'chapter:matthew:5': ['j1'] });
+    JournalStatsStore.replaceAll({ totalEntries: 42, currentStreak: 7, longestStreak: 14, lastEntryDate: today, milestonesUnlocked: ['first', 'streak-7'] });
+    RecentNavStore.replaceAll([{ kind: 'letter', letterId: 'wide-path', ts: 2000 }]);
+    HistoryStore.setAll([{ type: 'letter', letterId: 'wide-path', key: 'lt:wide-path', ts: 2000 }]);
+    ProphecyCardsStore.setAll({ 'matthew-1:0:prophecy': true });
+    HomeOrderStore.set(['settings', 'library', 'history', 'volumes', 'scriptures', 'studies']);
+    StateStore.set({ theme: 'light', settings: { fontStyle: 'modern', translation: 'nkjv' }, tabs: [{ id: 't1', screen: 'home' }], activeTabIdx: 0 });
+    WelcomedFlagStore.set();
+    GardenWarningFlagStore.set();
+
+    // media: a real blob referenced by the journal entry
+    const mediaBytes = new Uint8Array([10, 20, 30, 40, 200, 201, 202, 255]);
+    await JournalMediaStore.put({
+      id: 'media_1', type: 'image', blob: new NodeBlob([mediaBytes], { type: 'image/jpeg' }),
+      mime: 'image/jpeg', size: mediaBytes.length, width: 4, height: 2, duration: null, created: 1234,
+    });
+
+    await flushAll(); // device-A writes are durable before we read them back
+
+    // ── EXPORT ──
+    const result = await buildExportPayload({
+      storesMap: storesMap(), flagMap: flagMap(),
+      idbAdapter: IDBAdapter, mediaStore: JournalMediaStore,
+      diagnosticLog: [], nowIso: () => '2026-06-01T12:00:00.000Z',
+    });
+    expect(result.ok).toBe(true);
+    const json = JSON.stringify(result.payload);
+    // counts manifest captured everything
+    expect(result.payload.counts['vot-annotations']).toBe(2);
+    expect(result.payload.counts['vot-bookmarks']).toBe(2);
+    expect(result.payload.counts._media).toBe(1);
+
+    // ── WIPE the device (clear caches + durable IDB rows + media + LS) ──
+    AnnotationStore.replaceAll(null); NoteStore.replaceAll(null); BookmarkStore.replaceAll(null);
+    LinkStore.replaceAll(null); NotebookStore.replaceAll(null); JournalStore.replaceAll(null);
+    JournalNotebookStore.replaceAll(null); JournalIndexStore.replaceAll(null); JournalStatsStore.replaceAll(null);
+    RecentNavStore.replaceAll(null); HistoryStore.setAll(null); ProphecyCardsStore.setAll(null);
+    HomeOrderStore.set([]); StateStore.set({});
+    WelcomedFlagStore.clear(); AboutSeenFlagStore.clear(); GardenWarningFlagStore.clear();
+    await flushAll();
+    await JournalMediaStore.pruneOrphans([]);
+    localStorage.clear();
+    // sanity: the device is empty
+    expect(AnnotationStore.all()).toEqual({});
+    expect(BookmarkStore.count()).toBe(0);
+    expect(await JournalMediaStore.allIds()).toEqual([]);
+
+    // ── IMPORT ──
+    const parsed = JSON.parse(json);
+    expect(validateImportEnvelope(parsed)).toEqual([]);
+    const importRes = await applyImportPayload(parsed, {
+      storesMap: storesMap(), flagMap: flagMap(),
+      mediaStore: JournalMediaStore,
+      validateStorePayload, validateMediaRecord,
+    });
+    expect(importRes).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [] });
+
+    // ── RELOAD: drop in-memory caches + the IDB connection, re-hydrate ──
+    ALL_STORES.forEach((s) => s._resetForTests()); // → 'pending', cache null
+    IDBAdapter._resetForTests();                    // next get() reopens the SAME data
+    await hydrateAllStores();                        // read every store back from IDB
+
+    // ── ASSERT survival: durable, byte-equal restore of device-A state ──
+    expect(AnnotationStore.all()).toEqual(annPayload);
+    expect(NoteStore.get('g1').body).toBe('Note A');
+    expect(BookmarkStore.count()).toBe(2);
+    expect(BookmarkStore.get('b1').label).toBe('Beginning');
+    expect(LinkStore.all().length).toBe(1);
+    expect(NotebookStore.get('nb_a').name).toBe('Devotional');
+    expect(JournalStore.count()).toBe(1);
+    expect(JournalStore.get('j1').title).toBe('Entry One');
+    expect(JournalNotebookStore.get('jnb_a').name).toBe('Daily');
+    expect(JournalIndexStore.entriesReferencing('chapter:matthew:5')).toEqual(['j1']);
+    const stats = JournalStatsStore.get();
+    expect(stats.totalEntries).toBe(42);
+    expect(stats.longestStreak).toBe(14);
+    expect(stats.lastEntryDate).toBe(today);
+    expect(stats.milestonesUnlocked).toEqual(['first', 'streak-7']);
+    expect(RecentNavStore.list()[0].letterId).toBe('wide-path');
+    expect(HistoryStore.list()[0].letterId).toBe('wide-path');
+    expect(ProphecyCardsStore.getOne('matthew-1:0:prophecy')).toBe(true);
+    expect(HomeOrderStore.get()[0]).toBe('settings');
+    expect(StateStore.get().theme).toBe('light');
+    expect(StateStore.get().settings.fontStyle).toBe('modern');
+    expect(WelcomedFlagStore.is()).toBe(true);
+    expect(GardenWarningFlagStore.is()).toBe(true);
+    expect(AboutSeenFlagStore.is()).toBe(false);
+
+    // media survived with bytes + metadata intact
+    const mediaIds = await JournalMediaStore.allIds();
+    expect(mediaIds).toEqual(['media_1']);
+    const rec = await JournalMediaStore.get('media_1');
+    expect(rec.mime).toBe('image/jpeg');
+    expect(rec.width).toBe(4);
+    const restoredBytes = new Uint8Array(await rec.blob.arrayBuffer());
+    expect(Array.from(restoredBytes)).toEqual(Array.from(mediaBytes));
+  }, 20000);
+});

@@ -376,34 +376,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     id: _TOAST_ID, className: 'vot-toast', html: html, durationMs: durationMs == null ? 3500 : durationMs,
   });
 
-  /**
-   * Encode a Blob to base64 string via streaming Uint8Array chunks.
-   * Avoids the OOM hazard of FileReader.readAsDataURL on blobs > 1 MB
-   * (per [[readAsDataURL-oom-risk]]) by processing in 64KB slices and
-   * incrementally concatenating into the binary string before btoa.
-   */
-  const _blobToBase64 = async (blob) => {
-    const CHUNK = 8192;
-    const reader = blob.stream().getReader();
-    let binary = '';
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      for (let i = 0; i < value.length; i += CHUNK) {
-        const slice = value.subarray(i, Math.min(i + CHUNK, value.length));
-        binary += String.fromCharCode.apply(null, /** @type {any} */ (slice));
-      }
-    }
-    return btoa(binary);
-  };
-
-  /** Decode a base64 string to a Blob. Caller owns the lifetime. */
-  const _base64ToBlob = (b64, mime) => {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return new Blob([bytes], { type: mime || 'application/octet-stream' });
-  };
+  // The base64 codecs + the export-payload build + the import-apply data
+  // plane live in utils/backup.js (extracted U14) so the export → wipe →
+  // import → reload round-trip is testable end-to-end against the real
+  // stores. This screen owns only the UI orchestration around them.
 
   /**
    * Map from IDB store name to its store object + the method used to
@@ -441,108 +417,28 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     try {
       _showToast('Preparing export…', 0);
 
-      // (a) data: LS boot-shim only. V1 clients reading this file see
-      //     just theme + fontStyle restored (intentional limitation).
-      const data = {};
-      for (const k of ['vot-state']) {
-        const v = localStorage.getItem(k);
-        if (v != null) data[k] = v;
-      }
-
-      // (b) stores: every IDB-backed store, keyed by store name.
-      const storesMap = _exportableStores();
-      const flagMap = _flagStores();
-      const stores = {};
-      // U6: track read failures instead of silently swallowing them. A backup
-      // that LOOKS complete but dropped a store is the worst failure for the
-      // ONLY backup mechanism, so any failure aborts the export loudly below.
-      const exportProblems = [];
-      for (const name of Object.keys(storesMap)) {
-        try {
-          const v = await IDBAdapter.get(name, 'v');
-          if (v !== undefined) stores[name] = v;
-        } catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
-      }
-      for (const name of Object.keys(flagMap)) {
-        try {
-          const v = await IDBAdapter.get(name, 'v');
-          if (v !== undefined) stores[name] = !!v;
-        } catch (e) { console.warn('export: flag read failed', name, e); exportProblems.push(name); }
-      }
-
-      // (c) media: encode JournalMediaStore blobs as base64.
-      const media = {};
-      let totalMediaBytes = 0;
-      const MEDIA_LIMIT_BYTES = 100 * 1024 * 1024; // 100 MB hard guard
-      try {
-        const ids = await JournalMediaStore.allIds();
-        for (const id of ids) {
-          const rec = await JournalMediaStore.get(id);
-          if (!rec || !rec.blob) continue;
-          totalMediaBytes += rec.blob.size || 0;
-          if (totalMediaBytes > MEDIA_LIMIT_BYTES) {
-            hideToast(_TOAST_ID);
-            _showToast('Export aborted: media exceeds 100 MB. Streaming export support is planned for a future update.');
-            return;
-          }
-          const b64 = await _blobToBase64(rec.blob);
-          media[id] = {
-            type: rec.type, mime: rec.mime, size: rec.size,
-            width: rec.width, height: rec.height, duration: rec.duration,
-            created: rec.created,
-            data: b64,
-          };
-        }
-      } catch (e) {
-        console.warn('media export failed', e);
-        exportProblems.push('journal media');
-      }
-
-      // W2.5 — storageQuota + storageUsed diagnostic fields. Raw
-      // bytes (not formatted) so a future Settings → Your Data
-      // history view can plot them over time. Feature-detected
-      // (some browsers don't expose navigator.storage); null when
-      // unavailable.
-      let storageQuota = null;
-      let storageUsed = null;
-      try {
-        if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.estimate === 'function') {
-          const est = await navigator.storage.estimate();
-          if (est && typeof est.quota === 'number') storageQuota = est.quota;
-          if (est && typeof est.usage === 'number') storageUsed = est.usage;
-        }
-      } catch (_e) { /* best-effort diagnostic; null on failure */ }
-
-      // U6: abort loudly on any read failure rather than write a misleading,
-      // incomplete-but-valid-looking backup file. The user retries; a persistent
-      // failure signals real storage trouble (better than silent data loss).
-      if (exportProblems.length) {
+      // Build the V2 payload (reads stores straight from IDB, encodes media,
+      // adds the counts manifest). buildExportPayload fails LOUD (U6): a read
+      // failure or an over-limit media set returns !ok so we abort here rather
+      // than write a misleading, incomplete-but-valid-looking backup.
+      const result = await buildExportPayload({
+        storesMap: _exportableStores(),
+        flagMap: _flagStores(),
+        idbAdapter: IDBAdapter,
+        mediaStore: JournalMediaStore,
+        diagnosticLog: diagnosticLog,
+      });
+      if (!result.ok) {
         hideToast(_TOAST_ID);
-        _showToast('Export aborted — could not read: ' + exportProblems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        if (result.reason === 'media-limit') {
+          _showToast('Export aborted: media exceeds 100 MB. Streaming export support is planned for a future update.');
+        } else {
+          _showToast('Export aborted — could not read: ' + result.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        }
         return;
       }
-      // Integrity manifest: per-store entry count + media count, so a future
-      // import can verify the round-trip captured everything (U14 will check it).
-      const counts = { _media: Object.keys(media).length };
-      for (const name of Object.keys(stores)) {
-        const v = stores[name];
-        counts[name] = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 1);
-      }
 
-      const payload = {
-        app: 'VOTReader',
-        exportVersion: 2,
-        exportDate: new Date().toISOString(),
-        diagnosticLog: diagnosticLog,
-        storageQuota: storageQuota,
-        storageUsed: storageUsed,
-        counts: counts,
-        data: data,
-        stores: stores,
-        media: media,
-      };
-
-      const json = JSON.stringify(payload);
+      const json = JSON.stringify(result.payload);
       const stamp = new Date().toISOString().slice(0, 10);
       const filename = `votreader-backup-${stamp}.json`;
 
@@ -631,108 +527,19 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           return;
         }
 
-        let importFailures = 0;
-        // Stores whose payload failed shape validation — skipped (not
-        // written) so a corrupt section can't overwrite good data or, for
-        // the non-coercing stores (state, home-order), persist garbage.
-        const skippedStores = [];
-
-        // (1) Clear the legacy + shim LS keys and re-seed from data.
-        ['vot-state'].forEach((k) => {
-          try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
+        // Apply the payload (LS reseed + stores + flags + media) and WAIT for
+        // every write to durably land in IDB before reloading (U1 barrier:
+        // _save() is fire-and-forget, so returning early would let the reload
+        // tear down the page mid-transaction and silently drop the imported
+        // data). applyImportPayload SKIPS any section that fails shape
+        // validation so a corrupt section can't overwrite good data.
+        const { importFailures, writeFailures, skippedStores } = await applyImportPayload(parsed, {
+          storesMap: storesMap,
+          flagMap: flagMap,
+          mediaStore: JournalMediaStore,
+          validateStorePayload: validateStorePayload,
+          validateMediaRecord: validateMediaRecord,
         });
-        Object.keys(parsed.data || {}).forEach((k) => {
-          if (k.indexOf('vot-') !== 0) return;
-          const v = parsed.data[k];
-          if (typeof v === 'string') {
-            try { localStorage.setItem(k, v); } catch (e) { console.warn('LS write failed for', k, e); }
-          }
-        });
-
-        // (2) Apply stores → IDB-backed stores
-        if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
-          for (const name of Object.keys(storesMap)) {
-            if (!(name in parsed.stores)) continue;
-            const violations = validateStorePayload(name, parsed.stores[name]);
-            if (violations.length) {
-              skippedStores.push(name);
-              console.warn('skipping store with invalid payload:', name, violations);
-              continue;
-            }
-            const { store, method } = storesMap[name];
-            try { store[method](parsed.stores[name]); }
-            catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
-          }
-          for (const name of Object.keys(flagMap)) {
-            if (!(name in parsed.stores)) continue;
-            const truthy = !!parsed.stores[name];
-            try { if (truthy) flagMap[name].set(); else flagMap[name].clear(); }
-            catch (e) { importFailures += 1; console.warn('flag import failed for', name, e); }
-          }
-        } else {
-          // V1 fallback: parse each LS-shape value in `data` and call
-          // the store's replaceAll/setAll/set with the parsed object.
-          for (const name of Object.keys(storesMap)) {
-            const raw = parsed.data && parsed.data[name];
-            if (typeof raw !== 'string') continue;
-            try {
-              const obj = JSON.parse(raw);
-              const violations = validateStorePayload(name, obj);
-              if (violations.length) {
-                skippedStores.push(name);
-                console.warn('skipping V1 store with invalid payload:', name, violations);
-                continue;
-              }
-              const { store, method } = storesMap[name];
-              store[method](obj);
-            } catch (e) { importFailures += 1; console.warn('V1 import parse failed for', name, e); }
-          }
-          for (const name of Object.keys(flagMap)) {
-            if (parsed.data && (parsed.data[name] === '1' || parsed.data[name] === 1)) {
-              flagMap[name].set();
-            }
-          }
-        }
-
-        // (3) Apply media → JournalMediaStore (v2 only). Clear
-        //     existing media first so this is a true REPLACE.
-        if (exportVersion >= 2 && parsed.media && typeof parsed.media === 'object') {
-          try {
-            const existingIds = await JournalMediaStore.allIds();
-            for (const id of existingIds) await JournalMediaStore.delete(id);
-          } catch (e) { console.warn('clear existing media failed', e); }
-          for (const id of Object.keys(parsed.media)) {
-            const record = parsed.media[id];
-            const mediaViolations = validateMediaRecord(id, record);
-            if (mediaViolations.length) {
-              importFailures += 1;
-              console.warn('skipping invalid media record:', id, mediaViolations);
-              continue;
-            }
-            try {
-              const blob = _base64ToBlob(record.data, record.mime);
-              await JournalMediaStore.put({
-                id: id, type: record.type, blob: blob,
-                mime: record.mime, size: record.size,
-                width: record.width, height: record.height, duration: record.duration,
-                created: record.created,
-              });
-            } catch (e) { importFailures += 1; console.warn('media import failed for', id, e); }
-          }
-        }
-
-        // (4) U1 DURABILITY BARRIER. _save() is fire-and-forget, so without
-        // this a reload could tear down the page mid-transaction and silently
-        // drop the just-imported data — and Export/Import is the ONLY backup.
-        // Wait for every imported store's IDB write to actually land before
-        // reloading. (Media is already durable: JournalMediaStore.put is awaited
-        // above.) whenSaved() never rejects — false means that store failed.
-        const _whenSaved = (s) => (s && typeof s.whenSaved === 'function' ? s.whenSaved() : Promise.resolve(true));
-        const saveResults = await Promise.all(
-          Object.values(storesMap).map(({ store }) => _whenSaved(store))
-            .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
-        );
-        const writeFailures = saveResults.filter((ok) => !ok).length;
 
         hideToast(_TOAST_ID);
         const problems = [];
