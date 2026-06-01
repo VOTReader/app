@@ -10696,6 +10696,63 @@ function cacheClear() {
     });
   }).catch(function () {});
 }
+// Every key currently in the cache store. Used by the eviction path so we
+// can delete stale signatures without wiping the live one.
+function cacheKeys() {
+  return openCacheDb().then(function (db) {
+    return new Promise(function (resolve) {
+      try {
+        var tx = db.transaction(CACHE_STORE, 'readonly');
+        var req = tx.objectStore(CACHE_STORE).getAllKeys();
+        req.onsuccess = function () { resolve((req.result || []).map(String)); };
+        req.onerror   = function () { resolve([]); };
+      } catch (e) { resolve([]); }
+    });
+  }).catch(function () { return []; });
+}
+// Delete one key. Best-effort (resolves regardless), matching cacheGet/Put.
+function cacheDelete(key) {
+  return openCacheDb().then(function (db) {
+    return new Promise(function (resolve) {
+      try {
+        var tx = db.transaction(CACHE_STORE, 'readwrite');
+        var d = tx.objectStore(CACHE_STORE).delete(key);
+        d.onsuccess = function () { resolve(true); };
+        d.onerror   = function () { resolve(false); };
+      } catch (e) { resolve(false); }
+    });
+  }).catch(function () { return false; });
+}
+// Evict every cached index whose key is NOT in `keepKeys`. This is the fix
+// for the unbounded-growth bug: each saveToCache() writes a fresh ~21 MB
+// entry under a new dataSignature() (which changes on any corpus edit,
+// SCHEMA_VERSION bump, or translation switch), and nothing previously
+// deleted the superseded generations — so the vot-search-cache DB grew to
+// hundreds of MB of dead index copies. A stale signature can never be hit
+// again (tryLoadFromCache looks up by the exact CURRENT sig), so dropping
+// everything except the live keys is always safe; the cache is 100%
+// rebuildable. Returns the number of entries removed.
+async function evictStaleCache(keepKeys) {
+  var keep = {};
+  for (var i = 0; i < keepKeys.length; i++) keep[keepKeys[i]] = true;
+  var all = await cacheKeys();
+  var removed = 0;
+  for (var j = 0; j < all.length; j++) {
+    if (!keep[all[j]]) { await cacheDelete(all[j]); removed++; }
+  }
+  if (removed > 0) console.log('[VotSearch][cache] evicted ' + removed + ' stale index generation(s)');
+  return removed;
+}
+// Boot-time reclaim: drop every cached index except the current-signature
+// entries for the two corpora at the active translation. Frees disk that
+// accumulated before the self-evicting saveToCache() (below) existed,
+// without forcing a rebuild — if the live entries are present they stay and
+// the next ensureIndex() is still a cache HIT.
+async function purgeStaleCache(code) {
+  code = code || 'nkjv';
+  var keep = [dataSignature(code, 'scriptures'), dataSignature(code, 'volumes')];
+  try { return await evictStaleCache(keep); } catch (e) { return 0; }
+}
 
 function bookTestament(bookId) {
   return D.OT_BOOK_IDS.indexOf(bookId) >= 0 ? 'ot' : D.NT_BOOK_IDS.indexOf(bookId) >= 0 ? 'nt' : '';
@@ -11279,7 +11336,7 @@ async function tryLoadFromCache(sig) {
   }
 }
 
-async function saveToCache(sig, db, store) {
+async function saveToCache(sig, db, store, corpus, code) {
   try {
     var t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     var idx = await exportDb(db);
@@ -11288,6 +11345,15 @@ async function saveToCache(sig, db, store) {
     var t2 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     if (ok) {
       console.log('[VotSearch] cache saved — sig=' + sig.slice(0, 40) + '…, export=' + Math.round(t1-t0) + 'ms, put=' + Math.round(t2-t1) + 'ms, keys=' + idx.keys.length);
+      // Self-evict: this corpus's PRIOR signatures are now dead. Keep only the
+      // key we just wrote + the OTHER corpus's current key (the two corpora
+      // share one cache store, and a same-translation switch between them must
+      // not wipe the sibling). Without this the store grew unbounded — one
+      // ~21 MB generation per corpus edit / SCHEMA_VERSION bump / translation.
+      try {
+        var sibling = (corpus === 'scriptures') ? 'volumes' : 'scriptures';
+        await evictStaleCache([sig, dataSignature(code, sibling)]);
+      } catch (_e) { /* eviction is best-effort; a miss just leaves disk to the next save */ }
     } else {
       console.warn('[VotSearch] cache save reported failure (see previous errors)');
     }
@@ -11338,7 +11404,7 @@ async function ensureIndex(code, corpus, options) {
       slot.docStore = built.store;
       slot.docCount = built.count;
       slot.stats = built.stats;
-      saveToCache(sig, built.db, built.store);
+      saveToCache(sig, built.db, built.store, corpus, code);
       return built.db;
     } catch (e) {
       buildError = e;
@@ -11398,6 +11464,12 @@ async function init(options) {
   options = options || {};
   var code = options.translation || 'nkjv';
   var corpora = options.corpora || ['scriptures', 'volumes'];
+  // One-time reclaim of pre-existing stale index generations (the bug that
+  // grew vot-search-cache to hundreds of MB before saveToCache self-evicted).
+  // Fire-and-forget: it must never delay search readiness, and it only
+  // deletes superseded keys — the current-signature entries this very init
+  // is about to load/build are preserved, so it never forces a rebuild.
+  purgeStaleCache(code).catch(function () {});
   // Load alt translations FIRST if scriptures is in the build. Volumes can
   // build in parallel with this since they don't depend on bible translations.
   var translationLoad = corpora.indexOf('scriptures') >= 0 ? loadAllTranslations() : Promise.resolve();
@@ -12014,6 +12086,7 @@ window.VotSearch = {
   init: init,
   rebuild: rebuild,
   clearCache: clearCache,
+  purgeStaleCache: purgeStaleCache,
   ensureTranslations: ensureTranslations,
   parse: parse,
   search: executeSearch,

@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 391 distinct identifiers.
+// Total: 393 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -217,6 +217,7 @@ declare const TabsContext: any;
 declare const TabsNavBtn: any;
 declare const TabsOverview: any;
 declare const ThemeBtn: any;
+declare const USER_DATA_STORES: any;
 declare const Utilities: any;
 declare const VOT_LETTER_REGISTRY: any;
 declare const VersePickerScreen: any;
@@ -330,6 +331,7 @@ declare const lnkId: any;
 declare const loadBibleStudies: any;
 declare const loadTranslation: any;
 declare const lookupVersesFromBooks: any;
+declare const measureUserData: any;
 declare const modalRegistry: any;
 declare const navItemPreview: any;
 declare const navItemToEndpoint: any;

@@ -332,7 +332,7 @@
   })();
 
   // app/src/main/assets/src/stores/idb-adapter.js
-  var IDBAdapter = (function() {
+  var IDBAdapter2 = (function() {
     const DB_NAME = "votreader";
     const DB_VERSION = 3;
     const STORE_NAMES = Object.freeze([
@@ -744,7 +744,7 @@
         if (useIdb) {
           const cacheToWrite = this._cache;
           if (cacheToWrite !== null) {
-            IDBAdapter.put(idbStoreName, "v", cacheToWrite).catch(function(err) {
+            IDBAdapter2.put(idbStoreName, "v", cacheToWrite).catch(function(err) {
               console.error("IDB write failed for", idbStoreName, err);
               if (typeof DiagnosticLog !== "undefined") DiagnosticLog.warn("store", "IDB write failed: " + idbStoreName + " \u2014 " + (err && err.name || err));
               if (typeof StorageHealth !== "undefined") StorageHealth.onWriteFailure(err);
@@ -945,7 +945,7 @@
         if (target <= 1) return loadedData;
         let persisted;
         try {
-          persisted = await IDBAdapter.get("meta", this._schemaMetaKey);
+          persisted = await IDBAdapter2.get("meta", this._schemaMetaKey);
         } catch (e) {
           console.warn("schema-version read failed for", storageKey, e);
           return loadedData;
@@ -959,7 +959,7 @@
         }
         if (loadedData === void 0 || loadedData === null) {
           try {
-            await IDBAdapter.put("meta", this._schemaMetaKey, target);
+            await IDBAdapter2.put("meta", this._schemaMetaKey, target);
           } catch (e) {
             console.warn("schema-version stamp failed for", storageKey, e);
           }
@@ -983,7 +983,7 @@
           return loadedData;
         }
         try {
-          await IDBAdapter.commitMigration(idbStoreName, working, target);
+          await IDBAdapter2.commitMigration(idbStoreName, working, target);
         } catch (e) {
           console.warn("schema migration commit failed for", storageKey, "\u2014 data left at v" + from + ", will retry next boot", e);
           return loadedData;
@@ -1022,7 +1022,7 @@
             }
             settle();
           }, hydrationTimeoutMs);
-          IDBAdapter.get(idbStoreName, "v").then(function(loadedData) {
+          IDBAdapter2.get(idbStoreName, "v").then(function(loadedData) {
             clearTimeout(timeoutId);
             if (self._state === "loaded") {
               settle();
@@ -1033,7 +1033,7 @@
                 const lsRaw = localStorage.getItem(legacyLsKey);
                 if (lsRaw) {
                   const parsed = JSON.parse(lsRaw);
-                  IDBAdapter.put(idbStoreName, "v", parsed).catch(function(e) {
+                  IDBAdapter2.put(idbStoreName, "v", parsed).catch(function(e) {
                     console.warn("IDB legacy-LS seed failed for", storageKey, e);
                   });
                   loadedData = parsed;
@@ -1165,14 +1165,14 @@
         let attempt = 0;
         const tick = function() {
           if (self._state === "loaded") return;
-          IDBAdapter.get(idbStoreName, "v").then(function(loadedData) {
+          IDBAdapter2.get(idbStoreName, "v").then(function(loadedData) {
             if (self._state === "loaded") return;
             if ((loadedData === void 0 || loadedData === null) && legacyLsKey) {
               try {
                 const lsRaw = localStorage.getItem(legacyLsKey);
                 if (lsRaw) {
                   const parsed = JSON.parse(lsRaw);
-                  IDBAdapter.put(idbStoreName, "v", parsed).catch(function() {
+                  IDBAdapter2.put(idbStoreName, "v", parsed).catch(function() {
                   });
                   loadedData = parsed;
                 }
@@ -1221,7 +1221,7 @@
   async function clearLegacyLs() {
     let alreadyDone;
     try {
-      alreadyDone = await IDBAdapter.get("meta", LS_MIGRATION_FLAG_KEY);
+      alreadyDone = await IDBAdapter2.get("meta", LS_MIGRATION_FLAG_KEY);
     } catch (e) {
       console.warn("clearLegacyLs: meta read failed; deferring to next boot", e);
       return;
@@ -1246,7 +1246,7 @@
       }
     }
     try {
-      await IDBAdapter.put("meta", LS_MIGRATION_FLAG_KEY, true);
+      await IDBAdapter2.put("meta", LS_MIGRATION_FLAG_KEY, true);
     } catch (e) {
       console.warn("clearLegacyLs: meta write failed; will retry next boot", e);
     }
@@ -7411,6 +7411,72 @@
     RISK
   };
 
+  // app/src/main/assets/src/utils/user-data-size.js
+  var USER_DATA_STORES = [
+    "vot-annotations",
+    "vot-notes",
+    "vot-bookmarks",
+    "vot-links",
+    "vot-notebooks",
+    "vot-journal",
+    "vot-journal-notebooks",
+    "vot-journal-index",
+    "vot-journal-stats",
+    "vot-recent-nav",
+    "vot-history",
+    "vot-prophecy-cards",
+    "vot-home-order",
+    "vot-state",
+    // includes readItems (marked-as-read) + tabs + settings
+    "vot-welcomed",
+    "vot-about-seen",
+    "vot-garden-warning-acked"
+  ];
+  function utf8Bytes(str) {
+    if (typeof TextEncoder !== "undefined") {
+      try {
+        return new TextEncoder().encode(str).length;
+      } catch (_e) {
+      }
+    }
+    var bytes = 0;
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charCodeAt(i);
+      if (c < 128) bytes += 1;
+      else if (c < 2048) bytes += 2;
+      else if (c >= 55296 && c <= 56319) {
+        bytes += 4;
+        i++;
+      } else bytes += 3;
+    }
+    return bytes;
+  }
+  async function measureUserData() {
+    var structured = 0;
+    var media = 0;
+    var mediaCount = 0;
+    for (var i = 0; i < USER_DATA_STORES.length; i++) {
+      var name = USER_DATA_STORES[i];
+      try {
+        var v = await IDBAdapter.get(name, "v");
+        if (v !== void 0 && v !== null) {
+          structured += utf8Bytes(JSON.stringify(v));
+        }
+      } catch (_e) {
+      }
+    }
+    try {
+      var metas = await JournalMediaStore.list();
+      for (var j = 0; j < metas.length; j++) {
+        var sz = metas[j] && typeof metas[j].size === "number" ? metas[j].size : 0;
+        media += sz;
+        mediaCount++;
+      }
+    } catch (_e) {
+    }
+    return { total: structured + media, structured, media, mediaCount };
+  }
+
   // app/src/main/assets/src/utils/import-validators.js
   function isPlainObject(v) {
     return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -10462,7 +10528,7 @@
     LS_SKIP_LIST,
     showToast: showToast2,
     hideToast,
-    IDBAdapter,
+    IDBAdapter: IDBAdapter2,
     WelcomedFlagStore,
     AboutSeenFlagStore: AboutSeenFlagStore2,
     GardenWarningFlagStore,
@@ -10538,6 +10604,8 @@
     useStorageInfo,
     formatBytes,
     StorageHealth: StorageHealth2,
+    measureUserData,
+    USER_DATA_STORES,
     DiagnosticLog: DiagnosticLog2,
     validateStorePayload,
     validateImportEnvelope,

@@ -4994,14 +4994,6 @@
     const _VOT_READY = typeof window.__votCorpus !== "undefined" ? window.__votCorpus.loaded : false;
     const [openSections, setOpenSections] = React.useState(/* @__PURE__ */ new Set());
     const storageInfo = useStorageInfo();
-    const storageDisplayText = (() => {
-      if (storageInfo.status === "loading") return "Checking\u2026";
-      if (storageInfo.status === "unavailable") return "Storage info unavailable on this browser.";
-      if (storageInfo.usage == null || storageInfo.quota == null) {
-        return "Storage info partially unavailable.";
-      }
-      return "Approximately " + formatBytes(storageInfo.usage) + " of " + formatBytes(storageInfo.quota) + " used.";
-    })();
     const protectionDisplayText = (() => {
       if (storageInfo.status === "loading") return "Checking\u2026";
       if (storageInfo.status === "unavailable") return "Persistence API unavailable on this browser.";
@@ -5010,6 +5002,33 @@
       return 'Not active \u2014 tap "Protect now" to request protection from automatic browser cleanup.';
     })();
     const showProtectButton = storageInfo.status === "ready" && !storageInfo.persisted && !storageInfo.persistDenied;
+    const [userData, setUserData] = React.useState(
+      /** @type {null | {total:number,structured:number,media:number,mediaCount:number}} */
+      null
+    );
+    React.useEffect(() => {
+      let alive = true;
+      measureUserData().then((r) => {
+        if (alive) setUserData(r);
+      }).catch(() => {
+      });
+      return () => {
+        alive = false;
+      };
+    }, []);
+    const appDataDisplayText = (() => {
+      if (storageInfo.status === "loading") return "Checking\u2026";
+      if (storageInfo.status === "unavailable") return "Storage info unavailable on this browser.";
+      if (storageInfo.usage == null) return "Storage info partially unavailable.";
+      const used = formatBytes(storageInfo.usage);
+      return storageInfo.quota != null ? `About ${used} of ${formatBytes(storageInfo.quota)} \u2014 everything this app stores on the device, including the offline library and Garden images.` : `About ${used} \u2014 everything this app stores on the device, including the offline library and Garden images.`;
+    })();
+    const userDataDisplayText = (() => {
+      if (userData == null) return "Calculating\u2026";
+      const total = formatBytes(userData.total);
+      const mediaPart = userData.mediaCount > 0 ? ` (includes ${userData.mediaCount} journal ${userData.mediaCount === 1 ? "item" : "items"} \u2014 ${formatBytes(userData.media)})` : "";
+      return `About ${total}${mediaPart} \u2014 your highlights, notes, journal, bookmarks, links, reading progress, and history. This is what Export backs up. Garden images are not counted here.`;
+    })();
     const [wipeConfirm, setWipeConfirm] = React.useState(false);
     const [wipeText, setWipeText] = React.useState("");
     const [diagnosticLog, setDiagnosticLog] = React.useState([]);
@@ -5776,7 +5795,7 @@ Continue?`
           })),
           onChange: (v) => onSetting("gardenTier", v)
         }
-      )), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Platform"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, _platformLabel(StorageHealth.getPlatform())))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Storage"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, storageDisplayText))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Protection"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, protectionDisplayText)), showProtectButton && /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
+      )), /* @__PURE__ */ React.createElement("div", { className: "settings-section" }, /* @__PURE__ */ React.createElement("div", { className: "settings-section-label" }, "Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Platform"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, _platformLabel(StorageHealth.getPlatform())))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Total app data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, appDataDisplayText))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Your data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, userDataDisplayText))), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Protection"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, protectionDisplayText)), showProtectButton && /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {
         e.stopPropagation();
         storageInfo.requestPersist();
       } }, "Protect now")), /* @__PURE__ */ React.createElement("div", { className: "settings-row" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-text" }, /* @__PURE__ */ React.createElement("div", { className: "settings-row-label" }, "Export Your Data"), /* @__PURE__ */ React.createElement("div", { className: "settings-row-desc" }, "Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as a single JSON file. No credentials or login info \u2014 just your data. Save the file anywhere you control.")), /* @__PURE__ */ React.createElement("button", { className: "settings-clear-btn", onClick: (e) => {

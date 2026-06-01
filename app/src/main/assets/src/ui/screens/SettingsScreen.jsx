@@ -124,14 +124,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // on mount; the derived display strings below pick the right text
   // for each (status, persisted, persistDenied) combination.
   const storageInfo = useStorageInfo();
-  const storageDisplayText = (() => {
-    if (storageInfo.status === 'loading') return 'Checking…';
-    if (storageInfo.status === 'unavailable') return 'Storage info unavailable on this browser.';
-    if (storageInfo.usage == null || storageInfo.quota == null) {
-      return 'Storage info partially unavailable.';
-    }
-    return 'Approximately ' + formatBytes(storageInfo.usage) + ' of ' + formatBytes(storageInfo.quota) + ' used.';
-  })();
   const protectionDisplayText = (() => {
     if (storageInfo.status === 'loading') return 'Checking…';
     if (storageInfo.status === 'unavailable') return 'Persistence API unavailable on this browser.';
@@ -142,6 +134,38 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const showProtectButton = storageInfo.status === 'ready'
     && !storageInfo.persisted
     && !storageInfo.persistDenied;
+
+  // "Your data" = the bytes of the user's OWN content (the set Export
+  // backs up): annotations, notes, journal + media, bookmarks, links,
+  // notebooks, marked-as-read, history, saved tabs/settings. Measured
+  // separately from the OS-level "total app data" (storageInfo.usage),
+  // which also counts the regenerable corpus/search/thumbnail caches and
+  // the Garden images. Garden is app data, never user data. Re-measured
+  // when the screen mounts (cheap — JSON byte-length + blob sizes).
+  const [userData, setUserData] = React.useState(/** @type {null | {total:number,structured:number,media:number,mediaCount:number}} */ (null));
+  React.useEffect(() => {
+    let alive = true;
+    measureUserData().then((r) => { if (alive) setUserData(r); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const appDataDisplayText = (() => {
+    if (storageInfo.status === 'loading') return 'Checking…';
+    if (storageInfo.status === 'unavailable') return 'Storage info unavailable on this browser.';
+    if (storageInfo.usage == null) return 'Storage info partially unavailable.';
+    const used = formatBytes(storageInfo.usage);
+    return storageInfo.quota != null
+      ? `About ${used} of ${formatBytes(storageInfo.quota)} — everything this app stores on the device, including the offline library and Garden images.`
+      : `About ${used} — everything this app stores on the device, including the offline library and Garden images.`;
+  })();
+  const userDataDisplayText = (() => {
+    if (userData == null) return 'Calculating…';
+    const total = formatBytes(userData.total);
+    const mediaPart = userData.mediaCount > 0
+      ? ` (includes ${userData.mediaCount} journal ${userData.mediaCount === 1 ? 'item' : 'items'} — ${formatBytes(userData.media)})`
+      : '';
+    return `About ${total}${mediaPart} — your highlights, notes, journal, bookmarks, links, reading progress, and history. This is what Export backs up. Garden images are not counted here.`;
+  })();
+
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
   // NK5c: diagnostic-log snapshot for the "Your Data" section. The bridge
@@ -973,8 +997,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           </div>
           <div className="settings-row">
             <div className="settings-row-text">
-              <div className="settings-row-label">Storage</div>
-              <div className="settings-row-desc">{storageDisplayText}</div>
+              <div className="settings-row-label">Total app data</div>
+              <div className="settings-row-desc">{appDataDisplayText}</div>
+            </div>
+          </div>
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <div className="settings-row-label">Your data</div>
+              <div className="settings-row-desc">{userDataDisplayText}</div>
             </div>
           </div>
           <div className="settings-row">
