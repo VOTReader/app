@@ -159,387 +159,26 @@
   })();
   </script>
 
-  <!-- The ~4.4k-line CSS now lives in app.css, loaded via <link rel="stylesheet"> in <head>. This eliminates the
-       const CSS template-literal black-screen footgun (a stray backtick in a CSS comment used to
-       break the whole app). app.css is a plain static stylesheet - no JS, no escaping. -->
-
   <script>
 function _extends() {return _extends = Object.assign ? Object.assign.bind() : function (n) {for (var e = 1; e < arguments.length; e++) {var t = arguments[e];for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);}return n;}, _extends.apply(null, arguments);}
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
-
-/* ErrorBoundary → extracted to src/components/ErrorBoundary.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   HIGHLIGHT & LINK STORAGE
-   Persistent stores backed by IndexedDB (W2). Components read via
-   .get()/.getForKey() and write via .add()/.remove(); each store's
-   _bump() notifies useSyncExternalStore subscribers to re-render (W7.3).
-═══════════════════════════════════════════════════════════════ */
-/* Saturated highlight palette. Yellow first (the OG highlighter). Brown
-   and gray included for low-emphasis annotations. Order matters — the
-   color ROW shows them in this order. */
 const HL_COLORS = ['yellow','green','pink','red','orange','blue','purple','teal','brown','gray'];
-
-/* useMarkAsRead → extracted to src/hooks/useMarkAsRead.js (P6 warmup) */
-
-/* CachedStore → extracted to src/stores/cached-store.js */
-
-/* recent-navStore → extracted to src/stores/recent-nav-store.js */
-
-/* annotationStore → extracted to src/stores/annotation-store.js */
-
-/* noteStore → extracted to src/stores/note-store.js */
-
-/* notebookStore → extracted to src/stores/notebook-store.js */
-
-/* ── Source label & navigation helpers ──
-   Notes anchor to one or more `hlKey` values (the containers their
-   segments live in). For display + navigation we need to convert
-   that array into a human label like "Proverbs 2:1-3" and an
-   endpoint object compatible with navigateToLink(). */
-/* _bookTitle --> extracted to src/utils/note-source.js */
-/* Compress a sorted list of integers into "1-3, 5, 7-9" form. */
-/* _verseRangeLabel --> extracted to src/utils/note-source.js */
-/* noteSourceLabel --> extracted to src/utils/note-source.js */
-/* noteSourceNav --> extracted to src/utils/note-source.js */
   </script>
-  <!-- Core in-memory stores extracted from the inline block above.
-       CachedStore is the factory used by every other store — must
-       load first. Then the 4 stores that depend on it. -->
   <!-- Cluster B: stores + components + hooks + journal + scripture-resolution +
-       letter-linking (29 files). -->
+       letter-linking. -->
   <script src="dist/bundle-b.js"></script>
-  <!-- ─── /JOURNAL ─── -->
   <script>
-/* hlId and lnkId are now defined in src/stores/link-store.js */
-
-/* snapRangeToWords → extracted to src/renderer/annotation-engine.js */
-
-/* Build a highlight key for a Bible verse */
-/* bibleHlKey --> extracted to src/utils/hl-keys.js */
-/* Build a highlight key for a letter block */
-/* letterHlKey --> extracted to src/utils/hl-keys.js */
-/* Build a highlight key for a WTLB paragraph */
-/* wtlbHlKey --> extracted to src/utils/hl-keys.js */
-/* Build a highlight key for a study chapter block */
-/* studyHlKey --> extracted to src/utils/hl-keys.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   SCRIPTURE / COLLECTION RESOLUTION
-   The COLLECTION REGISTRY (COLLECTIONS + COL_BY_*) and the scripture
-   primitives (parseRefStr / findBook / parseScriptureRef /
-   resolveVerseText / findEntryContext) now live in
-   src/data/scripture-resolution.js — see the <script src> above.
-═══════════════════════════════════════════════════════════════ */
-
-/* Category label for a book — uses OT_BOOK_IDS (built from BIBLE_BOOK_LIST at line ~9568) */
 var _OT_BOOKS_INLINE = new Set(['genesis','exodus','leviticus','numbers','deuteronomy','joshua','judges','ruth',
   '1samuel','2samuel','1kings','2kings','1chronicles','2chronicles','ezra','nehemiah','esther',
   'job','psalms','proverbs','ecclesiastes','songofsolomon','isaiah','jeremiah','lamentations',
   'ezekiel','daniel','hosea','joel','amos','obadiah','jonah','micah','nahum','habakkuk',
   'zephaniah','haggai','zechariah','malachi']);
-/* bookCategory --> extracted to src/utils/book-category.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   NAVIGATION INDEX
-   Flat list of every navigable target (Bible chapter, letter,
-   WTLB entry, study chapter, etc.) with aliases for shortcut
-   matching. Built lazily, cached on window.__NAV_INDEX.
-═══════════════════════════════════════════════════════════════ */
-/* buildNavIndex --> extracted to src/utils/nav-index.js */
-
-/* Parse a query string into navigation candidates.
-   Returns an array of { item, score } sorted by descending score. */
-/* searchNavIndex --> extracted to src/utils/nav-index.js */
-
-/* Get a verse-text preview for a nav item (Bible/study chapters only). */
-/* navItemPreview --> extracted to src/utils/nav-index.js */
-
-/* annMarkClass + HighlightableText + the DOM-overlay engine
-   (findNoteIconInsertionPoint / _markCharEnd / applyNoteIcons /
-   applyActiveNoteState / applyDOMHighlights) + StaticSubtree are all
-   extracted to src/renderer/annotation-engine.js — see the <script src>
-   below, loaded at the canonical renderer point with dom-links /
-   dom-bookmarks. */
-/* applyDOMLinks, _buildLinkIcon, _insertLinkIconAt extracted to
-   src/renderer/dom-links.js — see <script src> below. */
   </script>
   <!-- Cluster C: DOM renderer engines (3 files). -->
   <script src="dist/bundle-c.js"></script>
   <script>
-/* findNoteIconInsertionPoint · _markCharEnd · applyNoteIcons ·
-   applyActiveNoteState · applyDOMHighlights → extracted to
-   src/renderer/annotation-engine.js (loaded above). */
-
-/* ═══════════════════════════════════════════════════════════════
-   SELECTION TOOLBAR
-   Floating popup that appears when user selects text inside a
-   [data-hl-key] container. Offers highlight colors, underline,
-   copy, link, note, and remove.
-═══════════════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════════════
-   ANNOTATION ACTION CHIP
-   Tap on a highlight or underline mark → chip floats at tap point.
-   Three buttons: ✕ Remove · 🎨 Color · 📝 Note (convert to note).
-   • ✕ → chip morphs to inline confirm strip in place
-   • 🎨 → chip swaps to a 10-color row
-   • 📝 → opens NoteSheet edit mode (kind flips to 'note')
-   • Outside tap → dismisses entirely
-   Notes do NOT use this chip — they go straight to NoteSheet read mode.
-═══════════════════════════════════════════════════════════════ */
-/* AnnotationActionChip → extracted to src/ui/sheets/AnnotationActionChip.js */
-
-/* SelectionToolbar → extracted to src/ui/sheets/SelectionToolbar.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   LINK ICON
-   Small chain icon rendered next to any verse/passage that has
-   user-created links. Tapping opens the link sidebar.
-═══════════════════════════════════════════════════════════════ */
-/* LinkIcon → extracted to src/ui/components/LinkIcon.js */
-
-
-/* ═══════════════════════════════════════════════════════════════
-   LINK SIDEBAR
-   Slide-in panel showing all cross-reference links for a given
-   hlKey. Each card shows the reference, category, text preview,
-   and a remove button. Tapping a card navigates to that ref.
-═══════════════════════════════════════════════════════════════ */
-/* LinkCard → extracted to src/ui/components/LinkCard.js */
-
-
-/* LinkSidebar → extracted to src/ui/sheets/LinkSidebar.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   LINK PICKER  — full navigation picker
-   Full-height bottom sheet. Search bar at top accepts:
-     - Bible refs:   "Eph 6", "Ephesians 6:5", "1 Cor 7:32-35"
-     - Volume:       "v1l2", "Vol 1 Letter 2", "Volume Two 5"
-     - WTLB:         "WTLB1 33", "wtlb 2 #5"
-     - Direct title: "The Wide Path"
-     - Free text:    fuzzy match across all titles
-   Shows Recent (history) when input is empty, else ranked results.
-═══════════════════════════════════════════════════════════════ */
-
-/* Convert a nav-index item into a link endpoint object usable by LinkStore. */
-/* navItemToEndpoint --> extracted to src/utils/nav-index.js */
-
-/* Build the source endpoint object from a sourceKey + optional excerpt offsets.
-   Pulled out of LinkPicker so refinement screens (verse-picker, excerpt-picker)
-   can reuse the same shape when finalizing a link. */
-/* buildSourceEndpoint --> extracted to src/utils/nav-index.js */
-
-/* persistLink is defined in src/stores/link-store.js */
-
-/* LinkPicker → extracted to src/ui/sheets/LinkPicker.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   VERSE PICKER SCREEN
-   Full-screen overlay shown after the user picks a chapter (with
-   no verse) in LinkPicker. Shows every verse of the chapter with
-   tap-to-select; tap a 2nd verse to extend to a range. The check
-   icon in the header confirms and creates the link.
-═══════════════════════════════════════════════════════════════ */
-/* VersePickerScreen → extracted to src/ui/sheets/VersePickerScreen.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   LETTER EXCERPT PICKER SCREEN
-   Full-screen overlay shown after the user picks a Letter/WTLB/
-   Blessed/Holy-Days entry in LinkPicker. Renders the entry's body
-   text and lets the user select a text range with native selection.
-   The check icon captures the selection's character offsets and
-   stores them on the link's target endpoint.
-═══════════════════════════════════════════════════════════════ */
-/* LetterExcerptPickerScreen → extracted to src/ui/sheets/LetterExcerptPickerScreen.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   NOTE SHEET
-   Bottom sheet for adding/editing a note on a highlight.
-═══════════════════════════════════════════════════════════════ */
-/* NoteSheet — read + edit modes for a single note (group).
-   Opens in 'read' mode by default; SelectionToolbar's Note action and
-   the action chip's Convert→Note path open in 'edit' mode for fresh notes.
-   The ⋯ menu surfaces Edit · Recolor · Delete (with inline confirm) · Share.
-   Notebook membership lives behind a placeholder until Commit 2. */
-/* NoteSheet → extracted to src/ui/sheets/NoteSheet.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   NOTEBOOK PICKER SHEET
-   Bottom sheet that toggles a note's notebook membership. Multi-
-   select: tap rows to check/uncheck, changes apply immediately.
-   Inline "+ New notebook" creates one without leaving the sheet.
-═══════════════════════════════════════════════════════════════ */
-/* NotebookPickerSheet → extracted to src/ui/sheets/NotebookPickerSheet.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   LIBRARY SCREEN
-   Top-level destination listing the user's personal-study spaces.
-   Notes is active; Journal / Bookmarks / Highlights & Underlines
-   render as Coming-Soon placeholders with the same tile chrome.
-═══════════════════════════════════════════════════════════════ */
-/* LibraryScreen → extracted to src/ui/screens/LibraryScreen.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   NOTES INDEX SCREEN
-   The user's notes hub. Every note across the corpus, with search,
-   notebook filter, and sort. Tap a row to jump back to the source
-   chapter and open the note for reading.
-═══════════════════════════════════════════════════════════════ */
-/* relativeDate --> extracted to src/utils/dates.js */
-
-/* Note-row component — shared between drilled view and All Notes.
-   Root is a div role=button so the body + anchor can host their own
-   "Show more" buttons (HTML disallows nested buttons inside a button). */
-/* NoteRow → extracted to src/ui/components/NoteRow.js */
-
-
-/* NotesIndexScreen — the Notes hub. Two tabs:
-   • Notebooks: card grid (Uncategorized + each user notebook + + New). Tap a
-     card to drill into that notebook's notes. Drilled view has inline rename
-     and delete for user notebooks.
-   • All Notes: flat chronological list of every note with newest/oldest sort. */
-/* NotesIndexScreen → extracted to src/ui/screens/NotesIndexScreen.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   MULTI-NOTE DISAMBIGUATION POPOVER
-   When multiple notes overlap on the same anchor (or share an icon
-   insertion point), tapping shows this popover so the user can
-   pick which note to open.
-═══════════════════════════════════════════════════════════════ */
-/* MultiNotePopover → extracted to src/ui/sheets/MultiNotePopover.js */
-
-
-/* ═══════════════════════════════════════════════════════════════
-   SHARED HELPERS
-═══════════════════════════════════════════════════════════════ */
-/* firstVerseOfRef --> extracted to src/utils/scripture-parse.js */
-/* parseRefRanges --> extracted to src/utils/scripture-parse.js */
-/* lastVerseOfFirstRange --> extracted to src/utils/scripture-parse.js */
-/* echoVersesForRef --> extracted to src/utils/scripture-parse.js */
-/* getNotesForVerse --> extracted to src/utils/scripture-parse.js */
-/* getEchoesForVerse --> extracted to src/utils/scripture-parse.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   SUI HELPERS & FOOTNOTE COMPONENTS
-═══════════════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════════════
-   COMPONENTS
-═══════════════════════════════════════════════════════════════ */
-
-// Render a text value that may contain inline {{ref:X}} scripture markers.
-// Each marker becomes a gold italic tappable citation; non-marker text renders
-// as the given plain element. Used by Segments for text/italic/bold-italic.
-/* Length-preserving normalization: curly quotes → straight; en/em dash → hyphen.
-   Keeps char offsets stable so indexOf on normalized strings maps 1:1 to the
-   original text. Lowercases for case-insensitive search. */
-/* normalizeForHighlight --> extracted to src/utils/highlight.js */
-
-/* Wrap the first occurrence of `needle` inside `text` with a <mark.letter-highlight>.
-   Offsets are computed against a normalized copy but applied to the raw original,
-   so the displayed text preserves curly quotes/dashes. */
-/* splitWithHighlight --> extracted to src/utils/highlight.js */
-
-/* Find and gold-flash every paragraph spanned by `excerpt` inside `mainEl`.
-   Used by both LetterView (Volumes) and WtlbEntryView (WTLB / Blessed / Holy
-   Days) to highlight a Matthew Study Bible cross-reference excerpt on
-   tap-through. Tokenizes both excerpt and paragraph (alphanumeric+apostrophe
-   only) so the match survives punctuation drift, smart quotes, em-dashes,
-   ellipses, and footnote markers between source and excerpt.
-
-   Algorithm:
-   1. Tokenize excerpt and each paragraph into alphanumeric+apostrophe runs.
-   2. Concatenate all paragraph tokens into one stream, recording each
-      paragraph's [startIdx, endIdx) range and its DOM element.
-   3. Find an anchor: first stream position where ≥6 consecutive excerpt
-      tokens match (fall back to ≥4 if needed).
-   4. From that anchor, walk forward through the stream; for every excerpt
-      token, look ahead ≤3 stream tokens for a match. Skip on mismatch up to
-      a small budget. Stop when budget exhausted or excerpt consumed.
-   5. Highlight every paragraph whose token range overlaps [anchor, last
-      matched position].
-   Scrolls the first highlighted paragraph into view (instant). */
-/* highlightExcerptInDom --> extracted to src/utils/highlight.js */
-
-/* renderTextWithScripRefs --> extracted to src/utils/render-text.js */
-
-/* StaticSubtree → extracted to src/renderer/annotation-engine.js */
-
-/* Segments → extracted to src/ui/components/Segments.js */
-
-/* ── PROPHECY GROUP (collapsible stacked cards) ── */
-/* ProphecyCard → extracted to src/ui/components/ProphecyCard.js */
-
-/* ProphecyGroup → extracted to src/ui/components/ProphecyGroup.js */
-
-/* ProphecyExpandToggle → extracted to src/ui/components/ProphecyExpandToggle.js */
-
-// Parse a ref string like "John 3:16", "Romans 1:1-5", "Psalm 50:3-4",
-// or comma-separated "1 Cor 7:7, 9". Returns { start, end, verses? } or null.
-// For comma refs, `verses` is the explicit list (e.g. [7, 9]).
-/* parseRefRange --> extracted to src/utils/scripture-parse.js */
-
-/* lookupVersesFromBooks → src/data/scripture-resolution.js */
-
-// Split a multi-verse text string into segments with verse numbers.
-// Returns an array of { vNum, text } objects, or null for single-verse refs.
-//
-// STRATEGY 0 (preferred): the build-time NKJV fetcher emits multi-verse text
-// as "N. text N. text" where each verse is prefixed with its number.
-// Detect these explicit markers at start-of-string or after ". " and split
-// on them — the captured N must fall within the expected verse range so
-// we never misfire on mid-text numbers.
-//
-// STRATEGY 1 (fallback): sentence-boundary split, used when the text lacks
-// explicit N. markers (legacy data, hand-baked compound refs, etc.).
-/* splitIntoVerses --> extracted to src/utils/scripture-parse.js */
-
-/* VerseWithNumbers → extracted to src/ui/components/VerseWithNumbers.js */
-
-/* InAppLinkButton → extracted to src/ui/components/InAppLinkButton.js */
-
-/* FootnoteSheet → extracted to src/ui/components/FootnoteSheet.js */
-
-/* ── ScriptureVerseText: handles plain and compound (pipe-separated) refs ── */
-/* ScriptureVerseText → extracted to src/ui/components/ScriptureVerseText.js */
-
-/* ── Scripture Sheet (Matthew) ── */
-/* ScriptureSheet → extracted to src/ui/components/ScriptureSheet.js */
-
-/* EXPAND_THRESHOLD + MIN_HIDDEN_WORDS → extracted to src/ui/components/ExpandableVerse.js (G.2.3) */
-/* ExpandableVerse → extracted to src/ui/components/ExpandableVerse.js */
-
-/* FootnoteListSection → extracted to src/ui/components/FootnoteListSection.js */
-;
-
-/* ── Global scroll container ref ── */
 let __scrollEl = null;
-
-// Tabs control surfaced through context so ScreenLayout can auto-inject
-// the tab button into every screen's nav without per-screen prop drilling.
 const TabsContext = React.createContext(null);
-/* TabsNavBtn → extracted to src/ui/components/TabsNavBtn.js */
-
-// Sticky chapter/letter prev-next arrows. Renders inside the scroll
-// container, stuck at top — always visible just below the top nav
-// as the user scrolls through a chapter or letter.
-/* StickyChapterNav → extracted to src/ui/components/StickyChapterNav.js */
-
-/* ScreenLayout → extracted to src/ui/components/ScreenLayout.js */
-
-/* ModeToggle → extracted to src/ui/components/ModeToggle.js */
-
-/* InlineNotes → extracted to src/ui/components/InlineNotes.js */
-
-/* InlineEcho → extracted to src/ui/components/InlineEcho.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   STUDY PANELS COMPONENT (used by PDF mode)
-═══════════════════════════════════════════════════════════════ */
-/* StudyPanels → extracted to src/ui/components/StudyPanels.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   BOOK SELECTOR
-═══════════════════════════════════════════════════════════════ */
 const CANON_SUBTITLES = {
   genesis: "The First Book of Moses", exodus: "The Second Book of Moses", leviticus: "The Third Book of Moses",
   numbers: "The Fourth Book of Moses", deuteronomy: "The Fifth Book of Moses", joshua: "The Book of Joshua",
@@ -662,78 +301,6 @@ const SCRIPTURE_GENRES = {
 
 };
 
-/* Inline chapter-bookmark button rendered alongside the standard nav cluster
-   on reading screens. When `chapterBookmark = { hlKey, label }` is provided,
-   the button checks BookmarkStore to determine if this chapter is already
-   bookmarked, renders a bright vs dim flag accordingly, and toggles on tap:
-     - Not bookmarked → creates a chapter-level bookmark (no :start-end suffix);
-       BookmarkStore._bump() re-applies the inline icons. The user sees the same
-       creation-pulse animation as the SelectionToolbar bookmark flow.
-     - Already bookmarked → opens the BookmarkPopover for that bookmark via
-       the existing window.__openBookmarkPopover bridge (offers Open /
-       Add/Edit Thought / Delete).
-   The flag visually flips gold-bright when active, providing clear status
-   feedback right in the nav so the user can tell at a glance whether
-   they've already marked the page. */
-/* ChapterBookmarkBtn → extracted to src/ui/components/ChapterBookmarkBtn.js */
-
-/* NavButtons → extracted to src/ui/components/NavButtons.js */
-
-/* ── Library nav: single source of truth for every Library screen's
-   top bar. Identical structure to _idxNav (back arrow + Home on the
-   left; NavButtons' settings-gear drives the margin-left:auto that
-   pushes the icon cluster right). Optional leftExtras render between
-   Home and the cluster (stay left, e.g. the editor's "Saved" chip);
-   rightExtras render after the cluster (far right, e.g. the viewer's
-   pin/delete). Keeps all Library sub-screens visually consistent with
-   the rest of the app and prevents future drift. ── */
-/* LibraryNav → extracted to src/ui/components/LibraryNav.js */
-
-/* ScripturesHome → extracted to src/ui/screens/ScripturesHome.js */
-
-
-/* ScriptureGenre → extracted to src/ui/screens/ScriptureGenre.js */
-
-
-/* ═══════════════════════════════════════════════════════════════
-   GARDEN VIEW — Progressive image viewer for "A Return to The Garden"
-   Constants + helpers extracted (G.2.3):
-   - GARDEN_TOTAL / GARDEN_TIERS / GARDEN_DEFAULT_TIER / gardenImageCache
-     → src/utils/garden.js (cross-module-shared; exposed on window via _entry-d.js
-       so inline App() in this file reads them through window globals)
-   - GARDEN_PRELOAD_AHEAD / GARDEN_CRAWL_DELAY → src/ui/screens/GardenView.js
-     (module-private; only GardenView consumes them)
-   - getGardenTier / gardenUrl / gardenCacheKey / gardenPreload / gardenIsCached
-     → src/utils/garden.js
-   - GardenView → src/ui/screens/GardenView.js
-═══════════════════════════════════════════════════════════════ */
-
-
-/* VolumesHome → extracted to src/ui/screens/VolumesHome.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   CHAPTER INDEX
-═══════════════════════════════════════════════════════════════ */
-/* ChapterIndex → extracted to src/ui/screens/ChapterIndex.js */
-
-
-/* ═══════════════════════════════════════════════════════════════
-   BIBLE LETTER STUDIES — home screen
-═══════════════════════════════════════════════════════════════ */
-/* StudiesHome → extracted to src/ui/screens/StudiesHome.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   BIBLE LETTER STUDIES — per-study chapter index
-═══════════════════════════════════════════════════════════════ */
-/* BibleStudyIndex → extracted to src/ui/screens/BibleStudyIndex.js */
-
-
-/* ═══════════════════════════════════════════════════════════════
-   CHAPTER VIEW
-═══════════════════════════════════════════════════════════════ */
-/* ChapterView → extracted to src/ui/screens/ChapterView.js */
-
-/* ── Bible Letter Study title helpers (top-level so HistoryScreen can use them) ── */
 const studyShortTitle = (t) => {
   if (!t) return '';
   for (const sp of [':', ' - ', ' (Bible', ' (Extensive']) {
@@ -757,74 +324,6 @@ const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'Ju
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/* timeAgo --> extracted to src/utils/dates.js */
-
-/* HistoryEntryCard → extracted to src/ui/components/HistoryEntryCard.js */
-
-
-/* HistoryScreen → extracted to src/ui/screens/HistoryScreen.js */
-
-/* ═══════════════════════════════════════════════════════════════
-    /* ═══════════════════════════════════════════════════════════════
-   VOT VOLUME INDEX + LETTER VIEW
-═══════════════════════════════════════════════════════════════ */
-
-
-/* -- Generic Volume/Collection Letter Index (consolidated 2026-05-19, P5d) -- */
-
-/* VolumeLetterIndex → extracted to src/ui/components/VolumeLetterIndex.js */
-
-
-/* ── Scripture ref lookup for WTLB — hardcoded in data/wtlb-scriptures.js ── */
-
-/* ── Render a line of text, replacing {{ref:...}} with tappable links ── */
-/* ── Words To Live By: entry view ── */
-/* WtlbEntryView → extracted to src/ui/screens/WtlbEntryView.js */
-
-/* ── Theme Button ── */
-
-/* ── Letter View ── */
-/* LetterView → extracted to src/ui/screens/LetterView.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   APP
-═══════════════════════════════════════════════════════════════ */
-
-
-/* ═══════════════════════════════════════════════════════════════
-   HOME SCREEN + BIBLE CHAPTER VIEW + APP
-═══════════════════════════════════════════════════════════════ */
-
-/* ═══════════════════════════════════════════════════════════════
-   HOME SCREEN
-═══════════════════════════════════════════════════════════════ */
-/* SelectField → extracted to src/ui/components/SelectField.js */
-
-
-/* SettingsRow → extracted to src/ui/components/SettingsRow.js */
-
-
-/* ClearProgressRow → extracted to src/ui/components/ClearProgressRow.jsx.
-   Owns its own confirm state via ConfirmStrip — the old three-stage
-   CLEAR_LABELS / CLEAR_CLASSES tap pattern was removed in the
-   delete-confirm standardization pass. */
-
-
-/* ═══════════════════════════════════════════════════════════════
-   TABS OVERVIEW — describe each tab + render the grid
-═══════════════════════════════════════════════════════════════ */
-/* describeTab --> extracted to src/utils/tabs.js */
-
-/* TabActionSheet → extracted to src/ui/sheets/TabActionSheet.js */
-
-/* TabsOverview → extracted to src/ui/sheets/TabsOverview.js */
-
-// Content signature for thumbnail cache — stable across tab index shifts
-/* tabContentKey --> extracted to src/utils/tabs.js */
-
-// Does this tab's screen actually have reading content with meaningful scroll
-// progress? Settings/history/index/search screens don't — the progress bar
-// would be noise there.
 const READING_SCREENS = new Set([
 'matthew-ch', 'bible-ch',
 'vot-letter', 'vot-one-letter', 'vot-three-letter', 'vot-four-letter',
@@ -835,37 +334,7 @@ const READING_SCREENS = new Set([
 'bible-study-chapter',
 'garden-view']
 );
-/* tabHasProgressBar --> extracted to src/utils/tabs.js */
 
-// Derive a scroll-memory key that matches the screen/content the tab is on.
-/* scrollKeyForTab --> extracted to src/utils/tabs.js */
-
-/* AboutScreen → extracted to src/ui/screens/AboutScreen.js */
-
-/* SettingsScreen → extracted to src/ui/screens/SettingsScreen.js */
-
-/* HomeScreen → extracted to src/ui/screens/HomeScreen.js */
-/* ═══════════════════════════════════════════════════════════════
-   TRANSLATIONS — verse-text override table
-   NKJV is the default (rendered from chapter.sections directly).
-   All other translations lookup by (bookId, chapter, verseNum) and
-   substitute the verse text while preserving NKJV section headings.
-   Matthew is deliberately excluded — Study Bible owns it.
-═══════════════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════════════
-   Thumbnail storage — IndexedDB-backed thumb cache.
-   Constants + state + helpers extracted (G.2.3) to
-   src/stores/thumb-store.js (module-private; never read from App()).
-═══════════════════════════════════════════════════════════════ */
-/* THUMB_DB / THUMB_STORE / _thumbDbPromise → src/stores/thumb-store.js */
-/* openThumbDB / idbPut / idbDelete / idbReadAll → src/stores/thumb-store.js */
-
-/* Alt-translation lazy loaders — state + helpers extracted (G.2.3) to
-   src/data/translations.js (module-private; never read from App()).
-   bible-studies.js (~4.3 MB) is also lazy-loaded there via the same
-   caching/promise pattern. */
-/* _translationPromises / _translationLoaded / _bibleStudiesPromise → src/data/translations.js */
-/* loadTranslation / loadBibleStudies / translateVerse → src/data/translations.js */
 const TRANSLATION_OPTIONS = [
 { id: 'nkjv', label: 'NKJV', desc: 'New King James Version — default' },
 { id: 'web', label: 'WEB', desc: 'World English Bible — modern, public domain' },
@@ -889,20 +358,6 @@ const ARROW_LAYOUT_OPTIONS = [
 { id: 'nav', label: 'In Top Nav', desc: 'Small bubble arrows inside the top nav bar.' },
 { id: 'off', label: 'Hidden', desc: 'Hide both arrows. Use the bottom prev/next cards.' }];
 
-/* translateVerse --> extracted to src/data/translations.js */
-/* ═══════════════════════════════════════════════════════════════ */
-/* BibleChapterView → extracted to src/ui/screens/BibleChapterView.js */
-
-/* ═══════════════════════════════════════════════════════════════
-   APP
-   Book order: Matthew → Mark → Luke → John → Acts → Romans → … → Jude → Revelation → Volume Two
-   Cross-type boundaries flow seamlessly between viewers
-═══════════════════════════════════════════════════════════════ */
-// Q8: BOOKS lives in bundle-a-bible.js (lazy-loaded). When this inline
-// block runs, BOOKS may be undefined. Move all BOOKS-touching init into
-// __finishBibleInit(), called by __loadBibleCorpus()'s onload handler.
-// Pre-declare the consumer-visible globals as mutable (BIBLE_BOOK_LIST /
-// OT_BOOK_IDS) so reads return empty rather than throwing pre-load.
 var BIBLE_BOOK_LIST = [];
 var OT_BOOK_IDS = new Set();
 window.__finishBibleInit = function() {
@@ -938,31 +393,6 @@ window.__finishBibleInit = function() {
   BIBLE_BOOK_LIST.slice(0, 39).forEach(function(b) { if (b && b.id) OT_BOOK_IDS.add(b.id); });
 };
 
-// BIBLE_BOOK_LIST + OT_BOOK_IDS are populated by __finishBibleInit()
-// which runs when bundle-a-bible.js loads (see __loadBibleCorpus above).
-
-/* ═══════════════════════════════════════════════════════════════
-   VOT CORPUS POST-LOAD WIRING (Q8.3)
-   ═══════════════════════════════════════════════════════════════
-   The VOT corpora (volume-one through volume-seven, letters-timothy,
-   letters-flock, lords-rebuke, wtlb-one, wtlb-two, wtlb-scriptures,
-   the-blessed, holy-days, hidden-manna) are lazy-loaded as
-   bundle-a-vot.js. Three pieces of cross-corpus wiring that USED to
-   run eagerly at module-init now defer until __finishVotInit:
-
-   1. linkWtlbEntries — wires prevEntry/nextEntry for WTLB-shaped
-      collections (WTLB One/Two + The Blessed).
-   2. linkPreface — connects each collection's preface to its first
-      letter for nav chain.
-   3. VOT_LETTER_REGISTRY — Map keyed by "<collection>::<letter
-      title>" → routing data, consumed by matthew.js's votNote
-      tap-through (which is itself in bundle-a-matthew, also lazy).
-
-   __finishVotInit is also called once OPTIONALLY at boot (after this
-   block) so any collections that happen to be loaded already (e.g.
-   if VOT corpus loaded during a previous session and the browser
-   already has matthew.js executing tap-through) work even without
-   a fresh __loadVotCorpus call. */
 let VOT_LETTER_REGISTRY = new Map();
 window.__finishVotInit = function() {
   // (1) linkWtlbEntries for any WTLB-shaped collections that are loaded.
@@ -1022,29 +452,12 @@ window.__finishVotInit = function() {
 // Real population happens when __loadVotCorpus()'s on-load fires this again.
 window.__finishVotInit();
 
-/* resolveVotLetter --> extracted to src/data/letter-linking.js */
-
-// Hidden Manna: true words given through Timothy that aren't publicly
-// published on thevolumesoftruth.com. They appear as excerpts in the
-// Matthew Study Bible (vol === letter pattern). Display an "HM" badge.
 const HIDDEN_MANNA_TITLES = new Set([
 "The Promise",
 "I Have Purged; Behold, I Shall Wipe Away and Restore",
 "Woe to Dallas"]
 );
-/* isHiddenManna --> extracted to src/data/letter-linking.js */
 
-/* ═══════════════════════════════════════════════════════════════
-   SEARCH (Orama-backed)
-     Heavy lifting lives in:
-     - app/src/main/assets/search-data.js (dictionaries, passages, synonyms)
-     - app/src/main/assets/search.js (parser, indexer, runtime)
-   Exposed as: window.VotSearchData, window.VotSearch.
-   This file hosts only the React SearchScreen that drives the module.
-═══════════════════════════════════════════════════════════════ */
-
-
-// ─── Kind → display badge mapping ───
 const SRCH_KIND_LABEL = {
   'verse': { label: 'Verse', cls: 'badge-verse' },
   'chapter-title': { label: 'Chapter', cls: 'badge-heading' },
@@ -1063,8 +476,6 @@ const SRCH_KIND_LABEL = {
   'bible-study': { label: 'Study', cls: 'badge-note' }
 };
 
-// ─── Result grouping ───
-/* srchGroupKey --> extracted to src/utils/search.js */
 const SRCH_GROUP_META = {
   'matthew': { label: 'Matthew Study Bible', order: 1 },
   'bible': { label: 'Scriptures', order: 2 },
@@ -1089,38 +500,13 @@ const SRCH_GROUP_META = {
   'other': { label: 'Other', order: 99 }
 };
 
-// ─── Highlighted snippet renderer ───
-/* SrchSnippet → extracted to src/ui/components/SrchSnippet.js */
-
-
-// ─── Result card ───
-/* SrchCard → extracted to src/ui/components/SrchCard.js */
-
-
-// ─── Group with collapse ───
-/* SrchGroup → extracted to src/ui/components/SrchGroup.js */
-
-
-// ─── Quick-pick chips on empty state ───
 const SRCH_QUICK_PICKS = [
 'Beatitudes', 'Armor of God', 'Love Chapter', 'Faith Chapter', 'Shepherd Psalm',
 'Ten Commandments', 'Great Commission', 'Fruit of the Spirit', 'New Jerusalem',
 'Four Horsemen', 'Valley of Dry Bones'];
 
-
-// ─── SearchScreen ───
-/* SearchScreen → extracted to src/ui/screens/SearchScreen.js */
-
-
-/* App() extracted to src/app.js (Q2.7-1 — verbatim move; JSX conversion in Q2.7-2) */
-
   </script>
-  <!-- LinksScreen — extracted to src/ui/screens/LinksScreen.js -->
-  <!-- Depends on: LinkStore (link-store.js), ScreenLayout, ThemeBtn, relativeDate, -->
-  <!--             bookCategory, findEntryContext, _allBooks, _matthew (all defined above). -->
-  <!-- All references are resolved at React render time, not at parse time, so -->
-  <!-- loading here (before root.render) is safe even though callee is defined above. -->
-  <!-- Cluster D: all extracted screens/sheets/components/utils (81 files). -->
+  <!-- Cluster D: screens, sheets, components, utils. -->
   <script src="dist/bundle-d.js"></script>
   <!-- Mirror lexical-only globals onto window so the smoke harness
        (tools/smoke.js) can probe them without `eval()` (CSP forbids
