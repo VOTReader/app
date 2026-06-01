@@ -453,17 +453,21 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       const storesMap = _exportableStores();
       const flagMap = _flagStores();
       const stores = {};
+      // U6: track read failures instead of silently swallowing them. A backup
+      // that LOOKS complete but dropped a store is the worst failure for the
+      // ONLY backup mechanism, so any failure aborts the export loudly below.
+      const exportProblems = [];
       for (const name of Object.keys(storesMap)) {
         try {
           const v = await IDBAdapter.get(name, 'v');
           if (v !== undefined) stores[name] = v;
-        } catch (_e) { /* per-store best-effort */ }
+        } catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
       }
       for (const name of Object.keys(flagMap)) {
         try {
           const v = await IDBAdapter.get(name, 'v');
           if (v !== undefined) stores[name] = !!v;
-        } catch (_e) { /* best-effort */ }
+        } catch (e) { console.warn('export: flag read failed', name, e); exportProblems.push(name); }
       }
 
       // (c) media: encode JournalMediaStore blobs as base64.
@@ -491,7 +495,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         }
       } catch (e) {
         console.warn('media export failed', e);
-        /* proceed with structured data only */
+        exportProblems.push('journal media');
       }
 
       // W2.5 — storageQuota + storageUsed diagnostic fields. Raw
@@ -509,6 +513,22 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         }
       } catch (_e) { /* best-effort diagnostic; null on failure */ }
 
+      // U6: abort loudly on any read failure rather than write a misleading,
+      // incomplete-but-valid-looking backup file. The user retries; a persistent
+      // failure signals real storage trouble (better than silent data loss).
+      if (exportProblems.length) {
+        hideToast(_TOAST_ID);
+        _showToast('Export aborted — could not read: ' + exportProblems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        return;
+      }
+      // Integrity manifest: per-store entry count + media count, so a future
+      // import can verify the round-trip captured everything (U14 will check it).
+      const counts = { _media: Object.keys(media).length };
+      for (const name of Object.keys(stores)) {
+        const v = stores[name];
+        counts[name] = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 1);
+      }
+
       const payload = {
         app: 'VOTReader',
         exportVersion: 2,
@@ -516,6 +536,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         diagnosticLog: diagnosticLog,
         storageQuota: storageQuota,
         storageUsed: storageUsed,
+        counts: counts,
         data: data,
         stores: stores,
         media: media,

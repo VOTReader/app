@@ -270,6 +270,14 @@
 
  U6 — Export: fail loud on incomplete backup                       [P1] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — export now TRACKS per-store + media read failures
+   (exportProblems) instead of swallowing them, and ABORTS loudly if any occur
+   ("Export aborted — could not read: … Nothing was saved") rather than writing
+   a misleading incomplete-but-valid-looking file. Added a `counts` manifest to
+   the payload (per-store entry count + media count) for a future import round-
+   trip integrity check (U14). Verified END-TO-END in preview: drove the real
+   Settings→EXPORT button through a patched saveToFile and captured a complete v2
+   payload with counts for all 17 stores + _media, no false abort.
  PROBLEM: export wraps each store read in try/catch that SWALLOWS failure and
    omits the store (SettingsScreen.jsx:456-461); media loop "proceeds with
    structured data only" on error (:492-495). A transient read error ⇒ a
@@ -632,7 +640,7 @@
  U3  corpus-version gate .......... DONE  [P1] (pre-commit + CI gate; break-tested)
  U4  search 31MB load ............. DONE  [P1] (translations load only on cache-miss build)
  U5  App() re-render .............. DONE  [P1] (annotation sub → AnnotationDomSync leaf; screen-memo→D4)
- U6  export fail-loud ............. TODO  [P1]
+ U6  export fail-loud ............. DONE  [P1] (abort on read failure + counts manifest)
  U7  Garden allowlist/cap ......... TODO  [P1]
  U8  applyDOMHighlights ........... TODO  [P2]
  U9  async screenshot ............. TODO  [P2]
