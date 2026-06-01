@@ -2637,8 +2637,10 @@ W8 — TYPE COVERAGE + CSS ARCHITECTURE (final quality bar)
 ───────────────────────────────────────────────────────────────────────────────
 
 Goal: close the two remaining structural gaps — the untyped UI tree
-(40+ screens, 25+ components, 17 sheets) and the 24 load-bearing
-!important declarations that mask a specificity architecture debt.
+(40+ screens, 25+ components, 17 sheets) and the app.css !important
+declarations. UI typing: W8.1 DONE. Scripture types: W8.3 DONE.
+!important: W8.2 @layer rewrite RETIRED (see below) after 5 redundant
+ones were removed and the rest confirmed load-bearing-by-design.
 
   W8.1 — UI tree JSDoc typing (screens, sheets, components)  — DONE 2026-05-29
   ──────────────────────────────────────────────────────────
@@ -2731,71 +2733,40 @@ Goal: close the two remaining structural gaps — the untyped UI tree
 
   Same rate as Q4: file-by-file, zero-tolerance after each.
 
-  W8.2 — CSS @layer architecture (eliminate all !important)
+  W8.2 — CSS @layer architecture (eliminate all !important) — RETIRED 2026-05-31
   ─────────────────────────────────────────────────────────
-  Problem: 24 !important declarations remain in app.css. Research
-  classified them:
-    - 11 annotation/highlight display (prevent palette bleed)
-    - 6 light-mode palette guards (state-specific overrides)
-    - 2 visibility/drag states
-    - 5 structural/spacing overrides
+  Originally scoped: eliminate ~24 !important via a 7-layer @layer cascade
+  rewrite of the whole sheet (scaffold -> remove one-by-one -> 120-state
+  visual walk).
 
-  All 24 are load-bearing — they exist because the cascade order of
-  existing rules doesn't match the intended priority. Removing them
-  without restructuring the cascade would break visual output.
+  DECISION 2026-05-31: RETIRED. Re-evaluated against the code; not worth
+  doing, and on one axis net-negative.
 
-  Fix: CSS @layer (supported in all browsers since 2022, Safari 15.4+,
-  Chrome 99+, Firefox 97+). Define explicit cascade layers:
+    1. Q6.9 ALREADY adjudicated this — it KEPT the load-bearing !important
+       after a specificity analysis and explicitly deferred ":where()/@layer
+       cleanup" as "a redesign." Nothing changed to reopen it.
+    2. Zero user-facing benefit (output is already correct), MEDIUM risk, on
+       an almost-finished app. The plan's own verification surface was 120
+       visual states x 3 breakpoints — a poor trade for deleting a token.
+    3. @layer fails CLOSED: a WebView that can't parse `@layer { }` discards
+       the WHOLE wrapped block -> unstyled app. Every other modern feature we
+       use (var(), mask-image, :focus-visible) degrades GRACEFULLY; @layer is
+       uniquely catastrophic, for an internal-aesthetics win. minSdk 26 does
+       NOT pin the System WebView version (it updates independently of the OS).
+    4. The "24" count was already stale (19 at decision time) — the squiggle
+       + B2 work had shuffled them.
 
-    @layer reset, base, layout, components, annotations, states, overrides;
+  SAFE REMNANT — DONE 2026-05-31 (commit 00d215e). Removed the 5 genuinely
+  REDUNDANT !important from the color-picker chrome (proven no-ops in preview
+  via computed-style probes — equal-specificity-later, or higher-specificity-
+  no-competitor), and documented the 3 genuinely load-bearing annotation ones
+  (.hl-underline / .hl-squiggle background:none, .hl-note.is-active gold wash)
+  with the specificity reason they exist. !important count 19 -> 14. The
+  remaining 14 are load-bearing state / drag / spacing / palette-guard
+  overrides — the right tool for the job, now commented as intentional rather
+  than left to read as debt. No @layer, no risk, no rewrite.
 
-  Rules in later layers win over earlier layers regardless of
-  specificity. This means:
-
-    - `@layer annotations` contains .hl-note, .hl-underline, per-color
-      palette rules. No !important needed — the layer order ensures
-      annotation rules beat component rules.
-    - `@layer states` contains .is-active, :hover, .dragging, .capturing-
-      thumb. These win over annotations by layer order.
-    - `@layer overrides` is the final layer — currently empty, reserved
-      for future escape hatches. If any !important survives the
-      migration, it goes here with a comment explaining why.
-
-  Migration approach:
-
-  W8.2a — Layer scaffold:
-    Add `@layer` declaration at top of app.css. Wrap existing rules in
-    their appropriate layers using `@layer X { ... }` blocks. NO rule
-    changes — just wrapping. Verify zero visual change via screenshot
-    diff (tools/smoke.js can capture screenshots for comparison).
-
-  W8.2b — Remove !important one-by-one:
-    For each of the 24 declarations:
-      1. Remove `!important`
-      2. Verify the rule still wins (it should, because layer order
-         guarantees it)
-      3. If it doesn't win, the rule is in the wrong layer — move it
-      4. Screenshot-diff to confirm zero visual change
-    Same one-commit-per-item discipline.
-
-  W8.2c — Verify dark + light mode:
-    Full visual walk in both themes at 3 breakpoints (mobile 375px,
-    tablet 768px, desktop 1440px). Every annotation color (10 colors)
-    × active/inactive × note/highlight/underline × dark/light = 120
-    visual states. Spot-check representative samples (not all 120).
-
-  Risk: MEDIUM — @layer is a cascade-order change that could have
-  unexpected interactions with the existing specificity hierarchy.
-  Mitigation: the scaffold step (W8.2a) wraps without changing, so
-  any breakage from the layer order itself is caught before any
-  !important is removed. The removal step (W8.2b) is one-at-a-time
-  with screenshot verification.
-
-  Browser support: @layer is in our support matrix (minSdk 26 =
-  Android 8 = Chrome 99+ in WebView; desktop Chrome/Edge/Firefox all
-  support since early 2022). No polyfill needed.
-
-  W8.3 — Scripture parsing JSDoc return types
+  W8.3 — Scripture parsing JSDoc return types — DONE 2026-05-31 (dfadf85)
   ───────────────────────────────────────────
   Problem (nuanced): research found parseRefStr and parseScriptureRef
   already return null on invalid input, and all callers check for null.
@@ -2813,20 +2784,32 @@ Goal: close the two remaining structural gaps — the untyped UI tree
                     text: string } | null}
     - Add @returns to findBook, lookupVersesFromBooks, resolveVerseText
     - Extend tsconfig.json include to cover src/data/scripture-resolution.js
-    - tsc --noEmit verifies all callers handle null correctly
+    - tsc --noEmit shape-checks the typedefs
 
-  Small task that gives tsc the information to catch future bugs.
-  No runtime change.
+  CORRECTION (caveat the plan got wrong): tsconfig runs strict:false, so
+  strictNullChecks is OFF. The "| null" returns are documented + shape-
+  checked but NOT enforced at call sites — the original "tsc enforces
+  null-check at all call sites" goal is unreachable without flipping
+  strict (out of scope; would flood the whole codebase). Real value here
+  is wrong-field / typo detection (checkJs shape-checking) + documentation.
 
-  Exit criteria (W8 complete):
-    [ ] tsconfig.json includes src/ui/, src/components/, src/renderer/,
+  DONE 2026-05-31 (dfadf85): @param/@returns added to all five primitives;
+  scripture-resolution.js added to the tsconfig include. tsc clean, build
+  clean, 1511 tests pass. JSDoc-only, no runtime change.
+
+  Exit criteria (W8 — effectively CLOSED 2026-05-31):
+    [X] tsconfig.json includes src/ui/, src/components/, src/renderer/,
         src/data/scripture-resolution.js. tsc passes zero-tolerance.
-    [ ] All ~82 UI files have JSDoc @param + @returns. Tier 1-5 complete.
-    [ ] app.css uses @layer for cascade control. Zero !important
-        declarations (or documented exceptions in @layer overrides
-        with rationale). Screenshot-verified dark + light + 3 widths.
-    [ ] parseRefStr + parseScriptureRef have @returns typedefs.
-        tsc enforces null-check at all call sites.
+    [X] UI tree has JSDoc @param + @returns (W8.1). app.jsx composition
+        root still excluded — optional separate pass, see OPEN THREADS.
+    [~] app.css !important: W8.2 @layer rewrite RETIRED (net-negative;
+        see W8.2 above). 5 redundant !important removed (19 -> 14, commit
+        00d215e); remaining 14 are load-bearing and commented as
+        intentional. No @layer.
+    [X] parseRefStr + parseScriptureRef have @returns typedefs (W8.3).
+        Shape-checked by tsc; null-enforcement N/A under strict:false.
+  Only the app.jsx typing pass remains, as an optional follow-up — not a
+  W8 blocker. W8.1 + W8.3 done; W8.2 retired.
 
 ───────────────────────────────────────────────────────────────────────────────
 W9 — DATA INTEGRITY (schema validation + import hardening)
@@ -3542,7 +3525,7 @@ SEQUENCING + PARALLELISM
     W7.4 (diagnostics) can run anytime after W1 (needs PlatformBridge).
     W7.5 (prop bundles) must precede W8.1 Tier 3 (screens need bundles).
     W8.1 (UI typing) can start Tier 1-2 during W6 (leaf components first).
-    W8.2 (CSS @layer) is independent of everything — can run anytime.
+    W8.2 (CSS @layer) — RETIRED 2026-05-31 (net-negative; see W8.2 section).
     W8.3 (scripture types) is small — slot anywhere.
     W9.1-W9.2 (schema defs + build validation) independent — can run
       anytime. No dependency on any other phase.
@@ -3623,12 +3606,11 @@ RISK REGISTER
     remove, color change, note create, bookmark toggle, link add)
     after W7.3a before starting W7.3b.
 
-  MEDIUM — CSS @layer cascade rewrite (W8.2)
-    Moving 4,100 lines of CSS into @layer blocks changes the cascade
-    globally. Unexpected interactions could break any visual state.
-    Mitigation: scaffold step (W8.2a) wraps without removing any
-    !important; breakage from layer order itself is caught before
-    any rule changes. Screenshot comparison at each step.
+  (RETIRED) CSS @layer cascade rewrite (W8.2)
+    Risk no longer applies — W8.2 retired 2026-05-31 (the @layer rewrite
+    was judged net-negative: @layer fails closed on an old WebView, for
+    zero user-facing gain). The 5 redundant !important that WERE removed
+    were proven no-ops via computed-style probes, not a cascade rewrite.
 
   LOW — CSP compatibility on GitHub Pages
     'self' should resolve correctly. If not, fall back to explicit
@@ -3706,7 +3688,7 @@ review is mapped to a specific work item. Zero gaps.
   | 14| No JS-side telemetry/diagnostics      | W7.4     | RESOLVED   |
   | 15| buildScreenRoutes 47-prop surface     | W7.5     | RESOLVED   |
   | 16| UI tree untyped (82 files)            | W8.1     | RESOLVED   |
-  | 17| 24 !important declarations            | W8.2     | RESOLVED   |
+  | 17| !important (most load-bearing)        | W8.2     | RETIRED    |
   | 18| Scripture parsing lacks JSDoc types    | W8.3     | RESOLVED   |
   | 19| Data fragility (structural validation)| W9.1-9.2 | PLANNED   |
   | 20| Import corruption vector              | W9.3     | PLANNED    |
