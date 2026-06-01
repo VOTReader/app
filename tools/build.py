@@ -47,7 +47,12 @@ DIST  = os.path.join(ROOT, 'dist')
 # overrides, BOOKS["matthew-plain"] for inline scripture refs).
 # See BUNDLE-LAZY-LOAD-PLAN.md for the design rationale.
 A = [
-    'react.min.js', 'react-dom.min.js', 'html2canvas.min.js',
+    # html2canvas.min.js is NO LONGER concatenated here (U13) — it was ~198 KB
+    # parsed at EVERY boot but is only used by web tab-thumbnails (Android uses
+    # native PixelCopy). platform-bridge._ensureHtml2canvas() lazy-loads it via
+    # <script src="html2canvas.min.js"> on the first web screenshot; the file
+    # stays SW-precached (service-worker.js CORE_ASSETS) so it's instant/offline.
+    'react.min.js', 'react-dom.min.js',
     'src/data/books-restored.js',
     'src/data/matthew-plain.js', 'src/data/matthew-nkjv.js',
     'flexsearch.min.js', 'search-data.js', 'search.js',

@@ -209,9 +209,26 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   it('nativeRecordAmplitude returns 0 on web', () => {
     expect(bridge.nativeRecordAmplitude()).toBe(0);
   });
-  it('takeScreenshot returns empty string when html2canvas is unavailable', async () => {
-    // html2canvas isn't loaded in the test env — bridge falls back to ''
-    expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
+  it('takeScreenshot returns empty string when html2canvas cannot load', async () => {
+    // U13: html2canvas is lazy-loaded via <script> on first web screenshot. In
+    // jsdom the script never fetches, so simulate the load FAILING (onerror) →
+    // the bridge degrades to ''. (The success path is covered by the
+    // html2canvas-integration block below, which pre-sets globalThis.html2canvas
+    // so the lazy-loader short-circuits without injecting.)
+    delete (/** @type {any} */ (globalThis)).html2canvas;
+    const origAppend = document.head.appendChild.bind(document.head);
+    const spy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
+      if (node && /** @type {any} */ (node).tagName === 'SCRIPT') {
+        setTimeout(() => { const n = /** @type {any} */ (node); if (n.onerror) n.onerror(new Event('error')); }, 0);
+        return node;
+      }
+      return origAppend(/** @type {any} */ (node));
+    });
+    try {
+      expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   // Category 3 — notYetImplemented warns but doesn't throw

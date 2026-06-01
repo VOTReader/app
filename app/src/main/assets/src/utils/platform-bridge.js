@@ -354,9 +354,38 @@ const SCREENSHOT_IGNORE_CLASSES = [
   'mode-toggle-wrap',
 ];
 
+/** @type {Promise<any> | null} */
+let _h2cPromise = null;
 /**
- * Web screenshot impl using html2canvas (bundled in bundle-a). Returns
- * a JPEG data URL string, or '' on failure / when html2canvas isn't loaded.
+ * Lazy-load html2canvas.min.js on the FIRST web screenshot (U13). It was
+ * concatenated into bundle-a — ~198 KB parsed at EVERY boot, but only web
+ * thumbnails use it (Android screenshots via native PixelCopy), so it was pure
+ * boot-path dead weight on Android. The file stays SW-precached, so this
+ * resolves ~instantly (and offline). Resolves to the html2canvas function, or
+ * null if it can't load (degrades to no thumbnail). The injected <script src>
+ * is governed by CSP script-src 'self' — unaffected by the U10 inline hashes.
+ * @returns {Promise<any>}
+ */
+function _ensureHtml2canvas() {
+  const g = /** @type {any} */ (globalThis);
+  if (typeof g.html2canvas === 'function') return Promise.resolve(g.html2canvas);
+  if (_h2cPromise) return _h2cPromise;
+  if (typeof document === 'undefined') return Promise.resolve(null);
+  _h2cPromise = new Promise((resolve) => {
+    try {
+      const s = document.createElement('script');
+      s.src = 'html2canvas.min.js';
+      s.onload = () => resolve(typeof g.html2canvas === 'function' ? g.html2canvas : null);
+      s.onerror = () => { _h2cPromise = null; resolve(null); }; // allow a retry next time
+      document.head.appendChild(s);
+    } catch (_e) { _h2cPromise = null; resolve(null); }
+  });
+  return _h2cPromise;
+}
+
+/**
+ * Web screenshot impl using html2canvas (lazy-loaded on demand — U13). Returns
+ * a JPEG data URL string, or '' on failure / when html2canvas can't load.
  *
  * @param {number} _topCropDp  - ignored on web (chrome hidden via classes)
  * @param {number} maxDim      - max width/height in CSS px; downscale if exceeded
@@ -365,9 +394,8 @@ const SCREENSHOT_IGNORE_CLASSES = [
  * @returns {Promise<string>}
  */
 async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality) {
-  // html2canvas ships in bundle-a (vendor); guard for unit-test env / cold boot
-  if (typeof /** @type {any} */ (globalThis).html2canvas !== 'function') return '';
-  const h2c = /** @type {any} */ (globalThis).html2canvas;
+  const h2c = await _ensureHtml2canvas();
+  if (typeof h2c !== 'function') return '';
   const isLight = (typeof document !== 'undefined') && document.body.classList.contains('light');
   const bg = isLight ? '#f7f2e8' : '#07070e';
   try {

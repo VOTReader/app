@@ -496,6 +496,18 @@
 
  U13 — Lazy-load html2canvas off the boot path                     [P2, perf] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — html2canvas.min.js removed from bundle-a's concat list
+   (build.py): MEASURED bundle-a 1,034,612 → 835,768 bytes (−198,844 / −19% off
+   the boot path — pure dead weight on Android, which screenshots via native
+   PixelCopy). platform-bridge._ensureHtml2canvas() lazy-injects
+   <script src="html2canvas.min.js"> on the FIRST web screenshot (cached promise
+   → injected exactly once; the src-script uses CSP script-src 'self', so the
+   U10 inline hashes don't touch it). The file STAYS SW-precached (CORE_ASSETS),
+   so the lazy load is instant + offline. Preview-VERIFIED: html2canvas absent at
+   boot (window.html2canvas undefined), present after a screenshot, exactly 1
+   script injected, a real data:image/ URL returned, 0 console errors. Test
+   updated (the "unavailable" case drives the injected script's onerror).
+   1635 vitest, coverage holds.
  PROBLEM: html2canvas (~198 KB raw) is in bundle-a (build.py:50), parsed at EVERY
    boot, but only used by web screenshot/thumbnail — and on Android native
    PixelCopy is used, so it's pure dead weight on Android boot. Already accessed
@@ -794,7 +806,7 @@
  U10 CSP tighten .................. DONE  [P2, sec] (script-src sha256 hashes, no unsafe-inline/blob:; web + WebView-69 verified)
  U11 dual-render equiv tests ...... DONE  [P2] (per-char equivalence, 5 scenarios + tap-winner; +6 tests)
  U12 scripture parser ............. DONE  [P2] (en/em-dash normalize + findBook exact-before-prefix; +4 tests)
- U13 html2canvas lazy ............. TODO  [P2]
+ U13 html2canvas lazy ............. DONE  [P2] (off boot path: bundle-a −199 KB; lazy <script> on 1st web screenshot; verified)
  U14 AndroidBridge routing ........ DONE  [P2] (4 sites → PlatformBridge.isAndroid; invariant restored; web-verified)
  U15 renderer coverage ............ DONE  [P2] (renderer/ + scripture-resolution measured; +70 tests; floor ratcheted)
  U16 CI smoke walk ................ TODO  [P2]
