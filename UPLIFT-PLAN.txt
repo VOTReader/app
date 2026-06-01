@@ -470,6 +470,20 @@
 
  U15 — Coverage: renderer/ + scripture-resolution into the gate     [P2, test] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — renderer/** + data/scripture-resolution.js added to the
+   vitest coverage `include` (renderer/_entry.js excluded). New tests: a 42-case
+   scripture-resolution.test.js (the COLLECTIONS registry + parseRefStr/findBook/
+   parseScriptureRef/lookupVersesFromBooks/resolveVerseText/findEntryContext/
+   colLetters engine — also sets up U12's parser work), dom-links.test.js (8),
+   dom-bookmarks.test.js (9), dom-journal-chip.test.jsx (11). +70 tests
+   (1551→1621). Counterintuitively the aggregate ROSE — annotation-engine.jsx is
+   heavily covered by its overlap + U11 equivalence suites and scripture-
+   resolution by the new suite — so the floor RATCHETED UP (statements 59→60,
+   branches 49→51, functions 63→64; lines held at 64) rather than down.
+   Actual now 61.22/52.21/65.48/65.07. tsc + 1621 vitest green. DEFERRED (the
+   optional "also" parts): the second whole-codebase informational report, and
+   lifting the shallow stores (journal-store search/scan ~46%, thumb-store,
+   recent-nav-store) — folded into U19's micro-perf/test ledger.
  PROBLEM: the coverage gate includes ONLY hooks/stores/utils — the entire ui/
    (83 files), renderer/ (dom-links, dom-bookmarks, dom-journal-chip — 0 tests),
    app.jsx, and data/scripture-resolution.js (the COLLECTIONS + verse engine)
@@ -693,7 +707,7 @@
  U12 scripture parser ............. TODO  [P2]
  U13 html2canvas lazy ............. TODO  [P2]
  U14 AndroidBridge routing ........ TODO  [P2]
- U15 renderer coverage ............ TODO  [P2]
+ U15 renderer coverage ............ DONE  [P2] (renderer/ + scripture-resolution measured; +70 tests; floor ratcheted)
  U16 CI smoke walk ................ TODO  [P2]
  U17 Kotlin/contract tests ........ TODO  [P2]
  U18 PWA hygiene .................. TODO  [P2]

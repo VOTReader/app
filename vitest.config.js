@@ -35,11 +35,16 @@ export default defineConfig({
         'app/src/main/assets/src/hooks/**/*.{js,jsx}',
         'app/src/main/assets/src/stores/**/*.{js,jsx}',
         'app/src/main/assets/src/utils/**/*.{js,jsx}',
+        // U15: the annotation render engine + the verse/collection resolution
+        // engine — the flagship feature's hot path + the scripture lookup core.
+        'app/src/main/assets/src/renderer/**/*.{js,jsx}',
+        'app/src/main/assets/src/data/scripture-resolution.js',
       ],
       // Exclude colocated test files + bundler entries from coverage measurement.
       exclude: [
         '**/*.test.{js,jsx}',
         '**/_entry-b.js',
+        '**/_entry.js',
       ],
       // Coverage gate locked at the Q5.2 baseline (per [[lint-regression-gate]]).
       // Baseline is AGGREGATE across the full Q4 scope (37 files): 2 files
@@ -218,10 +223,23 @@ export default defineConfig({
       // Ratchet functions 62→63 (margin 0.87) + lines 63→64 (margin 0.32),
       // both comfortable. HOLD statements at 59 (a 60 floor leaves only 0.04,
       // as thin as the 0.02 case held above) and branches at 49 (49.95 < 50).
+      //
+      // U15 SCOPE EXPANSION (1621 tests) — renderer/ (annotation-engine,
+      // dom-links, dom-bookmarks, dom-journal-chip) + data/scripture-resolution.js
+      // joined the measured `include`. Counterintuitively the aggregate ROSE,
+      // not fell: annotation-engine.jsx is heavily covered by its overlap +
+      // dual-render-equivalence suites and scripture-resolution.js by its new
+      // 42-case engine suite, outweighing the ~60-66% dom-overlay coverage.
+      //   statements 61.22 | branches 52.21 | functions 65.48 | lines 65.07
+      // +70 tests (scripture-resolution 42, dom-links 8, dom-bookmarks 9,
+      // dom-journal-chip 11). Ratchet CONSERVATIVELY because U8 next refactors
+      // the now-measured annotation-engine hot path: statements 59→60 (1.22),
+      // branches 49→51 (1.21), functions 63→64 (1.48); lines HELD at 64 (a 65
+      // floor leaves only 0.07). Re-ratchet after U8 re-measures.
       thresholds: {
-        statements: 59,
-        branches: 49,
-        functions: 63,
+        statements: 60,
+        branches: 51,
+        functions: 64,
         lines: 64,
       },
     },
