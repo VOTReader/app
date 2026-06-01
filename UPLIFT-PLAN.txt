@@ -609,6 +609,23 @@
 
  U18 — PWA hygiene: idle-tab updates + CORE_ASSETS + Garden offline honesty [P2] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — (a) sw-register now polls reg.update() hourly +
+   on visibilitychange(visible), so a long-lived idle tab actually surfaces the
+   "update available" toast (was a one-shot check at startup). (b) CORE_ASSETS
+   pruned 6 redundant entries — react.min.js / react-dom.min.js /
+   flexsearch.min.js / search.js / search-data.js are all CONCATENATED into
+   bundle-a (verified never loaded standalone) + the orphaned data-normalize.js;
+   precaching them was pure double-caching + extra install-failure surface
+   (addAll is all-or-nothing). html2canvas.min.js KEPT (U13 lazy-load source).
+   Preview-verified: core cache 33→27 entries, react/search/data-normalize
+   standalone absent, html2canvas present, app boots. CACHE_VERSION re-hashed
+   (26 listed assets). (c) Garden-offline honesty: the claims were ALREADY honest
+   — manifest says "Offline scripture reader" (scripture IS precached/offline),
+   offline.html is accurate; the Garden's GitHub-hosted images are the one
+   online-only feature BY DESIGN. Documented that in offline.html (+ the U19
+   "narrow window" note: index.html is itself a CORE_ASSET, so offline.html only
+   shows on a first-visit-while-offline / cache-evicted miss) + refreshed the SW
+   fetch-handler comment (the U21-removed connectivity ping is gone from it).
  PROBLEM(s): (a) no periodic reg.update() → an idle web tab never gets the
    "tap to update" toast (sw-register.js registers once at startup). (b)
    CORE_ASSETS pre-caches search.js/search-data.js (already folded into
@@ -811,7 +828,7 @@
  U15 renderer coverage ............ DONE  [P2] (renderer/ + scripture-resolution measured; +70 tests; floor ratcheted)
  U16 CI smoke walk ................ TODO  [P2]
  U17 Kotlin/contract tests ........ TODO  [P2]
- U18 PWA hygiene .................. TODO  [P2]
+ U18 PWA hygiene .................. DONE  [P2] (hourly+focus reg.update; CORE_ASSETS −6 redundant; offline claim honest+documented)
  U19 LOW ledger (cleanup/robust) .. TODO  [P3]
  U20 platform-detect misclassify .. DONE  [P2] (AppleWebKit + token-exclusion; CriOS/FxiOS/DDG no longer Safari; +6 tests)
  U21 connectivity ping egress ..... DONE  [P2] (navigator.onLine, no egress; dropped thevolumesoftruth.com from connect-src; +4 tests)

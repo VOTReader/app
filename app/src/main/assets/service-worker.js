@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-f4544cf9af';
+const CACHE_VERSION = 'v1.0.2-d86e172493';
 const CORPUS_VERSION = 'c5'; // c4→c5 (2026-05-31): footnote pile-strip — remaining "N." verse markers added to volume-two + wtlb-scriptures so every multi-verse footnote splits into gold sups (the marker-less guessing heuristics were deleted from scripture-parse); re-fetch the corrected corpus.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -30,13 +30,14 @@ const CORE_ASSETS = [
   './dist/bundle-b.js',
   './dist/bundle-c.js',
   './dist/bundle-d.js',
-  './react.min.js',
-  './react-dom.min.js',
-  './flexsearch.min.js',
+  // U18: react.min.js / react-dom.min.js / flexsearch.min.js / search.js /
+  // search-data.js are NOT listed — they are CONCATENATED into bundle-a.js
+  // (build.py) and never loaded standalone, so precaching them was pure
+  // double-caching + extra install-failure surface (addAll is all-or-nothing).
+  // data-normalize.js was orphaned (no loader references it). html2canvas.min.js
+  // STAYS: U13 moved it OUT of bundle-a to a lazy <script>, so this precache is
+  // what keeps the first web screenshot instant + offline.
   './html2canvas.min.js',
-  './search.js',
-  './search-data.js',
-  './data-normalize.js',
   './fonts/cinzel-latin-400-normal.woff2',
   './fonts/cinzel-latin-700-normal.woff2',
   './fonts/cinzel-decorative-latin-400-normal.woff2',
@@ -129,9 +130,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   if (event.request.method !== 'GET') return;
-  // Same-origin only. Cross-origin requests (Garden images on github.com,
-  // the connectivity ping) pass straight to the network — the SW caches
-  // nothing for them and shouldn't proxy opaque cross-origin responses.
+  // Same-origin only. Cross-origin requests (Garden images on github.com /
+  // *.githubusercontent.com) pass straight to the network — the SW caches
+  // nothing for them and shouldn't proxy opaque cross-origin responses. (This
+  // is why the Garden is the one online-only feature on web; see offline.html.)
   if (url.origin !== self.location.origin) return;
 
   const filename = url.pathname.split('/').pop();

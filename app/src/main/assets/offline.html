@@ -1,4 +1,12 @@
 <!DOCTYPE html>
+<!-- Offline fallback (U18/U19): reachable only in a NARROW window — the SW
+     serves this when a navigation request misses the cache AND the network is
+     down. In practice index.html is itself a CORE_ASSET (precached), so once
+     the app has been opened online, navigations succeed from cache and this
+     page rarely shows. It's the first-visit-while-offline / cache-evicted
+     safety net, not the normal offline experience (which is the cached app
+     itself — scripture reads fully offline; the Garden's GitHub-hosted images
+     are the one online-only feature, by design). -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />

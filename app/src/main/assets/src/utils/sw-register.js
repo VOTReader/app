@@ -57,6 +57,20 @@ export function registerServiceWorker() {
         }
       });
     });
+
+    // (U18) An idle tab otherwise NEVER re-checks for a new SW — it only looks
+    // once, here at startup — so a long-lived tab would never surface the
+    // "update available" toast. Poll hourly + whenever the tab regains focus.
+    // reg.update() is a no-op when nothing changed; on a real change it kicks
+    // the install→waiting→updatefound flow above, which then prompts. Failures
+    // (offline / transient) are swallowed — best-effort.
+    const pokeUpdate = () => { try { reg.update(); } catch (_e) { /* non-fatal */ } };
+    setInterval(pokeUpdate, 60 * 60 * 1000); // hourly
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') pokeUpdate();
+      });
+    }
   }).catch((err) => {
     console.warn('SW registration failed', err);
     DiagnosticLog.warn('sw', 'registration failed: ' + ((err && err.message) || err));
