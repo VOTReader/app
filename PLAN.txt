@@ -2266,6 +2266,24 @@ regression testing for the migration surfaces.
        Promise resolved via evaluateJavascript when PixelCopy finishes.
        LOW urgency: bounded, not concurrent, and the sync contract was a
        deliberate N1.7 choice ([[explicit-async-decision]]).
+    #3 Garden native image cache (Android) — MEDIUM, data-usage. Garden
+       images are fetched from GitHub Releases per view and held ONLY in
+       an in-memory cache (garden.js gardenImageCache), so every app
+       refresh re-downloads them — costly for limited-data users reading
+       the 209-page book over days. JS can't cache them (GitHub sends no
+       CORS headers → fetch() fails; only <img> display works), and the
+       PWA Service Worker that COULD opaque-cache them never runs on
+       Android (sw-register skips Android by design). Fix on the native
+       side: a WebViewClient.shouldInterceptRequest in MainActivity that
+       recognizes the garden_NNN.jpg release URLs, serves a cached copy
+       when present, else fetches + stores to a capped app-private dir.
+       KEY: key the cache by PAGE NUMBER only (strip the tier from the
+       URL) so re-reading at a new quality OVERWRITES the same page —
+       never 5 copies of 200 images at different tiers (user directive
+       2026-05-31). Bound to ≤209 entries. The CSP + "failed to load"
+       fix already shipped (1423bda); this is purely the offline/no-
+       re-download cache. Excluded from the export + "your data" count
+       (app data, regenerable).
 
   Exit criteria:
     [ ] Android 287-item walk: all PASS
