@@ -5,6 +5,10 @@
    Two shells (Android APK, desktop PWA), one JS codebase. PlatformBridge
    is the ONLY place that branches on platform. Consumers call its methods;
    they do NOT check `window.AndroidBridge` directly.
+   ⚠ 2026-06-01: this invariant is currently VIOLATED by 4 live sites —
+   storage-health.js:186, use-history-sync.js:159, use-android-back.js:275
+   & :397. Routing them through PlatformBridge.isAndroid is UPLIFT-PLAN U14;
+   until then the "ZERO matches" claim in the W1.2 note below is aspirational.
 
    Mirror of the 20 @JavascriptInterface methods on AppInterface.kt (the
    Android side). See AppInterface.kt for the authoritative contract.

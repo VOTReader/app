@@ -1,0 +1,471 @@
+═══════════════════════════════════════════════════════════════════════════
+ UPLIFT-PLAN.txt — "Bring VOTReader from 7/10 to 8/10"
+═══════════════════════════════════════════════════════════════════════════
+ Created 2026-06-01. CANONICAL HOME for the post-review remediation work.
+ PLAN.txt and CLAUDE.md point here. (Distinct from the old, closed
+ quality-uplift-plan.txt, which was the Q-phase plan.)
+
+ Source: a deep 7-subsystem review run 2026-06-01 (frontend architecture,
+ storage/data-safety, annotation engine/renderer, native Android, performance/
+ build, PWA/SW/cross-platform, testing). Each finding below is tagged:
+   [V]  = independently verified against source by the coordinator this session
+   [R]  = review-found, file:line cited, CONFIRM at implementation time
+
+───────────────────────────────────────────────────────────────────────────
+ WHY (the gap to 8/10)
+───────────────────────────────────────────────────────────────────────────
+ The app is already strong (store state machine, native lifecycle, lazy-load
+ architecture, discipline gates). The 7/10 is held down by a cluster of FIXABLE
+ issues that land in the two areas the project claims as strengths —
+ DATA SAFETY and PERFORMANCE — several of them silent-failure modes.
+
+ Subsystem scorecard (review): native 8 · renderer 7 · frontend 6.5 ·
+ storage 6.5 · PWA 6.5 · testing 5 · perf 5.
+
+ 8/10 EXIT BAR (what "done" means):
+   • All P0 + P1 items closed and verified (U1–U7).
+   • Both security items closed (U7 Garden allowlist, U10 CSP).
+   • The backup path (Export/Import — the ONLY backup) has an end-to-end
+     round-trip test (U14, folded into U1).
+   • Doc truth-pass complete (U0).
+   • The two weakest subsystems lifted off the floor: at least U8 (apply-pass
+     perf) and U15 (renderer coverage) landed — these are what drag perf(5)
+     and testing(5) down, and they move the weighted average most.
+   • Every gate green: tsc · eslint --max-warnings 0 · vitest (coverage floor
+     held/ratcheted) · npm run build · smoke · Kotlin testDebugUnitTest + jacoco.
+   The P2 "D-bucket" (deferred/architectural) items RAISE THE CEILING past 8
+   but are NOT required to reach it.
+
+───────────────────────────────────────────────────────────────────────────
+ CONVENTIONS (how to execute)
+───────────────────────────────────────────────────────────────────────────
+ • One work item = one focused commit (or a tight series). Each closes with
+   its own exit criteria + the relevant gate re-run BEFORE commit.
+ • Run test:coverage locally (not just test) before pushing a test-count change
+   — pre-commit runs `test`, CI runs `test:coverage`. (Burned before.)
+ • Update HISTORY.md (landed log) + the CLAUDE.md current-state bullet on close;
+   commit + push to main (standing authorization). Keep this file's status
+   column current.
+ • Device-verify the items that only manifest on hardware (U1 import, U7 cache,
+   U9 screenshot) on the API-28 emulator / personal phone (adb at
+   C:/Users/corbi/AppData/Local/Android/Sdk/platform-tools/). Preview-eval for
+   web-observable behavior.
+ • Accuracy rule (learned this session): VERIFY a claim against current source
+   before acting on it. The review's "__bumpHlTick still live" finding was a
+   FALSE ALARM — it is fully removed (no assignment anywhere; only explanatory
+   comments). Don't chase it. Spot-check every [R] the same way.
+
+═══════════════════════════════════════════════════════════════════════════
+ U0 — DOC TRUTH-PASS                          [P0-doc]  STATUS: IN PROGRESS
+═══════════════════════════════════════════════════════════════════════════
+ Correct the confirmed false/misleading claims so future-you and contributors
+ don't trust them. Confirmed inaccuracies (all [V]):
+
+  (a) CLAUDE.md:102 — "esbuild strips comments in minified prod build."
+      FALSE: there is NO minified build. `npm run build` is the only build and
+      build:b/c/d carry no --minify (package.json:9-11; build.py has none).
+      → Correct to state no minify step exists; point to U2.
+  (b) CLAUDE.md:74,77,245 + PLAN.txt:53,94,162 — "cold-boot critical path
+      11.7 MB → 1.03 MB (91%)". MISLEADING: 1.03 MB is bundle-a ALONE; bundle
+      b+c+d ALSO load as blocking <script> before first render (index.html
+      151/228/237/569). Real blocking JS path = a+b+c+d = ~2.10 MB (measured:
+      1034+446+30+593 KB). → Keep the true bundle-a 11.7→1.03 reduction; add
+      that the full blocking path is ~2.10 MB.
+  (c) platform-bridge.js:7,19 — "Consumers do NOT check window.AndroidBridge
+      directly / grep returns ZERO matches." FALSE: 4 live runtime sites bypass
+      the bridge — storage-health.js:186, use-history-sync.js:159,
+      use-android-back.js:275 & :397. → Annotate the header honestly; the
+      routing fix is U14.
+
+  NOT corrected (verified ACCURATE — review over-claimed):
+   • __bumpHlTick "removed in W7.3" is TRUE (no assignment in source; comments
+     only). The Q7→W7.3 narrative is a correct chronology, not a contradiction.
+
+  Exit: the three claims above corrected in-place; a current-state bullet added
+  to CLAUDE.md pointing here. (Done partly this session.)
+
+═══════════════════════════════════════════════════════════════════════════
+ P0 — DATA SAFETY (do first)
+═══════════════════════════════════════════════════════════════════════════
+
+ U1 — Import durability race + orphan-sweep guard + e2e round-trip   [P0] [V]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: Import (the ONLY backup; allowBackup=false) can SILENTLY lose data.
+   `_save()` in IDB mode is fire-and-forget — `IDBAdapter.put(...).catch(...)`
+   with no await/return (cached-store.js:273-292 [V]). _doImport writes all
+   stores synchronously then reloads on a BLIND timer:
+     setTimeout(() => window.location.reload(), 1500);   (SettingsScreen.jsx:714 [V])
+   If a large store hasn't flushed in 1500 ms, reload tears down the page,
+   IndexedDB aborts the in-flight tx → that store reverts to pre-import state,
+   and the .catch never runs (context gone). Toast says "Import complete."
+   COMPOUND [R, confirm]: the ~4 s boot orphan-media sweep (app.jsx:553-564)
+   hard-deletes any blob not referenced by a journal entry — if entries failed
+   to flush but media succeeded, or if JournalStore is still degraded at 4 s,
+   it permanently deletes freshly-imported media.
+ FIX:
+   1. IDB-mode `_save()` returns its IDBAdapter.put promise (or add
+      `whenSaved()` resolving on the last queued write). Audit all _save callers
+      — most ignore the return, which is fine; the import path will await it.
+   2. _doImport: `await Promise.all(...)` every store write (mirror the media
+      loop, which already awaits) BEFORE reload. Delete the setTimeout(1500).
+   3. Gate the orphan sweep on `JournalStore.isReady() === true`; skip if
+      degraded/pending. Only run after #1/#2 land.
+ EXIT: an import of a large multi-store payload (annotations+journal+media) is
+   durable across an immediate reload — proven by U14's test. Orphan sweep
+   provably skipped when JournalStore not ready.
+ VERIFY: U14 vitest e2e (fake-indexeddb) + manual import on the API-28 emulator
+   with a real backup file; confirm all stores survive the reload.
+ RISK: _save signature change touches the store base — keep the return optional
+   so non-awaiting callers are unaffected. This is the highest-value item.
+
+═══════════════════════════════════════════════════════════════════════════
+ P1 — HIGH (perf, correctness, security)
+═══════════════════════════════════════════════════════════════════════════
+
+ U2 — Minify the bundles                                            [P1] [V]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: nothing is minified. Boot ships ~2.10 MB of pretty-printed JS WITH
+   JSDoc comments intact, on the Android 8/9 budget devices --target=chrome69
+   exists for. Parse/compile cost scales with RAW bytes, not gzip.
+ MEASURED (--minify, this session): b 446→232 KB (−214), c 30→15 (−15),
+   d 593→350 (−243) ⇒ b+c+d 1069→597 KB (−472 KB, −44%). bundle-a (concat) and
+   the corpus bundles shrink too when piped through esbuild --minify (vendor
+   files already .min, but search.js 1737 lines + matthew-plain + corpus are not).
+ FIX: add `--minify` to build:b/c/d (package.json). For bundle-a + the 3 lazy
+   corpus bundles, pipe build.py's concatenated output through
+   `esbuild --minify --target=chrome69` (or emit via esbuild). Keep chrome69 so
+   no modern syntax leaks.
+ EXIT: all shipped bundles minified; smoke walk + tsc + build green; the
+   pre-commit bundle-match gate updated for the new sizes; SW CACHE_VERSION
+   re-synced (hashes the core assets).
+ VERIFY: preview clean-slate smoke (votSmoke PASS, 0 console errors); confirm
+   zero `?.`/`??` in output (chrome69 floor). Device boot on API-28.
+ RISK: low. Minification can rarely expose a reliance on function.name / source
+   order — smoke + the 1522 tests cover it. Highest ROI in the repo.
+
+ U3 — CORPUS_VERSION enforcement gate                               [P1] [V]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: corpus data lives in bundle-a-vot/bible/matthew.js, served cache-first
+   by the SW and busted ONLY by a manual CORPUS_VERSION bump. The content-hash
+   CACHE_VERSION EXCLUDES corpus bundles (sync-sw-version.js:13-16 is a comment
+   saying so [V]); there is NO gate in .githooks or .github [V]. Edit a verse →
+   build → deploy → every existing web client serves OLD scripture forever.
+   On a scripture reader, corpus correctness IS the product.
+ FIX: a pre-commit + CI gate. Hash bundle-a-bible/matthew/vot.js; store the
+   last-seen hash→CORPUS_VERSION mapping (e.g. a committed
+   tools/.corpus-version.lock or a check inside sync-sw-version.js). If corpus
+   bytes changed but CORPUS_VERSION in service-worker.js did NOT, FAIL with a
+   "bump CORPUS_VERSION" message. Reuse the sync-sw-version.js machinery.
+ EXIT: editing a corpus data file without bumping CORPUS_VERSION fails the
+   commit; bumping it passes. Prove via break-and-revert.
+ VERIFY: stage a 1-char corpus edit → expect FAIL; bump → expect PASS.
+ RISK: low. Pure tooling.
+
+ U4 — Search: stop loading 31 MB of translations on every open      [P1] [V]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: init() fires loadAllTranslations() whenever scriptures are searched
+   (search.js:1076 [V]), loading all 7 bible-*.js (~31 MB) via Promise.all
+   (:1052-1057) — even on a FlexSearch CACHE HIT, where the index already holds
+   those tokens. Not in the SW precache ⇒ on web they re-download every session.
+   Worst memory + bandwidth event in the app, on the weakest hardware.
+ FIX: (a) gate loadAllTranslations() on a genuine rebuild — if ensureIndex will
+   cache-hit, skip it (the index is self-sufficient). Restructure init() so the
+   translation load is awaited only inside the build path, not unconditionally
+   parallel to ensureIndex. (b) add the alt-translation files (and
+   bible-studies.js, also raw/unbundled/un-precached) to the SW corpus precache
+   OR make coreFirst cache-on-use. (c) optional: lazy per-translation.
+ EXIT: opening Search on a warm cache loads 0 MB of alt translations (console
+   shows no "loaded N/7 alt translations"); web second-session search makes no
+   bible-*.js network fetch.
+ VERIFY: preview — warm the index, reload, open Search, watch network + console.
+ RISK: medium — must ensure a genuine rebuild (corpus/SCHEMA/translation change)
+   STILL loads translations. Test both paths.
+
+ U5 — Stop App()-wide re-render on annotation mutation              [P1] [V]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: useDomAnnotationSync subscribes to 4 stores INSIDE App() (app.jsx:150),
+   so every highlight/note/link/bookmark _bump() re-renders all of App(),
+   rebuilds the ~90-prop ROUTES object with ~33 fresh closures, and reconciles
+   the active screen. There is ZERO React.memo in the entire ui/ tree [V].
+   The imperative DOM layer exists to AVOID re-rendering verses for annotations;
+   routing the trigger through App() defeats it. On a 176-verse Psalm, one
+   highlight = full reconcile.
+ FIX: move the 4-store subscription out of App()/useDomAnnotationSync into a
+   tiny dedicated leaf component (e.g. <AnnotationDomSync screen letterId/>)
+   mounted once, that re-runs ONLY the imperative apply passes on bump — no App
+   re-render. Then React.memo the leaf reading/index screens (LetterView,
+   BibleChapterView, ChapterView, ChapterIndex) and stabilize their handler
+   props (useCallback or via the ROUTES factory).
+ EXIT: adding a highlight on a long chapter does NOT re-render App()/ROUTES
+   (verify with a render counter / React DevTools profiler in preview); marks
+   still update correctly.
+ VERIFY: preview profiler before/after; annotation round-trip smoke still PASS.
+ RISK: medium — must preserve the screen/letterId context the apply passes read.
+   Pairs with U8.
+
+ U6 — Export: fail loud on incomplete backup                       [P1] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: export wraps each store read in try/catch that SWALLOWS failure and
+   omits the store (SettingsScreen.jsx:456-461); media loop "proceeds with
+   structured data only" on error (:492-495). A transient read error ⇒ a
+   structurally-valid file that passes import validation and says "Backup saved."
+   but is missing stores/media, with no signal.
+ FIX: if ANY store get or the media loop throws, abort the export OR show a
+   prominent "backup INCOMPLETE — do not rely on it" error (not "Backup saved").
+   Embed expected counts (per-store record count, media count) in the payload;
+   verify them on import (U14) for a round-trip integrity check.
+ EXIT: a forced store-read failure yields a visible error, not a success toast;
+   payload carries counts.
+ VERIFY: unit test the export with an injected failing store.
+ RISK: low.
+
+ U7 — GardenImageCache: host allowlist + atomic cap + tmp cleanup  [P1, security] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: native-privileged fetch with no origin check. intercept() fires on
+   every WebView subresource (MainActivity.kt:489); any URL matching
+   `garden_NNN.jpg` anywhere in the string triggers a native HttpURLConnection
+   GET with instanceFollowRedirects=true and NO host allowlist
+   (GardenImageCache.kt:103-125), returning the body with
+   Access-Control-Allow-Origin:* (:132). SSRF-shaped; becomes a proxy if any
+   XSS lands (CSP allows unsafe-inline — see U10). Also: 800 MB cap accounting
+   is non-atomic across per-miss enforcer threads (:151-170) so it can overshoot;
+   a .tmp from a disk-full write isn't cleaned up (:73-75).
+ FIX: (a) gate intercept on the known GitHub release host(s) BEFORE the regex;
+   reject native fetch for any other host; don't blindly follow cross-host
+   redirects. (b) single-flight the cap enforcer (AtomicBoolean in-progress) +
+   AtomicLong running total; sweep orphaned *.tmp.
+ EXIT: a non-allowlisted `garden_NNN.jpg` URL is NOT natively fetched;
+   concurrent crawl cannot exceed the cap; no .tmp leak under simulated failure.
+ VERIFY: extend GardenImageCacheTest; Kotlin testDebugUnitTest + jacoco green;
+   device crawl on the Ultra tier still caches with 0 eviction.
+ RISK: low-medium (Kotlin only). Honors the project's no-network-egress policy.
+
+═══════════════════════════════════════════════════════════════════════════
+ P2 — MEDIUM (correctness/perf/security hardening + testing safety net)
+═══════════════════════════════════════════════════════════════════════════
+
+ U8 — applyDOMHighlights: single walk, drop dead guard, scope it    [P2, perf] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: O(containers × annotations × textNodes) document-wide sweep re-run on
+   EVERY store mutation. document.querySelectorAll('[data-hl-key]') over the
+   whole doc (annotation-engine.jsx:337) + a fresh TreeWalker PER sub-range PER
+   annotation (:386-393, re-walked because splitText mutates the tree). Plus a
+   DEAD expensive guard at :338 (computes a querySelector + textContent
+   expression, then both :339 and :341 gate identically on the attr, discarding
+   it). Plus 3 more full-document walks (dom-links :200, dom-bookmarks :180,
+   note-icons :228) per mutation.
+ FIX: (1) delete the dead :338 computation → single `if (!hasAttribute(
+   'data-hl-dom')) return;`. (2) build the text-node map ONCE per container,
+   splice it as you splitText (don't re-walk per sub-range). (3) scope the apply
+   to the changed container(s) (pass affected hlKey through use-dom-annotation-
+   sync) instead of the whole document. (4) drive highlights+links+bookmarks+
+   icons from one shared per-container walk.
+ EXIT: adding a highlight on a long annotated chapter re-walks ONE container,
+   not the document; no behavior change (both render paths still equal).
+ VERIFY: U11 equivalence test stays green; preview timing on a 176-verse chapter.
+ RISK: medium — the hottest, trickiest code. Land AFTER U11's tests exist.
+
+ U9 — Async screenshot bridge                                      [P2, native-High] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: takeScreenshot is a SYNC @JavascriptInterface running
+   `runBlocking { withTimeoutOrNull(2000){ withContext(Main){...} } }` on the
+   binder thread (MainActivity.kt:149-160) — binder blocks up to 2 s on the main
+   thread → jank/ANR risk on budget devices; abandoned-continuation can leave a
+   half-applied zoom reset.
+ FIX: convert to fire-and-forget firing window.__onScreenshotComplete(dataUrl),
+   mirroring the import/export/recording async contract (new JsEvent member).
+   Update the JS side (use-thumbnails.js + platform-bridge.js webImpl already
+   async-shaped) and the web impl to match.
+ EXIT: no runBlocking on the screenshot path; thumbnails still generate.
+ VERIFY: device screenshot/thumbnail walk; Kotlin tests.
+ RISK: medium — async contract change across the bridge.
+
+ U10 — Tighten CSP (drop unsafe-inline)                            [P2, security] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: unsafe-inline on script-src AND style-src (index.html:21-22) ⇒ CSP
+   gives no XSS protection for an app rendering imported JSON + user journal
+   content. img-src/connect-src allow bare https://github.com (over-broad);
+   blob: in script-src is unnecessary (export uses an <a download>, not script).
+ FIX: move the static inline boot scripts (incl. the polyfill block) behind a
+   nonce or sha256-hash so script-src can drop 'unsafe-inline' (mechanical with
+   the build step). Same for the static <style id="custom-fonts"> if feasible.
+   Remove blob: from script-src. Narrow img/connect-src to the *.githubusercontent
+   asset hosts only. Verify on BOTH the Android asset loader and GitHub Pages.
+ EXIT: CSP has no unsafe-inline on script-src; app renders with 0 CSP violations
+   on web + Android.
+ VERIFY: preview console (0 CSP errors) + device boot; smoke PASS.
+ RISK: medium — a missed inline script becomes a hard CSP block (black-screen
+   class). Enumerate every inline <script>/<style> first; test on old WebView.
+
+ U11 — Dual-render equivalence + 3-overlap tests                   [P2, test] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: the two render paths (React HighlightableText + imperative
+   applyDOMHighlights) have NO equivalence test and NO 3+-overlap render test —
+   every render-path test uses exactly 2 annotations (annotation-engine.test.jsx).
+   For the flagship feature, "they're identical" is an untested claim.
+ FIX: one parameterized test rendering the SAME 3-way staggered set (A 0-20/c1,
+   B 5-15/c2, C 8-12/c3, + a note on the fully-covered one) through BOTH paths,
+   asserting the same (data-hl-id, painted-color-or-blank, has-note) per
+   character range.
+ EXIT: the equivalence + 3-overlap test passes; it would FAIL if the paths drift.
+ VERIFY: vitest. Land BEFORE U8 so U8 can't silently break equivalence.
+ RISK: low. renderer/ enters the coverage gate via U15.
+
+ U12 — Scripture parser robustness                                 [P2] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: parseRefRange (scripture-parse.js:131) + parseRefStr (scripture-
+   resolution.js:112) only match ASCII hyphen — an en/em-dash that slips the
+   data gate silently renders multi-verse footnotes WHITE (no gold numbers).
+   findBook (scripture-resolution.js:128) is a linear startsWith scan → prefix
+   collisions ("Jo…") resolve to an arbitrary book.
+ FIX: `ref.replace(/[–—]/g, '-')` at the top of both parsers (defense-in-depth;
+   keeps check_balance.py as the enforcement layer). Make findBook prefer
+   exact-title then word-boundary matches over the first startsWith hit.
+ EXIT: an en-dash range renders gold; "Jo 3:16"-style refs resolve correctly.
+ VERIFY: unit tests for both; data gate still 0 errors.
+ RISK: low.
+
+ U13 — Lazy-load html2canvas off the boot path                     [P2, perf] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: html2canvas (~198 KB raw) is in bundle-a (build.py:50), parsed at EVERY
+   boot, but only used by web screenshot/thumbnail — and on Android native
+   PixelCopy is used, so it's pure dead weight on Android boot. Already accessed
+   via globalThis.html2canvas guard (platform-bridge.js:365).
+ FIX: remove from bundle-a; load on demand from the web screenshot path
+   (inject a <script> or dynamic import the first time it's needed).
+ EXIT: bundle-a no longer contains html2canvas; web screenshot still works.
+ VERIFY: measure bundle-a (−~198 KB raw); preview web screenshot.
+ RISK: low.
+
+ U14 — Route the 4 AndroidBridge bypasses through PlatformBridge    [P2] [V]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: the bridge's "ONLY place that branches on platform" invariant is
+   violated by 4 live runtime checks: storage-health.js:186,
+   use-history-sync.js:159, use-android-back.js:275 & :397.
+ FIX: replace each `window.AndroidBridge` check with `PlatformBridge.isAndroid`
+   (import or the existing global). Then restore the header invariant in
+   platform-bridge.js (U0 annotated it as currently-false; this makes it true).
+ EXIT: grep for window.AndroidBridge outside platform-bridge.js returns only
+   comments; header invariant restored.
+ VERIFY: tsc + tests; smoke. (Confirm storage-health's module-load timing still
+   sees the global — it runs early.)
+ RISK: low.
+
+ U15 — Coverage: renderer/ + scripture-resolution into the gate     [P2, test] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: the coverage gate includes ONLY hooks/stores/utils — the entire ui/
+   (83 files), renderer/ (dom-links, dom-bookmarks, dom-journal-chip — 0 tests),
+   app.jsx, and data/scripture-resolution.js (the COLLECTIONS + verse engine)
+   are OUTSIDE it. ~56% of hand-written code is unmeasured; effective whole-app
+   coverage ~26%.
+ FIX: add renderer/ and data/scripture-resolution.js to the vitest include
+   (vitest.config.js); write tests for dom-links + dom-bookmarks + the
+   resolution engine (jsdom, like annotation-engine.test.jsx). Ratchet the floor
+   to the real new baseline. Optionally add a SECOND informational whole-codebase
+   coverage report so the true denominator is visible.
+ EXIT: renderer/ + scripture-resolution measured + floored; dom-links/dom-
+   bookmarks have real tests.
+ VERIFY: test:coverage; CI floor holds.
+ RISK: low-medium (effort).
+
+ U16 — smoke.js render-walk in CI (headless)                       [P2, test] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: only smoke-lite (structural) runs in CI; the actual 12-screen render
+   walk (smoke.js) is browser-only/manual. CI renders zero screens — the
+   black-screen class can slip every gate.
+ FIX: run smoke.js against the built bundles in a headless browser (Playwright/
+   Puppeteer) in the CI build job. Cheapest enforced coverage over the 83-file
+   ui/ tree without 83 component tests.
+ EXIT: CI fails if any of the 12 screens black-screens / trips ErrorBoundary.
+ VERIFY: break a screen → CI red; revert → green.
+ RISK: low-medium (CI infra; headless browser in Actions).
+
+ U17 — JS↔Kotlin bridge contract test + extend JaCoCo              [P2, test] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM: the Android side of platform-bridge is a mock tautology (asserts the
+   mock returns what it was told). JaCoCo floors only JsBridge + BoundedLogTree
+   (14% of native LOC); MainActivity (the WebView security shell — intercept,
+   onRenderProcessGone, tap path) has NO test; StorageManager + GardenImageCache
+   are tested but un-gated.
+ FIX: a shared contract fixture (method names, arg counts, callback names)
+   asserted on both JS and Kotlin sides. Robolectric tests for MainActivity's
+   shouldInterceptRequest + tap-coordinate conversion. Extend JaCoCo
+   coveredClasses to StorageManager + GardenImageCache.
+ EXIT: a bridge contract drift fails a test; the data-I/O native classes are
+   coverage-gated.
+ VERIFY: Kotlin testDebugUnitTest + jacoco.
+ RISK: medium (effort; Robolectric for MainActivity).
+
+ U18 — PWA hygiene: idle-tab updates + CORE_ASSETS + Garden offline honesty [P2] [R]
+ ───────────────────────────────────────────────────────────────────────────
+ PROBLEM(s): (a) no periodic reg.update() → an idle web tab never gets the
+   "tap to update" toast (sw-register.js registers once at startup). (b)
+   CORE_ASSETS pre-caches search.js/search-data.js (already folded into
+   bundle-a) + orphaned data-normalize.js — ~136 KB wasted per install + adds
+   install-failure surface (core.addAll is all-or-nothing). (c) "full offline"
+   is false for Garden on web (SW skips cross-origin; no web equivalent of the
+   native GardenImageCache).
+ FIX: (a) setInterval(reg.update, 1h) + reg.update() on visibilitychange. (b)
+   remove the 3 dead entries from CORE_ASSETS. (c) EITHER cache the GitHub
+   release image hosts in a vot-garden SW bucket, OR scope the offline claim
+   down in manifest.json + offline.html to be honest.
+ EXIT: idle tab receives updates; CORE_ASSETS install pulls only real assets;
+   the offline claim matches reality.
+ VERIFY: preview SW update cycle; install size; offline Garden behavior.
+ RISK: low.
+
+═══════════════════════════════════════════════════════════════════════════
+ D-BUCKET — DEFERRED / ARCHITECTURAL (raises ceiling past 8; NOT required for 8)
+═══════════════════════════════════════════════════════════════════════════
+ D1  Virtualize long reading views (content-visibility:auto is a cheap CSS-only
+     first step) — ChapterView/BibleChapterView/LetterView render every verse.
+ D2  Replace window.__pending* / __*ReturnCtx mutable data-slot channels with a
+     typed module (navHandoff.set/take) so cross-component coupling is discoverable.
+ D3  Put app.jsx + screen-routes.jsx in the typecheck include + enable
+     strictNullChecks — catches the wrong-named/missing-prop + stale-null class.
+ D4  NavContext to collapse the ~90-prop ROUTES factory + dissolve TDZ-ordering
+     coupling + slim useAndroidBack's param bag.
+ D5  Per-action write-failure toast (not just the passive StorageHealth banner)
+     at the cached-store _save reject site — user learns THIS note didn't save.
+ D6  Harden _applyToPendingCache cross-store cascade under degraded hydration
+     (add a replay-during-degraded test).
+ D7  Doc-bloat cleanup: prune/merge the stale root docs (handoff_*.txt,
+     _handoff.txt, BUNDLE-LAZY-LOAD-PLAN.md, quality-uplift-plan.txt) into
+     HISTORY.md; CLAUDE.md (127 KB) + PLAN.txt (234 KB) are themselves a
+     maintenance burden. Single canonical location per fact.
+
+═══════════════════════════════════════════════════════════════════════════
+ SEQUENCING (waves)
+═══════════════════════════════════════════════════════════════════════════
+ Wave 0 (this session):  U0 doc truth-pass + this plan.
+ Wave 1 (data safety):   U1 (+ U14 e2e test).         ← do first; lose-sleep item
+ Wave 2 (cheap big wins): U2 minify, U3 corpus gate.  ← ~an afternoon each
+ Wave 3 (perf/sec):      U4 search, U5 re-render, U7 Garden, U6 export.
+ Wave 4 (hardening):     U11 tests → U8 apply-pass, U9 screenshot, U10 CSP,
+                         U12 parser, U13 html2canvas, U14 bridge routing.
+ Wave 5 (safety net):    U15 coverage, U16 CI smoke, U17 Kotlin/contract, U18 PWA.
+ Then revisit D-bucket to push past 8.
+
+═══════════════════════════════════════════════════════════════════════════
+ STATUS TABLE  (update on each close)
+═══════════════════════════════════════════════════════════════════════════
+ U0  doc truth-pass ............... IN PROGRESS (this session)
+ U1  import durability ............ TODO  [P0]
+ U2  minify ....................... TODO  [P1]
+ U3  corpus-version gate .......... TODO  [P1]
+ U4  search 31MB load ............. TODO  [P1]
+ U5  App() re-render .............. TODO  [P1]
+ U6  export fail-loud ............. TODO  [P1]
+ U7  Garden allowlist/cap ......... TODO  [P1]
+ U8  applyDOMHighlights ........... TODO  [P2]
+ U9  async screenshot ............. TODO  [P2]
+ U10 CSP tighten .................. TODO  [P2]
+ U11 dual-render equiv tests ...... TODO  [P2]
+ U12 scripture parser ............. TODO  [P2]
+ U13 html2canvas lazy ............. TODO  [P2]
+ U14 AndroidBridge routing ........ TODO  [P2]
+ U15 renderer coverage ............ TODO  [P2]
+ U16 CI smoke walk ................ TODO  [P2]
+ U17 Kotlin/contract tests ........ TODO  [P2]
+ U18 PWA hygiene .................. TODO  [P2]
+═══════════════════════════════════════════════════════════════════════════
