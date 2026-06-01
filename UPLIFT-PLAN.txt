@@ -134,6 +134,17 @@
 
  U2 — Minify the bundles                                            [P1] [V]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — --minify on build:b/c/d + a minify:a post-step for
+   bundle-a (the Python-concat critical bundle). MEASURED: a 1010→808 KB (−20%),
+   b 435→226 (−48%), c 29→15 (−50%), d 579→342 (−41%) ⇒ blocking critical path
+   2054→1391 KB (−663 KB / −32%). CACHE_VERSION auto-bumped (CORE cache only).
+   votSmoke PASS on the minified bundles (12 screens, both annotation round-trips,
+   0 console errors, 0 404s; the earlier "FAIL" was the app restoring into the
+   Garden reader so the harness couldn't start from Home — env, not minify).
+   esbuild's lone warning is a benign duplicate-case in already-minified VENDOR
+   code. DEFERRED: the 3 LAZY corpus bundles (a-bible/matthew/vot) — minifying
+   them changes bytes → forces a CORPUS_VERSION bump → ~10 MB re-download per
+   existing client; do that deliberately later (folded near U4).
  PROBLEM: nothing is minified. Boot ships ~2.10 MB of un-minified JS (full
    whitespace + unshortened identifiers, no tree-shake/compression) on the
    Android 8/9 budget devices --target=chrome69 exists for. Parse/compile cost
@@ -562,7 +573,7 @@
 ═══════════════════════════════════════════════════════════════════════════
  U0  doc truth-pass ............... IN PROGRESS (this session)
  U1  import durability ............ DONE  [P0] (barrier+guard; device walk + U14 owed)
- U2  minify ....................... TODO  [P1]
+ U2  minify ....................... DONE  [P1] (−663 KB / −32% crit path; corpus deferred)
  U3  corpus-version gate .......... TODO  [P1]
  U4  search 31MB load ............. TODO  [P1]
  U5  App() re-render .............. TODO  [P1]
