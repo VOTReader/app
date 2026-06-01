@@ -90,6 +90,16 @@
 
  U1 — Import durability race + orphan-sweep guard + e2e round-trip   [P0] [V]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — whenSaved() durability barrier on CachedStore: _save()
+   captures the IDB put promise; whenSaved() resolves true/false (NEVER throws).
+   _doImport now awaits Promise.all of every store's whenSaved() before reload
+   (deleted the blind setTimeout(1500) → 600ms cosmetic only). Orphan-media
+   sweep (app.jsx) gated on JournalStore.isReady(). 5 unit tests (barrier timing
+   + multi-store import barrier + reject→false + LS/never-written immediate);
+   tsc + build + 1527 vitest + 0 console errors; web-verified whenSaved() is
+   wired into AnnotationStore/Bookmark/Note/State and resolves in the shipped
+   bundle. OWED: emulator import file-walk. U14 (full _doImport extraction +
+   real export→import round-trip test) remains TODO.
  PROBLEM: Import (the ONLY backup; allowBackup=false) can SILENTLY lose data.
    `_save()` in IDB mode is fire-and-forget — `IDBAdapter.put(...).catch(...)`
    with no await/return (cached-store.js:273-292 [V]). _doImport writes all
@@ -551,7 +561,7 @@
  STATUS TABLE  (update on each close)
 ═══════════════════════════════════════════════════════════════════════════
  U0  doc truth-pass ............... IN PROGRESS (this session)
- U1  import durability ............ TODO  [P0]
+ U1  import durability ............ DONE  [P0] (barrier+guard; device walk + U14 owed)
  U2  minify ....................... TODO  [P1]
  U3  corpus-version gate .......... TODO  [P1]
  U4  search 31MB load ............. TODO  [P1]

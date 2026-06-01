@@ -554,6 +554,16 @@ function App() {
     const t = setTimeout(() => {
       try {
         if (typeof JournalStore === 'undefined' || typeof JournalMediaStore === 'undefined') return;
+        // U1: only sweep when the journal store is fully hydrated. If it is
+        // still pending/degraded (slow IDB, or a fresh import that hasn't
+        // rebased yet), collectAllMediaIds() under-reports referenced blobs and
+        // the prune would irreversibly delete real (or just-imported) media.
+        // Skipping is safe: an orphan blob is harmless leftover space, swept on
+        // a later boot once the store loads in time.
+        if (!JournalStore.isReady()) {
+          console.info('Journal media orphan sweep skipped — store not ready (' + JournalStore.getState() + ')');
+          return;
+        }
         const referenced = JournalStore.collectAllMediaIds();
         JournalMediaStore.pruneOrphans(referenced).then((n) => {
           if (n) console.info('Journal media orphan sweep removed', n, 'blob(s)');

@@ -5535,9 +5535,15 @@ Continue?`
               }
             }
           }
+          const _whenSaved = (s) => s && typeof s.whenSaved === "function" ? s.whenSaved() : Promise.resolve(true);
+          const saveResults = await Promise.all(
+            Object.values(storesMap).map(({ store }) => _whenSaved(store)).concat(Object.values(flagMap).map((s) => _whenSaved(s)))
+          );
+          const writeFailures = saveResults.filter((ok) => !ok).length;
           hideToast(_TOAST_ID);
           const problems = [];
           if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? "s" : ""}`);
+          if (writeFailures > 0) problems.push(`${writeFailures} store${writeFailures > 1 ? "s" : ""} failed to save`);
           if (skippedStores.length > 0) {
             problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? "s" : ""} skipped (invalid: ${skippedStores.join(", ")})`);
           }
@@ -5546,7 +5552,7 @@ Continue?`
           } else {
             _showToast("Import complete. Reloading\u2026", 0);
           }
-          setTimeout(() => window.location.reload(), 1500);
+          setTimeout(() => window.location.reload(), 600);
         } catch (err) {
           console.warn("import failed", err);
           hideToast(_TOAST_ID);
@@ -10579,6 +10585,10 @@ Continue?`
       const t = setTimeout(() => {
         try {
           if (typeof JournalStore === "undefined" || typeof JournalMediaStore === "undefined") return;
+          if (!JournalStore.isReady()) {
+            console.info("Journal media orphan sweep skipped \u2014 store not ready (" + JournalStore.getState() + ")");
+            return;
+          }
           const referenced = JournalStore.collectAllMediaIds();
           JournalMediaStore.pruneOrphans(referenced).then((n) => {
             if (n) console.info("Journal media orphan sweep removed", n, "blob(s)");

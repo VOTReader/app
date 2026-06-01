@@ -697,6 +697,10 @@
         /** @type {Promise<void> | null} */
         null
       ),
+      _lastWrite: (
+        /** @type {Promise<any> | null} */
+        null
+      ),
       /**
        * Sync read. LS-mode: lazy init from localStorage. IDB-mode loaded:
        * return `_cache`. IDB-mode pending/degraded: return `_pendingCache`
@@ -744,7 +748,9 @@
         if (useIdb) {
           const cacheToWrite = this._cache;
           if (cacheToWrite !== null) {
-            IDBAdapter2.put(idbStoreName, "v", cacheToWrite).catch(function(err) {
+            const writePromise = IDBAdapter2.put(idbStoreName, "v", cacheToWrite);
+            this._lastWrite = writePromise;
+            writePromise.catch(function(err) {
               console.error("IDB write failed for", idbStoreName, err);
               if (typeof DiagnosticLog !== "undefined") DiagnosticLog.warn("store", "IDB write failed: " + idbStoreName + " \u2014 " + (err && err.name || err));
               if (typeof StorageHealth !== "undefined") StorageHealth.onWriteFailure(err);
@@ -858,6 +864,24 @@
       /** Current state-machine state. */
       getState() {
         return this._state;
+      },
+      /**
+       * Resolves `true` once this store's most recent IDB write has durably
+       * landed, `false` if that write failed. localStorage-mode and a
+       * never-written store both resolve `true` immediately. NEVER rejects (so a
+       * stray caller can't trip an unhandled rejection). The import path awaits
+       * this across every store before reloading, so a fire-and-forget `_save()`
+       * can't be torn down mid-transaction and silently drop the imported data
+       * (U1 — Export/Import is the only backup).
+       * @returns {Promise<boolean>}
+       */
+      whenSaved() {
+        if (!this._lastWrite) return Promise.resolve(true);
+        return this._lastWrite.then(function() {
+          return true;
+        }, function() {
+          return false;
+        });
       },
       /**
        * Deferred-write guard called by mutation methods as their first

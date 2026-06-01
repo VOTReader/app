@@ -1370,3 +1370,83 @@ describe('CachedStore W7.1b — versioned migration framework', () => {
     expect(warn).toHaveBeenCalled();  // warned about the newer-than-app version
   });
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+   U1 — whenSaved() durability barrier.
+   _save() is fire-and-forget; the import path (the ONLY backup) must be
+   able to wait for the actual IDB write to land before reloading, or a
+   reload races the write and silently drops the just-imported data.
+   These tests pin that whenSaved() is a real barrier (resolves AFTER the
+   put settles), reports failure as `false` rather than throwing, and
+   composes across stores the way the import barrier uses it.
+   ═══════════════════════════════════════════════════════════════════ */
+describe('CachedStore U1 — whenSaved() durability barrier', () => {
+  beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('LS-mode store resolves whenSaved() true immediately (no IDB write to await)', async () => {
+    const store = createTestStore('vot-test-whensaved-ls', { idb: false });
+    store.add({ id: 'a', label: 'A' });
+    await expect(store.whenSaved()).resolves.toBe(true);
+  });
+
+  it('never-written store resolves whenSaved() true immediately', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockReturnValue(new Promise(() => {})); // hydration never settles
+    const store = createTestStore('vot-test-whensaved-nw', { idb: true });
+    await expect(store.whenSaved()).resolves.toBe(true); // _lastWrite is null
+  });
+
+  it('does NOT resolve until the IDB put settles (the barrier)', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue([]);
+    let putSettled = false;
+    let releasePut = () => {};
+    const putGate = new Promise((res) => { releasePut = () => { putSettled = true; res(undefined); }; });
+    vi.spyOn(IDBAdapter, 'put').mockReturnValue(putGate);
+    const store = createTestStore('vot-test-whensaved-barrier', { idb: true });
+    await store._hydrate();
+
+    store.add({ id: 'b1', label: 'fresh' });
+    // Write in flight — whenSaved() must still be pending.
+    const PENDING = Symbol('pending');
+    expect(await Promise.race([store.whenSaved(), Promise.resolve(PENDING)])).toBe(PENDING);
+    expect(putSettled).toBe(false);
+
+    releasePut();
+    await expect(store.whenSaved()).resolves.toBe(true);
+    expect(putSettled).toBe(true);
+  });
+
+  it('resolves FALSE (never throws) when the IDB put rejects', async () => {
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue([]);
+    vi.spyOn(IDBAdapter, 'put').mockRejectedValue(new Error('QuotaExceededError'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const store = createTestStore('vot-test-whensaved-fail', { idb: true });
+    await store._hydrate();
+    store.add({ id: 'b1', label: 'x' });
+    await expect(store.whenSaved()).resolves.toBe(false);
+  });
+
+  it('import barrier: Promise.all(whenSaved) waits for EVERY store\'s put to land', async () => {
+    // Mirrors _doImport: one store's write is slow; the barrier must not
+    // resolve until both have durably landed.
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue([]);
+    let releaseSlow = (/** @type {any} */ _v) => {};
+    const slowGate = new Promise((res) => { releaseSlow = res; });
+    vi.spyOn(IDBAdapter, 'put').mockImplementation((key) =>
+      key === 'vot-test-whensaved-slow' ? slowGate : Promise.resolve(undefined));
+
+    const fast = createTestStore('vot-test-whensaved-fast2', { idb: true });
+    const slow = createTestStore('vot-test-whensaved-slow', { idb: true });
+    await fast._hydrate();
+    await slow._hydrate();
+    fast.add({ id: 'f', label: 'fast' });
+    slow.add({ id: 's', label: 'slow' });
+
+    const barrier = Promise.all([fast.whenSaved(), slow.whenSaved()]);
+    const PENDING = Symbol('pending');
+    expect(await Promise.race([barrier, Promise.resolve(PENDING)])).toBe(PENDING);
+
+    releaseSlow(undefined);
+    await expect(barrier).resolves.toEqual([true, true]);
+  });
+});

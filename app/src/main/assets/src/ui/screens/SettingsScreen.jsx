@@ -700,9 +700,23 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           }
         }
 
+        // (4) U1 DURABILITY BARRIER. _save() is fire-and-forget, so without
+        // this a reload could tear down the page mid-transaction and silently
+        // drop the just-imported data — and Export/Import is the ONLY backup.
+        // Wait for every imported store's IDB write to actually land before
+        // reloading. (Media is already durable: JournalMediaStore.put is awaited
+        // above.) whenSaved() never rejects — false means that store failed.
+        const _whenSaved = (s) => (s && typeof s.whenSaved === 'function' ? s.whenSaved() : Promise.resolve(true));
+        const saveResults = await Promise.all(
+          Object.values(storesMap).map(({ store }) => _whenSaved(store))
+            .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
+        );
+        const writeFailures = saveResults.filter((ok) => !ok).length;
+
         hideToast(_TOAST_ID);
         const problems = [];
         if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? 's' : ''}`);
+        if (writeFailures > 0) problems.push(`${writeFailures} store${writeFailures > 1 ? 's' : ''} failed to save`);
         if (skippedStores.length > 0) {
           problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? 's' : ''} skipped (invalid: ${skippedStores.join(', ')})`);
         }
@@ -711,7 +725,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         } else {
           _showToast('Import complete. Reloading…', 0);
         }
-        setTimeout(() => window.location.reload(), 1500);
+        // Durability is already guaranteed above; this short delay only lets the
+        // toast render before reload (was a 1500ms BLIND timer that raced the
+        // writes — U1).
+        setTimeout(() => window.location.reload(), 600);
       } catch (err) {
         console.warn('import failed', err);
         hideToast(_TOAST_ID);

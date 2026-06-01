@@ -101,6 +101,7 @@ const _idbStoreRegistry = new Set();
  *   _hydratePromise: Promise<void> | null,
  *   _load(): T,
  *   _save(): void,
+ *   _lastWrite: Promise<any> | null,
  *   raw(): T,
  *   _version: number,
  *   _listeners: Set<() => void> | null,
@@ -110,6 +111,7 @@ const _idbStoreRegistry = new Set();
  *   getVersion(): number,
  *   isReady(): boolean,
  *   getState(): StoreState,
+ *   whenSaved(): Promise<boolean>,
  *   _shouldDefer(opName: string, ...args: any[]): boolean,
  *   _migrateIfNeeded(loadedData: T | null | undefined): Promise<T | null | undefined>,
  *   _hydrate(): Promise<void>,
@@ -230,6 +232,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _replaying: false,
     _applyingPending: false,
     _hydratePromise: /** @type {Promise<void> | null} */ (null),
+    _lastWrite: /** @type {Promise<any> | null} */ (null),
 
     /**
      * Sync read. LS-mode: lazy init from localStorage. IDB-mode loaded:
@@ -275,7 +278,13 @@ export function CachedStore(storageKey, defaultVal, opts) {
       if (useIdb) {
         const cacheToWrite = this._cache;
         if (cacheToWrite !== null) {
-          IDBAdapter.put(idbStoreName, 'v', cacheToWrite).catch(function (err) {
+          // U1: keep the raw put promise so whenSaved() can await durability
+          // before the import path reloads. The .catch below is a separate
+          // branch for health/logging — it does NOT consume `_lastWrite`, so an
+          // awaiter still observes whether the write succeeded or failed.
+          const writePromise = IDBAdapter.put(idbStoreName, 'v', cacheToWrite);
+          this._lastWrite = writePromise;
+          writePromise.catch(function (err) {
             console.error('IDB write failed for', idbStoreName, err);
             // W7.4: bare-global (typeof) guard mirrors the StorageHealth line
             // below — cached-store deliberately holds no imports (see header).
@@ -377,6 +386,21 @@ export function CachedStore(storageKey, defaultVal, opts) {
 
     /** Current state-machine state. */
     getState() { return this._state; },
+
+    /**
+     * Resolves `true` once this store's most recent IDB write has durably
+     * landed, `false` if that write failed. localStorage-mode and a
+     * never-written store both resolve `true` immediately. NEVER rejects (so a
+     * stray caller can't trip an unhandled rejection). The import path awaits
+     * this across every store before reloading, so a fire-and-forget `_save()`
+     * can't be torn down mid-transaction and silently drop the imported data
+     * (U1 — Export/Import is the only backup).
+     * @returns {Promise<boolean>}
+     */
+    whenSaved() {
+      if (!this._lastWrite) return Promise.resolve(true);
+      return this._lastWrite.then(function () { return true; }, function () { return false; });
+    },
 
     /**
      * Deferred-write guard called by mutation methods as their first
