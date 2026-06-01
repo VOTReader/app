@@ -61,6 +61,47 @@ describe('platform detection', () => {
     )).toBe(PLATFORM.SAFARI_TAB);
   });
 
+  it('genuine iOS Safari → safari-tab', () => {
+    expect(StorageHealth._detectPlatform(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+    )).toBe(PLATFORM.SAFARI_TAB);
+  });
+
+  // U20: browsers that carry "Safari" but are NOT Safari must NOT receive the
+  // Safari-specific 7-day-eviction warning / first-data-creation gate — they
+  // fall to the conservative, SILENT UNKNOWN path instead of a wrong warning.
+  it('Chrome-iOS (CriOS) → NOT safari (was misclassified)', () => {
+    const p = StorageHealth._detectPlatform(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/125.0.0.0 Mobile/15E148 Safari/604.1'
+    );
+    expect(p).not.toBe(PLATFORM.SAFARI_TAB);
+    expect(p).toBe(PLATFORM.UNKNOWN);
+  });
+
+  it('Firefox-iOS (FxiOS) → NOT safari', () => {
+    expect(StorageHealth._detectPlatform(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/126.0 Mobile/15E148 Safari/605.1.15'
+    )).not.toBe(PLATFORM.SAFARI_TAB);
+  });
+
+  it('Edge-iOS (EdgiOS) → edge, not safari', () => {
+    expect(StorageHealth._detectPlatform(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 EdgiOS/125.0.0.0 Mobile/15E148 Safari/605.1.15'
+    )).toBe(PLATFORM.EDGE);
+  });
+
+  it('DuckDuckGo-iOS → NOT safari (conservative silent path)', () => {
+    expect(StorageHealth._detectPlatform(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 DuckDuckGo/7 Safari/605.1.15'
+    )).not.toBe(PLATFORM.SAFARI_TAB);
+  });
+
+  it('in-app WebView with a Safari token (Line) → NOT safari', () => {
+    expect(StorageHealth._detectPlatform(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Line/13.0.0 Safari/605.1.15'
+    )).not.toBe(PLATFORM.SAFARI_TAB);
+  });
+
   it('Android WebView (window.AndroidBridge present) → android-webview', () => {
     /** @type {any} */ (window).AndroidBridge = {};
     try {

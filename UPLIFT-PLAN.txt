@@ -660,6 +660,17 @@
 
  U20 — Platform detection misclassifies non-Safari browsers        [P2] [R]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — _detectPlatform now requires AppleWebKit + Safari + NONE
+   of a known non-Safari token set (Chrome/Chromium/Edg/EdgiOS/CriOS/FxiOS/OPR/
+   OPiOS/OPT/SamsungBrowser/DuckDuckGo/Ddg/YaBrowser/GSA/FBAN/FBAV/FB_IAB/
+   Instagram/Line/MicroMessenger/HuaweiBrowser/MiuiBrowser). The old
+   `/Safari/ && !/Chrome|Chromium|Edg/` even tagged Chrome-iOS (CriOS) +
+   Firefox-iOS (FxiOS) as Safari (they carry "Safari", no "Chrome"); now they +
+   DuckDuckGo + in-app webviews fall to UNKNOWN (the conservative, SILENT path —
+   no Safari 7-day-eviction warning / first-data-creation gate). EdgiOS now also
+   routes to EDGE (`/Edg(iOS)?\//`). Genuine Mac/iOS Safari still → SAFARI_TAB.
+   +6 UA-table tests (CriOS/FxiOS/EdgiOS/DuckDuckGo-iOS/Line + a genuine
+   iOS-Safari control); 1631 vitest, coverage holds.
  PROBLEM: _detectPlatform (storage-health.js:184-201) tags anything with
    "Safari" and not Chrome/Chromium/Edg as Safari — so DuckDuckGo, embedded
    webviews, and in-app browsers become SAFARI_TAB and get Safari-specific
@@ -764,7 +775,7 @@
  U17 Kotlin/contract tests ........ TODO  [P2]
  U18 PWA hygiene .................. TODO  [P2]
  U19 LOW ledger (cleanup/robust) .. TODO  [P3]
- U20 platform-detect misclassify .. TODO  [P2]
+ U20 platform-detect misclassify .. DONE  [P2] (AppleWebKit + token-exclusion; CriOS/FxiOS/DDG no longer Safari; +6 tests)
  U21 connectivity ping egress ..... TODO  [P2]
  U22 headings out of search ....... DONE  [P2] (user-flagged; SCHEMA 12→13)
 ═══════════════════════════════════════════════════════════════════════════

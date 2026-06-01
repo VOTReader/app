@@ -187,13 +187,24 @@ function _detectPlatform(uaOverride) {
 
   var ua = uaOverride || ((typeof navigator !== 'undefined' && navigator.userAgent) || '');
 
-  var isSafari = /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua);
+  // U20: real Safari = Apple's WebKit browser with NO impostor token. The old
+  // `/Safari/ && !/Chrome|Chromium|Edg/` was far too loose: it tagged
+  // DuckDuckGo, in-app webviews (Facebook/Instagram/WeChat/Line), and even the
+  // iOS variants of other browsers (CriOS = Chrome-iOS, FxiOS = Firefox-iOS,
+  // EdgiOS, OPiOS) as Safari — they all carry "Safari" but no "Chrome" token —
+  // and then surfaced Safari's 7-day-eviction warning + first-data-creation gate,
+  // which read WRONG in those browsers. UA-sniffing should never drive a
+  // user-facing warning on a guess. Require AppleWebKit + Safari + none of the
+  // known non-Safari tokens; anything misclassified falls to UNKNOWN — the
+  // conservative, SILENT path (generic storage health, no Safari-specific flows).
+  var NON_SAFARI = /(Chrome|Chromium|Edg|EdgiOS|CriOS|FxiOS|OPR|OPiOS|OPT|SamsungBrowser|DuckDuckGo|Ddg|YaBrowser|GSA|FBAN|FBAV|FB_IAB|Instagram|Line|MicroMessenger|HuaweiBrowser|MiuiBrowser)/i;
+  var isSafari = /AppleWebKit/.test(ua) && /Safari/.test(ua) && !NON_SAFARI.test(ua);
   if (isSafari) {
     if (/** @type {any} */ (navigator).standalone === true) return PLATFORM.SAFARI_PWA;
     return PLATFORM.SAFARI_TAB;
   }
 
-  if (/Edg\//.test(ua)) return PLATFORM.EDGE;
+  if (/Edg(iOS)?\//.test(ua)) return PLATFORM.EDGE;
   if (/Firefox\//.test(ua)) return PLATFORM.FIREFOX;
   if (/Chrome\//.test(ua)) return PLATFORM.CHROME;
 
