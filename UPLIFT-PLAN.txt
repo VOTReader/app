@@ -508,6 +508,20 @@
 
  U14 — Route the 4 AndroidBridge bypasses through PlatformBridge    [P2] [V]
  ───────────────────────────────────────────────────────────────────────────
+ ✅ LANDED 2026-06-01 — all 4 runtime sites (storage-health _detectPlatform,
+   use-history-sync push-guard, use-android-back ×2 Escape-guards) now read
+   PlatformBridge.isAndroid via an `import { PlatformBridge }` (matching the
+   correct consumers use-desktop-keyboard / sw-register); no circular dep
+   (storage-health→platform-bridge→diagnostic-log is acyclic). Header invariant
+   RESTORED in platform-bridge.js (U0 had annotated it false). Grep confirms
+   `window.AndroidBridge` outside platform-bridge.js is now ONLY comments + test
+   fixtures. Tests updated to set PlatformBridge.isAndroid (not inject
+   window.AndroidBridge, which the module-load boolean no longer reads at call
+   time): use-history-sync (2) + storage-health (1). tsc + 1631 vitest + coverage
+   hold; preview-verified on web — app boots, isAndroid=false, and the web-only
+   history-sync ran (__historyReady=true — direct proof the routing reads web
+   correctly), 0 console errors. NOTE: this is the FORMAL U14 (distinct from the
+   export→import e2e round-trip the exit bar loosely called "U14", landed earlier).
  PROBLEM: the bridge's "ONLY place that branches on platform" invariant is
    violated by 4 live runtime checks: storage-health.js:186,
    use-history-sync.js:159, use-android-back.js:275 & :397.
@@ -769,7 +783,7 @@
  U11 dual-render equiv tests ...... DONE  [P2] (per-char equivalence, 5 scenarios + tap-winner; +6 tests)
  U12 scripture parser ............. DONE  [P2] (en/em-dash normalize + findBook exact-before-prefix; +4 tests)
  U13 html2canvas lazy ............. TODO  [P2]
- U14 AndroidBridge routing ........ TODO  [P2]
+ U14 AndroidBridge routing ........ DONE  [P2] (4 sites → PlatformBridge.isAndroid; invariant restored; web-verified)
  U15 renderer coverage ............ DONE  [P2] (renderer/ + scripture-resolution measured; +70 tests; floor ratcheted)
  U16 CI smoke walk ................ TODO  [P2]
  U17 Kotlin/contract tests ........ TODO  [P2]

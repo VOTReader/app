@@ -59,7 +59,7 @@
      back-presses to return).
 
    PLATFORM GUARD:
-     Skips entirely on Android (window.AndroidBridge present). The
+     Skips entirely on Android (PlatformBridge.isAndroid). The
      Android back button is handled by Kotlin's MainActivity routing
      through window.handleAndroidBack; browser history would be
      pointless overhead and could interfere with WebView lifecycle.
@@ -75,6 +75,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { disarm as _disarmRootExit } from '../utils/root-exit-toast.js';
+import { PlatformBridge } from '../utils/platform-bridge.js';
 
 // Module-level suppress flag — set by suppressNextHistoryPush(), consumed
 // by the next effect run. Persists across renders intentionally; the
@@ -123,7 +124,7 @@ export function clearSuppressNextHistoryPush() {
  * empty-state entry every time the nav-key tuple changes (with the
  * suppression carve-out above for back-induced navigations).
  *
- * Skips on Android (window.AndroidBridge present). Skips on the very
+ * Skips on Android (PlatformBridge.isAndroid). Skips on the very
  * first mount so the bootstrap state doesn't create a redundant
  * entry. Sets window.__historyReady after first-mount-skip for the
  * Firefox popstate-on-load guard in W1.5(d).
@@ -155,8 +156,8 @@ export function useHistorySync({
   React.useEffect(() => {
     // Android: Kotlin MainActivity handles back via window.handleAndroidBack.
     // No browser back button to consume history entries; pushState would
-    // be pure overhead.
-    if (typeof window !== 'undefined' && window.AndroidBridge) return;
+    // be pure overhead. (U14: via the bridge, not a direct AndroidBridge probe.)
+    if (PlatformBridge.isAndroid) return;
     if (typeof history === 'undefined' || typeof history.pushState !== 'function') return;
 
     const key = `${screen}|${bookId}|${chapterNum}|${letterId}|${studyId}|${studyChapterId}|${genreId}|${gardenPage}`;

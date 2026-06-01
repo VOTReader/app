@@ -98,6 +98,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { PlatformBridge } from '../utils/platform-bridge.js';
 import {
   arm as _rootExitArm,
   disarm as _rootExitDisarm,
@@ -231,7 +232,7 @@ export function useAndroidBack({
      never both.
 
      Gates, in priority order:
-       1. Web-only: skip if window.AndroidBridge present. Android has its
+       1. Web-only: skip on Android (PlatformBridge.isAndroid). Android has its
           own back-button routing via Kotlin → window.handleAndroidBack;
           there's no Escape-key UX to gate.
        2. Not Escape: ignore. event.key === 'Escape' (the deprecated
@@ -272,7 +273,7 @@ export function useAndroidBack({
      ═══════════════════════════════════════════════════════════════════════ */
   React.useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    if (window.AndroidBridge) return;  // Android handles back via the OS button, not Escape.
+    if (PlatformBridge.isAndroid) return;  // U14: Android handles back via the OS button, not Escape (via the bridge, not a direct AndroidBridge probe).
 
     function onKeyDown(e) {
       if (e.key !== 'Escape') return;
@@ -356,7 +357,7 @@ export function useAndroidBack({
      double-tap pattern per [[root-of-history-pwa]].
 
      Three gates, in order:
-       1. Web-only (window.AndroidBridge absent — Android uses the
+       1. Web-only (skipped on Android via PlatformBridge.isAndroid — Android uses the
           system back button, never browser navigation).
        2. Firefox popstate-on-load — older HTML5 spec interpretation
           says popstate fires on initial page load; Chrome doesn't.
@@ -394,7 +395,7 @@ export function useAndroidBack({
      ═══════════════════════════════════════════════════════════════════════ */
   React.useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    if (window.AndroidBridge) return;
+    if (PlatformBridge.isAndroid) return;  // U14: via the bridge, not a direct AndroidBridge probe.
     if (typeof window.addEventListener !== 'function') return;
 
     function onPopState() {

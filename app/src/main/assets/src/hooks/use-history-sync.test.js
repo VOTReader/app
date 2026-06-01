@@ -28,6 +28,7 @@ import {
   suppressNextHistoryPush,
   clearSuppressNextHistoryPush,
 } from './use-history-sync.js';
+import { PlatformBridge } from '../utils/platform-bridge.js';
 
 const _origPushState = history.pushState;
 let _pushCalls = [];
@@ -39,7 +40,9 @@ beforeEach(() => {
     _pushCalls.push({ state, title, url });
     return _origPushState.call(history, state, title, url);
   };
-  // Clear the Android guard between tests.
+  // Clear the Android guard between tests (U14: the hook now reads
+  // PlatformBridge.isAndroid, not window.AndroidBridge — default to web).
+  PlatformBridge.isAndroid = false;
   delete window.AndroidBridge;
   delete window.__historyReady;
   // Defensively clear any stranded suppress flag from a prior test.
@@ -206,8 +209,8 @@ describe('useHistorySync — suppressNextHistoryPush', () => {
 });
 
 describe('useHistorySync — Android guard', () => {
-  it('does NOT push on Android (window.AndroidBridge present)', () => {
-    window.AndroidBridge = { stub: true };
+  it('does NOT push on Android (PlatformBridge.isAndroid)', () => {
+    PlatformBridge.isAndroid = true;
 
     const { rerender } = renderHook(({ k }) => useHistorySync(k), {
       initialProps: { k: nav({ screen: 'home' }) },
@@ -218,7 +221,7 @@ describe('useHistorySync — Android guard', () => {
   });
 
   it('does NOT set __historyReady on Android (the Firefox guard is web-only)', () => {
-    window.AndroidBridge = { stub: true };
+    PlatformBridge.isAndroid = true;
     renderHook(() => useHistorySync(nav({ screen: 'home' })));
     expect(window.__historyReady).toBeUndefined();
   });

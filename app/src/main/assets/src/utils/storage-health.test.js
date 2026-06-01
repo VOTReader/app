@@ -8,6 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { StorageHealth } from './storage-health.js';
+import { PlatformBridge } from './platform-bridge.js';
 
 const { TIER, PLATFORM, RISK } = StorageHealth;
 
@@ -102,12 +103,15 @@ describe('platform detection', () => {
     )).not.toBe(PLATFORM.SAFARI_TAB);
   });
 
-  it('Android WebView (window.AndroidBridge present) → android-webview', () => {
-    /** @type {any} */ (window).AndroidBridge = {};
+  it('Android (PlatformBridge.isAndroid) → android-webview', () => {
+    // U14: _detectPlatform now routes through the bridge's single source of
+    // truth instead of probing window.AndroidBridge directly.
+    const orig = PlatformBridge.isAndroid;
+    PlatformBridge.isAndroid = true;
     try {
       expect(StorageHealth._detectPlatform()).toBe(PLATFORM.ANDROID_WEBVIEW);
     } finally {
-      delete /** @type {any} */ (window).AndroidBridge;
+      PlatformBridge.isAndroid = orig;
     }
   });
 

@@ -50,6 +50,7 @@
 // quota pressure shows up in the diagnostic export. Clean one-way import —
 // diagnostic-log.js is a zero-dependency leaf in the same bundle.
 import { DiagnosticLog } from './diagnostic-log.js';
+import { PlatformBridge } from './platform-bridge.js';
 
 /* ─── Constants ─────────────────────────────────────────────────────── */
 
@@ -183,7 +184,11 @@ function _getStorageApi() {
  */
 function _detectPlatform(uaOverride) {
   if (typeof window === 'undefined') return PLATFORM.UNKNOWN;
-  if (typeof /** @type {any} */ (window).AndroidBridge !== 'undefined') return PLATFORM.ANDROID_WEBVIEW;
+  // U14: route platform detection through the bridge's single source of truth
+  // (PlatformBridge.isAndroid) instead of probing window.AndroidBridge directly.
+  // isAndroid is a module-load boolean and _detectPlatform runs lazily (via
+  // getPlatform), so the bridge is always resolved by the time we read it.
+  if (PlatformBridge.isAndroid) return PLATFORM.ANDROID_WEBVIEW;
 
   var ua = uaOverride || ((typeof navigator !== 'undefined' && navigator.userAgent) || '');
 
