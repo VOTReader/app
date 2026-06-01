@@ -80,11 +80,12 @@
 
   // app/src/main/assets/src/utils/tabs.js
   function describeTab2(tab) {
+    var _a, _b;
     const s = tab.screen || "home";
     const resolveBook = (id) => id ? id === "matthew" ? MATTHEW : id === "matthew-plain" ? MATTHEW_PLAIN : typeof BOOKS !== "undefined" ? BOOKS[id] : null : null;
     const book = resolveBook(tab.bookId);
     if (s === "matthew-ch" || s === "bible-ch") {
-      const title = book ? `${book.title} \xB7 Ch. ${tab.chapterNum ?? "?"}` : "Reading";
+      const title = book ? `${book.title} \xB7 Ch. ${(_a = tab.chapterNum) != null ? _a : "?"}` : "Reading";
       const ot = book && OT_BOOK_IDS && OT_BOOK_IDS.has(book.id);
       const subtitle = book ? book.id === "matthew" || book.id === "matthew-plain" ? "New Testament \xB7 Gospels" : ot ? "Old Testament" : "New Testament" : "Scripture";
       return { title, subtitle };
@@ -98,7 +99,7 @@
     const _ltrCol = COL_BY_LETTER_SC.get(s);
     if (_ltrCol) {
       const l = colLetterArr(_ltrCol).find((e) => e.id === tab.letterId);
-      return { title: l?.title || (_ltrCol.kind === "letter" ? "Letter" : "Entry"), subtitle: _ltrCol.label };
+      return { title: (l == null ? void 0 : l.title) || (_ltrCol.kind === "letter" ? "Letter" : "Entry"), subtitle: _ltrCol.label };
     }
     const _idxCol = COL_BY_INDEX_SC.get(s);
     if (_idxCol) return { title: _idxCol.label, subtitle: _idxCol.kind === "letter" ? "Letter index" : "Entry index" };
@@ -106,21 +107,22 @@
     if (s === "studies-home") return { title: "Studies", subtitle: "Letter Studies \xB7 Matthew Study Bible" };
     if (s === "bible-study-index") {
       const _study = _studies().find((st) => st.slug === tab.studyId);
-      return { title: _study?.title || "Study", subtitle: "Bible Letter Study" };
+      return { title: (_study == null ? void 0 : _study.title) || "Study", subtitle: "Bible Letter Study" };
     }
     if (s === "bible-study-chapter") {
       const _study = _studies().find((st) => st.slug === tab.studyId);
       const _ch = _study && _study.chapters && _study.chapters.find((c) => c.id === tab.studyChapterId);
-      return { title: _ch?.title || "Study Chapter", subtitle: _study?.title || "Bible Letter Study" };
+      return { title: (_ch == null ? void 0 : _ch.title) || "Study Chapter", subtitle: (_study == null ? void 0 : _study.title) || "Bible Letter Study" };
     }
-    if (s === "garden-view") return { title: `The Garden \xB7 Page ${tab.gardenPage ?? 1}`, subtitle: "A Return to The Garden" };
+    if (s === "garden-view") return { title: `The Garden \xB7 Page ${(_b = tab.gardenPage) != null ? _b : 1}`, subtitle: "A Return to The Garden" };
     if (s === "search") return { title: tab.searchQuery ? `"${tab.searchQuery}"` : "Search", subtitle: "Full-text search" };
     if (s === "history") return { title: "History", subtitle: "Recently visited" };
     if (s === "settings") return { title: "Settings", subtitle: "App configuration" };
     return { title: "Home", subtitle: "VOT Study Bible" };
   }
   function tabContentKey2(tab) {
-    return `${tab.screen || "home"}|${tab.bookId || ""}|${tab.chapterNum ?? ""}|${tab.letterId || ""}|${tab.studyId || ""}|${tab.studyChapterId || ""}|${tab.genreId || ""}|${tab.gardenPage ?? ""}`;
+    var _a, _b;
+    return `${tab.screen || "home"}|${tab.bookId || ""}|${(_a = tab.chapterNum) != null ? _a : ""}|${tab.letterId || ""}|${tab.studyId || ""}|${tab.studyChapterId || ""}|${tab.genreId || ""}|${(_b = tab.gardenPage) != null ? _b : ""}`;
   }
   function tabHasProgressBar2(tab) {
     return READING_SCREENS.has(tab.screen);
@@ -1281,7 +1283,7 @@
   // app/src/main/assets/src/ui/components/FootnoteSheet.jsx
   function FootnoteSheet2({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate }) {
     const isOpen = num !== null;
-    const verse = fn?.type === "scripture" ? nkjv?.[fn.ref] || null : null;
+    const verse = (fn == null ? void 0 : fn.type) === "scripture" ? (nkjv == null ? void 0 : nkjv[fn.ref]) || null : null;
     const orderedKeys = footnotes ? Object.keys(footnotes).sort((a, b) => {
       const na = parseInt(a, 10), nb = parseInt(b, 10);
       if (!isNaN(na) && !isNaN(nb)) return na - nb;
@@ -3370,7 +3372,7 @@
           {
             book,
             chapter,
-            onIndex: book?.chapters.length === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
+            onIndex: (book == null ? void 0 : book.chapters.length) === 1 ? genreId ? () => setScreen("scripture-genre") : goScripturesHome : goBibleIdx,
             onNavigate: (num) => {
               setSurpriseAnchor(null);
               selectBibleCh(num);
@@ -3546,6 +3548,7 @@
 
   // app/src/main/assets/src/ui/screens/LetterView.jsx
   function LetterView2({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen }) {
+    var _a, _b, _c;
     const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
     const [highlightedFn, setHighlightedFn] = React.useState(null);
     const [sheetFn, setSheetFn] = React.useState(null);
@@ -3740,7 +3743,7 @@
       } }, letter.addendum) : letter.addendumInternal ? /* @__PURE__ */ React.createElement("a", { className: "related-link", href: "#", onClick: (e) => {
         e.preventDefault();
         onNavigate(letter.addendumInternal);
-      } }, letter.addendum) : /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.addendumUrl, target: "_blank", rel: "noopener noreferrer" }, letter.addendum)), letter.relatedTopics?.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "related-card" }, /* @__PURE__ */ React.createElement("div", { className: "related-card-title" }, "Related Topics"), letter.relatedTopics.map(
+      } }, letter.addendum) : /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.addendumUrl, target: "_blank", rel: "noopener noreferrer" }, letter.addendum)), ((_a = letter.relatedTopics) == null ? void 0 : _a.length) > 0 && /* @__PURE__ */ React.createElement("div", { className: "related-card" }, /* @__PURE__ */ React.createElement("div", { className: "related-card-title" }, "Related Topics"), letter.relatedTopics.map(
         (t, i) => t.link && wrappedInAppLink ? /* @__PURE__ */ React.createElement("a", { key: i, className: "related-link", href: "#", onClick: (e) => {
           e.preventDefault();
           wrappedInAppLink(t.link);
@@ -3748,7 +3751,7 @@
           e.preventDefault();
           onStudyNavigate(t.internalStudy);
         } }, t.label) : /* @__PURE__ */ React.createElement("a", { key: i, className: "related-link", href: t.url, target: "_blank", rel: "noopener noreferrer" }, t.label)
-      )), letter.bibleStudies?.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "related-card" }, /* @__PURE__ */ React.createElement("div", { className: "related-card-title" }, "Bible Study"), letter.bibleStudies.map(
+      )), ((_b = letter.bibleStudies) == null ? void 0 : _b.length) > 0 && /* @__PURE__ */ React.createElement("div", { className: "related-card" }, /* @__PURE__ */ React.createElement("div", { className: "related-card-title" }, "Bible Study"), letter.bibleStudies.map(
         (s, i) => s.link && wrappedInAppLink ? /* @__PURE__ */ React.createElement("a", { key: i, className: "related-link", href: "#", onClick: (e) => {
           e.preventDefault();
           wrappedInAppLink(s.link);
@@ -3756,7 +3759,7 @@
           e.preventDefault();
           onStudyNavigate(s.internalStudy);
         } }, s.label) : /* @__PURE__ */ React.createElement("a", { key: i, className: "related-link", href: s.url, target: "_blank", rel: "noopener noreferrer" }, s.label)
-      )), (letter.audioUrl || letter.soundcloudUrl) && /* @__PURE__ */ React.createElement("div", { className: "related-card" }, /* @__PURE__ */ React.createElement("div", { className: "related-card-title" }, "Audio"), letter.audioUrl && /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.audioUrl, target: "_blank", rel: "noopener noreferrer" }, "\u266A Audio Recording"), letter.soundcloudUrl && /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.soundcloudUrl, target: "_blank", rel: "noopener noreferrer" }, "\u266A Listen on SoundCloud")), /* @__PURE__ */ React.createElement("div", { className: "related-card" }, /* @__PURE__ */ React.createElement("div", { className: "related-card-title" }, "Videos"), letter.videos?.map((v, i) => /* @__PURE__ */ React.createElement("a", { key: i, className: "related-link", href: v.url, target: "_blank", rel: "noopener noreferrer" }, "\u25B6 ", v.label)), letter.videoVoiceUrl && /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.videoVoiceUrl, target: "_blank", rel: "noopener noreferrer" }, "\u25B6 ", letter.videoVoiceLabel || "Video (with voice over)"), letter.videoMusicUrl && /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.videoMusicUrl, target: "_blank", rel: "noopener noreferrer" }, "\u25B6 Video (excerpts set to music)"), /* @__PURE__ */ React.createElement("a", { className: "related-link", href: "https://www.youtube.com/user/trumpetcallofgod", target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("span", { style: { color: "#cc4444" } }, "\u25B6"), " Official YouTube Channel")))))),
+      )), (letter.audioUrl || letter.soundcloudUrl) && /* @__PURE__ */ React.createElement("div", { className: "related-card" }, /* @__PURE__ */ React.createElement("div", { className: "related-card-title" }, "Audio"), letter.audioUrl && /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.audioUrl, target: "_blank", rel: "noopener noreferrer" }, "\u266A Audio Recording"), letter.soundcloudUrl && /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.soundcloudUrl, target: "_blank", rel: "noopener noreferrer" }, "\u266A Listen on SoundCloud")), /* @__PURE__ */ React.createElement("div", { className: "related-card" }, /* @__PURE__ */ React.createElement("div", { className: "related-card-title" }, "Videos"), (_c = letter.videos) == null ? void 0 : _c.map((v, i) => /* @__PURE__ */ React.createElement("a", { key: i, className: "related-link", href: v.url, target: "_blank", rel: "noopener noreferrer" }, "\u25B6 ", v.label)), letter.videoVoiceUrl && /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.videoVoiceUrl, target: "_blank", rel: "noopener noreferrer" }, "\u25B6 ", letter.videoVoiceLabel || "Video (with voice over)"), letter.videoMusicUrl && /* @__PURE__ */ React.createElement("a", { className: "related-link", href: letter.videoMusicUrl, target: "_blank", rel: "noopener noreferrer" }, "\u25B6 Video (excerpts set to music)"), /* @__PURE__ */ React.createElement("a", { className: "related-link", href: "https://www.youtube.com/user/trumpetcallofgod", target: "_blank", rel: "noopener noreferrer" }, /* @__PURE__ */ React.createElement("span", { style: { color: "#cc4444" } }, "\u25B6"), " Official YouTube Channel")))))),
       /* @__PURE__ */ React.createElement(
         FootnoteSheet,
         {
@@ -3892,6 +3895,7 @@
     const renderLine = (line, consumeRef) => {
       const parts = line.split(/(\*\*.*?\*\*|_.*?_|\{\{ref:[^}]+\}\}|\{\{nav:[^}]+\}\}|\[From [^\]]+\])/g);
       return parts.map((seg, si) => {
+        var _a;
         if (!seg) return null;
         if (seg.startsWith("**") && seg.endsWith("**")) return /* @__PURE__ */ React.createElement("strong", { key: si }, renderLine(seg.slice(2, -2), consumeRef));
         if (seg.startsWith("_") && seg.endsWith("_")) return /* @__PURE__ */ React.createElement("em", { key: si }, renderLine(seg.slice(1, -1), consumeRef));
@@ -3941,7 +3945,7 @@
         const navMatch = seg.match(/^\{\{nav:([^:]+):(\d+)\}\}$/);
         if (navMatch) {
           const bookId = navMatch[1], ch = parseInt(navMatch[2], 10);
-          const bookTitle = BOOKS[bookId]?.title || bookId;
+          const bookTitle = ((_a = BOOKS[bookId]) == null ? void 0 : _a.title) || bookId;
           return /* @__PURE__ */ React.createElement("a", { key: si, className: "fn-link", href: "#", onClick: (e) => {
             e.preventDefault();
             onNavToChapter(bookId, ch);
@@ -4972,6 +4976,7 @@
     }
   }
   function SettingsScreen2({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
+    var _a, _b;
     React.useEffect(() => {
       if (typeof window.__loadBibleCorpus === "function") {
         window.__loadBibleCorpus().catch((e) => console.warn("Bible corpus pre-load failed", e));
@@ -5199,7 +5204,7 @@
           {
             label: "VOT Study Bible",
             books: [
-              { id: "matthew", label: "Matthew Study Bible", total: _matthew()?.chapters?.length || 0 }
+              { id: "matthew", label: "Matthew Study Bible", total: ((_b = (_a = _matthew()) == null ? void 0 : _a.chapters) == null ? void 0 : _b.length) || 0 }
             ]
           },
           ..._studies().filter((s) => !s.locked && s.chapters && s.chapters.length > 0).length > 0 ? [{
@@ -6119,6 +6124,7 @@ Continue?`
       }, 1380);
     };
     const endPress = () => {
+      var _a, _b;
       clearTimeout(pressTimerRef.current);
       clearTimeout(visualDelayTimerRef.current);
       const wasPressing = pressingIdxRef.current >= 0;
@@ -6130,7 +6136,7 @@ Continue?`
         const to = targetIdxRef.current >= 0 ? targetIdxRef.current : from;
         const clone = dragCloneRef.current;
         if (clone) {
-          const snapTop = naturalCardTopsRef.current[to] ?? naturalCardTopsRef.current[from] ?? 0;
+          const snapTop = (_b = (_a = naturalCardTopsRef.current[to]) != null ? _a : naturalCardTopsRef.current[from]) != null ? _b : 0;
           clone.style.transition = "top 0.22s cubic-bezier(0.2,0.8,0.3,1), transform 0.22s cubic-bezier(0.2,0.8,0.3,1)";
           clone.style.top = snapTop + "px";
           clone.style.transform = "scale(1)";
@@ -6227,7 +6233,7 @@ Continue?`
       setBuildInfo({ ready: false, building: true, progress: null });
       window.VotSearch.init({
         onProgress: (done, total) => setBuildInfo((b) => ({ ...b, progress: { done, total } }))
-      }).then(() => setBuildInfo({ ready: true, building: false, progress: null })).catch((err) => setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }));
+      }).then(() => setBuildInfo({ ready: true, building: false, progress: null })).catch((err) => setBuildInfo({ ready: false, building: false, progress: null, error: (err == null ? void 0 : err.message) || String(err) }));
     }, []);
     React.useEffect(() => {
       const t = setTimeout(() => {
@@ -6269,7 +6275,7 @@ Continue?`
           const terms = r.parsed && r.parsed.kind === "text" ? [r.parsed.phrase].filter(Boolean).concat(r.parsedTerms || []) : [];
           setState({ phase: "done", parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length });
         }).catch((err) => {
-          setState({ phase: "done", parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0 });
+          setState({ phase: "done", parsed: null, results: [], terms: [], error: (err == null ? void 0 : err.message) || String(err), total: 0 });
         });
       }, 140);
       return () => {
@@ -6292,10 +6298,11 @@ Continue?`
       }
       const keys = Object.keys(groups);
       keys.sort((a, b) => {
-        const aTop = groups[a][0]?.score || 0;
-        const bTop = groups[b][0]?.score || 0;
+        var _a, _b, _c, _d;
+        const aTop = ((_a = groups[a][0]) == null ? void 0 : _a.score) || 0;
+        const bTop = ((_b = groups[b][0]) == null ? void 0 : _b.score) || 0;
         if (aTop !== bTop) return bTop - aTop;
-        return (SRCH_GROUP_META[a]?.order || 99) - (SRCH_GROUP_META[b]?.order || 99);
+        return (((_c = SRCH_GROUP_META[a]) == null ? void 0 : _c.order) || 99) - (((_d = SRCH_GROUP_META[b]) == null ? void 0 : _d.order) || 99);
       });
       return keys.map((k) => ({ key: k, items: groups[k] }));
     }, [state.results]);
@@ -7114,12 +7121,18 @@ Continue?`
     const navBar = /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "nav-home", onClick: onBack }, "\u2190 Home"), /* @__PURE__ */ React.createElement(NavButtons, { onSettings, onHistory, onSearch, theme, onThemeChange }));
     const hero = /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "home-eyebrow" }, "New King James Version"), /* @__PURE__ */ React.createElement("h1", { className: "home-title" }, "The Scriptures of Truth"), /* @__PURE__ */ React.createElement("div", { className: "home-ornament" }, /* @__PURE__ */ React.createElement("div", { className: "home-ornament-line" }), /* @__PURE__ */ React.createElement("div", { className: "home-ornament-diamond" }), /* @__PURE__ */ React.createElement("div", { className: "home-ornament-line r" })));
     if (layout === "genre" || !layout) return /* @__PURE__ */ React.createElement(ScreenLayout, { navChildren: navBar }, /* @__PURE__ */ React.createElement("div", { className: "home-screen scriptures-landing" }, hero, /* @__PURE__ */ React.createElement("div", { className: "genre-columns" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col genre-col-stretch" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col-label" }, "Old Testament"), SCRIPTURE_GENRES.ot.map((g) => {
-      const totalCh = bibleLoaded ? g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0) : "\u2014";
+      const totalCh = bibleLoaded ? g.books.reduce((s, b) => {
+        var _a;
+        return s + (((_a = BOOKS[b.id]) == null ? void 0 : _a.chapters.length) || 0);
+      }, 0) : "\u2014";
       const bookCount = g.books.length;
       const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
       return /* @__PURE__ */ React.createElement("button", { key: g.id, className: "genre-tile", onClick: () => handleTile(g) }, /* @__PURE__ */ React.createElement("div", { className: "genre-tile-title" }, g.label), /* @__PURE__ */ React.createElement("div", { className: "genre-tile-sub" }, bookLabel, " \xB7 ", totalCh, " Chapters"));
     })), /* @__PURE__ */ React.createElement("div", { className: "genre-col genre-col-stretch" }, /* @__PURE__ */ React.createElement("div", { className: "genre-col-label" }, "New Testament"), SCRIPTURE_GENRES.nt.map((g) => {
-      const totalCh = bibleLoaded ? g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0) : "\u2014";
+      const totalCh = bibleLoaded ? g.books.reduce((s, b) => {
+        var _a;
+        return s + (((_a = BOOKS[b.id]) == null ? void 0 : _a.chapters.length) || 0);
+      }, 0) : "\u2014";
       const bookCount = g.books.length;
       const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
       return /* @__PURE__ */ React.createElement("button", { key: g.id, className: "genre-tile", onClick: () => handleTile(g) }, /* @__PURE__ */ React.createElement("div", { className: "genre-tile-title" }, g.label), /* @__PURE__ */ React.createElement("div", { className: "genre-tile-sub" }, bookLabel, " \xB7 ", totalCh, " Chapters"));
@@ -10125,6 +10138,7 @@ Continue?`
   // app/src/main/assets/src/app.jsx
   var { useState, useEffect } = React;
   function App() {
+    var _a, _b;
     const saved = useSavedState();
     const tabState = useTabs({ saved });
     const { tabField, activeTab, tabs, activeTabIdx, updateActiveTab } = tabState;
@@ -10858,7 +10872,7 @@ Continue?`
         setSettings,
         setScreen
       }
-    ), /* @__PURE__ */ React.createElement(ErrorBoundary, { key: screen }, ROUTES[screen]?.() ?? null), /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement(ErrorBoundary, { key: screen }, (_b = (_a = ROUTES[screen]) == null ? void 0 : _a.call(ROUTES)) != null ? _b : null), /* @__PURE__ */ React.createElement(
       AppShellSheets,
       {
         openLinkPicker,

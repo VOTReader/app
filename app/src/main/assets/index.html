@@ -58,6 +58,65 @@
   </style>
   <link rel="stylesheet" href="app.css" />
   <script>
+    /* ── Old-WebView polyfills — MUST be the very first script ──────────────
+       minSdk 26 (Android 8) ships System WebView as old as Chromium ~58, and
+       a non-Play-updated Android 9 ships Chromium 69 (verified on an API-28
+       emulator). A few runtime APIs the app uses are newer than that floor,
+       and an unguarded reference throws at parse/exec time and BLACK-SCREENS
+       the whole app. (The esbuild `--target=chrome69` flag handles modern
+       SYNTAX like ?. / ?? — these are runtime APIs it can't transpile.)
+       Each polyfill is feature-detected (no-op on a modern WebView):
+         - globalThis            (Chromium 71)
+         - Promise.allSettled    (Chromium 76) — used by store hydration (boot)
+         - Promise.any           (Chromium 85) — used by idb-adapter / health
+       Kept tiny + spec-faithful; this is the one place such shims live. */
+    (function(){
+      if (typeof globalThis === 'undefined') {
+        try {
+          // Standard self-reference fallback for engines without globalThis.
+          Object.defineProperty(Object.prototype, '__magic__', {
+            get: function(){ return this; }, configurable: true
+          });
+          __magic__.globalThis = __magic__;            // eslint-disable-line
+          delete Object.prototype.__magic__;
+        } catch (e) {
+          if (typeof window !== 'undefined') window.globalThis = window;
+        }
+      }
+      var P = (typeof Promise !== 'undefined') ? Promise : null;
+      if (P && typeof P.allSettled !== 'function') {
+        P.allSettled = function(iterable){
+          return P.all(Array.prototype.map.call(iterable, function(p){
+            return P.resolve(p).then(
+              function(v){ return { status: 'fulfilled', value: v }; },
+              function(r){ return { status: 'rejected', reason: r }; }
+            );
+          }));
+        };
+      }
+      if (P && typeof P.any !== 'function') {
+        P.any = function(iterable){
+          var arr = Array.prototype.slice.call(iterable);
+          return new P(function(resolve, reject){
+            if (arr.length === 0) { reject(new Error('All promises were rejected')); return; }
+            var errs = new Array(arr.length), remaining = arr.length;
+            arr.forEach(function(p, i){
+              P.resolve(p).then(resolve, function(e){
+                errs[i] = e;
+                if (--remaining === 0) {
+                  var agg = (typeof AggregateError === 'function')
+                    ? new AggregateError(errs, 'All promises were rejected')
+                    : new Error('All promises were rejected');
+                  reject(agg);
+                }
+              });
+            });
+          });
+        };
+      }
+    })();
+  </script>
+  <script>
     /* Resource-load error capture — feeds tools/smoke.js so the harness
        can surface stale-path / 404 regressions that the regular console
        .error capture misses (resource failures don't go through

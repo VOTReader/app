@@ -5600,6 +5600,7 @@
     const journalEntryIdRef = useRefMirror(journalEntryId);
     React.useEffect(() => {
       window.handleAndroidBack = () => {
+        var _a;
         if (window.__closeSheet) {
           window.__closeSheet();
           window.__closeSheet = null;
@@ -5720,7 +5721,7 @@
           } else {
             const bid = bookIdRef.current;
             const _BOOKS = typeof BOOKS !== "undefined" ? BOOKS : null;
-            if (bid && _BOOKS && _BOOKS[bid]?.chapters.length === 1) {
+            if (bid && _BOOKS && ((_a = _BOOKS[bid]) == null ? void 0 : _a.chapters.length) === 1) {
               if (genreIdRef.current) {
                 setScreen("scripture-genre");
               } else {
@@ -5978,13 +5979,13 @@
         const _MATTHEW = typeof window !== "undefined" ? window.MATTHEW : void 0;
         if (!_MATTHEW) return;
         const ch = _MATTHEW.chapters.find((c) => c.num === chapterNum);
-        addToHistory({ type: "chapter", bookId: "matthew", bookTitle: "Matthew", chapterNum, chapterTitle: ch?.title || null });
+        addToHistory({ type: "chapter", bookId: "matthew", bookTitle: "Matthew", chapterNum, chapterTitle: (ch == null ? void 0 : ch.title) || null });
       } else if (screen === "bible-ch" && bookId && chapterNum) {
         const _BOOKS = typeof window !== "undefined" ? window.BOOKS : void 0;
         if (!_BOOKS) return;
         const book = _BOOKS[bookId];
-        const ch = book?.chapters.find((c) => c.num === chapterNum);
-        addToHistory({ type: "chapter", bookId, bookTitle: book?.title || bookId, chapterNum, chapterTitle: ch?.title || null });
+        const ch = book == null ? void 0 : book.chapters.find((c) => c.num === chapterNum);
+        addToHistory({ type: "chapter", bookId, bookTitle: (book == null ? void 0 : book.title) || bookId, chapterNum, chapterTitle: (ch == null ? void 0 : ch.title) || null });
       } else if (letterId) {
         var _hcol = COL_BY_LETTER_SC.get(screen);
         if (_hcol) {
@@ -6357,8 +6358,9 @@
     const getStudyById = (id) => STUDIES.find((s) => s.id === id) || null;
     const getStudyChapter = (study, chId) => study && study.chapters ? study.chapters.find((c) => c.id === chId) : null;
     const selectStudy = (id) => {
+      var _a;
       const study = getStudyById(id);
-      if (!study || study.locked || !study.chapters?.length) return;
+      if (!study || study.locked || !((_a = study.chapters) == null ? void 0 : _a.length)) return;
       setStudyId(id);
       if (study.chapters.length === 1 || study.singlePage) {
         const ch = study.chapters[0];
@@ -6407,6 +6409,7 @@
       return i >= 0 && i < UNIFIED_CHAIN.length - 1 ? UNIFIED_CHAIN[i + 1] : null;
     };
     const goToChainEntryFirst = (slug) => () => {
+      var _a;
       if (slug === "matthew-study") {
         setFromStudies(true);
         setBookId("matthew");
@@ -6416,10 +6419,11 @@
         return;
       }
       const s = getStudyById(slug);
-      if (!s || !s.chapters?.length) return;
+      if (!s || !((_a = s.chapters) == null ? void 0 : _a.length)) return;
       selectStudyChapter(slug, s.chapters[0].id);
     };
     const goToChainEntryLast = (slug) => () => {
+      var _a;
       if (slug === "matthew-study") {
         const _MATTHEW = typeof window !== "undefined" ? window.MATTHEW : null;
         if (!_MATTHEW) return;
@@ -6432,7 +6436,7 @@
         return;
       }
       const s = getStudyById(slug);
-      if (!s || !s.chapters?.length) return;
+      if (!s || !((_a = s.chapters) == null ? void 0 : _a.length)) return;
       selectStudyChapter(slug, s.chapters[s.chapters.length - 1].id);
     };
     return {
@@ -6737,8 +6741,8 @@
       setChapterNum(prevBibleBook.chapters[prevBibleBook.chapters.length - 1].num);
       setScreen("bible-ch");
     };
-    const chIsFirst = chapter && !book?.chapters.find((c) => c.num === chapter.num - 1);
-    const chIsLast = chapter && !book?.chapters.find((c) => c.num === chapter.num + 1);
+    const chIsFirst = chapter && !(book == null ? void 0 : book.chapters.find((c) => c.num === chapter.num - 1));
+    const chIsLast = chapter && !(book == null ? void 0 : book.chapters.find((c) => c.num === chapter.num + 1));
     const bcvPrevBook = chIsFirst ? prevBibleBook : null;
     const bcvOnPrevBook = goPrevBibleBook;
     const bcvPrevBoundaryTitle = null;
@@ -7749,6 +7753,7 @@
       return "";
     }
     function attachmentSummary(entry) {
+      var _a;
       var counts = { image: 0, audio: 0, letter: 0, chapter: 0, verse: 0, bookmark: 0, note: 0, journal: 0 };
       var blocks = entry && entry.blocks || [];
       for (var i = 0; i < blocks.length; i++) {
@@ -7769,9 +7774,9 @@
       if (counts.bookmark) out.push({ kind: "bookmark", label: counts.bookmark + (counts.bookmark === 1 ? " bookmark" : " bookmarks") });
       if (counts.note) out.push({ kind: "note", label: counts.note + (counts.note === 1 ? " note" : " notes") });
       if (counts.image) out.push({ kind: "image", label: counts.image + (counts.image === 1 ? " image" : " images") });
-      if (counts.audio) out.push({ kind: "audio", label: "Voice \xB7 " + (counts.audio > 1 ? counts.audio + " clips" : blocks.find(function(b2) {
+      if (counts.audio) out.push({ kind: "audio", label: "Voice \xB7 " + (counts.audio > 1 ? counts.audio + " clips" : ((_a = blocks.find(function(b2) {
         return b2.type === "audio";
-      })?.duration ? formatDuration(blocks.find(function(b2) {
+      })) == null ? void 0 : _a.duration) ? formatDuration(blocks.find(function(b2) {
         return b2.type === "audio";
       }).duration) : "memo") });
       if (counts.journal) out.push({ kind: "journal", label: counts.journal + (counts.journal === 1 ? " link" : " links") });
