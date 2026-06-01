@@ -77,14 +77,15 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **Q8 lazy-load COMPLETE.** All corpus files lazy-loaded. **bundle-a**: 11.7 MB → 1.03 MB (**91% reduction**). (CLARIFICATION 2026-06-01: 1.03 MB is bundle-a ALONE; bundle b+c+d also load as blocking `<script>` before first render, so the real cold-boot blocking JS path is **~2.10 MB** across a+b+c+d — see UPLIFT-PLAN U0/U2.) Q8.1 books.js → `bundle-a-bible.js` (6.9 MB), Q8.2 matthew.js → `bundle-a-matthew.js` (618 KB), Q8.3 all VOT corpora → `bundle-a-vot.js` (3 MB). Loaders pre-fire from the appropriate landing screens (Home / ScripturesHome / StudiesHome / VolumesHome); ROUTES entries show "Loading…" placeholder if user lands directly on a content screen pre-load.
 - **135+ modules** under `app/src/main/assets/src/` — every screen, sheet, component, store, hook, utility, renderer helper is an ES module.
 - **7 cluster bundles** in `app/src/main/assets/dist/`:
-  - `bundle-a.js` 1.03 MB — vendor + small data (matthew-plain/nkjv, books-restored) + search engine (critical path)
-  - `bundle-a-bible.js` 6.9 MB — books.js (NKJV) lazy-loaded via `window.__loadBibleCorpus()`
-  - `bundle-a-matthew.js` 618 KB — matthew.js (Study Bible) lazy-loaded via `window.__loadMatthewCorpus()`
-  - `bundle-a-vot.js` 3 MB — 14 VOT corpora (volumes/letters/WTLB/holy days/hidden manna) lazy-loaded via `window.__loadVotCorpus()`
-  - `bundle-b.js` 431.6 KB — stores + components + hooks + journal + scripture-resolution + letter-linking + W1.5 modal registry + history-sync + W1 platform-bridge + W2.7 StorageHealth + W3 SW registration + W7.4 DiagnosticLog (esbuild IIFE)
-  - `bundle-c.js` 27 KB — renderer (esbuild IIFE, 3 files)
-  - `bundle-d.js` 565.8 KB — screens + sheets + components + utils + late stores + screen-routes + App() + W1.5 AppShell registrations + W2.7 StorageHealthBanner + SafariFlows (esbuild IIFE)
-- **1248 vitest tests** across 48 files.
+  - `bundle-a.js` ~816 KB — vendor (react/react-dom) + small data (matthew-plain/nkjv, books-restored) + search engine (critical path). html2canvas is NO LONGER concatenated here (U13 — lazy-loaded standalone on the first web screenshot).
+  - `bundle-a-bible.js` ~6.8 MB — books.js (NKJV) lazy-loaded via `window.__loadBibleCorpus()`
+  - `bundle-a-matthew.js` ~603 KB — matthew.js (Study Bible) lazy-loaded via `window.__loadMatthewCorpus()`
+  - `bundle-a-vot.js` ~2.9 MB — 14 VOT corpora (volumes/letters/WTLB/holy days/hidden manna) lazy-loaded via `window.__loadVotCorpus()`
+  - `bundle-b.js` ~227 KB (minified, U2) — stores + components + hooks + journal + scripture-resolution + letter-linking + platform-bridge + StorageHealth + SW registration + DiagnosticLog (esbuild IIFE)
+  - `bundle-c.js` ~14 KB (minified, U2) — renderer (esbuild IIFE, 4 files)
+  - `bundle-d.js` ~343 KB (minified, U2) — screens + sheets + components + utils (incl. backup.js, U1) + late stores + screen-routes + App() + AppShell + StorageHealthBanner + SafariFlows (esbuild IIFE)
+  - Cold-boot blocking path (a+b+c+d) ≈ **1.40 MB** after U2 minify + U13 (was ~2.10 MB).
+- **1637 vitest tests** across 63 files.
 
 ### Q3 ESLint — CLOSED 2026-05-24
 
@@ -537,13 +538,18 @@ D:/VOTReader-studio/
 ├── HISTORY.md                         # landed work log
 ├── ARCHITECTURE.md                    # system reference
 ├── PLAN.txt                           # live strategic working memory
-├── package.json, package-lock.json    # esbuild + eslint deps
+├── UPLIFT-PLAN.txt                    # 7→8/10 remediation — canonical home (U0–U22, all closed)
+├── package.json, package-lock.json    # esbuild + eslint + puppeteer (smoke-ci) deps
 ├── .githooks/pre-commit               # versioned; activate: git config core.hooksPath .githooks
 ├── tools/
 │   ├── build.py                       # emits bundle-a.js
 │   ├── preview-server.py              # serves with Cache-Control: no-store
 │   ├── smoke.js                       # 12-screen render walk + annotation round-trips
-│   ├── validate-schemas.js            # W9.1 Format A data validator + CLI runner
+│   ├── smoke-ci.js                    # U16 — runs smoke.js headless (puppeteer) as a CI gate
+│   ├── validate-schemas.js            # Format A/B/C/D/E data validator + CLI runner
+│   ├── sync-sw-version.js             # content-hash CACHE_VERSION (build:sw)
+│   ├── check-corpus-version.js        # U3 — CORPUS_VERSION enforcement gate
+│   ├── sync-csp-hashes.js             # U10 — CSP script-src sha256 sync (build:csp)
 │   └── SMOKE.md                       # smoke harness docs
 ├── app/src/main/
 │   ├── assets/
@@ -565,7 +571,7 @@ D:/VOTReader-studio/
 │   │       │   ├── components/        # 25 shared components (incl. AppShellOverlays, AppShellSheets, HolyDaysPlaylistHeader)
 │   │       │   ├── sheets/            # 17 sheets/pickers
 │   │       │   └── _entry-d.js        # esbuild entry for bundle-d
-│   │       ├── utils/                 # 14 helper bundles (incl. storage-health.js W2.7a, sw-register.js W3, diagnostic-log.js W7.4)
+│   │       ├── utils/                 # 15 helper bundles (incl. backup.js U1, storage-health.js, sw-register.js, diagnostic-log.js)
 │   │       ├── hooks/                 # 28 App() hooks (P6 + P7a–k + P11 dom-annotation-sync/keyboard-inset)
 │   │       ├── components/            # ExpandableText, ErrorBoundary
 │   │       └── styles/                # journal-styles
