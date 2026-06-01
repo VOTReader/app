@@ -4,6 +4,78 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## 8/10 UPLIFT — Wave 4 (the 8/10 exit bar) (2026-06-01)
+
+Commits `a6f3972..bfbeb4b`. The five items between Wave 1 and the 8/10 target.
+Tests 1527 → **1621**; coverage floor ratcheted twice. All CI-green + deployed.
+Per-item evidence lives in UPLIFT-PLAN.txt; this is the chapter record.
+
+**U14 / U1-owed — export→import e2e round-trip.** The backup DATA plane (payload
+build + import-apply + the U1 durability barrier) was extracted from
+SettingsScreen into a pure, dependency-injected `src/utils/backup.js`
+(`buildExportPayload` / `applyImportPayload` / `blobToBase64` / `base64ToBlob`);
+SettingsScreen keeps only UI orchestration (toasts/confirm/degraded-guard/reload/
+PlatformBridge). `backup.test.js` drives the full populate → export → WIPE →
+import → **RELOAD** → assert round-trip against the REAL stores + a fake
+IndexedDB — the "reload" drops every in-memory cache + the IDB connection and
+re-hydrates from disk, proving the import DURABLY landed (all 14 stores + 3 flags
++ a real media blob, bytes-equal). 18 tests; the real Settings→EXPORT button
+preview-verified through the shipped bundle (complete v2 payload, 17 stores +
+counts, passes `validateImportEnvelope`). Note: the exit bar loosely called this
+"U14"; the FORMAL U14 (route 4 `window.AndroidBridge` bypasses through
+PlatformBridge) is a separate, still-open item.
+
+**U11 — dual-render equivalence + 3-overlap tests.** `annotation-engine.test.jsx`
+gained a parameterized suite asserting a per-CHARACTER signature {innermost-mark
+color, data-hl-id (== the elementFromPoint tap winner — folds in the U19 z-order
+sub-item), note-in-chain} is byte-equal across React `HighlightableText` and the
+imperative `applyDOMHighlights` over 5 overlap scenarios (3-way, 3-way + a note on
+a fully-covered 4th, note-on-top, 4-way + underline, blank-newest) + a
+triple-overlap tap-winner assertion. Both paths nest oldest→outer/newest→inner, so
+the signature diverges the moment they drift — the regression net U8 needed.
++6 tests (22→28). Also documented `snapRangeToWords`' START-only snap (U19).
+
+**U15 — renderer/ + scripture-resolution into the coverage gate.** Added
+`renderer/**` + `data/scripture-resolution.js` to the vitest coverage `include`.
+New suites: `scripture-resolution.test.js` (42 — the COLLECTIONS registry +
+parseRefStr/findBook/parseScriptureRef/lookupVersesFromBooks/resolveVerseText/
+findEntryContext engine; also seeds U12), dom-links (8), dom-bookmarks (9),
+dom-journal-chip (11). +70 tests. The aggregate ROSE (annotation-engine is heavily
+covered by its overlap + U11 suites, resolution by the new suite), so the floor
+RATCHETED UP: statements 59→60, branches 49→51, functions 63→64 (lines held 64).
+
+**U8 — applyDOMHighlights perf.** PROFILED first (preview, shipped bundle): a full
+sweep over 176 unannotated containers = 0.215 ms; a 4-way-overlap container =
+0.17 ms — both sub-millisecond (~2 ms even at a 10× budget-device penalty). The
+risky single-walk / document→container / 5-pass-unify refactor of the hot,
+U11-guarded code is NOT justified by the data — deferred to the D-bucket with the
+numbers (à la W7.6 OPFS). Landed the one genuine win: dropped a DEAD guard —
+`applyDOMHighlights` scopes its query to `[data-hl-key][data-hl-dom]` (matching
+the sibling passes) instead of computing a mark/childElementCount querySelector
+then gating on data-hl-dom twice and discarding it. Sweep 0.215→0.15 ms (−30%);
+equivalence held (U11 green + preview-verified).
+
+**U10 — CSP: drop `unsafe-inline` from script-src (security).** `script-src` no
+longer carries `unsafe-inline` (or `blob:`). `tools/sync-csp-hashes.js`
+sha256-hashes the 9 inline `<script>` blocks into the CSP allow-list — nonces are
+impossible on static hosting (Pages + the Android asset loader serve byte-for-byte,
+no server to mint a per-response value). Wired into `build:csp` (before
+`build:sw`), pre-commit (re-stages index.html), and CI (`check:csp` --check +
+index.html in the bundle-match diff), so an inline-script edit can't silently drift
+the policy into a black screen. **Verified on BOTH platforms:** web preview
+(clean-slate) — all 9 inline scripts execute, app boots, 0 CSP violations; AND the
+**API-28 emulator (WebView 69)** — app FULLY RENDERS (screenshot proof), 0 "Refused
+to execute inline script" in logcat. Two non-obvious traps solved: (1) hash over
+CR-STRIPPED content — the HTML parser normalizes CR/CRLF→LF before computing the
+CSP hash, so tokens match whether the file is served LF (Pages) or CRLF (a
+Windows-built APK); (2) STRIP HTML comments before extracting scripts (the browser
+hashes only real `<script>` ELEMENTS, never commented prose). `style-src` KEEPS
+`unsafe-inline` by necessity (React `style={{}}` emits dynamic inline `style=""`
+attributes — no static hash/nonce path). img/connect-src host-narrowing deferred to
+U21 (narrowing risks re-breaking Garden's github→githubusercontent 302 redirect).
+
+---
+
 ## 8/10 UPLIFT — Wave 1 (P0 + P1) + the search-quality fix (2026-06-01)
 
 Commits `6f2615d..a989514`. A deep 7-subsystem review (frontend, storage,
