@@ -2266,24 +2266,22 @@ regression testing for the migration surfaces.
        Promise resolved via evaluateJavascript when PixelCopy finishes.
        LOW urgency: bounded, not concurrent, and the sync contract was a
        deliberate N1.7 choice ([[explicit-async-decision]]).
-    #3 Garden native image cache (Android) — MEDIUM, data-usage. Garden
-       images are fetched from GitHub Releases per view and held ONLY in
-       an in-memory cache (garden.js gardenImageCache), so every app
-       refresh re-downloads them — costly for limited-data users reading
-       the 209-page book over days. JS can't cache them (GitHub sends no
-       CORS headers → fetch() fails; only <img> display works), and the
-       PWA Service Worker that COULD opaque-cache them never runs on
-       Android (sw-register skips Android by design). Fix on the native
-       side: a WebViewClient.shouldInterceptRequest in MainActivity that
-       recognizes the garden_NNN.jpg release URLs, serves a cached copy
-       when present, else fetches + stores to a capped app-private dir.
-       KEY: key the cache by PAGE NUMBER only (strip the tier from the
-       URL) so re-reading at a new quality OVERWRITES the same page —
-       never 5 copies of 200 images at different tiers (user directive
-       2026-05-31). Bound to ≤209 entries. The CSP + "failed to load"
-       fix already shipped (1423bda); this is purely the offline/no-
-       re-download cache. Excluded from the export + "your data" count
-       (app data, regenerable).
+    #3 Garden native image cache (Android) — DONE 2026-05-31 (9483500).
+       Was also the fix for per-page-turn LAG, not just data-usage: the
+       GitHub release URL 302-redirects to a no-cache signed asset, so the
+       WebView re-downloaded every image + re-did the redirect hop on every
+       navigation (invisible on desktop's fast pipe; a stall on a phone).
+       JS can't cache them (no CORS → fetch fails) and the PWA SW never
+       runs on Android, so it's native: GardenImageCache in MainActivity's
+       shouldInterceptRequest serves from / populates cacheDir/garden/,
+       KEYED BY PAGE NUMBER (tier stripped) so a quality change overwrites
+       rather than accumulating copies (≤209 files). Cap 800 MB — measured
+       Ultra at ~3.5 MB/page avg (~720 MB full read), so a full read of any
+       tier incl. Ultra never evicts mid-browse (an initial 260 MB cap was
+       observed churning Ultra and was raised). Atomic writes; failures
+       degrade to null (WebView loads normally). Device-verified on Ultra:
+       accumulated to 176 files / 586 MB with zero eviction + zero errors;
+       6 GardenImageCacheTest cases. App data, not in export / "your data".
 
   Exit criteria:
     [ ] Android 287-item walk: all PASS
