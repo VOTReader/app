@@ -298,15 +298,61 @@ async function evictStaleCache(keepKeys) {
   if (removed > 0) console.log('[VotSearch][cache] evicted ' + removed + ' stale index generation(s)');
   return removed;
 }
-// Boot-time reclaim: drop every cached index except the current-signature
-// entries for the two corpora at the active translation. Frees disk that
-// accumulated before the self-evicting saveToCache() (below) existed,
-// without forcing a rebuild — if the live entries are present they stay and
-// the next ensureIndex() is still a cache HIT.
-async function purgeStaleCache(code) {
-  code = code || 'nkjv';
-  var keep = [dataSignature(code, 'scriptures'), dataSignature(code, 'volumes')];
-  try { return await evictStaleCache(keep); } catch (e) { return 0; }
+// Every cached entry as { key, corpus, savedAt }. corpus is parsed from the
+// key's `cp:<corpus>` segment; savedAt from the stored value (0 if absent).
+// Used by the signature-INDEPENDENT boot purge below.
+function cacheEntries() {
+  return openCacheDb().then(function (db) {
+    return new Promise(function (resolve) {
+      try {
+        var tx = db.transaction(CACHE_STORE, 'readonly');
+        var req = tx.objectStore(CACHE_STORE).openCursor();
+        var out = [];
+        req.onsuccess = function (e) {
+          var cur = e.target.result;
+          if (cur) {
+            var key = String(cur.key);
+            var m = key.match(/cp:([a-z]+)/);
+            out.push({ key: key, corpus: m ? m[1] : '?', savedAt: (cur.value && cur.value.savedAt) || 0 });
+            cur.continue();
+          } else { resolve(out); }
+        };
+        req.onerror = function () { resolve([]); };
+      } catch (e) { resolve([]); }
+    });
+  }).catch(function () { return []; });
+}
+
+// Boot-time reclaim: keep only the NEWEST entry per corpus, evict the rest.
+//
+// This is deliberately signature-INDEPENDENT. The earlier version kept
+// dataSignature(code, corpus) — but dataSignature reads the lazy corpus
+// globals (BOOKS / MATTHEW / LETTERS_*), which are NOT loaded at app boot,
+// so the boot-time signature (…mt0…bk0.0) never matched the real cached
+// keys (…mt28…bk66.N) and the purge couldn't identify the live entry. By
+// grouping on the key's cp:<corpus> segment and keeping the max-savedAt in
+// each group, we reclaim regardless of when corpora load: the freshest
+// Scriptures index + the freshest Volumes index survive (those are what the
+// next ensureIndex cache-hits), every older generation is dropped. Returns
+// the number removed.
+async function purgeStaleCache(_code) {
+  try {
+    var entries = await cacheEntries();
+    if (entries.length <= 1) return 0;
+    var newestPerCorpus = {};
+    entries.forEach(function (e) {
+      var cur = newestPerCorpus[e.corpus];
+      if (!cur || e.savedAt > cur.savedAt) newestPerCorpus[e.corpus] = e;
+    });
+    var keep = {};
+    Object.keys(newestPerCorpus).forEach(function (c) { keep[newestPerCorpus[c].key] = true; });
+    var removed = 0;
+    for (var i = 0; i < entries.length; i++) {
+      if (!keep[entries[i].key]) { await cacheDelete(entries[i].key); removed++; }
+    }
+    if (removed > 0) console.log('[VotSearch][cache] boot purge removed ' + removed + ' stale index generation(s)');
+    return removed;
+  } catch (e) { return 0; }
 }
 
 function bookTestament(bookId) {

@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-88fbd7eef5';
+const CACHE_VERSION = 'v1.0.2-5106c5f5d8';
 const CORPUS_VERSION = 'c5'; // c4→c5 (2026-05-31): footnote pile-strip — remaining "N." verse markers added to volume-two + wtlb-scriptures so every multi-verse footnote splits into gold sups (the marker-less guessing heuristics were deleted from scripture-parse); re-fetch the corrected corpus.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
