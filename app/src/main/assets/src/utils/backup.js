@@ -261,6 +261,7 @@ function _whenSaved(s) {
  * @property {(name: string, payload: any) => string[]} validateStorePayload
  * @property {(id: string, record: any) => string[]} validateMediaRecord
  * @property {string[]} [dataLsKeys]
+ * @property {number} [mediaTotalLimitBytes] - aggregate decoded-media ceiling (S5)
  */
 
 /**
@@ -284,6 +285,7 @@ export async function applyImportPayload(parsed, ctx) {
     storesMap, flagMap, mediaStore,
     validateStorePayload, validateMediaRecord,
     dataLsKeys = DEFAULT_DATA_LS_KEYS,
+    mediaTotalLimitBytes = DEFAULT_MEDIA_LIMIT_BYTES,
   } = ctx;
 
   const exportVersion = (parsed && parsed.exportVersion) || 1;
@@ -358,6 +360,18 @@ export async function applyImportPayload(parsed, ctx) {
       const existingIds = await mediaStore.allIds();
       for (const id of existingIds) await mediaStore.delete(id);
     } catch (e) { console.warn('clear existing media failed', e); }
+    // S5: aggregate decoded-byte guard. validateMediaRecord caps EACH record
+    // (100 MB), but a hand-edited backup can carry many sub-cap records that sum
+    // to GBs; our own export refuses a backup whose TOTAL decoded media exceeds
+    // DEFAULT_MEDIA_LIMIT_BYTES (buildExportPayload :196), so anything past that
+    // isn't a backup we produced. Stop decoding once the running total would
+    // exceed the cap so the base64->Blob decode can't OOM a budget device. (The
+    // raw import FILE is also size-capped upstream — platform-bridge /
+    // StorageManager — so this is defense-in-depth for the decode phase + any
+    // path that bypasses that file cap.) Skipped records count as importFailures
+    // so the caller's summary toast reports them.
+    let totalMediaBytes = 0;
+    let mediaCapHit = false;
     for (const id of Object.keys(parsed.media)) {
       const record = parsed.media[id];
       const mediaViolations = validateMediaRecord(id, record);
@@ -366,6 +380,15 @@ export async function applyImportPayload(parsed, ctx) {
         console.warn('skipping invalid media record:', id, mediaViolations);
         continue;
       }
+      // 4 base64 chars -> 3 bytes (same estimate validateMediaRecord uses).
+      const approxBytes = Math.floor((record.data.length * 3) / 4);
+      if (totalMediaBytes + approxBytes > mediaTotalLimitBytes) {
+        importFailures += 1;
+        mediaCapHit = true;
+        console.warn('skipping media past aggregate cap:', id);
+        continue;
+      }
+      totalMediaBytes += approxBytes; // count what we're about to decode
       try {
         const blob = base64ToBlob(record.data, record.mime);
         await mediaStore.put({
@@ -375,6 +398,9 @@ export async function applyImportPayload(parsed, ctx) {
           created: record.created,
         });
       } catch (e) { importFailures += 1; console.warn('media import failed for', id, e); }
+    }
+    if (mediaCapHit) {
+      console.warn('import: media aggregate cap (' + mediaTotalLimitBytes + ' bytes) reached; some media skipped');
     }
   }
 

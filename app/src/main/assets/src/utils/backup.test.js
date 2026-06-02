@@ -295,6 +295,46 @@ describe('applyImportPayload', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  it('S5: stops importing media once the aggregate decoded-byte cap is hit', async () => {
+    const put = vi.fn(async () => {});
+    const okB64 = 'QUJDREVG'; // 8 base64 chars → ~6 decoded bytes each
+    const res = await applyImportPayload(
+      { exportVersion: 2, media: {
+        m1: { data: okB64, mime: 'image/jpeg' },
+        m2: { data: okB64, mime: 'image/jpeg' },
+        m3: { data: okB64, mime: 'image/jpeg' },
+      } },
+      {
+        storesMap: {}, flagMap: {},
+        mediaStore: { allIds: async () => [], delete: async () => {}, put },
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+        mediaTotalLimitBytes: 12, // fits exactly two ~6-byte records; the third overflows
+      },
+    );
+    // m1 + m2 imported (6 + 6 = 12 ≤ cap); m3 skipped before decode (18 > 12).
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(res.importFailures).toBe(1);
+  });
+
+  it('S5: the cap is a no-op for legit media under the default ceiling', async () => {
+    const put = vi.fn(async () => {});
+    const okB64 = 'QUJDREVG';
+    const res = await applyImportPayload(
+      { exportVersion: 2, media: {
+        m1: { data: okB64, mime: 'image/jpeg' },
+        m2: { data: okB64, mime: 'image/png' },
+      } },
+      {
+        storesMap: {}, flagMap: {},
+        mediaStore: { allIds: async () => [], delete: async () => {}, put },
+        validateStorePayload: okValidate, validateMediaRecord: okValidate,
+        // no mediaTotalLimitBytes → default 100 MB
+      },
+    );
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(res.importFailures).toBe(0);
+  });
+
   it('reseeds the LS data block (vot- keys only)', async () => {
     await applyImportPayload(
       { exportVersion: 2, data: { 'vot-state': '{"theme":"dark"}', 'evil': 'nope' }, stores: {} },
