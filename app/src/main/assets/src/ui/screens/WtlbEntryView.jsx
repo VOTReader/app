@@ -2,6 +2,13 @@
    WtlbEntryView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
+    corpus loads — "esther" → "Esther". BOOKS[id].title is preferred when
+    available; this only keeps the inline link from showing a raw lowercase id. */
+function _prettyBookId(id) {
+  return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
 export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
@@ -152,7 +159,12 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
       const navMatch = seg.match(/^\{\{nav:([^:]+):(\d+)\}\}$/);
       if (navMatch) {
         const bookId = navMatch[1], ch = parseInt(navMatch[2], 10);
-        const bookTitle = BOOKS[bookId]?.title || bookId;
+        // BOOKS is the LAZY Bible corpus (var in bundle-a-bible.js), undeclared
+        // until __loadBibleCorpus resolves. A bare BOOKS[bookId] throws a
+        // ReferenceError here on a cold-boot WTLB read (VolumesHome pre-fires
+        // only the VOT corpus) — the `?.` does NOT guard the base identifier.
+        // Guard with typeof; fall back to a readable book name until it loads.
+        const bookTitle = (typeof BOOKS !== 'undefined' && BOOKS[bookId]?.title) || _prettyBookId(bookId);
         return (
           <a key={si} className="fn-link" href="#" onClick={(e) => { e.preventDefault(); onNavToChapter(bookId, ch); }}>
             [{bookTitle} {ch}]

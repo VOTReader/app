@@ -514,7 +514,7 @@ function App() {
   const handleScriptureSelect = (id, clearGenre) => {
     if (clearGenre) setGenreId(null);
     if (id === "matthew") {setBookId("matthew");setChapterNum(null);setScreen("matthew-idx");} else
-    if (BOOKS[id]) {setBookId(id);if (BOOKS[id].chapters.length === 1) {setChapterNum(1);setScreen("bible-ch");} else {setChapterNum(null);setScreen("bible-idx");}}
+    if (typeof BOOKS !== 'undefined' && BOOKS[id]) {setBookId(id);if (BOOKS[id].chapters.length === 1) {setChapterNum(1);setScreen("bible-ch");} else {setChapterNum(null);setScreen("bible-idx");}}
   };
   const handleVolumeSelect = (id) => {
     const col = COL_BY_CARD.get(id);
