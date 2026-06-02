@@ -107,6 +107,22 @@ export var JournalMediaStore = (function() {
     return 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
   }
 
+  /**
+   * S2 — settle on the TRANSACTION's abort/error, not just the request. A
+   * request's onsuccess can fire BEFORE the tx commits; if the tx then aborts
+   * (QuotaExceeded at commit, or a concurrent versionchange forcing db.close()),
+   * neither req.onsuccess nor req.onerror re-fires — so a promise that waits only
+   * on the request would hang FOREVER. The import awaits each media put with no
+   * timeout, so one such hang freezes the whole import (the only backup). Reject.
+   * @param {IDBObjectStore} store
+   * @param {(reason?: any) => void} reject
+   */
+  function guardTx(store, reject) {
+    var t = store.transaction;
+    t.addEventListener('abort', function() { reject(t.error || new Error('media transaction aborted')); });
+    t.addEventListener('error', function() { reject(t.error || new Error('media transaction error')); });
+  }
+
   return {
     /**
      * Insert a media record. Auto-generates id/created/size/mime when
@@ -126,11 +142,16 @@ export var JournalMediaStore = (function() {
       return tx('readwrite').then(function(store) {
         return new Promise(function(resolve, reject) {
           var req = store.put(record);
+          // Pre-warm the URL cache on the request, but RESOLVE only once the tx
+          // COMMITS — so a put the caller awaits (e.g. the import) is genuinely
+          // durable. (req.onsuccess fires before commit; an abort after it used
+          // to look like success.)
           req.onsuccess = function() {
             try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
-            resolve(record.id);
           };
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          store.transaction.addEventListener('complete', function() { resolve(record.id); });
+          guardTx(store, reject);
         });
       });
     },
@@ -148,6 +169,7 @@ export var JournalMediaStore = (function() {
           var req = store.get(id);
           req.onsuccess = function(e) { resolve(/** @type {IDBRequest} */ (e.target).result || null); };
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          guardTx(store, reject);
         });
       });
     },
@@ -166,8 +188,9 @@ export var JournalMediaStore = (function() {
       return tx('readwrite').then(function(store) {
         return new Promise(function(resolve, reject) {
           var req = store.delete(id);
-          req.onsuccess = function() { resolve(); };
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          store.transaction.addEventListener('complete', function() { resolve(); });
+          guardTx(store, reject);
         });
       });
     },
@@ -194,6 +217,7 @@ export var JournalMediaStore = (function() {
             }
           };
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          guardTx(store, reject);
         });
       });
     },
@@ -219,6 +243,7 @@ export var JournalMediaStore = (function() {
             }
           };
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          guardTx(store, reject);
         });
       });
     },
