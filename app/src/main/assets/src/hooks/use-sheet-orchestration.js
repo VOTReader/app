@@ -6,12 +6,6 @@
 
    OWNS:
      - annChip state             { x, y, hlKey, groupId } | null
-     - linkSidebarKey state      hlKey | null
-     - linkPickerSource state    { key, label, ... } | null
-     - linkRefineRequest state   { kind, target, item } | null
-     - lastLinkCreated state     most recently created link, for undo
-     - linkPickerMode state      null | 'card' | 'excerpt'
-     - linkPickerOnPickRef       useRef — callback for target-picker mode
      - noteSheetTarget state     { groupId, startInEditMode } | null
      - notebookPickerTarget state  groupId | null
      - multiNotePayload state    { groupIds, x, y } | null
@@ -19,12 +13,16 @@
      - bookmarkCreatePending state   { hlKey, sourceLabel, excerpt,
                                        defaultLabel, ... } | null
      - inboundJournalPayload state   { refKey, label } | null
-     - openLinkSidebar / closeLinkSidebar      (useCallback)
-     - openLinkPicker / closeLinkPicker         (useCallback)
-     - openLinkPickerForTarget                  (useCallback)
      - openNoteSheet / closeNoteSheet           (useCallback)
-     - 10 window.__open* / __show* bridge effects (all with delete cleanup)
+     - 7 window.__open* / __show* bridge effects (all with delete cleanup)
      - auto-dismiss effect (clears note/chip/multi/bookmark on nav change)
+
+   DELEGATES (spread into the return; App()'s destructure is unchanged):
+     - the link-picker / link-sidebar sub-domain → useLinkPickerOrchestration
+       (use-link-picker-orchestration.js) — linkSidebarKey, linkPickerSource /
+       linkPickerMode / linkRefineRequest, lastLinkCreated, linkPickerOnPickRef
+       + their openers/closers + the __openLinkPicker / __openLinkPickerForTarget
+       / __openLinkSidebar bridges.
 
    DOES NOT OWN:
      - _navToLinkRef + navigateToLink — P6j territory; not touched here
@@ -60,12 +58,10 @@
      None. All state is in-memory React state; nothing persisted to
      localStorage directly. The render tree consumes the returned values.
 
-   WINDOW: 10 handler bridges, each wired in its own effect and torn down
-     with `delete` in that effect's cleanup —
-       __openLinkPicker          → openLinkPicker
-       __openLinkPickerForTarget → openLinkPickerForTarget
+   WINDOW: 7 handler bridges, each wired in its own effect and torn down
+     with `delete` in that effect's cleanup (the 3 link-picker bridges moved to
+     useLinkPickerOrchestration) —
        __openNote                → openNoteSheet
-       __openLinkSidebar         → openLinkSidebar
        __showAnnChip             → inline setAnnChip(x,y,hlKey,groupId)
        __showMultiNote           → inline setMultiNotePayload(groupIds,x,y)
        __openBookmarkPopover     → inline setBookmarkPopoverPayload(...)
@@ -76,13 +72,16 @@
      auto-dismiss effect — owned by SelectionToolbar).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { useLinkPickerOrchestration } from './use-link-picker-orchestration.js';
+
 /**
- * Sheet/overlay state container + window-bridge wirings. Owns ~9 sheet
- * state slots (annChip / linkSidebarKey / linkPickerSource /
- * linkRefineRequest / lastLinkCreated / linkPickerMode / noteSheetTarget /
- * notebookPickerTarget / multiNotePayload), every "open this sheet"
- * window bridge (__openLinkSidebar / __openNoteSheet / etc), and the
- * auto-dismiss effects that close sheets when nav state changes.
+ * Sheet/overlay state container + window-bridge wirings. Owns the transient
+ * overlay state slots (annChip / noteSheetTarget / notebookPickerTarget /
+ * multiNotePayload / bookmarkPopoverPayload / bookmarkCreatePending /
+ * inboundJournalPayload), their "open this sheet" window bridges, and the
+ * auto-dismiss effects that close sheets when nav state changes. The
+ * link-picker / link-sidebar sub-domain is delegated to
+ * useLinkPickerOrchestration and spread into the return.
  *
  * The returned surface is wide on purpose — App() destructures every
  * sheet state slot + setter so render-tree branches can wire components
@@ -103,17 +102,10 @@ export function useSheetOrchestration({
 }) {
   // ── State slots ────────────────────────────────────────────────────────
   const [annChip, setAnnChip] = React.useState(null);                  // { x, y, hlKey, groupId } or null
-  const [linkSidebarKey, setLinkSidebarKey] = React.useState(null);   // hlKey or null
-  const [linkPickerSource, setLinkPickerSource] = React.useState(null); // { key, label } or null
-  const [linkRefineRequest, setLinkRefineRequest] = React.useState(null); // { kind, target, item } or null
-  const [lastLinkCreated, setLastLinkCreated] = React.useState(null); // most recently created link, for undo
-  // Picker mode — when set, LinkPicker behaves as a target picker (no source,
-  // no link persistence); the selected/refined target is handed back via
-  // linkPickerOnPickRef.current. Used by Journal to drive the LinkPicker for
-  // "Insert Card" (mode='card', no excerpt prompt) and "Insert Excerpt"
-  // (mode='excerpt', always refine through verse/letter picker).
-  const [linkPickerMode, setLinkPickerMode] = React.useState(null); // null | 'card' | 'excerpt'
-  const linkPickerOnPickRef = React.useRef(null);
+  // Link-picker / link-sidebar sub-domain — extracted to its own cohesive
+  // hook (see use-link-picker-orchestration.js); spread into the return below
+  // so App()'s destructure is unchanged.
+  const linkPicker = useLinkPickerOrchestration();
   const [noteSheetTarget, setNoteSheetTarget] = React.useState(null);  // { groupId, startInEditMode } or null
   const [notebookPickerTarget, setNotebookPickerTarget] = React.useState(null); // groupId or null
   const [multiNotePayload, setMultiNotePayload] = React.useState(null); // { groupIds, x, y } or null
@@ -122,55 +114,6 @@ export function useSheetOrchestration({
   const [inboundJournalPayload, setInboundJournalPayload] = React.useState(null);
 
   // ── Opener / closer useCallbacks ───────────────────────────────────────
-  const openLinkSidebar = React.useCallback((hlKey) => setLinkSidebarKey(hlKey), []);
-  const closeLinkSidebar = React.useCallback(() => setLinkSidebarKey(null), []);
-  const openLinkPicker = React.useCallback((selInfo) => {
-    const hlKey = typeof selInfo === 'string' ? selInfo : selInfo.hlKey;
-    if (!hlKey) return;
-    const parts = hlKey.split(':');
-    let label = hlKey;
-    if (parts[0] === 'bible') {
-      const b = _allBooks()[parts[1]];
-      label = (b ? b.title : parts[1]) + ' ' + parts[2] + ':' + parts[3];
-    } else if (parts[0] === 'study') {
-      // study:bookId-chapter:verse  e.g. "study:matthew-4:7"
-      const m = parts[1].match(/^(.+)-(\d+)$/);
-      if (m) label = (m[1].charAt(0).toUpperCase() + m[1].slice(1)) + ' ' + m[2] + (parts[2] && parts[2] !== '0' ? ':' + parts[2] : '');
-    } else if (parts[0] === 'letter' || parts[0] === 'wtlb' || parts[0] === 'blessed' || parts[0] === 'holy-days') {
-      // Centralized lookup also covers Bible-Study chapters (whose source
-      // hlKey shape is "letter:{chapterId}:N" because LetterView renders them).
-      const ctx = findEntryContext(parts[1], parts[0]);
-      if (ctx && ctx.title) label = ctx.title;
-    } else if (parts[0] === 'journal') {
-      // journal:<entryId>:<blockIdx>
-      const eid = parts[1];
-      const je = (typeof JournalStore !== 'undefined') ? JournalStore.get(eid) : null;
-      if (je && typeof JournalHelpers !== 'undefined') {
-        label = 'Journal · ' + (JournalHelpers.entryDisplayTitle(je) || 'Untitled');
-      }
-    }
-    const src = typeof selInfo === 'string'
-      ? { key: hlKey, label }
-      : { key: hlKey, label, start: selInfo.start, end: selInfo.end, text: selInfo.text };
-    setLinkPickerSource(src);
-  }, []);
-  const closeLinkPicker = React.useCallback(() => { setLinkPickerSource(null); setLinkRefineRequest(null); setLastLinkCreated(null); setLinkPickerMode(null); linkPickerOnPickRef.current = null; }, []);
-  // Picker mode — Journal calls this to open LinkPicker as a target picker.
-  //   mode: 'card'    → return target after the first item is chosen (no
-  //                     verse/excerpt prompt). Used for "Insert Card".
-  //   mode: 'excerpt' → always run the verse/letter excerpt picker so the
-  //                     user can pick a character-precise span. Used for
-  //                     "Insert Excerpt".
-  // onPick receives the chosen target endpoint (+ optional refinement data).
-  const openLinkPickerForTarget = React.useCallback((mode, onPick) => {
-    linkPickerOnPickRef.current = typeof onPick === 'function' ? onPick : null;
-    // Use a sentinel source object so the render conditions ("source &&
-    // !refine") still fire — but no real source key/label exists.
-    setLinkPickerSource({ key: null, label: null, picker: true });
-    setLinkPickerMode(mode || 'card');
-    setLinkRefineRequest(null);
-    setLastLinkCreated(null);
-  }, []);
   const openNoteSheet = React.useCallback((groupId, startInEditMode) => {
     setNoteSheetTarget({ groupId, startInEditMode: !!startInEditMode });
     setAnnChip(null);
@@ -178,22 +121,10 @@ export function useSheetOrchestration({
   const closeNoteSheet = React.useCallback(() => setNoteSheetTarget(null), []);
 
   // ── Window-bridge effects ──────────────────────────────────────────────
-  // Expose openLinkPicker globally so the SelectionToolbar can invoke it
-  // from anywhere (Bible/Letter/WTLB views), and so tests / hardware-back
-  // handling can interact with it without prop-drilling.
-  React.useEffect(() => {
-    window.__openLinkPicker = openLinkPicker;
-    window.__openLinkPickerForTarget = openLinkPickerForTarget;
-    return () => {
-      delete window.__openLinkPicker;
-      delete window.__openLinkPickerForTarget;
-    };
-  }, [openLinkPicker, openLinkPickerForTarget]);
+  // (The link-picker / link-sidebar bridges — __openLinkPicker,
+  // __openLinkPickerForTarget, __openLinkSidebar — live in
+  // useLinkPickerOrchestration now.)
   React.useEffect(() => { window.__openNote = openNoteSheet; return () => { delete window.__openNote; }; }, [openNoteSheet]);
-  // Apply DOM-based highlights + inline link icons to LetterView/WtlbEntryView
-  // containers after React renders. HighlightableText handles BibleChapterView/
-  // ChapterView. window.__openLinkSidebar is read by inline link icon clicks.
-  React.useEffect(() => { window.__openLinkSidebar = openLinkSidebar; return () => { delete window.__openLinkSidebar; }; }, [openLinkSidebar]);
   React.useEffect(() => { window.__showAnnChip = (x, y, hlKey, groupId) => setAnnChip({ x, y, hlKey, groupId }); return () => { delete window.__showAnnChip; }; }, []);
   React.useEffect(() => { window.__showMultiNote = (groupIds, x, y) => setMultiNotePayload({ groupIds, x, y }); return () => { delete window.__showMultiNote; }; }, []);
   React.useEffect(() => { window.__openBookmarkPopover = (bkmIds, x, y, hlKey) => setBookmarkPopoverPayload({ bkmIds, x, y, hlKey }); return () => { delete window.__openBookmarkPopover; }; }, []);
@@ -261,11 +192,7 @@ export function useSheetOrchestration({
   // ── Return ─────────────────────────────────────────────────────────────
   return {
     annChip, setAnnChip,
-    linkSidebarKey, openLinkSidebar, closeLinkSidebar,
-    linkPickerSource, openLinkPicker, openLinkPickerForTarget, closeLinkPicker,
-    linkRefineRequest, setLinkRefineRequest,
-    lastLinkCreated, setLastLinkCreated,
-    linkPickerMode, linkPickerOnPickRef,
+    ...linkPicker, // linkSidebarKey/openLinkSidebar/linkPickerSource/openLinkPicker/… (use-link-picker-orchestration.js)
     noteSheetTarget, setNoteSheetTarget, openNoteSheet, closeNoteSheet,
     notebookPickerTarget, setNotebookPickerTarget,
     multiNotePayload, setMultiNotePayload,
