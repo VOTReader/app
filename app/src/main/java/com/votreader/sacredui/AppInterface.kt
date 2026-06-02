@@ -105,7 +105,17 @@ class AppInterface(
     fun startAudioSession() {
         host.postToUi {
             val am = host.audioSystemService ?: return@postToUi
-            vm.previousAudioMode = am.mode
+            // N2: only capture the prior mode when we're NOT already in a
+            // recording session. A double startAudioSession() without an
+            // intervening endAudioSession() (a recovery re-fire, a re-mounted
+            // sheet, or a start after a failed stop) would otherwise save
+            // MODE_IN_COMMUNICATION as "previous", and endAudioSession() would
+            // then restore TO communication mode and never return to normal —
+            // stranding the device on earpiece routing. The normal path (mode is
+            // NORMAL at start) is unchanged.
+            if (am.mode != AudioManager.MODE_IN_COMMUNICATION) {
+                vm.previousAudioMode = am.mode
+            }
             try {
                 am.mode = AudioManager.MODE_IN_COMMUNICATION
             } catch (e: Exception) {

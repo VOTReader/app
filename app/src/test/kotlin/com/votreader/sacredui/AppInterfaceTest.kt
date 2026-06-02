@@ -226,6 +226,24 @@ class AppInterfaceTest {
     }
 
     @Test
+    fun `startAudioSession does NOT re-save prior mode on a double-start (N2 guard)`() {
+        val am = mockk<AudioManager>(relaxed = true)
+        every { am.mode } returns AudioManager.MODE_IN_COMMUNICATION // already mid-session
+        every { am.mode = any() } just Runs
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = mockk<MainViewModel>(relaxed = true)
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.startAudioSession()
+
+        // N2: a second start (mode already COMMUNICATION) must NOT overwrite
+        // previousAudioMode — otherwise endAudioSession would restore TO
+        // communication mode and strand the device. The mode is still applied.
+        verify(exactly = 0) { vm.previousAudioMode = any() }
+        verify { am.mode = AudioManager.MODE_IN_COMMUNICATION }
+    }
+
+    @Test
     fun `startAudioSession is a safe no-op when AudioManager is null`() {
         val host = FakeBridgeHost() // audioSystemService = null
         val vm = mockk<MainViewModel>(relaxed = true)
