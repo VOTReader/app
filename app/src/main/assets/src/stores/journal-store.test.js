@@ -230,6 +230,58 @@ describe('JournalStore.remove() — cross-store cascade', () => {
 });
 
 /* ──────────────────────────────────────────────────────────────
+   D6 — the cross-store cascade must be ATOMIC under degraded/pending
+   hydration. _scanAssociated reads the loaded TARGET stores by key
+   prefix, so without a guard the cascade fires DURABLY during the
+   _applyToPendingCache overlay — while the entry deletion is only
+   queued. That risks a half-applied delete (associations purged but
+   the entry kept = orphan, if hydration never completes) and a double
+   recordDeletion at replay. The cascade must be deferred to replay.
+   ────────────────────────────────────────────────────────────── */
+describe('JournalStore.remove() — cascade is atomic under degraded hydration', () => {
+  it('defers the cross-store cascade + stats to replay (no premature purge, no double recordDeletion)', () => {
+    // Target stores stay loaded (beforeEach); JournalStore goes degraded.
+    JournalStore._resetForTests();        // idb-backed → 'pending'
+    JournalStore._state = 'degraded';     // exercise the degraded label
+    expect(JournalStore.getState()).toBe('degraded');
+
+    const jid = 'j_degraded_1';
+    const jkey = 'journal:' + jid + ':0';
+
+    // Associations for the entry, seeded in the (loaded) target stores.
+    AnnotationStore.add(jkey, { id: 'hl_x', start: 0, end: 5, kind: 'highlight', color: 'yellow' });
+    AnnotationStore.add(jkey, { id: 'note_x', start: 6, end: 9, kind: 'note', groupId: 'gid_x' });
+    NoteStore.set('gid_x', { body: 'note', keys: [jkey] });
+    BookmarkStore.add({ id: 'bk_x', hlKey: 'journal:' + jid + ':1', label: 'b' });
+
+    // Seed stats to 2 so a single decrement (→1) is distinguishable from a
+    // double decrement (→0). recordDeletion clamps at 0.
+    JournalStatsStore.recordNewEntry(Date.now());
+    JournalStatsStore.recordNewEntry(Date.now());
+    expect(JournalStatsStore.get().totalEntries).toBe(2);
+
+    // ACT 1 — delete while degraded: queued + applied to the overlay only.
+    // The DURABLE cross-store cascade + stats MUST NOT fire yet (else an
+    // app close before hydration would orphan the entry).
+    JournalStore.remove(jid);
+    expect(AnnotationStore.all()[jkey]).toBeDefined();
+    expect(NoteStore.get('gid_x')).not.toBeNull();
+    expect(BookmarkStore.get('bk_x')).not.toBeNull();
+    expect(JournalStatsStore.get().totalEntries).toBe(2); // no premature decrement
+
+    // ACT 2 — hydration completes with IDB data containing the entry; the
+    // queued 'remove' replays and the cascade fires exactly ONCE.
+    JournalStore._rebaseAndPromote({ list: [{ id: jid, title: 'E' }] });
+    expect(JournalStore.getState()).toBe('loaded');
+    expect(JournalStore.get(jid)).toBeNull();
+    expect(AnnotationStore.all()[jkey]).toBeUndefined();
+    expect(NoteStore.get('gid_x')).toBeNull();
+    expect(BookmarkStore.get('bk_x')).toBeNull();
+    expect(JournalStatsStore.get().totalEntries).toBe(1); // ONE decrement, not two
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────
    JournalStore.pruneNotebook — symmetric to NoteStore.pruneNotebook
    ────────────────────────────────────────────────────────────── */
 describe('JournalStore.pruneNotebook — cascade from journal-notebook deletion', () => {

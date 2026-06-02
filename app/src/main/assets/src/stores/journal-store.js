@@ -347,13 +347,29 @@ export var JournalStore = extendStore(
     remove(id) {
       if (!id) return;
       if (this._shouldDefer('remove', id)) return;
-      this._purgeAssociated(id);
+      // D6 — the cross-store cascade + index/stats updates are DURABLE
+      // real-apply effects; they must NOT fire during the pending/degraded
+      // overlay simulation (_applyToPendingCache → _applyingPending=true).
+      // There the entry deletion is only QUEUED (not yet durable), but
+      // _scanAssociated reads the loaded TARGET stores by key-prefix — so the
+      // cascade would durably purge the associations (NoteStore/Annotation/
+      // Bookmark/Link writes) + decrement stats immediately. If hydration
+      // never completes (app closed while degraded), the delete is then
+      // half-applied: associations gone but the entry kept = orphan; and the
+      // cascade/stats also re-fire at replay (double recordDeletion). Gating
+      // on !_applyingPending makes the whole delete atomic — it runs exactly
+      // once, on the loaded path or on queue replay, never during the overlay.
+      // The local list mutation below always runs so the overlay still
+      // reflects the deletion immediately for the UI.
+      if (!this._applyingPending) this._purgeAssociated(id);
       var data = this._load();
       data.list = (data.list || []).filter(function(e) { return e.id !== id; });
       this._save();
       this._bump();
-      if (typeof JournalIndexStore !== 'undefined') JournalIndexStore.removeEntry(id);
-      if (typeof JournalStatsStore !== 'undefined') JournalStatsStore.recordDeletion();
+      if (!this._applyingPending) {
+        if (typeof JournalIndexStore !== 'undefined') JournalIndexStore.removeEntry(id);
+        if (typeof JournalStatsStore !== 'undefined') JournalStatsStore.recordDeletion();
+      }
     },
 
     /**
