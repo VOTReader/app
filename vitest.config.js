@@ -241,6 +241,24 @@ export default defineConfig({
         branches: 51,
         functions: 64,
         lines: 64,
+        // T3: PER-FILE floors for the hot files the AGGREGATE masks. The global
+        // mean (64/54/69/68) sat well above the floor while journal-store and the
+        // DOM overlays rendered on EVERY Android annotation pass sit far below it —
+        // a localized regression there (e.g. journal-store's search/scan paths)
+        // would hide behind an unrelated gain. An exact-file glob key thresholds
+        // that single file. Locked just below current per-file coverage (1678
+        // tests); ratchet upward with new tests, never lower (same discipline as
+        // the aggregate). Current: journal-store 51.82/42.48/62/56.12 · dom-links
+        // 60.28/53.93/73.33/62.18 · dom-bookmarks 63.37/51.92/75/66.19.
+        'app/src/main/assets/src/stores/journal-store.js': {
+          statements: 50, branches: 41, functions: 60, lines: 54,
+        },
+        'app/src/main/assets/src/renderer/dom-links.js': {
+          statements: 58, branches: 52, functions: 72, lines: 60,
+        },
+        'app/src/main/assets/src/renderer/dom-bookmarks.js': {
+          statements: 61, branches: 50, functions: 73, lines: 64,
+        },
       },
     },
   },
