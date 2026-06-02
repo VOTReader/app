@@ -247,9 +247,36 @@
      aborts install → no silent pin to the old version). +service-worker.test.js
      (first SW test): mocked self/caches/fetch, proves best-effort 404 RESOLVES
      install + critical 404 REJECTS it. vitest → 1704/70.
-   OWED next in Wave 4: PF4, PF2, PF5, PF3. Then F1+F2 render fan-out, the
-   annotation cluster, UX round-trips, CQ/B hygiene, PWA polish, storage/journal
-   edges. (full list below in P1/P2/P3.)
+   • CQ2/B10/B9 (400563b) — deleted dead data-normalize.js + data-schema.d.ts
+     (0 refs, tsc clean without them) + the JSX-era one-shot tooling (6 scripts +
+     the jsx-progress npm script); fixed the package.json triple-encoded em-dash.
+   • globals fix + B1 (2d7dd04) — SC3's BOOK_ALIASES (a src/data UPPER_CASE const)
+     shifted gen-eslint-globals (398→399) but the regenerated globals weren't
+     re-staged, so CI's smoke-lite globals-mirror went RED across 5 commits
+     (41b92d6→400563b). Re-staged + added B1: the pre-commit now regenerates +
+     re-stages globals when a src file is staged (closes the manual-SPOF; the
+     index.html-only edge still needs manual regen). [[globals-regen-workflow]]
+     memory updated.
+   • B5/B6/B8 (4b4da97) — esprima: loud warning when missing + pinned in a new
+     requirements-dev.txt (was a silent weak-heuristic fallback). validate-schemas:
+     a type=scripture block now needs >=1 of segments/text/lines (forward guard;
+     no shipped block is type=scripture). .nvmrc (24) + node-version-file in both
+     workflows. NOTE: B6's test update slipped 4b4da97 (a tools/-only commit
+     doesn't run the hook's vitest step) → CI red → fixed in 55536d4.
+   • A2 (55536d4, committed under the B6-test-fix message — a staged-but-failed
+     prior commit left the files staged) — snapRangeToWords word-class /[\w’’-]/
+     duplicated U+2019 + omitted the ASCII apostrophe; "don't" snapped wrong.
+     Fixed to /[\w’'-]/; +5 tests (was untested).
+   • smoke-ci protocolTimeout 180s→600s (921b00a) — smoke:ci hit a flaky
+     "Runtime.callFunctionOn timed out" on CI (passes locally in 18s; both green
+     + red runs used node v24.16.0 so it was slow-runner transient, not a real
+     failure). CI green at 921b00a.
+   STILL OWED in Wave 4: PF4 (alt-translations free+precache), PF2 (bundle-a
+   minify), PF5 (Garden LRU), PF3 (virtualization — RISKY). HIGH-RISK render/nav
+   items DEFERRED for owner review (could regress load-bearing paths unsupervised):
+   F1+F2 (per-verse re-render fan-out), A4 (offset table O(n²)), A1+A5 (note-icon
+   path), UX1-4 (back-router/nav). Safe remainder: CQ1/CQ3/CQ6 docs+types, PWA
+   polish P4-P7pwa, E4/E5, S4-S6/J3/J5/J7, T4-T7.
 
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
