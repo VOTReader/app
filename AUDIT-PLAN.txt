@@ -121,8 +121,35 @@
   Wave 8 (docs/hygiene/small wins):    CQ* · B* · SE* · SC* · the rest of P3
   (Waves are guidance; any item is independently shippable.)
 
+───────────────────────────────────────────────────────────────────────────
+ PROGRESS LOG
+───────────────────────────────────────────────────────────────────────────
+ 2026-06-02 — Wave 1 (P0) COMPLETE — all gated + verified, pushed to main:
+   • SC1        (698c95b) — WTLB bare-BOOKS ReferenceError guard + prettify
+     fallback; same-class app.jsx handleScriptureSelect hardened (grep-audit:
+     only live render-path site was WtlbEntryView:155).
+   • J1/J2/J4   (f0f7eab) — journal editor pagehide + visibilitychange:hidden
+     flush + immediate-save-on-media-insert (commitSave now reads entryIdRef).
+     +JournalEditorScreen.test.jsx (4 cases, REAL JournalStore, no-timer-advance
+     so only the synchronous paths can satisfy them + a visible-no-flush control).
+   • E1/E2/E3   (00912b1) — lazy-corpus error state + version-bump + route retry
+     UI (_corpusView); DiagnosticLog on corpus failure; global onerror +
+     unhandledrejection capture. Browser-verified in preview: a real 404 corpus
+     load → error/retry cycle works; an uncaught throw + an unhandled rejection
+     each landed in DiagnosticLog.
+
+ D-BUCKET RECONCILIATION (the other agent closed D1–D8: 4 landed / 4 skipped):
+   • CQ4  → DONE by D3-narrow (d2082f4: journal-helpers + letter-linking typed).
+   • PF3  → OPEN, explicitly handed here (D1 content-visibility skipped as a
+            WebView-69 no-op; AUDIT-PLAN owns the IntersectionObserver windowing).
+   • F5 / UX3 → OPEN (D4 NavContext skipped — W7.5 already adjudicated net-neg).
+   • CQ5  → OPEN (D3 project-wide strictNullChecks skipped; app.jsx still untyped).
+   • E5 ≈ adjacent to D5 (per-action write-fail toast landed) — re-scope on reach.
+   • T7 ≈ adjacent to D6 (degraded-cascade atomicity + test landed) — re-scope.
+   • D2 navHandoff landed → the UX1/UX2 nav-origin work now routes through it.
+
 ═══════════════════════════════════════════════════════════════════════════
- P0 — DATA LOSS & REACHABLE CRASHES (do first)
+ P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
 ═══════════════════════════════════════════════════════════════════════════
 
  [J1] Journal media-insert lost on background-kill          STATUS: OPEN
