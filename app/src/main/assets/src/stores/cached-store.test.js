@@ -418,6 +418,7 @@ describe('CachedStore W2.2 — hydration timeout → degraded → recovery (Vect
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    delete window.DiagnosticLog;
   });
 
   it('hydration >3s without resolution → degraded', async () => {
@@ -428,6 +429,17 @@ describe('CachedStore W2.2 — hydration timeout → degraded → recovery (Vect
     vi.advanceTimersByTime(3000);
     await hydratePromise;
     expect(store.getState()).toBe('degraded');
+  });
+
+  it('logs the degraded transition to DiagnosticLog — E5', async () => {
+    const warn = vi.fn();
+    window.DiagnosticLog = { warn }; // cached-store reads the bare global
+    vi.spyOn(IDBAdapter, 'get').mockReturnValue(new Promise(() => {}));
+    const store = createTestStore('vot-test-w22-e5', { idb: true });
+    const hydratePromise = store._hydrate();
+    vi.advanceTimersByTime(3000);
+    await hydratePromise;
+    expect(warn).toHaveBeenCalledWith('hydration', expect.stringContaining('degraded'));
   });
 
   it('subscribers are notified on degraded transition', async () => {

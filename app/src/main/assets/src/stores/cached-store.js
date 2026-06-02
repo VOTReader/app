@@ -563,6 +563,10 @@ export function CachedStore(storageKey, defaultVal, opts) {
           if (settled) return;
           if (self._state !== 'loaded') {
             self._state = 'degraded';
+            // E5: trace the degraded transition. Under the no-telemetry policy
+            // the exported diagnostic log is the ONLY signal that a store's
+            // hydration timed out (and is now serving copyDefault snapshots).
+            if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', storageKey + ' degraded (hydration timed out @' + hydrationTimeoutMs + 'ms)');
             // Wake subscribers so any "Storage temporarily unavailable"
             // UI mounts. Increment _version manually + notify — _bump()
             // would semantically mean "data changed" but really only the
@@ -611,6 +615,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
           console.warn('IDB hydration failed for', storageKey, err);
           if (self._state !== 'degraded') {
             self._state = 'degraded';
+            // E5: trace the degraded transition (see the timeout path above).
+            if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', storageKey + ' degraded (IDB hydration rejected: ' + ((err && err.name) || err) + ')');
             self._version += 1;
             self._notifySubscribers();
             self._backgroundRetry();
