@@ -288,12 +288,19 @@
       var landed = await goHome();
       var detail = '';
       if (!landed) { out.push({ name: name, reached: false, crashed: false, detail: 'could not return home' }); return; }
-      try { await fn(); } catch (e) { detail = 'threw:' + (e && e.message); }
+      // T2: CONSUME fn()'s per-step content assertion — the boolean content
+      // regex (/Genesis/, /letter-body/, …) that proves the screen actually
+      // RENDERED, not just navigated off home. Discarding it let a blank-but-
+      // structured screen pass. undefined = "no assertion" (steps like lib()
+      // return nothing) → treated as satisfied, preserving their behaviour.
+      var assertion;
+      try { assertion = await fn(); } catch (e) { detail = 'threw:' + (e && e.message); }
       await sleep(300);
       var st = screenState();
-      var reached = !onHome() && !st.crashed && !detail;
+      var asserted = (assertion === undefined) ? true : !!assertion;
+      var reached = asserted && !onHome() && !st.crashed && !detail;
       out.push({ name: name, reached: reached, crashed: st.crashed,
-        detail: detail || st.heading });
+        detail: detail || (asserted ? st.heading : 'content assertion failed @ ' + (st.heading || 'blank')) });
       if (st.crashed) await goHome();
     }
     async function lib(tileRe) {
@@ -655,6 +662,7 @@
       report.globals.ok &&
       report.dataWiring.ok &&
       screenFails === 0 &&
+      screenUnreached === 0 &&
       (report.annotation === 'skipped' || report.annotation.ok) &&
       (report.wtlbAnnotation === 'skipped' || report.wtlbAnnotation.ok) &&
       (report.tabs === 'skipped' || report.tabs.ok) &&
