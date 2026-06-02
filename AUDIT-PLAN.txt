@@ -1,0 +1,833 @@
+═══════════════════════════════════════════════════════════════════════════
+ AUDIT-PLAN.txt — "Second deep audit: 7.5/10 → 8.5+/10 hardening"
+═══════════════════════════════════════════════════════════════════════════
+ Created 2026-06-01. CANONICAL HOME for the post-UPLIFT audit remediation.
+ (Distinct from UPLIFT-PLAN.txt, the closed 7→8 remediation. This is the NEXT
+ pass: a fresh adversarial audit run AFTER UPLIFT closed, to find what remains.)
+
+ PROVENANCE
+ ----------
+ Two fleets, 2026-06-01:
+  • 15 audit agents, one per subsystem (frontend, storage, annotation engine,
+    native Kotlin, search, PWA/SW, performance, scripture parsing, testing/CI,
+    security, build/tooling, journal, code-quality/doc-drift, UX/nav, error-
+    handling). Each read real source, rated its subsystem, cited file:line.
+  • 15 verification agents, one per report, each adversarially RE-CHECKED every
+    claim against source (several ran node/vm sandbox tests: FlexSearch AND-
+    semantics, regex byte-dumps, prototype-pollution exploit attempts, real
+    `esbuild --minify` measurements). Every item below carries a VERDICT from
+    that second pass — this is not an unverified wish-list.
+
+ OUT OF SCOPE (by owner directive): accessibility (under construction next) and
+ device/emulator verification (already in progress on the API-28 emulator +
+ personal phone). Findings here are code/perf/correctness only.
+
+───────────────────────────────────────────────────────────────────────────
+ WHY (the gap to 8.5+)
+───────────────────────────────────────────────────────────────────────────
+ The app is genuinely strong post-UPLIFT. The ceiling is held down by a SMALL,
+ CONCRETE, mostly-cheap set of issues concentrated in: (1) one real data-loss
+ window in the journal, (2) a couple of reachable crash / failure-UX dead-ends,
+ (3) a partly-broken search, (4) a large trivially-safe perf win left unrealized.
+ Foundations (security, the storage durability spine, native bridge, build gates)
+ verified airtight and need no work.
+
+ Overall: 7.5/10. Subsystem scorecard (audit):
+   security 9 · storage 8.5 · native 8.5 · PWA 8 · scripture 8 · build 8 ·
+   error-handling 8 · code-quality 8 · frontend 7.5 · annotation 7.5 ·
+   testing 7.5 · journal 7.5 · UX 7 · performance 6.5 · search 6.5
+
+ EXIT BAR (what "done enough" means — lifts 7.5 → 8.5+):
+   • All P0 closed + verified (no data-loss window, no reachable crash, no
+     silent failure dead-end).
+   • The search cluster (SR1–SR5, SR8) closed — it is the lowest subsystem and
+     has the clearest high-leverage fixes.
+   • The only-backup integrity items closed (S1, S2, S3).
+   • PF1 corpus minify landed (largest single perf win).
+   • Every gate green: tsc · eslint --max-warnings 0 · vitest (coverage floor
+     held/ratcheted) · npm run build · smoke:ci · Kotlin testDebugUnitTest+jacoco.
+   P2/P3 raise the ceiling further but are not required for 8.5.
+
+───────────────────────────────────────────────────────────────────────────
+ CONVENTIONS (how to execute)  — inherited from UPLIFT-PLAN.txt
+───────────────────────────────────────────────────────────────────────────
+ • One work item = one focused commit (or a tight series). Each closes with its
+   own exit criteria + the relevant gate re-run BEFORE commit.
+ • Run test:coverage locally (not just test) before pushing a test-count change
+   — pre-commit runs `test`, CI runs `test:coverage`. (Burned before; see B7.)
+ • A new window-global needs `npm run lint:globals` + re-stage (pre-commit does
+   NOT regenerate it; see B1). CSP inline-script edits need `npm run build` or a
+   black-screen ships (project_csp-script-src-hashes). Corpus data edits need a
+   manual CORPUS_VERSION bump.
+ • Update HISTORY.md + the CLAUDE.md current-state bullet on close; commit + push
+   to main (standing authorization). Keep the STATUS column here current.
+ • Device-verify hardware-only items (N1/N2 audio, A8 tap, J* on-device) on the
+   API-28 emulator / phone (adb at C:/Users/corbi/AppData/Local/Android/Sdk/
+   platform-tools/). Preview-eval for web-observable behavior.
+
+───────────────────────────────────────────────────────────────────────────
+ VERDICT LEGEND (from the verification fleet)
+───────────────────────────────────────────────────────────────────────────
+   [CONFIRMED] code matches the claim; issue is real as described.
+   [PARTIAL]   real, but with a correction (lower severity / different mechanism
+               / wrong detail in the original cite — corrected inline below).
+   [RUNTIME]   code path settled but felt severity needs a device/preview check.
+   [JUDGMENT]  a design opinion, not a code defect.
+   [REFUTED]   verification disproved it — see the DROPPED ledger; DO NOT ACT.
+ Severity = the verification-corrected severity (may differ from the audit's).
+
+═══════════════════════════════════════════════════════════════════════════
+ VERIFICATION LEDGER — what the second pass changed
+═══════════════════════════════════════════════════════════════════════════
+ DROPPED (refuted — do not act):
+  • T8  — scratch `_probe.test.jsx` red/blocking. File does not exist on disk or
+          in git history; the vitest glob is scoped, not `**/*`. Fabricated.
+  • J6  — recorder error-stage interval leak. Every error path already clears
+          both intervals before cleanup(). Not a defect.
+  • N5  — clearCache stale bundle after APK update. First post-update launch is
+          always a fresh clearCache; assets served by WebViewAssetLoader, not the
+          HTTP cache. Scenario not reachable.
+  • S7  — background-retry races the import. The degraded-precondition early-
+          return prevents the window + rebase is synchronous. Effectively nil.
+  • CQ9 — _probe file absent (as T8); worktree-gitignore gap is harmless
+          (registered worktrees don't pollute git status).
+
+ DEMOTED (still real, lower than first rated): N1 strand-on-kill→Low (OS resets
+  audio mode on process death; the missing AUDIOFOCUS request is the real part)
+  · N3/N4/N7/N8→Low · S1→Low-Med · A8→premise inactive in this build · P2(pwa)→
+  Med (Pages deploys atomically) · UX2/UX9→Med-High.
+
+ SURFACED DURING VERIFICATION (new / upgraded):
+  • app.css minify ≈ −80 KB (−33%) — measured; no CSS-minify step exists (→ PF7).
+  • Whole bundle-a minify ≈ −210 KB (25%), NOT −55 KB — corpus DATA strips ~153
+    KB of indentation too (→ PF2). Combined with PF1, total safe win ≈ 3.5 MB.
+  • esprima is not pinned — on a machine without it, check_balance.py's weak
+    smart-quote heuristic becomes the ONLY check (→ B5).
+  • SE5 — imported settings.translation reaches an unsanitized script.src
+    (same-origin-contained today; 1-line allowlist closes it).
+  • Reverse doc-drift — CLAUDE.md UNDER-counts: ui components 42 vs 25, screens
+    26 vs 21, modules 201 vs "135+" (→ CQ3).
+
+───────────────────────────────────────────────────────────────────────────
+ RECOMMENDED WAVE SEQUENCE
+───────────────────────────────────────────────────────────────────────────
+  Wave 1 (P0, one data-safety branch): J1+J2+J4 · SC1 · E1+E2+E3
+  Wave 2 (search cluster):             SR1 · SR2 · SR3 · SR4 · SR5 · SR8/T1
+  Wave 3 (only-backup + native audio): S1 · S2 · S3 · N1+N2
+  Wave 4 (perf headline):              PF1 · PF7 · PF4 · PF2
+  Wave 5 (frontend/render):            F1+F2 · A4 · A1+A5
+  Wave 6 (test/CI integrity):          T2 · T3 · T4 · T5 · T6 · P1pwa · P2pwa
+  Wave 7 (UX round-trips):             UX1 · UX3 · UX2 · UX4 · UX9 · UX5 ...
+  Wave 8 (docs/hygiene/small wins):    CQ* · B* · SE* · SC* · the rest of P3
+  (Waves are guidance; any item is independently shippable.)
+
+═══════════════════════════════════════════════════════════════════════════
+ P0 — DATA LOSS & REACHABLE CRASHES (do first)
+═══════════════════════════════════════════════════════════════════════════
+
+ [J1] Journal media-insert lost on background-kill          STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED
+   Evidence: JournalMediaStore.put durably stores the blob, but the block that
+     references its mediaId persists only via the editor's 1.2s debounce
+     (JournalEditorScreen.jsx:110-113 setTimeout; the only other flush is the
+     unmount effect :120-127). NOTE: JournalStore.update itself is NOT debounced
+     — its _save fires IDB put immediately; the debounce is editor-level.
+   Problem: Android backgrounds + OOM-kills the WebView without firing React
+     unmount → flush never runs → blob exists, no entry references it → the photo
+     / voice memo silently vanishes AND becomes an orphan the boot sweep deletes.
+     No pagehide/visibilitychange/beforeunload anywhere in the editor (grep=0),
+     while use-scroll-memory.js:151 DOES register one.
+   Fix: add a `pagehide` + `visibilitychange:hidden` listener in
+     JournalEditorScreen that calls the existing synchronous commitSave()
+     (already reads from refs, :129-134); also call commitSave() immediately
+     after insertAtCursor in onFileChosen + onRecordingSaved (:290-311).
+   Exit: edit→background→reopen round-trip preserves media+text (preview + device).
+
+ [J2] Journal text edits lost on background-kill            STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED
+   Evidence/Problem: same mechanism as J1 for plain text — every keystroke rides
+     the 1.2s debounce; no background flush (JournalEditorScreen.jsx:102-127).
+     Bounded to ≤1.2s of edits, but on the app's richest UGC surface.
+   Fix: same pagehide/visibility handler covers J1+J2.
+   Exit: covered with J1.
+
+ [J4] Orphan sweep deletes a put-but-unflushed blob         STATUS: OPEN
+   SEV: Med   VERDICT: CONFIRMED
+   Evidence: the 4s-deferred boot sweep is gated on JournalStore.isReady()
+     (app.jsx:561 — guards the HYDRATION race, not the FLUSH race);
+     collectAllMediaIds() reads the current in-memory list (journal-store.js:
+     442-454); a blob from J1's window is absent from `referenced` →
+     pruneOrphans → self.delete(id) irreversible (journal-media-store.js:253-261).
+   Fix: largely closes once J1 lands (synchronous save on insert); optionally
+     skip the sweep while a journal editor is mounted, or grace-list blobs
+     created in the last N seconds.
+   Exit: covered with J1; add a regression test for "put-then-sweep keeps blob".
+
+ [SC1] Reachable ReferenceError in WTLB nav-link            STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED (sandbox-reproduced)
+   Evidence: WtlbEntryView.jsx:155 `const bookTitle = BOOKS[bookId]?.title ||
+     bookId` reads the BARE global BOOKS (declared `var BOOKS` only in the lazy
+     bundle-a-bible.js; 0 occurrences in bundle-d). The `?.` does NOT save it —
+     `BOOKS[bookId]` evaluates the undeclared identifier first → ReferenceError.
+     VolumesHome.jsx:11 pre-fires only __loadVotCorpus, never bible. Live trigger:
+     `{{nav:esther:7}}` in wtlb-one.js. index.html:436 guards the identical
+     access with `typeof BOOKS === 'undefined'`.
+   Repro: cold-boot → Words To Live By Part One → reach that entry before the
+     bible bundle loads → ReferenceError (caught by the inner ErrorBoundary).
+   Fix: `const bookTitle = (typeof BOOKS !== 'undefined' && BOOKS[bookId]?.title)
+     || bookId;` + pre-fire __loadBibleCorpus() on the WTLB index so the title
+     resolves.
+   Exit: tsc+build+vitest; preview the WTLB entry cold (no bible) → no throw.
+
+ [E1] Corpus-load failure = permanent "Loading…" dead-end   STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED
+   Evidence: index.html:209-214 script.onerror rejects + nulls _promise, but the
+     render paths re-fire the loader with NO .catch and no error UI: _wrapVot
+     (screen-routes.jsx:153-157), bible-ch (:604-608), bible-idx (:565-569),
+     matthew-idx (:510-512), matthew-ch (:617-619) — all return a bare "Loading…"
+     gated on .loaded, which stays false forever. Pre-fire effects only
+     .catch(console.warn).
+   Problem: a persistent failure (offline miss, 404, old-WebView parse error)
+     leaves the entire Volumes/WTLB/Bible/Matthew section stuck forever — no
+     retry, no message.
+   Fix: add an `error` state to the lazy-loader object (set in onerror), subscribe
+     to it in the routes, render a "Couldn't load this section — Retry" affordance
+     (the loader already nulls _promise, so re-calling load() retries cleanly).
+   Exit: simulate a corpus 404 in preview → user sees Retry, not a spinner.
+
+ [E2] No global error capture (onerror/unhandledrejection)  STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED
+   Evidence: codebase-wide grep = zero window.onerror / unhandledrejection. The
+     only addEventListener('error') (index.html:140) pushes to a smoke-harness
+     array, not DiagnosticLog. So errors in event handlers, async effects,
+     setTimeout callbacks, and store subscribers are invisible in the exported
+     diagnostic — and there is no telemetry by policy, so the export is the only
+     trace.
+   Fix: add window.onerror + unhandledrejection listeners (in the first inline
+     <script>, like the resource-error one) → DiagnosticLog.error('uncaught', …).
+   Exit: throw a test error in an async effect → appears in getCrashLog export.
+
+ [E3] Corpus failure writes nothing to the diagnostic log   STATUS: OPEN
+   SEV: Med   VERDICT: CONFIRMED  (compounds E1/E2)
+   Evidence: the lazy loader logs DiagnosticLog.timing('corpus',…) on SUCCESS
+     only (index.html:203-204); the onerror branch (:209-214) logs nothing.
+   Fix: one line in onerror — DiagnosticLog.warn('corpus','failed: '+bundlePath)
+     (guarded like the timing call).
+   Exit: covered with E1; failure leaves a log line.
+
+═══════════════════════════════════════════════════════════════════════════
+ P1 — CORRECTNESS & ONLY-BACKUP INTEGRITY
+═══════════════════════════════════════════════════════════════════════════
+ NOTE: the search engine lives at app/src/main/assets/search.js + search-data.js
+ (classic scripts concatenated into bundle-a.js), NOT src/data/search.js.
+
+ [SR1] `heading` field throws on EVERY query               STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED (sandbox-reproduced against flexsearch 0.7.41)
+   Evidence: executeSearch iterates a field list including {name:'heading',
+     boost:2.0} (search.js:1403-1408) and calls db.search(term,{index:'heading'})
+     (:1420), but U22 dropped `heading` from createDb()'s indexed fields
+     (:806-813). Searching a non-indexed field THROWS "Cannot read properties of
+     undefined (reading 'search')" — caught by the try/catch (:1421), logging one
+     warn per corpus per query; the 2.0× heading boost is dead.
+   Fix: delete the heading entry from the fields array (+ from KIND_BOOST :1454
+     and srchGroupKey :24, both now unreachable).
+   Exit: a search produces 0 console warns; SR8 test pins it.
+
+ [SR2] Multi-word queries strict-AND → silent zero results  STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED (sandbox: "beginning void light" → 0)
+   Evidence: the per-field db.search passes only {index,limit} (search.js:1420);
+     FlexSearch Document.search defaults to intersection (AND). Verses are short,
+     so any multi-concept query whose terms don't co-occur in ONE verse returns
+     nothing. The term-coverage multiplier (:1471-1499) is moot under AND.
+   Fix: pass `suggest:true` to the per-field search (sandbox-verified to yield
+     partial-OR ranked by coverage), then let the existing coverage multiplier
+     rank. Single biggest result-quality win available.
+   Exit: "beginning void light" returns Genesis 1 verses; SR8 pins it.
+
+ [SR3] No relevance ranking (insertion order)               STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED (sandbox: shuffled-insert returns insert order)
+   Evidence: rankScore=(perFieldLimit-r)/perFieldLimit (search.js:1437) assumes
+     result index r reflects relevance, but FlexSearch 0.7 (resolution:9) returns
+     insertion order = corpus position; only a minor intra-doc position nudge,
+     never TF-IDF. So "love" doesn't surface 1 Cor 13 first except via the
+     hardcoded named-passage shortcut.
+   Fix: suggest:true (SR2) + a length-normalization / term-frequency pass; at
+     minimum document that FlexSearch contributes recall, app-side boosts are the
+     only ranking signal.
+   Exit: a relevance smoke assertion (a known passage ranks above a sparse hit).
+
+ [SR4] ~100 lines dead relevance code; stale hero copy       STATUS: OPEN
+   SEV: Med   VERDICT: CONFIRMED (corrected detail)
+   Evidence: SYNONYM_GROUPS/SYNONYM_MAP (search-data.js:381-441), stemWord
+     (:445-464), phoneticKey (:467-483) are defined but NOT in the
+     window.VotSearchData export (:572-588) and never referenced in search.js
+     (grep=0) → dead. CORRECTION: the empty-state hero advertises "headings"
+     (U22-removed, pushHeading is a no-op at search.js:416), NOT synonyms.
+   Fix: decide — wire synonym/stem expansion into parseTextQuery/executeSearch
+     (the intended remedy for SR2's brittleness) OR delete the dead code; fix the
+     SearchScreen.jsx:259-260 hero copy ("headings").
+   Exit: no dead exports; hero copy matches indexed fields.
+
+ [SR5] Search-before-corpus caches a near-empty index        STATUS: OPEN
+   SEV: Med   VERDICT: CONFIRMED
+   Evidence: SearchScreen.jsx:21 calls VotSearch.init() on mount with no corpus-
+     readiness guard; init() builds both engines immediately reading bare
+     BOOKS/MATTHEW (typeof-guarded → skipped if absent), then saveToCache (:985)
+     PERSISTS the result. Nothing subscribes to __bibleCorpus/__votCorpus to
+     rebuild on load → an empty/partial index can survive reloads in IndexedDB
+     until a manual /rebuild index.
+   Fix: gate init() on corpus readiness, or subscribe the engine to the corpus
+     load-state and dropActive()+ensureIndex() when they resolve.
+   Exit: open Search pre-corpus → after load, index reflects full corpus.
+
+ [SR8 / T1] Search engine 0% tested + outside coverage       STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED
+   Evidence: search.js is 1714 lines / 72 KB; the only search test
+     (src/hooks/use-search.test.js) MOCKS window.VotSearch. The engine is OUTSIDE
+     the coverage include globs (vitest.config.js:34-42 cover only src/**). SR1/
+     SR2/SR3 would each have been caught by one engine-level test.
+   Fix: add search.test.js loading search.js over a small fixture corpus in a vm
+     sandbox (verifier confirmed this runs headless) — pin parse outputs, result
+     sets, cache-key dataSignature, and purgeStaleCache keep-newest-per-corpus.
+     Add app/src/main/assets/search.js to the coverage include.
+   Exit: search.test.js green; engine coverage measured.
+
+ [S2] JournalMediaStore has no tx.onabort → import can hang  STATUS: OPEN
+   SEV: Med   VERDICT: CONFIRMED  (highest-value storage fix)
+   Evidence: put/get/delete/list/allIds settle only on req.onsuccess/onerror with
+     NO tx.onabort/tx.onerror (journal-media-store.js:127-223), unlike the
+     hardened IDBAdapter (idb-adapter.js:257-263). put resolves on req.onsuccess
+     (BEFORE commit), so a commit-phase abort (QuotaExceeded) never re-fires
+     onerror → the promise hangs → import `await mediaStore.put` (backup.js:361)
+     freezes forever with no toast.
+   Fix: add tx.onerror/tx.onabort reject handlers to all 5 methods, mirroring
+     IDBAdapter. Converts an indefinite hang into a normal importFailures count
+     the S3 toast already reports.
+   Exit: a forced-abort media put rejects (test) instead of hanging.
+
+ [S3] Partial-failure import still auto-reloads              STATUS: OPEN
+   SEV: Med   VERDICT: CONFIRMED
+   Evidence: on writeFailures>0 the code only appends to the toast and still
+     setTimeout(reload,600) unconditionally (SettingsScreen.jsx:546-559) → failed
+     stores re-hydrate OLD data, the rest hold imported data → inconsistent set.
+   Fix: gate the reload on writeFailures===0; on failures, surface a blocking
+     "Import incomplete — retry, do not navigate away" state.
+   Exit: simulated write-failure import does not auto-reload.
+
+ [S1] Export reads stale IDB (no whenSaved flush)            STATUS: OPEN
+   SEV: Low-Med (demoted)   VERDICT: CONFIRMED
+   Evidence: buildExportPayload reads each store via idbAdapter.get (backup.js:
+     165) with no whenSaved() flush; exportPersonalData doesn't flush either
+     (SettingsScreen.jsx:416-430). A write made then immediately exported can miss
+     the only backup. Window is sub-frame (IDB put p90 ~2ms) and export is a
+     deliberate gesture, but the fix is trivial and the primitive exists.
+   Fix: await Promise.all(stores.map(s=>s.whenSaved())) before buildExportPayload.
+   Exit: edit-then-export round-trip includes the edit (test).
+
+ [N1+N2] Audio session lifecycle (focus + double-start)      STATUS: OPEN
+   SEV: Med   VERDICT: CONFIRMED (N1 strand-half DEMOTED to Low)
+   Evidence: (a) no requestAudioFocus(AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+     anywhere (grep=0) → recording bleeds other apps' audio. This is the still-
+     QUEUED N2.2. (b) startAudioSession does `vm.previousAudioMode = am.mode`
+     unconditionally (AppInterface.kt:106-110) with no double-call guard → a
+     second start without an intervening end captures MODE_IN_COMMUNICATION as
+     "previous" so endAudioSession never restores NORMAL. MainViewModel.onCleared
+     releases the recorder but never endAudioSession (MainViewModel.kt:63-66).
+     NOTE: the OS resets audio mode on process death, so "strands the device on
+     kill" is overstated (Low); the real items are the missing focus request and
+     the double-start guard.
+   Fix: land N2.2 (transient-exclusive focus request, routed through a BridgeHost
+     method to keep AppInterface testable) + `if (am.mode != MODE_IN_COMMUNICATION)`
+     guard on the capture + restore mode in onCleared. DEVICE-VERIFY (touches the
+     Pixel/Samsung MODE_IN_COMMUNICATION tuning).
+   Exit: Kotlin tests + on-device: recording pauses Spotify; double-start cannot
+     strand the mode.
+
+ [F1+F2] Per-verse re-render fan-out + zero React.memo       STATUS: OPEN
+   SEV: Med-High   VERDICT: CONFIRMED (empirically: 176 re-renders on Psalm 119)
+   Evidence: each verse's HighlightableText subscribes to AnnotationStore AND
+     NoteStore via useSyncExternalStore against a SINGLE global per-store version
+     counter (cached-store.js:348-380 — not keyed by hlKey), so one
+     AnnotationStore.add bumps the global counter and re-renders every verse in
+     the chapter. Grep for React.memo across all of src = 0 matches. ROUTES is
+     rebuilt every render with fresh closures (screen-routes.jsx). The letter/WTLB
+     path avoids this via imperative data-hl-dom + StaticSubtree; the Bible/Matthew
+     React path opted out.
+   Fix: React.memo(HighlightableText) keyed on a per-key annotation signature, or
+     a keyed-snapshot store subscription (getVersionForKey); memoize the 3 heavy
+     reading screens (BibleChapterView, ChapterView, LetterView) + hoist stable
+     handler props.
+   Exit: preview instrumentation — one highlight re-renders ~1 verse, not 176.
+
+ [PF1] Corpus bundles fully unminified (−3.3 MB)             STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED (measured on copies)
+   Evidence: esbuild --minify --target=chrome69 on copies: bible 6913→4533 KB
+     (−2380), vot 2934→2135 (−796), matthew 603→480 (−122) ≈ −3.3 MB. Source are
+     plain `var X={…}` data with NO top-level `this` (every `this` is inside verse
+     strings), so the bundle-a UMD `this`→undefined trap does NOT apply.
+     tools/build.py:121-147 never minifies (only build:b/c/d carry --minify). On
+     Android these serve raw from the APK with no gzip, so full size is downloaded
+     + parsed on a budget device.
+   Fix: pipe each corpus bundle through esbuild --minify --target=chrome69 after
+     the Python concat (verify 0 optional-chaining in output).
+   Exit: bundles shrink as measured; app boots + renders on the API-28 emulator
+     (WebView 69) with 0 parse errors; APK shrinks.
+
+ [T2] Smoke gate proves "didn't crash", not "rendered right" STATUS: OPEN
+   SEV: High   VERDICT: CONFIRMED
+   Evidence: tools/smoke.js:291 is the only fn() call; its boolean return (the
+     per-step content regex, e.g. /Genesis/) is DISCARDED; reached = !onHome() &&
+     !st.crashed && !detail (:294). A screen that navigates to a blank-but-
+     structured state passes. This is the CI render gate (smoke-ci.js → ci.yml).
+   Fix: consume the return — `const ok = await fn(); … reached = ok && !onHome()
+     && !st.crashed && !detail` (treat undefined as "no assertion" for back-compat).
+   Exit: a deliberately-blanked screen fails smoke.
+
+ [T3] Coverage gate is one global mean (gameable)            STATUS: OPEN
+   SEV: Med-High   VERDICT: CONFIRMED (live run reproduced 46/38 on journal-store)
+   Evidence: aggregate 61.29/52.25/65.37/65.18 vs floor 60/51/64/64
+     (vitest.config.js:239-244), masking journal-store.js 46/38/58/50, dom-links
+     60/53/73/62, dom-bookmarks 63/51/75/66. No perFile thresholds → a hot-file
+     regression hides behind an unrelated gain.
+   Fix: add perFile (or per-glob) thresholds for the renderer DOM overlays + the
+     stores, even at a modest floor (~55%).
+   Exit: a localized journal-store coverage drop fails the gate.
+
+═══════════════════════════════════════════════════════════════════════════
+ P2 — PERFORMANCE & ROBUSTNESS
+═══════════════════════════════════════════════════════════════════════════
+
+ [PF2] bundle-a minify win is −210 KB, not −55 KB           SEV: Med  [PARTIAL]
+   Evidence: whole bundle-a minifies 816→610 KB (−210/25%); the docs' "44%/472KB"
+     is overstated, but the audit's "only −55KB clean JS" is too pessimistic —
+     corpus DATA files (books-restored −27%, matthew-plain −34%) strip ~153 KB of
+     indentation. Vendor (react/react-dom/flexsearch =154 KB) is already minified.
+   Fix: minify search.js/search-data pre-concat (no UMD `this`), or wrap the UMD
+     vendors in (function(){…}).call(this) so the whole bundle-a can be minified.
+
+ [PF4] ~32 MB alt-translations resident + not cached offline SEV: Med  [CONFIRMED]
+   Evidence: 7 ALT_TRANSLATIONS (search.js:42) load into window.BIBLE_* on a
+     scriptures cache-miss (:1029-1034) and are NEVER freed (all reads, no delete);
+     they are NOT in the SW CORPUS_BUNDLES → coreFirst → 503 offline.
+   Fix: null window.BIBLE_* after the index build consumes them; add bible-*.js to
+     a lazy SW precache list.
+
+ [PF3] Zero list virtualization                              SEV: Med  [CONFIRMED]
+   Evidence: grep for any windowing primitive across src = 0. Long lists render
+     all rows (WTLB Part Two 203, Psalms 150, Psalm 119 = 176 verses).
+   Fix: windowed render via a manual IntersectionObserver sentinel (no dep, CSP-
+     clean) for the lists >100 rows.
+
+ [PF5] Garden crawl force-loads all 209 + never evicts       SEV: Med  [PARTIAL]
+   Evidence: GardenView.jsx:90-118 crawls pages 1..209 on open into the module-
+     level gardenImageCache (garden.js:45,87-94) of live Image() refs, never
+     evicted; Ultra-tier decoded bitmaps trend ~700 MB with no web eviction.
+     (Correction: persists across mounts, so it's "first open per tier", not
+     literally every open.)
+   Fix: gate the crawl on navigator.connection; LRU-cap the in-session cache; use
+     a Set of page numbers as the done-marker instead of live Image refs.
+
+ [PF6] bundle-d ships all 53 screens, parser-blocking        SEV: Low-Med [CONFIRMED]
+   Evidence: index.html:582 loads bundle-d (344 KB, 97 imports, all screens) with
+     no defer/async; only the landing screen renders first. bundle-a also carries
+     547 KB scripture-display data needed only on scripture open.
+   Fix: code-split heavy non-home screens (Journal editor, Settings, Search,
+     Garden) into a lazy bundle-e injected on first navigation.
+
+ [PF7] app.css 234 KB render-blocking + unminified           SEV: Low  [CONFIRMED]
+   Evidence: index.html:72 <link rel=stylesheet>; no CSS-minify step. Measured
+     esbuild --minify: 234→156 KB (−80 KB / −33%).
+   Fix: add a CSS minify step (and/or inline critical home CSS).
+
+ [A4] Annotation apply pass ~O(n^2), main-thread, all conts  SEV: Med  [CONFIRMED]
+   Evidence: applyDOMHighlights re-walks the whole container via createTreeWalker
+     per sub-range per annotation against a tree that fragments each pass
+     (annotation-engine.jsx:388-400); the full pipeline re-runs for ALL on-screen
+     [data-hl-dom] containers on any of 4 store bumps (use-dom-annotation-sync.js:
+     70-127). n (anns/block) is small, so the fan-out across containers is the
+     bigger cost; matters on long letters on a budget device.
+   Fix: build the text-node offset table ONCE per container and reuse across sub-
+     ranges/annotations; scope the re-apply to the container(s) whose hlKey changed.
+
+ [A1+A5] applyNoteIcons unscoped, mutates React DOM no-guard SEV: Med/Low [CONFIRMED]
+   Evidence: applyNoteIcons queries the WHOLE document for mark.hl-note
+     (annotation-engine.jsx:265-267) and does splitText + space-move on adjacent
+     text nodes; the React-path screens (BibleChapterView.jsx:146, ChapterView)
+     render HighlightableText WITHOUT StaticSubtree and have NO React <NoteIcon>,
+     so icons are imperatively injected into React-owned DOM with no freeze guard
+     (latent; no forced crash). applyNoteIcons + applyActiveNoteState also never
+     got the U8 [data-hl-key][data-hl-dom] scoping (:331,336).
+   Fix: render note icons via a React <NoteIcon> on the React path (symmetry with
+     LinkIcon/BookmarkIcon), or scope the two note passes to the annotation
+     containers. One fix closes both.
+
+ [E4] Inner ErrorBoundary can't break a same-screen crash    SEV: Med  [CONFIRMED]
+   Evidence: <ErrorBoundary key={screen}> resets only on screen change
+     (app.jsx:770); "Reload App" = location.reload() (ErrorBoundary.jsx:28) re-
+     restores the persisted last screen (use-tabs.js:122) → same crash. No web
+     crash-loop guard (native has one). NUANCE: _validateTabState coerces missing-
+     DATA screens to home, so the loop needs a screen with valid nav data that
+     still crashes deterministically (e.g. a corrupt store record render).
+   Fix: in the root ErrorBoundary detect repeat crashes (sessionStorage counter
+     within N s) and offer "Reset to Home" (clear saved screen/tab) on the 2nd+.
+
+ [E5] Degraded hydration tier is silent                      SEV: Med  [CONFIRMED]
+   Evidence: cached-store.js:565 (timeout) / :613 (reject) set _state='degraded'
+     and only bump — no DiagnosticLog; StorageHealthBanner._pickScenario (:69-145)
+     has no degraded case. A store stuck degraded serves empty copyDefault()
+     snapshots with no user signal and no trace.
+   Fix: DiagnosticLog.warn('hydration', storeName+' degraded') on both transitions;
+     add a low-key "storage is slow — recent changes may not be saved yet" banner.
+
+ [UX1] "Surprise Me" is a navigation dead-end                SEV: High(UX) [CONFIRMED]
+   Evidence: use-surprise.js:120-133 sets bookId/chapterNum/screen (or letterId)
+     but never fromSearch/navOrigin; the bible-ch/matthew-ch back branches only
+     check fromSearchRef (use-android-back.js:190,195) → back dumps the user on
+     the chapter INDEX of a book they never chose.
+   Fix: snapshot the pre-jump position (or set a fromSurprise flag) and add a back
+     branch returning Home.
+
+ [UX3] 13-branch back router, asymmetric, exit-on-fallthrough SEV: High(struct) [CONFIRMED]
+   Evidence: use-android-back.js:175-219 is a hand-maintained if(s===…) chain with
+     terminal `return "false"` (=app-exit) for any unlisted screen; index screens
+     hardcode →library (:178-182) and screen-routes.jsx:419/437 duplicate it,
+     IGNORING the navOrigin that goNotesIndex/etc. already capture via
+     _captureOrigin (use-nav.js:185-188). So a note opened from a reading screen
+     backs out to library, not the reading screen.
+   Fix: drive the index-screen back branches through goNavOrigin (origin already
+     captured); make the fallthrough default to goHome() unless genuinely at root.
+
+ [UX2] Back-from-search loses anchor + result scroll         SEV: Med-High [CONFIRMED]
+   Evidence: goSearchOrigin restores only screen/bookId/chapterNum/letterId
+     (use-search.js:271-282) — not searchScope, doesn't re-run the query, doesn't
+     clear surpriseAnchor; `search` is not in READING_SCREENS so the results list
+     has no scroll restoration → back lands at the top of a long list.
+   Fix: give `search` a scroll-memory key; clear surpriseAnchor in goSearchOrigin;
+     restore scope.
+
+ [UX4] Garden has no swipe-to-flip                           SEV: Med-High [CONFIRMED]
+   Evidence: GardenView.jsx:138-344 touch handlers do only pinch/pan/double-tap-
+     ZOOM; page nav is solely the two bottom arrows (:330-340). touch-action:none
+     already captures all touches; desktop arrow-key nav is a no-op here.
+   Fix: add horizontal-swipe detection in the existing onTouchEnd (when scale===1
+     and |dx|>threshold with low dy → goNext/goPrev).
+
+ [P1pwa] Zero SW / offline / update-flow test coverage       SEV: Med-High [CONFIRMED]
+   Evidence: no test references serviceWorker/CORE_ASSETS/skipWaiting; smoke.js/
+     smoke-ci.js never register a SW, go offline, or exercise the update flow.
+   Fix: SW unit test (install/activate/fetch are pure fns of caches+fetch — mock
+     with a fake CacheStorage) + extend smoke-ci: register → activated →
+     offline → reload → assert boot + a corpus section renders.
+
+ [P2pwa] core.addAll all-or-nothing blocks ALL updates       SEV: Med  [CONFIRMED]
+   Evidence: service-worker.js:82-83 — addAll is atomic; one 404/5xx on any of the
+     26 CORE_ASSETS rejects install, the SW never reaches 'installed', so the
+     sw-register prompt (:55) never fires → silent pin to the old version. (Trigger
+     is a partial Pages deploy, which Pages makes atomic → Med.)
+   Fix: keep addAll for a critical set (index/css/4 bundles) + Promise.allSettled
+     per-asset for the rest (like the corpus block already does), and log an
+     install-rejection to DiagnosticLog.
+
+ [T4] DOM link/bookmark overlays half-covered, no equiv test SEV: Med  [CONFIRMED]
+   Evidence: dom-links 60%, dom-bookmarks 63%; only applyDOMHighlights has the
+     dual-render equivalence partner. These run on every Android annotation render.
+   Fix: extend the equivalence harness (or add offset-edge tests) for the link/
+     bookmark overlays — multi-range merge at same offset, end-of-block fallback,
+     removal-on-rerun under nested marks.
+
+ [T5] MainActivity.kt (886 lines) has no test                SEV: Med  [CONFIRMED]
+   Evidence: no MainActivityTest.kt; the tap-coordinate conversion (/density) and
+     the crash-loop counter (renderRecoveryCount + 60s window) are pure logic but
+     untested. A wrong tap coordinate opens the chip on the wrong annotation.
+   Fix: extract those into pure helpers and unit-test them.
+
+ [T6] check_balance.py (data gate) untested                  SEV: Med  [CONFIRMED]
+   Evidence: the front-line black-screen/white-verse gate has no test; a
+     regression would silently stop catching the bug class the project fears most.
+   Fix: a pytest fixture feeding known-bad strings (en-dash range, smart-quote
+     delimiter, unescaped ") asserting nonzero exit. (See also B5: pin esprima.)
+
+ [T7] No boot-with-degraded-store integration test           SEV: Med  [PARTIAL]
+   Evidence: backup.test.js DOES cover import failure paths (so "round-trip is
+     happy-path-only" is wrong), but there is no integration test for the boot
+     end-state with a store left degraded + the SettingsScreen.jsx:519-524 import-
+     blocked-when-degraded guard (untested, outside coverage scope).
+   Fix: one integration test driving hydrateAllStores with one store permanently
+     degraded; assert the import refuses + the banner scenario resolves.
+
+═══════════════════════════════════════════════════════════════════════════
+ P3 — HYGIENE, DEBT, DOCS & SMALL WINS  (every win counts)
+═══════════════════════════════════════════════════════════════════════════
+
+ --- Docs / dead code / types ---
+ [CQ1] ARCHITECTURE.md:11 says App() "2,191 lines / 15 hooks"; actual 798 / 28.
+   SEV: High(doc) [CONFIRMED] → update line 11 + the §workflow claims, or add a
+   "verify against code" banner. CLAUDE.md routes agents here as the deep ref.
+ [CQ2] Dead data-normalize.js (494 lines, self-labeled NOT-loaded skeleton) +
+   data-schema.d.ts (503, 0 src refs). SEV: Med [CONFIRMED] → delete both.
+ [CQ3] CLAUDE.md counts stale BOTH ways: index.html 614 (claims 522),
+   MainActivity.kt 886 (773), app.jsx 798 (770); AND under-counts ui components
+   42 (25), screens 26 (21), modules 201 ("135+"). Exact-OK: vitest 1638/63,
+   ROUTES 53, AppInterface 20, bundle sizes (~d=344). SEV: Med [CONFIRMED] →
+   regenerate counts from a script or stop quoting exacts.
+ [CQ4] journal-helpers.js (494 lines, 12 consumers) untyped — only scripture-
+   resolution.js from src/data is in tsconfig. SEV: Med [CONFIRMED] → add
+   journal-helpers.js (+ letter-linking.js) to the tsconfig include.
+ [CQ5] app.jsx (798) zero JSDoc, excluded from tsc; wires ~90 props + 28 hooks
+   untyped (strictNullChecks off compounds it). SEV: Med [CONFIRMED] → type the
+   composition root (highest-value type gap).
+ [CQ6] var-useState debt forces ~8 disables. CORRECTION: it's the SINGLE-var form
+   `var _x = useState()` (76 occ / 10 files), NOT tuple-unpack `var [a,b]` (only 2,
+   in SafariFlows.jsx). SEV: Low-Med [PARTIAL] → convert to const [x,setX] to drop
+   the disables (e.g. JournalViewerScreen.jsx:273, JournalEditorScreen.jsx:82,115).
+ [CQ7] 50 MB import cap duplicated cross-language: platform-bridge.js:283
+   (WEB_MAX_IMPORT_BYTES) + StorageManager.kt:110 (MAX_IMPORT_SIZE); storage-
+   health.js:63 hardcodes the same value for a DIFFERENT meaning (critical-quota).
+   SEV: Low [CONFIRMED] → comment the cross-language link; don't "unify" the
+   coincidental third.
+ [CQ8] Dead _setMood — mood loads + round-trips but no picker UI (read-only field).
+   JournalEditorScreen.jsx:26-32. SEV: Low [CONFIRMED] → build the picker or
+   document as a deliberate frozen field.
+ [SC8] Stale header comment "Bundled into bundle-b" — splitIntoVerses actually
+   ships in bundle-d (_entry-d.js:63). src/utils/scripture-parse.js:4. SEV: Triv
+   [CONFIRMED] → fix the comment.
+ [A3] Test comment claims "structurally identical DOM" but the paths differ in mark
+   count (9 vs 7); signature() checks per-char paint/tap-winner only. annotation-
+   engine.test.jsx:254-256. SEV: Low(doc) [CONFIRMED] → correct the comment.
+
+ --- Build / CI / tooling ---
+ [B1] Manual globals-regen SPOF — a new window-global needs `npm run lint:globals`
+   + re-stage; pre-commit Step 2 (lint-staged) never regenerates it; only CI
+   smoke-lite catches staleness → fails AFTER push. SEV: Med-High [CONFIRMED] →
+   run lint:globals in pre-commit + re-stage the generated files (~6 lines).
+ [B2] CI re-downloads all deps + ~150 MB Chromium every push; setup-node has no
+   cache:'npm'; both jobs run on every push. SEV: Med [CONFIRMED] → add cache:'npm'
+   + cache ~/.cache/puppeteer keyed on the lockfile; consider a paths filter on
+   the build job's smoke step.
+ [B3] ~10 MB lazy corpus bundles are committed + rebuilt + re-staged on every
+   bundle-touching commit (no-op git-add on unchanged blobs; rebuild CPU is the
+   real cost). SEV: Low-Med [CONFIRMED] → gitignore + build in CI/deploy, or skip
+   the rebuild unless a src/data/ file is staged.
+ [B5] check_balance.py smart-quote heuristic is weak (start-of-line + colon only);
+   esprima backstops it — BUT esprima isn't pinned, so on a machine without it the
+   weak heuristic is the only smart-quote check. SEV: Low-Med [PARTIAL] → pin/
+   install esprima in pre-commit+CI (and/or mark the heuristic as a hint).
+ [B6] validateFormatA has `case 'scripture': break;` — accepts a scripture block
+   with none of segments/text/lines (valid schema, blank render). validate-
+   schemas.js:191-194. SEV: Low [CONFIRMED] → require >=1 of the three.
+ [B7] Pre-commit runs `test` (no coverage), CI runs `test:coverage` with a hard
+   floor; per-file lint-staged vs whole-repo CI eslint. SEV: Low(known) [CONFIRMED]
+   → documented tradeoff; B1 closes the sharpest instance.
+ [B8] Node unpinned — engines >=20, CI uses lts/* (drifts), no .nvmrc. SEV: Low
+   [CONFIRMED] → add .nvmrc + node-version-file in both workflows.
+ [B9] package.json:4 description mojibake — TRIPLE-encoded em-dash (bytes c3 a2 e2
+   82 ac e2 80 9d), worse than first thought. SEV: Triv [CONFIRMED] → one-run fix.
+ [B10] Dead tooling: tools/_p4_extract_view.py, _p5e_bundle_helpers.py,
+   _g23_add_exports.py, _q27_extract_app.py, triage-eslint-baseline.py,
+   jsx-progress.py + the dead `jsx-progress` npm script (JSX conversion 100% done).
+   SEV: Triv [CONFIRMED] → delete; git history preserves them.
+ [B4] Hand-rolled build vs Vite/Rollup. VERDICT: [JUDGMENT] do NOT migrate — the
+   Chromium-69 floor + UMD globals + the bespoke lazy-loader contract make it a
+   re-derivation (3-5 risky days) with ~zero payoff for an offline single-user
+   reader. Recorded as adjudicated; no action.
+
+ --- Security (defense-in-depth on an already-strong posture) ---
+ [SE1] Import has no __proto__/constructor guard. INERT today (V8 JSON.parse drops
+   __proto__; stores assign/stringify wholesale, no deep-merge — exploit attempt
+   failed), but no defense exists. SEV: Low [CONFIRMED-latent] → reject dangerous
+   keys in validateImportEnvelope / use a JSON.parse reviver.
+ [SE2] CSP connect-src lists github/githubusercontent hosts but the app makes ZERO
+   document-context fetch/XHR (grep=0); the SW's own fetch isn't governed by it.
+   index.html:38. SEV: Low [CONFIRMED] → set connect-src 'self' (keep img-src
+   hosts — load-bearing for the web Garden).
+ [SE5] Imported settings.translation → translations.js:25 `script.src='src/data/
+   bible-'+code+'.js'` unsanitized; attacker-controllable but same-origin-contained
+   (string-wrapping keeps every payload same-origin; no writable same-origin .js;
+   script-src 'self' blocks cross-origin/inline). SEV: Low [CONFIRMED-latent] →
+   allowlist `code` against TRANSLATION_OPTIONS ids before the script-load.
+ [SE7] Vendored react/react-dom/flexsearch/html2canvas .min.js have no recorded
+   upstream version/SHA (runtime is fully static — devDeps only, no npm pull).
+   SEV: Info [JUDGMENT] → record version + sha256 per vendored blob.
+ [SE4] garden.js:67 interpolates page index n into the URL path (internal, range-
+   guarded). SEV: Low [CONFIRMED-defense] → coerce/clamp n to an int-in-range in
+   gardenUrl so safety is local, not caller-dependent.
+
+ --- PWA polish ---
+ [P4pwa] <head> icon-180/32/16 referenced but not in CORE_ASSETS → 503 offline AND
+   escape the content-hash (editing them won't bump CACHE_VERSION). index.html:
+   50-52. SEV: Low [CONFIRMED] → add the 3 to CORE_ASSETS.
+ [P5pwa] manifest.json has no `id` → install identity pinned to start_url; a future
+   start_url/scope change orphans installs (already renamed once). SEV: Low
+   [CONFIRMED] → add "id":"./".
+ [P6pwa] sw-register `prompted` latch never resets → a 2nd in-session update is
+   never surfaced. sw-register.js:28,83-84. SEV: Low [CONFIRMED] → reset after the
+   toast is tapped/dismissed.
+ [P7pwa] skipWaiting reloads every open tab on update (web-only; single-screen
+   reader, uncommon multi-tab). SEV: Low(note) [CONFIRMED] → optional: gate the
+   reload on document focus/visibility.
+
+ --- Scripture parser (user-typed-ref robustness; shipped data is gated) ---
+ [SC2] findBook has no Roman-numeral support ("I John"/"II Corinthians"→null);
+   flows into user search via searchNavIndex. scripture-resolution.js:132-156.
+   SEV: Med [CONFIRMED] → normalize leading I/II/III → 1/2/3.
+ [SC3] findBook prefix match silently mis-resolves: "Jud"→judges (not jude),
+   "Jo"→JOB (job precedes joshua, correcting the audit), "Co"→colossians,
+   "M"→micah; 3 disconnected alias tables (findBook, nav-index.js:46-66,
+   mark-footnote-verses.js:29). SEV: Med [CONFIRMED] → explicit alias table,
+   canonical-short-form on tie.
+ [SC4] parseRefStr rejects period-abbrevs ("Rev. 22:13"), trailing verse letters
+   ("John 3:16a"), comma lists ("John 3:16,17" — though parseRefRange handles
+   them), and digit tags ("(NIV84)" fails the whole ref). scripture-resolution.js:
+   114,116. SEV: Med [CONFIRMED] → allow optional `.`, strip a trailing [a-c],
+   accept comma lists, fail-soft on an unknown tag.
+ [SC5] FootnoteSheet/FootnoteListSection do exact nkjv[fn.ref] with no
+   lookupVersesFromBooks fallback (the inline ref sheet HAS one, LetterView.jsx:
+   469). src/ui/components/FootnoteSheet.jsx:7. SEV: Low-Med [CONFIRMED] → add the
+   fallback (makes the data gate a backstop, not the sole line).
+ [SC6] WTLB {{ref:}} dict-miss is only a build WARNING but the runtime lookupVerse
+   has no global resolver (validator rationale is false) → renders "not available".
+   WtlbEntryView.jsx:53-57. SEV: Low [CONFIRMED] → make it an error OR add a
+   lookupVersesFromBooks fallback.
+ [SC7] splitIntoVerses consumes only the longest in-order marker prefix; a missing
+   interior marker / dup number-dot / first-verse-no-marker leaves later "N." as
+   WHITE text (gate catches shipped data; runtime still degrades). src/utils/
+   scripture-parse.js:181-196. SEV: Low [CONFIRMED] → note the gate is load-bearing;
+   optional runtime hardening.
+
+ --- Storage edge cases ---
+ [S4] Export can OOM under its own 100 MB ceiling — raw-byte guard + base64 (+33%)
+   + whole-payload JSON.stringify peaks multi-hundred-MB. backup.js:185-188,
+   SettingsScreen.jsx:441. SEV: Med [CONFIRMED] → lower the practical media ceiling
+   (30-40 MB) until streaming export lands, or stream the JSON to the writer.
+ [S5] Import has no aggregate media cap (per-record 100 MB only) → a hand-edited
+   backup with many large records OOMs. backup.js:351-368. SEV: Low [CONFIRMED] →
+   track cumulative decoded bytes, abort past a sane total.
+ [S6] Import confirm says "REPLACE all your current data" but stores absent from
+   the payload are KEPT, not wiped. backup.js:301-302, SettingsScreen.jsx:509.
+   SEV: Low [CONFIRMED] → reword "overwrite the data types in this backup".
+
+ --- Native (low / latent) ---
+ [N3] pause/resume on a null recorder return Success("ok") (deliberate, test-
+   pinned) — masks a dead recorder. NativeAudioRecorder.kt:93-114. SEV: Low
+   [JUDGMENT] → optional: return a distinct sentinel for consistency with stop().
+ [N4] vm.currentScale can desync from the restored WebView zoom; only the
+   screenshot path reads it live (self-healing bracket) — resetZoom/setZoomEnabled
+   are dead-from-JS (Garden uses CSS-transform zoom). SEV: Low [PARTIAL] → reset
+   currentScale=1 on restoreState, or read the live scale.
+ [N6] JsEvent / getCrashLog JSON shape have no ProGuard keep rules; BridgeContract
+   Test runs on UNMINIFIED classes. Dormant (isMinifyEnabled=false). SEV: Low
+   [CONFIRMED] → when N2.1b enables minify, run the bridge contract against the
+   minified APK.
+ [N7] captureScreenshot runBlocking on the binder thread has no single-flight guard
+   (captures serialize on Main anyway; no live concurrent caller). MainActivity.kt:
+   155-160. SEV: Low-Med [CONFIRMED] → optional AtomicBoolean single-flight.
+ [N8] Retry-view leaves a detached-but-live webView field (stray bridge calls are
+   benign no-ops; documented). MainActivity.kt:695-712. SEV: Low(info) [CONFIRMED]
+   → optional: park the detached reference.
+
+ --- Journal (lower) ---
+ [J3] Web audio path uses readAsDataURL on the assembled blob (rule-5 violation;
+   held ~3x in heap) — Android needs base64 for the bridge, web does not.
+   platform-bridge.js:510-520; web already has the Blob at :609. SEV: Med
+   [CONFIRMED] → pass the Blob/objectURL through directly on web.
+ [J5] recordDeletion never repairs currentStreak/longestStreak/milestones →
+   deleting your only entry shows a phantom live streak. journal-stats-store.js:
+   194-199. SEV: Low-Med [CONFIRMED] → reset currentStreak to 0 when totalEntries
+   hits 0 (full recompute out of scope).
+ [J7] Save-while-recording defers persist to __onNativeRecordingComplete; if the
+   sheet unmounts in the async gap, cleanup deletes the callback + nulls onstop →
+   recording lost (tiny ~ms window). JournalRecordingSheet.jsx:120-122,230-236.
+   SEV: Low [CONFIRMED] → persist from the bridge-owned blob, not the component
+   global.
+
+ --- Frontend / UX (lower) ---
+ [F3] _findLetter runs 15 full array scans per App render while reading a letter.
+   app.jsx:414-434. SEV: Low [CONFIRMED] → resolve only the active screen's volume
+   via a screen→volKey map.
+ [F4] tabsCtxValue useMemo omits goTabs from deps — DEMOTED to benign/documented,
+   not a latent stale-closure. app.jsx:652-659. SEV: Low [PARTIAL] → leave; note
+   intentional.
+ [F5] ROUTES rebuilt every render with fresh closures (downstream of F2). screen-
+   routes.jsx. SEV: Low/design [CONFIRMED] → matters less than F1/F2; memoizing
+   the heavy screens dominates.
+ [F6] Two annotation render architectures (React sweep-line vs imperative+Static
+   Subtree) — documented reason (avoid splitText/React reconciliation race). SEV:
+   Low(maint) [CONFIRMED] → consider consolidating onto the imperative path (also
+   the root of F1).
+ [A2] snapRangeToWords regex /[\w’’-]/ — duplicated U+2019, MISSING straight ASCII
+   ' (byte-confirmed; siblings all use /[\w’'-]/). annotation-engine.jsx:25. SEV:
+   Low [CONFIRMED] → fix to /[\w’'-]/.
+ [A6] Stacked non-note highlights under the newest are untappable (multi-disambig
+   is note-only). SelectionToolbar.jsx:181,193-200. SEV: Low [CONFIRMED] → extend
+   elementsFromPoint disambiguation to all stacked marks (optional).
+ [A7] Out-of-range stored offsets diverge between paths post-corpus-edit (React
+   clamps + paints truncated; DOM drops the overflow). SEV: Low [CONFIRMED] →
+   clamp identically if consistency is wanted.
+ [A8] Native tap→CSS-px /density assumes fixed dpr. PREMISE INACTIVE in this build
+   (setSupportZoom false, wide-viewport false, no TEXT_AUTOSIZING; density re-read
+   per tap). MainActivity.kt:676-678. SEV: Low [RUNTIME] → device-confirm only;
+   lower likelihood than first rated.
+ [UX5] Tab switcher undiscoverable — single ▢N glyph, no swipe/long-press/hint;
+   tabs default ON; disable-prompt only after 3 last-tab close strikes. SEV:
+   Med-High [CONFIRMED/RUNTIME] → first-use coachmark; reconsider tabs-default-on.
+ [UX6] Welcome splash near-blank — tiny ✕, invisible bordered <a> hotspot at 37%,
+   no label. CORRECTION: the ✕ DOES route first-run to About; isOnline is now
+   navigator.onLine (no egress). AppShellOverlays.jsx:78-114. SEV: Med [RUNTIME]
+   → visible "Enter" button + a labeled link.
+ [UX7] Inconsistent delete-confirm — ConfirmStrip for highlight/clear-all-tabs vs
+   INSTANT irreversible per-tab close; last-tab close resets to Home (lossy, no
+   undo). SEV: Med [CONFIRMED] → undo-toast for tab close, or standardize.
+ [UX8] Tab-card progress bar renders 0% for short/unscrolled reading tabs (reads as
+   "unread"). TabsOverview.jsx:104-108. SEV: Med [CONFIRMED] → hide the bar when
+   pct===0 and no scrollPosition recorded.
+ [UX9] Reading-dot gated by a hardcoded 15-element denylist (a new screen joins the
+   wrong side); resume target is the global activeReadKey (NOT per-tab) → cross-tab
+   bleed. app.jsx:724; use-reading-position-nav.js:176-201. SEV: Med-High
+   [CONFIRMED] → denylist→allowlist; scope activeReadKey per-tab.
+ [UX10] No swipe-to-change-chapter on mobile (3 redundant tap affordances; desktop
+   has arrow keys, mobile none). BibleChapterView.jsx:43-58,199-233. SEV: Low-Med
+   [CONFIRMED] → swipe-left/right on the chapter body (reuse the boundary handlers).
+
+═══════════════════════════════════════════════════════════════════════════
+ CONFIRMED-STRONG — verified airtight, NO ACTION
+═══════════════════════════════════════════════════════════════════════════
+ • U1 import durability barrier: _save() captures the put promise into _lastWrite
+   BEFORE the .catch; applyImportPayload awaits _whenSaved() for every store
+   before reload (cached-store.js:285-293, backup.js:371-379). Airtight.
+ • Boot orphan-media sweep gated on JournalStore.isReady() (app.jsx:561). Airtight.
+ • _rebaseAndPromote → _replayQueueOnto fully synchronous — no lost-write window
+   (cached-store.js:629-668).
+ • Migration framework: clone-before-migrate + abort-on-throw + atomic data+version
+   commit (cached-store.js:513-535, idb-adapter.js:342-363). Failure-safe.
+ • Journal cascade-delete purges anns/bookmarks/links/notes before entry delete;
+   the missing-braces if(changed) bug is fixed; shared-media protection
+   (isMediaReferencedElsewhere) works; export covers ALL media via streaming
+   8192-byte chunks and fails loud (journal-store.js:347-357,412,466-478,
+   journal-index-store.js:136, backup.js:48-61,176-209).
+ • Security posture: no dangerouslySetInnerHTML, no eval, no fetch/telemetry, hash-
+   locked script-src, regex+quote-guarded JS bridge, SSRF-guarded GardenImageCache.
+   No live injection/egress/prototype-pollution vector (exploit attempts failed).
+ • clearLegacyLs is fail-safe (gated on hasAnyPendingStores; flag not set on meta-
+   write failure → retries next boot) (cached-store.js:857,876-884).
+ • Doc invariants that HOLD: __bumpHlTick/hlTick removed from prod; migrateAnnotations
+   gone (0 refs); window.AndroidBridge single-source; ROUTES 53; AppInterface 20
+   @JavascriptInterface methods; vitest 1638/63; bundle sizes ~accurate.
+
+═══════════════════════════════════════════════════════════════════════════
+ DROPPED LEDGER — refuted by verification, DO NOT ACT
+═══════════════════════════════════════════════════════════════════════════
+ • T8  — _probe.test.jsx red/blocking: file does not exist on disk or in git
+         history; vitest glob is scoped, not **/*. Fabricated.
+ • J6  — recorder error-stage interval leak: every error path already clears both
+         intervals before cleanup(). Not a defect.
+ • N5  — clearCache stale-bundle-after-APK-update: first post-update launch is
+         always a fresh clearCache; assets served by WebViewAssetLoader. Not
+         reachable.
+ • S7  — background-retry races the import: degraded-precondition early-return
+         prevents the window + synchronous rebase. Effectively nil.
+ • CQ9 — probe-file half refuted (as T8); worktree-gitignore gap harmless
+         (registered worktrees don't pollute git status).
+
+═══════════════════════════════════════════════════════════════════════════
+ END — AUDIT-PLAN.txt   (status column to be kept current as items land)
+═══════════════════════════════════════════════════════════════════════════
