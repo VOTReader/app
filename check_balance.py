@@ -86,6 +86,19 @@ def esprima_check(text):
 
 def main():
     files = sys.argv[1:] if len(sys.argv) > 1 else DEFAULT_FILES
+    # B5: esprima is the AUTHORITATIVE JS-validity check; the brace/quote counter
+    # is only a weak heuristic. Without esprima a real syntax error that still
+    # balances braces (e.g. an unescaped " inside a JSON value) slips through
+    # SILENTLY. Make that loud rather than degrading quietly — pin it via
+    # requirements-dev.txt so CI/pre-commit machines actually have it.
+    try:
+        import esprima  # noqa: F401
+    except ImportError:
+        sys.stderr.write(
+            "\n  WARNING: esprima is NOT installed -- falling back to the WEAK\n"
+            "  brace/quote heuristic only; a real JS syntax error can slip through.\n"
+            "  Install it:  pip install -r requirements-dev.txt   (or: pip install esprima)\n\n"
+        )
     all_ok = True
     for f in files:
         path = DATA_DIR + f + '.js'

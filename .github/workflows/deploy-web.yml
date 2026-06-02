@@ -67,10 +67,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node (LTS)
+      - name: Set up Node (pinned via .nvmrc)
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version-file: '.nvmrc'
 
       - name: Set up Python (tools/build.py emits bundle-a)
         uses: actions/setup-python@v5

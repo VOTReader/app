@@ -1,0 +1,8 @@
+# Python dev dependencies for VOTReader-studio's data gates.
+# Install once per clone:  pip install -r requirements-dev.txt
+#
+# esprima — the AUTHORITATIVE JS-syntax check in check_balance.py (the
+# pre-commit data gate). Without it, check_balance silently degrades to a
+# weak brace/quote heuristic that misses real syntax errors (B5). Pinned so
+# every machine that runs the gate behaves identically.
+esprima==4.0.1

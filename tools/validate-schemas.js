@@ -189,8 +189,13 @@ export function validateFormatA(letters, opts = {}) {
             break;
 
           case 'scripture':
-            // scripture blocks have varied structure in the spec;
-            // accept segments, text, or lines
+            // B6: a scripture block must carry SOME content — at least one of
+            // segments (array), text (string), or lines (array). The spec allows
+            // varied structure, but "none of the three" is a valid schema that
+            // renders BLANK. (No shipped block is type=scripture today; forward guard.)
+            if (!Array.isArray(block.segments) && typeof block.text !== 'string' && !Array.isArray(block.lines)) {
+              errors.push(`${bp}: type="scripture" needs at least one of segments/text/lines`);
+            }
             break;
         }
       }
