@@ -110,19 +110,73 @@ export function parseRefStr(str) {
   // data gate (check_balance.py) still parses as a range instead of silently
   // collapsing to a single verse. Defense-in-depth; the gate stays the
   // enforcement layer, but a stray "3:16–18" shouldn't drop the range here.
-  const s = str.trim().replace(/[–—]/g, '-');
-  const tagM = s.match(/\s*\(([A-Za-z]+)\)\s*$/);
-  const clean = tagM ? s.slice(0, tagM.index).trim() : s;
-  const m = clean.match(/^(\d?\s*[A-Za-z][A-Za-z\s]+?)\s+(\d+)(?::(\d+)(?:\s*-\s*(\d+))?)?$/);
+  let s = str.trim().replace(/[–—]/g, '-');
+  // SC4: strip a trailing translation tag and capture it. Accept letters AND
+  // digits ("NIV84"); an unrecognized parenthetical is dropped (fail-soft) so
+  // a junk tag doesn't fail the whole ref.
+  let tag = null;
+  const tagM = s.match(/\s*\(([^)]*)\)\s*$/);
+  if (tagM) { tag = /^[A-Za-z0-9]+$/.test(tagM[1]) ? tagM[1] : null; s = s.slice(0, tagM.index).trim(); }
+  // SC4: drop abbreviation periods ("Rev." -> "Rev", "1 Cor." -> "1 Cor"). No
+  // reference ever needs a literal period, so this is unambiguous.
+  const clean = s.replace(/\./g, '');
+  // SC4: tolerate a trailing verse letter ("3:16a") and a comma-list tail
+  // ("3:16,17" -> primary verse 16; the extra members are consumed, not
+  // expanded — parseRefRange owns full list expansion). Gate-validated DATA
+  // never needs these, but a USER-typed ref shouldn't fail outright.
+  const m = clean.match(/^(\d?\s*[A-Za-z][A-Za-z\s]+?)\s+(\d+)(?::(\d+)[a-c]?(?:\s*-\s*(\d+)[a-c]?)?(?:\s*,\s*\d+[a-c]?)*)?$/);
   if (!m) return null;
   return {
     rawBook: m[1].trim(),
     chapter: parseInt(m[2], 10),
     verse: m[3] ? parseInt(m[3], 10) : null,
     verseEnd: m[4] ? parseInt(m[4], 10) : null,
-    tag: tagM ? tagM[1] : null
+    tag,
   };
 }
+
+// SC3 — standard book abbreviations, consulted AFTER the exact pass and BEFORE
+// the loose prefix fallback. Without it, an abbreviation resolved to whatever
+// book shares its prefix FIRST ("Jud"->Judges, "Phil"->Philemon, "Col"->the
+// first "Co…"). Keys are despaced+lowercased to match `q`; VALUES are the
+// despaced canonical id/title — a value that matches no book is harmless (it
+// just falls through to the prefix pass), so the table is fail-safe.
+const BOOK_ALIASES = {
+  gen: 'genesis', ge: 'genesis', exod: 'exodus', exo: 'exodus', ex: 'exodus',
+  lev: 'leviticus', lv: 'leviticus', num: 'numbers', nu: 'numbers', nm: 'numbers',
+  deut: 'deuteronomy', deu: 'deuteronomy', dt: 'deuteronomy',
+  josh: 'joshua', jos: 'joshua', judg: 'judges', jdg: 'judges', jud: 'jude',
+  rut: 'ruth', ru: 'ruth',
+  '1sam': '1samuel', '2sam': '2samuel', '1sa': '1samuel', '2sa': '2samuel',
+  '1kgs': '1kings', '2kgs': '2kings', '1ki': '1kings', '2ki': '2kings',
+  '1chr': '1chronicles', '2chr': '2chronicles', '1ch': '1chronicles', '2ch': '2chronicles',
+  ezr: 'ezra', neh: 'nehemiah', est: 'esther', esth: 'esther',
+  ps: 'psalms', psa: 'psalms', psalm: 'psalms', pss: 'psalms',
+  prov: 'proverbs', pro: 'proverbs', prv: 'proverbs',
+  eccl: 'ecclesiastes', ecc: 'ecclesiastes', qoh: 'ecclesiastes',
+  song: 'songofsolomon', sos: 'songofsolomon', sng: 'songofsolomon',
+  isa: 'isaiah', is: 'isaiah', jer: 'jeremiah', je: 'jeremiah',
+  lam: 'lamentations', ezek: 'ezekiel', ezk: 'ezekiel', eze: 'ezekiel',
+  dan: 'daniel', dn: 'daniel',
+  hos: 'hosea', joe: 'joel', jl: 'joel', amo: 'amos', am: 'amos',
+  oba: 'obadiah', obad: 'obadiah', jon: 'jonah', mic: 'micah',
+  nah: 'nahum', hab: 'habakkuk', zep: 'zephaniah', zeph: 'zephaniah',
+  hag: 'haggai', zec: 'zechariah', zech: 'zechariah', mal: 'malachi',
+  mt: 'matthew', matt: 'matthew', mk: 'mark', mar: 'mark', mrk: 'mark',
+  lk: 'luke', luk: 'luke', jn: 'john', act: 'acts',
+  rom: 'romans', ro: 'romans',
+  '1cor': '1corinthians', '2cor': '2corinthians', '1co': '1corinthians', '2co': '2corinthians',
+  gal: 'galatians', ga: 'galatians', eph: 'ephesians',
+  phil: 'philippians', php: 'philippians', pp: 'philippians',
+  col: 'colossians',
+  '1thess': '1thessalonians', '2thess': '2thessalonians', '1th': '1thessalonians', '2th': '2thessalonians',
+  '1tim': '1timothy', '2tim': '2timothy', '1ti': '1timothy', '2ti': '2timothy',
+  tit: 'titus', phlm: 'philemon', phm: 'philemon',
+  heb: 'hebrews', jas: 'james', jam: 'james', jm: 'james',
+  '1pet': '1peter', '2pet': '2peter', '1pe': '1peter', '2pe': '2peter',
+  '1jn': '1john', '2jn': '2john', '3jn': '3john', '1jo': '1john', '2jo': '2john', '3jo': '3john',
+  rev: 'revelation', re: 'revelation', rv: 'revelation',
+};
 
 /**
  * Resolve a raw book name (or alias / abbreviation) to a canonical book key.
@@ -132,7 +186,12 @@ export function parseRefStr(str) {
 export function findBook(rawName) {
   if (rawName == null) return null;
   const books = _allBooks();
-  const q = String(rawName).toLowerCase().replace(/\s+/g, '');
+  // SC2: normalize a leading Roman-numeral ordinal — "I John" -> "1 John",
+  // "II Corinthians" -> "2 …", "III John" -> "3 …". The required trailing \s+
+  // distinguishes the ordinal token from a book that merely begins with I
+  // (Isaiah). Try III/II/I longest-first so "III" isn't read as I + II.
+  const roman = String(rawName).replace(/^\s*(III|II|I)\s+/i, (_, r) => r.length + ' ');
+  const q = roman.toLowerCase().replace(/\s+/g, '');
   if (!q) return null;
   // U12: two passes so an EXACT match always beats a prefix hit. A single-pass
   // startsWith returned the first key that happened to share a prefix — so
@@ -145,6 +204,17 @@ export function findBook(rawName) {
     const t = b.title.toLowerCase().replace(/\s+/g, '');
     if (t === q || b.id === q || t === q + 's' || t.replace(/s$/, '') === q.replace(/s$/, ''))
       return k;
+  }
+  // SC3: a recognized standard abbreviation resolves to its conventional book
+  // BEFORE the loose prefix fallback can grab a same-prefix neighbour.
+  const aliased = BOOK_ALIASES[q];
+  if (aliased) {
+    for (const k of Object.keys(books)) {
+      const b = books[k];
+      if (!b) continue;
+      const t = b.title ? b.title.toLowerCase().replace(/\s+/g, '') : '';
+      if (t === aliased || b.id === aliased) return k;
+    }
   }
   for (const k of Object.keys(books)) {
     const b = books[k];

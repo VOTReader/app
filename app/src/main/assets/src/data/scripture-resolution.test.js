@@ -192,6 +192,24 @@ describe('parseRefStr', () => {
     expect(parseRefStr('John 3:16–18')).toMatchObject({ verse: 16, verseEnd: 18 }); // en-dash
     expect(parseRefStr('John 3:16—18')).toMatchObject({ verse: 16, verseEnd: 18 }); // em-dash
   });
+  // SC4 — user-typed-ref tolerances.
+  it('strips abbreviation periods — SC4', () => {
+    expect(parseRefStr('Rev. 22:13')).toEqual({ rawBook: 'Rev', chapter: 22, verse: 13, verseEnd: null, tag: null });
+    expect(parseRefStr('1 Cor. 13:4')).toMatchObject({ rawBook: '1 Cor', chapter: 13, verse: 4 });
+  });
+  it('tolerates a trailing verse letter — SC4', () => {
+    expect(parseRefStr('John 3:16a')).toMatchObject({ verse: 16, verseEnd: null });
+    expect(parseRefStr('John 3:16b-18a')).toMatchObject({ verse: 16, verseEnd: 18 });
+  });
+  it('takes the primary verse of a comma list — SC4', () => {
+    expect(parseRefStr('John 3:16,17')).toMatchObject({ verse: 16, verseEnd: null });
+  });
+  it('accepts an alphanumeric translation tag — SC4', () => {
+    expect(parseRefStr('John 3:16 (NIV84)')).toMatchObject({ verse: 16, tag: 'NIV84' });
+  });
+  it('drops a non-alphanumeric parenthetical, fail-soft — SC4', () => {
+    expect(parseRefStr('John 3:16 (see also!)')).toMatchObject({ verse: 16, tag: null });
+  });
 });
 
 /* ── findBook ─────────────────────────────────────────────────── */
@@ -215,6 +233,25 @@ describe('findBook', () => {
   it('prefers an EXACT title over a prefix collision (Jude, not Judges) — U12', () => {
     expect(findBook('Jude')).toBe('jude');     // exact beats 'judges'.startsWith('jude')
     expect(findBook('Judges')).toBe('judges');
+  });
+  // SC2 — Roman-numeral ordinals.
+  it('normalizes Roman-numeral ordinals — SC2', () => {
+    expect(findBook('I Corinthians')).toBe('1corinthians'); // "I " → "1 "
+    expect(findBook('I Cor')).toBe('1corinthians');         // roman + abbreviation
+  });
+  // SC3 — standard abbreviations resolve to the conventional book before the
+  // loose prefix fallback can grab a same-prefix neighbour.
+  it('resolves standard abbreviations (SC3) — Jud→Jude not Judges', () => {
+    expect(findBook('Jud')).toBe('jude');
+    expect(findBook('Judg')).toBe('judges');
+  });
+  it('resolves other standard abbreviations (SC3)', () => {
+    expect(findBook('Ps')).toBe('psalms');
+    expect(findBook('Gen')).toBe('genesis');
+    expect(findBook('1 Cor')).toBe('1corinthians');
+  });
+  it('still falls to the prefix pass for an unaliased prefix (Jo→John)', () => {
+    expect(findBook('Jo')).toBe('john'); // "jo" is intentionally NOT aliased (ambiguous)
   });
 });
 
