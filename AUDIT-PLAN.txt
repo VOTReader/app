@@ -325,6 +325,9 @@
      DIFFERENT-meaning quota threshold (don't unify). CQ8: documented journal mood
      as a deliberately read-only field (no picker planned), replacing a speculative
      "wiring gap" TODO. Comment-only (minify strips them -> bundles byte-identical).
+   • SE7 (vendor provenance) — new VENDORED-LIBS.md records version + bytes + sha256
+     for the 4 vendored runtime blobs + a re-verify sha command. Surfaced a real
+     skew: runtime React 18.2.0 vs the React 19.x devDep/test stack (documented).
 
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
@@ -904,7 +907,15 @@
    allowlist `code` against TRANSLATION_OPTIONS ids before the script-load.
  [SE7] Vendored react/react-dom/flexsearch/html2canvas .min.js have no recorded
    upstream version/SHA (runtime is fully static — devDeps only, no npm pull).
-   SEV: Info [JUDGMENT] → record version + sha256 per vendored blob.
+   SEV: Info [JUDGMENT] → record version + sha256 per vendored blob.   STATUS: DONE
+   DONE (2026-06-02): new VENDORED-LIBS.md (repo root, beside the other docs — NOT
+   in assets/ to avoid shipping a dev doc + churning the SW CACHE_VERSION) records
+   each blob's self-reported version + byte size + sha256 + a re-verify command.
+   react 18.2.0 / react-dom 18.2.0-next-9e3b772b8-20220608 / flexsearch 0.7.41 /
+   html2canvas 1.4.1. SURFACED a real skew: the RUNTIME React is 18.2.0 while
+   package.json pins React 19.x for the build + vitest/@testing-library test stack
+   — the app ships on 18.2.0 but components are tested under 19 (documented, not
+   changed; swapping the vendored runtime React is a separate verified upgrade).
  [SE4] garden.js:67 interpolates page index n into the URL path (internal, range-
    guarded). SEV: Low [CONFIRMED-defense] → coerce/clamp n to an int-in-range in
    gardenUrl so safety is local, not caller-dependent.
