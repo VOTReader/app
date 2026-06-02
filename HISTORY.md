@@ -66,6 +66,20 @@ Tests 1638 → 1650. Doc footprint: ~630 KB stale docs removed + CLAUDE/PLAN
 slimmed ~280 KB. A parallel "second deep audit" (AUDIT-PLAN.txt, 7.5→8.5) ran
 concurrently in the repo this session — distinct scope; no D-bucket overlap.
 
+**Narrow follow-ups (2026-06-02)** — after a "don't just follow the plan, what
+do YOU think" challenge, the *wholesale* D8/D3 skips held, but their two
+genuinely-defensible sub-pieces shipped:
+- **`useLinkPickerOrchestration`** (`47c4b30`) — extracted the one truly-separable
+  cohesive cluster from useSheetOrchestration (link picker / link sidebar: 6 of
+  13 slots + the 3 __openLink* bridges; callbacks touch only their own slots +
+  bare-global helpers). Internal sub-hook (imported, not globalized); moved code
+  byte-identical, spread back into the parent's return so App() is unchanged.
+  Preview-verified: bridges wired + __openLinkPicker opens the LinkPicker sheet.
+- **journal-helpers.js + letter-linking.js → typecheck gate** (`d2082f4`) — both
+  measured 0 tsc errors, so pure free coverage (overlaps AUDIT-PLAN CQ4). The D3
+  global strictNullChecks flag stays off; app.jsx full typing (CQ5) + the PF3
+  virtualization stay owned by AUDIT-PLAN.
+
 ---
 
 ## N2 — second native-review response (2026-06-01)

@@ -846,7 +846,8 @@
 ═══════════════════════════════════════════════════════════════════════════
  D-BUCKET — DEFERRED / ARCHITECTURAL (raises ceiling past 8; NOT required for 8)
 ═══════════════════════════════════════════════════════════════════════════
- ★ DISPOSITIONED 2026-06-01 (D-bucket execution session). 4 landed, 4 skipped.
+ ★ DISPOSITIONED 2026-06-01 (D-bucket execution session). 4 landed, 4 skipped
+   (+ 2 narrow sub-pieces of the skips later landed 2026-06-02 — see D8/D3).
    D7 DONE (79781f8) — stale-doc prune + CLAUDE 142→27 KB / PLAN 235→70 KB;
      orphaned W2–W9/NK/feature history relocated into HISTORY.md.
    D5 DONE (43fb827) — cooldown-deduped per-action write-failure toast.
@@ -859,13 +860,15 @@
      working scroll/annotation layer. The 2026-06-01 AUDIT-PLAN.txt [PF3]
      independently picks IntersectionObserver windowing (works on WV69) instead
      and OWNS that virtualization work — so it's not a D-bucket item.
-   D8 SKIP — low-priority refactor of load-bearing, working sheet UI; respect
-     production code in a nearly-done app.
+   D8 SKIP (wholesale) — dissolving the cohesive sheet hook is net-negative.
+     NARROW HALF LANDED 2026-06-02 (47c4b30): extracted the one truly-separable
+     cluster, useLinkPickerOrchestration (link picker / link sidebar). See HISTORY.
    D4 SKIP — already W7.5-adjudicated net-negative (explicit ROUTES signature is
      the honest receipt of clean extraction; bundling doesn't reduce coupling).
-   D3 SKIP — project-wide strictNullChecks; W8.3 deliberately left it off and the
-     fresh audit (CQ4/CQ5) also scopes typing TARGETED (app.jsx + journal-helpers,
-     owned by AUDIT-PLAN), not a global strict flag. Original D1–D8 below.
+   D3 SKIP (wholesale) — project-wide strictNullChecks stays off (W8.3 + the fresh
+     audit both scope typing TARGETED). NARROW HALF LANDED 2026-06-02 (d2082f4):
+     journal-helpers.js + letter-linking.js into the typecheck gate (0 errors).
+     app.jsx full typing (CQ5) stays with AUDIT-PLAN. Original D1–D8 below.
  ───────────────────────────────────────────────────────────────────────────
  D1  Virtualize long reading views (content-visibility:auto is a cheap CSS-only
      first step) — ChapterView/BibleChapterView/LetterView render every verse.
