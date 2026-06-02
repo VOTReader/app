@@ -319,6 +319,12 @@
      (the raw file is already ~50 MB-capped per CQ7), protecting the base64->Blob
      decode on the only-backup surface. +2 backup.test.js. vitest 1740/70
      test:coverage exit 0, tsc + eslint clean.
+   • CQ7 + CQ8 (hygiene comments) — CQ7: documented the import-cap cross-language
+     pair bidirectionally (StorageManager.MAX_IMPORT_SIZE <-> platform-bridge
+     WEB_MAX_IMPORT_BYTES) + marked storage-health's coincidental 50 MB as the
+     DIFFERENT-meaning quota threshold (don't unify). CQ8: documented journal mood
+     as a deliberately read-only field (no picker planned), replacing a speculative
+     "wiring gap" TODO. Comment-only (minify strips them -> bundles byte-identical).
 
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
@@ -825,10 +831,20 @@
    (WEB_MAX_IMPORT_BYTES) + StorageManager.kt:110 (MAX_IMPORT_SIZE); storage-
    health.js:63 hardcodes the same value for a DIFFERENT meaning (critical-quota).
    SEV: Low [CONFIRMED] → comment the cross-language link; don't "unify" the
-   coincidental third.
+   coincidental third.   STATUS: DONE
+   DONE (2026-06-02): the web side already cross-referenced Android; added the
+   back-reference on StorageManager.MAX_IMPORT_SIZE (-> platform-bridge
+   WEB_MAX_IMPORT_BYTES, "keep in sync"), and marked storage-health's
+   CRITICAL_QUOTA_BYTES as the coincidental-but-DIFFERENT-meaning 50 MB (quota
+   threshold, not the import cap) — do NOT unify. Comment-only; minify strips
+   them so the bundles stay byte-identical.
  [CQ8] Dead _setMood — mood loads + round-trips but no picker UI (read-only field).
    JournalEditorScreen.jsx:26-32. SEV: Low [CONFIRMED] → build the picker or
-   document as a deliberate frozen field.
+   document as a deliberate frozen field.   STATUS: DONE
+   DONE (2026-06-02): documented mood as a deliberately READ-ONLY field (preserved
+   across the save round-trip, no picker UI planned) — replaced the speculative
+   "likely a wiring gap / was never built" TODO with a definite design statement
+   ([[no-comment-breadcrumbs]]). No picker built (that's a feature, out of scope).
  [SC8] Stale header comment "Bundled into bundle-b" — splitIntoVerses actually
    ships in bundle-d (_entry-d.js:63). src/utils/scripture-parse.js:4. SEV: Triv
    [CONFIRMED] → fix the comment.

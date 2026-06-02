@@ -24,11 +24,10 @@ export function JournalEditorScreen(props) {
   var blocks = _blocks[0]; var setBlocks = _blocks[1];
 
   var _mood = useState((initial && initial.mood) || null);
-  // TODO Q3-followup: setMood is never called — mood loads from the existing
-  //   entry but the editor has no UI to change it. Likely a wiring gap
-  //   (mood-picker UI was never built or got removed). Keeping the read
-  //   plumbing intact so existing-mood persists round-trip; underscore on
-  //   the setter marks "intentionally unused for now" per Q3 exit criteria.
+  // mood is a deliberately READ-ONLY field (CQ8): the editor preserves an
+  // existing entry's mood across the save round-trip but exposes no picker UI
+  // to change it — no mood-picker feature is planned. The setter is therefore
+  // unused (underscore-marked); wire it from a picker if one is ever added.
   var mood = _mood[0]; var _setMood = _mood[1];
 
   var _saved = useState('Saved');

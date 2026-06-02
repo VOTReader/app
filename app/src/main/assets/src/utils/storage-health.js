@@ -61,6 +61,10 @@ const CAUTION_PERCENT = 0.50;
 const WARNING_PERCENT = 0.80;
 const CRITICAL_PERCENT = 0.95;
 const LOW_QUOTA_BYTES = 100 * 1024 * 1024;
+// NOTE (CQ7): this 50 MB is the CRITICAL storage-QUOTA threshold (we warn when
+// free space drops this low), NOT the 50 MB import-file cap (platform-bridge
+// WEB_MAX_IMPORT_BYTES / StorageManager MAX_IMPORT_SIZE). Same number, unrelated
+// meaning — do NOT "unify" them; they move independently.
 const CRITICAL_QUOTA_BYTES = 50 * 1024 * 1024;
 const PRIVATE_SAFARI_QUOTA_HEURISTIC = 120 * 1024 * 1024;
 

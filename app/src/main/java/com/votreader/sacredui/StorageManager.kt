@@ -107,6 +107,8 @@ class StorageManager(private val context: Context) {
         // "application/json" but Android does not enforce it, so the cap
         // stops an accidental or hostile GB-scale pick from OOM-ing the
         // app even before we get to readBytes.
+        // CROSS-LANGUAGE PAIR: the web import path enforces the same 50 MB in
+        // platform-bridge.js (WEB_MAX_IMPORT_BYTES). Keep the two values in sync.
         const val MAX_IMPORT_SIZE = 50L * 1024 * 1024
     }
 
