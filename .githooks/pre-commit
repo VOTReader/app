@@ -151,6 +151,16 @@ if [ -n "$src_changed" ]; then
       fi
     done
   fi
+  # B1: regenerate the cross-bundle globals list FIRST, then re-stage it. A new
+  # top-level UPPER_CASE decl in src/data/ (or a newly window-exposed export)
+  # shifts this generated list. The per-file lint-staged below still passes on
+  # stale globals, but CI's smoke-lite globals-mirror check then fails AFTER
+  # push (exactly what BOOK_ALIASES did). Regenerating + staging here closes the
+  # gap noted in [[globals-regen-workflow]]. (gen-eslint-globals.py is Python,
+  # already on PATH from Step 1; the generator is idempotent — a no-op stages
+  # nothing.)
+  npm run lint:globals >/dev/null 2>&1
+  git add tools/eslint-globals.generated.js tools/globals.generated.d.ts
   npx lint-staged
   status=$?
   if [ $status -ne 0 ]; then
