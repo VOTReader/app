@@ -197,7 +197,19 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // matches the existing UX contract.
             when (val r = vm.storage.readUriAsBase64(uri)) {
                 is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ImportFile, r.value)
-                is StorageManager.Result.Failure -> bridge.callOptional(JsEvent.ImportFile, null)
+                // Pass the oversize case through as a controlled "too_large" code
+                // so JS can show a specific "that file is too large" message. Every
+                // other failure stays a bare null (one arg) -- byte-identical to the
+                // cancel path above, so a generic read error remains silent as
+                // before. The raw reason (which may carry an exception message)
+                // never crosses the bridge; it is already in logcat via
+                // StorageManager's Timber.w.
+                is StorageManager.Result.Failure ->
+                    if (r.reason == "too_large") {
+                        bridge.callOptional(JsEvent.ImportFile, null, "too_large")
+                    } else {
+                        bridge.callOptional(JsEvent.ImportFile, null)
+                    }
             }
         }
 

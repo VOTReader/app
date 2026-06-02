@@ -278,6 +278,10 @@ const webResetZoom = () => {};
 // FileReader.readAsDataURL gives us a "data:<mime>;base64,XXX" string; we
 // strip the prefix so the callback receives pure base64 matching the
 // Android contract (atob-decodable directly).
+// Matches Android's StorageManager.MAX_IMPORT_SIZE (50 MB) so the oversize
+// import guard is symmetric across both platforms.
+const WEB_MAX_IMPORT_BYTES = 50 * 1024 * 1024;
+
 function webOpenFilePicker() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -287,6 +291,14 @@ function webOpenFilePicker() {
     const file = ev.target.files && ev.target.files[0];
     if (!file) {
       if (typeof cb === 'function') cb(null);
+      return;
+    }
+    // Mirror the Android 50 MB import cap: a huge accidental pick would
+    // otherwise OOM / hang FileReader on a low-end device. Report it as the
+    // 'too_large' code so SettingsScreen shows the specific oversize message;
+    // every other null stays a silent cancel/error exactly as before.
+    if (file.size > WEB_MAX_IMPORT_BYTES) {
+      if (typeof cb === 'function') cb(null, 'too_large');
       return;
     }
     const reader = new FileReader();

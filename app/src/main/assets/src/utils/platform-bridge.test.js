@@ -429,6 +429,26 @@ describe('PlatformBridge — Web openFilePicker (DOM input + FileReader)', () =>
     /** @type {any} */ (globalThis).FileReader = origFileReader;
   });
 
+  it('fires window.__onImportFile(null, "too_large") when the file exceeds the 50 MB cap', () => {
+    const cb = vi.fn();
+    /** @type {any} */ (globalThis.window).__onImportFile = cb;
+    // FileReader must never run on the oversize path — fail loudly if it does.
+    const origFileReader = globalThis.FileReader;
+    /** @this {any} */
+    function MockFileReaderUnused() {
+      /** @type {any} */ const self = this;
+      self.readAsDataURL = () => { throw new Error('FileReader should not run for an oversize file'); };
+    }
+    /** @type {any} */ (globalThis).FileReader = MockFileReaderUnused;
+
+    bridge.openFilePicker();
+    // 51 MB — one MB over the 50 MB cap (matches Android MAX_IMPORT_SIZE).
+    /** @type {any} */ (inputEl).onchange({ target: { files: [/** @type {any} */ ({ name: 'huge.json', size: 51 * 1024 * 1024 })] } });
+    expect(cb).toHaveBeenCalledWith(null, 'too_large');
+
+    /** @type {any} */ (globalThis).FileReader = origFileReader;
+  });
+
   it('does not throw when window.__onImportFile is not installed', () => {
     delete (/** @type {any} */ (globalThis.window)).__onImportFile;
     bridge.openFilePicker();

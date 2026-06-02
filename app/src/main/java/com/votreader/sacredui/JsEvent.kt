@@ -8,7 +8,7 @@ package com.votreader.sacredui
  * surface.
  *
  * JS-side receivers:
- *   ImportFile            -> SettingsScreen.__onImportFile(b64OrNull)
+ *   ImportFile            -> SettingsScreen.__onImportFile(b64OrNull, errCode?)
  *   ExportComplete        -> SettingsScreen.__onExportComplete("ok"|"error:<reason>"|"cancelled")
  *   MicPermissionResult   -> JournalRecordingSheet.__onMicPermissionResult(granted)
  *   NativeRecordingComplete -> JournalRecordingSheet.__onNativeRecordingComplete(b64, durMs, mime)

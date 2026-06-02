@@ -563,9 +563,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         _showToast('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
       }
     };
-    window.__onImportFile = (b64OrNull) => {
+    window.__onImportFile = (b64OrNull, errCode) => {
       window.__onImportFile = null;
-      if (!b64OrNull) return;
+      if (!b64OrNull) {
+        // errCode is only set for a real failure (never for a user cancel,
+        // which stays a bare null). 'too_large' gets a specific, actionable
+        // message; any other failure stays silent, as before.
+        if (errCode === 'too_large') {
+          _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
+        }
+        return;
+      }
       try { _doImport(atob(b64OrNull)); }
       catch (_e) { _showToast('Import failed: could not decode file.'); }
     };

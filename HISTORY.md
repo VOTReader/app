@@ -4,6 +4,122 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## N2 — second native-review response (2026-06-01)
+
+A follow-up external review of the native Kotlin layer (proguard, audio
+session, GardenImageCache, JsBridge, bundle sizes) produced ~12 suggestions.
+Each was verified against source before acting -- several converged with
+conclusions already reached in U7/U9/U19, a few rested on stale or incorrect
+premises. Two items landed this session; the rest were dispositioned (queued
+for the owed device walk, or skipped-with-reasoning) so none is lost. The
+native layer remains the highest-rated subsystem; this round is polish on
+working, device-tuned code.
+
+LANDED:
+
+- **N2.1 -- ProGuard keep-rule fix.** proguard-rules.pro named
+  `com.votreader.sacredui.MainActivity$AppInterface { *; }` -- a stale
+  inner-class name. AppInterface became a TOP-LEVEL class in the N1
+  extraction, so the rule matched nothing; an R8/minified release would have
+  renamed/stripped the @JavascriptInterface methods and silently killed the
+  entire native bridge (import, export, recording, screenshot, haptic).
+  Replaced with `-keep class AppInterface { @android.webkit.JavascriptInterface
+  <methods>; }` + a `-keepclassmembers class * { @android.webkit.
+  JavascriptInterface <methods>; }` wildcard backstop. CURRENTLY DORMANT --
+  release `isMinifyEnabled = false`, so R8 never runs; this is latent-footgun
+  removal, not active breakage. Becomes load-bearing the instant minify is
+  enabled (N2.1b, deferred).
+
+- **N2.11 -- "file too large" import message.** The 50 MB import cap
+  (StorageManager.MAX_IMPORT_SIZE) failed SILENTLY: the Android picker's
+  Failure branch fired `__onImportFile(null)`, indistinguishable from a user
+  cancel, so an oversize pick produced no feedback. Minimal, backward-
+  compatible fix: MainActivity now passes a controlled `"too_large"` code
+  (every other failure stays a bare null -- byte-identical to cancel ->
+  silent), the web picker enforces the same 50 MB cap (WEB_MAX_IMPORT_BYTES)
+  before touching FileReader, and SettingsScreen's
+  `__onImportFile(b64, errCode)` shows a specific actionable toast for the
+  oversize case only. No existing behavior or test changed; +1 vitest
+  (oversize -> `(null,'too_large')`, FileReader never invoked). 1637 -> 1638.
+  Gates: build, tsc, eslint (397 globals), vitest+coverage (above floor),
+  Kotlin testDebugUnitTest + jacoco, headless 12-screen smoke -- all green.
+
+QUEUED for the owed device walk (real improvements that touch device-tuned or
+device-verified code, so they must be validated on hardware rather than
+shipped blind):
+
+- **N2.2 audio focus** -- request AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE around
+  the recording session so background media (Spotify/YouTube) pauses instead
+  of bleeding into the voice memo. startAudioSession currently sets
+  MODE_IN_COMMUNICATION but never requests focus (grep: 0 AudioFocus refs).
+  Route the AudioManager calls through new BridgeHost methods so AppInterface
+  stays unit-testable (mirrors hasAudioPermission); hold the AudioFocusRequest
+  in MainViewModel beside previousAudioMode.
+- **N2.3 volumeControlStream = STREAM_MUSIC** -- marginal: Android's adaptive
+  default (USE_DEFAULT_STREAM_TYPE) already targets the media stream during
+  active playback, so this only helps idle pre-adjustment and slightly fights
+  the OS default. Optional.
+- **N2.4 GardenImageCache stream-to-disk** -- replace download()'s
+  readBytes()-into-heap with a streamed copy to the tmp file. PROFILE FIRST
+  (a la U8/W7.6): the cache is device-verified working (176 files/586 MB,
+  0 eviction), the ~40 MB-transient is the reviewer's estimate not an observed
+  problem, and the naive fix would change the deliberate "serve-from-memory
+  even if the disk write fails" robustness property. Measure heap during an
+  Ultra crawl on-device; only refactor if the data justifies it.
+- **N2.5 haptic fallback amplitude** -- API 26-28 createOneShot uses amplitude
+  80 for the tick, which weak OEM motors (Huawei/Xiaomi) may not register;
+  DEFAULT_AMPLITUDE (-1) is safer. DORMANT (haptic() has no JS caller yet) --
+  fold into the eventual JS-haptic wiring + device-verify together.
+- **N2.1b enable R8 minify** -- shrinks unused AndroidX -> a modest APK win
+  (does NOT touch the JS/corpus assets). Needs a full device bridge walk
+  because R8/reflection/WebView is exactly where keep-rule gaps surface. Low
+  urgency (no Play Store goal; ships debug APKs). Depends on N2.1.
+
+SKIPPED -- with reasoning (verified against source):
+
+- **N2.6 screenshot async contract** = already U9. The runBlocking is on the
+  BINDER thread, not Main (no ANR), and takeScreenshot is one-at-a-time
+  thumbnail capture (no binder-pool exhaustion at realistic rates). The
+  off-Main encode landed in U9; the full window.__onScreenshotComplete rewrite
+  stays deferred (cross-bridge change, device-verify burden, marginal gain).
+- **N2.7 follow system dark mode** -- declined by the user: the app has an
+  explicit, persisted light/dark toggle; an auto-follow would be a second
+  source of truth fighting it. Not a bug -- a feature we deliberately omit.
+- **N2.8 WebView Safe Browsing** -- net-negative here: adds a Google callback
+  in tension with the no-egress policy, and protects almost nothing (only
+  local-asset top-level loads; external links open via ACTION_VIEW; the only
+  remote subresources are static Garden JPEGs, which a URL-list check would
+  not vet anyway). Optionally EXPLICITLY DISABLE via manifest meta-data for
+  policy clarity.
+- **N2.9 Thread -> Coroutine in the cap enforcer** -- cosmetic; the daemon
+  Thread is a fast, single-flighted, fire-and-forget sweep, and the class has
+  no CoroutineScope owner, so going coroutine adds plumbing for no real gain.
+  download() correctly stays synchronous on the intercept thread.
+- **N2.10 quote() U+0085 (NEL) escaping** -- rests on a false premise. The
+  ECMAScript LineTerminator set is exactly {LF, CR, U+2028, U+2029}; U+0085 is
+  NOT a line terminator, so an unescaped NEL is a legal JS string char and
+  causes no SyntaxError in V8/Chromium. quote()'s real U+2028/U+2029 escaping
+  is correct and pinned by JsBridgeTest. (Byte-verified the two when-branches
+  are genuinely E2 80 A8 / E2 80 A9, not a duplicate-branch bug -- the Read
+  tool just renders both as blank.)
+- **N2.12 SQLite / FTS5 corpus** -- the reviewer's "next level up," but it
+  collides with three deliberate commitments: dual-platform single codebase
+  (web has no native SQLite -> WASM sql.js + OPFS, re-forking the data layer
+  the PWA migration existed to unify), the diffable/schema-validated/
+  CORPUS_VERSION-gated corpus source (a .db blob loses git diffs + the
+  validation gates), and the offline PWA model. The reviewer's bundle figures
+  were stale (bundle-a is 836 KB, not 4.6 MB; the corpora are lazy). Capture
+  the budget-device benefit cheaply via the D-bucket instead: D1
+  content-visibility virtualization + search docStore teardown.
+
+Also corrected for the record: the "hardcoded string leak" concern (review
+batch 1 #C) is not realized -- readUriAsBase64 failures discard the reason
+(JS gets null) and the export reason goes to console.warn only, never a raw UI
+toast; combined with the no-localization policy, the error-enum refactor solves
+a non-problem (its one genuine payoff, the oversize message, landed as N2.11).
+
+---
+
 ## 8/10 UPLIFT — Wave 5 (the full P2 "ceiling" set) (2026-06-01)
 
 Commits `c836686..3c1dda9`. Everything past the 8/10 bar — the P2 items that
