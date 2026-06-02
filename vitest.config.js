@@ -20,6 +20,7 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.js'],
     include: [
       'app/src/main/assets/src/**/*.test.{js,jsx}',
+      'app/src/main/assets/*.test.{js,jsx}', // service-worker.test.js (SW lives at the assets root)
       'tools/**/*.test.{js,jsx}',
     ],
     // Default reporter ('default') is fine for v1. Add 'json' / 'junit'

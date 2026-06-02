@@ -58,6 +58,23 @@ const CORE_ASSETS = [
   './offline.html',
 ];
 
+// P2pwa: the CRITICAL shell — the directory index, index.html, the minified
+// CSS, and the four eager bundles. A partial boot is useless, so these stay
+// all-or-nothing on install. Everything ELSE in CORE_ASSETS (fonts, icons,
+// images, offline page, html2canvas) caches best-effort: a single 404 there
+// must NOT abort the install, or the SW never reaches 'installed' → the
+// update-available prompt never fires → the client is silently pinned to the
+// old version. (Keep this subset of the CORE_ASSETS literal above.)
+const CRITICAL_ASSETS = new Set([
+  './',
+  './index.html',
+  './dist/app.min.css',
+  './dist/bundle-a.js',
+  './dist/bundle-b.js',
+  './dist/bundle-c.js',
+  './dist/bundle-d.js',
+]);
+
 const CORPUS_BUNDLES = new Set([
   'bundle-a-bible.js',
   'bundle-a-matthew.js',
@@ -78,9 +95,19 @@ const CORPUS_PRECACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    // Core shell — must all succeed (small, the critical path).
     const core = await caches.open(CORE_CACHE);
-    await core.addAll(CORE_ASSETS);
+    // Critical shell — all-or-nothing; a miss here SHOULD fail install.
+    await core.addAll(CORE_ASSETS.filter((a) => CRITICAL_ASSETS.has(a)));
+    // Everything else — best-effort, so a single 404 (e.g. a partial deploy or
+    // a renamed asset) doesn't abort the install and silently pin the old SW.
+    const bestEffort = CORE_ASSETS.filter((a) => !CRITICAL_ASSETS.has(a));
+    const results = await Promise.allSettled(bestEffort.map((u) => core.add(u)));
+    const failed = results
+      .map((r, i) => (r.status === 'rejected' ? bestEffort[i] : null))
+      .filter(Boolean);
+    if (failed.length) {
+      console.warn('[sw] install: ' + failed.length + ' best-effort asset(s) not cached:', failed);
+    }
 
     // Full corpus into the STABLE corpus cache, so an app-version bump
     // won't re-download ~10 MB (only a CORPUS_VERSION bump will). Best-
