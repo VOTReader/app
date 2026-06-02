@@ -18,10 +18,22 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     }
     if (window.VotSearch.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return;}
     setBuildInfo({ ready: false, building: true, progress: null });
-    window.VotSearch.init({
-      onProgress: (done, total) => setBuildInfo((b) => ({ ...b, progress: { done, total } }))
-    }).then(() => setBuildInfo({ ready: true, building: false, progress: null })).
-    catch((err) => setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }));
+    // SR5: the index folds in BOTH the Bible (BOOKS) AND the Volumes (VOT +
+    // MATTHEW), all LAZY-loaded. Building before they arrive produces — and
+    // CACHES — a near-empty index that never self-repairs (init reads the bare
+    // corpus globals; an empty read yields an empty index that survives reloads
+    // until a manual reindex). Load every corpus first, then build. Warm opens
+    // cache-hit, so this pays the corpus download once and does NOT re-load the
+    // alt-translations (ensureIndex still pulls those only on a cache miss — U4).
+    const loadBible = (typeof window.__loadBibleCorpus === 'function') ? window.__loadBibleCorpus().catch(() => {}) : Promise.resolve();
+    const loadMatthew = (typeof window.__loadMatthewCorpus === 'function') ? window.__loadMatthewCorpus().catch(() => {}) : Promise.resolve();
+    const loadVot = (typeof window.__loadVotCorpus === 'function') ? window.__loadVotCorpus().catch(() => {}) : Promise.resolve();
+    Promise.all([loadBible, loadMatthew, loadVot])
+      .then(() => window.VotSearch.init({
+        onProgress: (done, total) => setBuildInfo((b) => ({ ...b, progress: { done, total } }))
+      }))
+      .then(() => setBuildInfo({ ready: true, building: false, progress: null }))
+      .catch((err) => setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }));
   }, []);
 
   // Focus input on mount
@@ -257,7 +269,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <>
             <div className="srch-empty-hero">
               <h3>Search everything</h3>
-              <p>Verses, letters, study notes, headings, footnotes — across all 66 books and every Volume.</p>
+              <p>Verses, letters, study notes, footnotes — across all 66 books and every Volume.</p>
             </div>
             <div className="srch-section-label">Quick picks</div>
             <div className="srch-quick-row">
