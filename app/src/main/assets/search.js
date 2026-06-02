@@ -1399,11 +1399,17 @@ async function executeSearch(query, options) {
   // for exact substring, short tokens naturally match via `forward` prefix.
   var searchTerm = p.phrase ? p.phrase : filtered.join(' ');
   if (!searchTerm) return { parsed: parsed, results: [], parsedTerms: filtered, textQuery: p };
+  // SR2: a PHRASE is one AND'd search (its words must co-occur, then the exact
+  // post-filter applies); a non-phrase query is searched TERM-BY-TERM and the
+  // matches UNION'd (OR) — see the field loop below.
+  var searchUnits = p.phrase ? [p.phrase] : filtered;
 
+  // SR1: U22 dropped the 'heading' field from the index (createDb), so searching
+  // index:'heading' threw on EVERY query (caught + logged per corpus, the 2.0
+  // boost dead). Removed — the field no longer exists.
   var fields = [
     { name: 'title',   boost: 3.0 },
     { name: 'ref',     boost: 2.5 },
-    { name: 'heading', boost: 2.0 },
     { name: 'text',    boost: 1.0 }
   ];
   var perFieldLimit = Math.min(Math.max(limit * 4, 400), 1500);
@@ -1416,27 +1422,37 @@ async function executeSearch(query, options) {
     if (!slot || !slot.db) continue;
     for (var fi = 0; fi < fields.length; fi++) {
       var f = fields[fi];
-      var raw;
-      try { raw = slot.db.search(searchTerm, { index: f.name, limit: perFieldLimit }); }
-      catch (e) { console.warn('[VotSearch] field search failed', cname, f.name, e); continue; }
-      if (!raw) continue;
-      var ids = [];
-      if (Array.isArray(raw)) {
-        for (var rr = 0; rr < raw.length; rr++) {
-          var entry = raw[rr];
-          if (entry && typeof entry === 'object' && entry.result) {
-            for (var er = 0; er < entry.result.length; er++) ids.push(entry.result[er]);
-          } else if (typeof entry === 'string' || typeof entry === 'number') {
-            ids.push(entry);
+      // SR2: search each query term SEPARATELY and UNION the matches (OR).
+      // FlexSearch ANDs a multi-word query, so terms spread across different
+      // (short) verses — e.g. "beginning void light" (Genesis 1:1 / 1:2 / 1:3) —
+      // returned ZERO. suggest:true does NOT change this (verified against the
+      // vendored FlexSearch 0.7.41). A phrase is a single AND'd search (searchUnits
+      // is then [phrase]); the exact-phrase post-filter below enforces the literal
+      // string. Docs matching more terms accumulate score across iterations, so
+      // full-coverage results rank above partial ones.
+      for (var ui = 0; ui < searchUnits.length; ui++) {
+        var raw;
+        try { raw = slot.db.search(searchUnits[ui], { index: f.name, limit: perFieldLimit }); }
+        catch (e) { console.warn('[VotSearch] field search failed', cname, f.name, e); continue; }
+        if (!raw) continue;
+        var ids = [];
+        if (Array.isArray(raw)) {
+          for (var rr = 0; rr < raw.length; rr++) {
+            var entry = raw[rr];
+            if (entry && typeof entry === 'object' && entry.result) {
+              for (var er = 0; er < entry.result.length; er++) ids.push(entry.result[er]);
+            } else if (typeof entry === 'string' || typeof entry === 'number') {
+              ids.push(entry);
+            }
           }
         }
-      }
-      if (!ids.length) continue;
-      for (var r = 0; r < ids.length; r++) {
-        var key = cname + '|' + ids[r];
-        var rankScore = (perFieldLimit - r) / perFieldLimit;
-        scoreMap[key] = (scoreMap[key] || 0) + (f.boost * rankScore);
-        if (!docLookup[key]) docLookup[key] = slot.docStore[ids[r]];
+        if (!ids.length) continue;
+        for (var r = 0; r < ids.length; r++) {
+          var key = cname + '|' + ids[r];
+          var rankScore = (perFieldLimit - r) / perFieldLimit;
+          scoreMap[key] = (scoreMap[key] || 0) + (f.boost * rankScore);
+          if (!docLookup[key]) docLookup[key] = slot.docStore[ids[r]];
+        }
       }
     }
   }
