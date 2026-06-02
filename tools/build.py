@@ -43,10 +43,11 @@ REPO  = os.path.dirname(_HERE)
 ROOT  = os.path.join(REPO, 'app', 'src', 'main', 'assets')
 DIST  = os.path.join(ROOT, 'dist')
 
-# esbuild's node entry point. Invoked via `node` (not the .bin/.cmd shim) so the
-# call is byte-identical on Windows / Linux / CI. esbuild is a devDependency,
-# present in every build context (npm run build, CI, pre-commit all `npm ci`).
-ESBUILD_JS = os.path.join(REPO, 'node_modules', 'esbuild', 'bin', 'esbuild')
+# PF1 corpus minify runs through this JS-API helper (NOT node_modules/esbuild/
+# bin/esbuild — on Unix the installer makes that path the native binary, so
+# `node bin/esbuild` fails parsing ELF as JS). minify-bundle.mjs imports the
+# esbuild JS API, which resolves the platform binary internally → cross-platform.
+MINIFY_JS = os.path.join(_HERE, 'minify-bundle.mjs')
 
 # Cluster A — vendor + small data + search engine (CRITICAL PATH).
 # All corpus content is lazy-loaded:
@@ -172,13 +173,12 @@ def minify_in_place(name):
     `this`.
     """
     path = os.path.join(DIST, 'bundle-' + name + '.js')
-    if not os.path.isfile(ESBUILD_JS):
-        print('FATAL: esbuild not found at ' + ESBUILD_JS + ' — run `npm ci` first.')
+    if not os.path.isfile(MINIFY_JS):
+        print('FATAL: minify helper not found at ' + MINIFY_JS + '.')
         sys.exit(1)
     before = os.path.getsize(path)
     result = subprocess.run(
-        ['node', ESBUILD_JS, path, '--minify', '--target=chrome69',
-         '--allow-overwrite', '--outfile=' + path],
+        ['node', MINIFY_JS, path],
         capture_output=True, text=True,
     )
     if result.returncode != 0:
