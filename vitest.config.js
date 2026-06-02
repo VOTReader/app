@@ -247,18 +247,24 @@ export default defineConfig({
         // DOM overlays rendered on EVERY Android annotation pass sit far below it —
         // a localized regression there (e.g. journal-store's search/scan paths)
         // would hide behind an unrelated gain. An exact-file glob key thresholds
-        // that single file. Locked just below current per-file coverage (1678
-        // tests); ratchet upward with new tests, never lower (same discipline as
-        // the aggregate). Current: journal-store 51.82/42.48/62/56.12 · dom-links
-        // 60.28/53.93/73.33/62.18 · dom-bookmarks 63.37/51.92/75/66.19.
+        // that single file. Locked just below current per-file coverage; ratchet
+        // upward with new tests, never lower (same discipline as the aggregate).
+        // Per-file floors are safe to set tight: an unrelated commit doesn't touch
+        // these files, so their coverage can't drift the way the aggregate mean can.
+        // Current: journal-store 51.82/42.48/62/56.12 · dom-links 99.29/97.75/100/
+        // 99.15 · dom-bookmarks 97.67/90.38/100/99.29. T4 raised the two overlays
+        // from ~60/63% with slide-off placement suites (mid-word / closing-punct /
+        // skip-element / cross-<em> / block-stop / end-of-block fallbacks / under-
+        // <mark> removal); the only lines left uncovered are the unreachable
+        // hasBlockBetween defensive `return true` (dom-links:251, dom-bookmarks:225).
         'app/src/main/assets/src/stores/journal-store.js': {
           statements: 50, branches: 41, functions: 60, lines: 54,
         },
         'app/src/main/assets/src/renderer/dom-links.js': {
-          statements: 58, branches: 52, functions: 72, lines: 60,
+          statements: 98, branches: 96, functions: 100, lines: 98,
         },
         'app/src/main/assets/src/renderer/dom-bookmarks.js': {
-          statements: 61, branches: 50, functions: 73, lines: 64,
+          statements: 96, branches: 88, functions: 100, lines: 98,
         },
       },
     },

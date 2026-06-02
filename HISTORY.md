@@ -4,6 +4,15 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## AUDIT-PLAN remediation — 7.5 → 8.5+ hardening (2026-06-02, ongoing)
+
+A second deep adversarial audit (15 subsystem agents + 15 verification agents) rated the post-UPLIFT app 7.5/10 and produced **AUDIT-PLAN.txt** — the canonical, item-by-item tracker (~108 verified P0–P3 items) with a full commit-by-commit PROGRESS LOG. The 8.5 exit bar was met by Waves 1–4 (P0 data-loss/crash fixes, the search cluster, only-backup integrity + native audio, PF1 corpus minify) plus a large overnight batch (PF7, T2/T3, SE1–5, SC2–7, P1/P2pwa, B1/B5/B6/B8, A2, …). **Detail lives in AUDIT-PLAN.txt, not here** — this section is just the HISTORY-timeline landmark; per-item receipts (evidence, fix, gates) are in that tracker's PROGRESS LOG and per-item STATUS lines. The high-risk render/nav/storage items (F1/F2, A4, A1/A5, PF2/PF3/PF4, UX1–4, E4, E5 pt2) are explicitly DEFERRED for owner review.
+
+**Safe-bucket items (owner coordinating, autonomous-OK):**
+- **T4 DOM overlay placement coverage** — +25 tests pinning the `_insertLinkIconAt` / `_insertBookmarkIconAt` slide-off placement algorithm (dom-links.js / dom-bookmarks.js), the code that injects link-chain + bookmark-flag icons on every Android annotation render and was previously only exercised at clean word boundaries in bare `"Hello world"`. New cases cover mid-word + closing-punct slide, skip-element jump (adjacent / offset-lands-inside / skip-is-last-node → append), cross-text-node flow through inline `<em>`, the `<br>` block-stop, both end-of-block fallbacks, multi-offset placement, the dim legacy target-only link, the bookmark cross-overlay skip past an existing link icon, just-created pulse threading, the `!bkm.hlKey` guard, and removal-on-rerun when the stale icon is nested inside a `<mark>` (the real post-`applyDOMHighlights` DOM). Coverage dom-links 60/54/73/62 → 99/98/100/99, dom-bookmarks 63/52/75/66 → 98/90/100/99; per-file floors ratcheted in vitest.config.js (98/96/100/98 and 96/88/100/98). The only lines left uncovered are the unreachable `hasBlockBetween` defensive `return true` (always called with the next text node strictly after the previous in document order). Gates: vitest 1738/70 full `test:coverage` exit 0 (per-file + aggregate floors held), eslint clean; no app/bundle/data/inline-script touched so build/smoke/typecheck were unaffected.
+
+---
+
 ## D-bucket — final architectural items dispositioned (2026-06-01)
 
 The D-bucket (D1–D8 in UPLIFT-PLAN.txt) was the only un-started work after the

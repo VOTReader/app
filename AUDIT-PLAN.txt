@@ -278,6 +278,21 @@
    path), UX1-4 (back-router/nav). Safe remainder: CQ1/CQ3/CQ6 docs+types, PWA
    polish P4-P7pwa, E4/E5, S4-S6/J3/J5/J7, T4-T7.
 
+ 2026-06-02 — SAFE BUCKET (new session, owner coordinating) — pushed to main:
+   • T4 (DOM overlay placement coverage) — +25 tests across dom-links.test.js
+     (+12) and dom-bookmarks.test.js (+13) pinning the _insert*IconAt slide-off
+     algorithm that runs on every Android annotation render and was wholly
+     untested (the old suites only placed icons at clean word boundaries in bare
+     "Hello world"). New cases: mid-word + closing-punct slide, skip-element jump
+     (adjacent / offset-inside / skip-is-last->append), cross-<em> text-node flow,
+     <br> block-stop, both end-of-block fallbacks, multi-offset placement, dim
+     legacy target-only link, bookmark skip past an existing link icon, just-
+     created threading, !bkm.hlKey guard, removal-under-<mark>. Coverage: dom-links
+     60/54/73/62 -> 99/98/100/99; dom-bookmarks 63/52/75/66 -> 98/90/100/99. Floors
+     ratcheted (98/96/100/98 and 96/88/100/98). Only the unreachable hasBlockBetween
+     `return true` remains uncovered. Gates: vitest 1738/70 test:coverage exit 0
+     (per-file + aggregate held), eslint clean; build/smoke/typecheck untouched.
+
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
 ═══════════════════════════════════════════════════════════════════════════
@@ -685,12 +700,36 @@
      per-asset for the rest (like the corpus block already does), and log an
      install-rejection to DiagnosticLog.
 
- [T4] DOM link/bookmark overlays half-covered, no equiv test SEV: Med  [CONFIRMED]
+ [T4] DOM link/bookmark overlays half-covered, no equiv test STATUS: DONE
+   SEV: Med  VERDICT: CONFIRMED
    Evidence: dom-links 60%, dom-bookmarks 63%; only applyDOMHighlights has the
      dual-render equivalence partner. These run on every Android annotation render.
    Fix: extend the equivalence harness (or add offset-edge tests) for the link/
      bookmark overlays — multi-range merge at same offset, end-of-block fallback,
      removal-on-rerun under nested marks.
+   DONE (2026-06-02): added offset-edge / slide-off placement suites to both
+     dom-links.test.js (+12) and dom-bookmarks.test.js (+13). The prior suites
+     placed every icon at a clean word boundary in bare "Hello world", so the
+     ENTIRE _insert*IconAt slide algorithm (the bulk of each file, run on every
+     Android annotation pass) was untested. The new cases pin: mid-word slide,
+     closing-punct slide, skip-element jump (adjacent + offset-lands-inside +
+     skip-is-last-node->append), cross-text-node flow through inline <em>, the
+     block-boundary stop (<br>), both end-of-block fallbacks (offset past all
+     text; nextInsertionPoint climbing out to the container), multi-offset
+     placement, the dim legacy target-only link, the bookmark cross-overlay skip
+     past an existing inline-link-icon, just-created threading on slid + fallback
+     placements, the !bkm.hlKey guard, and removal-on-rerun when the stale icon
+     is nested inside a <mark> (the real post-applyDOMHighlights DOM). Coverage:
+     dom-links 60.28/53.93/73.33/62.18 -> 99.29/97.75/100/99.15; dom-bookmarks
+     63.37/51.92/75/66.19 -> 97.67/90.38/100/99.29. Per-file floors ratcheted
+     (vitest.config.js): dom-links 98/96/100/98, dom-bookmarks 96/88/100/98. The
+     only lines left uncovered are the unreachable hasBlockBetween defensive
+     `return true` (dom-links:251, dom-bookmarks:225) — always called with
+     nextTextNode strictly after prevTextNode in doc order, so the walker never
+     exhausts first; covering it would need an impossible DOM. Gates: vitest
+     1738/70 (full test:coverage exit 0, both new per-file floors + aggregate
+     held), eslint --max-warnings 0 clean. No app/bundle/data/inline-script
+     touched -> build/smoke/typecheck/check_balance unaffected.
 
  [T5] MainActivity.kt (886 lines) has no test                SEV: Med  [CONFIRMED]
    Evidence: no MainActivityTest.kt; the tap-coordinate conversion (/density) and
