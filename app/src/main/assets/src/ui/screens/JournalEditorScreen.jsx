@@ -89,6 +89,10 @@ export function JournalEditorScreen(props) {
   var blocksContainerRef = useRef(null);
   var pendingFocusIdRef = useRef(null);  // block id to focus after the next render
   var firstRunRef = useRef(true);
+  // Set true right before inserting a media block so the next auto-save is
+  // IMMEDIATE (not the 1.2s debounce) — see the auto-save effect below and
+  // onFileChosen / onRecordingSaved.
+  var immediateSaveRef = useRef(false);
 
   // Always-fresh refs that mirror the latest state. Used by the unmount
   // cleanup to flush, since useEffect cleanup closures capture stale state.
@@ -107,6 +111,15 @@ export function JournalEditorScreen(props) {
       return;
     }
     setSavedLabel('Saving…');
+    if (immediateSaveRef.current) {
+      // A media block (image / voice memo) was just inserted — persist its
+      // entry reference NOW, not after the 1.2s debounce, so a background-kill
+      // in the window can't lose the block (and orphan its already-durable blob).
+      immediateSaveRef.current = false;
+      JournalStore.update(entryId, { title: title, blocks: blocks, mood: mood });
+      setSavedLabel('Saved');
+      return;
+    }
     var t = setTimeout(function() {
       JournalStore.update(entryId, { title: title, blocks: blocks, mood: mood });
       setSavedLabel('Saved');
@@ -126,10 +139,33 @@ export function JournalEditorScreen(props) {
     };
   }, []);
 
+  // Flush pending edits when the page is BACKGROUNDED / hidden. On Android the
+  // WebView can be OOM-killed while backgrounded WITHOUT firing React unmount,
+  // so the unmount flush above never runs — the debounced save (1.2s) would
+  // lose the last edits, and a just-inserted media block would lose its blob
+  // reference, orphaning the (already-durable) blob, which the boot orphan-sweep
+  // then deletes. pagehide + visibilitychange give a synchronous flush point
+  // that survives the kill. (Mirrors use-scroll-memory's pagehide flush;
+  // commitSave is hoisted and reads always-current refs, so these mount-only
+  // listeners never capture stale state.)
+  useEffect(function() {
+    function onVisibility() { if (document.visibilityState === 'hidden') commitSave(); }
+    window.addEventListener('pagehide', commitSave);
+    document.addEventListener('visibilitychange', onVisibility);
+    return function() {
+      window.removeEventListener('pagehide', commitSave);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only flush listeners; commitSave reads always-current refs (title/blocks/mood/entryId), so it never goes stale. Re-subscribing per render would only churn listeners.
+  }, []);
+
   function commitSave() {
-    // Synchronous immediate save, e.g. when navigating away via Done.
-    if (!entryId) return;
-    JournalStore.update(entryId, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
+    // Synchronous immediate save — Done nav, textarea blur, or page background.
+    // Reads from refs so it's correct even when invoked from a long-lived
+    // (mount-time) listener whose closure would otherwise be stale.
+    var eid = entryIdRef.current;
+    if (!eid) return;
+    JournalStore.update(eid, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
     setSavedLabel('Saved');
   }
 
@@ -296,6 +332,7 @@ export function JournalEditorScreen(props) {
         height: out.height
       });
     }).then(function(mid) {
+      immediateSaveRef.current = true;  // persist the new image block at once (skip the 1.2s debounce)
       insertAtCursor(JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
     }).catch(function(err) {
       if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
@@ -307,6 +344,7 @@ export function JournalEditorScreen(props) {
   function onRecordingSaved(info) {
     setShowRec(false);
     if (!info || !info.mediaId) return;
+    immediateSaveRef.current = true;  // persist the new audio block at once (skip the 1.2s debounce)
     insertAtCursor(JournalHelpers.newBlock('audio', { mediaId: info.mediaId, duration: info.duration, caption: '', samples: info.samples || null }));
   }
 
