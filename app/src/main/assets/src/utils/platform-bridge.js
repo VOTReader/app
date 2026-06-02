@@ -457,9 +457,11 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality) {
 //   across every amplitude poll (~50ms cadence) to avoid GC pressure.
 // - requestMicPermission is fire-and-forget per [[explicit-async-decision]]:
 //   getUserMedia + store stream + fire window.__onMicPermissionResult.
-// - nativeRecordStop fires the existing __onNativeRecordingComplete(b64,
-//   durMs, mime) callback so both platforms share one contract per
-//   [[callback-flow-unification]].
+// - nativeRecordStop fires __onNativeRecordingComplete(b64, durMs, mime, blob?)
+//   — one callback shape for both platforms ([[callback-flow-unification]]):
+//   Android passes base64 (string-only bridge), web passes the Blob directly as
+//   the 4th arg (J3 — no base64 round-trip) with b64=null; the consumer prefers
+//   the blob and falls back to decoding b64.
 // - MediaStream tracks are .stop()-ed on every exit path (stop / cancel /
 //   error) per [[mediastream-track-cleanup]] — leaked tracks keep the mic
 //   indicator active + hardware allocated.
@@ -503,36 +505,23 @@ function _webRecorderCleanup() {
   _webRecorder.mime = '';
 }
 
-// Blob → pure base64 (strips the 'data:<mime>;base64,' prefix from
-// FileReader.readAsDataURL) — matches Android NativeAudioRecorder's
-// base64 output for __onNativeRecordingComplete callback.
-/** @param {Blob} blob @returns {Promise<string>} */
-function _webRecordBlobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      const idx = result.indexOf(',');
-      resolve(idx >= 0 ? result.substring(idx + 1) : result);
-    };
-    reader.onerror = () => reject(new Error('blob-read-failed'));
-    reader.readAsDataURL(blob);
-  });
-}
-
-// Fire __onNativeRecordingComplete(base64, durationMs, mime) — the global
-// callback that the consumer (JournalRecordingSheet) installs before
-// recording starts. Wrapped in try/catch so a consumer-side throw doesn't
-// leak out of the bridge.
+// Fire __onNativeRecordingComplete(base64, durationMs, mime, blob) — the global
+// callback that the consumer (JournalRecordingSheet) installs before recording
+// starts. Android passes base64 (its bridge is string-only) and no blob; web
+// passes the assembled Blob DIRECTLY as the 4th arg (CLAUDE.md rule 5 — no
+// base64 encode/decode round-trip held in heap) and the consumer prefers it.
+// Wrapped in try/catch so a consumer-side throw doesn't leak out of the bridge.
 /**
  * @param {string | null} b64
  * @param {number} durMs
  * @param {string} mime
+ * @param {Blob} [blob] - web only: the recording Blob, passed straight through
+ *   to skip a base64 round-trip; Android omits it and the consumer uses b64.
  */
-function _fireRecordingComplete(b64, durMs, mime) {
+function _fireRecordingComplete(b64, durMs, mime, blob) {
   const cb = /** @type {any} */ (window).__onNativeRecordingComplete;
   if (typeof cb === 'function') {
-    try { cb(b64, durMs, mime); } catch (e) {
+    try { cb(b64, durMs, mime, blob); } catch (e) {
       if (typeof console !== 'undefined' && console.warn) {
         console.warn('[PlatformBridge] __onNativeRecordingComplete consumer threw:', /** @type {any} */ (e).message || e);
       }
@@ -602,16 +591,19 @@ function webNativeRecordStart() {
     if (e.data && e.data.size > 0) _webRecorder.chunks.push(e.data);
   };
   rec.onstop = () => {
-    // Fire __onNativeRecordingComplete with the assembled blob.
-    // Per [[callback-flow-unification]], web mirrors the Android contract:
-    // base64-encoded audio, duration ms, mime type.
+    // J3: hand the assembled Blob STRAIGHT to the consumer — no base64 round
+    // trip. readAsDataURL held the whole recording as a ~1.33x base64 string in
+    // heap (CLAUDE.md rule 5); the web consumer already wants a Blob, so pass it
+    // as the 4th arg and skip both the encode here and the atob in the consumer.
+    // b64 is null on web; the consumer prefers the blob. Android still passes
+    // base64 (its string-only native bridge can't carry a Blob). Building the
+    // Blob copies the chunks' data, so the immediate cleanup() (which clears
+    // _webRecorder.chunks) cannot invalidate it.
     const finalMime = _webRecorder.mime || mime;
     const blob = new Blob(_webRecorder.chunks, { type: finalMime });
     const durMs = _webRecorder.accumulatedMs;
-    _webRecordBlobToBase64(blob)
-      .then((b64) => _fireRecordingComplete(b64, durMs, finalMime))
-      .catch(() => _fireRecordingComplete(null, 0, finalMime))
-      .finally(() => _webRecorderCleanup());
+    _fireRecordingComplete(null, durMs, finalMime, blob);
+    _webRecorderCleanup();
   };
 
   // AnalyserNode for amplitude polling. Optional — if AudioContext isn't

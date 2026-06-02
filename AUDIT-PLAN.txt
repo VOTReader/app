@@ -328,6 +328,12 @@
    • SE7 (vendor provenance) — new VENDORED-LIBS.md records version + bytes + sha256
      for the 4 vendored runtime blobs + a re-verify sha command. Surfaced a real
      skew: runtime React 18.2.0 vs the React 19.x devDep/test stack (documented).
+   • J3 (web recording: Blob direct, no base64) — __onNativeRecordingComplete gained
+     an optional 4th blob arg; web fires the Blob directly (no readAsDataURL/atob
+     round-trip — rule 5), Android unchanged (base64). Consumer prefers the blob.
+     Deleted dead _webRecordBlobToBase64. platform-bridge 85/85, vitest 1740/70
+     test:coverage exit 0, tsc + eslint clean. (Recording-complete path is mic-
+     gated → verified by the mocked-recorder bridge test, not headless preview.)
 
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
@@ -1010,7 +1016,22 @@
  [J3] Web audio path uses readAsDataURL on the assembled blob (rule-5 violation;
    held ~3x in heap) — Android needs base64 for the bridge, web does not.
    platform-bridge.js:510-520; web already has the Blob at :609. SEV: Med
-   [CONFIRMED] → pass the Blob/objectURL through directly on web.
+   [CONFIRMED] → pass the Blob/objectURL through directly on web.   STATUS: DONE
+   DONE (2026-06-02): the web onstop path no longer FileReader.readAsDataURL's the
+   recording (that held a ~1.33x base64 string in heap + forced an atob round-trip
+   in the consumer). __onNativeRecordingComplete gained an optional 4th `blob` arg:
+   web fires (null, durMs, mime, BLOB), Android still fires (b64, durMs, mime) —
+   one callback shape, no contract break. The consumer (JournalRecordingSheet)
+   prefers the blob, falls back to decoding b64 (Android path byte-identical), and
+   the "nothing recorded" guard is now an empty/absent-blob check. Deleted the dead
+   _webRecordBlobToBase64. The web blob is the SAME bytes the old encode/decode
+   produced, so no behavior change beyond the memory win. Gates: platform-bridge
+   test 85/85 (updated to assert the blob, b64=null), vitest 1740/70 test:coverage
+   exit 0, tsc + eslint clean. NOTE: the changed paths only run on recording-
+   complete (mic-gated), so they can't be exercised headless — verified by the
+   mocked-MediaRecorder bridge test; a real record->store->play e2e is device-walk
+   territory (the project's audio queue), but the consumer logic is unchanged for
+   Android and uses an identical blob on web.
  [J5] recordDeletion never repairs currentStreak/longestStreak/milestones →
    deleting your only entry shows a phantom live streak. journal-stats-store.js:
    194-199. SEV: Low-Med [CONFIRMED] → reset currentStreak to 0 when totalEntries

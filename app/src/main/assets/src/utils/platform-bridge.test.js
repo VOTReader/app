@@ -978,7 +978,7 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
 
   // ── nativeRecordStop ──
 
-  it('nativeRecordStop triggers onstop which fires __onNativeRecordingComplete with base64 + duration + mime', async () => {
+  it('nativeRecordStop triggers onstop which fires __onNativeRecordingComplete with the Blob directly (J3 — no base64) + duration + mime', async () => {
     const completeCb = vi.fn();
     /** @type {any} */ (globalThis.window).__onNativeRecordingComplete = completeCb;
     bridge.requestMicPermission();
@@ -987,18 +987,17 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
     // Simulate a chunk being captured before stop
     if (recOnDataAvailable) recOnDataAvailable({ data: new Blob(['x'], { type: 'audio/webm' }) });
     bridge.nativeRecordStop();
-    // Wait for onstop's chain (Blob → FileReader → base64 → callback).
-    // Use vi.waitFor instead of a fixed real-time setTimeout to make this
-    // assertion deterministic under heavy combined-suite load — FileReader
-    // microtasks can stretch past a 20ms wait when ~25 test files run
-    // concurrently (the long-flagged platform-bridge.test.js flake). The
-    // poller fires the assertion every 10ms until it passes or hits the
-    // 1s ceiling; typical pass is under 50ms.
+    // The mock fires onstop via setTimeout(0); onstop now hands the assembled
+    // Blob straight through (no FileReader/base64 — J3). vi.waitFor polls the
+    // assertion rather than guessing a fixed wait, resilient under heavy
+    // combined-suite load.
     await vi.waitFor(() => expect(completeCb).toHaveBeenCalledTimes(1), { timeout: 1000 });
-    const [b64, durMs, mime] = completeCb.mock.calls[0];
-    expect(typeof b64).toBe('string');
+    const [b64, durMs, mime, blob] = completeCb.mock.calls[0];
+    expect(b64).toBeNull();                       // web passes the Blob, not base64 (J3)
     expect(typeof durMs).toBe('number');
     expect(mime).toBe('audio/webm;codecs=opus');
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.size).toBeGreaterThan(0);
   });
 
   it('nativeRecordStop cleans up — stops MediaStream tracks (no mic indicator leak)', async () => {
@@ -1006,9 +1005,9 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
     await new Promise((r) => setTimeout(r, 0));
     bridge.nativeRecordStart();
     bridge.nativeRecordStop();
-    // onstop's .finally() runs _webRecorderCleanup after the Blob → base64
-    // chain resolves. vi.waitFor polls until cleanup actually completed
-    // rather than guessing at a fixed wait — same load-resilience fix.
+    // onstop fires the callback then runs _webRecorderCleanup synchronously
+    // (no Blob → base64 chain anymore — J3); the mock still defers onstop via
+    // setTimeout(0), so vi.waitFor polls until cleanup actually completed.
     await vi.waitFor(() => {
       expect(mockTracks[0].stop).toHaveBeenCalledTimes(1);
       expect(mockAudioCtxClose).toHaveBeenCalledTimes(1);

@@ -9,8 +9,9 @@
    [[callback-flow-unification]]):
      window.__onMicPermissionResult(granted: boolean)
        Fires after PlatformBridge.requestMicPermission().
-     window.__onNativeRecordingComplete(base64: string, durMs: number, mime: string)
+     window.__onNativeRecordingComplete(base64: string|null, durMs: number, mime: string, blob?: Blob)
        Fires after PlatformBridge.nativeRecordStop() finalizes the recording.
+       Web (J3) passes the Blob directly (base64 null); Android passes base64.
    The component installs both callbacks at mount, removes them on unmount.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -91,28 +92,35 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     var permTimer = 0;
 
     // __onNativeRecordingComplete: fires when the bridge finalizes the
-    // recording (after PlatformBridge.nativeRecordStop). Unified contract on
-    // both platforms now per [[callback-flow-unification]] — base64 + duration
-    // ms + mime. Component decodes + Blobs + transitions to preview (or
-    // auto-saves if Save was tapped while still recording).
-    window.__onNativeRecordingComplete = function(b64, durMs, mime) {
+    // recording (after PlatformBridge.nativeRecordStop). One callback shape for
+    // both platforms ([[callback-flow-unification]]): (b64, durMs, mime, blob?).
+    // Web (J3) passes the Blob DIRECTLY as the 4th arg — no base64 round-trip;
+    // Android passes base64 (string-only bridge) which we decode here. Either
+    // way we end with one audio Blob and transition to preview (or auto-save if
+    // Save was tapped while still recording).
+    window.__onNativeRecordingComplete = function(b64, durMs, mime, blob) {
       if (cancelled) return;
       try { if (ampRef.current) clearInterval(ampRef.current); } catch (_e) { /* best-effort */ }
       try { if (tickRef.current) clearInterval(tickRef.current); } catch (_e) { /* best-effort */ }
       ampRef.current = 0;
       tickRef.current = 0;
-      if (!b64) {
-        setError('Nothing was recorded. Try again and speak after the timer starts.');
-        setStage('error');
-        return;
-      }
       try {
-        var bin = atob(b64);
-        var arr = new Uint8Array(bin.length);
-        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-        var blob = new Blob([arr], { type: mime || 'audio/webm' });
-        previewBlobRef.current = blob;
-        try { previewUrlRef.current = URL.createObjectURL(blob); } catch (_e) { /* best-effort */ }
+        // Prefer the Blob the web path hands us (J3 — avoids holding a redundant
+        // ~1.33x base64 copy in heap); fall back to decoding Android's base64.
+        var audioBlob = (blob && typeof blob.size === 'number') ? blob : null;
+        if (!audioBlob && b64) {
+          var bin = atob(b64);
+          var arr = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          audioBlob = new Blob([arr], { type: mime || 'audio/webm' });
+        }
+        if (!audioBlob || audioBlob.size === 0) {
+          setError('Nothing was recorded. Try again and speak after the timer starts.');
+          setStage('error');
+          return;
+        }
+        previewBlobRef.current = audioBlob;
+        try { previewUrlRef.current = URL.createObjectURL(audioBlob); } catch (_e) { /* best-effort */ }
         var d = Math.max(1, Math.round((durMs || 0) / 1000));
         previewDurationRef.current = d;
         setWaveFinal(samplesAccumRef.current.slice());
