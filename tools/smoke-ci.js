@@ -67,6 +67,13 @@ async function main() {
     browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      // The whole 12-screen walk + 2 annotation round-trips runs as ONE
+      // page.evaluate(votSmoke) — ~18s locally, but a loaded shared CI runner can
+      // stretch it past puppeteer's default 180s protocolTimeout, surfacing a
+      // flaky "Runtime.callFunctionOn timed out" with no real failure (the walk is
+      // bounded by its own sleeps, not infinite). Give the CDP call generous
+      // headroom so the gate is deterministic.
+      protocolTimeout: 600000,
     });
     const page = await browser.newPage();
     page.setDefaultTimeout(30000);
