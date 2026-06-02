@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-3887c7d783';
+const CACHE_VERSION = 'v1.0.2-34045528d6';
 const CORPUS_VERSION = 'c6'; // c5→c6 (2026-06-02): PF1 — the lazy corpus bundles (bundle-a-bible/matthew/vot.js) are now esbuild-minified (~3.3 MB smaller; data byte-identical, only whitespace/syntax shrunk). Re-fetch the smaller corpus.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -47,6 +47,12 @@ const CORE_ASSETS = [
   './icons/icon-512.png',
   './icons/icon-192-maskable.png',
   './icons/icon-512-maskable.png',
+  // P4pwa: the <head> apple-touch-icon (180) + favicons (32/16) were referenced
+  // but NOT precached → 503 offline AND outside the content-hash (editing them
+  // wouldn't bump CACHE_VERSION). Best-effort (not in CRITICAL_ASSETS).
+  './icons/icon-180.png',
+  './icons/icon-32.png',
+  './icons/icon-16.png',
   './splash.jpg',
   './study-cover-mtam.jpg',
   './study-cover-lamb.jpg',

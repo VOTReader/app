@@ -4,6 +4,7 @@
   "description": "Offline scripture reader for The Volumes of Truth",
   "start_url": "./index.html",
   "scope": "./",
+  "id": "./",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#b8860b",

@@ -25,7 +25,13 @@ import { showToast } from './toast.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 
 const TOAST_ID = 'vot-toast-sw-update';
-let prompted = false;
+// P6pwa: track the SPECIFIC waiting worker we've prompted for, not a permanent
+// boolean latch. A permanent latch meant a 2nd in-session update (the user
+// ignored the first toast, then a NEWER SW installed) was never surfaced, and
+// the stale toast still pointed at the now-superseded worker. Per-worker
+// tracking re-prompts for a newer worker (replacing the toast) while deduping
+// the same worker (so the hourly update poke doesn't re-toast).
+let promptedWorker = null;
 
 export function registerServiceWorker() {
   if (PlatformBridge.isAndroid) return;
@@ -80,8 +86,10 @@ export function registerServiceWorker() {
 // Show the persistent "update available" toast. Tapping it tells the
 // waiting SW to activate; the controllerchange listener handles the reload.
 function promptUpdate(worker) {
-  if (prompted) return;
-  prompted = true;
+  if (promptedWorker === worker) return;
+  promptedWorker = worker;
+  const prior = document.getElementById(TOAST_ID);
+  if (prior) prior.remove(); // it pointed at a now-superseded worker
   showToast({
     id: TOAST_ID,
     html: 'New version available — <b>tap to update</b>',
