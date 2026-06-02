@@ -506,7 +506,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(', ')}.` : '';
 
         const proceed = window.confirm(
-          `Importing the backup from ${dateLabel} will REPLACE all your current data on this device.${summary}${forwardCompatNote} This cannot be undone.\n\nContinue?`
+          `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote} This cannot be undone.\n\nContinue?`
         );
         if (!proceed) return;
 

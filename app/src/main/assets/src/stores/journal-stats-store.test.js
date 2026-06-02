@@ -404,17 +404,30 @@ describe('JournalStatsStore — recordDeletion', () => {
     expect(JournalStatsStore.get().totalEntries).toBe(0);
   });
 
-  it('does NOT touch streak fields (deletion is total-only)', () => {
+  it('does NOT touch streak fields while entries remain (total-only above zero)', () => {
     JournalStatsStore.recordNewEntry(_tsRelative(-1));
     JournalStatsStore.recordNewEntry(_tsRelative(0));
     const beforeStreak = JournalStatsStore.get().currentStreak;
     const beforeLast = JournalStatsStore.get().lastEntryDate;
 
-    JournalStatsStore.recordDeletion();
+    JournalStatsStore.recordDeletion(); // totalEntries 2 → 1 (still > 0)
 
     const after = JournalStatsStore.get();
     expect(after.currentStreak).toBe(beforeStreak);
     expect(after.lastEntryDate).toBe(beforeLast);
+  });
+
+  it('clears currentStreak when the LAST entry is deleted — J5', () => {
+    JournalStatsStore.recordNewEntry(_tsRelative(0));
+    expect(JournalStatsStore.get().currentStreak).toBe(1);
+    expect(JournalStatsStore.get().totalEntries).toBe(1);
+
+    JournalStatsStore.recordDeletion(); // totalEntries → 0
+
+    const after = JournalStatsStore.get();
+    expect(after.totalEntries).toBe(0);
+    expect(after.currentStreak).toBe(0);  // J5: no phantom live streak with 0 entries
+    expect(after.longestStreak).toBe(1);  // history is kept
   });
 });
 

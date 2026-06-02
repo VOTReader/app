@@ -195,6 +195,11 @@ export var JournalStatsStore = extendStore(
       if (this._shouldDefer('recordDeletion')) return;
       var data = this._load();
       data.totalEntries = Math.max(0, (data.totalEntries || 0) - 1);
+      // J5: deleting your LAST entry must clear the live streak — otherwise the
+      // hub shows a phantom "N-day streak" with zero entries. A full recompute
+      // on every delete would walk all entries; resetting only at the zero
+      // boundary is the cheap, correct fix. longestStreak is history — kept.
+      if (data.totalEntries === 0) data.currentStreak = 0;
       this._save();
     },
 
