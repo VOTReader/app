@@ -210,6 +210,47 @@
      29, WTLB_ONE 149, HOLY_DAYS 16, John 3:16 correct. NEXT: PF7 (app.css minify),
      PF4 (free + SW-precache alt-translations), PF3 (IntersectionObserver virt).
 
+ 2026-06-02 — Wave 4+ OVERNIGHT BATCH (autonomous, owner asleep) — pushed to main,
+   each CI-replicated locally + gated; main CI green throughout:
+   • PF7 (3fb5d3c) — app.css minified to dist/app.min.css via a build:css esbuild
+     step (--minify --target=chrome69); linked + core-cached + content-hashed.
+     240→160 KB (−80 KB) off the render-blocking path. RENDER-IDENTITY proven in
+     preview: 0 real-property computed-style diffs vs the source across home + a
+     Bible chapter (only cosmetic custom-prop value-shortening differs); John 3
+     pixel-identical. CI green.
+   • T2 (d69d5de) — smoke.js step() now CONSUMES fn()'s content assertion + report.ok
+     gates on screenUnreached===0 (was computed-but-unused). A blank-but-structured
+     screen passed the CI render gate before; proven both ways (happy path 0
+     unreached; a forced-blank Scriptures → 1 unreached → smoke FAILs exit 1).
+   • T3 (b097cba) — per-file coverage floors (exact-file glob keys) for the hot
+     files the aggregate masks: journal-store 50/41/60/54, dom-links 58/52/72/60,
+     dom-bookmarks 61/50/73/64. Enforcement PROVEN (a temp stmts:99 on journal-store
+     failed with the named-file threshold error). A localized regression now fails.
+   • SE1/SE2/SE4/SE5 (6cb4117) — defense-in-depth: import __proto__/constructor/
+     prototype reject (findUnsafeKey, +4 tests, JSON.parse-built payloads); CSP
+     connect-src 'self' (zero document fetch confirmed; img-src keeps GitHub for
+     the Garden; 0 CSP violations in preview); gardenUrl clamps n to [1,TOTAL]
+     (+garden.test.js, was 0% covered); loadTranslation allowlists code to
+     /^[a-z]{2,8}$/ before the <script> src.
+   • SC2/SC3/SC4 (41b92d6) — robust user-typed refs: Roman-numeral ordinals
+     ("I John"→1 John), a BOOK_ALIASES standard-abbreviation table consulted
+     before the loose prefix fallback ("Jud"→Jude not Judges; fail-safe values),
+     parseRefStr tolerances (periods, trailing verse letter, comma list, alnum
+     tag). +12 engine tests (42→54). End-to-end preview: "Rev. 22:13 (KJV)" →
+     the KJV verse (SC3 alias + SC4 strip through lookupVersesFromBooks).
+   • SC5/SC6/SC7 (7e719fa) — FootnoteSheet + FootnoteListSection + WtlbEntryView
+     fall back to lookupVersesFromBooks(ref) on a per-letter dict miss (additive;
+     dict still wins). SC7 documented splitIntoVerses' load-bearing gate. smoke:ci
+     letterAnn/wtlbAnn ok.
+   • P1pwa/P2pwa (c7535a6) — SW install splits CORE_ASSETS: CRITICAL shell stays
+     all-or-nothing, the rest cache best-effort via allSettled (a 404 no longer
+     aborts install → no silent pin to the old version). +service-worker.test.js
+     (first SW test): mocked self/caches/fetch, proves best-effort 404 RESOLVES
+     install + critical 404 REJECTS it. vitest → 1704/70.
+   OWED next in Wave 4: PF4, PF2, PF5, PF3. Then F1+F2 render fan-out, the
+   annotation cluster, UX round-trips, CQ/B hygiene, PWA polish, storage/journal
+   edges. (full list below in P1/P2/P3.)
+
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
 ═══════════════════════════════════════════════════════════════════════════
