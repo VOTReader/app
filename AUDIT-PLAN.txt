@@ -160,14 +160,16 @@
    • SR5 + hero copy (29778ec) — SearchScreen now loads ALL corpora before
      building the index (it was caching a near-empty index on a cold search-open
      that never self-repaired); dropped the stale "headings" from the hero copy.
-   • SR4 (synonym/stemmer/phonetic dead code) — DEFERRED as an OWNER decision:
-     ~100 lines of well-crafted scripture-aware synonym groups (mercy↔compassion,
-     shepherd↔pastor — plus aggressive deity/name groups: lord↔messiah,
-     god↔yahweh) are defined but never wired. Wiring = a real recall win BUT an
-     app-wide search BEHAVIOR change; deleting = loses crafted IP. Left intact +
-     flagged; the per-term-OR groundwork makes wiring a clean follow-up if wanted.
-     (Dead KIND_BOOST['heading'] / srchGroupKey 'heading' remnants left too —
-     harmless; tidy alongside the synonym decision.)
+   • SR4 (3a4873e) — WIRED synonym expansion behind a "Synonym Search" settings
+     toggle (default on; owner-approved). Slightly trimmed: dropped the over-broad
+     generic words 'lord'/'god'/'father' from the proper-name groups (the
+     name↔name synonyms stay). Each non-phrase term OR's in its synonym group;
+     exact matches still rank first (coverage scores on the original terms). +2
+     engine tests (mercy→compassion ON, nothing OFF). Verified end-to-end on the
+     REAL corpus in preview: agape 0→400, chesed 1→400, pastor 26→178 (shepherd
+     verses — 1 Pet 5:2, Heb 13:20, Micah 7:14); toggle row renders. The
+     stemmer/phonetic stay unused (separate from this feature). STILL OPEN
+     (trivial): dead KIND_BOOST['heading'] / srchGroupKey 'heading' remnants.
 
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
