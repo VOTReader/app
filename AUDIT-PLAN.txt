@@ -187,6 +187,29 @@
      N2.2 discipline). Kotlin changes don't auto-reach users (APK is a manual
      install), so deferring the device-tuned part is correct, not a gap.
 
+ 2026-06-02 — Wave 4 (performance) — PF1 DONE, pushed to main:
+   • PF1 (82e25d0) — the three lazy corpus bundles (bundle-a-bible/matthew/vot.js)
+     are now esbuild-minified in tools/build.py (--minify --target=chrome69 after
+     the Python concat, --allow-overwrite in place). bundle-a stays RAW (its UMD
+     vendors read top-level `this`, PF2). Measured: bible 7.08→4.64 MB (−34%),
+     vot 3.00→2.19 MB (−27%), matthew 618→492 KB (−20%) = −3.38 MB. APK 27.94→27.64
+     MB on disk (deflate already compresses the whitespace; the win is the −3.3 MB
+     DECOMPRESSED parse a budget WebView pays). CORPUS_VERSION c5→c6 (U3 gate; lock
+     re-hashed). RIGOR: a vm deep-equal of git-HEAD-raw vs the minified output
+     proved all 29 corpus globals (BOOKS, MATTHEW, 27 VOT) byte-identical in VALUE
+     (Unicode, key order, __proto__, numeric keys intact — ships exactly today's
+     data); a string-aware scan proved 0 optional-chaining/nullish operators in
+     CODE (the grep `?.` hits are all `?...` ellipsis in verse text); 0 CR bytes in
+     output (eol=lf no-op → CI Linux rebuild byte-matches the Windows commit, and
+     the git diff --exit-code replicated GREEN locally). Gates: tsc, eslint, vitest
+     1678/68 (floor held), build, smoke:ci (0 crashed, 0 console.error). Preview:
+     John 3 renders gold sups + real text, 0 console errors. FLOOR PROOF on the
+     API-28 emulator (WebView = Chromium 69.0.3497.100): fresh APK boots + renders
+     (welcome splash), 0 JS parse errors in logcat; a raw-CDP eval on the WV69
+     engine loaded all three minified bundles → BOOKS 66, MATTHEW 28, LETTERS(v2)
+     29, WTLB_ONE 149, HOLY_DAYS 16, John 3:16 correct. NEXT: PF7 (app.css minify),
+     PF4 (free + SW-precache alt-translations), PF3 (IntersectionObserver virt).
+
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
 ═══════════════════════════════════════════════════════════════════════════
@@ -425,7 +448,7 @@
      handler props.
    Exit: preview instrumentation — one highlight re-renders ~1 verse, not 176.
 
- [PF1] Corpus bundles fully unminified (−3.3 MB)             STATUS: OPEN
+ [PF1] Corpus bundles fully unminified (−3.3 MB)             STATUS: DONE (82e25d0)
    SEV: High   VERDICT: CONFIRMED (measured on copies)
    Evidence: esbuild --minify --target=chrome69 on copies: bible 6913→4533 KB
      (−2380), vot 2934→2135 (−796), matthew 603→480 (−122) ≈ −3.3 MB. Source are
