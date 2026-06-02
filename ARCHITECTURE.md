@@ -8,7 +8,7 @@ Deep dives into annotation, navigation, state management, and rendering. Read wh
 
 `index.html` was a pre-compiled (Babel-output `React.createElement`) single-file React app. Today `function App()` lives in `app/src/main/assets/src/app.jsx` (extracted Q2.7-1, converted to JSX Q2.7-2). Screen state is held per-tab in a tab state machine.
 
-- **App()** at `app/src/main/assets/src/app.jsx` — currently 2,191 lines after the P6 hook extraction completed. Composes 15 extracted hooks + the ~1,000-line render tree + nav-helper glue.
+- **App()** at `app/src/main/assets/src/app.jsx` — **~798 lines**, held at **≤800 by the P11 canary gate** (`tools/check-app-size.js`), after the P6–P11 hook-extraction phases. Composes **~33 extracted hooks** (`src/hooks/`) + the render tree + nav-helper glue. (CQ1: counts drift — verify against the file, don't trust the number.)
 - **Per-tab fields** via `tabField('screen')` — each tab maintains independent `screen`, `letterId`, `bookId`, `chapterNum`, `studyId`, `studyChapterId`, scroll positions, etc.
 - **`tabs` + `activeTabIdx`** arrays — multi-tab in-app browsing.
 - **`fromLetterStack`** per tab — drives **back-pill** navigation. Capped at 50 entries (was unbounded — caught in audit item 40).
