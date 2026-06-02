@@ -143,6 +143,16 @@ export async function buildExportPayload(ctx) {
     storageEstimate = _defaultStorageEstimate,
   } = ctx;
 
+  // S1: flush any in-flight store writes to IDB BEFORE reading. Stores _save()
+  // fire-and-forget and the loops below read STRAIGHT FROM IDB (the durable
+  // truth), so an edit made moments before Export could otherwise be missed from
+  // the ONLY backup. whenSaved() awaits the captured put and never rejects.
+  // Mirrors the import durability barrier (applyImportPayload).
+  await Promise.all(
+    Object.values(storesMap).map(({ store }) => _whenSaved(store))
+      .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
+  );
+
   // (a) data: LS boot-shim only. V1 clients reading this file see just
   //     theme + fontStyle restored (intentional limitation).
   /** @type {Record<string, string>} */

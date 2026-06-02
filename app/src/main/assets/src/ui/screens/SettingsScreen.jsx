@@ -542,9 +542,22 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         });
 
         hideToast(_TOAST_ID);
+
+        // S3: a store's IDB write FAILING (writeFailures) is NOT the same as a
+        // validation skip (skippedStores keep their old data safely) or a
+        // per-record media failure (importFailures). On a write failure the
+        // imported data is in the in-memory caches but did NOT durably land, so
+        // a reload would re-hydrate those stores from OLD IDB data and mix it
+        // with the imported rest — an inconsistent restore. Do NOT reload; keep
+        // the page up (the caches still hold what was imported) and ask the user
+        // to retry rather than tearing down into a half-imported state.
+        if (writeFailures > 0) {
+          _showToast(`Import incomplete — ${writeFailures} store${writeFailures > 1 ? 's' : ''} failed to save. Please retry the import and don't close the app.`);
+          return;
+        }
+
         const problems = [];
         if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? 's' : ''}`);
-        if (writeFailures > 0) problems.push(`${writeFailures} store${writeFailures > 1 ? 's' : ''} failed to save`);
         if (skippedStores.length > 0) {
           problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? 's' : ''} skipped (invalid: ${skippedStores.join(', ')})`);
         }
