@@ -57,30 +57,34 @@ function startServer() {
   return new Promise((res) => server.listen(0, '127.0.0.1', () => res(server)));
 }
 
-async function main() {
-  const server = await startServer();
-  const port = server.address().port;
-  const url = `http://127.0.0.1:${port}/index.html`;
+// One full smoke attempt against a FRESH browser: load → wait for mount →
+// pre-load corpora → inject smoke.js → run votSmoke → return { report, pageErrors }.
+// THROWS on a HARNESS error (CDP timeout / launch failure / wedged runner) — those
+// are retried by main(). A RETURNED report is authoritative (pass OR genuine fail)
+// and is never retried. The browser is always closed before returning/throwing so
+// a wedged attempt can't leak a Chrome process into the next one.
+async function runAttempt(url) {
   let browser;
-  let exitCode = 1;
   try {
     browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
       // The whole 12-screen walk + 2 annotation round-trips runs as ONE
-      // page.evaluate(votSmoke) — ~18s locally, but a loaded shared CI runner can
-      // stretch it past puppeteer's default 180s protocolTimeout, surfacing a
-      // flaky "Runtime.callFunctionOn timed out" with no real failure (the walk is
-      // bounded by its own sleeps, not infinite). Give the CDP call generous
-      // headroom so the gate is deterministic.
-      protocolTimeout: 600000,
+      // page.evaluate(votSmoke) — ~18s locally. On a loaded/wedged shared CI
+      // runner that single CDP call can stall and surface a flaky
+      // "Runtime.callFunctionOn timed out" with NO real failure (the walk is
+      // bounded by its own sleeps). Raising the ceiling 180→600s did NOT fix it
+      // — a hang consumes whatever timeout it's given (600s was hit too) — so the
+      // real fix is the retry loop in main(). Keep a per-attempt ceiling generous
+      // vs the ~18s walk (≈13×) but bounded so a hung attempt surfaces in minutes,
+      // letting the retry recover instead of burning 10 minutes on one hang.
+      protocolTimeout: 240000,
     });
     const page = await browser.newPage();
     page.setDefaultTimeout(30000);
     const pageErrors = [];
     page.on('pageerror', (e) => pageErrors.push(String(e)));
 
-    console.log('[smoke-ci] loading', url);
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     // Wait for React to mount the app shell.
     await page.waitForFunction(
@@ -102,19 +106,50 @@ async function main() {
     await page.evaluate(smokeSrc);
 
     const report = await page.evaluate(() => window.votSmoke());
-
-    console.log('[smoke-ci] ' + report.summary);
-    if (!report.ok) {
-      console.error('[smoke-ci] FAIL — full report:');
-      console.error(JSON.stringify(report, null, 2));
-      if (pageErrors.length) console.error('[smoke-ci] pageerrors:', pageErrors);
-    } else {
-      exitCode = 0;
-    }
-  } catch (e) {
-    console.error('[smoke-ci] harness error:', e && e.stack || e);
+    return { report, pageErrors };
   } finally {
-    if (browser) await browser.close();
+    if (browser) { try { await browser.close(); } catch { /* wedged browser — ignore */ } }
+  }
+}
+
+async function main() {
+  const server = await startServer();
+  const port = server.address().port;
+  const url = `http://127.0.0.1:${port}/index.html`;
+  // Retry a HARNESS error (the flaky CDP hang) with a fresh browser; never retry
+  // a genuine render failure. 3 attempts at a 240s ceiling bounds the worst case
+  // while auto-recovering from the transient runner hang that used to need a
+  // manual CI re-run.
+  const MAX_ATTEMPTS = 3;
+  let exitCode = 1;
+  try {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      console.log(`[smoke-ci] attempt ${attempt}/${MAX_ATTEMPTS} — loading ${url}`);
+      let result;
+      try {
+        result = await runAttempt(url);
+      } catch (e) {
+        // HARNESS error (CDP timeout / launch failure / wedged runner), NOT a
+        // render failure — retry with a fresh browser.
+        console.error(`[smoke-ci] harness error on attempt ${attempt}/${MAX_ATTEMPTS}:`, (e && e.message) || e);
+        if (attempt < MAX_ATTEMPTS) { console.error('[smoke-ci] retrying with a fresh browser…'); continue; }
+        console.error('[smoke-ci] giving up after', MAX_ATTEMPTS, 'attempts (runner likely wedged).');
+        break;
+      }
+      // A real report is AUTHORITATIVE: a genuine render failure (ok === false)
+      // must NOT be retried (that would mask a real regression). Done either way.
+      const { report, pageErrors } = result;
+      console.log('[smoke-ci] ' + report.summary);
+      if (report.ok) {
+        exitCode = 0;
+      } else {
+        console.error('[smoke-ci] FAIL — full report:');
+        console.error(JSON.stringify(report, null, 2));
+        if (pageErrors.length) console.error('[smoke-ci] pageerrors:', pageErrors);
+      }
+      break;
+    }
+  } finally {
     server.close();
   }
   process.exit(exitCode);

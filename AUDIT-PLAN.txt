@@ -302,6 +302,16 @@
      over the real corpus — it was pre-commit-only/--no-verify-bypassable before)
      and pre-commit Step 1c (runs on gate-code changes). unittest 17/17, real-data
      check_balance ALL OK, ci.yml YAML valid, pre-commit bash -n clean.
+   • smoke:ci flake fix (owner-approved, not a numbered item) — the recurring
+     "Runtime.callFunctionOn timed out" hang (921b00a raised the ceiling 180->600s
+     but a hang consumes ANY ceiling — 600s was hit on T4's push) is now fixed at
+     the root: smoke-ci.js runs each attempt in a FRESH browser via runAttempt()
+     and main() RETRIES a harness/CDP error (the hang) up to 3x at a 240s ceiling,
+     but NEVER retries a genuine render failure (report.ok===false is
+     authoritative). Auto-recovers the transient runner hang that used to need a
+     manual CI re-run. Verified locally: PASS on attempt 1/3, exit 0, 18.3s; node
+     --check clean. (Can't repro the hang locally; retry logic verified by
+     inspection — a thrown CDP error retries, a returned report does not.)
 
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
