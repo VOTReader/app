@@ -1,0 +1,189 @@
+═══════════════════════════════════════════════════════════════════════════
+ BACKUP-STREAMING-PLAN.txt — GB-scale, enterprise-grade Export / Import
+═══════════════════════════════════════════════════════════════════════════
+ Created 2026-06-02. Strategic working memory for the export/import
+ re-architecture. Owner directive (2026-06-02):
+
+   "User should be able to accumulate, export and import GBs of data — as much
+    as their device can store — safely, efficiently and quickly. Someone could
+    feasibly use the Journal for years and accumulate tons of text, inserted
+    images and audio recordings. That MUST be accounted for in a professional
+    and extremely robust manner ... keep exporting and importing impeccable and
+    easy. Enterprise level type behavior."
+
+ This SUPERSEDES AUDIT-PLAN.txt [S4] ("lower the export ceiling") — lowering is
+ a regression. It also REVISITS [S5] (the 100 MB aggregate import cap added
+ 2026-06-02): once import streams, that cap is removed/raised (it exists only
+ because today's decode holds everything in heap).
+
+───────────────────────────────────────────────────────────────────────────
+ WHY THE CURRENT DESIGN CANNOT DO GBs (verified against source, 2026-06-02)
+───────────────────────────────────────────────────────────────────────────
+ The backup is ONE big JSON object with every media blob base64-encoded inline,
+ produced + consumed whole. Every OOM point (file:line from the architecture map):
+
+ EXPORT
+  • buildExportPayload assembles ALL stores + ALL media base64 into one payload
+    object (backup.js:230-241); each media blob → base64 string accumulated in
+    `media{}` (backup.js:204).
+  • JSON.stringify(payload) → ONE giant string (SettingsScreen.jsx:441).
+  • Web: new Blob([json]) copies it again (platform-bridge.js:338).
+  • Android: the giant string crosses the JS→native bridge as a single argument
+    (AppInterface.saveToFile, :249) — a multi-GB string marshalled across the
+    WebView bridge is the hard OOM wall — then content.toByteArray copies it
+    again (StorageManager.kt:66).
+ IMPORT
+  • Android: readUriAsBase64 reads the WHOLE file into a ByteArray
+    (StorageManager.kt:43-45) then Base64.encodeToString (+33%, :46), crosses the
+    bridge as one string, JS atob's it (SettingsScreen.jsx:590), JSON.parse's it
+    (:476). 4-5 full copies of a GB file.
+  • Web: FileReader.readAsDataURL(whole file) (platform-bridge.js:315) → base64 →
+    atob → JSON.parse. Same multiplicity.
+  • base64ToBlob per record decodes inline (backup.js:69-82).
+
+ Net: base64 inflates the file 33% AND the whole thing lives in heap several
+ times over, on both platforms. Caps (50 MB import file / 100 MB export media)
+ exist precisely to dodge this OOM — they are the symptom, not the cure.
+
+───────────────────────────────────────────────────────────────────────────
+ TARGET ARCHITECTURE — stream everything, never hold the whole payload
+───────────────────────────────────────────────────────────────────────────
+ Two independent problems, both must be fixed:
+   (1) FORMAT: stop base64-inlining media into one JSON. Separate the small
+       structured data (stores = JSON, bounded to MBs even after years of text)
+       from the large binary media (images + audio = the GB-scale part), and
+       store media as RAW bytes (no +33% base64).
+   (2) I/O: read/write the file as a STREAM on both platforms so peak memory is
+       ONE media blob (a few MB), never the whole backup.
+
+ CHOSEN CONTAINER FORMAT: a standard **ZIP** (STORED / no compression).
+   backup.zip
+     ├── manifest.json     — { app:"VOTReader", exportVersion:3, exportDate,
+     │                         diagnosticLog, storageQuota/Used, counts,
+     │                         data:{vot-state:...}, stores:{...all IDB stores...},
+     │                         media:[ {id, type, mime, size, width, height,
+     │                                  duration, created} ... ]  ← METADATA ONLY,
+     │                                  NO bytes }
+     └── media/<id>         — one entry per blob, RAW bytes (no base64)
+
+   Why ZIP / STORED:
+    • Standard + battle-tested. Android reads/writes it with the JDK's native
+      ZipInputStream / ZipOutputStream — ZERO custom format code on the primary
+      platform (the safest possible choice for the only-backup mechanism).
+    • DATA-SAFETY NET: even if our own reader ever had a bug, the backup is a
+      valid .zip — the user can recover their media with any zip tool. A custom
+      binary format has no such fallback. Decisive for the only backup.
+    • STORED (uncompressed): journal media is ALREADY compressed (JPEG / opus),
+      so DEFLATE buys ~nothing and would add a compression-lib dependency +
+      cross-impl risk. STORED keeps it simple, fast, and dependency-light.
+    • No base64 → ~25% smaller files + no encode/decode CPU + no 1.33x heap.
+    • Streamable: entries are written/read sequentially; manifest.json first so
+      import knows the plan before touching media.
+
+ OPEN DECISION (owner) — the web ZIP codec:
+    Android uses native ZipStreams (no dep). The WEB (PWA) side needs to read +
+    write STORED zip. Options, in order of my preference:
+      (A) Hand-rolled STORED-zip reader/writer (~150 lines + a 15-line CRC32).
+          No dependency (fits the project's deliberate ~4-vendored-lib posture +
+          the "no added risk" stance). STORED zip is simple; correctness is
+          locked by EXHAUSTIVE cross-platform round-trip tests (web-write →
+          Android-read AND Android-write → web-read, on the API-28 emulator).
+          Because the output is a standard zip, a codec bug is still recoverable
+          by any zip tool — the safety net above.    ← RECOMMENDED
+      (B) Vendor fflate (~8 KB, MIT, zero-dep, battle-tested streaming zip).
+          Safest format handling; costs one new vendored runtime blob (recorded
+          in VENDORED-LIBS.md per SE7).
+    Recommendation: (A) hand-rolled STORED, with (B) as the fallback if the
+    hand-rolled codec proves fiddly under the round-trip tests. Both produce a
+    standard zip; the architecture below is identical either way.
+
+───────────────────────────────────────────────────────────────────────────
+ I/O DESIGN — per platform
+───────────────────────────────────────────────────────────────────────────
+ WEB (PWA, modern browser — Chrome/Edge are the realistic target):
+  • Export: File System Access API — showSaveFilePicker() → createWritable()
+    gives a streaming WritableStream. Write the zip incrementally: manifest
+    entry, then per media id read the blob via blob.stream() and pipe its bytes
+    into the entry. Peak memory ≈ one blob. FALLBACK (Firefox/Safari, no FS
+    Access API): assemble the zip as a Blob from PARTS (new Blob([...header,
+    blobRef, ...]) references the IDB blobs lazily, not one buffer) → download.
+    The fallback is heavier but still avoids base64; the FS Access API path is
+    the GB-scale one.
+  • Import: showOpenFilePicker() (or <input type=file>) → File.stream() →
+    read the zip entries sequentially; manifest.json → apply stores; each
+    media/<id> → Blob → IDB. Peak ≈ one entry. Replaces readAsDataURL.
+
+ ANDROID (APK / WebView — native does the file I/O; JS orchestrates):
+  The JS↔native string bridge cannot carry GBs in one arg, so add a CHUNKED
+  streaming bridge (new AppInterface @JavascriptInterface methods + JsEvent
+  callbacks; native side in StorageManager + MainActivity SAF pickers):
+  • Export: JS picks the SAF destination (existing create-document picker) →
+    native opens the OutputStream + a ZipOutputStream. JS drives:
+      exportPutEntry(name)             → native putNextEntry
+      exportWriteChunk(base64Chunk)    → native decode + write (JS sends the
+                                         manifest, then each blob read via
+                                         blob.stream() in ~64 KB chunks,
+                                         base64'd per chunk — bounded)
+      exportCloseEntry() / exportFinish()
+    Per-chunk base64 (~64 KB → ~85 KB string) is the only thing crossing the
+    bridge at a time.
+  • Import: JS picks the file → native opens InputStream + ZipInputStream.
+      importNextEntry()        → native returns the next entry name (or null)
+      importReadChunk(n)       → native reads n bytes from the current entry,
+                                 returns base64 (or "" at entry end)
+    JS reassembles each entry (manifest → stores; media → IDB), bounded.
+  NB: per-blob is bounded (audio memos + images are MB-scale; the app has no
+  video). The only unbounded axis is the COUNT of blobs, which streaming handles.
+
+ BACK-COMPAT (must not strand existing backups):
+  • Detect format on import: a leading 'PK\x03\x04' (zip magic) → v3 streaming
+    path; a leading '{' → the existing v1/v2 base64-JSON path (keep
+    applyImportPayload + JSON.parse for those — they're small/old).
+  • Export always writes v3 zip going forward.
+  • Old app versions can't read v3 — acceptable (forward-only); document it.
+
+ CAPS:
+  • Remove WEB_MAX_IMPORT_BYTES / MAX_IMPORT_SIZE / DEFAULT_MEDIA_LIMIT_BYTES
+    as hard refusals once streaming lands. Replace with a SOFT, advisory
+    free-space check (navigator.storage.estimate / StatFs) that WARNS but does
+    not block — the user owns their device's limits.
+  • S5's aggregate import cap: drop it on the v3 streaming path (memory is now
+    bounded per-blob); keep it only as a guard on the legacy base64 path.
+
+───────────────────────────────────────────────────────────────────────────
+ PHASES (each: own commit/series, own gates; cross-platform round-trip tested)
+───────────────────────────────────────────────────────────────────────────
+ P0  Owner confirms the format/dep decision (A hand-rolled vs B fflate). ← BLOCKS P1
+ P1  ZIP codec (web) + the v3 manifest builder/applier, as PURE, injectable
+     functions over Blobs/streams. Exhaustive vitest round-trip (incl. a fixture
+     that mimics native-zip output byte layout). No platform I/O yet.
+ P2  Web I/O: FS Access API export + File.stream import, wired through
+     PlatformBridge; preview-verified end-to-end with a multi-hundred-MB
+     synthetic dataset (real blobs in fake-IDB).
+ P3  Android native streaming: StorageManager ZipOutput/InputStream + the
+     chunked bridge methods + AppInterface + JsEvent + MainActivity pickers +
+     Kotlin tests. EMULATOR-verified (vot_api28): export a large dataset, pull
+     the file, re-import, assert byte-exact media round-trip. (File I/O is
+     emulator-verifiable — unlike the audio-tuning device walk.)
+ P4  Back-compat (import legacy v1/v2) + remove the hard caps + soft free-space
+     warning + reconcile S5. Full cross-platform matrix: web↔web, web↔Android,
+     Android↔Android, legacy→v3.
+ P5  Docs: CLAUDE.md current-state, HISTORY.md, AUDIT-PLAN.txt S4/S5 closure,
+     VENDORED-LIBS.md (if fflate), the export-format spec.
+
+ VERIFICATION BAR (non-negotiable for the only-backup path):
+  • Byte-exact media round-trip (sha256 each blob in == out) at >1 GB synthetic.
+  • Cross-platform: a backup made on web imports on Android and vice versa.
+  • Peak-memory assertion: instrument the import/export to prove memory stays
+    ~one-blob, not whole-payload.
+  • No data loss on a mid-stream failure (partial import must not wipe existing
+    data — write to a staging area / all-or-nothing per store, like today's
+    durability barrier).
+
+───────────────────────────────────────────────────────────────────────────
+ STATUS
+───────────────────────────────────────────────────────────────────────────
+ 2026-06-02 — Architecture mapped (full export/import data flow, both platforms,
+   every OOM point). Design above written. AWAITING owner nod on P0 (format/dep)
+   before P1. Everything else (P1–P5) is mine to execute + verify.
+═══════════════════════════════════════════════════════════════════════════
