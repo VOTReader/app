@@ -148,6 +148,27 @@
    • T7 ≈ adjacent to D6 (degraded-cascade atomicity + test landed) — re-scope.
    • D2 navHandoff landed → the UX1/UX2 nav-origin work now routes through it.
 
+ 2026-06-02 — Wave 2 (search cluster) COMPLETE — pushed to main:
+   • SR1/SR2/SR3 + SR8 (5c4e051) — removed the dead 'heading'-field throw (every
+     query); fixed multi-word search. KEY FINDING: the audit's recommended fix
+     (suggest:true) is WRONG — verified against the vendored FlexSearch 0.7.41
+     that suggest does NOT yield partial-OR (still []). Real fix = search each
+     term SEPARATELY + UNION. New search-engine.test.js loads the REAL engine
+     over a fixture (was 0% tested); the SR2 case was RED under suggest:true,
+     GREEN under per-term-OR. Real-corpus preview: "love your enemies" → Matthew
+     5:44 as the #1 result; 0 heading warnings.
+   • SR5 + hero copy (29778ec) — SearchScreen now loads ALL corpora before
+     building the index (it was caching a near-empty index on a cold search-open
+     that never self-repaired); dropped the stale "headings" from the hero copy.
+   • SR4 (synonym/stemmer/phonetic dead code) — DEFERRED as an OWNER decision:
+     ~100 lines of well-crafted scripture-aware synonym groups (mercy↔compassion,
+     shepherd↔pastor — plus aggressive deity/name groups: lord↔messiah,
+     god↔yahweh) are defined but never wired. Wiring = a real recall win BUT an
+     app-wide search BEHAVIOR change; deleting = loses crafted IP. Left intact +
+     flagged; the per-term-OR groundwork makes wiring a clean follow-up if wanted.
+     (Dead KIND_BOOST['heading'] / srchGroupKey 'heading' remnants left too —
+     harmless; tidy alongside the synonym decision.)
+
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
 ═══════════════════════════════════════════════════════════════════════════
