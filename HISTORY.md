@@ -4,6 +4,70 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## D-bucket — final architectural items dispositioned (2026-06-01)
+
+The D-bucket (D1–D8 in UPLIFT-PLAN.txt) was the only un-started work after the
+UPLIFT batch closed — architectural items that "raise the ceiling past 8" but
+were never required. This session dispositioned all eight: **4 landed, 4 skipped
+with reasoning** (each evaluated against source, not blindly executed). All
+CI-green on main.
+
+**LANDED:**
+- **D7 doc prune** (`79781f8`) — deleted 8 stale standalone docs (3 handoffs,
+  BUNDLE-LAZY-LOAD-PLAN, css-audit, JOURNAL_WIRING + gitignored b64/quality-uplift
+  artifacts, ~630 KB); **slimmed CLAUDE.md 142 → 27 KB** (819 → 361 lines — it
+  loads every session, so a recurring context-budget win) and **PLAN.txt 235 →
+  70 KB** (closed W0–W5/W7–W9 plan bodies stubbed → HISTORY + git). Crucially,
+  the orphaned W2–W9/NK/late-feature history (HISTORY.md had stopped tracking that
+  track) was relocated INTO HISTORY.md first (see the "Briefing-archived history"
+  section) so nothing was lost — the slim is a move, not a delete.
+- **D5 per-action write-fail toast** (`43fb827`) — `StorageHealth.onWriteFailure`
+  now fires a cooldown-deduped (8 s) bottom toast so the user learns THIS change
+  didn't persist, not just the passive banner. Reuses `.vot-toast` (no new CSS).
+  onWriteSuccess clears it + resets the cooldown. +3 vitest; preview-verified.
+- **D6 degraded-hydration cascade atomicity** (`8afdd2a`) — real data-integrity
+  fix. `JournalStore.remove`'s cross-store cascade (`_purgeAssociated` reads the
+  loaded TARGET stores by key-prefix) used to fire DURABLY during the
+  `_applyToPendingCache` overlay while the entry delete was only queued → if
+  hydration never completed, associations were purged but the entry survived
+  (orphan), plus double `recordDeletion` at replay. Gated the cascade + stats/index
+  on `!_applyingPending` so the whole delete is atomic (runs once, on the loaded
+  path or replay). +1 vitest, proven to FAIL on the pre-fix code.
+- **D2 typed navHandoff** (`a93ca80` + globals regen `ced1bb6`) — `src/utils/
+  nav-handoff.js` (window-backed Map for cross-bundle reach) replaces the 5 live
+  `window.__pending*` / `__notesReturnCtx` magic-string slots with a typed,
+  self-documenting `set/take/peek/clear/has` API; preserved exact semantics
+  (take where read-then-null in one place; peek+conditional-clear for
+  pendingHighlight/notesReturnCtx). Removed the write-only-dead `__pendingLinkExcerpt`.
+  4 hook test files + a new module test migrated (+8 net → 1650). BRIDGES.md §5
+  now points here. Preview-verified end-to-end (Search-from-selection pre-fill).
+  Follow-up: the CI-only smoke-lite `checkGlobalsMirror` caught the un-regenerated
+  globals (the pre-commit doesn't regen globals — [[globals-regen-workflow]]);
+  fixed by `npm run lint:globals` (397 → 398).
+
+**SKIPPED with reasoning** (the 2026-06-01 fresh AUDIT-PLAN.txt independently
+corroborates D1 + D3):
+- **D1** content-visibility:auto on verse blocks — a no-op on the WebView-69 floor
+  (Chromium-85 feature), so zero benefit on the budget Androids that most need it,
+  for non-zero risk to the working scroll-memory/annotation layer. AUDIT-PLAN's
+  `[PF3]` reaches the same conclusion and OWNS virtualization via IntersectionObserver
+  (works on WV69) — not a D-bucket item.
+- **D8** dissolve use-sheet-orchestration — plan-tagged low-priority refactor of
+  load-bearing, working sheet UI; respect production code in a nearly-done app.
+- **D4** NavContext to collapse the ROUTES factory — already W7.5-adjudicated
+  net-negative (the explicit signature is the honest receipt of clean extraction;
+  bundling doesn't reduce coupling).
+- **D3** project-wide strictNullChecks — W8.3 deliberately left it off; the fresh
+  audit also scopes typing TARGETED (CQ4/CQ5: app.jsx + journal-helpers, owned by
+  AUDIT-PLAN), not a global strict flag that would surface hundreds of nulls across
+  every typed file.
+
+Tests 1638 → 1650. Doc footprint: ~630 KB stale docs removed + CLAUDE/PLAN
+slimmed ~280 KB. A parallel "second deep audit" (AUDIT-PLAN.txt, 7.5→8.5) ran
+concurrently in the repo this session — distinct scope; no D-bucket overlap.
+
+---
+
 ## N2 — second native-review response (2026-06-01)
 
 A follow-up external review of the native Kotlin layer (proguard, audio
