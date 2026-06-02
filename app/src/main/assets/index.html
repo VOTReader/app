@@ -31,7 +31,7 @@
        img/connect-src host-narrowing is tracked separately (U21). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-BiBVmFw3ZhrU/PBwRHXqD0BNSiXHr8TDXQwQFLL9rxo=' 'sha256-Nn+jGCnUTXXk4L8kgvNzRc3gyE3BU0NuwEjS9goTrBA=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-eb7yoHrWRuulBiqUsLf9IEzQErxv2QD45Fkcf+wTmMs=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-BiBVmFw3ZhrU/PBwRHXqD0BNSiXHr8TDXQwQFLL9rxo=' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-WVTu+Gq7seQMHFegMz0iJskMo45FW2daywxFZPdjlqs=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -144,9 +144,32 @@
             tag: e.target.tagName,
             url: e.target.src || e.target.href
           });
+          return;
+        }
+        /* AUDIT-PLAN E2 — uncaught JS error (not a resource load). With no
+           telemetry by policy, the in-app DiagnosticLog is the ONLY failure
+           trace, and it previously captured NOTHING thrown from event handlers,
+           async effects, setTimeout callbacks, or store subscribers (i.e.
+           everything outside React's ErrorBoundary). DiagnosticLog lives in
+           bundle-b (loaded after this), so guard on its presence; messages are
+           path-sanitized by DiagnosticLog itself. */
+        if (window.DiagnosticLog && window.DiagnosticLog.error) {
+          var m = (e && (e.message || (e.error && e.error.message))) || 'uncaught error';
+          var at = (e && e.filename) ? (' @ ' + e.filename + ':' + (e.lineno || 0)) : '';
+          window.DiagnosticLog.error('uncaught', m + at);
         }
       } catch(x){}
     }, true);
+    /* E2 — unhandled promise rejections (the async sibling of the above). */
+    window.addEventListener('unhandledrejection', function(e){
+      try {
+        if (window.DiagnosticLog && window.DiagnosticLog.error) {
+          var r = e && e.reason;
+          var msg = (r && (r.message || (r.toString && r.toString()))) || 'unhandled rejection';
+          window.DiagnosticLog.error('unhandledrejection', String(msg));
+        }
+      } catch(x){}
+    });
   </script>
   <!-- vendor scripts moved into dist/bundle-a.js (G.1) -->
   
@@ -180,14 +203,23 @@
   window.__makeLazyLoader = function(name, bundlePath, finishFnName) {
     var corpus = {
       loaded: false,
+      error: false,           // E1: set when the bundle fails to load (offline / 404 / old-WebView parse error)
       _promise: null,
+      _version: 0,            // monotonic; bumps on load OR error so useSyncExternalStore re-renders for both
       _listeners: new Set(),
       subscribe: function(cb) { this._listeners.add(cb); var self = this; return function() { self._listeners.delete(cb); }; },
-      getVersion: function() { return this.loaded ? 1 : 0; },
-      _notify: function() { this.loaded = true; this._listeners.forEach(function(cb) { try { cb(); } catch (e) { console.warn(name + '-corpus subscriber threw', e); } }); }
+      getVersion: function() { return this._version; },
+      _bump: function() {
+        this._version += 1;
+        this._listeners.forEach(function(cb) { try { cb(); } catch (e) { console.warn(name + '-corpus subscriber threw', e); } });
+      },
+      _notify: function() { this.loaded = true; this.error = false; this._bump(); },
+      _setError: function() { this.error = true; this._bump(); }
     };
     var load = function() {
       if (corpus._promise) return corpus._promise;
+      // Retry: clear a prior error so subscribers flip back to the loading state.
+      if (corpus.error) { corpus.error = false; corpus._bump(); }
       corpus._promise = new Promise(function(resolve, reject) {
         var t0 = Date.now();
         var script = document.createElement('script');
@@ -204,12 +236,26 @@
               try { window.DiagnosticLog.timing('corpus', name, Date.now() - t0); } catch (_e) {}
             }
             resolve();
-          } catch (e) { reject(e); }
+          } catch (e) {
+            // Script loaded but its finishInit threw — same recovery path.
+            corpus._promise = null;
+            corpus._setError();
+            if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
+              try { window.DiagnosticLog.error('corpus', 'init failed for ' + name); } catch (_e2) {}
+            }
+            reject(e);
+          }
         };
         script.onerror = function() {
-          // Reset the promise so a later retry can succeed; reject this
-          // promise so the caller can show an error state.
+          // Reset the promise so a later retry can succeed; flag the error so
+          // the route can show a retry affordance instead of a perpetual
+          // spinner (E1); and leave a diagnostic trace (E3 — the success path
+          // logs a timing, the failure path previously logged nothing).
           corpus._promise = null;
+          corpus._setError();
+          if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
+            try { window.DiagnosticLog.error('corpus', 'failed to load ' + bundlePath); } catch (_e) {}
+          }
           reject(new Error('Failed to load ' + bundlePath));
         };
         document.head.appendChild(script);

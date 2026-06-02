@@ -149,12 +149,24 @@ export function buildScreenRoutes({
   // loader and renders a centered placeholder. App() subscribes to
   // __votCorpus so the wrapper re-evaluates when the corpus lands.
   const _votReady = (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.loaded : false;
-  const _votLoadingPlaceholder = <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading…</div>;
-  const _wrapVot = (jsx) => {
-    if (_votReady) return jsx;
-    if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
-    return _votLoadingPlaceholder;
+  // AUDIT-PLAN E1: a lazy corpus can FAIL to load (offline, 404, an old-WebView
+  // parse error). Render a retry affordance instead of a perpetual "Loading…".
+  // The loader (index.html) sets corpus.error + bumps its version on failure and
+  // nulls _promise so re-calling the loader retries cleanly; App subscribes to
+  // each corpus version, so this re-evaluates on the bump.
+  const _corpusView = (corpus, loadFn, loadingLabel) => {
+    if (corpus && corpus.error) {
+      return (
+        <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
+          <div>Couldn’t load this section.</div>
+          <button type="button" onClick={() => { if (typeof loadFn === 'function') loadFn(); }} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>Try again</button>
+        </div>
+      );
+    }
+    if (typeof loadFn === 'function') loadFn();
+    return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>{loadingLabel}</div>;
   };
+  const _wrapVot = (jsx) => _votReady ? jsx : _corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…');
 
   return {
     // ── Volume index screens (13) ──
@@ -507,11 +519,8 @@ export function buildScreenRoutes({
       />
     ),
     'matthew-idx': () => {
-      // Q8.2: MATTHEW lazy-loaded — render loading state until corpus arrives.
-      if (typeof MATTHEW === 'undefined') {
-        if (typeof window.__loadMatthewCorpus === 'function') window.__loadMatthewCorpus();
-        return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading Matthew…</div>;
-      }
+      // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
+      if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
       return (
         <ChapterIndex
           book={MATTHEW}
@@ -563,10 +572,9 @@ export function buildScreenRoutes({
           theme={theme} onThemeChange={setTheme}
         />
       );
-      // Q8: BOOKS not loaded yet — trigger lazy-load + show loading state.
+      // Q8: BOOKS not loaded yet — show loading (or a retry on failure, E1).
       if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
-        if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
-        return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading Bible…</div>;
+        return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…');
       }
       return null;
     },
@@ -602,10 +610,9 @@ export function buildScreenRoutes({
         onLinkOpen={openLinkSidebar}
       />
       );
-      // Q8: BOOKS not loaded yet — trigger lazy-load + show loading state.
+      // Q8: BOOKS not loaded yet — show loading (or a retry on failure, E1).
       if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
-        if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
-        return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading Bible…</div>;
+        return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…');
       }
       return null;
     },
@@ -614,11 +621,8 @@ export function buildScreenRoutes({
     //    letter shims, chain-aware boundaries) extracted to their own
     //    components in src/ui/screens/. ──
     'matthew-ch': () => {
-      // Q8.2: MATTHEW lazy-loaded — render loading state until corpus arrives.
-      if (typeof MATTHEW === 'undefined') {
-        if (typeof window.__loadMatthewCorpus === 'function') window.__loadMatthewCorpus();
-        return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading Matthew…</div>;
-      }
+      // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
+      if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
       return (
         <MatthewChapterView
           chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}
