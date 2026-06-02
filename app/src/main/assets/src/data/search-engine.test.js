@@ -48,6 +48,7 @@ beforeAll(async () => {
       id: 'john', title: 'John', chapters: [
         { num: 3, sections: [{ heading: '', verses: [
           { n: 16, text: 'For God so loved the world that He gave His only begotten Son.' },
+          { n: 17, text: 'He was moved with compassion, and the shepherd sought the lost.' },
         ] }] },
       ],
     },
@@ -98,6 +99,20 @@ describe('search engine — SR2 (multi-word no longer strict-AND)', () => {
 
   it('still finds a verse by a distinctive single word', async () => {
     expect((await refs('loved')).some((ref) => /John 3:16/.test(ref))).toBe(true);
+  });
+});
+
+describe('search engine — SR4 (opt-in synonym expansion)', () => {
+  // John 3:17 in the fixture contains "compassion"/"shepherd" but NOT "mercy".
+  it('with synonyms ON, "mercy" finds the verse that only contains "compassion"', async () => {
+    const r = await VotSearch.search('mercy', { synonyms: true });
+    const found = ((r && r.results) || []).map((m) => (m.doc && m.doc.ref) || '');
+    expect(found.some((ref) => /John 3:17/.test(ref))).toBe(true);
+  });
+
+  it('with synonyms OFF, "mercy" finds nothing (no verse has the literal word)', async () => {
+    const r = await VotSearch.search('mercy', { synonyms: false });
+    expect(((r && r.results) || []).length).toBe(0);
   });
 });
 

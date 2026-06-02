@@ -814,6 +814,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             disabledReason="Turn on Search to enable this."
           />
           <SettingsRow
+            label="Synonym Search"
+            desc="On (default): also match scripture synonyms — searching 'mercy' finds 'compassion', 'shepherd' finds 'pastor', 'faith' finds 'belief' and 'trust'. Exact-word matches always rank first. Off: match only the words you type."
+            checked={settings.searchSynonyms !== false}
+            onToggle={() => onToggle("searchSynonyms")}
+            disabled={settings.searchEnabled === false}
+            disabledReason="Turn on Search to enable this."
+          />
+          <SettingsRow
             label="History"
             desc="Keep a running list of chapters and letters you've visited. When off, recording stops and the history button is hidden. Existing history is preserved."
             checked={settings.historyEnabled !== false}

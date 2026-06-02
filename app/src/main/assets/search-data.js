@@ -384,8 +384,11 @@ var SYNONYM_GROUPS = [
   ['flesh','body','carnal','carnality'],
   ['spirit','ruach','pneuma','ghost'],
   ['word','logos','rhema'],
-  ['yahushua','yeshua','yahshua','yahusha','yeshu','jesus','christ','messiah','lord'],
-  ['yahuwah','yahweh','yhwh','jehovah','god','elohim','adonai','father'],
+  // NOTE: the generic words 'lord' / 'god' / 'father' were intentionally trimmed
+  // from these two name groups — they are far too common to expand every query
+  // into the full set of messianic / deity names. The name<->name synonyms stay.
+  ['yahushua','yeshua','yahshua','yahusha','yeshu','jesus','christ','messiah'],
+  ['yahuwah','yahweh','yhwh','jehovah','elohim','adonai'],
   ['holy spirit','holy ghost','ruach hakodesh','comforter','advocate','helper'],
   ['heaven','heavens','paradise','celestial'],
   ['hell','sheol','hades','gehenna','grave','pit','lake of fire'],
@@ -572,6 +575,7 @@ for (var _c = 0; _c < COMMANDS.length; _c++) {
 window.VotSearchData = {
   STOP_WORDS: STOP_WORDS,
   STOP_WORDS_TRIMMED: STOP_WORDS_TRIMMED,
+  SYNONYM_MAP: SYNONYM_MAP,   // SR4: scripture-aware synonym expansion (opt-in via settings.searchSynonyms)
   BOOK_ABBREVS: BOOK_ABBREVS,
   BOOK_DISPLAY: BOOK_DISPLAY,
   NAMED_PASSAGES: NAMED_PASSAGES,

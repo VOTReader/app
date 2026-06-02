@@ -1403,6 +1403,28 @@ async function executeSearch(query, options) {
   // post-filter applies); a non-phrase query is searched TERM-BY-TERM and the
   // matches UNION'd (OR) — see the field loop below.
   var searchUnits = p.phrase ? [p.phrase] : filtered;
+  // SR4: optional scripture-aware synonym expansion (settings.searchSynonyms,
+  // default on). Each non-phrase term also matches its synonym group, OR'd in
+  // for recall ("mercy" finds "compassion", "shepherd" finds "pastor"). Exact
+  // matches still rank FIRST — the coverage multiplier + per-term accumulation
+  // below score on the ORIGINAL `filtered` terms, so a synonym-only hit gets
+  // base score and lands below the literal matches. Phrases are exempt.
+  if (options.synonyms !== false && !p.phrase && D.SYNONYM_MAP) {
+    var expandedUnits = [];
+    var seenUnit = Object.create(null);
+    for (var sui = 0; sui < filtered.length; sui++) {
+      var baseTerm = String(filtered[sui]).toLowerCase();
+      if (!seenUnit[baseTerm]) { seenUnit[baseTerm] = true; expandedUnits.push(filtered[sui]); }
+      var grp = D.SYNONYM_MAP[baseTerm];
+      if (grp) {
+        for (var gsi = 0; gsi < grp.length; gsi++) {
+          var syn = String(grp[gsi]).toLowerCase();
+          if (!seenUnit[syn]) { seenUnit[syn] = true; expandedUnits.push(syn); }
+        }
+      }
+    }
+    if (expandedUnits.length) searchUnits = expandedUnits;
+  }
 
   // SR1: U22 dropped the 'heading' field from the index (createDb), so searching
   // index:'heading' threw on EVERY query (caught + logged per corpus, the 2.0

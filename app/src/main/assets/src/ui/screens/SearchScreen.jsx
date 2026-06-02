@@ -64,6 +64,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       window.VotSearch.search(q, {
         translation: settings.translation || 'nkjv',
         useStopWords: settings.searchUseStopWords !== false,
+        synonyms: settings.searchSynonyms !== false,
         scope: searchScope || null,
         corpus: settings.searchCorpus || 'all',
         limit: 400
@@ -77,7 +78,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       });
     }, 140);
     return () => {if (debounceRef.current) clearTimeout(debounceRef.current);};
-  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchCorpus, searchScope]);
+  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope]);
 
   // Handle command-kind parsed results
   React.useEffect(() => {
