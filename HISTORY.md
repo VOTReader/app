@@ -4,6 +4,16 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## Export/Import GB-scale streaming re-architecture (2026-06-02, ongoing)
+
+Owner directive: the backup path (the only backup mechanism) must handle GB-scale journal data — years of text + images + audio — safely, efficiently, enterprise-grade, **not** by lowering caps (the reframed AUDIT-PLAN S4) but by *streaming*, so peak memory is one media blob, never the whole payload. **Canonical tracker: BACKUP-STREAMING-PLAN.txt** (design, the format pivot, the 5-phase plan, the verification bar). This section is the HISTORY landmark only.
+
+- **Format decision:** a bespoke length-prefixed binary container (exportVersion 3) — `"VOTBACK1"` magic + a JSON manifest (stores + media *metadata*) + raw length-prefixed media frames, **64-bit lengths (no 4 GB / ZIP64 wall)**, no base64 bloat. Chosen over a standard zip because >4 GB ("as much as the device can store") would force either hand-rolled ZIP64 (too bug-prone on the only-backup path) or a vendored zip lib (a dependency the project avoids); a dumb-simple framed format is 64-bit-native, dependency-free, and minimal-bug-surface — the real data-safety win here. Tradeoff: not openable by a generic zip tool (acceptable for a re-import-only backup whose spec lives in the repo).
+- **P1 (landed):** `src/utils/backup-container.js` — `writeContainer` (streams; ≤1 MB slices, bounded memory) / `readContainer` (lazy `Blob.slice` per frame; verifies frame length vs the manifest's declared size; throws on truncation/mismatch/bad-magic/bad-JSON) / `isContainerMagic` (the legacy-vs-v3 import sniff) / `encode|decodeUint64BE` (the >4 GB length codec, no BigInt — chrome69-safe). +14 exhaustive round-trip tests (byte-exact over true binary, the 5 GB/17 GB length boundary, multi-chunk blobs, unicode manifests, every corruption guard). vitest 1754/71 `test:coverage` exit 0, tsc + eslint clean.
+- **Next:** P1 manifest builder/applier → P2 web I/O (FS Access API + `File.stream`) → P3 Android native framing + chunked bridge (emulator-verified) → P4 back-compat + cap removal → P5 docs.
+
+---
+
 ## AUDIT-PLAN remediation — 7.5 → 8.5+ hardening (2026-06-02, ongoing)
 
 A second deep adversarial audit (15 subsystem agents + 15 verification agents) rated the post-UPLIFT app 7.5/10 and produced **AUDIT-PLAN.txt** — the canonical, item-by-item tracker (~108 verified P0–P3 items) with a full commit-by-commit PROGRESS LOG. The 8.5 exit bar was met by Waves 1–4 (P0 data-loss/crash fixes, the search cluster, only-backup integrity + native audio, PF1 corpus minify) plus a large overnight batch (PF7, T2/T3, SE1–5, SC2–7, P1/P2pwa, B1/B5/B6/B8, A2, …). **Detail lives in AUDIT-PLAN.txt, not here** — this section is just the HISTORY-timeline landmark; per-item receipts (evidence, fix, gates) are in that tracker's PROGRESS LOG and per-item STATUS lines. The high-risk render/nav/storage items (F1/F2, A4, A1/A5, PF2/PF3/PF4, UX1–4, E4, E5 pt2) are explicitly DEFERRED for owner review.

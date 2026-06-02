@@ -56,46 +56,50 @@
    (2) I/O: read/write the file as a STREAM on both platforms so peak memory is
        ONE media blob (a few MB), never the whole backup.
 
- CHOSEN CONTAINER FORMAT: a standard **ZIP** (STORED / no compression).
-   backup.zip
-     ├── manifest.json     — { app:"VOTReader", exportVersion:3, exportDate,
-     │                         diagnosticLog, storageQuota/Used, counts,
-     │                         data:{vot-state:...}, stores:{...all IDB stores...},
-     │                         media:[ {id, type, mime, size, width, height,
-     │                                  duration, created} ... ]  ← METADATA ONLY,
-     │                                  NO bytes }
-     └── media/<id>         — one entry per blob, RAW bytes (no base64)
+ CHOSEN CONTAINER FORMAT (revised 2026-06-02 — see "format pivot" below):
+   a bespoke LENGTH-PREFIXED binary container (exportVersion 3). On-disk
+   (all integers big-endian):
+     [8]            magic = "VOTBACK1" (ASCII)
+     [8]            manifest length, bytes (uint64)
+     [manifestLen]  manifest, UTF-8 JSON = { app:"VOTReader", exportVersion:3,
+                      exportDate, diagnosticLog, storageQuota/Used, counts,
+                      data:{vot-state:...}, stores:{...all IDB stores...},
+                      media:[ {id, type, mime, size, width, height, duration,
+                               created} ... ]  ← METADATA ONLY, NO bytes }
+     for each media[i] in manifest.media, IN ORDER:
+       [8]          blob length, bytes (uint64)
+       [blobLen]    blob RAW bytes (no base64)
 
-   Why ZIP / STORED:
-    • Standard + battle-tested. Android reads/writes it with the JDK's native
-      ZipInputStream / ZipOutputStream — ZERO custom format code on the primary
-      platform (the safest possible choice for the only-backup mechanism).
-    • DATA-SAFETY NET: even if our own reader ever had a bug, the backup is a
-      valid .zip — the user can recover their media with any zip tool. A custom
-      binary format has no such fallback. Decisive for the only backup.
-    • STORED (uncompressed): journal media is ALREADY compressed (JPEG / opus),
-      so DEFLATE buys ~nothing and would add a compression-lib dependency +
-      cross-impl risk. STORED keeps it simple, fast, and dependency-light.
-    • No base64 → ~25% smaller files + no encode/decode CPU + no 1.33x heap.
-    • Streamable: entries are written/read sequentially; manifest.json first so
-      import knows the plan before touching media.
+   FORMAT PIVOT — why NOT a standard zip (the plan's first instinct):
+    A standard zip caps the TOTAL archive at 4 GB without ZIP64, and the bar is
+    "as much as the device can store" → >4 GB is in scope. The only ways to get
+    a >4 GB zip are (a) hand-roll ZIP64 — too bug-prone for the ONLY backup, or
+    (b) vendor a zip lib (fflate) — a dependency the project deliberately avoids.
+    A length-prefixed container sidesteps BOTH: 64-bit lengths natively (no 4 GB
+    wall), and it is so simple it is hard to get wrong — the real data-safety win
+    on this path is MINIMAL BUG SURFACE, not external tooling.
 
- OPEN DECISION (owner) — the web ZIP codec:
-    Android uses native ZipStreams (no dep). The WEB (PWA) side needs to read +
-    write STORED zip. Options, in order of my preference:
-      (A) Hand-rolled STORED-zip reader/writer (~150 lines + a 15-line CRC32).
-          No dependency (fits the project's deliberate ~4-vendored-lib posture +
-          the "no added risk" stance). STORED zip is simple; correctness is
-          locked by EXHAUSTIVE cross-platform round-trip tests (web-write →
-          Android-read AND Android-write → web-read, on the API-28 emulator).
-          Because the output is a standard zip, a codec bug is still recoverable
-          by any zip tool — the safety net above.    ← RECOMMENDED
-      (B) Vendor fflate (~8 KB, MIT, zero-dep, battle-tested streaming zip).
-          Safest format handling; costs one new vendored runtime blob (recorded
-          in VENDORED-LIBS.md per SE7).
-    Recommendation: (A) hand-rolled STORED, with (B) as the fallback if the
-    hand-rolled codec proves fiddly under the round-trip tests. Both produce a
-    standard zip; the architecture below is identical either way.
+   Why this format:
+    • 64-bit lengths → no 4 GB / ZIP64 problem; handles whatever the device holds.
+    • Dead simple → smallest possible bug surface on the only-backup path; fully
+      auditable; recoverable from this spec alone (a ~20-line script).
+    • No dependency (honors the lean-deps + "no added risk" posture).
+    • No base64 → ~25% smaller + no encode/decode CPU + no 1.33x heap.
+    • Streams trivially BOTH ways: random-access via Blob.slice on web (the codec
+      reads each frame as a lazy slice — bounded), and sequentially on Android
+      (native reads magic→len→manifest→[len+bytes]* straight off the SAF stream;
+      the JS codec is NOT used on Android — native writes/reads the same frames).
+    • Integrity: each frame's length is cross-checked against the manifest's
+      declared `size`; a mismatch or truncation throws (corruption is caught).
+   Tradeoff accepted: the file is not openable by a generic zip tool. For a
+   re-import-only backup whose owner has the source repo (the format spec lives
+   here), that is acceptable; the simplicity/safety win dominates.
+
+   STATUS: P1 LANDED — src/utils/backup-container.js (writeContainer /
+   readContainer / isContainerMagic / encode|decodeUint64BE) + 14 exhaustive
+   round-trip tests (byte-exact binary, the >4 GB length boundary, multi-chunk,
+   unicode, truncation/size-mismatch/bad-magic/bad-JSON guards). The codec is
+   web-side; Android frames natively in P3.
 
 ───────────────────────────────────────────────────────────────────────────
  I/O DESIGN — per platform
@@ -109,37 +113,44 @@
     blobRef, ...]) references the IDB blobs lazily, not one buffer) → download.
     The fallback is heavier but still avoids base64; the FS Access API path is
     the GB-scale one.
-  • Import: showOpenFilePicker() (or <input type=file>) → File.stream() →
-    read the zip entries sequentially; manifest.json → apply stores; each
-    media/<id> → Blob → IDB. Peak ≈ one entry. Replaces readAsDataURL.
+  • Import: showOpenFilePicker() (or <input type=file>) → readContainer(file) →
+    manifest → apply stores; each media frame is a lazy Blob.slice → IDB. Peak ≈
+    one frame. Replaces readAsDataURL + JSON.parse-of-the-whole-file.
 
- ANDROID (APK / WebView — native does the file I/O; JS orchestrates):
-  The JS↔native string bridge cannot carry GBs in one arg, so add a CHUNKED
-  streaming bridge (new AppInterface @JavascriptInterface methods + JsEvent
-  callbacks; native side in StorageManager + MainActivity SAF pickers):
-  • Export: JS picks the SAF destination (existing create-document picker) →
-    native opens the OutputStream + a ZipOutputStream. JS drives:
-      exportPutEntry(name)             → native putNextEntry
-      exportWriteChunk(base64Chunk)    → native decode + write (JS sends the
-                                         manifest, then each blob read via
-                                         blob.stream() in ~64 KB chunks,
-                                         base64'd per chunk — bounded)
-      exportCloseEntry() / exportFinish()
-    Per-chunk base64 (~64 KB → ~85 KB string) is the only thing crossing the
-    bridge at a time.
-  • Import: JS picks the file → native opens InputStream + ZipInputStream.
-      importNextEntry()        → native returns the next entry name (or null)
-      importReadChunk(n)       → native reads n bytes from the current entry,
-                                 returns base64 (or "" at entry end)
-    JS reassembles each entry (manifest → stores; media → IDB), bounded.
-  NB: per-blob is bounded (audio memos + images are MB-scale; the app has no
-  video). The only unbounded axis is the COUNT of blobs, which streaming handles.
+ ANDROID (APK / WebView — native owns the file I/O + the framing; JS feeds it):
+  Two WV69 facts shape this: (1) the JS↔native bridge can't carry GBs in one
+  string arg, and (2) WebView-69 lacks Blob.arrayBuffer/.stream, so the web codec
+  above cannot run there — JS must read blob bytes via FileReader per ≤1 MB slice
+  (rule 5). So native RE-IMPLEMENTS THE SAME framed format in Kotlin (trivial —
+  magic + manifest + length-prefixed frames). This dual-impl is precisely why the
+  format is dumb-simple: a ZIP would be unsafe to dual-impl / need a dep. New
+  AppInterface @JavascriptInterface methods + JsEvent callbacks; native side in
+  StorageManager + the existing SAF pickers:
+  • Export: JS picks the SAF destination → native opens the OutputStream, writes
+    magic + manifest. Then per media id JS reads the blob via FileReader (≤1 MB
+    slices) and hands native each slice as base64:
+      exportBegin(manifestJson)     → native writes magic + manifest frame
+      exportWriteBlob(id, size)     → native writes the next frame's length
+      exportBlobChunk(base64Chunk)  → native decodes + writes raw bytes
+      exportEnd()                   → native flushes + closes
+    Only one ≤1 MB slice (~1.3 MB base64) crosses the bridge at a time.
+  • Import: JS picks the file → native opens the InputStream, reads magic +
+    manifest, returns it (one small call), then streams each frame to JS:
+      importBegin()                 → native opens, returns manifestJson
+      importNextBlob()              → native advances to the next frame
+      importReadChunk(n)            → native returns ≤n bytes base64 ("" at end)
+    JS reassembles each blob (bounded) and puts it to JournalMediaStore.
+  Byte-compatibility web↔Android (export on one, import on the other) IS the
+  format's contract, locked by the P3 cross-platform round-trip tests.
+  NB: per-blob is bounded (audio + images are MB-scale; the app has no video).
+  Only the COUNT of blobs is unbounded — which streaming handles.
 
  BACK-COMPAT (must not strand existing backups):
-  • Detect format on import: a leading 'PK\x03\x04' (zip magic) → v3 streaming
-    path; a leading '{' → the existing v1/v2 base64-JSON path (keep
-    applyImportPayload + JSON.parse for those — they're small/old).
-  • Export always writes v3 zip going forward.
+  • Detect format on import by the first bytes: "VOTBACK1" → v3 streaming path;
+    a leading '{' → the existing v1/v2 base64-JSON path (keep applyImportPayload
+    + JSON.parse for those — they are small + old). isContainerMagic() already
+    does this sniff.
+  • Export always writes v3 going forward.
   • Old app versions can't read v3 — acceptable (forward-only); document it.
 
  CAPS:
@@ -153,23 +164,27 @@
 ───────────────────────────────────────────────────────────────────────────
  PHASES (each: own commit/series, own gates; cross-platform round-trip tested)
 ───────────────────────────────────────────────────────────────────────────
- P0  Owner confirms the format/dep decision (A hand-rolled vs B fflate). ← BLOCKS P1
- P1  ZIP codec (web) + the v3 manifest builder/applier, as PURE, injectable
-     functions over Blobs/streams. Exhaustive vitest round-trip (incl. a fixture
-     that mimics native-zip output byte layout). No platform I/O yet.
+ P0  Format/dep decision — RESOLVED: bespoke length-prefixed container, no dep
+     (see "FORMAT PIVOT"). [DONE]
+ P1  Container codec (web), PURE + injectable. [DONE — src/utils/backup-container.js
+     + 14 exhaustive round-trip/integrity tests.] NEXT within P1: the v3 manifest
+     builder/applier (buildV3Manifest + applyV3) reusing backup.js's store-read +
+     store-apply logic, as pure injectable fns over the codec; vitest round-trip
+     against fake stores + fake-IDB media.
  P2  Web I/O: FS Access API export + File.stream import, wired through
      PlatformBridge; preview-verified end-to-end with a multi-hundred-MB
      synthetic dataset (real blobs in fake-IDB).
- P3  Android native streaming: StorageManager ZipOutput/InputStream + the
-     chunked bridge methods + AppInterface + JsEvent + MainActivity pickers +
-     Kotlin tests. EMULATOR-verified (vot_api28): export a large dataset, pull
-     the file, re-import, assert byte-exact media round-trip. (File I/O is
-     emulator-verifiable — unlike the audio-tuning device walk.)
+ P3  Android native streaming: StorageManager framed read/write (same format, in
+     Kotlin) + the chunked bridge methods + AppInterface + JsEvent + MainActivity
+     pickers + a FileReader (WV69-safe) blob-slice reader on the JS side + Kotlin
+     tests. EMULATOR-verified (vot_api28): export a large dataset, pull the file,
+     re-import, assert byte-exact media round-trip. (File I/O is emulator-
+     verifiable — unlike the audio-tuning device walk.)
  P4  Back-compat (import legacy v1/v2) + remove the hard caps + soft free-space
      warning + reconcile S5. Full cross-platform matrix: web↔web, web↔Android,
      Android↔Android, legacy→v3.
  P5  Docs: CLAUDE.md current-state, HISTORY.md, AUDIT-PLAN.txt S4/S5 closure,
-     VENDORED-LIBS.md (if fflate), the export-format spec.
+     the export-format spec.
 
  VERIFICATION BAR (non-negotiable for the only-backup path):
   • Byte-exact media round-trip (sha256 each blob in == out) at >1 GB synthetic.
@@ -184,6 +199,14 @@
  STATUS
 ───────────────────────────────────────────────────────────────────────────
  2026-06-02 — Architecture mapped (full export/import data flow, both platforms,
-   every OOM point). Design above written. AWAITING owner nod on P0 (format/dep)
-   before P1. Everything else (P1–P5) is mine to execute + verify.
+   every OOM point). Design written.
+ 2026-06-02 — FORMAT PIVOT: chose a bespoke length-prefixed container over a zip
+   (zip needs ZIP64 for >4 GB → risky hand-roll or a dep; the framed format is
+   64-bit-native + dumb-simple + dep-free). P0 resolved.
+ 2026-06-02 — P1 codec DONE: src/utils/backup-container.js (writeContainer /
+   readContainer / isContainerMagic / encode|decodeUint64BE) + 14 round-trip +
+   integrity tests (byte-exact binary, >4 GB length boundary, multi-chunk,
+   unicode, truncation / size-mismatch / bad-magic / bad-JSON guards). Gates:
+   vitest 1754/71 test:coverage exit 0, tsc + eslint clean. NEXT: P1 manifest
+   builder/applier, then P2 web I/O.
 ═══════════════════════════════════════════════════════════════════════════
