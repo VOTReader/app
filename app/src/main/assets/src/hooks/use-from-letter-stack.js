@@ -65,9 +65,9 @@
    STORAGE: none directly. fromLetterStack is a tabField, so it rides along
             in the vot-state tab persistence (usePersistedState, P6k+1).
 
-   WINDOW: none. The only window touch is `window.__pendingHighlight = null`
-     inside tapThroughBack — a one-shot data-slot write consumed by
-     LetterView, not a handler bridge. No cleanup needed.
+   NAV HAND-OFF: the only touch is `navHandoff.clear('pendingHighlight')`
+     inside tapThroughBack — clearing the one-shot slot consumed by
+     LetterView, not a handler bridge. See utils/nav-handoff.js.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
@@ -127,7 +127,7 @@ export function useFromLetterStack({
     if (!stack || stack.length === 0) return;
     const popped = stack[stack.length - 1];
     setFromLetterStack(stack.slice(0, -1));
-    window.__pendingHighlight = null;
+    window.navHandoff.clear('pendingHighlight');
     if (popped.sourceBookId !== undefined) setBookId(popped.sourceBookId);
     if (popped.sourceChapterNum !== undefined) setChapterNum(popped.sourceChapterNum);
     if (popped.sourceLetterId !== undefined) setLetterId(popped.sourceLetterId);

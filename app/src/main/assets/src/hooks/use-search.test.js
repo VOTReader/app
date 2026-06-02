@@ -56,11 +56,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSearch } from './use-search.js';
+import { navHandoff } from '../utils/nav-handoff.js';
 
 // ── Global stubs ────────────────────────────────────────────────────────
 let _prevBOOKS, _prevCOL_BY_LETTER_SC, _prevCOL_BY_SEARCH_ID;
 let _prevColLetterArr, _prevColPreface;
-let _prevVotSearch, _prevPendingSearchQuery;
+let _prevVotSearch;
 
 beforeEach(() => {
   _prevBOOKS = window.BOOKS;
@@ -69,7 +70,9 @@ beforeEach(() => {
   _prevColLetterArr = window.colLetterArr;
   _prevColPreface = window.colPreface;
   _prevVotSearch = window.VotSearch;
-  _prevPendingSearchQuery = window.__pendingSearchQuery;
+  // goSearch takes the navHandoff 'pendingSearchQuery' slot; navHandoff is
+  // globalized by _entry-b in production — mirror that here.
+  window.navHandoff = navHandoff;
 
   window.BOOKS = {
     genesis: { title: 'Genesis', chapters: [{ num: 1 }] },
@@ -97,7 +100,7 @@ beforeEach(() => {
     return null;
   };
   // Clear pending query (one-shot slot).
-  delete window.__pendingSearchQuery;
+  navHandoff._resetForTests();
 });
 
 afterEach(() => {
@@ -107,7 +110,7 @@ afterEach(() => {
   window.colLetterArr = _prevColLetterArr;
   window.colPreface = _prevColPreface;
   window.VotSearch = _prevVotSearch;
-  window.__pendingSearchQuery = _prevPendingSearchQuery;
+  navHandoff._resetForTests();
   // Cleanup the window bridge in case a test left it behind.
   delete window.__goSearch;
 });
@@ -228,18 +231,18 @@ describe('useSearch — goSearch', () => {
     expect(setSearchScope).toHaveBeenCalledWith(null);
   });
 
-  it('consumes window.__pendingSearchQuery (one-shot pre-fill from SelectionToolbar)', () => {
-    window.__pendingSearchQuery = 'pre-filled query';
+  it('consumes the navHandoff pendingSearchQuery (one-shot pre-fill from SelectionToolbar)', () => {
+    navHandoff.set('pendingSearchQuery', 'pre-filled query');
     const tabField = makeTabField();
     const { result } = setup({ tabField });
     act(() => { result.current.goSearch(); });
     const [, setSearchQuery] = tabField('searchQuery');
     expect(setSearchQuery).toHaveBeenCalledWith('pre-filled query');
-    // One-shot: cleared after consumption.
-    expect(window.__pendingSearchQuery).toBeNull();
+    // One-shot: cleared after consumption (take).
+    expect(navHandoff.peek('pendingSearchQuery')).toBeNull();
   });
 
-  it('does NOT call setSearchQuery when __pendingSearchQuery is absent', () => {
+  it('does NOT call setSearchQuery when pendingSearchQuery is absent', () => {
     const tabField = makeTabField();
     const { result } = setup({ tabField });
     act(() => { result.current.goSearch(); });

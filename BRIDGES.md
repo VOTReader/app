@@ -145,39 +145,18 @@ setup effect.
 
 ## 5. Pending-after-nav data slots
 
-These are not function handlers — they're data fields the consuming
-view reads in its post-render effect, then nulls. The "bridge" is
-strictly a single read/clear cycle, not a long-lived handler.
+These are not function handlers — they're one-shot data fields a navigation
+writes just before a screen change, for the destination view to read on mount.
 
-### `__pendingHighlight`
-- **Setters:** `index.html:1247,1311` (excerpt nav from footnote tap-through), several places nulled
-- **Nullers:** `index.html:1249,1313,1484` (goHome), `src/hooks/use-from-letter-stack.js:99`, `src/hooks/use-android-back.js:141`, `src/ui/screens/LetterView.js:43`, `src/ui/screens/WtlbEntryView.js:22`
-- **Consumers:** LetterView / WtlbEntryView post-render effects (scroll-into-view + highlight pulse)
-
-### `__pendingScrollHlKey`
-- **Setter:** `src/hooks/use-navigate-to-link.js:98` (set to endpoint key)
-- **Nullers:** `index.html:1175,1484`
-- **Consumers:** destination view's post-render effect
-
-### `__pendingLinkExcerpt`
-- **Setter:** `src/hooks/use-navigate-to-link.js:137,147,154` (3 paths through the navigator)
-- **Cleanup:** consumer is expected to read-and-clear (search for "pendingLinkExcerpt" in views)
-- **Consumers:** destination view's scroll/highlight effect
-
-### `__pendingOpenNote`
-- **Setter:** `src/ui/screens/NotesIndexScreen.js:50` (set on row tap before nav)
-- **Nuller:** `index.html:1164`
-- **Consumers:** `index.html` post-render effect — opens the NoteSheet on arrival, then clears
-
-### `__pendingSearchQuery`
-- **Setter:** `src/ui/sheets/SelectionToolbar.js:487` (Search-selection action)
-- **Nuller:** `index.html:1563`
-- **Consumers:** `index.html:1561,1562` (SearchScreen mount picks it up and seeds the input)
-
-### `__notesReturnCtx`
-- **Setters:** `index.html:2408` (notebook drilldown nav), `src/ui/screens/NotesIndexScreen.js:53` (preserve tab + drilled state across nav)
-- **Cleanup:** `src/ui/screens/NotesIndexScreen.js:25` (cleared on Notes-index mount when present)
-- **Consumers:** NotesIndexScreen state-init
+**Migrated to `navHandoff` (D2 — see `src/utils/nav-handoff.js`, the canonical
+registry).** The five live one-shot slots — `pendingHighlight`,
+`pendingScrollHlKey`, `pendingSearchQuery`, `pendingOpenNote`, `notesReturnCtx`
+— are no longer raw `window.__*` properties. They go through the typed
+`navHandoff.set / take / peek / clear` API; that module's header documents each
+slot's shape, writer, and reader, so this file no longer hand-tracks them (the
+old per-slot line numbers had drifted). The backing store is a window-held Map
+(`window.__navHandoffSlots`) so writers in bundle-b and readers in bundle-d
+share it. (`__pendingLinkExcerpt` was removed in D2 — write-only dead code.)
 
 ### `__journalBackStack`
 - **Setter:** `src/ui/screens/JournalViewerScreen.js:495,556` — lazy-init (`if (!window.__journalBackStack) window.__journalBackStack = []`)

@@ -576,7 +576,7 @@ function App() {
   useEffect(() => {
     window.__goHome = () => {
       setFromSearch(false);setFromWtlb(null);setFromLetterStack([]);
-      window.__pendingHighlight = null;
+      window.navHandoff.clear('pendingHighlight');
       setScreen("home");setBookId(null);setChapterNum(null);
     };
     return () => {if (window.__goHome) delete window.__goHome;};

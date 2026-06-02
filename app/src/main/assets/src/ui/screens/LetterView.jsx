@@ -21,10 +21,10 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
     setSheetFn(null);
     setScripRef(null);
     setSurpriseBlockId(null);
-    const pending = window.__pendingHighlight;
+    const pending = window.navHandoff.peek('pendingHighlight');
     if (pending && pending.letterId === letter.id && pending.excerpt) {
       setHighlightExcerpt(pending.excerpt);
-      window.__pendingHighlight = null;
+      window.navHandoff.clear('pendingHighlight');
     } else {
       setHighlightExcerpt(null);
     }

@@ -90,12 +90,11 @@
    STORAGE: none directly. The setters write through to whichever owner
             (useTabs tabFields, useState locals) the setter came from.
 
-   WINDOW:
-     - goHome touches window.__pendingHighlight = null and
-       window.__pendingScrollHlKey = null. These are data-slot writes
-       (one-shot signals consumed by LetterView's scroll-on-mount path),
-       NOT handler bridges — no cleanup needed; the next reader either
-       picks up the value or the next writer overwrites.
+   NAV HAND-OFF (navHandoff, see utils/nav-handoff.js):
+     - goHome clears the 'pendingHighlight' and 'pendingScrollHlKey'
+       slots (one-shot signals consumed by LetterView's scroll-on-mount
+       path), NOT handler bridges — no cleanup needed; the next reader
+       either picks up the value or the next writer overwrites.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -164,8 +163,8 @@ export function useNav({
     setFromSearch(false);
     setFromWtlb(null);
     setFromLetterStack([]);
-    window.__pendingHighlight = null;
-    window.__pendingScrollHlKey = null;
+    window.navHandoff.clear('pendingHighlight');
+    window.navHandoff.clear('pendingScrollHlKey');
     setScreen('home');
     setBookId(null);
     setChapterNum(null);

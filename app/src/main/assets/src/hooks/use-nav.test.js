@@ -36,6 +36,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useNav } from './use-nav.js';
+import { navHandoff } from '../utils/nav-handoff.js';
 
 // ── Global stubs ────────────────────────────────────────────────────────
 // useNav reads COL_BY_KEY (cross-bundle Map, populated by _entry-b in
@@ -51,10 +52,13 @@ beforeEach(() => {
     ['wtlb1', { volKey: 'wtlb1', indexScreen: 'wtlb1-idx' }],
     ['empty', { volKey: 'empty' }],  // matches lookup but has no indexScreen
   ]);
-  // window data slots that goHome touches — set sentinels so the test
-  // can assert they were cleared (not just left untouched).
-  window.__pendingHighlight = { sentinel: true };
-  window.__pendingScrollHlKey = 'sentinel';
+  // navHandoff slots that goHome clears — set sentinels so the test can
+  // assert they were cleared (not just left untouched). navHandoff is
+  // globalized by _entry-b in production; mirror that here.
+  window.navHandoff = navHandoff;
+  navHandoff._resetForTests();
+  navHandoff.set('pendingHighlight', { sentinel: true });
+  navHandoff.set('pendingScrollHlKey', 'sentinel');
 });
 
 afterEach(() => {
@@ -166,16 +170,15 @@ describe('useNav — goHome (multi-state reset)', () => {
     expect(setters.setFromLetterStack).toHaveBeenCalledWith([]);
   });
 
-  it('clears the 2 window data slots (__pendingHighlight, __pendingScrollHlKey)', () => {
-    // Window slots are set to non-null sentinels in beforeEach so we can
-    // verify they were CLEARED (not just "still null because nothing
-    // touched them").
+  it('clears the 2 navHandoff slots (pendingHighlight, pendingScrollHlKey)', () => {
+    // Slots are set to non-null sentinels in beforeEach so we can verify
+    // they were CLEARED (not just "still null because nothing touched them").
     const { result } = setup();
-    expect(window.__pendingHighlight).toEqual({ sentinel: true });
-    expect(window.__pendingScrollHlKey).toBe('sentinel');
+    expect(navHandoff.peek('pendingHighlight')).toEqual({ sentinel: true });
+    expect(navHandoff.peek('pendingScrollHlKey')).toBe('sentinel');
     result.current.goHome();
-    expect(window.__pendingHighlight).toBeNull();
-    expect(window.__pendingScrollHlKey).toBeNull();
+    expect(navHandoff.peek('pendingHighlight')).toBeNull();
+    expect(navHandoff.peek('pendingScrollHlKey')).toBeNull();
   });
 
   it('routes to home + clears bookId + chapterNum', () => {

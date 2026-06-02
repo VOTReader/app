@@ -23,9 +23,9 @@
      1. The post-render re-apply effect (deps: the four store versions +
         screen + letterId). Runs the five apply* passes inside a 0ms timeout
         (so it fires after React's commit), each guarded so one layer's
-        failure can't trip the ErrorBoundary. Also drains two window hand-offs:
-          - __pendingOpenNote   → open the NoteSheet for a tapped Notes-index row
-          - __pendingScrollHlKey → scroll a Library-opened mark into view
+        failure can't trip the ErrorBoundary. Also takes two navHandoff slots:
+          - 'pendingOpenNote'   → open the NoteSheet for a tapped Notes-index row
+          - 'pendingScrollHlKey' → scroll a Library-opened mark into view
      2. The active-note toggle effect (deps: noteSheetTarget). Sets
         window.__activeNoteGroup + re-runs applyActiveNoteState so the open
         note's anchored text lights up (and reverts on close). Store-driven
@@ -42,13 +42,14 @@
      screen, letterId   nav keys; a screen/letter change re-applies.
      noteSheetTarget    the open note ({ groupId } | null) for the active toggle.
      setNoteSheetTarget useState setter (from useSheetOrchestration) used to
-                        open the NoteSheet when __pendingOpenNote is drained.
+                        open the NoteSheet when the 'pendingOpenNote' slot is taken.
 
    RETURNS: nothing — pure effects.
 
-   WINDOW (read + cleared):
-     - __pendingOpenNote     groupId stashed by the Notes index on tap-through.
-     - __pendingScrollHlKey  hl-key stashed by Library to scroll-to on open.
+   NAV HAND-OFF (navHandoff, see utils/nav-handoff.js) — taken (read+cleared):
+     - 'pendingOpenNote'     groupId stashed by the Notes index on tap-through.
+     - 'pendingScrollHlKey'  hl-key stashed by Library to scroll-to on open.
+   WINDOW:
      - __activeNoteGroup     written so the renderer knows which group is lit.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -100,9 +101,8 @@ export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNot
       // If we navigated here from the Notes index by tapping a row, the
       // groupId of the note to open was stashed on the window. Consume it
       // and open the NoteSheet now that the source page is rendered.
-      if (window.__pendingOpenNote) {
-        const gid = window.__pendingOpenNote;
-        window.__pendingOpenNote = null;
+      const gid = window.navHandoff.take('pendingOpenNote');
+      if (gid) {
         // Defer one more tick so DOM marks are in place for the active-state
         setTimeout(() => {
           if (NoteStore.get(gid)) setNoteSheetTarget({ groupId: gid, startInEditMode: false });
@@ -111,9 +111,8 @@ export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNot
       // Opened from Library (bookmark/note/highlight/underline) → jump
       // straight to that mark's block. Instant (no smooth behavior) so the
       // page opens already at the position rather than animating there.
-      if (window.__pendingScrollHlKey) {
-        const sk = window.__pendingScrollHlKey;
-        window.__pendingScrollHlKey = null;
+      const sk = window.navHandoff.take('pendingScrollHlKey');
+      if (sk) {
         setTimeout(() => {
           try {
             const el = document.querySelector('[data-hl-key="' + sk.replace(/"/g, '\\"') + '"]');

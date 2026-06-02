@@ -389,9 +389,10 @@ export function buildScreenRoutes({
         onOpenJournalEntry={(eid) => goJournalViewer(eid)}
         onOpenNotebook={(nbId) => {
           // Drop the user straight into that notebook's screen in the Notes
-          // hub. __notesReturnCtx is consumed by NotesIndexScreen on mount
-          // to pre-drill the right notebook (same channel the back-pill uses).
-          window.__notesReturnCtx = { tab: 'notebooks', drilledNbId: nbId };
+          // hub. The navHandoff 'notesReturnCtx' slot is consumed by
+          // NotesIndexScreen on mount to pre-drill the right notebook (same
+          // channel the back-pill uses; see utils/nav-handoff.js).
+          window.navHandoff.set('notesReturnCtx', { tab: 'notebooks', drilledNbId: nbId });
           setNavOrigin({ screen: 'journal-viewer' });
           setScreen('notes-index');
         }}

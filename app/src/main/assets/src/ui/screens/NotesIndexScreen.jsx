@@ -19,13 +19,13 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const allNotes = NoteStore.list();
   const notebooks = NotebookStore.list();
   // Restore the user's place (tab + drilled notebook) when returning from a
-  // source tap-through. window.__notesReturnCtx is set in onRowTap before we
-  // navigate away and consumed on this mount, so the back-pill ("Back to
-  // Devotional") actually lands back in the Devotional drilled view.
-  const _notesRet = (typeof window !== 'undefined' && window.__notesReturnCtx) || null;
+  // source tap-through. The navHandoff 'notesReturnCtx' slot is set in onRowTap
+  // before we navigate away and consumed on this mount, so the back-pill ("Back
+  // to Devotional") actually lands back in the Devotional drilled view.
+  const _notesRet = (typeof window !== 'undefined' && window.navHandoff) ? window.navHandoff.peek('notesReturnCtx') : null;
   const [tab, setTab] = React.useState((_notesRet && _notesRet.tab) || 'notebooks'); // 'notebooks' | 'all-notes'
   const [drilledNbId, setDrilledNbId] = React.useState((_notesRet && _notesRet.drilledNbId) || null); // null | 'uncategorized' | <notebookId>
-  React.useEffect(() => { if (typeof window !== 'undefined' && window.__notesReturnCtx) window.__notesReturnCtx = null; }, []);
+  React.useEffect(() => { if (typeof window !== 'undefined' && window.navHandoff) window.navHandoff.clear('notesReturnCtx'); }, []);
   const [newNbInline, setNewNbInline] = React.useState(false);
   const [newNbName, setNewNbName] = React.useState('');
   const [renaming, setRenaming] = React.useState(false);
@@ -50,10 +50,10 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const onRowTap = (note) => {
     const nav = noteSourceNav(note);
     if (nav) {
-      window.__pendingOpenNote = note.groupId;
+      window.navHandoff.set('pendingOpenNote', note.groupId);
       // Remember which tab/notebook we're in so the back-pill returns the
       // user to the exact list they tapped from (consumed on next mount).
-      window.__notesReturnCtx = { tab: tab, drilledNbId: drilledNbId };
+      window.navHandoff.set('notesReturnCtx', { tab: tab, drilledNbId: drilledNbId });
       onNavigateToSource(nav, { sourceLetterTitle: currentSourceTitle() });
     } else {
       onOpenNote(note.groupId);

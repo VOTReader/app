@@ -22,9 +22,9 @@
 
    Both share the same downstream side-effect shape:
      - Resolve the target via resolveVotLetter (cross-bundle global)
-     - Set window.__pendingHighlight (one-shot data slot) when the
-       call carries an excerpt, so the destination LetterView
-       highlights the matched text on next mount.
+     - Set the navHandoff 'pendingHighlight' slot when the call carries
+       an excerpt, so the destination LetterView highlights the matched
+       text on next mount.
      - Branch on dest.isStudy: route into bible-study-chapter (study)
        OR the letter screen (volume); set studyId/studyChapterId OR
        letterId + activeReadKey + last-read for the volume.
@@ -65,11 +65,11 @@
 
    STORAGE: none directly.
 
-   WINDOW:
-     __pendingHighlight   ONE-SHOT data slot — both helpers write the
+   NAV HAND-OFF (navHandoff, see utils/nav-handoff.js):
+     'pendingHighlight'   ONE-SHOT data slot — both helpers set the
                           excerpt + dest letterId for LetterView's
-                          mount-time highlight wrap; or null when no
-                          excerpt. NOT a handler bridge; no cleanup.
+                          mount-time highlight wrap; or clear it when no
+                          excerpt. NOT a handler bridge; no cleanup here.
 
    READS FROM GLOBAL SCOPE (cross-bundle):
      resolveVotLetter   letter-linking.js (bundle-b). Resolves
@@ -125,9 +125,9 @@ export function useTapThrough({
       sourceVolumeLabel: null,
     });
     if (excerpt) {
-      window.__pendingHighlight = { excerpt: excerpt, letterId: dest.id };
+      window.navHandoff.set('pendingHighlight', { excerpt: excerpt, letterId: dest.id });
     } else {
-      window.__pendingHighlight = null;
+      window.navHandoff.clear('pendingHighlight');
     }
     setFromMatthewCh({ chapterNum });
     if (dest.isStudy) {
@@ -143,7 +143,7 @@ export function useTapThrough({
 
   /* In-app letter tap-through from a footnote (link / seeAlso).
      Records the source letter + screen so Android back returns here.
-     Sets window.__pendingHighlight so the destination LetterView, on its
+     Sets the navHandoff 'pendingHighlight' slot so the destination LetterView, on its
      next mount/letter-change, wraps the excerpt with <mark.letter-highlight>. */
   const openInAppLetter = (target, meta) => {
     if (!target || !target.letterTitle) return;
@@ -174,9 +174,9 @@ export function useTapThrough({
       destSnapshot: destSnapshot,
     });
     if (target.excerpt) {
-      window.__pendingHighlight = { excerpt: target.excerpt, letterId: dest.id };
+      window.navHandoff.set('pendingHighlight', { excerpt: target.excerpt, letterId: dest.id });
     } else {
-      window.__pendingHighlight = null;
+      window.navHandoff.clear('pendingHighlight');
     }
     if (dest.isStudy) {
       setStudyId(dest.studyId);

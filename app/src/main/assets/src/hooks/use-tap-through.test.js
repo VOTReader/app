@@ -16,7 +16,7 @@
         (volume). A crossed-wires bug here routes the user to the
         wrong screen with a phantom letterId.
 
-     C) Excerpt → window.__pendingHighlight. Excerpt present → wraps
+     C) Excerpt → navHandoff 'pendingHighlight'. Excerpt present → wraps
         with letterId so the destination LetterView's mount-time
         highlight finds the right entry. Without excerpt → null (NOT
         leaving a stale value from a previous tap-through).
@@ -30,13 +30,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTapThrough } from './use-tap-through.js';
+import { navHandoff } from '../utils/nav-handoff.js';
 
 // ── Global stubs ────────────────────────────────────────────────────────
-let _prevResolve, _prevPendingHighlight;
+let _prevResolve;
 
 beforeEach(() => {
   _prevResolve = window.resolveVotLetter;
-  _prevPendingHighlight = window.__pendingHighlight;
+  // Production hooks call window.navHandoff.* — _entry-b globalizes it in the
+  // app; mirror that here, then start each case with empty slots.
+  window.navHandoff = navHandoff;
+  navHandoff._resetForTests();
   // Default stub: maps a few known (vol, letter) → dest. Tests override
   // per-case for unknowns / study branch / etc.
   window.resolveVotLetter = vi.fn((vol, letter) => {
@@ -48,12 +52,11 @@ beforeEach(() => {
     }
     return null;
   });
-  delete window.__pendingHighlight;
 });
 
 afterEach(() => {
   window.resolveVotLetter = _prevResolve;
-  window.__pendingHighlight = _prevPendingHighlight;
+  navHandoff._resetForTests();
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -119,17 +122,17 @@ describe('useTapThrough — goToLetterFromMatthew', () => {
     expect(props.setLetterId).not.toHaveBeenCalled();
   });
 
-  it('excerpt set → window.__pendingHighlight gets { excerpt, letterId }', () => {
+  it('excerpt set → navHandoff pendingHighlight gets { excerpt, letterId }', () => {
     const { result } = setup({ chapterNum: 5 });
     act(() => { result.current.goToLetterFromMatthew('two', 'The Wide Path', 'find me'); });
-    expect(window.__pendingHighlight).toEqual({ excerpt: 'find me', letterId: 'wide-path' });
+    expect(navHandoff.peek('pendingHighlight')).toEqual({ excerpt: 'find me', letterId: 'wide-path' });
   });
 
-  it('no excerpt → window.__pendingHighlight cleared to null', () => {
-    window.__pendingHighlight = { stale: true };
+  it('no excerpt → navHandoff pendingHighlight cleared', () => {
+    navHandoff.set('pendingHighlight', { stale: true });
     const { result } = setup({ chapterNum: 5 });
     act(() => { result.current.goToLetterFromMatthew('two', 'The Wide Path'); });
-    expect(window.__pendingHighlight).toBeNull();
+    expect(navHandoff.peek('pendingHighlight')).toBeNull();
   });
 
   it('unknown letter → no-op (no setters fire, defensive guard)', () => {
@@ -166,7 +169,7 @@ describe('useTapThrough — openInAppLetter', () => {
       letterId: 'wide-path', studyId: null, studyChapterId: null,
     });
     // Side effects: highlight + nav
-    expect(window.__pendingHighlight).toEqual({ excerpt: 'find me', letterId: 'wide-path' });
+    expect(navHandoff.peek('pendingHighlight')).toEqual({ excerpt: 'find me', letterId: 'wide-path' });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
     expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:two', expect.any(Function));
     expect(props.setScreen).toHaveBeenCalledWith('vot-letter');
@@ -205,11 +208,11 @@ describe('useTapThrough — openInAppLetter', () => {
     expect(pushedEntry.sourceChapterNum).toBe(22);
   });
 
-  it('no excerpt → window.__pendingHighlight cleared to null', () => {
-    window.__pendingHighlight = { stale: true };
+  it('no excerpt → navHandoff pendingHighlight cleared', () => {
+    navHandoff.set('pendingHighlight', { stale: true });
     const { result } = setup({ screen: 'vot-letter' });
     act(() => { result.current.openInAppLetter({ collection: 'two', letterTitle: 'The Wide Path' }); });
-    expect(window.__pendingHighlight).toBeNull();
+    expect(navHandoff.peek('pendingHighlight')).toBeNull();
   });
 
   it('meta missing → sourceLetterTitle/VolumeLabel default to null (defensive)', () => {

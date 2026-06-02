@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDomAnnotationSync } from './use-dom-annotation-sync.js';
+import { navHandoff } from '../utils/nav-handoff.js';
 
 const APPLY = ['applyDOMHighlights', 'applyDOMLinks', 'applyDOMBookmarks', 'applyNoteIcons', 'applyActiveNoteState'];
 // The four that only run inside the deferred setTimeout(0) pass. The fifth,
@@ -27,8 +28,10 @@ beforeEach(() => {
   window.LinkStore = { subscribe: sub, getVersion: ver };
   window.BookmarkStore = { subscribe: sub, getVersion: ver };
   window.NoteStore = { get: vi.fn(() => ({ groupId: 'g1' })), subscribe: sub, getVersion: ver };
-  window.__pendingOpenNote = null;
-  window.__pendingScrollHlKey = null;
+  // navHandoff (globalized by _entry-b in production) backs the two slots the
+  // hook takes; start each case empty.
+  window.navHandoff = navHandoff;
+  navHandoff._resetForTests();
   window.__activeNoteGroup = undefined;
 });
 
@@ -39,8 +42,7 @@ afterEach(() => {
   delete window.LinkStore;
   delete window.BookmarkStore;
   delete window.NoteStore;
-  delete window.__pendingOpenNote;
-  delete window.__pendingScrollHlKey;
+  navHandoff._resetForTests();
   delete window.__activeNoteGroup;
 });
 
@@ -63,19 +65,19 @@ describe('useDomAnnotationSync — apply pass', () => {
     errSpy.mockRestore();
   });
 
-  it('drains __pendingOpenNote and opens the NoteSheet for the stashed group', () => {
-    window.__pendingOpenNote = 'g1';
+  it('takes pendingOpenNote and opens the NoteSheet for the stashed group', () => {
+    navHandoff.set('pendingOpenNote', 'g1');
     const props = baseProps();
     renderHook(() => useDomAnnotationSync(props));
     act(() => { vi.advanceTimersByTime(0); });
-    expect(window.__pendingOpenNote).toBe(null); // consumed
+    expect(navHandoff.peek('pendingOpenNote')).toBe(null); // consumed
     act(() => { vi.advanceTimersByTime(60); });  // inner defer
     expect(props.setNoteSheetTarget).toHaveBeenCalledWith({ groupId: 'g1', startInEditMode: false });
   });
 
   it('does not open a NoteSheet when the stashed group no longer exists', () => {
     window.NoteStore.get = vi.fn(() => null);
-    window.__pendingOpenNote = 'gone';
+    navHandoff.set('pendingOpenNote', 'gone');
     const props = baseProps();
     renderHook(() => useDomAnnotationSync(props));
     act(() => { vi.advanceTimersByTime(0); });
@@ -83,15 +85,15 @@ describe('useDomAnnotationSync — apply pass', () => {
     expect(props.setNoteSheetTarget).not.toHaveBeenCalled();
   });
 
-  it('drains __pendingScrollHlKey and scrolls the matching mark into view', () => {
+  it('takes pendingScrollHlKey and scrolls the matching mark into view', () => {
     const el = document.createElement('div');
     el.setAttribute('data-hl-key', 'k1');
     el.scrollIntoView = vi.fn();
     document.body.appendChild(el);
-    window.__pendingScrollHlKey = 'k1';
+    navHandoff.set('pendingScrollHlKey', 'k1');
     renderHook(() => useDomAnnotationSync(baseProps()));
     act(() => { vi.advanceTimersByTime(0); });
-    expect(window.__pendingScrollHlKey).toBe(null);
+    expect(navHandoff.peek('pendingScrollHlKey')).toBe(null);
     act(() => { vi.advanceTimersByTime(70); });
     expect(el.scrollIntoView).toHaveBeenCalled();
     document.body.removeChild(el);

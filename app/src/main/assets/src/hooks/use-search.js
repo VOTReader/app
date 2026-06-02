@@ -48,8 +48,8 @@
    OWNED HELPERS (returned for callers):
      - goSearch()                 Opens the search screen with a
                                   computed context snapshot of the
-                                  current reading position. Reads
-                                  window.__pendingSearchQuery one-shot
+                                  current reading position. Takes the
+                                  navHandoff 'pendingSearchQuery' one-shot
                                   to pre-fill from SelectionToolbar.
      - goSearchOrigin()           Restores the captured searchOrigin
                                   position (back from search). Falls
@@ -141,10 +141,9 @@
                                  closure to SelectionToolbar (the
                                  "Search" action in the selection
                                  toolbar reads this).
-     __pendingSearchQuery        ONE-SHOT data slot — goSearch reads
-                                 it (if set) to pre-fill the search
-                                 input, then clears it. NOT a handler
-                                 bridge; no cleanup needed.
+     navHandoff 'pendingSearchQuery'  ONE-SHOT slot — goSearch takes it
+                                 (read+clear) to pre-fill the search input.
+                                 See utils/nav-handoff.js.
 
    READS FROM GLOBAL SCOPE (cross-bundle):
      BOOKS                      For goSearch's context computation
@@ -227,8 +226,8 @@ export function useSearch({
   const searchOriginRef = useRefMirror(searchOrigin);
 
   // ── goSearch ────────────────────────────────────────────────────────────
-  // Opens the search screen with a computed context snapshot. Reads
-  // window.__pendingSearchQuery one-shot to pre-fill from SelectionToolbar.
+  // Opens the search screen with a computed context snapshot. Takes the
+  // navHandoff 'pendingSearchQuery' one-shot to pre-fill from SelectionToolbar.
   const goSearch = () => {
     setSearchOrigin({ screen, bookId, chapterNum, letterId });
     // Compute the reading-position context so SearchScreen can offer an
@@ -249,9 +248,9 @@ export function useSearch({
     setSearchScope(null);
     // If a pending query was stashed by the SelectionToolbar's Search
     // action, pre-fill the search input.
-    if (window.__pendingSearchQuery) {
-      setSearchQuery(window.__pendingSearchQuery);
-      window.__pendingSearchQuery = null;
+    const pendingQuery = window.navHandoff.take('pendingSearchQuery');
+    if (pendingQuery) {
+      setSearchQuery(pendingQuery);
     }
     setScreen('search');
   };

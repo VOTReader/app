@@ -548,7 +548,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     window.getSelection().removeAllRanges();
     setVisible(false);
     // Stash query & route to search screen via global bridge
-    window.__pendingSearchQuery = text;
+    window.navHandoff.set('pendingSearchQuery', text);
     if (window.__goSearch) window.__goSearch();
   }, [selInfo]);
 

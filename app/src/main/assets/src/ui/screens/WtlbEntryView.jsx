@@ -8,9 +8,9 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const wtlbMainRef = React.useRef(null);
   React.useEffect(() => {
-    const pending = window.__pendingHighlight;
+    const pending = window.navHandoff.peek('pendingHighlight');
     if (!pending || pending.letterId !== entry.id || !pending.excerpt) return;
-    window.__pendingHighlight = null;
+    window.navHandoff.clear('pendingHighlight');
     const excerpt = pending.excerpt;
     const t = setTimeout(() => highlightExcerptInDom(wtlbMainRef.current, excerpt), 80);
     return () => clearTimeout(t);

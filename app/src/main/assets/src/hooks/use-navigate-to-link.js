@@ -62,10 +62,10 @@
 
    STORAGE: none.
 
-   WINDOW: no handler bridges wired (nothing to clean up). The body only
-     WRITES two data slots — window.__pendingScrollHlKey and
-     window.__pendingLinkExcerpt — which the destination view's post-render
-     effect consumes. Plain assignments, not `window.__openX` handlers.
+   NAV HAND-OFF (navHandoff, see utils/nav-handoff.js): no handler bridges
+     wired (nothing to clean up). The body only SETS the 'pendingScrollHlKey'
+     slot, which use-dom-annotation-sync takes post-render to scroll the mark
+     into view. (D2 removed the write-only-dead 'pendingLinkExcerpt' slot.)
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -121,9 +121,9 @@ export function useNavigateToLink({
     // already scrolled to that mark — no animation, just there. The
     // post-render apply-DOM effect consumes this. Non-Library tap-throughs
     // (footnote letter-links etc.) have no hlKey → null → no behavior change.
-    window.__pendingScrollHlKey = (endpoint && endpoint.key)
+    window.navHandoff.set('pendingScrollHlKey', (endpoint && endpoint.key)
       ? String(endpoint.key).replace(/:\d+-\d+$/, '')
-      : null;
+      : null);
     // Compute the destination snapshot based on the endpoint type. Used by
     // backHint + the pruning effect (useFromLetterStack) to detect "user
     // has moved on".
@@ -168,7 +168,6 @@ export function useNavigateToLink({
       setStudyId(endpoint.studyId);
       setStudyChapterId(endpoint.studyChapterId);
       setScreen('bible-study-chapter');
-      window.__pendingLinkExcerpt = (endpoint.start != null) ? { start: endpoint.start, end: endpoint.end, text: endpoint.text, key: endpoint.key } : null;
     } else if (endpoint.type === 'journal' && endpoint.entryId) {
       // Journal entries live on a separate journalEntryId state, not on
       // letterId — route through the dedicated setter so the viewer can
@@ -178,14 +177,12 @@ export function useNavigateToLink({
       setLetterId(null);
       setJournalEntryId(endpoint.entryId);
       setScreen('journal-viewer');
-      window.__pendingLinkExcerpt = (endpoint.start != null) ? { start: endpoint.start, end: endpoint.end, text: endpoint.text, key: endpoint.key } : null;
     } else if (endpoint.screen) {
       setBookId(null); setChapterNum(null);
       setStudyId(null); setStudyChapterId(null);
       if (endpoint.letterId) setLetterId(endpoint.letterId);
       else if (endpoint.entryId) setLetterId(endpoint.entryId);
       setScreen(endpoint.screen);
-      window.__pendingLinkExcerpt = (endpoint.start != null) ? { start: endpoint.start, end: endpoint.end, text: endpoint.text, key: endpoint.key } : null;
     }
   };
 

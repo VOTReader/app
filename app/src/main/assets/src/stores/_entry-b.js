@@ -39,6 +39,7 @@ import '../styles/journal-styles.js';
 // ── Stores ──────────────────────────────────────────────────────────────
 import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST } from './cached-store.js';
 import { showToast, hideToast } from '../utils/toast.js';
+import { navHandoff } from '../utils/nav-handoff.js';
 import { IDBAdapter } from './idb-adapter.js';
 import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore } from './app-flag-stores.js';
 import { ProphecyCardsStore } from './prophecy-cards-store.js';
@@ -152,6 +153,7 @@ Object.assign(window, {
   // Stores
   CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
   showToast, hideToast,
+  navHandoff,
   IDBAdapter,
   WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore,
   ProphecyCardsStore,

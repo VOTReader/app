@@ -93,8 +93,8 @@
      handleAndroidBack — the Kotlin-callable back router; wired in a
        []-deps effect, cleanup `delete window.handleAndroidBack`.
      Reads but does NOT own: window.__closeSheet (calls it, then nulls it —
-       owned by whichever sheet set it) and window.__pendingHighlight
-       (writes `= null` — a one-shot data slot, not a handler bridge).
+       owned by whichever sheet set it) and the navHandoff 'pendingHighlight'
+       slot (clears it — a one-shot data slot, not a handler bridge).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
@@ -163,7 +163,7 @@ export function useAndroidBack({
       if (LETTER_SCREEN_SET.has(s) && stack && stack.length > 0) {
         const fl = stack[stack.length - 1];
         setFromLetterStack((prev) => prev.slice(0, -1));
-        window.__pendingHighlight = null;
+        window.navHandoff.clear('pendingHighlight');
         if (fl.sourceBookId !== undefined) setBookId(fl.sourceBookId);
         if (fl.sourceChapterNum !== undefined) setChapterNum(fl.sourceChapterNum);
         if (fl.sourceLetterId !== undefined) setLetterId(fl.sourceLetterId);
