@@ -171,6 +171,22 @@
      stemmer/phonetic stay unused (separate from this feature). STILL OPEN
      (trivial): dead KIND_BOOST['heading'] / srchGroupKey 'heading' remnants.
 
+ 2026-06-02 — Wave 3 (only-backup integrity + native audio) — pushed to main:
+   • S2 (6fb3de5) — JournalMediaStore settles on the TRANSACTION (reject on tx
+     abort/error), not just the request; put/delete resolve on commit. Fixes the
+     import-hang + makes media puts durable. 20 tests pass.
+   • S1/S3 (67ff4c7) — export flushes whenSaved() before reading (the only backup
+     can't miss a just-made edit); import no longer auto-reloads on writeFailures
+     (a reload would mix imported + old IDB data). 19 backup round-trip tests pass.
+   • N2 (29dc4bc) — startAudioSession guards against a double-start that stranded
+     the device in MODE_IN_COMMUNICATION. Behavior-neutral on the normal path;
+     +1 Kotlin test; :app:testDebugUnitTest BUILD SUCCESSFUL.
+   • N1 (audio-focus request + onCleared mode-restore) — DEFERRED to the device
+     walk by design: it touches the Pixel/Samsung MODE_IN_COMMUNICATION tuning +
+     "pause other apps" behavior that only hardware can validate (the project's
+     N2.2 discipline). Kotlin changes don't auto-reach users (APK is a manual
+     install), so deferring the device-tuned part is correct, not a gap.
+
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
 ═══════════════════════════════════════════════════════════════════════════
