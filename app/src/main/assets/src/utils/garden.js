@@ -64,7 +64,12 @@ export function getGardenTier(id) {
  */
 export function gardenUrl(n, tierId) {
   const tier = getGardenTier(tierId);
-  return `https://github.com/VOTReader/votreader-assets/releases/download/${tier.tag}/garden_${String(n).padStart(3, "0")}.jpg`;
+  // SE4: clamp n to an integer in [1, GARDEN_TOTAL] so the URL path is safe
+  // LOCALLY, not dependent on every caller having range-guarded first — a
+  // non-integer / out-of-range n could otherwise build a malformed or
+  // unintended path (e.g. "garden_1.5.jpg" or a page that doesn't exist).
+  const page = Math.min(GARDEN_TOTAL, Math.max(1, Math.floor(Number(n) || 1)));
+  return `https://github.com/VOTReader/votreader-assets/releases/download/${tier.tag}/garden_${String(page).padStart(3, "0")}.jpg`;
 }
 
 /**

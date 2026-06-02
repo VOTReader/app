@@ -129,6 +129,26 @@ describe('validateImportEnvelope', () => {
     expect(validateImportEnvelope({ app: 'VOTReader', data: {}, exportVersion: 0 }).some((e) => e.includes('exportVersion'))).toBe(true);
     expect(validateImportEnvelope({ app: 'VOTReader', data: {}, exportVersion: 'two' }).some((e) => e.includes('exportVersion'))).toBe(true);
   });
+  // SE1 — prototype-pollution guard. JSON.parse stores "__proto__" as an OWN
+  // property (not the setter), so the payloads are built via JSON.parse to mimic
+  // a real imported file, not via object literals (which would set the proto).
+  it('rejects a top-level __proto__ key (SE1)', () => {
+    const p = JSON.parse('{"app":"VOTReader","data":{},"__proto__":{"polluted":true}}');
+    expect(validateImportEnvelope(p).some((e) => e.includes('unsafe key'))).toBe(true);
+  });
+  it('rejects a nested __proto__ key, with its path (SE1)', () => {
+    const p = JSON.parse('{"app":"VOTReader","data":{"x":{"__proto__":{"y":1}}}}');
+    const errs = validateImportEnvelope(p);
+    expect(errs.some((e) => e.includes('unsafe key') && e.includes('__proto__'))).toBe(true);
+  });
+  it('rejects a constructor key (SE1)', () => {
+    const p = JSON.parse('{"app":"VOTReader","data":{},"constructor":{"z":1}}');
+    expect(validateImportEnvelope(p).some((e) => e.includes('unsafe key'))).toBe(true);
+  });
+  it('accepts an envelope with no dangerous keys (SE1 control)', () => {
+    const p = JSON.parse('{"app":"VOTReader","exportVersion":2,"data":{"vot-state":{"x":1}},"stores":{},"media":{}}');
+    expect(validateImportEnvelope(p)).toEqual([]);
+  });
 });
 
 describe('validateMediaRecord', () => {

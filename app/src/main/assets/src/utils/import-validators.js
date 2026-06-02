@@ -30,6 +30,35 @@ function typeName(v) {
   return typeof v;
 }
 
+// SE1 — prototype-pollution defense. INERT today (V8's JSON.parse stores a
+// "__proto__" JSON key as a regular OWN property, NOT the prototype setter, and
+// the stores assign payloads wholesale with no deep-merge that would walk into
+// it) — but a backup carrying one of these keys is corrupt or hostile, so refuse
+// it rather than persist a booby-trapped shape. Cheap: walks own KEYS only
+// (string/number values aren't recursed), so cost is payload-proportional.
+const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
+
+/**
+ * Recursively scan an object graph's OWN keys for a prototype-pollution vector.
+ * Returns the offending key path (e.g. "stores.vot-notes.__proto__"), or null.
+ * Uses getOwnPropertyNames so a JSON-parsed own "__proto__" is seen, and returns
+ * on detection BEFORE dereferencing the dangerous key (value['__proto__'] would
+ * hit the inherited accessor, not the own value).
+ * @param {*} value
+ * @param {string} [path]
+ * @returns {string|null}
+ */
+function findUnsafeKey(value, path = '') {
+  if (value === null || typeof value !== 'object') return null;
+  for (const k of Object.getOwnPropertyNames(value)) {
+    const here = path ? path + '.' + k : k;
+    if (DANGEROUS_KEYS.includes(k)) return here;
+    const child = findUnsafeKey(value[k], here);
+    if (child) return child;
+  }
+  return null;
+}
+
 // Top-level shape category for each IDB store, keyed by store name.
 //   'objectOfArrays'   — plain object, every value is an array
 //   'objectOfObjects'  — plain object, every value is a plain object
@@ -117,6 +146,9 @@ export function validateStorePayload(name, payload) {
 export function validateImportEnvelope(parsed) {
   const errs = [];
   if (!isPlainObject(parsed)) { errs.push('backup is not an object'); return errs; }
+  // SE1: hard-refuse a payload carrying a prototype-pollution key anywhere.
+  const unsafe = findUnsafeKey(parsed);
+  if (unsafe) { errs.push(`backup contains an unsafe key ("${unsafe}")`); return errs; }
   if (parsed.app !== 'VOTReader') errs.push('not a VOTReader backup (missing app="VOTReader")');
   const ver = parsed.exportVersion === undefined ? 1 : parsed.exportVersion;
   if (typeof ver !== 'number' || ver < 1) errs.push(`invalid exportVersion ${JSON.stringify(parsed.exportVersion)}`);

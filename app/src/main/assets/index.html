@@ -28,14 +28,18 @@
        media-src blob: is required for journal voice-memo playback — recordings
        are captured locally and played from a Blob object URL; without it every
        <audio> src is rejected (no network media is unlocked — blob: only).
-       img/connect-src host-narrowing is tracked separately (U21). -->
+       connect-src is 'self' (SE2): the app makes ZERO document-context
+       fetch/XHR (grep=0), so no remote host needs to be reachable from the
+       page — the SW's own corpus fetch is same-origin + not page-CSP-governed.
+       img-src KEEPS the GitHub hosts: the web Garden renders release-asset
+       <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' 'sha256-BiBVmFw3ZhrU/PBwRHXqD0BNSiXHr8TDXQwQFLL9rxo=' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-WVTu+Gq7seQMHFegMz0iJskMo45FW2daywxFZPdjlqs=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
-    connect-src 'self' https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
+    connect-src 'self';
     media-src blob:;
     object-src 'none';
     frame-src 'none';
