@@ -33,8 +33,13 @@ export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLin
             {fn.type === "scripture" ? (
               <>
                 <span className="footnote-list-ref">{fn.ref}</span>
-                {nkjv[fn.ref] ? <ExpandableVerse text={nkjv[fn.ref]} refStr={fn.ref} /> :
-                  <span className="footnote-list-missing">{" — verse text not available"}</span>}
+                {(() => {
+                  // SC5: fall back to the global BOOKS corpus when the letter's
+                  // own nkjv dict doesn't carry the ref (data gate is a backstop).
+                  const v = nkjv[fn.ref] || lookupVersesFromBooks(fn.ref);
+                  return v ? <ExpandableVerse text={v} refStr={fn.ref} /> :
+                    <span className="footnote-list-missing">{" — verse text not available"}</span>;
+                })()}
                 {fn.seeAlso && (
                   <div style={{ marginTop: "0.5rem" }}>
                     <span style={{ fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" }}>Also see:</span>

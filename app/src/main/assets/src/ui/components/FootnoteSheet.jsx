@@ -4,7 +4,10 @@
 
 export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate }) {
   const isOpen = num !== null;
-  const verse = fn?.type === "scripture" ? nkjv?.[fn.ref] || null : null;
+  // SC5: fall back to the global BOOKS corpus when this letter's own nkjv dict
+  // doesn't carry the ref — the inline ref sheet (LetterView) already does this;
+  // the data gate is a backstop, not the sole source.
+  const verse = fn?.type === "scripture" ? (nkjv?.[fn.ref] || lookupVersesFromBooks(fn.ref) || null) : null;
   // Build ordered key list once we know the footnotes dict; keys are
   // typically numeric strings ("1", "2", "10"), so sort numerically when
   // possible and fall back to lexical order for unusual keys.

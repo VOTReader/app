@@ -178,6 +178,13 @@ export function splitIntoVerses(text, ref) {
   while ((mm = markerRx.exec(text)) !== null) {
     markers.push({ vNum: parseInt(mm[1], 10), start: mm.index, markerEnd: mm.index + mm[0].length });
   }
+  // SC7 — this consumes only the LONGEST IN-ORDER marker prefix: the first
+  // marker whose number doesn't match the expected verse (a missing interior
+  // marker, a duplicate "N.", or a first-verse-with-no-marker) ends the run, so
+  // any later "N." renders as plain white text instead of a gold verse sup. The
+  // validateFootnoteMarkers data gate (pre-commit + CI) is the LOAD-BEARING
+  // enforcement layer that keeps shipped corpus data well-formed; this parser
+  // degrades gracefully rather than re-deriving markers from guesswork.
   let prefixLen = 0;
   const cap = Math.min(markers.length, count);
   for (let i = 0; i < cap; i++) {

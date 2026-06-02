@@ -60,7 +60,11 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
   const lookupVerse = (ref) => {
     const perEntry = entry.scriptures || {};
     const dict = scripturesDict || WTLB_SCRIPTURES;
-    return perEntry[ref] || dict[ref] || null;
+    // SC6: fall back to the global BOOKS corpus when neither the per-entry nor
+    // the WTLB scripture dict carries the ref, so a dict-miss resolves instead
+    // of rendering "not available" (the SC1 fix pre-loads BOOKS on the WTLB
+    // index; lookupVersesFromBooks returns null if it isn't loaded yet).
+    return perEntry[ref] || dict[ref] || lookupVersesFromBooks(ref) || null;
   };
 
   React.useEffect(() => {
