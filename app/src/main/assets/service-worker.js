@@ -16,7 +16,7 @@
  */
 
 const CACHE_VERSION = 'v1.0.2-4cde6ade11';
-const CORPUS_VERSION = 'c5'; // c4→c5 (2026-05-31): footnote pile-strip — remaining "N." verse markers added to volume-two + wtlb-scriptures so every multi-verse footnote splits into gold sups (the marker-less guessing heuristics were deleted from scripture-parse); re-fetch the corrected corpus.
+const CORPUS_VERSION = 'c6'; // c5→c6 (2026-06-02): PF1 — the lazy corpus bundles (bundle-a-bible/matthew/vot.js) are now esbuild-minified (~3.3 MB smaller; data byte-identical, only whitespace/syntax shrunk). Re-fetch the smaller corpus.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;

@@ -1,13 +1,17 @@
 """Build script — concatenate Cluster A into a single classic-script bundle.
 
 After G.2.1/G.2.2/G.2.3, Clusters B, C, and D are bundled by esbuild as
-ES-module → IIFE bundles. This script now only emits bundle-a.js (vendor
-+ raw corpus + search engine), which remains classic-script forever (no
-benefit to converting third-party libs + ~1.5 MB of static data files to
-ES modules).
+ES-module → IIFE bundles. This script emits the classic-script bundle-a.js
+(vendor + small data + search engine) plus the three lazy corpus bundles.
+bundle-a stays UNMINIFIED — its vendored UMD libs (react/react-dom/flexsearch)
+read top-level `this`, which esbuild's minify would break (PF2). The corpus
+bundles are pure `var X = {...}` data with no top-level `this`, so they ARE
+minified here (PF1 — esbuild --minify --target=chrome69 after the concat,
+~3.3 MB saved; globals-preserving + chrome69-safe + data-identical, verified).
 
 CLUSTER OWNERSHIP:
-  A — vendor + raw corpus + search engine                  (Python concat — this script)
+  A — vendor + small data + search engine (raw)            (Python concat — this script)
+  A-bible/matthew/vot — lazy corpus, MINIFIED (PF1)        (Python concat + esbuild --minify)
   B — stores + components + hooks + journal + scripture    (esbuild → bundle-b.js)
   C — renderer (annotation engine + DOM bridges)           (esbuild → bundle-c.js)
   D — screens + sheets + components + utils + late stores  (esbuild → bundle-d.js)
@@ -23,9 +27,12 @@ Run:
   npm run build                    # full chain: this script + esbuild B/C/D
 
 Output:
-  app/src/main/assets/dist/bundle-a.js
+  app/src/main/assets/dist/bundle-a.js          (raw — UMD `this` trap, PF2)
+  app/src/main/assets/dist/bundle-a-bible.js    (minified — PF1)
+  app/src/main/assets/dist/bundle-a-matthew.js  (minified — PF1)
+  app/src/main/assets/dist/bundle-a-vot.js      (minified — PF1)
 """
-import os, sys
+import os, sys, subprocess
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
@@ -35,6 +42,11 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 REPO  = os.path.dirname(_HERE)
 ROOT  = os.path.join(REPO, 'app', 'src', 'main', 'assets')
 DIST  = os.path.join(ROOT, 'dist')
+
+# esbuild's node entry point. Invoked via `node` (not the .bin/.cmd shim) so the
+# call is byte-identical on Windows / Linux / CI. esbuild is a devDependency,
+# present in every build context (npm run build, CI, pre-commit all `npm ci`).
+ESBUILD_JS = os.path.join(REPO, 'node_modules', 'esbuild', 'bin', 'esbuild')
 
 # Cluster A — vendor + small data + search engine (CRITICAL PATH).
 # All corpus content is lazy-loaded:
@@ -147,13 +159,49 @@ def bundle(name, files):
     print('OK: ' + name + ' = ' + str(len(files)) + ' files, ' + str(total) + ' raw bytes, ' + str(len(out)) + ' bundle bytes')
 
 
+def minify_in_place(name):
+    """Minify a just-built bundle in place with esbuild (PF1).
+
+    --target=chrome69 is MANDATORY (Permanent Rule 6): it transpiles any syntax
+    newer than Chromium 69 so the bundle still PARSES on the Android 8/9 WebView
+    floor. ONLY the lazy corpus bundles (bundle-a-bible/matthew/vot.js) are passed
+    here — they are pure `var X = {...}` data with no top-level `this`, so the
+    bundle-a UMD-`this` trap (PF2) does not apply and minify is provably safe
+    (globals preserved, data byte-identical, 0 optional-chaining in output).
+    bundle-a itself stays raw because its vendored UMD libs DO read top-level
+    `this`.
+    """
+    path = os.path.join(DIST, 'bundle-' + name + '.js')
+    if not os.path.isfile(ESBUILD_JS):
+        print('FATAL: esbuild not found at ' + ESBUILD_JS + ' — run `npm ci` first.')
+        sys.exit(1)
+    before = os.path.getsize(path)
+    result = subprocess.run(
+        ['node', ESBUILD_JS, path, '--minify', '--target=chrome69',
+         '--allow-overwrite', '--outfile=' + path],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print('FATAL: esbuild minify failed for bundle-' + name + '.js')
+        sys.stderr.write(result.stderr)
+        sys.exit(1)
+    after = os.path.getsize(path)
+    pct = (before - after) * 100 // before if before else 0
+    print('   minified bundle-' + name + '.js: ' + str(before) + ' -> ' + str(after) + ' bytes (-' + str(pct) + '%)')
+
+
 def main():
     print('Building 4 classic-script bundles --> ' + DIST)
     print('  (clusters B, C, D are bundled by esbuild; run `npm run build` for the full chain)')
-    bundle('a', A)
+    bundle('a', A)  # raw — vendored UMD libs read top-level `this` (PF2 territory)
+    # The lazy corpus bundles are pure data → minify (PF1, ~3.3 MB saved).
+    # NOTE: any byte change here requires a CORPUS_VERSION bump (U3 gate).
     bundle('a-bible', A_BIBLE)
+    minify_in_place('a-bible')
     bundle('a-matthew', A_MATTHEW)
+    minify_in_place('a-matthew')
     bundle('a-vot', A_VOT)
+    minify_in_place('a-vot')
     print('Done. (bundle-b.js, bundle-c.js, bundle-d.js belong to esbuild now.)')
 
 
