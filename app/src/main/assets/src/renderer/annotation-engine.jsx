@@ -22,7 +22,11 @@ export function snapRangeToWords(text, start, end) {
   if (!text || typeof text !== 'string') return { start, end };
   start = Math.max(0, Math.min(start, text.length));
   end = Math.max(0, Math.min(end, text.length));
-  const isWord = (c) => !!c && /[\w’’-]/.test(c);
+  // A2: word chars include the typographic apostrophe (U+2019) AND the straight
+  // ASCII apostrophe — both appear in the corpus ("don't"/"don’t"); the prior
+  // class duplicated U+2019 and omitted ASCII ', so a straight-apostrophe word
+  // split mid-snap. Hyphen last = literal.
+  const isWord = (c) => !!c && /[\w’'-]/.test(c);
   while (start > 0 && isWord(text[start - 1]) && isWord(text[start])) start--;
   return { start, end };
 }

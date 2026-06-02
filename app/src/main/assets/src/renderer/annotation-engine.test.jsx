@@ -21,7 +21,29 @@ import {
   renderSubRanges,
   HighlightableText,
   applyDOMHighlights,
+  snapRangeToWords,
 } from './annotation-engine.jsx';
+
+describe('snapRangeToWords (A2)', () => {
+  it('walks start left out of the middle of a word', () => {
+    // "hello world", start mid-"world" → snaps to the word boundary (index 6)
+    expect(snapRangeToWords('hello world', 8, 11).start).toBe(6);
+  });
+  it('treats a STRAIGHT ASCII apostrophe as a word char (A2 fix)', () => {
+    // "don't" with ASCII '. Start mid-word must walk left THROUGH the apostrophe
+    // to the word start, not stop at it. start=4 ('t') → 0.
+    expect(snapRangeToWords("don't stop", 4, 5).start).toBe(0);
+  });
+  it('treats the typographic apostrophe U+2019 as a word char too', () => {
+    expect(snapRangeToWords('don’t stop', 4, 5).start).toBe(0);
+  });
+  it('leaves a start already at a boundary untouched', () => {
+    expect(snapRangeToWords('hello world', 6, 11).start).toBe(6);
+  });
+  it('clamps out-of-range offsets', () => {
+    expect(snapRangeToWords('abc', -5, 99)).toEqual({ start: 0, end: 3 });
+  });
+});
 
 /** Minimal annotation factory. */
 const ann = (o) => ({

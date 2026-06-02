@@ -221,12 +221,15 @@ describe('validateFormatA', () => {
       expect(result.errors).toEqual([]);
     });
 
-    it('accepts scripture block (flexible structure)', () => {
-      const letter = validLetter({
-        blocks: [{ type: 'scripture' }],
-      });
-      const result = validateFormatA([letter]);
-      expect(result.errors).toEqual([]);
+    it('accepts a scripture block WITH content (B6)', () => {
+      // text / segments / lines are all valid content carriers.
+      expect(validateFormatA([validLetter({ blocks: [{ type: 'scripture', text: 'A quoted verse.' }] })]).errors).toEqual([]);
+      expect(validateFormatA([validLetter({ blocks: [{ type: 'scripture', segments: [{ t: 'text', v: 'x' }] }] })]).errors).toEqual([]);
+    });
+    it('rejects a scripture block with NO content — segments/text/lines (B6)', () => {
+      const result = validateFormatA([validLetter({ blocks: [{ type: 'scripture' }] })]);
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.errors[0]).toContain('scripture');
     });
 
     it('validates poetry line arrays', () => {
