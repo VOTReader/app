@@ -74,6 +74,23 @@ jobs:
         # gate; fails fast (cheap) before the heavier typecheck/test/build.
         run: npm run validate:data
 
+      - name: Test + run the data gate (check_balance.py — T6)
+        # The front-line black-screen / white-verse gate: esprima JS parse,
+        # non-ASCII verse-range dashes, smart-quote JSON delimiters, brace
+        # imbalance. T6 adds test_check_balance.py (stdlib unittest) so a
+        # regression in the GATE ITSELF is caught — it was previously untested,
+        # i.e. it could silently stop catching the bug class it exists for.
+        # This step ALSO runs the gate over the real corpus in CI; before this
+        # check_balance ran only in the pre-commit hook (bypassable via
+        # --no-verify), so en-dash / smart-quote contamination could reach main.
+        # esprima (the authoritative JS-syntax check) is pinned in
+        # requirements-dev.txt; installing it makes the esprima cases real, not
+        # skipped. Cheap + deterministic — runs before the heavier build.
+        run: |
+          pip install -r requirements-dev.txt
+          python -m unittest test_check_balance -v
+          python check_balance.py
+
       - name: Check App() size budget (P11 canary)
         # `npm run check:app-size` fails if app.jsx exceeds its line budget.
         # Catches architectural drift — the composition root re-bloating —
