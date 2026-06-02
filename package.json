@@ -1,7 +1,7 @@
 {
   "name": "votreader-build",
   "version": "1.0.2",
-  "description": "Build pipeline for VOTReader's WebView assets (Objective G â€” bundler + ES modules).",
+  "description": "Build pipeline for VOTReader's WebView assets (Objective G — bundler + ES modules).",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,7 +14,6 @@
     "build:sw": "node tools/sync-sw-version.js",
     "check:csp": "node tools/sync-csp-hashes.js --check",
     "typecheck": "tsc --noEmit",
-    "jsx-progress": "python tools/jsx-progress.py",
     "lint:globals": "python tools/gen-eslint-globals.py",
     "lint": "npm run lint:globals && eslint app/src/main/assets/src",
     "lint:fix": "npm run lint:globals && eslint app/src/main/assets/src --fix",

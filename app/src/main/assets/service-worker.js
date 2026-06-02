@@ -34,9 +34,8 @@ const CORE_ASSETS = [
   // search-data.js are NOT listed — they are CONCATENATED into bundle-a.js
   // (build.py) and never loaded standalone, so precaching them was pure
   // double-caching + extra install-failure surface (addAll is all-or-nothing).
-  // data-normalize.js was orphaned (no loader references it). html2canvas.min.js
-  // STAYS: U13 moved it OUT of bundle-a to a lazy <script>, so this precache is
-  // what keeps the first web screenshot instant + offline.
+  // html2canvas.min.js STAYS: U13 moved it OUT of bundle-a to a lazy <script>,
+  // so this precache is what keeps the first web screenshot instant + offline.
   './html2canvas.min.js',
   './fonts/cinzel-latin-400-normal.woff2',
   './fonts/cinzel-latin-700-normal.woff2',
