@@ -9,6 +9,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { StorageHealth } from './storage-health.js';
 import { PlatformBridge } from './platform-bridge.js';
+// D5: spy on the toast primitive so onWriteFailure tests don't touch real DOM
+// and the dedup behavior is assertable.
+import { showToast, hideToast } from './toast.js';
+vi.mock('./toast.js', () => ({ showToast: vi.fn(), hideToast: vi.fn() }));
 
 const { TIER, PLATFORM, RISK } = StorageHealth;
 
@@ -26,6 +30,8 @@ function mockStorage(opts = {}) {
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: false });
+  vi.mocked(showToast).mockClear();
+  vi.mocked(hideToast).mockClear();
 });
 
 afterEach(() => {
@@ -580,6 +586,37 @@ describe('write-path integration', () => {
     const risks = StorageHealth.getReport().risks;
     const writeFailedCount = risks.filter(r => r === RISK.WRITE_FAILED).length;
     expect(writeFailedCount).toBe(1);
+  });
+
+  /* D5 — per-action write-failure toast (cooldown-deduped). */
+  it('onWriteFailure shows a write-fail toast, deduped within the cooldown', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    StorageHealth.onWriteFailure(new Error('quota'));
+    StorageHealth.onWriteFailure(new Error('quota')); // same instant → suppressed
+    StorageHealth.onWriteFailure(new Error('quota'));
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(showToast).mock.calls[0][0].id).toBe('vot-toast-writefail');
+    expect(vi.mocked(showToast).mock.calls[0][0].ariaLive).toBe('assertive');
+  });
+
+  it('re-shows the write-fail toast once the cooldown elapses', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    StorageHealth.onWriteFailure(new Error('quota'));
+    expect(showToast).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(8001); // past WRITE_FAIL_TOAST_COOLDOWN_MS (8000)
+    StorageHealth.onWriteFailure(new Error('quota'));
+    expect(showToast).toHaveBeenCalledTimes(2);
+  });
+
+  it('onWriteSuccess hides the toast + resets cooldown so the next failure toasts immediately', async () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    await StorageHealth.assess();
+    StorageHealth.onWriteFailure(new Error('quota'));
+    expect(showToast).toHaveBeenCalledTimes(1);
+    await StorageHealth.onWriteSuccess();
+    expect(hideToast).toHaveBeenCalledWith('vot-toast-writefail');
+    StorageHealth.onWriteFailure(new Error('quota')); // cooldown reset → immediate
+    expect(showToast).toHaveBeenCalledTimes(2);
   });
 
   it('onWriteSuccess clears READONLY and re-assesses', async () => {

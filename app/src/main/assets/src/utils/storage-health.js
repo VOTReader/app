@@ -51,6 +51,7 @@
 // diagnostic-log.js is a zero-dependency leaf in the same bundle.
 import { DiagnosticLog } from './diagnostic-log.js';
 import { PlatformBridge } from './platform-bridge.js';
+import { showToast, hideToast } from './toast.js';
 
 /* ─── Constants ─────────────────────────────────────────────────────── */
 
@@ -140,6 +141,16 @@ let _listeners = null;
 /** @type {string | null} */
 let _platform = null;
 let _writeFailedThisSession = false;
+/**
+ * D5: timestamp of the last per-action write-failure toast. Used to
+ * cooldown-dedup the toast so a BURST of failing writes (e.g. rapid edits
+ * while storage is broken) surfaces ONE toast, re-armed at most every
+ * WRITE_FAIL_TOAST_COOLDOWN_MS — not one toast per failed `_save()`.
+ */
+let _lastWriteFailToastAt = 0;
+const WRITE_FAIL_TOAST_COOLDOWN_MS = 8000;
+/** Stable DOM id for the write-failure toast (so repeats coalesce). */
+const WRITE_FAIL_TOAST_ID = 'vot-toast-writefail';
 /** @type {Set<string>} */
 let _sessionDismissals = new Set();
 /** @type {ReturnType<typeof setInterval> | null} */
@@ -431,8 +442,31 @@ function _checkBeforeWrite(bytes) {
  *
  * @param {any} _err
  */
+/**
+ * D5: show a cooldown-deduped per-action write-failure toast. The passive
+ * StorageHealth banner says storage is unhealthy in general; this tells the
+ * user THIS change didn't persist so they can re-try / export a backup.
+ * Wording is generic because any store can be the failing writer
+ * (annotation, note, journal, bookmark…). Coalesces by a stable toast id and
+ * throttles by WRITE_FAIL_TOAST_COOLDOWN_MS so a burst of failed writes can't
+ * spam a wall of toasts.
+ */
+function _notifyWriteFailureToast() {
+  var now = Date.now();
+  if (now - _lastWriteFailToastAt < WRITE_FAIL_TOAST_COOLDOWN_MS) return;
+  _lastWriteFailToastAt = now;
+  showToast({
+    id: WRITE_FAIL_TOAST_ID,
+    className: 'vot-toast',
+    html: "Couldn't save your last change — device storage may be full. Open Settings → Storage, or export a backup.",
+    durationMs: 6000,
+    ariaLive: 'assertive',
+  });
+}
+
 function _onWriteFailure(_err) {
   _writeFailedThisSession = true;
+  _notifyWriteFailureToast();
   if (_report) {
     var risks = _report.risks.includes(RISK.WRITE_FAILED)
       ? _report.risks
@@ -464,6 +498,10 @@ function _onWriteFailure(_err) {
 function _onWriteSuccess() {
   if (!_writeFailedThisSession) return;
   _writeFailedThisSession = false;
+  // D5: storage recovered — clear the error toast + reset the cooldown so a
+  // genuinely new failure surfaces immediately instead of waiting one out.
+  _lastWriteFailToastAt = 0;
+  hideToast(WRITE_FAIL_TOAST_ID);
   return _assess();
 }
 
@@ -590,6 +628,7 @@ function _resetForTests(opts) {
   _listeners = null;
   _platform = (opts && opts.platform) || null;
   _writeFailedThisSession = false;
+  _lastWriteFailToastAt = 0;
   _sessionDismissals = new Set();
   _lastAssessedAt = 0;
   _safariWarningShownThisSession = false;
