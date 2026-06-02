@@ -5,7 +5,7 @@
  *
  * CACHE_VERSION = `v{package.version}-{hash}` where {hash} is a short
  * SHA-256 over the contents of every file in the SW's own CORE_ASSETS list
- * (index.html, app.css, the dist bundles, vendor libs, fonts, icons,
+ * (index.html, the minified app.min.css, the dist bundles, vendor libs, fonts, icons,
  * images, offline page). The package.json version is kept only as a
  * human-readable prefix (handy in DevTools / for the APK) — it no longer
  * needs bumping for users to receive an update; the hash does that.
