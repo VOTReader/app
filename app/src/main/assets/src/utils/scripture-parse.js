@@ -1,7 +1,8 @@
 /* ===================================================================
    Scripture reference parsing — verse range splitting + footnote helpers + echo lookups
    ===================================================================
-   Global-scope module. Bundled into bundle-b via _entry-b.js.
+   Global-scope module. Bundled into bundle-d via _entry-d.js (SC8: was wrongly
+   documented as bundle-b — splitIntoVerses & friends are imported by _entry-d).
    Bundled helpers (P5e):
    - firstVerseOfRef
    - parseRefRanges

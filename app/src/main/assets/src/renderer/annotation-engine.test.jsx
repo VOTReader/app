@@ -274,11 +274,15 @@ describe('applyDOMHighlights overlap precedence', () => {
 
 // ── DUAL-RENDER EQUIVALENCE (U11) ──────────────────────────────
 /* The flagship invariant: the React sweep-line (HighlightableText) and the
-   imperative DOM overlay (applyDOMHighlights) MUST produce structurally
-   identical annotation DOM. Until now every render-path test used exactly
-   2 annotations and asserted each path in isolation — "they're identical"
-   was an untested claim. This parameterizes a 3+-overlap set through BOTH
-   paths and asserts a per-CHARACTER signature is equal:
+   imperative DOM overlay (applyDOMHighlights) MUST produce VISUALLY EQUIVALENT
+   annotation DOM — identical per-CHARACTER paint + tap-winner. (A3: NOT
+   byte-identical structure — the two paths emit a different NUMBER of <mark>
+   elements, e.g. 9 vs 7, because they split overlaps differently; signature()
+   below checks only the rendered paint/tap result, which is what matters.)
+   Until now every render-path test used exactly 2 annotations and asserted each
+   path in isolation — "they're identical" was an untested claim. This
+   parameterizes a 3+-overlap set through BOTH paths and asserts the per-CHARACTER
+   signature is equal:
 
      { color: innermost-covering-mark's color class,
        id:    innermost-covering-mark's data-hl-id  (== the elementFromPoint
