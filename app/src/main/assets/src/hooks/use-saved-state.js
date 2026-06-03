@@ -126,6 +126,20 @@ export function useSavedState() {
       // a read.
       const s = raw && typeof raw === 'object' ? Object.assign({}, raw) : {};
       if (Array.isArray(s.tabs)) s.tabs = s.tabs.map((t) => Object.assign({}, t));
+      // E4: crash-loop recovery. The root ErrorBoundary sets this one-shot flag
+      // when a screen crashes repeatedly; the crashing screen is the persisted
+      // one, so coerce it (and every tab) to home BEFORE validation. The next
+      // durable write (usePersistedState) then persists the safe shape, ending
+      // the loop. Wrapped — sessionStorage may be unavailable.
+      try {
+        if (sessionStorage.getItem('vot-crash-recover')) {
+          sessionStorage.removeItem('vot-crash-recover');
+          sessionStorage.removeItem('vot-crash-count');
+          sessionStorage.removeItem('vot-crash-first-ms');
+          s.screen = 'home';
+          if (Array.isArray(s.tabs)) s.tabs.forEach((t) => { t.screen = 'home'; });
+        }
+      } catch (_e) { /* sessionStorage unavailable — nothing to recover */ }
       _validateTabState(s);
       if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
       return s;

@@ -349,6 +349,7 @@ describe('_validateTabState — 13 coercion rules', () => {
   describe('useSavedState — load + validate StateStore (vot-state)', () => {
     beforeEach(() => {
       localStorage.clear();
+      try { sessionStorage.clear(); } catch (_e) { /* jsdom always has it */ }
       // W2.3b: useSavedState now reads via StateStore. Reset its state
       // machine + force loaded so the hook's sync useMemo read sees the
       // seeded cache without going through async hydration.
@@ -417,6 +418,41 @@ describe('_validateTabState — 13 coercion rules', () => {
       expect(result.current.tabs[1].bookId).toBe('preserve-me');     // preserved
       expect(result.current.tabs[2].screen).toBe('journal-home');
       expect(result.current.tabs[2].letterId).toBe('preserve-me-too'); // preserved
+    });
+
+    it('E4: the crash-recover flag coerces screen + every tab to home, then clears it', () => {
+      try {
+        sessionStorage.setItem('vot-crash-recover', '1');
+        sessionStorage.setItem('vot-crash-count', '2');
+        sessionStorage.setItem('vot-crash-first-ms', String(Date.now()));
+      } catch (_e) { /* jsdom always has it */ }
+      StateStore._cache = /** @type {any} */ ({
+        screen: 'bible-ch', chapterNum: 5, bookId: 'genesis',
+        tabs: [
+          { screen: 'bible-ch', chapterNum: 5, bookId: 'genesis' },
+          { screen: 'matthew-ch', chapterNum: 3 },
+        ],
+      });
+
+      const { result } = renderHook(() => useSavedState());
+
+      // The crashing screen is the persisted one — coerce top-level + every tab.
+      expect(result.current.screen).toBe('home');
+      expect(result.current.tabs[0].screen).toBe('home');
+      expect(result.current.tabs[1].screen).toBe('home');
+      // One-shot: the recover flag + counters are consumed.
+      expect(sessionStorage.getItem('vot-crash-recover')).toBeNull();
+      expect(sessionStorage.getItem('vot-crash-count')).toBeNull();
+    });
+
+    it('E4: without the recover flag, a valid persisted screen is untouched', () => {
+      StateStore._cache = /** @type {any} */ ({
+        screen: 'bible-ch', chapterNum: 5, bookId: 'genesis',
+        tabs: [{ screen: 'bible-ch', chapterNum: 5, bookId: 'genesis' }],
+      });
+      const { result } = renderHook(() => useSavedState());
+      expect(result.current.screen).toBe('bible-ch');
+      expect(result.current.tabs[0].screen).toBe('bible-ch');
     });
 
     it('returns {} when localStorage is empty', () => {
