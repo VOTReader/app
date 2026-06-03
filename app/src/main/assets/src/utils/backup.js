@@ -243,6 +243,113 @@ export async function buildExportPayload(ctx) {
 }
 
 /**
+ * Build a v3 streaming-export MANIFEST + the ordered media blob list
+ * (BACKUP-STREAMING-PLAN.txt). Unlike buildExportPayload (v2), media is NOT
+ * base64-inlined: the manifest carries per-blob METADATA only, and the blobs are
+ * returned separately for the container codec (writeContainer) to stream as raw
+ * frames — so peak memory is the (small) store data + one blob at a time, which
+ * is what makes GB-scale export safe.
+ *
+ * Same loud-abort contract as buildExportPayload (U6): any store/media read
+ * failure returns { ok:false, reason:'read-failure', problems } so the caller
+ * never writes a silently-incomplete backup.
+ *
+ * The flush + store/data read here intentionally MIRRORS buildExportPayload's
+ * rather than sharing a helper yet — v2 stays untouched while v3 is built
+ * alongside and proven end-to-end. Folding the shared read into one helper is a
+ * tracked P5 cleanup (BACKUP-STREAMING-PLAN.txt), once v3 ships.
+ *
+ * @param {BuildExportCtx} ctx
+ * @returns {Promise<{ ok:true, manifest:any, mediaEntries: Array<{id:string, blob:Blob}> }
+ *   | { ok:false, reason:'read-failure', problems:string[] }>}
+ */
+export async function buildV3Manifest(ctx) {
+  const {
+    storesMap, flagMap, idbAdapter, mediaStore,
+    diagnosticLog = [],
+    dataLsKeys = DEFAULT_DATA_LS_KEYS,
+    nowIso = () => new Date().toISOString(),
+    storageEstimate = _defaultStorageEstimate,
+  } = ctx;
+
+  // S1: flush in-flight writes before reading STRAIGHT FROM IDB — the only backup
+  // must not miss an edit made moments before export. whenSaved never rejects.
+  await Promise.all(
+    Object.values(storesMap).map(({ store }) => _whenSaved(store))
+      .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
+  );
+
+  /** @type {Record<string, string>} */
+  const data = {};
+  for (const k of dataLsKeys) { const v = localStorage.getItem(k); if (v != null) data[k] = v; }
+
+  // Stores + flags from IDB; collect read failures (U6) — abort loudly below.
+  /** @type {Record<string, any>} */
+  const stores = {};
+  /** @type {string[]} */
+  const exportProblems = [];
+  for (const name of Object.keys(storesMap)) {
+    try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = v; }
+    catch (e) { console.warn('export: store read failed', name, e); exportProblems.push(name); }
+  }
+  for (const name of Object.keys(flagMap)) {
+    try { const v = await idbAdapter.get(name, 'v'); if (v !== undefined) stores[name] = !!v; }
+    catch (e) { console.warn('export: flag read failed', name, e); exportProblems.push(name); }
+  }
+
+  // Media: per-blob METADATA for the manifest + the blob refs (SAME order) for
+  // the container to stream. No base64, no size cap (streaming is bounded). The
+  // manifest `size` is the ACTUAL blob byte length — readContainer checks each
+  // frame's length against it, so it must be the real size.
+  /** @type {Array<any>} */
+  const mediaMeta = [];
+  /** @type {Array<{id:string, blob:Blob}>} */
+  const mediaEntries = [];
+  try {
+    const ids = await mediaStore.allIds();
+    for (const id of ids) {
+      const rec = await mediaStore.get(id);
+      if (!rec || !rec.blob) continue;
+      mediaMeta.push({
+        id: id, type: rec.type, mime: rec.mime, size: rec.blob.size,
+        width: rec.width, height: rec.height, duration: rec.duration, created: rec.created,
+      });
+      mediaEntries.push({ id: id, blob: rec.blob });
+    }
+  } catch (e) {
+    console.warn('media export failed', e);
+    exportProblems.push('journal media');
+  }
+
+  const { quota: storageQuota, usage: storageUsed } = await storageEstimate();
+
+  if (exportProblems.length) {
+    return { ok: false, reason: 'read-failure', problems: exportProblems };
+  }
+
+  /** @type {Record<string, number>} */
+  const counts = { _media: mediaMeta.length };
+  for (const name of Object.keys(stores)) {
+    const v = stores[name];
+    counts[name] = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 1);
+  }
+
+  const manifest = {
+    app: 'VOTReader',
+    exportVersion: 3,
+    exportDate: nowIso(),
+    diagnosticLog: diagnosticLog,
+    storageQuota: storageQuota,
+    storageUsed: storageUsed,
+    counts: counts,
+    data: data,
+    stores: stores,
+    media: mediaMeta,
+  };
+  return { ok: true, manifest, mediaEntries };
+}
+
+/**
  * Resolve a store's durability barrier without throwing. `true` for a
  * store with no whenSaved() (LS-mode / never-written); the store's own
  * promise otherwise.

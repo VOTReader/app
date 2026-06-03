@@ -166,11 +166,13 @@
 ───────────────────────────────────────────────────────────────────────────
  P0  Format/dep decision — RESOLVED: bespoke length-prefixed container, no dep
      (see "FORMAT PIVOT"). [DONE]
- P1  Container codec (web), PURE + injectable. [DONE — src/utils/backup-container.js
-     + 14 exhaustive round-trip/integrity tests.] NEXT within P1: the v3 manifest
-     builder/applier (buildV3Manifest + applyV3) reusing backup.js's store-read +
-     store-apply logic, as pure injectable fns over the codec; vitest round-trip
-     against fake stores + fake-IDB media.
+ P1  Container codec + manifest builder (web), PURE + injectable. [DONE —
+     backup-container.js (14 tests); buildV3Manifest in backup.js (4 tests incl. a
+     builder→writeContainer→readContainer byte-exact round-trip).] NEXT: applyV3
+     (the import applier — apply the manifest's stores/flags + stream each frame
+     blob to IDB), then P2. NOTE: buildV3Manifest is self-contained for now;
+     folding its store-read into a shared helper with buildExportPayload is a
+     tracked P5 cleanup — v2 stays untouched until v3 ships end-to-end.
  P2  Web I/O: FS Access API export + File.stream import, wired through
      PlatformBridge; preview-verified end-to-end with a multi-hundred-MB
      synthetic dataset (real blobs in fake-IDB).
@@ -207,6 +209,11 @@
    readContainer / isContainerMagic / encode|decodeUint64BE) + 14 round-trip +
    integrity tests (byte-exact binary, >4 GB length boundary, multi-chunk,
    unicode, truncation / size-mismatch / bad-magic / bad-JSON guards). Gates:
-   vitest 1754/71 test:coverage exit 0, tsc + eslint clean. NEXT: P1 manifest
-   builder/applier, then P2 web I/O.
+   vitest 1754/71 test:coverage exit 0, tsc + eslint clean.
+ 2026-06-02 — P1 manifest builder DONE: buildV3Manifest (backup.js) builds the v3
+   manifest (stores + media METADATA, no base64) + the ordered blob list; +4 tests
+   incl. a builder→writeContainer→readContainer byte-exact round-trip. Self-
+   contained (v2 buildExportPayload untouched; shared-read consolidation is a P5
+   cleanup). vitest 1758/71 test:coverage exit 0, tsc + eslint clean. NEXT: applyV3
+   (import applier), then P2 web I/O.
 ═══════════════════════════════════════════════════════════════════════════

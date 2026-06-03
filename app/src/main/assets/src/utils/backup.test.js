@@ -30,8 +30,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
   blobToBase64, base64ToBlob, buildExportPayload, applyImportPayload,
-  DEFAULT_MEDIA_LIMIT_BYTES,
+  buildV3Manifest, DEFAULT_MEDIA_LIMIT_BYTES,
 } from './backup.js';
+import { writeContainer, readContainer } from './backup-container.js';
 
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { hydrateAllStores } from '../stores/cached-store.js';
@@ -191,6 +192,104 @@ describe('buildExportPayload', () => {
 
   it('exposes a sane default media limit', () => {
     expect(DEFAULT_MEDIA_LIMIT_BYTES).toBe(100 * 1024 * 1024);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+   PART 2b — buildV3Manifest (streaming-export manifest + blob list, P1)
+   ───────────────────────────────────────────────────────────────────── */
+describe('buildV3Manifest', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  function fakeAdapter(values, throwFor) {
+    return {
+      get: async (name) => {
+        if (throwFor && throwFor.has(name)) throw new Error('read boom: ' + name);
+        return Object.prototype.hasOwnProperty.call(values, name) ? values[name] : undefined;
+      },
+    };
+  }
+  const noEstimate = async () => ({ quota: null, usage: null });
+  const fakeMedia = (recs) => ({ allIds: async () => Object.keys(recs), get: async (id) => recs[id] || null });
+  const blobOf = (str) => new Blob([new TextEncoder().encode(str)]);
+  const storesMap = {
+    'vot-annotations': { store: {}, method: 'replaceAll' },
+    'vot-bookmarks': { store: {}, method: 'replaceAll' },
+  };
+  const flagMap = { 'vot-welcomed': {} };
+
+  it('builds a v3 manifest with media METADATA (no base64) + order-paired blobs', async () => {
+    const b1 = blobOf('image-bytes'), b2 = blobOf('audio');
+    const res = await buildV3Manifest({
+      storesMap, flagMap,
+      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [{ id: 'a' }] }, 'vot-bookmarks': [{ id: 'x' }], 'vot-welcomed': true }),
+      mediaStore: fakeMedia({
+        m1: { blob: b1, type: 'image', mime: 'image/png', width: 4, height: 5, created: 't1' },
+        m2: { blob: b2, type: 'audio', mime: 'audio/webm', duration: 9, created: 't2' },
+      }),
+      storageEstimate: noEstimate,
+      nowIso: () => '2026-06-02T00:00:00.000Z',
+    });
+    expect(res.ok).toBe(true);
+    expect(res.manifest.exportVersion).toBe(3);
+    expect(res.manifest.stores['vot-welcomed']).toBe(true);
+    expect(res.manifest.counts._media).toBe(2);
+    // media is METADATA ONLY — no base64 `data` field anywhere
+    expect(res.manifest.media.map((m) => m.id)).toEqual(['m1', 'm2']);
+    expect(res.manifest.media[0]).toMatchObject({ id: 'm1', mime: 'image/png', size: b1.size });
+    expect(res.manifest.media.some((m) => 'data' in m)).toBe(false);
+    // blob entries pair with the manifest media by order, same blob refs
+    expect(res.mediaEntries.map((e) => e.id)).toEqual(['m1', 'm2']);
+    expect(res.mediaEntries[0].blob).toBe(b1);
+    expect(res.mediaEntries[1].blob).toBe(b2);
+  });
+
+  it('uses the ACTUAL blob byte length for size (the container integrity contract)', async () => {
+    const b = blobOf('exactly-these-bytes');
+    const res = await buildV3Manifest({
+      storesMap: {}, flagMap: {},
+      idbAdapter: fakeAdapter({}),
+      mediaStore: fakeMedia({ m: { blob: b, type: 'image', mime: 'image/png', size: 999 /* stale */ } }),
+      storageEstimate: noEstimate,
+    });
+    expect(res.manifest.media[0].size).toBe(b.size); // blob.size, not the stale rec.size
+  });
+
+  it('ABORTS loud on a store read failure (read-failure) — no manifest', async () => {
+    const res = await buildV3Manifest({
+      storesMap, flagMap,
+      idbAdapter: fakeAdapter({ 'vot-annotations': {} }, new Set(['vot-bookmarks'])),
+      mediaStore: fakeMedia({}), storageEstimate: noEstimate,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('read-failure');
+    expect(res.problems).toContain('vot-bookmarks');
+    expect(res.manifest).toBeUndefined();
+  });
+
+  it('builder → writeContainer → readContainer round-trips stores + media byte-exact', async () => {
+    const img = new Uint8Array([0, 1, 2, 250, 251, 255]);
+    const aud = new TextEncoder().encode('opus-ish');
+    const built = await buildV3Manifest({
+      storesMap, flagMap,
+      idbAdapter: fakeAdapter({ 'vot-annotations': { k: [{ id: 'a' }] }, 'vot-bookmarks': [], 'vot-welcomed': true }),
+      mediaStore: fakeMedia({
+        m1: { blob: new Blob([img]), type: 'image', mime: 'image/png', width: 4, height: 5, duration: 0, created: 't1' },
+        m2: { blob: new Blob([aud]), type: 'audio', mime: 'audio/webm', width: 0, height: 0, duration: 9, created: 't2' },
+      }),
+      storageEstimate: noEstimate, nowIso: () => 'fixed',
+    });
+    expect(built.ok).toBe(true);
+
+    const chunks = [];
+    await writeContainer(built.manifest, built.mediaEntries, (u8) => chunks.push(u8.slice()));
+    const { manifest, entries } = await readContainer(new Blob(chunks));
+
+    expect(manifest).toEqual(built.manifest);                 // stores + metadata survive the round-trip
+    expect(entries.map((e) => e.id)).toEqual(['m1', 'm2']);
+    // compare as plain arrays — realm-agnostic (jsdom TextEncoder vs Node Uint8Array)
+    expect(Array.from(new Uint8Array(await entries[0].blob.arrayBuffer()))).toEqual(Array.from(img));  // byte-exact
+    expect(Array.from(new Uint8Array(await entries[1].blob.arrayBuffer()))).toEqual(Array.from(aud));
   });
 });
 
