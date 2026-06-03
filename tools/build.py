@@ -32,7 +32,7 @@ Output:
   app/src/main/assets/dist/bundle-a-matthew.js  (minified — PF1)
   app/src/main/assets/dist/bundle-a-vot.js      (minified — PF1)
 """
-import os, sys, subprocess
+import os, sys, subprocess, tempfile
 
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
@@ -70,6 +70,22 @@ A = [
     'src/data/matthew-plain.js', 'src/data/matthew-nkjv.js',
     'flexsearch.min.js', 'search-data.js', 'search.js',
 ]
+
+# PF2 — the pure-corpus-DATA members of bundle-a (`var X = {…}`, no top-level
+# `this`, no cross-file bare-name dep beyond their one global). These are
+# minified per-file BEFORE the concat (the PF1 pattern, proven globals-preserving
+# + value-identical), stripping ~150 KB of indentation off the cold-boot parse a
+# budget WebView pays on EVERY launch. The vendored UMD libs (react/react-dom/
+# flexsearch read top-level `this`) stay RAW, and the search ENGINE (search.js) +
+# its index data (search-data.js, multi-global) stay raw too — minify them only
+# with the same deep-equal rigor if the marginal win is ever wanted. bundle-a is
+# NOT in the corpus-version gate (that hashes only the lazy a-bible/matthew/vot
+# bundles), so this needs no CORPUS_VERSION bump; the SW content-hash auto-busts.
+MINIFY_A = {
+    'src/data/books-restored.js',
+    'src/data/matthew-plain.js',
+    'src/data/matthew-nkjv.js',
+}
 
 # Cluster A-bible — the 66-book NKJV corpus. Loaded ON DEMAND via
 # window.__loadBibleCorpus() (see index.html ~line 67). Until this
@@ -131,6 +147,30 @@ C = []  # intentionally empty; esbuild owns bundle-c.js
 D = []  # intentionally empty; esbuild owns bundle-d.js
 
 
+def _minify_content(content, label):
+    """Minify ONE JS source string via esbuild (PF2) and return it. Same options
+    as the PF1 corpus minify (minify + target=chrome69, bundle:false → top-level
+    globals preserved, value-identical). Used for the pure-data bundle-a members.
+    """
+    fd, tmp = tempfile.mkstemp(suffix='.js')
+    os.close(fd)
+    try:
+        with open(tmp, 'w', encoding='utf-8', newline='') as f:
+            f.write(content)
+        result = subprocess.run(['node', MINIFY_JS, tmp], capture_output=True, text=True)
+        if result.returncode != 0:
+            print('FATAL: esbuild minify failed for ' + label)
+            sys.stderr.write(result.stderr)
+            sys.exit(1)
+        with open(tmp, 'r', encoding='utf-8', newline='') as f:
+            return f.read()
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
 def bundle(name, files):
     out_path = os.path.join(DIST, 'bundle-' + name + '.js')
     parts = []
@@ -146,6 +186,10 @@ def bundle(name, files):
             sys.exit(1)
         with open(path, 'r', encoding='utf-8', newline='') as f:
             content = f.read()
+        # PF2: minify the pure-data members of bundle-a per-file before concat
+        # (vendors + the search engine stay raw — see MINIFY_A).
+        if name == 'a' and rel in MINIFY_A:
+            content = _minify_content(content, rel)
         parts.append('\n/* ' + '-' * 60 + '\n')
         parts.append(' * ' + rel + '\n')
         parts.append(' * ' + '-' * 60 + ' */\n')

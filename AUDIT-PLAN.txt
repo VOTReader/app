@@ -617,7 +617,23 @@
      corpus DATA files (books-restored −27%, matthew-plain −34%) strip ~153 KB of
      indentation. Vendor (react/react-dom/flexsearch =154 KB) is already minified.
    Fix: minify search.js/search-data pre-concat (no UMD `this`), or wrap the UMD
-     vendors in (function(){…}).call(this) so the whole bundle-a can be minified.
+     vendors in (function(){…}).call(this) so the whole bundle-a can be minified.   STATUS: DONE
+   DONE (2026-06-02): took the finding's first (safe) option — tools/build.py now
+   minifies the 3 pure-corpus-DATA members of bundle-a per-file before concat
+   (MINIFY_A = books-restored / matthew-plain / matthew-nkjv via _minify_content →
+   the PF1 minify-bundle.mjs path, --target=chrome69). bundle-a 838,473 → 685,381 B
+   (−153 KB / −18% off EVERY cold-boot parse). Left RAW: the UMD vendors
+   (react/react-dom/flexsearch read top-level `this`) AND the search ENGINE
+   (search.js, code, outside lint/tsc — verified no top-level `this`, but the
+   marginal win isn't worth the engine-minify risk) + search-data.js (multi-global).
+   RIGOR (PF1 method): a vm canonical-sha256 deep-equal proved all 3 globals
+   (BOOKS_RESTORED 66 / MATTHEW_PLAIN 4 / MATTHEW_NKJV 172) byte-identical IN VALUE
+   raw-vs-minified (esbuild only escapes non-ASCII to \xNN + strips whitespace —
+   no data change). bundle-a is NOT in the corpus-version gate, so no CORPUS_VERSION
+   bump (the SW content-hash auto-busts). Gates: tsc/eslint/vitest 1797/build green.
+   Preview (cleared SW): all bundle-a globals load, MATTHEW_NKJV 'Acts 2:23' verse
+   intact, app mounts, 0 console errors. WV69-safe by construction: data-only +
+   --target=chrome69 (no new syntax) — the same pattern PF1 emulator-verified.
 
  [PF4] ~32 MB alt-translations resident + not cached offline SEV: Med  [CONFIRMED]
    Evidence: 7 ALT_TRANSLATIONS (search.js:42) load into window.BIBLE_* on a
