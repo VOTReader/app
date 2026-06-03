@@ -15,8 +15,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 /**
- * The full 20-method surface mirroring AppInterface.kt @JavascriptInterface.
- * Methods are kept in the same order as the Kotlin file for review parity.
+ * The full bridge surface. Most methods mirror AppInterface.kt
+ * @JavascriptInterface 1:1; openExportSink/pickImportFile are the v3 streaming
+ * backup I/O added in P2 (web-real now; Android native chunked bridge in P3).
  */
 const METHODS = [
   'setLightStatusBar',
@@ -36,6 +37,8 @@ const METHODS = [
   'takeScreenshot',
   'openFilePicker',
   'saveToFile',
+  'openExportSink',
+  'pickImportFile',
   'getCrashLog',
   'setImmersiveMode',
   'haptic',
@@ -103,10 +106,15 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     delete (/** @type {any} */ (globalThis.window).AndroidBridge);
   });
 
-  it('exposes exactly the 21 expected keys', () => {
+  it('exposes exactly the 23 expected keys', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);
+  });
+
+  it('v3 backup I/O rejects on Android until the native bridge lands (P3)', async () => {
+    await expect(bridge.openExportSink('b.votbak')).rejects.toThrow(/pending/);
+    await expect(bridge.pickImportFile()).rejects.toThrow(/pending/);
   });
 
   /** @type {Array<[string, any[]]>} */
@@ -179,7 +187,7 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
     warnSpy.mockRestore();
   });
 
-  it('exposes the same 21 keys as Android impl (uniform shape)', () => {
+  it('exposes the same 23 keys as Android impl (uniform shape)', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);
@@ -1146,5 +1154,87 @@ describe('PlatformBridge — getCrashLog (DiagnosticLog merge, W7.4)', () => {
     /** @type {any} */ (globalThis.window).AndroidBridge = { getCrashLog: () => '{"t":1}' };
     await load();
     expect(JSON.parse(bridge.getCrashLog())).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// v3 streaming backup I/O — web (P2)
+// ─────────────────────────────────────────────────────────────────────
+
+describe('PlatformBridge — v3 backup I/O (web)', () => {
+  /** @type {any} */ let bridge;
+  beforeEach(async () => {
+    /** @type {any} */ (globalThis).window = globalThis.window || /** @type {any} */ ({});
+    delete (/** @type {any} */ (globalThis.window).AndroidBridge);
+    bridge = await importBridge();
+  });
+  afterEach(() => {
+    const w = /** @type {any} */ (globalThis.window);
+    delete w.showSaveFilePicker; delete w.showOpenFilePicker;
+    vi.restoreAllMocks();
+  });
+
+  // ── openExportSink ──
+  it('openExportSink streams through the FS Access API writable when available', async () => {
+    const writes = [];
+    const writable = { write: vi.fn(async (c) => { writes.push(c); }), close: vi.fn(async () => {}) };
+    const handle = { createWritable: vi.fn(async () => writable) };
+    /** @type {any} */ (globalThis.window).showSaveFilePicker = vi.fn(async () => handle);
+    const sink = await bridge.openExportSink('backup.votbak');
+    expect(sink).not.toBeNull();
+    await sink.write(new Uint8Array([1, 2, 3]));
+    await sink.close();
+    expect(Array.from(writes[0])).toEqual([1, 2, 3]);
+    expect(writable.close).toHaveBeenCalledTimes(1);
+    expect(/** @type {any} */ (globalThis.window).showSaveFilePicker)
+      .toHaveBeenCalledWith(expect.objectContaining({ suggestedName: 'backup.votbak' }));
+  });
+
+  it('openExportSink returns null when the save picker is cancelled (AbortError)', async () => {
+    /** @type {any} */ (globalThis.window).showSaveFilePicker = vi.fn(async () => {
+      const e = new Error('cancel'); /** @type {any} */ (e).name = 'AbortError'; throw e;
+    });
+    expect(await bridge.openExportSink('b.votbak')).toBeNull();
+  });
+
+  it('openExportSink falls back to a Blob download (no FS Access API) — bytes preserved', async () => {
+    let captured = /** @type {any} */ (null);
+    const origCreate = URL.createObjectURL; const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn((b) => { captured = b; return 'blob:fake'; });
+    URL.revokeObjectURL = vi.fn();
+    try {
+      const sink = await bridge.openExportSink('b.votbak'); // no showSaveFilePicker
+      await sink.write(new Uint8Array([10, 20]));
+      await sink.write(new Uint8Array([30]));
+      await sink.close();
+      expect(captured).toBeInstanceOf(Blob);
+      expect(Array.from(new Uint8Array(await captured.arrayBuffer()))).toEqual([10, 20, 30]);
+    } finally {
+      URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke;
+    }
+  });
+
+  // ── pickImportFile ──
+  it('pickImportFile uses the FS Access API open picker when available', async () => {
+    const file = new Blob([new Uint8Array([7])]);
+    const handle = { getFile: vi.fn(async () => file) };
+    /** @type {any} */ (globalThis.window).showOpenFilePicker = vi.fn(async () => [handle]);
+    expect(await bridge.pickImportFile()).toBe(file);
+  });
+
+  it('pickImportFile returns null when the open picker is cancelled (AbortError)', async () => {
+    /** @type {any} */ (globalThis.window).showOpenFilePicker = vi.fn(async () => {
+      const e = new Error('cancel'); /** @type {any} */ (e).name = 'AbortError'; throw e;
+    });
+    expect(await bridge.pickImportFile()).toBeNull();
+  });
+
+  it('pickImportFile falls back to a DOM file input (no FS Access API)', async () => {
+    const file = new Blob([new Uint8Array([5, 5])]);
+    /** @type {any} */ const fakeInput = {};
+    fakeInput.click = vi.fn(function () { if (fakeInput.onchange) fakeInput.onchange({ target: { files: [file] } }); });
+    const orig = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((/** @type {any} */ tag) => (tag === 'input' ? fakeInput : orig(tag)));
+    expect(await bridge.pickImportFile()).toBe(file);
   });
 });

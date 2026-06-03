@@ -64,6 +64,8 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
  * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string) => void} saveToFile
+ * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void> } | null>} openExportSink
+ * @property {() => Promise<Blob | null>} pickImportFile
  * @property {() => string} getCrashLog
  */
 
@@ -125,6 +127,11 @@ const androidImpl = {
   takeScreenshot: async (top, max, q) => /** @type {any} */ (window).AndroidBridge.takeScreenshot(top, max, q),
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
+  // v3 streaming backup I/O — native chunked-bridge impl lands in P3. Dormant in
+  // P2 (SettingsScreen keeps the Android export/import on the v2 saveToFile /
+  // openFilePicker path until P3), so these reject rather than silently no-op.
+  openExportSink: () => Promise.reject(new Error('openExportSink: Android native streaming pending (P3)')),
+  pickImportFile: () => Promise.reject(new Error('pickImportFile: Android native streaming pending (P3)')),
   // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
   getCrashLog: () => mergeCrashLog(/** @type {any} */ (window).AndroidBridge.getCrashLog()),
 };
@@ -349,6 +356,92 @@ function webSaveToFile(suggestedName, content) {
   } catch (e) {
     report('error:' + (/** @type {any} */ (e) && /** @type {any} */ (e).message || e));
   }
+}
+
+// ── v3 streaming backup I/O (P2 — web side) ─────────────────────────────
+// The bridge provides format-AGNOSTIC file primitives; SettingsScreen layers the
+// container codec (writeContainer/readContainer) on top. The File System Access
+// API (showSaveFilePicker/createWritable, Chromium/Edge) streams straight to disk
+// so a GB-scale backup never sits whole in memory. Where it's absent
+// (Firefox/Safari/most mobile web) we fall back to a Blob download — best-effort,
+// bounded by available memory. The Android equivalents stream through the native
+// chunked bridge (P3) and implement the SAME { write, close } / File contract.
+
+/**
+ * Open a streaming WRITE sink for an export. Returns { write, close }, or null
+ * if the user cancelled the destination picker.
+ * @param {string} suggestedName
+ * @returns {Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void> } | null>}
+ */
+async function webOpenExportSink(suggestedName) {
+  const picker = /** @type {any} */ (window).showSaveFilePicker;
+  if (typeof picker === 'function') {
+    let handle;
+    try {
+      handle = await picker({
+        suggestedName,
+        types: [{ description: 'VOTReader backup', accept: { 'application/octet-stream': ['.votbak'] } }],
+      });
+    } catch (e) {
+      if (e && /** @type {any} */ (e).name === 'AbortError') return null; // user cancelled
+      throw e;
+    }
+    const writable = await handle.createWritable();
+    return {
+      write: (chunk) => writable.write(chunk),
+      close: () => writable.close(),
+    };
+  }
+  // Fallback: accumulate chunks, download as a Blob on close. No streaming-to-disk
+  // without the FS Access API, so this is memory-bounded (best-effort for moderate
+  // sizes; the GB-scale web path is the FS Access API above / the Android native bridge).
+  /** @type {Uint8Array[]} */
+  const chunks = [];
+  return {
+    write: (chunk) => { chunks.push(chunk.slice()); return Promise.resolve(); },
+    close: () => {
+      try {
+        // Cast: TS lib types Uint8Array as Uint8Array<ArrayBufferLike>, which it
+        // won't accept as a BlobPart (wants ArrayBuffer-backed) — a runtime no-op.
+        const blob = new Blob(/** @type {any} */ (chunks), { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = suggestedName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { try { URL.revokeObjectURL(url); a.remove(); } catch (_e) { /* DOM teardown best-effort */ } }, 0);
+      } catch (e) { return Promise.reject(e); }
+      return Promise.resolve();
+    },
+  };
+}
+
+/**
+ * Pick a backup file to import. Returns the File (a Blob the container reader can
+ * slice) or null if cancelled. MUST be called synchronously from a user gesture
+ * ([[file-input-user-gesture]]) — the caller awaits this from a click handler.
+ * @returns {Promise<Blob | null>}
+ */
+function webPickImportFile() {
+  const picker = /** @type {any} */ (window).showOpenFilePicker;
+  if (typeof picker === 'function') {
+    return picker({ multiple: false })
+      .then((/** @type {any[]} */ handles) => (handles && handles[0] ? handles[0].getFile() : null))
+      .catch((/** @type {any} */ e) => { if (e && e.name === 'AbortError') return null; throw e; });
+  }
+  // Fallback: a DOM file input; input.click() runs synchronously in the gesture.
+  return new Promise((resolve, reject) => {
+    try {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.votbak,application/octet-stream,application/json,.json';
+      input.onchange = (/** @type {any} */ ev) => {
+        const file = ev.target.files && ev.target.files[0];
+        resolve(file || null);
+      };
+      input.click();
+    } catch (e) { reject(e); }
+  });
 }
 
 // Web screenshot — html2canvas integration (W1.2 Tier A). Folded in from
@@ -724,6 +817,8 @@ const webImpl = {
   setKeepScreenOn: webSetKeepScreenOn,       // Tier B.1 (WakeLock + de-dup)
   openFilePicker: webOpenFilePicker,         // Tier B.2 (DOM input + FileReader → __onImportFile)
   saveToFile: webSaveToFile,                 // Tier B.2 (Blob + URL.createObjectURL + anchor → __onExportComplete)
+  openExportSink: webOpenExportSink,         // P2 (FS Access API writable / Blob-download fallback)
+  pickImportFile: webPickImportFile,         // P2 (FS Access API open / DOM input → File)
   setImmersiveMode: webSetImmersiveMode,     // Tier B.3 (Fullscreen API, best-effort)
   setZoomEnabled: webSetZoomEnabled,         // Tier B.3 (no-op — browsers handle zoom natively)
   resetZoom: webResetZoom,                   // Tier B.3 (no-op — no JS API to reset user pinch-zoom)

@@ -223,4 +223,13 @@
    buildV3Manifest→writeContainer→readContainer→applyV3 (stores + media byte-exact).
    The whole pure v3 core is now done + verified; v2 untouched. vitest 1763/71
    test:coverage exit 0, tsc + eslint clean. NEXT: P2 web I/O wiring.
+ 2026-06-02 — P2a (web bridge primitives) DONE: PlatformBridge gained
+   openExportSink (FS Access API writable, or a Blob-download fallback) +
+   pickImportFile (FS Access open picker, or a DOM <input> → File) — format-
+   AGNOSTIC web file I/O; SettingsScreen layers the container codec on top (P2b).
+   Android impls are P3 stubs that reject (SettingsScreen keeps Android on the v2
+   saveToFile/openFilePicker path until P3 — never breaks the only backup). +7
+   platform-bridge tests (FS-API delegation, cancel→null, fallback bytes, android
+   reject). vitest 1770/71 test:coverage exit 0, tsc + eslint clean. NEXT: P2b —
+   wire SettingsScreen export/import (web branch) + the legacy-vs-v3 import sniff.
 ═══════════════════════════════════════════════════════════════════════════
