@@ -596,12 +596,11 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 val crashed = detail?.didCrash() ?: false
                 Timber.w("WebView renderer died (crashed=%b). Recovering.", crashed)
 
-                val now = System.currentTimeMillis()
-                if (vm.firstRecoveryMs == 0L || now - vm.firstRecoveryMs > 60_000L) {
-                    vm.renderRecoveryCount = 0
-                    vm.firstRecoveryMs = now
-                }
-                vm.renderRecoveryCount++
+                val decision = MainActivityLogic.decideRecovery(
+                    vm.firstRecoveryMs, vm.renderRecoveryCount, System.currentTimeMillis()
+                )
+                vm.firstRecoveryMs = decision.firstRecoveryMs
+                vm.renderRecoveryCount = decision.renderRecoveryCount
 
                 // Resolve any in-flight WebView resource requests bound to
                 // the dying instance — same cleanup as onDestroy. The
@@ -624,7 +623,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 // attaching + loading until the user taps.
                 webView = createConfiguredWebView()
 
-                if (vm.renderRecoveryCount > 2) {
+                if (decision.showRetryView) {
                     Timber.e("Renderer crashed %d times in 60s. Showing retry view.", vm.renderRecoveryCount)
                     showRendererCrashRetryView()
                     return true
@@ -715,8 +714,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         val tapDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
                 val density = resources.displayMetrics.density
-                if (density > 0f) {
-                    bridge.callOptional(JsEvent.AnnotationTap, e.x / density, e.y / density)
+                MainActivityLogic.deviceToCssPx(e.x, e.y, density)?.let { (cx, cy) ->
+                    bridge.callOptional(JsEvent.AnnotationTap, cx, cy)
                 }
                 return false  // never consume — the tap still flows to the WebView
             }
