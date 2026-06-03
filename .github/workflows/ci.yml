@@ -44,6 +44,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
+          cache: 'npm'   # B2 — restore ~/.npm keyed on package-lock.json (skips re-fetch each push)
+
+      # B2 — cache puppeteer's downloaded Chromium (~150 MB) keyed on the lockfile,
+      # so `npm ci` reuses it across pushes instead of re-downloading the browser
+      # the smoke:ci render walk drives. The path is puppeteer's default cache dir.
+      - name: Cache puppeteer Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       # `npm run build` invokes `python tools/build.py` (which generates
       # bundle-a.js) — setup-python guarantees a `python` on PATH.

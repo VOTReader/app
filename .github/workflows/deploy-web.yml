@@ -71,6 +71,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
+          cache: 'npm'   # B2 — restore ~/.npm keyed on package-lock.json
 
       - name: Set up Python (tools/build.py emits bundle-a)
         uses: actions/setup-python@v5

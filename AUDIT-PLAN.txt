@@ -881,11 +881,25 @@
  [B2] CI re-downloads all deps + ~150 MB Chromium every push; setup-node has no
    cache:'npm'; both jobs run on every push. SEV: Med [CONFIRMED] → add cache:'npm'
    + cache ~/.cache/puppeteer keyed on the lockfile; consider a paths filter on
-   the build job's smoke step.
+   the build job's smoke step.   STATUS: DONE
+   DONE (2026-06-02): added cache:'npm' to setup-node in BOTH ci.yml + deploy-web.yml
+   (restores ~/.npm keyed on package-lock.json) + an actions/cache@v4 step in ci.yml
+   for ~/.cache/puppeteer (the ~150 MB Chromium the smoke walk drives) keyed on the
+   lockfile. The paths-filter on the smoke step is deliberately NOT added — gating
+   the render walk by changed paths could let a render regression slip past on a
+   "non-UI" commit (the gate's whole point), a bad trade for a single job's minutes.
  [B3] ~10 MB lazy corpus bundles are committed + rebuilt + re-staged on every
    bundle-touching commit (no-op git-add on unchanged blobs; rebuild CPU is the
    real cost). SEV: Low-Med [CONFIRMED] → gitignore + build in CI/deploy, or skip
-   the rebuild unless a src/data/ file is staged.
+   the rebuild unless a src/data/ file is staged.   STATUS: ADJUDICATED — no action
+   JUDGMENT (2026-06-02): keep committing the built bundles. (a) Both ship targets
+   read them directly — the APK packages app/src/main/assets/dist and the Pages
+   deploy publishes it — so gitignoring would force a build step into the deploy
+   path + risk shipping a stale/absent bundle (the recurring "I don't see my change"
+   class) for a few seconds of rebuild CPU. (b) The finding's alt ("skip rebuild
+   unless src/data/ staged") is UNSAFE: bundles depend on ALL of src (a SettingsScreen
+   or stores edit needs a rebuild too), so a src/data-only trigger would ship stale
+   bundles. The rebuild is cheap + the committed-bundle contract is the safe one.
  [B5] check_balance.py smart-quote heuristic is weak (start-of-line + colon only);
    esprima backstops it — BUT esprima isn't pinned, so on a machine without it the
    weak heuristic is the only smart-quote check. SEV: Low-Med [PARTIAL] → pin/
@@ -895,7 +909,11 @@
    schemas.js:191-194. SEV: Low [CONFIRMED] → require >=1 of the three.
  [B7] Pre-commit runs `test` (no coverage), CI runs `test:coverage` with a hard
    floor; per-file lint-staged vs whole-repo CI eslint. SEV: Low(known) [CONFIRMED]
-   → documented tradeoff; B1 closes the sharpest instance.
+   → documented tradeoff; B1 closes the sharpest instance.   STATUS: ADJUDICATED
+   JUDGMENT (2026-06-02): no action — this is a DELIBERATE speed/safety split (the
+   pre-commit stays fast; CI is the authoritative coverage+lint gate), already
+   documented + memory-pinned ([[verify-current-state-not-plan]] / B7 itself). B1
+   (pre-commit globals regen) closed the one instance where the split actually bit.
  [B8] Node unpinned — engines >=20, CI uses lts/* (drifts), no .nvmrc. SEV: Low
    [CONFIRMED] → add .nvmrc + node-version-file in both workflows.
  [B9] package.json:4 description mojibake — TRIPLE-encoded em-dash (bytes c3 a2 e2
