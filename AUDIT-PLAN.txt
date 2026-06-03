@@ -1126,16 +1126,37 @@
  [F6] Two annotation render architectures (React sweep-line vs imperative+Static
    Subtree) — documented reason (avoid splitText/React reconciliation race). SEV:
    Low(maint) [CONFIRMED] → consider consolidating onto the imperative path (also
-   the root of F1).
+   the root of F1).   STATUS: DONE (documented; consolidation declined)
+   DONE (2026-06-02): added an explicit "TWO RENDER ARCHITECTURES (F6)" block to the
+   annotation-engine.jsx header — what each path is, where each is used, that both
+   share the overlap-precedence + A7 clamping, and that the dual-render equivalence
+   test pins them. Consolidating onto one path is DECLINED: the split has a real
+   reason (StaticSubtree freezes single-block prose so React won't clobber the
+   imperative marks; verse screens want the declarative React path) and merging
+   would risk the most load-bearing render path for a maintainability-only gain.
  [A2] snapRangeToWords regex /[\w’’-]/ — duplicated U+2019, MISSING straight ASCII
    ' (byte-confirmed; siblings all use /[\w’'-]/). annotation-engine.jsx:25. SEV:
    Low [CONFIRMED] → fix to /[\w’'-]/.
  [A6] Stacked non-note highlights under the newest are untappable (multi-disambig
    is note-only). SelectionToolbar.jsx:181,193-200. SEV: Low [CONFIRMED] → extend
-   elementsFromPoint disambiguation to all stacked marks (optional).
+   elementsFromPoint disambiguation to all stacked marks (optional).   STATUS: ADJUDICATED
+   JUDGMENT (2026-06-02): no action — the finding itself marks it "(optional)", SEV
+   Low, and it's an edge case (differently-colored highlights overlapping the same
+   span). "Newest-wins" tap routing is a reasonable, predictable default; adding a
+   stacked-highlight chooser is a NET-NEW interaction/UI (a feature), not a bug fix,
+   and the action chip already lets the user recolor/clear the top one then reach the
+   one beneath. Notes keep their multi-disambig because losing a note is high-stakes;
+   a buried highlight is not. Revisit only if users actually report it.
  [A7] Out-of-range stored offsets diverge between paths post-corpus-edit (React
    clamps + paints truncated; DOM drops the overflow). SEV: Low [CONFIRMED] →
-   clamp identically if consistency is wanted.
+   clamp identically if consistency is wanted.   STATUS: DONE
+   DONE (2026-06-02): applyDOMHighlights now clamps each stored offset into the
+   current text length and drops empties IDENTICALLY to the React path
+   (Math.max(0,Math.min(...,textContent.length)) then s<e filter), right after the
+   sort. So a corpus edit that shortened the text can no longer make the two paths
+   diverge or leave a stray/oversize mark. +2 annotation-engine.test.jsx cases
+   (offset past end → clamped to the real end; range entirely past end → dropped);
+   the dual-render equivalence test stays green (33→35).
  [A8] Native tap→CSS-px /density assumes fixed dpr. PREMISE INACTIVE in this build
    (setSupportZoom false, wide-viewport false, no TEXT_AUTOSIZING; density re-read
    per tap). MainActivity.kt:676-678. SEV: Low [RUNTIME] → device-confirm only;

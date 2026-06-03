@@ -11,6 +11,21 @@
      applyActiveNoteState()           → void (DOM mutation)
      applyDOMHighlights()             → void (DOM mutation)
      StaticSubtree                    → React.Component (freeze wrapper)
+
+   TWO RENDER ARCHITECTURES (F6 — by design, not drift):
+     1. REACT SWEEP-LINE — `HighlightableText`. Used by the verse-rendered screens
+        (Bible/Matthew/study chapters). Builds overlap-aware nested <mark>s as JSX
+        from sorted boundaries; annotations live in React's tree.
+     2. IMPERATIVE DOM — `applyDOMHighlights` (+ applyDOMLinks/Bookmarks/NoteIcons),
+        run by useDomAnnotationSync AFTER React commits. Used for content React
+        renders as a single block (letters/WTLB/journal, marked [data-hl-dom]):
+        it walks text nodes and wraps ranges via splitText. StaticSubtree freezes
+        those blocks so React won't clobber the imperatively-injected marks.
+     Both implement the SAME overlap precedence (annVisible/annAbove/renderSubRanges)
+     + the SAME offset clamping (A7), so their per-character paint + tap-winner are
+     equivalent — pinned by the DUAL-RENDER EQUIVALENCE test (annotation-engine.test).
+     Pick the React path for new verse-style content; the imperative path only for
+     single-block prose React owns.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* Snap an annotation's START back to a whole-word boundary — but leave the END
@@ -368,6 +383,22 @@ export function applyDOMHighlights() {
     // Newest LAST so a more-recent annotation nests INNERMOST — it both paints
     // on top (its mark wraps the text last) and is the natural tap target.
     var sorted = anns.slice().sort(function(a, b) { return annAbove(a, b) ? 1 : annAbove(b, a) ? -1 : 0; });
+
+    // A7: clamp each stored offset into the CURRENT text length and drop any that
+    // collapse to empty — IDENTICALLY to the React path (HighlightableText, which
+    // does Math.max(0, Math.min(start/end, text.length)) then filters s<e). Without
+    // this, a stored offset left dangling past the end by a later corpus edit was
+    // clamped on the React path but used raw here, so the two paths diverged (and
+    // the imperative path could leave a stray/empty mark). `container.textContent`
+    // is the clean text now (marks were just unwrapped + normalized above).
+    var fullLen = container.textContent.length;
+    sorted = sorted.map(function(a) {
+      var s = Math.max(0, Math.min(a.start, fullLen));
+      var e = Math.max(0, Math.min(a.end, fullLen));
+      return s < e ? Object.assign({}, a, { start: s, end: e }) : null;
+    }).filter(Boolean);
+    if (!sorted.length) return;
+
     var groupSeen = {};
 
     for (var hi = 0; hi < sorted.length; hi++) {

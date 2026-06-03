@@ -270,6 +270,27 @@ describe('applyDOMHighlights overlap precedence', () => {
     expect(c.querySelector('mark.hl-yellow[data-hl-id="a"]')).not.toBeNull();
     expect(c.querySelector('mark.hl-blue[data-hl-id="b"]')).not.toBeNull();
   });
+
+  // A7: the DOM path now clamps stored offsets to the current text length (and
+  // drops empties) exactly like the React path, so a corpus edit that shortened
+  // the text can't make the two paths diverge or leave a stray/oversize mark.
+  it('A7: clamps an offset that runs past the end (no oversize mark, text intact)', () => {
+    store['k'] = [ann({ id: 'over', color: 'yellow', start: 6, end: 999, created: 1 })];
+    const c = setup('Hello world');
+    applyDOMHighlights();
+    const m = c.querySelector('mark.hl-yellow[data-hl-id="over"]');
+    expect(m).not.toBeNull();
+    expect(m.textContent).toBe('world');        // clamped to [6, 11]
+    expect(c.textContent).toBe('Hello world');  // no duplication / loss
+  });
+
+  it('A7: drops an annotation whose range is entirely past the end', () => {
+    store['k'] = [ann({ id: 'gone', color: 'blue', start: 50, end: 99, created: 1 })];
+    const c = setup('Hello world');
+    applyDOMHighlights();
+    expect(c.querySelector('mark[data-hl-id="gone"]')).toBeNull(); // clamped→empty→dropped
+    expect(c.textContent).toBe('Hello world');
+  });
 });
 
 // ── DUAL-RENDER EQUIVALENCE (U11) ──────────────────────────────
