@@ -44,6 +44,40 @@ export const GARDEN_DEFAULT_TIER = "standard";
  *  @type {Record<string, HTMLImageElement>} */
 export const gardenImageCache = {};
 
+/** PF5 — LRU bound on the DECODED-image cache. The viewer shows ONE page at a
+ *  time, so a handful of decoded bitmaps around the current page is plenty for
+ *  instant prev/next while bounding RAM: an Ultra-tier page decodes to tens of MB,
+ *  and without a bound the 209-page background crawl trended ~700 MB of resident
+ *  bitmaps that were never evicted. */
+export const GARDEN_CACHE_MAX = 12;
+/** LRU order of live cache keys, oldest first. @type {string[]} */
+const _gardenLru = [];
+/** PF5 — the crawl's done-marker: page-keys whose JPEG has been REQUESTED (so the
+ *  browser's HTTP cache is warm). Kept as a Set of strings SEPARATE from the live
+ *  `gardenImageCache`, so LRU-evicting a decoded bitmap does NOT make the crawl
+ *  re-fetch it (the old code used the live Image ref as the marker, which both
+ *  pinned the bitmaps AND would loop forever once eviction landed).
+ *  @type {Set<string>} */
+export const gardenCrawled = new Set();
+
+/** Drop the decoded bitmap for a cache key (release its memory). */
+function _gardenEvict(key) {
+  const img = gardenImageCache[key];
+  if (img) { try { img.src = ''; } catch (_e) { /* releasing the decode — best-effort */ } }
+  delete gardenImageCache[key];
+}
+
+/** Mark `key` most-recently-used; evict the oldest beyond GARDEN_CACHE_MAX. */
+function _gardenTouch(key) {
+  const i = _gardenLru.indexOf(key);
+  if (i >= 0) _gardenLru.splice(i, 1);
+  _gardenLru.push(key);
+  while (_gardenLru.length > GARDEN_CACHE_MAX) {
+    const oldest = _gardenLru.shift();
+    if (oldest !== undefined && oldest !== key) _gardenEvict(oldest);
+  }
+}
+
 /**
  * Resolve a tier id to its full record, falling back to the default tier
  * if the id is unknown (never returns undefined).
@@ -92,10 +126,12 @@ export function gardenCacheKey(n, tierId) {return `${tierId}:${n}`;}
 export function gardenPreload(n, tierId) {
   if (n < 1 || n > GARDEN_TOTAL) return;
   const key = gardenCacheKey(n, tierId);
-  if (gardenImageCache[key]) return;
+  if (gardenImageCache[key]) { _gardenTouch(key); return; } // already resident — keep it fresh
   const img = new Image();
   img.src = gardenUrl(n, tierId);
   gardenImageCache[key] = img;
+  gardenCrawled.add(key);   // PF5: remember it was fetched even after LRU eviction
+  _gardenTouch(key);        // PF5: LRU-insert + evict the oldest beyond the cap
 }
 
 /**

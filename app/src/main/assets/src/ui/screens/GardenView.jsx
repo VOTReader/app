@@ -88,12 +88,21 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
   // Restarts when tier changes (because all existing cached pages are for a
   // different tier now).
   React.useEffect(() => {
+    // PF5: skip the aggressive 209-page background warm on a metered / slow link
+    // (Save-Data or 2g). The priority preload of current + ahead (above) still
+    // runs, so the page in view is always loaded; far pages then load on demand.
+    const conn = (typeof navigator !== 'undefined') && /** @type {any} */ (navigator).connection;
+    if (conn && (conn.saveData || /(^|-)2g$/.test(conn.effectiveType || ''))) return;
+
     let cancelled = false;
     let crawlPage = 1;
 
     const crawlNext = () => {
       if (cancelled) return;
-      while (crawlPage <= GARDEN_TOTAL && gardenImageCache[gardenCacheKey(crawlPage, tier)]) crawlPage++;
+      // PF5: the done-marker is the gardenCrawled Set (survives LRU eviction of the
+      // decoded bitmap), NOT the live-image cache — otherwise an evicted page would
+      // be re-crawled forever, and the live refs would never be freed.
+      while (crawlPage <= GARDEN_TOTAL && gardenCrawled.has(gardenCacheKey(crawlPage, tier))) crawlPage++;
       if (crawlPage > GARDEN_TOTAL) return;
 
       const cur = pageRef.current;
@@ -101,7 +110,7 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
         crawlPage++;
       }
 
-      if (crawlPage <= GARDEN_TOTAL && !gardenImageCache[gardenCacheKey(crawlPage, tier)]) {
+      if (crawlPage <= GARDEN_TOTAL && !gardenCrawled.has(gardenCacheKey(crawlPage, tier))) {
         gardenPreload(crawlPage, tier);
         crawlPage++;
       }

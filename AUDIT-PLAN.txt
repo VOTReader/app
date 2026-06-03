@@ -655,7 +655,19 @@
      (Correction: persists across mounts, so it's "first open per tier", not
      literally every open.)
    Fix: gate the crawl on navigator.connection; LRU-cap the in-session cache; use
-     a Set of page numbers as the done-marker instead of live Image refs.
+     a Set of page numbers as the done-marker instead of live Image refs.   STATUS: DONE
+   DONE (2026-06-02): all three. (a) gardenImageCache is now LRU-bounded to
+   GARDEN_CACHE_MAX=12 decoded bitmaps — gardenPreload _gardenTouch()es on insert
+   and _gardenEvict()s the oldest (img.src='' to release the decode), so resident
+   RAM is bounded regardless of the 209-page crawl. (b) The crawl's done-marker is
+   a new `gardenCrawled` Set of page-keys (NOT the live Image refs) so an evicted
+   page is never re-crawled (the old live-ref marker would loop forever once
+   eviction landed). (c) The background crawl is skipped on a Save-Data / 2g link
+   (navigator.connection) — the priority preload of current+ahead still runs, so
+   the viewed page always loads; far pages load on demand. +3 garden.test.js tests
+   (cap bounds the cache; every fetch recorded in gardenCrawled even post-eviction;
+   re-touch doesn't grow). Android Garden is unaffected (native per-page disk cache).
+   Gates: tsc/eslint/vitest 1800/build green.
 
  [PF6] bundle-d ships all 53 screens, parser-blocking        SEV: Low-Med [CONFIRMED]
    Evidence: index.html:582 loads bundle-d (344 KB, 97 imports, all screens) with

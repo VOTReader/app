@@ -5,6 +5,10 @@ import {
   getGardenTier,
   gardenUrl,
   gardenCacheKey,
+  gardenPreload,
+  gardenImageCache,
+  gardenCrawled,
+  GARDEN_CACHE_MAX,
 } from './garden.js';
 
 describe('getGardenTier', () => {
@@ -50,5 +54,34 @@ describe('gardenUrl', () => {
 describe('gardenCacheKey', () => {
   it('keys by tier and page', () => {
     expect(gardenCacheKey(5, 'native')).toBe('native:5');
+  });
+});
+
+describe('gardenPreload LRU + crawled set (PF5)', () => {
+  it('bounds the live decoded-image cache to GARDEN_CACHE_MAX', () => {
+    const N = GARDEN_CACHE_MAX + 6;
+    for (let p = 1; p <= N; p++) gardenPreload(p, 'standard');
+    // resident decoded bitmaps never exceed the cap (the ~700 MB unbounded-crawl fix)
+    expect(Object.keys(gardenImageCache).length).toBeLessThanOrEqual(GARDEN_CACHE_MAX);
+    // the most-recent page stays resident; the oldest was evicted (LRU order)
+    expect(gardenImageCache[gardenCacheKey(N, 'standard')]).toBeTruthy();
+    expect(gardenImageCache[gardenCacheKey(1, 'standard')]).toBeUndefined();
+  });
+  it('records EVERY fetched page in gardenCrawled even after its bitmap is evicted', () => {
+    const N = GARDEN_CACHE_MAX + 6;
+    for (let p = 1; p <= N; p++) {
+      expect(gardenCrawled.has(gardenCacheKey(p, 'standard'))).toBe(true); // crawl won't re-fetch
+    }
+    // page 1's bitmap is gone (evicted) but it's still marked crawled — proves the
+    // done-marker is the Set, not the live ref (no re-crawl loop, refs freed).
+    expect(gardenImageCache[gardenCacheKey(1, 'standard')]).toBeUndefined();
+    expect(gardenCrawled.has(gardenCacheKey(1, 'standard'))).toBe(true);
+  });
+  it('re-touching a resident page does not grow the cache', () => {
+    const residentKey = Object.keys(gardenImageCache)[0];
+    const before = Object.keys(gardenImageCache).length;
+    const [tierId, pageStr] = residentKey.split(':');
+    gardenPreload(Number(pageStr), tierId);
+    expect(Object.keys(gardenImageCache).length).toBe(before);
   });
 });
