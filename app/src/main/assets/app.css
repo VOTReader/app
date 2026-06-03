@@ -2025,6 +2025,28 @@
     .tabs-nav-btn-glyph { font-size:0.85rem; line-height:1; display:inline-block; transform:translateY(-1px); }
     .tabs-nav-btn-count { font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.05em; min-width:0.9em; text-align:center; }
 
+    /* UX5 — first-use coachmark pointing at the tab switcher glyph. */
+    .tabs-hint-wrap { position:relative; display:inline-flex; flex-shrink:0; }
+    .tabs-hint {
+      position:absolute; top:calc(100% + 0.45rem); right:0; z-index:120;
+      display:inline-flex; align-items:center; gap:0.4rem;
+      width:max-content; max-width:80vw; padding:0.4rem 0.55rem;
+      background:#1b1407; border:1px solid var(--gold-border);
+      border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,0.5);
+      animation:tabsHintIn 0.22s ease;
+    }
+    .tabs-hint::before {
+      content:""; position:absolute; bottom:100%; right:0.85rem;
+      border:5px solid transparent; border-bottom-color:var(--gold-border);
+    }
+    .tabs-hint-text { font-size:0.74rem; line-height:1.25; color:var(--gold-bright); white-space:nowrap; }
+    .tabs-hint-dismiss {
+      background:none; border:none; cursor:pointer; color:var(--gold);
+      font-size:0.95rem; line-height:1; padding:0 0.1rem; flex-shrink:0;
+      -webkit-tap-highlight-color:transparent;
+    }
+    @keyframes tabsHintIn { from { opacity:0; transform:translateY(-3px); } to { opacity:1; transform:translateY(0); } }
+
     /* ── TABS: overview layer ─────────────────────────────────────── */
     .tabs-overview-layer {
       position:fixed; inset:0; z-index:400;
