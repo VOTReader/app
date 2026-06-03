@@ -260,8 +260,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
 export function JournalImageBlock({ mediaId, caption }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
-  var _src = useState(null);
-  var src = _src[0]; var setSrc = _src[1];
+  const [src, setSrc] = useState(null);
   useEffect(function() {
     var cancelled = false;
     if (mediaId && typeof JournalMediaStore !== 'undefined') {
@@ -270,7 +269,6 @@ export function JournalImageBlock({ mediaId, caption }) {
       });
     }
     return function() { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSrc is a tuple-unpacked useState setter (`var _src = useState(null); var setSrc = _src[1]`) — eslint can't trace this back to its useState origin; identity-stable per React invariant.
   }, [mediaId]);
 
   return (
@@ -294,15 +292,11 @@ export function JournalAudioBlock(props) {
   var editable = !!props.editable;
   var confirming = !!props.confirming;
 
-  var _src = useState(null);
-  var src = _src[0]; var setSrc = _src[1];
+  const [src, setSrc] = useState(null);
   var audioRef = useRef(null);
-  var _playing = useState(false);
-  var playing = _playing[0]; var setPlaying = _playing[1];
-  var _progress = useState(0);
-  var progress = _progress[0]; var setProgress = _progress[1];
-  var _curTime = useState(0);
-  var curTime = _curTime[0]; var setCurTime = _curTime[1];
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [curTime, setCurTime] = useState(0);
 
   useEffect(function() {
     var cancelled = false;
@@ -312,7 +306,6 @@ export function JournalAudioBlock(props) {
       });
     }
     return function() { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSrc is a tuple-unpacked useState setter (`var _src = useState(null); var setSrc = _src[1]`) — eslint can't trace this back to its useState origin; identity-stable per React invariant.
   }, [mediaId]);
 
   function toggle(e) {

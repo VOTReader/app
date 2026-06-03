@@ -30,8 +30,7 @@ export function JournalEditorScreen(props) {
   // unused (underscore-marked); wire it from a picker if one is ever added.
   var mood = _mood[0]; var _setMood = _mood[1];
 
-  var _saved = useState('Saved');
-  var savedLabel = _saved[0]; var setSavedLabel = _saved[1];
+  const [savedLabel, setSavedLabel] = useState('Saved');
 
   var _showInsert = useState(false);
   var showInsert = _showInsert[0]; var setShowInsert = _showInsert[1];
@@ -61,8 +60,7 @@ export function JournalEditorScreen(props) {
   // currently awaiting confirm, or null. Audio uses confirmAudioDelete
   // because its inline waveform layout has its own compact confirm strip
   // sized for the play-button row.
-  var _confirmDel = useState(null);
-  var confirmDelIdx = _confirmDel[0]; var setConfirmDelIdx = _confirmDel[1];
+  const [confirmDelIdx, setConfirmDelIdx] = useState(null);
 
   // Tap anywhere outside the ConfirmStrip fully cancels it. Capture phase
   // so the gesture is seen even if a child stops propagation; taps inside
@@ -78,7 +76,6 @@ export function JournalEditorScreen(props) {
     }
     document.addEventListener('pointerdown', onDocDown, true);
     return function() { document.removeEventListener('pointerdown', onDocDown, true); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setConfirmDelIdx is a tuple-unpacked useState setter (identity-stable per React invariant; eslint can't trace this form back to its useState origin).
   }, [confirmDelIdx]);
 
   var fileInputRef = useRef(null);
@@ -124,7 +121,6 @@ export function JournalEditorScreen(props) {
       setSavedLabel('Saved');
     }, 1200);
     return function() { clearTimeout(t); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setSavedLabel is a tuple-unpacked useState setter (identity-stable). Effect intent is debounced-save on content change, not on setter-identity churn.
   }, [entryId, title, blocks, mood]);
 
   // Final flush on real unmount. Reads from refs so the latest state
@@ -155,7 +151,6 @@ export function JournalEditorScreen(props) {
       window.removeEventListener('pagehide', commitSave);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only flush listeners; commitSave reads always-current refs (title/blocks/mood/entryId), so it never goes stale. Re-subscribing per render would only churn listeners.
   }, []);
 
   function commitSave() {
