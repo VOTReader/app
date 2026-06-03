@@ -523,3 +523,99 @@ export async function applyImportPayload(parsed, ctx) {
 
   return { importFailures, writeFailures, skippedStores };
 }
+
+/**
+ * Apply a v3 STREAMING import to the live stores: reseed LS data, apply the
+ * manifest's stores + flags (validated, skip-on-violation like applyImportPayload),
+ * REPLACE media by streaming each container frame's Blob straight to IDB (no
+ * base64 — the frame already IS a Blob), then await the U1 durability barrier.
+ *
+ * `entries` are readContainer()'s lazy {id, meta, blob} frames (in manifest.media
+ * order); each blob's bytes are read only when JournalMediaStore.put consumes it,
+ * one at a time — bounded memory, GB-scale safe. No aggregate media cap (S5) is
+ * needed on this path: streaming never holds more than one blob, so the OOM that
+ * cap defends against cannot happen. The container reader already integrity-checked
+ * each frame's length against the manifest.
+ *
+ * Returns the SAME shape as applyImportPayload so SettingsScreen treats v3 and the
+ * legacy v1/v2 path identically. Self-contained for now (the store-apply mirrors
+ * applyImportPayload's v2 branch — no V1 fallback, since v3 is always v2-shape
+ * stores); folding the shared apply is the tracked P5 cleanup.
+ *
+ * @param {any} manifest - the v3 manifest (readContainer().manifest)
+ * @param {Iterable<{id:any, meta:any, blob:Blob}> | AsyncIterable<{id:any, meta:any, blob:Blob}>} entries
+ * @param {ApplyImportCtx} ctx
+ * @returns {Promise<{ importFailures: number, writeFailures: number, skippedStores: string[] }>}
+ */
+export async function applyV3(manifest, entries, ctx) {
+  const {
+    storesMap, flagMap, mediaStore,
+    validateStorePayload,
+    dataLsKeys = DEFAULT_DATA_LS_KEYS,
+  } = ctx;
+
+  let importFailures = 0;
+  /** @type {string[]} */
+  const skippedStores = [];
+  const stores = (manifest && manifest.stores) || {};
+
+  // (1) Clear the shim LS keys and re-seed from the manifest's `data`.
+  dataLsKeys.forEach((k) => {
+    try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
+  });
+  Object.keys((manifest && manifest.data) || {}).forEach((k) => {
+    if (k.indexOf('vot-') !== 0) return;
+    const v = manifest.data[k];
+    if (typeof v === 'string') {
+      try { localStorage.setItem(k, v); } catch (e) { console.warn('LS write failed for', k, e); }
+    }
+  });
+
+  // (2) Apply stores + flags (v3 is always v2-shape stores — no V1 fallback).
+  for (const name of Object.keys(storesMap)) {
+    if (!(name in stores)) continue;
+    const violations = validateStorePayload(name, stores[name]);
+    if (violations.length) {
+      skippedStores.push(name);
+      console.warn('skipping store with invalid payload:', name, violations);
+      continue;
+    }
+    const { store, method } = storesMap[name];
+    try { store[method](stores[name]); }
+    catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
+  }
+  for (const name of Object.keys(flagMap)) {
+    if (!(name in stores)) continue;
+    const truthy = !!stores[name];
+    try { if (truthy) flagMap[name].set(); else flagMap[name].clear(); }
+    catch (e) { importFailures += 1; console.warn('flag import failed for', name, e); }
+  }
+
+  // (3) REPLACE media: clear existing, then put each streamed frame Blob DIRECTLY
+  // (no base64 decode, no aggregate cap — streaming is bounded per-blob).
+  try {
+    const existingIds = await mediaStore.allIds();
+    for (const id of existingIds) await mediaStore.delete(id);
+  } catch (e) { console.warn('clear existing media failed', e); }
+  for await (const entry of entries) {
+    const m = entry.meta || {};
+    try {
+      await mediaStore.put({
+        id: entry.id, type: m.type, blob: entry.blob,
+        mime: m.mime, size: m.size,
+        width: m.width, height: m.height, duration: m.duration,
+        created: m.created,
+      });
+    } catch (e) { importFailures += 1; console.warn('media import failed for', entry.id, e); }
+  }
+
+  // (4) U1 DURABILITY BARRIER — same as applyImportPayload (media already durable;
+  // JournalMediaStore.put is awaited above). whenSaved never rejects.
+  const saveResults = await Promise.all(
+    Object.values(storesMap).map(({ store }) => _whenSaved(store))
+      .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
+  );
+  const writeFailures = saveResults.filter((ok) => !ok).length;
+
+  return { importFailures, writeFailures, skippedStores };
+}

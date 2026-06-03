@@ -30,7 +30,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
   blobToBase64, base64ToBlob, buildExportPayload, applyImportPayload,
-  buildV3Manifest, DEFAULT_MEDIA_LIMIT_BYTES,
+  buildV3Manifest, applyV3, DEFAULT_MEDIA_LIMIT_BYTES,
 } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
 
@@ -456,6 +456,117 @@ describe('applyImportPayload', () => {
     );
     expect(res.importFailures).toBe(0);
     expect(bkm.calls).toEqual([[{ id: 'b1' }]]);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+   PART 3b — applyV3 (the v3 streaming-import applier, P1)
+   ───────────────────────────────────────────────────────────────────── */
+describe('applyV3', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  const okValidate = () => [];
+  function destStore(method, opts = {}) {
+    const calls = [];
+    return {
+      calls,
+      [method]: (arg) => { if (opts.throws) throw new Error('write boom'); calls.push(arg); },
+      whenSaved: () => Promise.resolve(opts.saved === undefined ? true : opts.saved),
+    };
+  }
+  function destMedia(seed) {
+    const store = Object.assign({}, seed);
+    const puts = [];
+    return {
+      puts, _store: store,
+      allIds: async () => Object.keys(store),
+      delete: async (id) => { delete store[id]; },
+      put: async (rec) => { store[rec.id] = rec; puts.push(rec); },
+    };
+  }
+  const blobOf = (u8) => new Blob([u8]);
+
+  it('FULL PIPELINE: buildV3Manifest → writeContainer → readContainer → applyV3 (byte-exact)', async () => {
+    const img = new Uint8Array([9, 8, 7, 255, 0, 128]);
+    const aud = new TextEncoder().encode('voice-memo');
+    // SOURCE — build the v3 manifest + blob list from fake source stores/media
+    const built = await buildV3Manifest({
+      storesMap: { 'vot-annotations': { store: {}, method: 'replaceAll' }, 'vot-bookmarks': { store: {}, method: 'replaceAll' } },
+      flagMap: { 'vot-welcomed': {} },
+      idbAdapter: { get: async (n) => ({ 'vot-annotations': { k: [{ id: 'a' }] }, 'vot-bookmarks': [{ id: 'b' }], 'vot-welcomed': true }[n]) },
+      mediaStore: {
+        allIds: async () => ['m1', 'm2'],
+        get: async (id) => ({
+          m1: { blob: blobOf(img), type: 'image', mime: 'image/png', width: 2, height: 3, duration: 0, created: 't1' },
+          m2: { blob: blobOf(aud), type: 'audio', mime: 'audio/webm', width: 0, height: 0, duration: 5, created: 't2' },
+        }[id]),
+      },
+      storageEstimate: async () => ({ quota: null, usage: null }), nowIso: () => 'fixed',
+    });
+    expect(built.ok).toBe(true);
+
+    // SERIALIZE → container Blob → READ BACK
+    const chunks = [];
+    await writeContainer(built.manifest, built.mediaEntries, (u8) => chunks.push(u8.slice()));
+    const read = await readContainer(new Blob(chunks));
+
+    // DEST — apply into fresh fakes
+    const ann = destStore('replaceAll'); const bkm = destStore('replaceAll');
+    const wel = { set: vi.fn(), clear: vi.fn(), whenSaved: () => Promise.resolve(true) };
+    const media = destMedia();
+    const res = await applyV3(read.manifest, read.entries, {
+      storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' }, 'vot-bookmarks': { store: bkm, method: 'replaceAll' } },
+      flagMap: { 'vot-welcomed': wel }, mediaStore: media, validateStorePayload: okValidate,
+    });
+
+    expect(res).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [] });
+    expect(ann.calls).toEqual([{ k: [{ id: 'a' }] }]);     // stores reconstructed exactly
+    expect(bkm.calls).toEqual([[{ id: 'b' }]]);
+    expect(wel.set).toHaveBeenCalledTimes(1);              // flag reconstructed
+    expect(media.puts.map((p) => p.id)).toEqual(['m1', 'm2']);
+    expect(media.puts[0].mime).toBe('image/png');          // metadata reconstructed
+    // media bytes survive the WHOLE export → container → import pipeline
+    expect(Array.from(new Uint8Array(await media.puts[0].blob.arrayBuffer()))).toEqual(Array.from(img));
+    expect(Array.from(new Uint8Array(await media.puts[1].blob.arrayBuffer()))).toEqual(Array.from(aud));
+  });
+
+  it('SKIPS a store whose payload fails validation (never written)', async () => {
+    const ann = destStore('replaceAll');
+    const res = await applyV3(
+      { stores: { 'vot-annotations': { bad: true } } }, [],
+      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: destMedia(), validateStorePayload: () => ['shape violation'] },
+    );
+    expect(res.skippedStores).toEqual(['vot-annotations']);
+    expect(ann.calls).toEqual([]);
+  });
+
+  it('REPLACES media: clears existing before putting the streamed frames', async () => {
+    const media = destMedia({ old1: { id: 'old1' }, old2: { id: 'old2' } });
+    await applyV3(
+      { stores: {} },
+      [{ id: 'new1', meta: { mime: 'image/png' }, blob: blobOf(new Uint8Array([1, 2])) }],
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
+    );
+    expect(Object.keys(media._store)).toEqual(['new1']); // old media gone
+    expect(media.puts.map((p) => p.id)).toEqual(['new1']);
+  });
+
+  it('reports writeFailures when a store durability barrier resolves false', async () => {
+    const ann = destStore('replaceAll', { saved: false });
+    const res = await applyV3(
+      { stores: { 'vot-annotations': { k: [] } } }, [],
+      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: destMedia(), validateStorePayload: okValidate },
+    );
+    expect(res.writeFailures).toBe(1);
+  });
+
+  it('counts importFailures when a store write throws', async () => {
+    const ann = destStore('replaceAll', { throws: true });
+    const res = await applyV3(
+      { stores: { 'vot-annotations': { k: [] } } }, [],
+      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: destMedia(), validateStorePayload: okValidate },
+    );
+    expect(res.importFailures).toBe(1);
   });
 });
 

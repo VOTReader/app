@@ -166,13 +166,15 @@
 ───────────────────────────────────────────────────────────────────────────
  P0  Format/dep decision — RESOLVED: bespoke length-prefixed container, no dep
      (see "FORMAT PIVOT"). [DONE]
- P1  Container codec + manifest builder (web), PURE + injectable. [DONE —
-     backup-container.js (14 tests); buildV3Manifest in backup.js (4 tests incl. a
-     builder→writeContainer→readContainer byte-exact round-trip).] NEXT: applyV3
-     (the import applier — apply the manifest's stores/flags + stream each frame
-     blob to IDB), then P2. NOTE: buildV3Manifest is self-contained for now;
-     folding its store-read into a shared helper with buildExportPayload is a
-     tracked P5 cleanup — v2 stays untouched until v3 ships end-to-end.
+ P1  COMPLETE — the pure, injectable v3 core (web), all tested:
+       • backup-container.js — writeContainer/readContainer/isContainerMagic/u64 (14 tests)
+       • buildV3Manifest (backup.js) — export manifest + ordered blob list (4 tests)
+       • applyV3 (backup.js) — streaming import applier (5 tests)
+     incl. the FULL export→container→import byte-exact round-trip (buildV3Manifest
+     → writeContainer → readContainer → applyV3 reconstructs stores + media bytes
+     exactly). v3 is built ENTIRELY ALONGSIDE v2 (buildExportPayload/applyImport-
+     Payload untouched); folding the shared store-read/apply is the tracked P5
+     cleanup. NEXT: P2 (wire the web I/O).
  P2  Web I/O: FS Access API export + File.stream import, wired through
      PlatformBridge; preview-verified end-to-end with a multi-hundred-MB
      synthetic dataset (real blobs in fake-IDB).
@@ -212,8 +214,13 @@
    vitest 1754/71 test:coverage exit 0, tsc + eslint clean.
  2026-06-02 — P1 manifest builder DONE: buildV3Manifest (backup.js) builds the v3
    manifest (stores + media METADATA, no base64) + the ordered blob list; +4 tests
-   incl. a builder→writeContainer→readContainer byte-exact round-trip. Self-
-   contained (v2 buildExportPayload untouched; shared-read consolidation is a P5
-   cleanup). vitest 1758/71 test:coverage exit 0, tsc + eslint clean. NEXT: applyV3
-   (import applier), then P2 web I/O.
+   incl. a builder→writeContainer→readContainer byte-exact round-trip. vitest
+   1758/71 exit 0.
+ 2026-06-02 — P1 COMPLETE: applyV3 (backup.js) DONE — the streaming import applier
+   (reseed LS, apply stores/flags validated, REPLACE media by streaming each frame
+   blob straight to IDB — no base64, no S5 cap needed; U1 durability barrier; same
+   return shape as applyImportPayload). +5 tests incl. the FULL pipeline round-trip
+   buildV3Manifest→writeContainer→readContainer→applyV3 (stores + media byte-exact).
+   The whole pure v3 core is now done + verified; v2 untouched. vitest 1763/71
+   test:coverage exit 0, tsc + eslint clean. NEXT: P2 web I/O wiring.
 ═══════════════════════════════════════════════════════════════════════════
