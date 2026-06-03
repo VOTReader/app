@@ -1170,7 +1170,17 @@
    → visible "Enter" button + a labeled link.
  [UX7] Inconsistent delete-confirm — ConfirmStrip for highlight/clear-all-tabs vs
    INSTANT irreversible per-tab close; last-tab close resets to Home (lossy, no
-   undo). SEV: Med [CONFIRMED] → undo-toast for tab close, or standardize.
+   undo). SEV: Med [CONFIRMED] → undo-toast for tab close, or standardize.   STATUS: DONE
+   DONE (2026-06-02, owner chose the undo-toast over a confirm tap): closeTab now
+   snapshots the closed tab (closedTabRef = {tab, idx}) and, on the next macrotask
+   (after React flushes), shows a 6 s "Tab closed · Undo" toast; the Undo button
+   calls the new restoreClosedTab() which re-inserts the tab at its original index
+   + re-activates it. The last-tab reset path nulls the snapshot (no toast — a tab
+   always remains there). New .vot-toast-undo CSS makes the toast clickable
+   (base .vot-toast is pointer-events:none) at its z-index 9998, ABOVE the tabs
+   overview (z-index 400) where the ✕ lives. +3 use-tab-actions.test.js cases
+   (close+snapshot+restore round-trip, no-undo-on-last-tab, no-op restore). Tab
+   close stays instant (no friction); just recoverable now. Gates: vitest 1805/build.
  [UX8] Tab-card progress bar renders 0% for short/unscrolled reading tabs (reads as
    "unread"). TabsOverview.jsx:104-108. SEV: Med [CONFIRMED] → hide the bar when
    pct===0 and no scrollPosition recorded.

@@ -64,6 +64,12 @@
       .vot-toast-sw-update { position:fixed; z-index:9999; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + 2rem); max-width:min(92%,32rem); background:rgba(20,20,24,0.96); color:#f0e6d2; border:1px solid var(--gold-border,rgba(255,215,140,0.35)); border-radius:12px; padding:14px 20px; font-family:var(--font-cinzel,Georgia,serif); font-size:0.82rem; letter-spacing:0.04em; line-height:1.45; text-align:center; box-shadow:0 8px 28px rgba(0,0,0,0.55); cursor:pointer; pointer-events:auto; opacity:0; transition:opacity 220ms ease-out; }
       .vot-toast-sw-update.show { opacity:1; }
       body.light .vot-toast-sw-update { background:rgba(247,242,232,0.96); color:#2a2018; border-color:rgba(176,144,56,0.5); }
+      /* UX7 — tab-close undo toast. Reuses .vot-toast's look but is CLICKABLE
+         (base .vot-toast is pointer-events:none), so the Undo control works; it
+         already sits at z-index 9998, above the tabs overview (z-index 400). */
+      .vot-toast-undo { pointer-events:auto; }
+      .vot-toast-undo .vot-undo-btn { margin-left:0.7em; background:none; border:none; padding:0; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+      body.light .vot-toast-undo .vot-undo-btn { color:var(--gold-strong,#9a7b2e); }
 
       /* StorageHealthBanner — fixed strip above the nav (z-index 101 > nav 100).
          Three severity styles: gold (soft), amber (warning), danger (critical). */
