@@ -67,6 +67,26 @@ interface BridgeHost {
     fun launchMicPermissionRequest()
 
     /**
+     * Launch the SAF create-document picker for a v3 streaming export
+     * (BACKUP-STREAMING-PLAN P3). Unlike [launchExportPicker] (v2: the whole
+     * payload is handed over up front), this only obtains the destination URI
+     * — the host stashes it on the vm and fires __onV3ExportReady; the bytes
+     * are then streamed frame-by-frame through AppInterface's v3Export* methods.
+     * [suggestedName] pre-fills the picker's filename (a `.votbak` name).
+     */
+    fun launchV3ExportPicker(suggestedName: String)
+
+    /**
+     * Launch the SAF open-document picker for a v3 streaming import. Obtains
+     * the source URI only (the host stashes it on the vm and fires
+     * __onV3ImportReady); the file is then read frame-by-frame through
+     * AppInterface's v3Import* methods. Accepts any file type so a `.votbak`
+     * container or a legacy `.json` backup are both pickable — the native
+     * magic-sniff in beginV3Import routes them.
+     */
+    fun launchV3ImportPicker()
+
+    /**
      * True if RECORD_AUDIO is currently granted. Wraps the static
      * ContextCompat.checkSelfPermission call so AppInterface can be
      * tested without spinning up Robolectric for a permission probe.

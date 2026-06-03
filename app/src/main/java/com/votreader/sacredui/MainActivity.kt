@@ -89,6 +89,17 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     private lateinit var exportPickerLauncher: ActivityResultLauncher<String>
     private var pendingExportContent: String? = null
 
+    // Launchers for the v3 STREAMING backup (BACKUP-STREAMING-PLAN P3). Unlike
+    // the v2 launchers above (which read/write the whole payload in the result
+    // callback), these only obtain the destination/source URI: the callback
+    // stashes it on the vm and fires __onV3ExportReady / __onV3ImportReady, then
+    // AppInterface's v3Export*/v3Import* methods stream the bytes frame-by-frame
+    // off the binder thread. The import picker accepts any type ("*/*") so a
+    // .votbak container OR a legacy .json backup is pickable; the native
+    // magic-sniff in StorageManager.beginV3Import routes them.
+    private lateinit var v3ExportPickerLauncher: ActivityResultLauncher<String>
+    private lateinit var v3ImportPickerLauncher: ActivityResultLauncher<Array<String>>
+
     // Launcher for the WebChromeClient.onShowFileChooser callback (image
     // inserts via <input type="file"> in the journal editor). The callback
     // is held in fileChooserCallback so the result lands back on the WebView.
@@ -139,6 +150,14 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override fun launchExportPicker(suggestedName: String, content: String) {
         pendingExportContent = content
         exportPickerLauncher.launch(suggestedName)
+    }
+    override fun launchV3ExportPicker(suggestedName: String) {
+        v3ExportPickerLauncher.launch(suggestedName)
+    }
+    override fun launchV3ImportPicker() {
+        // "*/*" so a .votbak (octet-stream) container OR a legacy .json backup
+        // are both visible; the native magic-sniff distinguishes them.
+        v3ImportPickerLauncher.launch(arrayOf("*/*"))
     }
     override fun launchMicPermissionRequest() {
         micPrepLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -232,6 +251,28 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                     is StorageManager.Result.Failure -> bridge.callOptional(JsEvent.ExportComplete, "error:${r.reason}")
                 }
             }
+        }
+
+        // v3 streaming export picker (BACKUP-STREAMING-PLAN P3). Obtains the
+        // destination URI ONLY — stash it on the vm and signal JS, which then
+        // streams the container frame-by-frame via AppInterface.v3Export*.
+        // (Created doc MIME octet-stream; the suggested name carries .votbak.)
+        v3ExportPickerLauncher = registerForActivityResult(
+            ActivityResultContracts.CreateDocument("application/octet-stream")
+        ) { uri ->
+            vm.pendingV3ExportUri = uri
+            bridge.callOptional(JsEvent.V3ExportReady, if (uri != null) "ok" else "cancelled")
+        }
+
+        // v3 streaming import picker. Obtains the source URI ONLY — stash it and
+        // signal JS, which then reads the manifest + streams the blobs via
+        // AppInterface.v3Import*. OpenDocument (not GetContent) so the URI stays
+        // readable for the whole streaming session.
+        v3ImportPickerLauncher = registerForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            vm.pendingV3ImportUri = uri
+            bridge.callOptional(JsEvent.V3ImportReady, if (uri != null) "ok" else "cancelled")
         }
 
         // WebView file chooser launcher — drives <input type="file"> for

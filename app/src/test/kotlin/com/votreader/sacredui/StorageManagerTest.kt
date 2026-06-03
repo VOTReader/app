@@ -332,7 +332,176 @@ class StorageManagerTest {
         )
     }
 
+    // ─── v3 streaming container (BACKUP-STREAMING-PLAN P3) ────────────
+    // The native framing must be byte-identical to the web codec
+    // (src/utils/backup-container.js) so a backup written on either platform
+    // imports on the other. These exercise the framing directly over
+    // ByteArray streams (the same way writeTextToUri's tests stub the CR).
+
+    @Test
+    fun `v3 export writes the exact on-disk framing (magic + BE lengths + raw bytes)`() {
+        val uri = Uri.parse("content://test/v3-export")
+        val sink = ByteArrayOutputStream()
+        every { cr.openOutputStream(uri) } returns sink
+
+        val manifest = "{\"app\":\"VOTReader\",\"exportVersion\":3}".toByteArray(Charsets.UTF_8)
+        val blob1 = byteArrayOf(1, 2, 3, 0xFF.toByte())
+        val blob2 = "voice".toByteArray(Charsets.UTF_8)
+
+        assertIs<StorageManager.Result.Success<Unit>>(storage.beginV3Export(uri, manifest))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.v3ExportWriteBlobHeader(blob1.size.toLong()))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.v3ExportWriteChunk(blob1))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.v3ExportWriteBlobHeader(blob2.size.toLong()))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.v3ExportWriteChunk(blob2))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.finishV3Export(commit = true, uri = uri))
+
+        // The exact layout the web codec also produces: magic, BE manifest len,
+        // manifest, then per-frame BE len + raw bytes.
+        val expected = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            write(beLong(manifest.size.toLong())); write(manifest)
+            write(beLong(blob1.size.toLong())); write(blob1)
+            write(beLong(blob2.size.toLong())); write(blob2)
+        }.toByteArray()
+
+        assertTrue(
+            sink.toByteArray().contentEquals(expected),
+            "native v3 framing must match backup-container.js byte-for-byte"
+        )
+    }
+
+    @Test
+    fun `v3 round-trips manifest + media bytes exactly (write then read back)`() {
+        // WRITE a container to a buffer.
+        val exportUri = Uri.parse("content://test/v3-exp")
+        val sink = ByteArrayOutputStream()
+        every { cr.openOutputStream(exportUri) } returns sink
+        val manifestJson = "{\"exportVersion\":3,\"media\":[{\"id\":\"m1\",\"size\":4},{\"id\":\"m2\",\"size\":5}]}"
+        val m1 = byteArrayOf(0, 1, 2, 0x80.toByte())            // includes a high byte
+        val m2 = byteArrayOf(9, 8, 7, 6, 5)
+        storage.beginV3Export(exportUri, manifestJson.toByteArray(Charsets.UTF_8))
+        storage.v3ExportWriteBlobHeader(m1.size.toLong()); storage.v3ExportWriteChunk(m1)
+        storage.v3ExportWriteBlobHeader(m2.size.toLong()); storage.v3ExportWriteChunk(m2)
+        storage.finishV3Export(commit = true, uri = exportUri)
+        val container = sink.toByteArray()
+
+        // READ it back.
+        val importUri = Uri.parse("content://test/v3-imp")
+        every { cr.openInputStream(importUri) } returns ByteArrayInputStream(container)
+        val begin = storage.beginV3Import(importUri)
+        assertIs<StorageManager.Result.Success<String>>(begin)
+        assertEquals("v3:$manifestJson", begin.value)        // manifest survives verbatim
+
+        val n1 = storage.v3ImportNextBlob()
+        assertIs<StorageManager.Result.Success<Long>>(n1)
+        assertEquals(4L, n1.value)
+        assertTrue(readWholeFrame().contentEquals(m1))       // bytes survive exactly
+
+        val n2 = storage.v3ImportNextBlob()
+        assertIs<StorageManager.Result.Success<Long>>(n2)
+        assertEquals(5L, n2.value)
+        assertTrue(readWholeFrame().contentEquals(m2))
+
+        assertIs<StorageManager.Result.Success<Unit>>(storage.closeV3Import())
+    }
+
+    @Test
+    fun `beginV3Import sniffs a legacy JSON backup and returns it tagged`() {
+        val uri = Uri.parse("content://test/legacy")
+        val json = "{\"app\":\"VOTReader\",\"exportVersion\":2,\"stores\":{}}"
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(json.toByteArray(Charsets.UTF_8))
+        val r = storage.beginV3Import(uri)
+        assertIs<StorageManager.Result.Success<String>>(r)
+        assertEquals("legacy:$json", r.value)
+    }
+
+    @Test
+    fun `v3 import detects a truncated media frame`() {
+        // Frame header declares 10 bytes but only 3 follow before EOF.
+        val truncated = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            val manifest = "{\"media\":[{\"id\":\"m1\",\"size\":10}]}".toByteArray(Charsets.UTF_8)
+            write(beLong(manifest.size.toLong())); write(manifest)
+            write(beLong(10L)); write(byteArrayOf(1, 2, 3))     // says 10, gives 3
+        }.toByteArray()
+        val uri = Uri.parse("content://test/trunc")
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(truncated)
+
+        assertIs<StorageManager.Result.Success<String>>(storage.beginV3Import(uri))
+        val n = storage.v3ImportNextBlob()
+        assertIs<StorageManager.Result.Success<Long>>(n)
+        assertEquals(10L, n.value)
+        // Reading the frame hits EOF before the declared length → loud failure.
+        val chunk = storage.v3ImportReadChunk(64)
+        assertIs<StorageManager.Result.Failure>(chunk)
+        assertEquals("truncated", chunk.reason)
+    }
+
+    @Test
+    fun `v3 export rejects a short final frame on commit`() {
+        val uri = Uri.parse("content://test/short")
+        every { cr.openOutputStream(uri) } returns ByteArrayOutputStream()
+        storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
+        storage.v3ExportWriteBlobHeader(5L)
+        storage.v3ExportWriteChunk(byteArrayOf(1, 2, 3))         // only 3 of 5
+        val r = storage.finishV3Export(commit = true, uri = uri)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("frame_incomplete", r.reason)
+    }
+
+    @Test
+    fun `v3 export refuses to overflow a frame`() {
+        val uri = Uri.parse("content://test/overflow")
+        every { cr.openOutputStream(uri) } returns ByteArrayOutputStream()
+        storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
+        storage.v3ExportWriteBlobHeader(2L)
+        val r = storage.v3ExportWriteChunk(byteArrayOf(1, 2, 3, 4, 5))  // 5 > 2
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("frame_overflow", r.reason)
+    }
+
+    @Test
+    fun `v3 export rejects a new blob header before the prior frame completes`() {
+        val uri = Uri.parse("content://test/incomplete")
+        every { cr.openOutputStream(uri) } returns ByteArrayOutputStream()
+        storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
+        storage.v3ExportWriteBlobHeader(5L)
+        storage.v3ExportWriteChunk(byteArrayOf(1, 2, 3))         // frame not done
+        val r = storage.v3ExportWriteBlobHeader(2L)              // illegal: prior frame open
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("frame_incomplete", r.reason)
+    }
+
+    @Test
+    fun `v3 bridge methods fail cleanly with no open session`() {
+        assertEquals("no_session", (storage.v3ExportWriteBlobHeader(1L) as StorageManager.Result.Failure).reason)
+        assertEquals("no_session", (storage.v3ExportWriteChunk(byteArrayOf(1)) as StorageManager.Result.Failure).reason)
+        assertEquals("no_session", (storage.v3ImportNextBlob() as StorageManager.Result.Failure).reason)
+        // finish/close with no session are benign no-ops / failures, never crashes.
+        assertIs<StorageManager.Result.Failure>(storage.finishV3Export(commit = true, uri = null))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.closeV3Import())
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────
+
+    /** Drain the current import frame via small reads (exercises multi-read). */
+    private fun readWholeFrame(): ByteArray {
+        val out = ByteArrayOutputStream()
+        while (true) {
+            val r = storage.v3ImportReadChunk(3)
+            assertIs<StorageManager.Result.Success<ByteArray>>(r)
+            if (r.value.isEmpty()) break
+            out.write(r.value)
+        }
+        return out.toByteArray()
+    }
+
+    /** 8-byte big-endian encoding (the spec's frame/manifest length format). */
+    private fun beLong(v: Long): ByteArray {
+        val b = ByteArray(8)
+        for (i in 0 until 8) b[i] = (v ushr (8 * (7 - i))).toByte()
+        return b
+    }
 
     private fun sizeCursor(size: Long): MatrixCursor {
         val c = MatrixCursor(arrayOf(OpenableColumns.SIZE))

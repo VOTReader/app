@@ -94,6 +94,50 @@ function _platformLabel(platform) {
   }
 }
 
+/* ── v3 streaming backup — Android byte plumbing (BACKUP-STREAMING-PLAN P3) ──
+   The Android WebView-69 floor lacks Blob.arrayBuffer()/.stream() (Chromium-76
+   APIs) and Blob.text(), so the JS side cannot use the web backup-container.js
+   codec; it reads blob slices via FileReader.readAsArrayBuffer and base64s them
+   for the string bridge (native owns the binary framing). These helpers are
+   WV69-safe (FileReader + chunked String.fromCharCode/btoa/atob — all ancient).
+   base64 is the transient bridge encoding ONLY — never written to disk. */
+
+// Per-chunk size for the bridge: 512 KB raw → ~683 KB base64 per call. Keeps
+// peak heap bounded on budget devices regardless of total blob/backup size.
+const ANDROID_V3_CHUNK = 512 * 1024;
+
+/** Uint8Array → standard base64. Builds the binary string in 32 KB sub-chunks
+ *  so String.fromCharCode.apply never blows the call-stack on a big slice. */
+function _u8ToBase64(u8) {
+  let binary = '';
+  const STEP = 0x8000; // 32 KB — safely under the apply() arg-count limit
+  for (let i = 0; i < u8.length; i += STEP) {
+    binary += String.fromCharCode.apply(null, u8.subarray(i, i + STEP));
+  }
+  return btoa(binary);
+}
+
+/** Standard base64 → Uint8Array (WV69 atob + charCodeAt). */
+function _base64ToU8(b64) {
+  const binary = atob(b64);
+  const u8 = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
+  return u8;
+}
+
+/** Read one Blob slice to base64 via FileReader (WV69-safe — no Blob.arrayBuffer). */
+function _blobSliceToBase64(blobSlice) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      try { resolve(_u8ToBase64(new Uint8Array(/** @type {ArrayBuffer} */ (fr.result)))); }
+      catch (e) { reject(e); }
+    };
+    fr.onerror = () => reject(fr.error || new Error('blob read failed'));
+    fr.readAsArrayBuffer(blobSlice);
+  });
+}
+
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
   // Q8: BOOKS + VOT corpora are lazy. PROGRESS_GROUPS reads BOOKS[...] keys
   // (for the NT section) AND LETTERS_V1/LETTERS/etc. globals (for the
@@ -461,62 +505,82 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     }
   };
 
-  const exportPersonalData = async () => {
-    if (!PlatformBridge.isAndroid) { await _exportV3Web(); return; }
+  // Android export uses the v3 STREAMING container via the native chunked bridge
+  // (the WebView-69 floor can't run the web codec — see backup-container.js /
+  // StorageManager.kt; native owns the framing). buildV3Manifest is SHARED with
+  // the web path; only the container WRITE differs. Peak memory is one
+  // ANDROID_V3_CHUNK slice, so this scales to whatever the device can store.
+  // BACKUP-STREAMING-PLAN P3.
+  const _exportV3Android = async () => {
+    let opened = false;
     try {
       _showToast('Preparing export…', 0);
-
-      // Build the V2 payload (reads stores straight from IDB, encodes media,
-      // adds the counts manifest). buildExportPayload fails LOUD (U6): a read
-      // failure or an over-limit media set returns !ok so we abort here rather
-      // than write a misleading, incomplete-but-valid-looking backup.
-      const result = await buildExportPayload({
+      const built = await buildV3Manifest({
         storesMap: _exportableStores(),
         flagMap: _flagStores(),
         idbAdapter: IDBAdapter,
         mediaStore: JournalMediaStore,
         diagnosticLog: diagnosticLog,
       });
-      if (!result.ok) {
+      if (!built.ok) {
+        // buildV3Manifest fails LOUD (U6) on a store/media read failure — abort
+        // rather than write a misleading, incomplete backup. (No media-limit
+        // case: v3 streams, so there is no size cap.)
         hideToast(_TOAST_ID);
-        if (result.reason === 'media-limit') {
-          _showToast('Export aborted: media exceeds 100 MB. Streaming export support is planned for a future update.');
-        } else {
-          _showToast('Export aborted — could not read: ' + result.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
-        }
+        _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
         return;
       }
-
-      const json = JSON.stringify(result.payload);
       const stamp = new Date().toISOString().slice(0, 10);
-      const filename = `votreader-backup-${stamp}.json`;
-
-      // saveToFile is async: the user chooses the destination (Android SAF
-      // create-document picker — folder + filename; the browser download
-      // manager on web), then the outcome arrives via
-      // window.__onExportComplete. Install the one-shot callback BEFORE
-      // launching, mirroring the import flow's window.__onImportFile pattern.
-      window.__onExportComplete = (result) => {
-        window.__onExportComplete = null;
-        hideToast(_TOAST_ID);
-        if (result === 'ok') {
-          _showToast('Backup saved.');
-        } else if (result === 'cancelled') {
-          /* user dismissed the picker — no error, stay quiet */
-        } else {
-          console.warn('export error:', result);
-          _showToast('Export failed. Please try again.');
+      const filename = `votreader-backup-${stamp}.votbak`;
+      // The destination picker takes over the screen; drop the "Preparing…" toast.
+      hideToast(_TOAST_ID);
+      // 1. SAF destination picker (async). Install the ready callback BEFORE launch.
+      const ready = await new Promise((resolve) => {
+        window.__onV3ExportReady = (status) => { window.__onV3ExportReady = null; resolve(status); };
+        PlatformBridge.v3ExportOpen(filename);
+      });
+      if (ready === 'cancelled') return;                 // user dismissed the picker
+      if (ready !== 'ok') throw new Error('picker: ' + ready);
+      opened = true;
+      _showToast('Saving backup…', 0);
+      // 2. Write magic + manifest frame (native frames it — the manifest is the
+      //    structured stores + per-blob METADATA only, bounded to MBs).
+      let r = PlatformBridge.v3ExportBegin(JSON.stringify(built.manifest));
+      if (r !== 'ok') throw new Error('begin: ' + r);
+      // 3. Stream each media blob in <=ANDROID_V3_CHUNK slices — one slice in
+      //    memory at a time (FileReader read; native decodes + appends raw bytes).
+      for (const entry of built.mediaEntries) {
+        const blob = entry.blob;
+        r = PlatformBridge.v3ExportWriteBlob(String(blob.size));
+        if (r !== 'ok') throw new Error('writeBlob: ' + r);
+        for (let pos = 0; pos < blob.size; pos += ANDROID_V3_CHUNK) {
+          const b64 = await _blobSliceToBase64(blob.slice(pos, Math.min(pos + ANDROID_V3_CHUNK, blob.size)));
+          r = PlatformBridge.v3ExportChunk(b64);
+          if (r !== 'ok') throw new Error('chunk: ' + r);
         }
-      };
-      // The picker takes over the screen; drop the "Preparing…" toast so it
-      // isn't stranded behind the system UI while the user picks a folder.
+      }
+      // 4. Commit (flush + close).
+      r = PlatformBridge.v3ExportFinish(true);
+      if (r !== 'ok') throw new Error('finish: ' + r);
+      opened = false;
       hideToast(_TOAST_ID);
-      PlatformBridge.saveToFile(filename, json);
+      _showToast('Backup saved.');
     } catch (e) {
-      console.warn('export failed', e);
+      console.warn('android v3 export failed', e);
+      // Abort: close + delete the partial file so no truncated, misleading
+      // backup is left behind (the only backup must fail clean).
+      if (opened) { try { PlatformBridge.v3ExportFinish(false); } catch (_e) { /* best-effort */ } }
       hideToast(_TOAST_ID);
-      _showToast('Export failed. See console for details.');
+      _showToast('Export failed while writing. Please try again.');
     }
+  };
+
+  const exportPersonalData = async () => {
+    // Both platforms now write the v3 STREAMING container (.votbak). Web streams
+    // via openExportSink + writeContainer; Android via the native chunked bridge.
+    // (The v2 buildExportPayload remains exported for rollback + the P5 fold.)
+    if (PlatformBridge.isAndroid) { await _exportV3Android(); return; }
+    await _exportV3Web();
   };
 
   const importPersonalData = () => {
@@ -644,23 +708,119 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         _showToast('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
       }
     };
-    // Android keeps the proven v2 picker (native v3 streaming import lands in P3):
-    // openFilePicker → __onImportFile(base64) → legacy _doImport.
-    if (PlatformBridge.isAndroid) {
-      window.__onImportFile = (b64OrNull, errCode) => {
-        window.__onImportFile = null;
-        if (!b64OrNull) {
-          // errCode is only set for a real failure (never for a user cancel).
-          // 'too_large' gets a specific message; any other failure stays silent.
-          if (errCode === 'too_large') {
-            _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
-          }
-          return;
+    // Android v3 streaming import via the native chunked bridge. Native sniffs
+    // the magic and returns "v3:<manifest>" (stream the blobs) or "legacy:<json>"
+    // (a whole v1/v2 backup → reuse _doImport). For v3, the blobs feed applyV3
+    // through an async-generator of {id, meta, blob} entries — the SAME applier
+    // the web path uses — so only the SOURCE of the entries differs per platform.
+    // BACKUP-STREAMING-PLAN P3.
+    const _importV3Android = async () => {
+      // 1. SAF source picker (async). Install the ready callback BEFORE launch.
+      const ready = await new Promise((resolve) => {
+        window.__onV3ImportReady = (status) => { window.__onV3ImportReady = null; resolve(status); };
+        PlatformBridge.v3ImportOpen();
+      });
+      if (ready === 'cancelled') return;                  // user dismissed the picker
+      if (ready !== 'ok') { _showToast('Import failed: ' + ready); return; }
+      // 2. Open + sniff (native reads the magic, then the manifest OR the whole
+      //    legacy file). Close the native stream on every non-v3 / error exit.
+      let begin;
+      try { begin = PlatformBridge.v3ImportBegin(); }
+      catch (e) {
+        console.warn('v3 import begin failed', e);
+        try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
+        _showToast('Import failed: could not read file.');
+        return;
+      }
+      if (begin.indexOf('error:') === 0) {
+        try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
+        if (begin.slice(6) === 'too_large') {
+          _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
+        } else {
+          _showToast('This backup file is corrupt or incomplete and could not be read.');
         }
-        try { _doImport(atob(b64OrNull)); }
-        catch (_e) { _showToast('Import failed: could not decode file.'); }
-      };
-      PlatformBridge.openFilePicker();
+        return;
+      }
+      if (begin.indexOf('legacy:') === 0) {
+        // Legacy v1/v2 JSON — already fully read by native; route to the v2 applier.
+        try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
+        await _doImport(begin.slice(7));
+        return;
+      }
+      if (begin.indexOf('v3:') !== 0) {
+        try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
+        _showToast('This file does not look like a VOTReader backup.');
+        return;
+      }
+      // 3. Parse + validate the v3 manifest.
+      let manifest;
+      try { manifest = JSON.parse(begin.slice(3)); }
+      catch (e) {
+        console.warn('v3 import manifest parse failed', e);
+        try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
+        _showToast('This backup file is corrupt or incomplete and could not be read.');
+        return;
+      }
+      const envelopeErrors = validateImportEnvelope(manifest);
+      if (envelopeErrors.length) {
+        try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
+        console.warn('import envelope invalid:', envelopeErrors);
+        _showToast('This file does not look like a VOTReader backup.');
+        return;
+      }
+      // 4. Stream the media frames as an async-gen of {id, meta, blob}; applyV3
+      //    consumes it, reassembling each blob bounded (one frame at a time) from
+      //    <=ANDROID_V3_CHUNK base64 chunks. A frame-length / size mismatch or a
+      //    truncation throws — applyV3's fail-safe ordering keeps existing media.
+      const media = Array.isArray(manifest.media) ? manifest.media : [];
+      const entries = (async function* () {
+        for (let i = 0; i < media.length; i++) {
+          const meta = media[i];
+          const sizeStr = PlatformBridge.v3ImportNextBlob();
+          if (sizeStr.indexOf('error:') === 0) throw new Error('nextBlob: ' + sizeStr.slice(6));
+          const declared = Number(sizeStr);
+          if (meta && typeof meta.size === 'number' && meta.size !== declared) {
+            throw new Error('size mismatch for ' + meta.id + ' (manifest ' + meta.size + ', frame ' + declared + ')');
+          }
+          const parts = [];
+          let readTotal = 0;
+          for (;;) {
+            const chunk = PlatformBridge.v3ImportReadChunk(ANDROID_V3_CHUNK);
+            if (chunk === '') break;                       // current frame fully read
+            if (chunk.indexOf('error:') === 0) throw new Error('readChunk: ' + chunk.slice(6));
+            const u8 = _base64ToU8(chunk);
+            parts.push(u8);
+            readTotal += u8.length;
+          }
+          if (readTotal !== declared) throw new Error('truncated frame for ' + (meta && meta.id));
+          yield {
+            id: meta ? meta.id : null,
+            meta: meta || null,
+            blob: new Blob(parts, { type: (meta && meta.mime) || 'application/octet-stream' }),
+          };
+        }
+      })();
+      // 5. Confirm + degraded-guard + apply + reload (shared helper). Close the
+      //    native stream no matter what (success, cancel at the confirm, or error).
+      try {
+        await _confirmDegradeApplyReload(manifest, (storesMap, flagMap) => applyV3(manifest, entries, {
+          storesMap: storesMap,
+          flagMap: flagMap,
+          mediaStore: JournalMediaStore,
+          validateStorePayload: validateStorePayload,
+        }));
+      } catch (e) {
+        console.warn('android v3 import failed', e);
+        hideToast(_TOAST_ID);
+        _showToast('Import failed — the file may be corrupt or incomplete. Please try again.');
+      } finally {
+        try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
+      }
+    };
+
+    // Android: v3 streaming import (native sniffs v3 vs legacy v1/v2).
+    if (PlatformBridge.isAndroid) {
+      _importV3Android();
       return;
     }
 

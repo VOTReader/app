@@ -66,6 +66,16 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(suggestedName: string, content: string) => void} saveToFile
  * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void> } | null>} openExportSink
  * @property {() => Promise<Blob | null>} pickImportFile
+ * @property {(suggestedName: string) => void} v3ExportOpen
+ * @property {(manifestJson: string) => string} v3ExportBegin
+ * @property {(sizeStr: string) => string} v3ExportWriteBlob
+ * @property {(base64Chunk: string) => string} v3ExportChunk
+ * @property {(commit: boolean) => string} v3ExportFinish
+ * @property {() => void} v3ImportOpen
+ * @property {() => string} v3ImportBegin
+ * @property {() => string} v3ImportNextBlob
+ * @property {(maxBytes: number) => string} v3ImportReadChunk
+ * @property {() => void} v3ImportClose
  * @property {() => string} getCrashLog
  */
 
@@ -127,11 +137,32 @@ const androidImpl = {
   takeScreenshot: async (top, max, q) => /** @type {any} */ (window).AndroidBridge.takeScreenshot(top, max, q),
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
-  // v3 streaming backup I/O — native chunked-bridge impl lands in P3. Dormant in
-  // P2 (SettingsScreen keeps the Android export/import on the v2 saveToFile /
-  // openFilePicker path until P3), so these reject rather than silently no-op.
-  openExportSink: () => Promise.reject(new Error('openExportSink: Android native streaming pending (P3)')),
-  pickImportFile: () => Promise.reject(new Error('pickImportFile: Android native streaming pending (P3)')),
+  // openExportSink/pickImportFile are the WEB v3 file primitives (FS Access API
+  // / sliceable Blob). They are NOT the Android path: the WebView-69 floor lacks
+  // Blob.arrayBuffer/.stream, and an import can't expose a GB file as a lazy
+  // random-access Blob, so Android streams through the native chunked bridge
+  // below instead (native owns the framing — see backup-container.js /
+  // StorageManager.kt). SettingsScreen branches on isAndroid and never calls
+  // these two on Android; they reject loudly if something ever does.
+  openExportSink: () => Promise.reject(new Error('openExportSink: web-only — Android uses the v3 chunked bridge (v3Export*)')),
+  pickImportFile: () => Promise.reject(new Error('pickImportFile: web-only — Android uses the v3 chunked bridge (v3Import*)')),
+  // v3 streaming backup — native chunked bridge (P3). The framing is in Kotlin
+  // (StorageManager); these are 1:1 passthroughs. base64 is the transient bridge
+  // encoding only (the string bridge can't carry raw bytes). v3ExportOpen/
+  // v3ImportOpen launch the async SAF picker and settle via __onV3ExportReady /
+  // __onV3ImportReady; the rest are synchronous and return "ok"/"error:<reason>"
+  // (or "v3:<manifest>"/"legacy:<json>" for v3ImportBegin, base64/""/"error:" for
+  // v3ImportReadChunk). Driven by SettingsScreen._exportV3Android/_importV3Android.
+  v3ExportOpen: (name) => /** @type {any} */ (window).AndroidBridge.v3ExportOpen(name),
+  v3ExportBegin: (manifestJson) => /** @type {any} */ (window).AndroidBridge.v3ExportBegin(manifestJson),
+  v3ExportWriteBlob: (sizeStr) => /** @type {any} */ (window).AndroidBridge.v3ExportWriteBlob(sizeStr),
+  v3ExportChunk: (b64) => /** @type {any} */ (window).AndroidBridge.v3ExportChunk(b64),
+  v3ExportFinish: (commit) => /** @type {any} */ (window).AndroidBridge.v3ExportFinish(commit),
+  v3ImportOpen: () => /** @type {any} */ (window).AndroidBridge.v3ImportOpen(),
+  v3ImportBegin: () => /** @type {any} */ (window).AndroidBridge.v3ImportBegin(),
+  v3ImportNextBlob: () => /** @type {any} */ (window).AndroidBridge.v3ImportNextBlob(),
+  v3ImportReadChunk: (n) => /** @type {any} */ (window).AndroidBridge.v3ImportReadChunk(n),
+  v3ImportClose: () => /** @type {any} */ (window).AndroidBridge.v3ImportClose(),
   // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
   getCrashLog: () => mergeCrashLog(/** @type {any} */ (window).AndroidBridge.getCrashLog()),
 };
@@ -157,6 +188,18 @@ const notYetImplemented = (name) => () => {
   if (typeof console !== 'undefined' && console.warn) {
     console.warn(`${NYI_TAG} ${name}() web impl pending (W1.3-W1.5)`);
   }
+};
+
+/**
+ * The v3 native chunked-bridge methods exist only on Android — on web, the v3
+ * container is streamed via openExportSink + writeContainer / pickImportFile +
+ * readContainer (SettingsScreen branches on isAndroid and never calls these on
+ * web). They throw rather than silently no-op so a wiring mistake surfaces.
+ * @param {string} name
+ * @returns {(...args: any[]) => never}
+ */
+const v3AndroidOnly = (name) => () => {
+  throw new Error(`${name}: Android-only (web v3 backup uses openExportSink/writeContainer + pickImportFile/readContainer)`);
 };
 
 // Web WakeLock — keepScreenOn impl (W1.2 Tier B.1). Per [[explicit-async-decision]]
@@ -819,6 +862,17 @@ const webImpl = {
   saveToFile: webSaveToFile,                 // Tier B.2 (Blob + URL.createObjectURL + anchor → __onExportComplete)
   openExportSink: webOpenExportSink,         // P2 (FS Access API writable / Blob-download fallback)
   pickImportFile: webPickImportFile,         // P2 (FS Access API open / DOM input → File)
+  // v3 native chunked bridge — Android-only (web uses openExportSink/pickImportFile above)
+  v3ExportOpen: v3AndroidOnly('v3ExportOpen'),
+  v3ExportBegin: v3AndroidOnly('v3ExportBegin'),
+  v3ExportWriteBlob: v3AndroidOnly('v3ExportWriteBlob'),
+  v3ExportChunk: v3AndroidOnly('v3ExportChunk'),
+  v3ExportFinish: v3AndroidOnly('v3ExportFinish'),
+  v3ImportOpen: v3AndroidOnly('v3ImportOpen'),
+  v3ImportBegin: v3AndroidOnly('v3ImportBegin'),
+  v3ImportNextBlob: v3AndroidOnly('v3ImportNextBlob'),
+  v3ImportReadChunk: v3AndroidOnly('v3ImportReadChunk'),
+  v3ImportClose: v3AndroidOnly('v3ImportClose'),
   setImmersiveMode: webSetImmersiveMode,     // Tier B.3 (Fullscreen API, best-effort)
   setZoomEnabled: webSetZoomEnabled,         // Tier B.3 (no-op — browsers handle zoom natively)
   resetZoom: webResetZoom,                   // Tier B.3 (no-op — no JS API to reset user pinch-zoom)

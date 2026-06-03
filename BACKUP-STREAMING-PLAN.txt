@@ -187,12 +187,18 @@
      byte-exact); the real Import BUTTON applied a container's data to the store;
      Settings renders clean, 0 console errors. (Real OS file-picker dialog itself
      is manual — not headless-automatable.)
- P3  Android native streaming: StorageManager framed read/write (same format, in
-     Kotlin) + the chunked bridge methods + AppInterface + JsEvent + MainActivity
-     pickers + a FileReader (WV69-safe) blob-slice reader on the JS side + Kotlin
-     tests. EMULATOR-verified (vot_api28): export a large dataset, pull the file,
-     re-import, assert byte-exact media round-trip. (File I/O is emulator-
-     verifiable — unlike the audio-tuning device walk.)
+ P3  DONE — Android native streaming + EMULATOR-verified (vot_api28 / WV69 =
+     Chrome 69.0.3497.100). StorageManager v3 framing (DataOutputStream.writeLong /
+     readLong = big-endian, byte-identical to encodeUint64BE; magic-sniff routes v3
+     vs legacy JSON; frame/truncation/overflow guards) + the chunked bridge
+     (AppInterface v3Export*/v3Import* + JsEvent V3ExportReady/V3ImportReady +
+     BridgeHost/MainActivity SAF launchers stashing the URI on the vm) + the
+     platform-bridge Android passthroughs (web throws) + SettingsScreen
+     _exportV3Android/_importV3Android (FileReader-slice read — WV69 lacks
+     Blob.arrayBuffer; native owns framing). applyV3 reordered to a FAIL-SAFE media
+     replace (stream/put FIRST, prune stale AFTER) so a mid-stream truncation never
+     wipes existing media. Kotlin + JS tests added. See the STATUS entry below for
+     the full emulator matrix.
  P4  Back-compat (import legacy v1/v2) + remove the hard caps + soft free-space
      warning + reconcile S5. Full cross-platform matrix: web↔web, web↔Android,
      Android↔Android, legacy→v3.
@@ -254,6 +260,50 @@
    console errors. Gates: vitest 1771/71 test:coverage exit 0, tsc + eslint clean,
    build green. Manual residual: the OS file-picker dialog (not headless-drivable).
    NEXT: P3 — Android native framing + chunked bridge (emulator-verified).
+ 2026-06-02 — P3 DONE (Android native v3 streaming) + EMULATOR-VERIFIED end-to-end
+   on vot_api28 (WebView = Chrome 69.0.3497.100, the Android 8/9 floor). Built:
+   • StorageManager.kt — native v3 framing over the SAF stream: beginV3Export /
+     v3ExportWriteBlobHeader / v3ExportWriteChunk / finishV3Export (write) +
+     beginV3Import (magic-sniff → "v3:"<manifest> | "legacy:"<json>) / v3ImportNextBlob /
+     v3ImportReadChunk / closeV3Import (read). DataOutputStream.writeLong/readLong are
+     big-endian = byte-identical to backup-container.js encodeUint64BE. Frame
+     accounting + truncation/overflow/incomplete guards; abort deletes the partial.
+   • AppInterface.kt v3Export*/v3Import* @JavascriptInterface (base64 only at the
+     bridge boundary, never on disk) + JsEvent V3ExportReady/V3ImportReady; BridgeHost
+     + MainActivity SAF launchers (CreateDocument octet-stream / OpenDocument */*)
+     stash the chosen URI on MainViewModel (@Volatile) + fire the ready callback.
+   • platform-bridge.js — Android passthroughs for the 10 methods; web throws
+     (web uses openExportSink/writeContainer). openExportSink/pickImportFile are now
+     documented web-only (Android streams via the chunked bridge — WV69 has no
+     random-access Blob for a GB import).
+   • SettingsScreen _exportV3Android (buildV3Manifest → v3ExportOpen→Begin→WriteBlob→
+     Chunk→Finish, FileReader <=512KB slices) + _importV3Android (v3ImportOpen→Begin→
+     async-gen of {id,meta,blob} driving NextBlob/ReadChunk → applyV3, the SAME
+     applier the web path uses; legacy → _doImport). Android export/import branches
+     FLIPPED v2→v3. WV69-safe byte helpers (FileReader read, chunked btoa/atob).
+   • SAFETY: applyV3 media replace reordered to put-then-prune-stale so a truncated /
+     corrupt container (reachable only on the Android stream; web readContainer
+     pre-validates) cannot wipe existing media — the manifest + every store are read
+     atomically, so only media frames can truncate, handled non-destructively.
+   GATES: npm build, tsc, eslint (0 warn), vitest 1792/71, Kotlin testDebugUnitTest —
+   all green. Web preview: byte-exact writeContainer→readContainer round-trip, 0
+   console errors (shipping web path unregressed).
+   EMULATOR MATRIX (all byte-exact, real SAF + real chunked bridge on WV69):
+     1. 10 v3 bridge methods wired on window.AndroidBridge; Blob.arrayBuffer/.stream
+        confirmed ABSENT (→ FileReader); FileReader-slice read, btoa/atob chunking,
+        Blob([u8a,u8b]) concat all correct on WV69.
+     2. Native WRITE: a 5000-byte payload → real SAF file byte-exact to spec
+        (magic, BE lengths, manifest verbatim, blob bytes, 0 trailing).
+     3. Android→web: the web codec readContainer reads the Android-written file
+        byte-exact (5000 B).
+     4. web→Android: the Android native import reads a web-codec container byte-exact,
+        MULTI-FRAME (7777 B + 3 B). ← the mandatory cross-platform contract.
+     5. Legacy v1/v2 sniff on Android: a v2 JSON backup → "legacy:" (exportVersion 2,
+        parsed) → routes to the v2 applier (no old backup stranded).
+     6. REAL Settings UI: Export button → buildV3Manifest over real IDB (17 stores) →
+        SAF → valid v3 container + "Backup saved." toast. Import button → SAF open
+        picker launches; clean cancel.
+   NEXT: P4 (cap reconciliation + optional soft free-space warning) + P5 (docs).
 ═══════════════════════════════════════════════════════════════════════════
 
 ───────────────────────────────────────────────────────────────────────────

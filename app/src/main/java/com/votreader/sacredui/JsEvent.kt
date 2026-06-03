@@ -10,6 +10,8 @@ package com.votreader.sacredui
  * JS-side receivers:
  *   ImportFile            -> SettingsScreen.__onImportFile(b64OrNull, errCode?)
  *   ExportComplete        -> SettingsScreen.__onExportComplete("ok"|"error:<reason>"|"cancelled")
+ *   V3ExportReady         -> SettingsScreen.__onV3ExportReady("ok"|"cancelled"|"error:<reason>")
+ *   V3ImportReady         -> SettingsScreen.__onV3ImportReady("ok"|"cancelled"|"error:<reason>")
  *   MicPermissionResult   -> JournalRecordingSheet.__onMicPermissionResult(granted)
  *   NativeRecordingComplete -> JournalRecordingSheet.__onNativeRecordingComplete(b64, durMs, mime)
  *   AnnotationTap         -> SelectionToolbar.__nativeTapAnnotation(cssX, cssY)
@@ -22,6 +24,15 @@ sealed class JsEvent(val fn: String) {
     // "error:<reason>" on a write failure, "cancelled" when the user
     // dismissed the picker. Mirrors ImportFile's async-callback shape.
     data object ExportComplete : JsEvent("__onExportComplete")
+
+    // v3 streaming backup (BACKUP-STREAMING-PLAN P3). The SAF picker is async,
+    // so the destination/source URI arrives in an ActivityResult callback AFTER
+    // v3ExportOpen()/v3ImportOpen() returns. These fire once the picker settles
+    // and the chosen URI is stashed, so the JS driver knows it may proceed (or
+    // that the user cancelled). "ok" = a URI was chosen; "cancelled" = the user
+    // dismissed the picker; "error:<reason>" = the launch itself failed.
+    data object V3ExportReady : JsEvent("__onV3ExportReady")
+    data object V3ImportReady : JsEvent("__onV3ImportReady")
 
     data object MicPermissionResult : JsEvent("__onMicPermissionResult")
     data object NativeRecordingComplete : JsEvent("__onNativeRecordingComplete")

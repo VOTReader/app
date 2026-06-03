@@ -1,6 +1,7 @@
 package com.votreader.sacredui
 
 import android.media.AudioManager
+import android.net.Uri
 import android.view.WindowManager
 import io.mockk.Runs
 import io.mockk.every
@@ -146,6 +147,137 @@ class AppInterfaceTest {
             "my-export-2026.json" to "{\"k\":\"v\"}",
             host.exportPickerCalls[0]
         )
+    }
+
+    // ─── v3 streaming backup delegation (BACKUP-STREAMING-PLAN P3) ────
+    // The base64 boundary (v3ExportChunk decode / v3ImportReadChunk encode) needs
+    // android.util.Base64, which is a stub in this plain-JVM suite, so it is proven
+    // by StorageManagerTest (Robolectric, byte-exact framing) + the emulator
+    // cross-platform round-trip. Here we cover the delegation + Result→string mapping.
+
+    @Test
+    fun `v3ExportOpen posts to UI thread and launches the v3 export picker`() {
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
+        app.v3ExportOpen("votreader-backup.votbak")
+        assertEquals(1, host.postedActions.size, "should hop through postToUi")
+        assertEquals(listOf("votreader-backup.votbak"), host.v3ExportPickerCalls)
+    }
+
+    @Test
+    fun `v3ImportOpen posts to UI thread and launches the v3 import picker`() {
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
+        app.v3ImportOpen()
+        assertEquals(1, host.postedActions.size, "should hop through postToUi")
+        assertEquals(1, host.v3ImportPickerLaunchCount)
+    }
+
+    @Test
+    fun `v3ExportBegin returns no_destination when no URI is stashed`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.pendingV3ExportUri } returns null
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("error:no_destination", app.v3ExportBegin("{}"))
+    }
+
+    @Test
+    fun `v3ExportBegin delegates to storage with the stashed URI and maps success`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        val uri = mockk<Uri>()
+        every { vm.pendingV3ExportUri } returns uri
+        every { vm.storage.beginV3Export(uri, any()) } returns StorageManager.Result.Success(Unit)
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("ok", app.v3ExportBegin("{\"exportVersion\":3}"))
+        verify(exactly = 1) { vm.storage.beginV3Export(uri, any()) }
+    }
+
+    @Test
+    fun `v3ExportBegin maps a storage failure to an error string`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.pendingV3ExportUri } returns mockk<Uri>()
+        every { vm.storage.beginV3Export(any(), any()) } returns StorageManager.Result.Failure("no_output_stream")
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("error:no_output_stream", app.v3ExportBegin("{}"))
+    }
+
+    @Test
+    fun `v3ExportWriteBlob rejects a non-numeric size`() {
+        val (app, _, _) = newSubject()
+        assertEquals("error:bad_size", app.v3ExportWriteBlob("not-a-number"))
+    }
+
+    @Test
+    fun `v3ExportWriteBlob delegates a valid size to storage`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.storage.v3ExportWriteBlobHeader(2048L) } returns StorageManager.Result.Success(Unit)
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("ok", app.v3ExportWriteBlob("2048"))
+        verify(exactly = 1) { vm.storage.v3ExportWriteBlobHeader(2048L) }
+    }
+
+    @Test
+    fun `v3ExportFinish maps success and clears the stashed URI`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.pendingV3ExportUri } returns mockk<Uri>()
+        every { vm.storage.finishV3Export(any(), any()) } returns StorageManager.Result.Success(Unit)
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("ok", app.v3ExportFinish(true))
+        verify { vm.pendingV3ExportUri = null }
+    }
+
+    @Test
+    fun `v3ImportBegin returns no_source when no URI is stashed`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.pendingV3ImportUri } returns null
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("error:no_source", app.v3ImportBegin())
+    }
+
+    @Test
+    fun `v3ImportBegin passes the storage result through verbatim`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        val uri = mockk<Uri>()
+        every { vm.pendingV3ImportUri } returns uri
+        every { vm.storage.beginV3Import(uri) } returns
+            StorageManager.Result.Success("v3:{\"exportVersion\":3}")
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("v3:{\"exportVersion\":3}", app.v3ImportBegin())
+    }
+
+    @Test
+    fun `v3ImportBegin maps a storage failure to an error string`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.pendingV3ImportUri } returns mockk<Uri>()
+        every { vm.storage.beginV3Import(any()) } returns StorageManager.Result.Failure("no_input_stream")
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("error:no_input_stream", app.v3ImportBegin())
+    }
+
+    @Test
+    fun `v3ImportNextBlob renders the frame size as a decimal string`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.storage.v3ImportNextBlob() } returns StorageManager.Result.Success(123456L)
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("123456", app.v3ImportNextBlob())
+    }
+
+    @Test
+    fun `v3ImportNextBlob maps a storage failure to an error string`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.storage.v3ImportNextBlob() } returns StorageManager.Result.Failure("bad_frame_len")
+        val (app, _, _) = newSubject(vm = vm)
+        assertEquals("error:bad_frame_len", app.v3ImportNextBlob())
+    }
+
+    @Test
+    fun `v3ImportClose delegates to storage and clears the stashed URI`() {
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.storage.closeV3Import() } returns StorageManager.Result.Success(Unit)
+        val (app, _, _) = newSubject(vm = vm)
+        app.v3ImportClose()
+        verify(exactly = 1) { vm.storage.closeV3Import() }
+        verify { vm.pendingV3ImportUri = null }
     }
 
     // ─── Zoom + screenshot ────────────────────────────────────────────

@@ -43,6 +43,17 @@ class BridgeContractTest {
         "takeScreenshot" to 3,
         "openFilePicker" to 0,
         "saveToFile" to 2,
+        // v3 streaming backup — native chunked bridge (BACKUP-STREAMING-PLAN P3).
+        "v3ExportOpen" to 1,
+        "v3ExportBegin" to 1,
+        "v3ExportWriteBlob" to 1,
+        "v3ExportChunk" to 1,
+        "v3ExportFinish" to 1,
+        "v3ImportOpen" to 0,
+        "v3ImportBegin" to 0,
+        "v3ImportNextBlob" to 0,
+        "v3ImportReadChunk" to 1,
+        "v3ImportClose" to 0,
         "getCrashLog" to 0,
         "haptic" to 1
     )

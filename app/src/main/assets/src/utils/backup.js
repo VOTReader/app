@@ -591,14 +591,22 @@ export async function applyV3(manifest, entries, ctx) {
     catch (e) { importFailures += 1; console.warn('flag import failed for', name, e); }
   }
 
-  // (3) REPLACE media: clear existing, then put each streamed frame Blob DIRECTLY
-  // (no base64 decode, no aggregate cap — streaming is bounded per-blob).
-  try {
-    const existingIds = await mediaStore.allIds();
-    for (const id of existingIds) await mediaStore.delete(id);
-  } catch (e) { console.warn('clear existing media failed', e); }
+  // (3) REPLACE media — FAIL-SAFE ordering. Stream each frame's Blob in FIRST
+  // (put = overwrite by id), recording every id streamed. Existing media is NOT
+  // cleared up front: if the stream fails partway (a truncated / corrupt
+  // container — reachable on the Android path, which reads frames straight off
+  // the file; the web readContainer pre-validates every frame so it can't fail
+  // there), the for-await throws BEFORE the prune below, leaving the prior media
+  // INTACT rather than wiped. The only backup must never destroy data on a
+  // partial import (BACKUP-STREAMING-PLAN verification bar). The manifest — and
+  // therefore every store — was read atomically upstream, so the sole thing that
+  // can truncate after a valid manifest is a media frame, which this handles
+  // non-destructively. No base64, no aggregate cap — streaming is bounded per-blob.
+  /** @type {Record<string, boolean>} */
+  const streamedIds = {};
   for await (const entry of entries) {
     const m = entry.meta || {};
+    streamedIds[entry.id] = true;  // intended import — recorded even if the put fails
     try {
       await mediaStore.put({
         id: entry.id, type: m.type, blob: entry.blob,
@@ -608,6 +616,14 @@ export async function applyV3(manifest, entries, ctx) {
       });
     } catch (e) { importFailures += 1; console.warn('media import failed for', entry.id, e); }
   }
+  // Reached ONLY after the full stream landed (a throw above skips it): prune the
+  // stale media — present on the device but NOT in this backup — so the end state
+  // is an exact REPLACE. An id we tried-but-failed to put stays in streamedIds, so
+  // it is NOT pruned (its existing copy is preserved; the failure is in importFailures).
+  try {
+    const existingIds = await mediaStore.allIds();
+    for (const id of existingIds) { if (!streamedIds[id]) await mediaStore.delete(id); }
+  } catch (e) { console.warn('prune stale media failed', e); }
 
   // (4) U1 DURABILITY BARRIER — same as applyImportPayload (media already durable;
   // JournalMediaStore.put is awaited above). whenSaved never rejects.

@@ -3,6 +3,7 @@ package com.votreader.sacredui
 import android.content.Context
 import android.media.AudioManager
 import android.os.Build
+import android.util.Base64
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -249,6 +250,115 @@ class AppInterface(
     @JavascriptInterface
     fun saveToFile(suggestedName: String, content: String) {
         host.postToUi { host.launchExportPicker(suggestedName, content) }
+    }
+
+    // ─── v3 streaming backup (BACKUP-STREAMING-PLAN P3) ──────────────────
+    // GB-scale export/import. The binary framing lives in StorageManager (a
+    // native mirror of src/utils/backup-container.js); these
+    // @JavascriptInterface methods are the CHUNKED bridge between the JS driver
+    // (SettingsScreen) and that framing. base64 is the transient bridge
+    // encoding ONLY — the string bridge can't carry raw bytes / GBs in one arg
+    // — and is NEVER written to disk. The SAF picker is async, so
+    // v3ExportOpen/v3ImportOpen just launch it; the chosen URI lands in the
+    // MainActivity result callback (stashed on the vm) and these binder-thread
+    // methods then do all the stream I/O off the UI thread. JS only ever holds
+    // one <=ANDROID_CHUNK slice at a time, so peak memory is bounded regardless
+    // of total backup size.
+
+    /** Map a StorageManager Unit result to the "ok"/"error:<reason>" string the
+     *  JS bridge contract expects (same shape as the recorder methods). */
+    private fun okOr(r: StorageManager.Result<Unit>): String = when (r) {
+        is StorageManager.Result.Success -> "ok"
+        is StorageManager.Result.Failure -> "error:${r.reason}"
+    }
+
+    /** Launch the SAF create-document picker for a v3 export. The chosen URI
+     *  arrives in the MainActivity callback, which fires __onV3ExportReady. */
+    @JavascriptInterface
+    fun v3ExportOpen(suggestedName: String) {
+        host.postToUi { host.launchV3ExportPicker(suggestedName) }
+    }
+
+    /** Open the stashed export URI and write the container header (magic + the
+     *  manifest frame). [manifestJson] is the buildV3Manifest output. Returns
+     *  "ok" / "error:<reason>". Runs on the binder thread (off the UI thread). */
+    @JavascriptInterface
+    fun v3ExportBegin(manifestJson: String): String {
+        val uri = vm.pendingV3ExportUri ?: return "error:no_destination"
+        return okOr(vm.storage.beginV3Export(uri, manifestJson.toByteArray(Charsets.UTF_8)))
+    }
+
+    /** Write the next media frame's 8-byte length header. [sizeStr] is the
+     *  blob's exact byte length as a decimal string (a JS number loses
+     *  precision past 2^53 and @JavascriptInterface int overflows at 2 GB). */
+    @JavascriptInterface
+    fun v3ExportWriteBlob(sizeStr: String): String {
+        val size = sizeStr.toLongOrNull() ?: return "error:bad_size"
+        return okOr(vm.storage.v3ExportWriteBlobHeader(size))
+    }
+
+    /** Decode one base64 chunk of the current blob and append its raw bytes. */
+    @JavascriptInterface
+    fun v3ExportChunk(base64: String): String {
+        val bytes = try { Base64.decode(base64, Base64.NO_WRAP) }
+            catch (e: IllegalArgumentException) { return "error:bad_base64" }
+        return okOr(vm.storage.v3ExportWriteChunk(bytes))
+    }
+
+    /** Finish the export. [commit] true → flush + close; false → abort (close +
+     *  delete the partial file). Clears the stashed URI either way. */
+    @JavascriptInterface
+    fun v3ExportFinish(commit: Boolean): String {
+        val r = okOr(vm.storage.finishV3Export(commit, vm.pendingV3ExportUri))
+        vm.pendingV3ExportUri = null
+        return r
+    }
+
+    /** Launch the SAF open-document picker for a v3 import. The chosen URI
+     *  arrives in the MainActivity callback, which fires __onV3ImportReady. */
+    @JavascriptInterface
+    fun v3ImportOpen() {
+        host.postToUi { host.launchV3ImportPicker() }
+    }
+
+    /** Open the stashed import URI, sniff the format, and return
+     *  "v3:<manifestJson>" (a v3 container — stream the blobs next),
+     *  "legacy:<jsonText>" (a whole v1/v2 backup), or "error:<reason>". */
+    @JavascriptInterface
+    fun v3ImportBegin(): String {
+        val uri = vm.pendingV3ImportUri ?: return "error:no_source"
+        return when (val r = vm.storage.beginV3Import(uri)) {
+            is StorageManager.Result.Success -> r.value
+            is StorageManager.Result.Failure -> "error:${r.reason}"
+        }
+    }
+
+    /** Advance to the next media frame; returns its declared byte length as a
+     *  decimal string (JS cross-checks it against manifest.media[i].size) or
+     *  "error:<reason>". */
+    @JavascriptInterface
+    fun v3ImportNextBlob(): String = when (val r = vm.storage.v3ImportNextBlob()) {
+        is StorageManager.Result.Success -> r.value.toString()
+        is StorageManager.Result.Failure -> "error:${r.reason}"
+    }
+
+    /** Read up to [maxBytes] of the current frame as base64. "" = the current
+     *  frame is fully read (advance to the next). "error:<reason>" on a
+     *  truncated/corrupt stream. (base64 never contains ':', so the error
+     *  sentinel is unambiguous.) */
+    @JavascriptInterface
+    fun v3ImportReadChunk(maxBytes: Int): String = when (val r = vm.storage.v3ImportReadChunk(maxBytes)) {
+        is StorageManager.Result.Success ->
+            if (r.value.isEmpty()) "" else Base64.encodeToString(r.value, Base64.NO_WRAP)
+        is StorageManager.Result.Failure -> "error:${r.reason}"
+    }
+
+    /** Close the import stream (success, cancel, or error cleanup). Clears the
+     *  stashed URI. */
+    @JavascriptInterface
+    fun v3ImportClose() {
+        vm.storage.closeV3Import()
+        vm.pendingV3ImportUri = null
     }
 
     /**

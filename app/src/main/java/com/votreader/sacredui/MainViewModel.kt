@@ -2,6 +2,7 @@ package com.votreader.sacredui
 
 import android.app.Application
 import android.media.AudioManager
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 
 /**
@@ -45,9 +46,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ---- Native recorder. Owns its own lock + recorder + temp-file state. ----
     val audioRecorder: NativeAudioRecorder = NativeAudioRecorder(application)
 
-    // ---- File I/O. Stateless; just gives a named home for the JS-facing
-    // read/write helpers + the import size cap.
+    // ---- File I/O. The legacy v2 read/write helpers are stateless; the v3
+    // streaming sessions (BACKUP-STREAMING-PLAN P3) hold an open stream + frame
+    // counters internally between bridge calls.
     val storage: StorageManager = StorageManager(application)
+
+    // ---- v3 streaming backup: the SAF picker is async, so the chosen
+    // destination (export) / source (import) URI is stashed here between
+    // v3*Open() launching the picker and the binder-thread bridge methods that
+    // open the stream. @Volatile because the picker callback writes on the UI
+    // thread and the @JavascriptInterface methods read on a binder thread.
+    @Volatile var pendingV3ExportUri: Uri? = null
+    @Volatile var pendingV3ImportUri: Uri? = null
 
     // ---- Renderer-crash recovery (60-second sliding window) ----
     var renderRecoveryCount: Int = 0
@@ -63,5 +73,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         audioRecorder.release()
+        // Free any v3 backup stream left open by an export/import interrupted
+        // by the Activity finishing mid-flight (best-effort; no file delete).
+        storage.releaseV3Sessions()
     }
 }

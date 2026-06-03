@@ -42,6 +42,12 @@ class FakeBridgeHost(
     /** Records (suggestedName, content) for every launchExportPicker call. */
     val exportPickerCalls: MutableList<Pair<String, String>> = mutableListOf()
 
+    /** Records the suggestedName of every launchV3ExportPicker call. */
+    val v3ExportPickerCalls: MutableList<String> = mutableListOf()
+
+    /** Counts launchV3ImportPicker calls. */
+    var v3ImportPickerLaunchCount: Int = 0
+
     /** Optional exception that launchFilePicker throws when invoked. */
     var filePickerThrowsOnLaunch: Exception? = null
 
@@ -63,6 +69,14 @@ class FakeBridgeHost(
 
     override fun launchExportPicker(suggestedName: String, content: String) {
         exportPickerCalls.add(suggestedName to content)
+    }
+
+    override fun launchV3ExportPicker(suggestedName: String) {
+        v3ExportPickerCalls.add(suggestedName)
+    }
+
+    override fun launchV3ImportPicker() {
+        v3ImportPickerLaunchCount++
     }
 
     override fun launchMicPermissionRequest() {

@@ -39,6 +39,17 @@ const METHODS = [
   'saveToFile',
   'openExportSink',
   'pickImportFile',
+  // v3 streaming backup — native chunked bridge (P3). Android passthrough; web throws.
+  'v3ExportOpen',
+  'v3ExportBegin',
+  'v3ExportWriteBlob',
+  'v3ExportChunk',
+  'v3ExportFinish',
+  'v3ImportOpen',
+  'v3ImportBegin',
+  'v3ImportNextBlob',
+  'v3ImportReadChunk',
+  'v3ImportClose',
   'getCrashLog',
   'setImmersiveMode',
   'haptic',
@@ -69,6 +80,17 @@ function mockAndroidBridge() {
     takeScreenshot: vi.fn(() => 'data:image/jpeg;base64,abc'),
     openFilePicker: vi.fn(),
     saveToFile: vi.fn(),
+    // v3 chunked bridge — defaults match the native return contracts.
+    v3ExportOpen: vi.fn(),
+    v3ExportBegin: vi.fn(() => 'ok'),
+    v3ExportWriteBlob: vi.fn(() => 'ok'),
+    v3ExportChunk: vi.fn(() => 'ok'),
+    v3ExportFinish: vi.fn(() => 'ok'),
+    v3ImportOpen: vi.fn(),
+    v3ImportBegin: vi.fn(() => 'v3:{"app":"VOTReader","exportVersion":3}'),
+    v3ImportNextBlob: vi.fn(() => '42'),
+    v3ImportReadChunk: vi.fn(() => ''),
+    v3ImportClose: vi.fn(),
     getCrashLog: vi.fn(() => '[{"ts":0,"tag":"x","msg":"y"}]'),
     setImmersiveMode: vi.fn(),
     haptic: vi.fn(),
@@ -106,15 +128,18 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     delete (/** @type {any} */ (globalThis.window).AndroidBridge);
   });
 
-  it('exposes exactly the 23 expected keys', () => {
+  it('exposes exactly the 33 expected keys', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);
   });
 
-  it('v3 backup I/O rejects on Android until the native bridge lands (P3)', async () => {
-    await expect(bridge.openExportSink('b.votbak')).rejects.toThrow(/pending/);
-    await expect(bridge.pickImportFile()).rejects.toThrow(/pending/);
+  it('openExportSink/pickImportFile reject on Android (web-only — Android uses the v3 chunked bridge)', async () => {
+    // These two are the WEB v3 file primitives (FS Access API / sliceable Blob);
+    // Android streams through the v3Export*/v3Import* chunked methods instead, so
+    // SettingsScreen never calls these on Android. They reject loudly if anything does.
+    await expect(bridge.openExportSink('b.votbak')).rejects.toThrow(/web-only/);
+    await expect(bridge.pickImportFile()).rejects.toThrow(/web-only/);
   });
 
   /** @type {Array<[string, any[]]>} */
@@ -135,6 +160,10 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     // the result arrives via window.__onExportComplete, so the bridge
     // method itself returns void and just delegates.
     ['saveToFile', ['notes.json', '{}']],
+    // v3 chunked bridge — the picker-launch + close methods return void.
+    ['v3ExportOpen', ['backup.votbak']],
+    ['v3ImportOpen', []],
+    ['v3ImportClose', []],
   ];
   it.each(voidCases)('void method %s delegates with args %o', (name, args) => {
     bridge[name](...args);
@@ -155,6 +184,14 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['takeScreenshot', [0, 1024, 80], 'data:image/jpeg;base64,abc'],
     // getCrashLog is NO LONGER a pure passthrough — W7.4 merges the native
     // BoundedLogTree with the JS DiagnosticLog. See its own describe below.
+    // v3 chunked bridge — synchronous value passthroughs (forward args, return native result).
+    ['v3ExportBegin', ['{"app":"VOTReader","exportVersion":3}'], 'ok'],
+    ['v3ExportWriteBlob', ['42'], 'ok'],
+    ['v3ExportChunk', ['QUJD'], 'ok'],
+    ['v3ExportFinish', [true], 'ok'],
+    ['v3ImportBegin', [], 'v3:{"app":"VOTReader","exportVersion":3}'],
+    ['v3ImportNextBlob', [], '42'],
+    ['v3ImportReadChunk', [65536], ''],
   ];
   it.each(valueCases)('value method %s returns native result and forwards args %o', async (name, args, expected) => {
     let result = bridge[name](...args);
@@ -256,6 +293,16 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   it('warnings are tagged with [PlatformBridge]', () => {
     bridge.haptic(1);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[PlatformBridge]'));
+  });
+
+  // The v3 native chunked methods are Android-only — on web the v3 container is
+  // streamed via openExportSink/writeContainer + pickImportFile/readContainer, so
+  // these throw (rather than silently no-op) to surface a wiring mistake loudly.
+  it.each([
+    'v3ExportOpen', 'v3ExportBegin', 'v3ExportWriteBlob', 'v3ExportChunk', 'v3ExportFinish',
+    'v3ImportOpen', 'v3ImportBegin', 'v3ImportNextBlob', 'v3ImportReadChunk', 'v3ImportClose',
+  ])('v3 method %s throws on web (Android-only)', (name) => {
+    expect(() => bridge[name]()).toThrow(/Android-only/);
   });
 
   // Tier B.3: zoom methods are DELIBERATE no-ops on web (verify inertness

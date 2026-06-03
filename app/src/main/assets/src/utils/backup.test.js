@@ -540,15 +540,32 @@ describe('applyV3', () => {
     expect(ann.calls).toEqual([]);
   });
 
-  it('REPLACES media: clears existing before putting the streamed frames', async () => {
+  it('REPLACES media: streamed frames win; stale media (not in the backup) is pruned', async () => {
     const media = destMedia({ old1: { id: 'old1' }, old2: { id: 'old2' } });
     await applyV3(
       { stores: {} },
       [{ id: 'new1', meta: { mime: 'image/png' }, blob: blobOf(new Uint8Array([1, 2])) }],
       { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
     );
-    expect(Object.keys(media._store)).toEqual(['new1']); // old media gone
+    expect(Object.keys(media._store)).toEqual(['new1']); // old (stale) media pruned after the stream
     expect(media.puts.map((p) => p.id)).toEqual(['new1']);
+  });
+
+  it('does NOT wipe existing media when the stream throws mid-way (no data loss on truncation)', async () => {
+    // The fail-safe ordering: frames are put FIRST, the stale-prune runs only
+    // after the full stream lands. A truncated/corrupt container (reachable on
+    // the Android path) throws before the prune, so prior media survives.
+    const media = destMedia({ old1: { id: 'old1' }, old2: { id: 'old2' } });
+    async function* truncated() {
+      yield { id: 'new1', meta: { mime: 'image/png' }, blob: blobOf(new Uint8Array([1, 2])) };
+      throw new Error('truncated frame');
+    }
+    await expect(applyV3(
+      { stores: {} }, truncated(),
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
+    )).rejects.toThrow(/truncated/);
+    // Prune never ran → existing media intact (plus the one frame that did land).
+    expect(Object.keys(media._store).sort()).toEqual(['new1', 'old1', 'old2']);
   });
 
   it('reports writeFailures when a store durability barrier resolves false', async () => {
