@@ -67,7 +67,7 @@ export function StorageHealthBanner({ onNavigateSettings }) {
    * @param {'idle' | 'granted' | 'denied'} persist
    */
   function _pickScenario(r, persist) {
-    const { tier, risks, remaining, privateModeLikely, writeFailedThisSession } = r;
+    const { tier, risks, remaining, privateModeLikely, writeFailedThisSession, storesDegraded } = r;
 
     if (tier === StorageHealth.TIER.READONLY && writeFailedThisSession) {
       return {
@@ -138,6 +138,19 @@ export function StorageHealthBanner({ onNavigateSettings }) {
         text: "Your data isn't protected from browser cleanup yet.",
         dismissable: true,
         buttons: [{ label: 'Protect my data', primary: true, onClick: _handlePersist }],
+      };
+    }
+
+    // E5: lowest priority — a store is stuck in the degraded hydration tier
+    // (serving empty defaults). Placed last so it never masks a real quota /
+    // write-fail / private-mode banner; auto-clears when the store recovers.
+    if (storesDegraded) {
+      return {
+        id: 'storage-slow',
+        style: 'amber',
+        text: 'Storage is slow to load — recent changes are kept on screen and will be saved automatically once it catches up.',
+        dismissable: false,
+        buttons: [],
       };
     }
 

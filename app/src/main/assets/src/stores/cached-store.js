@@ -567,6 +567,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // the exported diagnostic log is the ONLY signal that a store's
             // hydration timed out (and is now serving copyDefault snapshots).
             if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', storageKey + ' degraded (hydration timed out @' + hydrationTimeoutMs + 'ms)');
+            // E5: surface a low-key "storage is slow" banner via StorageHealth
+            // (the banner subscribes to StorageHealth, not to the stores).
+            if (typeof StorageHealth !== 'undefined') StorageHealth.setStoresDegraded(true);
             // Wake subscribers so any "Storage temporarily unavailable"
             // UI mounts. Increment _version manually + notify — _bump()
             // would semantically mean "data changed" but really only the
@@ -617,6 +620,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
             self._state = 'degraded';
             // E5: trace the degraded transition (see the timeout path above).
             if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', storageKey + ' degraded (IDB hydration rejected: ' + ((err && err.name) || err) + ')');
+            // E5: surface the "storage is slow" banner (see the timeout path).
+            if (typeof StorageHealth !== 'undefined') StorageHealth.setStoresDegraded(true);
             self._version += 1;
             self._notifySubscribers();
             self._backgroundRetry();
@@ -635,6 +640,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _rebaseAndPromote(loadedData) {
       this._cache = /** @type {any} */ ((loadedData !== undefined && loadedData !== null) ? loadedData : copyDefault());
       this._state = 'loaded';
+      // E5: this store recovered — clear the degraded banner ONLY if no other
+      // store is still degraded (the setter no-ops when unchanged).
+      if (typeof StorageHealth !== 'undefined') StorageHealth.setStoresDegraded(_anyStoreDegraded());
       this._pendingCache = null;
       this._defaultRef = null;
       this._replayQueueOnto();
@@ -782,6 +790,20 @@ export function hydrateAllStores() {
 export function hasAnyPendingStores() {
   for (const s of _idbStoreRegistry) {
     if (s._state === 'pending') return true;
+  }
+  return false;
+}
+
+/**
+ * E5: true iff any registered IDB store is currently in the degraded tier.
+ * Used to clear the "storage is slow" banner only once NO store remains
+ * degraded (a single store recovering must not hide a still-broken one).
+ *
+ * @returns {boolean}
+ */
+function _anyStoreDegraded() {
+  for (const s of _idbStoreRegistry) {
+    if (s._state === 'degraded') return true;
   }
   return false;
 }

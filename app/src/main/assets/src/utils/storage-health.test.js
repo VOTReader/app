@@ -810,6 +810,57 @@ describe('checkFirstDataCreation', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
+   setStoresDegraded (E5)
+   ═══════════════════════════════════════════════════════════════════ */
+
+describe('setStoresDegraded (E5)', () => {
+  const healthyApi = {
+    estimate: () => Promise.resolve({ quota: 1e9, usage: 1e6 }),
+    persisted: () => Promise.resolve(true),
+  };
+
+  it('default report carries storesDegraded:false', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME });
+    expect(StorageHealth.getReport().storesDegraded).toBe(false);
+  });
+
+  it('flips the report flag + bumps version', async () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: healthyApi });
+    await StorageHealth.assess();
+    expect(StorageHealth.getReport().storesDegraded).toBe(false);
+    const vBefore = StorageHealth.getVersion();
+    StorageHealth.setStoresDegraded(true);
+    expect(StorageHealth.getReport().storesDegraded).toBe(true);
+    expect(StorageHealth.getVersion()).toBe(vBefore + 1);
+  });
+
+  it('clearing flips it back + bumps again', async () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: healthyApi });
+    await StorageHealth.assess();
+    StorageHealth.setStoresDegraded(true);
+    const v = StorageHealth.getVersion();
+    StorageHealth.setStoresDegraded(false);
+    expect(StorageHealth.getReport().storesDegraded).toBe(false);
+    expect(StorageHealth.getVersion()).toBe(v + 1);
+  });
+
+  it('no-op early-return: setting the same value does not bump', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME });
+    StorageHealth.setStoresDegraded(true);
+    const v = StorageHealth.getVersion();
+    StorageHealth.setStoresDegraded(true);
+    expect(StorageHealth.getVersion()).toBe(v);
+  });
+
+  it('resets across _resetForTests', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME });
+    StorageHealth.setStoresDegraded(true);
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME });
+    expect(StorageHealth.getReport().storesDegraded).toBe(false);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
    Dismissal state
    ═══════════════════════════════════════════════════════════════════ */
 

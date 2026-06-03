@@ -42,6 +42,7 @@ function mkReport(overrides) {
     privateModeLikely: false,
     lastAssessedAt: Date.now(),
     writeFailedThisSession: false,
+    storesDegraded: false,
     ...overrides,
   };
 }
@@ -92,6 +93,36 @@ describe('StorageHealthBanner — scenario 1 (healthy)', () => {
       tier: StorageHealth.TIER.CAUTION,
       risks: ['safari-7day'],
     });
+    expect(container.querySelector('.sh-banner')).toBeNull();
+  });
+});
+
+/* ─── Banner: E5 storage-slow (degraded hydration) ─────────────── */
+
+describe('StorageHealthBanner — E5 storage-slow (degraded)', () => {
+  it('shows an amber, non-dismissable banner when a store is degraded', () => {
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: true });
+    const banner = container.querySelector('.sh-banner');
+    expect(banner).not.toBeNull();
+    expect(banner.className).toContain('sh-banner-amber');
+    expect(banner.textContent).toContain('Storage is slow to load');
+    expect(container.querySelector('.sh-banner-dismiss')).toBeNull();
+  });
+
+  it('is OUTRANKED by a real CRITICAL quota banner (degraded never masks it)', () => {
+    const { container } = renderBanner({
+      tier: StorageHealth.TIER.CRITICAL,
+      remaining: 1e6,
+      storesDegraded: true,
+    });
+    const banner = container.querySelector('.sh-banner');
+    expect(banner.className).toContain('sh-banner-danger');
+    expect(banner.textContent).toContain('almost full');
+    expect(banner.textContent).not.toContain('Storage is slow to load');
+  });
+
+  it('renders nothing when storesDegraded is false and tier is healthy', () => {
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, storesDegraded: false });
     expect(container.querySelector('.sh-banner')).toBeNull();
   });
 });

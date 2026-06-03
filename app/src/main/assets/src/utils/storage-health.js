@@ -116,6 +116,7 @@ const RISK = Object.freeze({
  *   lastAssessedAt: number,
  *   writeFailedThisSession: boolean,
  *   safariGateBlocked: boolean,
+ *   storesDegraded: boolean,
  * }} StorageHealthReport
  */
 
@@ -133,6 +134,7 @@ const _DEFAULT_REPORT = Object.freeze({
   lastAssessedAt: 0,
   writeFailedThisSession: false,
   safariGateBlocked: false,
+  storesDegraded: false,
 });
 
 /* ─── Module state ──────────────────────────────────────────────────── */
@@ -162,6 +164,11 @@ let _refreshIntervalId = null;
 let _lastAssessedAt = 0;
 let _safariWarningShownThisSession = false;
 let _safariGateBlocked = false;
+// E5: true while any cached store is stuck in the degraded hydration tier
+// (serving empty copyDefault() snapshots). Plumbed into the report so the
+// StorageHealthBanner — which only subscribes to StorageHealth — can surface
+// a low-key "storage is slow" heads-up.
+let _storesDegraded = false;
 /** @type {Promise<StorageHealthReport> | null} */
 let _assessInFlight = null;
 /** @type {(() => void) | null} */
@@ -340,6 +347,7 @@ async function _assessImpl() {
       lastAssessedAt: Date.now(),
       writeFailedThisSession: _writeFailedThisSession,
       safariGateBlocked: _safariGateBlocked,
+      storesDegraded: _storesDegraded,
     });
     _report = fallback;
     _lastAssessedAt = Date.now();
@@ -386,6 +394,7 @@ async function _assessImpl() {
     lastAssessedAt: Date.now(),
     writeFailedThisSession: _writeFailedThisSession,
     safariGateBlocked: _safariGateBlocked,
+    storesDegraded: _storesDegraded,
   };
 
   _report = report;
@@ -488,6 +497,7 @@ function _onWriteFailure(_err) {
       lastAssessedAt: _report.lastAssessedAt,
       writeFailedThisSession: true,
       safariGateBlocked: _safariGateBlocked,
+      storesDegraded: _storesDegraded,
     };
   }
   _bump();
@@ -580,6 +590,24 @@ function _isDismissed(scenarioId) {
 }
 
 /**
+ * E5: set/clear the "a cached store is stuck degraded" flag. Cached stores
+ * call this (as a bare global, typeof-guarded) on their degraded-hydration
+ * transition, and recompute-clear it once no store remains degraded. Mirrors
+ * the safariGateBlocked plumbing (Object.assign + _bump) so the banner picks
+ * it up via its existing StorageHealth subscription. No-op early-return makes
+ * the per-store calls cheap.
+ *
+ * @param {boolean} v
+ */
+function _setStoresDegraded(v) {
+  var b = !!v;
+  if (b === _storesDegraded) return;
+  _storesDegraded = b;
+  if (_report) _report = Object.assign({}, _report, { storesDegraded: b });
+  _bump();
+}
+
+/**
  * Start periodic health assessment. Called once after hydration
  * completes (from HydrationGate). Kicks off the initial assess(),
  * sets up a 5-minute refresh interval, and listens for visibility
@@ -637,6 +665,7 @@ function _resetForTests(opts) {
   _lastAssessedAt = 0;
   _safariWarningShownThisSession = false;
   _safariGateBlocked = false;
+  _storesDegraded = false;
   _assessInFlight = null;
   _storageApiOverride = (opts && opts.storageApi) || null;
 }
@@ -657,6 +686,7 @@ export const StorageHealth = {
   checkFirstDataCreation: _checkFirstDataCreation,
   dismissScenario: _dismissScenario,
   isDismissed: _isDismissed,
+  setStoresDegraded: _setStoresDegraded,
   start: _start,
   stop: _stop,
   _resetForTests: _resetForTests,
