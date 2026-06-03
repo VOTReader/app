@@ -54,11 +54,8 @@ export function buildScreenRoutes({
   lastReadLetterMap, setLastReadForVol,
   readItems, readHistory,
   markRead, unmarkRead, isRead, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
-  // ── Data resolved from screen state ──
-  letter, letterV1, letterV3, letterV4, letterV5, letterV6, letterV7,
-  letterTimothy, letterFlock, letterRebuke,
-  wtlb1Entry, wtlb2Entry, blessedEntry,
-  hdEntry, hmEntry,
+  // ── Data resolved from screen state (F3: the active letter/entry only) ──
+  activeLetter, activeVolKey,
   book, chapter,
   // ── Nav helpers ──
   goHome, goNavOrigin, goSearch, goHistory, goSettings, goAbout,
@@ -98,6 +95,11 @@ export function buildScreenRoutes({
   // ── Garden ──
   gardenPage, setGardenPage,
 }) {
+  // F3: App() resolves the active letter/entry ONCE (by screen->volKey) and
+  // passes it as activeLetter + activeVolKey. actL(k) returns it only for the
+  // matching volume, so each letter route stays guarded exactly as before
+  // (a non-matching screen yields null → the route renders nothing).
+  const actL = (k) => (activeVolKey === k ? activeLetter : null);
   /* ─────────────────────────────────────────────────────────────────────
      Built-in prop-builder helpers. Previously defined inside App() and
      threaded as 5 props (colIdxProps, colReadNavProps, _idxNav,
@@ -237,21 +239,21 @@ export function buildScreenRoutes({
     )),
 
     // ── Letter screens (10) — data-guarded ──
-    'vot-one-letter':    () => _wrapVot(letterV1       && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', letterV1)}     letter={letterV1}     volumeLabel="Volume One" />),
-    'vot-letter':    () => _wrapVot(letter         && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', letter)}       letter={letter} />),
-    'vot-three-letter':    () => _wrapVot(letterV3       && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', letterV3)}   letter={letterV3}     volumeLabel="Volume Three" />),
-    'vot-four-letter':    () => _wrapVot(letterV4       && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', letterV4)}    letter={letterV4}     volumeLabel="Volume Four" />),
-    'vot-five-letter':    () => _wrapVot(letterV5       && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', letterV5)}    letter={letterV5}     volumeLabel="Volume Five" />),
-    'vot-six-letter':    () => _wrapVot(letterV6       && <LetterView {...sharedViewProps} {...colReadNavProps('six', true)}     {...boundaryConfig('six', letterV6)}     letter={letterV6}     volumeLabel="Volume Six" />),
-    'vot-seven-letter':    () => _wrapVot(letterV7       && <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)}   {...boundaryConfig('seven', letterV7)}   letter={letterV7}     volumeLabel="Volume Seven" />),
-    'vot-timothy-letter':    () => _wrapVot(letterTimothy  && <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', letterTimothy)} letter={letterTimothy} volumeLabel="Letters from Timothy" />),
-    'vot-flock-letter':    () => _wrapVot(letterFlock    && <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)}   {...boundaryConfig('flock', letterFlock)}   letter={letterFlock}   volumeLabel="Letters to The Lord's Little Flock" />),
-    'vot-rebuke-letter':    () => _wrapVot(letterRebuke   && <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)}  {...boundaryConfig('rebuke', letterRebuke)} letter={letterRebuke}  volumeLabel="The Lord's Rebuke" />),
+    'vot-one-letter':    () => _wrapVot(actL('one')     && <LetterView {...sharedViewProps} {...colReadNavProps('one', true)}     {...boundaryConfig('one', actL('one'))}     letter={actL('one')}     volumeLabel="Volume One" />),
+    'vot-letter':    () => _wrapVot(actL('two')     && <LetterView {...sharedViewProps} {...colReadNavProps('two', true)}     {...boundaryConfig('two', actL('two'))}       letter={actL('two')} />),
+    'vot-three-letter':    () => _wrapVot(actL('three')   && <LetterView {...sharedViewProps} {...colReadNavProps('three', true)}   {...boundaryConfig('three', actL('three'))}   letter={actL('three')}     volumeLabel="Volume Three" />),
+    'vot-four-letter':    () => _wrapVot(actL('four')    && <LetterView {...sharedViewProps} {...colReadNavProps('four', true)}    {...boundaryConfig('four', actL('four'))}    letter={actL('four')}     volumeLabel="Volume Four" />),
+    'vot-five-letter':    () => _wrapVot(actL('five')    && <LetterView {...sharedViewProps} {...colReadNavProps('five', true)}    {...boundaryConfig('five', actL('five'))}    letter={actL('five')}     volumeLabel="Volume Five" />),
+    'vot-six-letter':    () => _wrapVot(actL('six')     && <LetterView {...sharedViewProps} {...colReadNavProps('six', true)}     {...boundaryConfig('six', actL('six'))}     letter={actL('six')}     volumeLabel="Volume Six" />),
+    'vot-seven-letter':    () => _wrapVot(actL('seven')   && <LetterView {...sharedViewProps} {...colReadNavProps('seven', true)}   {...boundaryConfig('seven', actL('seven'))}   letter={actL('seven')}     volumeLabel="Volume Seven" />),
+    'vot-timothy-letter':    () => _wrapVot(actL('timothy') && <LetterView {...sharedViewProps} {...colReadNavProps('timothy', true)} {...boundaryConfig('timothy', actL('timothy'))} letter={actL('timothy')} volumeLabel="Letters from Timothy" />),
+    'vot-flock-letter':    () => _wrapVot(actL('flock')   && <LetterView {...sharedViewProps} {...colReadNavProps('flock', true)}   {...boundaryConfig('flock', actL('flock'))}   letter={actL('flock')}   volumeLabel="Letters to The Lord's Little Flock" />),
+    'vot-rebuke-letter':    () => _wrapVot(actL('rebuke')  && <LetterView {...sharedViewProps} {...colReadNavProps('rebuke', true)}  {...boundaryConfig('rebuke', actL('rebuke'))} letter={actL('rebuke')}  volumeLabel="The Lord's Rebuke" />),
 
     // ── WTLB / Blessed entry screens (3) — data-guarded ──
-    'wtlb-one-entry':    () => _wrapVot(wtlb1Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', wtlb1Entry)}   entry={wtlb1Entry}   partLabel="Part One" onNavToChapter={_navToChapter} />),
-    'wtlb-two-entry':    () => _wrapVot(wtlb2Entry     && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', wtlb2Entry)}   entry={wtlb2Entry}   partLabel="Part Two" onNavToChapter={_navToChapter} />),
-    'blessed-entry':    () => _wrapVot(blessedEntry   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', blessedEntry)} entry={blessedEntry} partLabel="The Blessed" onNavToChapter={_navToChapter} />),
+    'wtlb-one-entry':    () => _wrapVot(actL('wtlb1')   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb1')}   {...boundaryConfig('wtlb1', actL('wtlb1'))}   entry={actL('wtlb1')}   partLabel="Part One" onNavToChapter={_navToChapter} />),
+    'wtlb-two-entry':    () => _wrapVot(actL('wtlb2')   && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('wtlb2')}   {...boundaryConfig('wtlb2', actL('wtlb2'))}   entry={actL('wtlb2')}   partLabel="Part Two" onNavToChapter={_navToChapter} />),
+    'blessed-entry':    () => _wrapVot(actL('blessed') && <WtlbEntryView {...sharedViewProps} {...colReadNavProps('blessed')} {...boundaryConfig('blessed', actL('blessed'))} entry={actL('blessed')} partLabel="The Blessed" onNavToChapter={_navToChapter} />),
 
     // ── AppShell / settings / search / home / library (P8b — 20 medium
     //    prop-threading screens folded in; same pattern as P8a). ──
@@ -703,6 +705,7 @@ export function buildScreenRoutes({
     )),
 
     'holy-days-entry': () => {
+      const hdEntry = actL('holydays');
       if (!hdEntry) return null;
       const bc = boundaryConfig('holydays', hdEntry);
       if (hdEntry.type === 'wtlb') {
@@ -713,6 +716,7 @@ export function buildScreenRoutes({
     },
 
     'hm-letter': () => {
+      const hmEntry = actL('hm');
       if (!hmEntry) return null;
       const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };
       // Returning home from HM goes back to the Matthew chapter that led here.

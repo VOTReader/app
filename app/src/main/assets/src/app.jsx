@@ -417,21 +417,13 @@ function App() {
     var arr = colLetterArr(col), pref = colPreface(col);
     return arr.find(function(l) { return l.id === letterId; }) || (pref && pref.id === letterId ? pref : null);
   }
-  const letter = _findLetter('two');
-  const letterV1 = _findLetter('one');
-  const letterV3 = _findLetter('three');
-  const letterV4 = _findLetter('four');
-  const letterV5 = _findLetter('five');
-  const letterV6 = _findLetter('six');
-  const letterV7 = _findLetter('seven');
-  const letterTimothy = _findLetter('timothy');
-  const letterFlock = _findLetter('flock');
-  const letterRebuke = _findLetter('rebuke');
-  const wtlb1Entry = _findLetter('wtlb1');
-  const wtlb2Entry = _findLetter('wtlb2');
-  const blessedEntry = _findLetter('blessed');
-  const hdEntry = _findLetter('holydays');
-  const hmEntry = _findLetter('hm');
+  // F3: resolve only the ACTIVE letter's volume (screen -> its collection ->
+  // its array) instead of brute-scanning all 15 collections every render. NOT
+  // memoized on letterId: colLetterArr reads the lazy VOT corpus live, so a
+  // cold-opened letter would freeze at null (the documented staleness trap).
+  const _activeCol = letterId ? COL_BY_LETTER_SC.get(screen) : null;
+  const activeVolKey = _activeCol ? _activeCol.volKey : null;
+  const activeLetter = activeVolKey ? _findLetter(activeVolKey) : null;
 
   /* App-shell nav surface (20 helpers) → src/hooks/use-nav.js (P7b).
      goTabs / goNavOrigin / goSearch / goSearchOrigin stay below (P7c). */
@@ -683,10 +675,7 @@ function App() {
     lastReadLetterMap, setLastReadForVol,
     readItems, readHistory,
     markRead, unmarkRead, isRead, clearReadForBook, clearAllProgress, clearHistory, pruneHistoryDay,
-    letter, letterV1, letterV3, letterV4, letterV5, letterV6, letterV7,
-    letterTimothy, letterFlock, letterRebuke,
-    wtlb1Entry, wtlb2Entry, blessedEntry,
-    hdEntry, hmEntry,
+    activeLetter, activeVolKey,
     book, chapter,
     goHome, goNavOrigin, goSearch, goHistory, goSettings, goAbout,
     goVolumesHome, goScripturesHome, goScriptureGenre, goBibleIdx, goMatthewIdx,
