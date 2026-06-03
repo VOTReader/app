@@ -360,6 +360,88 @@ function _whenSaved(s) {
   return (s && typeof s.whenSaved === 'function') ? s.whenSaved() : Promise.resolve(true);
 }
 
+// ── Shared import apply (folds the v2 applyImportPayload + the v3 applyV3) ──
+// The LS reseed, the v2-shape store/flag apply, and the U1 durability barrier
+// were duplicated verbatim across both appliers (only the MEDIA handling — v2
+// base64 decode vs v3 streamed frames — and applyImportPayload's V1 fallback
+// genuinely differ). These three helpers are the single source of truth for the
+// shared parts (the BACKUP-STREAMING-PLAN P5 fold). Module-private; covered by
+// the applyImportPayload + applyV3 integration tests.
+
+/**
+ * Reseed the localStorage shim keys from a backup's `data` map: clear each known
+ * key, then restore the string value for any `vot-`-prefixed key.
+ * @param {Record<string, any> | null | undefined} dataObj
+ * @param {string[]} dataLsKeys
+ */
+function _reseedLsData(dataObj, dataLsKeys) {
+  dataLsKeys.forEach((k) => {
+    try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
+  });
+  Object.keys(dataObj || {}).forEach((k) => {
+    if (k.indexOf('vot-') !== 0) return;
+    const v = dataObj[k];
+    if (typeof v === 'string') {
+      try { localStorage.setItem(k, v); } catch (e) { console.warn('LS write failed for', k, e); }
+    }
+  });
+}
+
+/**
+ * Apply a v2-shape `stores` object to the IDB-backed stores + flags: SKIP any
+ * section that fails shape validation (so a corrupt section can't overwrite good
+ * data), call the store's import method otherwise, set/clear each flag. Returns
+ * the failure tallies for the caller to fold into its running totals (its media
+ * step also contributes to importFailures).
+ * @param {Record<string, any>} storesObj
+ * @param {StoresMap} storesMap
+ * @param {FlagMap} flagMap
+ * @param {(name: string, payload: any) => string[]} validateStorePayload
+ * @returns {{ importFailures: number, skippedStores: string[] }}
+ */
+function _applyStoresAndFlags(storesObj, storesMap, flagMap, validateStorePayload) {
+  let importFailures = 0;
+  /** @type {string[]} */
+  const skippedStores = [];
+  for (const name of Object.keys(storesMap)) {
+    if (!(name in storesObj)) continue;
+    const violations = validateStorePayload(name, storesObj[name]);
+    if (violations.length) {
+      skippedStores.push(name);
+      console.warn('skipping store with invalid payload:', name, violations);
+      continue;
+    }
+    const { store, method } = storesMap[name];
+    try { store[method](storesObj[name]); }
+    catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
+  }
+  for (const name of Object.keys(flagMap)) {
+    if (!(name in storesObj)) continue;
+    const truthy = !!storesObj[name];
+    try { if (truthy) flagMap[name].set(); else flagMap[name].clear(); }
+    catch (e) { importFailures += 1; console.warn('flag import failed for', name, e); }
+  }
+  return { importFailures, skippedStores };
+}
+
+/**
+ * The U1 durability barrier: wait for every store + flag write to durably land in
+ * IDB before returning (the caller reloads right after, and `_save` is
+ * fire-and-forget — returning early would drop the just-imported data). Media is
+ * already durable (its put() is awaited by the caller). whenSaved never rejects;
+ * `false` means that store's write failed.
+ * @param {StoresMap} storesMap
+ * @param {FlagMap} flagMap
+ * @returns {Promise<number>} writeFailures
+ */
+async function _awaitDurability(storesMap, flagMap) {
+  const saveResults = await Promise.all(
+    Object.values(storesMap).map(({ store }) => _whenSaved(store))
+      .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
+  );
+  return saveResults.filter((ok) => !ok).length;
+}
+
 /**
  * @typedef {Object} ApplyImportCtx
  * @property {StoresMap} storesMap
@@ -403,38 +485,14 @@ export async function applyImportPayload(parsed, ctx) {
   /** @type {string[]} */
   const skippedStores = [];
 
-  // (1) Clear the shim LS keys and re-seed from `data`.
-  dataLsKeys.forEach((k) => {
-    try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
-  });
-  Object.keys((parsed && parsed.data) || {}).forEach((k) => {
-    if (k.indexOf('vot-') !== 0) return;
-    const v = parsed.data[k];
-    if (typeof v === 'string') {
-      try { localStorage.setItem(k, v); } catch (e) { console.warn('LS write failed for', k, e); }
-    }
-  });
+  // (1) Reseed the LS shim keys from `data`.
+  _reseedLsData(parsed && parsed.data, dataLsKeys);
 
   // (2) Apply stores → IDB-backed stores.
   if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
-    for (const name of Object.keys(storesMap)) {
-      if (!(name in parsed.stores)) continue;
-      const violations = validateStorePayload(name, parsed.stores[name]);
-      if (violations.length) {
-        skippedStores.push(name);
-        console.warn('skipping store with invalid payload:', name, violations);
-        continue;
-      }
-      const { store, method } = storesMap[name];
-      try { store[method](parsed.stores[name]); }
-      catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
-    }
-    for (const name of Object.keys(flagMap)) {
-      if (!(name in parsed.stores)) continue;
-      const truthy = !!parsed.stores[name];
-      try { if (truthy) flagMap[name].set(); else flagMap[name].clear(); }
-      catch (e) { importFailures += 1; console.warn('flag import failed for', name, e); }
-    }
+    const applied = _applyStoresAndFlags(parsed.stores, storesMap, flagMap, validateStorePayload);
+    importFailures += applied.importFailures;
+    skippedStores.push(...applied.skippedStores);
   } else {
     // V1 fallback: parse each LS-shape value in `data` and call the
     // store's replaceAll/setAll/set with the parsed object.
@@ -511,15 +569,9 @@ export async function applyImportPayload(parsed, ctx) {
     }
   }
 
-  // (4) U1 DURABILITY BARRIER. Wait for every imported store's IDB write
-  // to actually land before returning (the caller reloads right after).
-  // Media is already durable: JournalMediaStore.put is awaited above.
-  // whenSaved() never rejects — false means that store's write failed.
-  const saveResults = await Promise.all(
-    Object.values(storesMap).map(({ store }) => _whenSaved(store))
-      .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
-  );
-  const writeFailures = saveResults.filter((ok) => !ok).length;
+  // (4) U1 DURABILITY BARRIER — wait for every imported store's IDB write to land
+  // before returning (the caller reloads right after; media is already durable).
+  const writeFailures = await _awaitDurability(storesMap, flagMap);
 
   return { importFailures, writeFailures, skippedStores };
 }
@@ -538,9 +590,10 @@ export async function applyImportPayload(parsed, ctx) {
  * each frame's length against the manifest.
  *
  * Returns the SAME shape as applyImportPayload so SettingsScreen treats v3 and the
- * legacy v1/v2 path identically. Self-contained for now (the store-apply mirrors
- * applyImportPayload's v2 branch — no V1 fallback, since v3 is always v2-shape
- * stores); folding the shared apply is the tracked P5 cleanup.
+ * legacy v1/v2 path identically. The LS reseed, the v2-shape store/flag apply, and
+ * the durability barrier are SHARED with applyImportPayload via the _reseedLsData /
+ * _applyStoresAndFlags / _awaitDurability helpers (the P5 fold); only the MEDIA
+ * handling differs — v3 streams frame Blobs (below), v2 base64-decodes a media map.
  *
  * @param {any} manifest - the v3 manifest (readContainer().manifest)
  * @param {Iterable<{id:any, meta:any, blob:Blob}> | AsyncIterable<{id:any, meta:any, blob:Blob}>} entries
@@ -554,42 +607,15 @@ export async function applyV3(manifest, entries, ctx) {
     dataLsKeys = DEFAULT_DATA_LS_KEYS,
   } = ctx;
 
-  let importFailures = 0;
-  /** @type {string[]} */
-  const skippedStores = [];
+  // (1) Reseed the LS shim keys from the manifest's `data`.
+  _reseedLsData(manifest && manifest.data, dataLsKeys);
+
+  // (2) Apply stores + flags (v3 is always v2-shape — no V1 fallback; SHARED with
+  // applyImportPayload's v2 branch). The media step below also adds to importFailures.
   const stores = (manifest && manifest.stores) || {};
-
-  // (1) Clear the shim LS keys and re-seed from the manifest's `data`.
-  dataLsKeys.forEach((k) => {
-    try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
-  });
-  Object.keys((manifest && manifest.data) || {}).forEach((k) => {
-    if (k.indexOf('vot-') !== 0) return;
-    const v = manifest.data[k];
-    if (typeof v === 'string') {
-      try { localStorage.setItem(k, v); } catch (e) { console.warn('LS write failed for', k, e); }
-    }
-  });
-
-  // (2) Apply stores + flags (v3 is always v2-shape stores — no V1 fallback).
-  for (const name of Object.keys(storesMap)) {
-    if (!(name in stores)) continue;
-    const violations = validateStorePayload(name, stores[name]);
-    if (violations.length) {
-      skippedStores.push(name);
-      console.warn('skipping store with invalid payload:', name, violations);
-      continue;
-    }
-    const { store, method } = storesMap[name];
-    try { store[method](stores[name]); }
-    catch (e) { importFailures += 1; console.warn('store import failed for', name, e); }
-  }
-  for (const name of Object.keys(flagMap)) {
-    if (!(name in stores)) continue;
-    const truthy = !!stores[name];
-    try { if (truthy) flagMap[name].set(); else flagMap[name].clear(); }
-    catch (e) { importFailures += 1; console.warn('flag import failed for', name, e); }
-  }
+  const applied = _applyStoresAndFlags(stores, storesMap, flagMap, validateStorePayload);
+  let importFailures = applied.importFailures;
+  const skippedStores = applied.skippedStores;
 
   // (3) REPLACE media — FAIL-SAFE ordering. Stream each frame's Blob in FIRST
   // (put = overwrite by id), recording every id streamed. Existing media is NOT
