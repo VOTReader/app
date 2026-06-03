@@ -2,6 +2,16 @@
    BibleChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+// UX10 — swipe thresholds for chapter flipping on touch devices.
+const SWIPE_MIN_DX = 60;
+const SWIPE_MAX_DY = 45;
+// Returns +1 (next chapter), -1 (prev), or 0 (not a horizontal swipe).
+// Exported for unit tests — the full screen render needs many free globals.
+export function bibleSwipeDir(dx, dy) {
+  if (Math.abs(dx) > SWIPE_MIN_DX && Math.abs(dy) < SWIPE_MAX_DY) return dx < 0 ? 1 : -1;
+  return 0;
+}
+
 export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack }) {
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // Restored-Name chrome lookup. When settings.restoredNames is on and
@@ -30,6 +40,25 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   }, [surpriseAnchor]);
   const prevCh = book.chapters.find((c) => c.num === chapter.num - 1);
   const nextCh = book.chapters.find((c) => c.num === chapter.num + 1);
+  // UX10 — single source for chapter nav, reused by the arrow buttons, the
+  // sticky nav, and the swipe handler (was duplicated inline 4x).
+  const goPrevCh = () => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook();
+  const goNextCh = () => nextCh ? onNavigate(nextCh.num) : onNextBook && onNextBook();
+  // Horizontal swipe on the body flips chapters on touch devices. No
+  // preventDefault + the dy gate keep vertical scroll intact; an active text
+  // selection suppresses it so selecting a verse never flips the chapter.
+  const swipeRef = React.useRef({ x: 0, y: 0 });
+  const onBodyTouchStart = (e) => {
+    if (e.touches.length !== 1) { swipeRef.current.x = NaN; return; }
+    swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onBodyTouchEnd = (e) => {
+    const s = swipeRef.current;
+    if (isNaN(s.x) || e.changedTouches.length !== 1) return;
+    if (window.getSelection && String(window.getSelection())) return;
+    const dir = bibleSwipeDir(e.changedTouches[0].clientX - s.x, e.changedTouches[0].clientY - s.y);
+    if (dir > 0) goNextCh(); else if (dir < 0) goPrevCh();
+  };
 
   useMarkAsRead(markAsReadEnabled, onMarkRead);
 
@@ -44,14 +73,14 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
             <button
               className="nav-arrow-btn"
               disabled={!prevCh && !prevBook}
-              onClick={() => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook()}
+              onClick={goPrevCh}
               title="Previous"
               aria-label="Previous chapter"
             >‹</button>
             <button
               className="nav-arrow-btn"
               disabled={!nextCh && !nextBook}
-              onClick={() => nextCh ? onNavigate(nextCh.num) : onNextBook && onNextBook()}
+              onClick={goNextCh}
               title="Next"
               aria-label="Next chapter"
             >›</button>
@@ -71,8 +100,8 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
       }
     >
       <StickyChapterNav
-        onPrev={() => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook()}
-        onNext={() => nextCh ? onNavigate(nextCh.num) : onNextBook && onNextBook()}
+        onPrev={goPrevCh}
+        onNext={goNextCh}
         prevDisabled={!prevCh && !prevBook}
         nextDisabled={!nextCh && !nextBook}
         prevLabel="Previous chapter"
@@ -123,7 +152,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         );
       })()}
       <div className="page-wrapper">
-        <div className="chapter-body">
+        <div className="chapter-body" onTouchStart={onBodyTouchStart} onTouchEnd={onBodyTouchEnd}>
           {showSectionHeadings && headingsFocusHidden && chapter.sections.some((s) => s.heading || s.letter) && (
             <button
               className="hero-subtitle-restore headings-restore"

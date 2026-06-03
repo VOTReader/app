@@ -7,6 +7,18 @@ export const GARDEN_CRAWL_DELAY = 500;
 const MAX_ZOOM = 5;
 const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_ZOOM = 2.5;
+// UX4 — horizontal swipe flips the page (only when not zoomed). A real page
+// flip needs a clear horizontal intent; the dy gate keeps a vertical drag or a
+// diagonal pan from triggering it.
+const SWIPE_MIN_DX = 60;
+const SWIPE_MAX_DY = 45;
+// Returns +1 (next), -1 (prev), or 0 (not a horizontal swipe). Exported for
+// unit tests; the full GardenView render needs ~10 free globals, so the swipe
+// decision is the unit worth pinning directly.
+export function gardenSwipeDir(dx, dy) {
+  if (Math.abs(dx) > SWIPE_MIN_DX && Math.abs(dy) < SWIPE_MAX_DY) return dx < 0 ? 1 : -1;
+  return 0;
+}
 
 export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeChange: _onThemeChange, tier }) {
   const [loading, setLoading] = React.useState(false);
@@ -17,6 +29,11 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
   const crawlRef = React.useRef(null);
   const pageRef = React.useRef(page);
   pageRef.current = page;
+  // The touch effect below attaches once (deps are stable callbacks), so it
+  // would capture a stale `page`/`onPageChange`. Mirror both into refs the
+  // swipe handler reads at gesture time. (Mirrors the crawl effect's pageRef.)
+  const onPageChangeRef = React.useRef(onPageChange);
+  onPageChangeRef.current = onPageChange;
 
   const imgAreaRef = React.useRef(null);
   const imgElRef = React.useRef(null);
@@ -242,6 +259,16 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
             }
           } else {
             g.lastTapTime = 0;
+            // UX4: a horizontal drag at scale 1 flips the page. Read pageRef +
+            // the onPageChange ref (this effect attached once with a stale
+            // closure). Clamp to [1, GARDEN_TOTAL] like the arrow buttons do.
+            if (z.scale === 1) {
+              const dir = gardenSwipeDir(t.clientX - g.tapStartX, t.clientY - g.tapStartY);
+              if (dir) {
+                const nx = pageRef.current + dir;
+                if (nx >= 1 && nx <= GARDEN_TOTAL) onPageChangeRef.current(nx);
+              }
+            }
           }
         }
       } else if (e.touches.length === 1 && z.scale > 1) {
