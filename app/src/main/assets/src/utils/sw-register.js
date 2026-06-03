@@ -39,11 +39,28 @@ export function registerServiceWorker() {
 
   // When the waiting SW activates (after the user opts in), it takes
   // control and 'controllerchange' fires — reload once onto the new build.
+  // P7pwa: 'controllerchange' fires in ALL controlled clients, so updating in
+  // one foreground tab would also yank every BACKGROUND tab. If THIS tab is
+  // hidden when control changes, defer its reload to the next time it becomes
+  // visible (rather than reloading it out from under a backgrounded reader).
   let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
+  const doReload = () => {
     if (refreshing) return;
     refreshing = true;
     window.location.reload();
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+      doReload();
+      return;
+    }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') {
+        document.removeEventListener('visibilitychange', onVis);
+        doReload();
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
   });
 
   navigator.serviceWorker.register('./service-worker.js').then((reg) => {
