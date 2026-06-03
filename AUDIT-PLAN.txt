@@ -126,9 +126,11 @@
 ───────────────────────────────────────────────────────────────────────────
  2026-06-03 — PILE A BATCH (owner: "finish everything / close the plan"). Every
  item SOURCE-VERIFIED FIRST by a 16-agent read-only pass, then one focused
- commit. 10 DONE + 3 ADJUDICATED; 2 flagged-for-owner; 1 deferred. All gated
- (lint --max-warnings 0 + tsc + vitest + build + Kotlin testDebugUnitTest+jacoco)
- + pushed; web-observable items preview-verified. vitest 1797 → 1851.
+ commit. 12 DONE + 3 ADJUDICATED; 1 deferred (PF6). The 2 visible items first
+ flagged for a nod (UX1+UX2, A1+A5) were then APPROVED and landed — see the
+ "LANDED AFTER OWNER APPROVAL" block below. All gated (lint --max-warnings 0 +
+ tsc + vitest + build + Kotlin testDebugUnitTest+jacoco) + pushed; web-observable
+ items preview-verified. vitest 1797 → 1860. PILE A is now CLOSED.
    • UX5        (5142c5f) — first-use tab-switcher coachmark. localStorage flag,
      NOT a new IDB store (that needs a DB_VERSION bump to persist). +6 tests.
    • UX4+UX10   (f15345c) — Garden swipe-to-flip + Bible swipe-to-change-chapter;
@@ -184,19 +186,26 @@
      lookupVersesFromBooks. A safe design frees only the 6 NON-active codes +
      keeps/refetches the active one offline — a multi-file cross-bundle change on
      the un-linted cold-boot search.js. Not a batch item.
-   FLAGGED FOR OWNER (normal-use VISIBLE deltas, NOT in the prior approved set —
-   awaiting a nod; verified specs ready to implement):
-   • UX1+UX2 — changes what Back does (Surprise→Home instead of a stray index;
-     clear the search anchor so the result-list scroll restores). The audit's
-     other 2 UX2 bullets are NO-OPS (search already has a scroll key via the
-     getScrollKey fallback; searchScope is already preserved) — the real fix is
-     just the surpriseAnchor clears + a fromSurprise tabField.
-   • A1+A5   — fixes a latent React-DOM mutation crash on Bible verse notes, but
-     the note icon MOVES from phrase-end to verse-end (where link/bookmark icons
-     already sit). Scope-only (the audit's alternative) is a REGRESSION (strips
-     icons from every Bible/Matthew/study verse, and the smoke gate wouldn't
-     catch it) — must ship the React <NoteIcon> + the scoped imperative passes
-     TOGETHER, with a Bible-verse note seeded into smoke.js.
+   LANDED AFTER OWNER APPROVAL (2026-06-03 — owner: "Agreed on everything, do all
+   the real fixes"; both gated + pushed to main):
+   • UX1+UX2   (951d468) — Back from a Surprise jump now returns Home (a
+     fromSurprise tabField checked FIRST in the 4 surprise-reachable branches),
+     not the stray index of a book the user never chose; goSearchOrigin + the
+     search-return sites clear surpriseAnchor so the result-list scroll restores.
+     The audit's other 2 UX2 bullets were NO-OPS (search already keys scroll via
+     the getScrollKey fallback; searchScope is already preserved) — skipped. +6
+     (new use-android-back.test.js).
+   • A1+A5     (17f6348) — note icons on the React verse path. UPGRADED past BOTH
+     the audit's verse-end sibling AND the scope-only regression (the owner asked
+     to keep the icon exactly where the highlight ends): HighlightableText now
+     renders the icon INLINE at the note-group's last segment (renderNoteIcon) =
+     EXACT phrase-end placement, React-owned so no splitText into React DOM (the
+     latent NotFoundError); applyNoteIcons scoped to [data-hl-dom] (letters
+     unchanged); applyActiveNoteState stays global (classList-only = safe, tints
+     the inline icons too). Dual-render equivalence STAYS GREEN; +3. Live on
+     Genesis 1: the icon lands immediately after the highlighted phrase, 0 console
+     errors. (smoke.js Bible-seed judged redundant — the new unit test guards the
+     React-path icon in CI.)
    DEFERRED (focused session): PF6 lazy bundle-e — verified feasible but L (new
    esbuild bundle + SW precache + screen-routes typeof-guards + an app.jsx
    subscription refactor to stay <800) for a parse-time-only ~55 KB win.
