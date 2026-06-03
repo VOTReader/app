@@ -255,3 +255,57 @@
    build green. Manual residual: the OS file-picker dialog (not headless-drivable).
    NEXT: P3 — Android native framing + chunked bridge (emulator-verified).
 ═══════════════════════════════════════════════════════════════════════════
+
+───────────────────────────────────────────────────────────────────────────
+ P3 — EXECUTION NOTES & GOTCHAS  (read before starting Android)
+───────────────────────────────────────────────────────────────────────────
+ GOAL: Android does v3 export/import NATIVELY, byte-compatible with the web
+ codec, EMULATOR-verified, WITHOUT breaking the live v2 path until v3 passes.
+
+ WHAT TO BUILD:
+  • StorageManager.kt — stream the framed container to/from the SAF Uri
+    (OutputStream / InputStream): magic "VOTBACK1" + 8-byte BE manifest length +
+    manifest JSON + per-frame [8-byte BE length][raw bytes]. The spec IS
+    src/utils/backup-container.js — mirror it EXACTLY (64-bit lengths, big-endian).
+  • AppInterface.kt + JsBridge/JsEvent — a CHUNKED bridge (the string bridge
+    can't carry GBs in one arg). Suggestion: exportBegin(manifestJson) /
+    exportWriteBlob(id,size) / exportBlobChunk(base64) / exportEnd ; importBegin()
+    →manifestJson / importNextBlob() / importReadChunk(n)→base64. Names are a
+    suggestion — keep AppInterface testable via BridgeHost (the project pattern).
+  • MainActivity.kt — reuse the existing SAF create-document + open-document
+    pickers (v2 export/import already wire them).
+  • platform-bridge.js androidImpl — replace the openExportSink/pickImportFile
+    REJECT stubs with chunked-bridge impls that return the SAME { write, close }
+    sink / File-or-source shape the web side returns, so SettingsScreen's web
+    branch logic ports cleanly. Then flip SettingsScreen's `if (PlatformBridge.
+    isAndroid)` export/import branches from v2 to v3.
+  • JS-on-Android (WV69!) — feeding blob bytes to native CANNOT use
+    Blob.arrayBuffer()/.stream() (Chromium-76 APIs, ABSENT on the WebView-69
+    floor). Use FileReader.readAsArrayBuffer on <=1 MB slices (rule 5). The web
+    backup-container.js codec is WEB-ONLY for this reason — do NOT import it into
+    the Android path; native owns the framing there.
+
+ GOTCHAS (learned in P1/P2):
+  • PREVIEW SW CACHE — the PWA service worker caches the bundles, so after a
+    rebuild the preview serves STALE bundles (v3 globals read `undefined` until
+    cleared). Before preview-testing, in preview_eval clear it:
+      (async()=>{for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();for(const k of await caches.keys())await caches.delete(k);location.reload();})()
+  • ORPHAN-MEDIA SWEEP — the boot sweep (app.jsx ~:561) deletes any media blob
+    NOT referenced by a journal entry. It WILL delete a test blob you put with no
+    journal entry (confounded a P2 preview test). Verify media with a real journal
+    entry, or use a STORE value (e.g. a bookmark) which is sweep-immune.
+  • BYTE-COMPAT IS THE CONTRACT — web-export must import on Android and vice
+    versa. The P3 cross-platform round-trip is MANDATORY: export on web → pull the
+    file → import on the emulator AND the reverse; sha256 each media blob in==out.
+  • DON'T touch v2 buildExportPayload/applyImportPayload (proven, still live). v3
+    lives ALONGSIDE; P5 folds the shared store-read into one helper (tracked).
+  • CAPS — applyV3 has NO aggregate cap (streaming is bounded). The 50 MB file cap
+    (platform-bridge WEB_MAX_IMPORT_BYTES / StorageManager MAX_IMPORT_SIZE) + the
+    100 MB export/import caps come OUT in P4 once v3 streams on BOTH platforms —
+    replace with a SOFT free-space warning, not a hard refusal.
+  • EMULATOR — AVD vot_api28 (API-28 / WebView 69 = the Android 8/9 floor); adb at
+    C:/Users/corbi/AppData/Local/Android/Sdk/platform-tools/; debug APK at
+    D:\VOTReader-build\app\outputs\apk\debug\app-debug.apk (NOT app/build). The
+    build→install→drive-SAF loop is slow — budget for it; that's why P3 wants its
+    own focused run.
+═══════════════════════════════════════════════════════════════════════════
