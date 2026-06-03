@@ -136,6 +136,41 @@ function annMarkClass(ann, isFirst, isLast, suppress) {
    sweep-line algorithm. Sorted boundaries → constant-active-set segments
    → inside-out <mark> nesting per segment using reduceRight (outer = i=0,
    inner = i=N-1; CSS cascade gives "more-specific overrides broader"). */
+/* A1+A5: the React-path note icon (Bible/Matthew verses). Rendered INLINE at the
+   highlighted-phrase end inside HighlightableText, mirroring the imperative
+   applyNoteIcons markup so SelectionToolbar's tap routing + applyActiveNoteState
+   (kept global — classList-only, so safe on React-owned DOM) treat both paths
+   alike. Because React renders it, there's no splitText into React's verse DOM
+   (the latent NotFoundError applyNoteIcons caused). */
+function renderNoteIcon(segIdx, entries, hlKey) {
+  const gids = entries.map((e) => e.gid);
+  const multi = gids.length > 1;
+  const color = entries[0].color ? ' hl-' + entries[0].color : '';
+  const open = (x, y) => {
+    if (multi && window.__showMultiNote) window.__showMultiNote(gids, x, y);
+    else if (window.__openNote) window.__openNote(gids[0]);
+  };
+  return (
+    <span
+      key={'ni' + segIdx}
+      className={'hl-note-icon' + color + (multi ? ' hl-note-icon-badge' : '')}
+      data-group-id={gids[0]}
+      data-group-ids={gids.join(',')}
+      data-hl-key={hlKey}
+      data-count={multi ? String(gids.length) : undefined}
+      title={multi ? gids.length + ' notes here' : 'Open note'}
+      onClick={(e) => { e.stopPropagation(); open(e.clientX, e.clientY); }}
+    >
+      <svg viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="8" y1="13" x2="16" y2="13" />
+        <line x1="8" y1="17" x2="16" y2="17" />
+      </svg>
+    </span>
+  );
+}
+
 export const HighlightableText = React.memo(function HighlightableText({ text, hlKey }) {
   // Subscribe to AnnotationStore mutations. F1+F2: snapshot the per-KEY
   // version, not the global one — so adding/removing/recoloring an annotation
@@ -190,6 +225,23 @@ export const HighlightableText = React.memo(function HighlightableText({ text, h
       lastSegByGroup.set(a.groupId, idx);
     });
   });
+  // A1+A5: collect the note-bearing groups (those with a NoteStore entry) by the
+  // segment they END on, so renderNoteIcon can drop the icon inline at the
+  // highlighted-phrase end. Several notes ending on the same segment collapse to
+  // one badge. (Subscribed to NoteStore above, so this re-runs on note changes.)
+  const noteIconsBySeg = new Map();
+  if (typeof NoteStore !== 'undefined') {
+    lastSegByGroup.forEach((segIdx, groupId) => {
+      if (!NoteStore.get(groupId)) return;
+      let color = '';
+      const segAtEnd = segments[segIdx];
+      if (segAtEnd) {
+        for (const a of segAtEnd.active) { if (a.groupId === groupId) { color = a.color || ''; break; } }
+      }
+      if (!noteIconsBySeg.has(segIdx)) noteIconsBySeg.set(segIdx, []);
+      noteIconsBySeg.get(segIdx).push({ gid: groupId, color });
+    });
+  }
   // Mid-word boundary detection.
   const isWordChar = (c) => !!c && /[\w’'-]/.test(c);
   segments.forEach((seg, idx) => {
@@ -221,7 +273,7 @@ export const HighlightableText = React.memo(function HighlightableText({ text, h
         // Inside-out: reduceRight wraps innermost (i = active.length - 1)
         // first, working outward. Outer element (i = 0) is what React keys
         // off — gets the segment-level key; inner elements get composite keys.
-        return seg.active.reduceRight((child, ann, i) => {
+        const markEl = seg.active.reduceRight((child, ann, i) => {
           const kind = ann.kind || 'highlight';
           const isFirst = firstSegByGroup.get(ann.groupId) === segIdx;
           const isLast = lastSegByGroup.get(ann.groupId) === segIdx;
@@ -237,6 +289,10 @@ export const HighlightableText = React.memo(function HighlightableText({ text, h
           if (isOutermost && seg.noBreakAfter) props['data-no-break-after'] = '1';
           return <mark {...props}>{child}</mark>;
         }, segText);
+        // A1+A5: a note ending on this segment gets its icon inline, right after
+        // the highlighted phrase (React-owned — no imperative DOM mutation).
+        const ni = noteIconsBySeg.get(segIdx);
+        return ni ? [markEl, renderNoteIcon(segIdx, ni, hlKey)] : markEl;
       })}
     </span>
   );
@@ -282,9 +338,14 @@ function _markCharEnd(mark) {
 }
 
 export function applyNoteIcons() {
-  document.querySelectorAll('.hl-note-icon').forEach(el => el.remove());
+  // A1+A5: scope to the IMPERATIVE DOM-path containers ([data-hl-dom], i.e.
+  // letters/WTLB). The React verse path (Bible/Matthew) renders its own inline
+  // <span class=hl-note-icon> via renderNoteIcon, so this pass must neither
+  // remove nor splitText-insert into those — mutating React-owned DOM is the
+  // latent NotFoundError. React verses carry data-hl-key but NOT data-hl-dom.
+  document.querySelectorAll('[data-hl-dom] .hl-note-icon').forEach(el => el.remove());
   const lastByGroup = new Map();
-  document.querySelectorAll('mark.hl-note[data-group-id]').forEach(mark => {
+  document.querySelectorAll('[data-hl-dom] mark.hl-note[data-group-id]').forEach(mark => {
     lastByGroup.set(mark.getAttribute('data-group-id'), mark);
   });
   const groupsByTarget = new Map();

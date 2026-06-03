@@ -13,7 +13,7 @@
    measured scope, so these are assertion-only (no coverage-floor effect). */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { render, cleanup, act, fireEvent } from '@testing-library/react';
 import {
   annVisible,
   annAbove,
@@ -480,5 +480,58 @@ describe('HighlightableText — F1+F2 keyed re-render fan-out', () => {
     expect(reRead).toContain('k:A');
     expect(reRead).toContain('k:B'); // bulk op bumps _crossKeyVersion → both re-render
     getSpy.mockRestore();
+  });
+});
+
+// ── A1+A5: inline note icon on the React verse path ──
+describe('HighlightableText — A1+A5 inline note icon', () => {
+  beforeEach(() => {
+    /** @type {any} */ (window).AnnotationStore = {
+      get: (k) => (k === 'k:v' ? [{ id: 'a1', groupId: 'g1', kind: 'highlight', color: 'yellow', start: 0, end: 5 }] : []),
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+    /** @type {any} */ (window).NoteStore = {
+      _notes: { g1: { groupId: 'g1', body: 'a note' } },
+      get: (gid) => window.NoteStore._notes[gid] || null,
+      subscribe: () => () => {},
+      getVersion: () => 0,
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    delete (/** @type {any} */ (window)).AnnotationStore;
+    delete (/** @type {any} */ (window)).NoteStore;
+  });
+
+  it('renders the note icon INLINE, immediately after the highlighted phrase', () => {
+    const { container } = render(<HighlightableText text="hello world" hlKey="k:v" />);
+    const icon = container.querySelector('.hl-note-icon');
+    const mark = container.querySelector('mark.hl-note');
+    expect(icon).not.toBeNull();
+    expect(mark).not.toBeNull();
+    expect(icon.getAttribute('data-group-id')).toBe('g1');
+    // phrase-end, not verse-end: the icon is the mark's very next sibling, with
+    // the rest of the verse (" world") following it.
+    expect(mark.nextElementSibling).toBe(icon);
+    expect(container.textContent).toContain('world');
+  });
+
+  it('renders NO icon when the group has no NoteStore entry', () => {
+    /** @type {any} */ (window).NoteStore._notes = {};
+    const { container } = render(<HighlightableText text="hello world" hlKey="k:v" />);
+    expect(container.querySelector('.hl-note-icon')).toBeNull();
+    // ...but the highlight mark itself still renders.
+    expect(container.querySelector('mark')).not.toBeNull();
+  });
+
+  it('clicking the icon opens the note', () => {
+    const opened = [];
+    /** @type {any} */ (window).__openNote = (gid) => opened.push(gid);
+    const { container } = render(<HighlightableText text="hello world" hlKey="k:v" />);
+    fireEvent.click(container.querySelector('.hl-note-icon'));
+    expect(opened).toEqual(['g1']);
+    delete (/** @type {any} */ (window)).__openNote;
   });
 });
