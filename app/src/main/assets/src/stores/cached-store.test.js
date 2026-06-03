@@ -143,6 +143,56 @@ describe('CachedStore — useSyncExternalStore reactivity contract (LS mode)', (
   });
 });
 
+describe('CachedStore — F1+F2 keyed reactivity (getVersionForKey / _bumpKey)', () => {
+  let store;
+  beforeEach(() => {
+    if (typeof localStorage !== 'undefined') localStorage.clear?.();
+    store = CachedStore('test-keyed-store', {});
+  });
+
+  it('initial getVersionForKey is 0 for any key', () => {
+    expect(store.getVersionForKey('a')).toBe(0);
+    expect(store.getVersionForKey('b')).toBe(0);
+  });
+
+  it('_bumpKey changes ONLY the named key — other keys stay isolated', () => {
+    const a0 = store.getVersionForKey('a');
+    const b0 = store.getVersionForKey('b');
+    store._bumpKey('a');
+    expect(store.getVersionForKey('a')).not.toBe(a0); // A changed → A re-renders
+    expect(store.getVersionForKey('b')).toBe(b0);      // B unchanged → B does NOT re-render
+  });
+
+  it('_bumpKey still bumps the global version (whole-store getVersion consumers update)', () => {
+    const v0 = store.getVersion();
+    store._bumpKey('a');
+    expect(store.getVersion()).toBe(v0 + 1);
+  });
+
+  it('a cross-key _bump changes getVersionForKey for EVERY key', () => {
+    const a0 = store.getVersionForKey('a');
+    const b0 = store.getVersionForKey('b');
+    store._bump();
+    expect(store.getVersionForKey('a')).not.toBe(a0);
+    expect(store.getVersionForKey('b')).not.toBe(b0);
+  });
+
+  it('_bumpKey notifies subscribers (the keyed verse wakes)', () => {
+    const cb = vi.fn();
+    store.subscribe(cb);
+    store._bumpKey('a');
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it('_bumpKey is suppressed during _replaying (the end-of-replay _bump covers the batch)', () => {
+    store._replaying = true;
+    const before = store.getVersionForKey('a');
+    store._bumpKey('a');
+    expect(store.getVersionForKey('a')).toBe(before);
+    store._replaying = false;
+  });
+});
+
 describe('CachedStore — backward compatibility (no opts, 2-arg call)', () => {
   beforeEach(() => { localStorage.clear?.(); });
 

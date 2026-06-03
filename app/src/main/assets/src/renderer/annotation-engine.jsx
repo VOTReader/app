@@ -136,14 +136,15 @@ function annMarkClass(ann, isFirst, isLast, suppress) {
    sweep-line algorithm. Sorted boundaries → constant-active-set segments
    → inside-out <mark> nesting per segment using reduceRight (outer = i=0,
    inner = i=N-1; CSS cascade gives "more-specific overrides broader"). */
-export function HighlightableText({ text, hlKey }) {
-  // Subscribe to AnnotationStore mutations so this component re-renders
-  // whenever any annotation is added / removed / recolored. The snapshot
-  // return value is unused; the act of subscribing is what triggers the
-  // React 18 re-render.
+export const HighlightableText = React.memo(function HighlightableText({ text, hlKey }) {
+  // Subscribe to AnnotationStore mutations. F1+F2: snapshot the per-KEY
+  // version, not the global one — so adding/removing/recoloring an annotation
+  // on one verse re-renders only THAT verse, not all 176 in the chapter. A
+  // whole-data op (replaceAll / removeGroup / rebase) bumps _crossKeyVersion,
+  // which getVersionForKey includes, so those still re-render every verse.
   React.useSyncExternalStore(
     React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
-    () => AnnotationStore.getVersion()
+    () => AnnotationStore.getVersionForKey(hlKey)
   );
   // Also re-render when notes change — a mark's has-note class (the icon +
   // active marker) depends on whether its group has a NoteStore entry.
@@ -239,7 +240,7 @@ export function HighlightableText({ text, hlKey }) {
       })}
     </span>
   );
-}
+});
 
 /* ═══════════════════════════════════════════════════════════════
    DOM-BASED HIGHLIGHT OVERLAY (unchanged — imperative DOM mutation)

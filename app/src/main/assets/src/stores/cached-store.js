@@ -104,11 +104,15 @@ const _idbStoreRegistry = new Set();
  *   _lastWrite: Promise<any> | null,
  *   raw(): T,
  *   _version: number,
+ *   _keyVersions: Record<string, number>,
+ *   _crossKeyVersion: number,
  *   _listeners: Set<() => void> | null,
  *   _bump(): void,
+ *   _bumpKey(key: string): void,
  *   _notifySubscribers(): void,
  *   subscribe(callback: () => void): () => void,
  *   getVersion(): number,
+ *   getVersionForKey(key: string): number,
  *   isReady(): boolean,
  *   getState(): StoreState,
  *   whenSaved(): Promise<boolean>,
@@ -336,6 +340,12 @@ export function CachedStore(storageKey, defaultVal, opts) {
 
     /* ─── React 18 reactivity contract (subscribe + getSnapshot) ─── */
     _version: 0,
+    /* F1+F2: per-hlKey version map + a cross-key "generation" counter. A keyed
+       getSnapshot (getVersionForKey) lets a verse re-render ONLY when ITS key
+       changed, or on a whole-data op — instead of every verse re-rendering on
+       any store mutation (176 re-renders on Psalm 119 → ~1). */
+    _keyVersions: /** @type {Record<string, number>} */ ({}),
+    _crossKeyVersion: 0,
     _listeners: /** @type {Set<() => void> | null} */ (null),
 
     /**
@@ -348,6 +358,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _bump() {
       if (this._replaying) return;
       this._version += 1;
+      this._crossKeyVersion += 1; // F1+F2: a whole-store bump re-renders every keyed verse
       this._notifySubscribers();
     },
 
@@ -378,6 +389,24 @@ export function CachedStore(storageKey, defaultVal, opts) {
     },
 
     getVersion() { return this._version; },
+
+    /* F1+F2: keyed reactivity. getVersionForKey(key) changes when key's own
+       records change (via _bumpKey) OR on any whole-data op (_crossKeyVersion,
+       bumped by _bump + the rebase/degraded transitions). So a verse subscribed
+       to its hlKey re-renders on its own edits + bulk ops, but NOT on a single-
+       key edit to a DIFFERENT verse. */
+    getVersionForKey(key) { return (this._keyVersions[key] || 0) + this._crossKeyVersion; },
+
+    /* Single-key sibling of _bump: bumps the per-key counter + the global
+       _version (so whole-store getVersion() consumers still update), but NOT
+       _crossKeyVersion — that omission is what isolates other keys. Respects
+       _replaying like _bump (the end-of-replay _bump covers the batch). */
+    _bumpKey(key) {
+      if (this._replaying) return;
+      this._keyVersions[key] = (this._keyVersions[key] || 0) + 1;
+      this._version += 1;
+      this._notifySubscribers();
+    },
 
     /* ─── W2.2 IDB-backing API ─── */
 
@@ -575,6 +604,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // would semantically mean "data changed" but really only the
             // state-machine state changed (no cache write).
             self._version += 1;
+            self._crossKeyVersion += 1; // F1+F2: keyed verses re-render on a degraded transition too
             self._notifySubscribers();
             self._backgroundRetry();
           }
@@ -623,6 +653,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
             // E5: surface the "storage is slow" banner (see the timeout path).
             if (typeof StorageHealth !== 'undefined') StorageHealth.setStoresDegraded(true);
             self._version += 1;
+            self._crossKeyVersion += 1; // F1+F2: keyed verses re-render on a degraded transition too
             self._notifySubscribers();
             self._backgroundRetry();
           }
@@ -654,6 +685,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
       // degraded-transition sites and to make the "one bump per rebase"
       // intent explicit at the call site.
       this._version += 1;
+      this._crossKeyVersion += 1; // F1+F2: keyed verses re-render after a rebase
       this._notifySubscribers();
     },
 

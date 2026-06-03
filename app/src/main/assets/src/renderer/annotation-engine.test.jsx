@@ -12,8 +12,8 @@
    and applyDOMHighlights imperative DOM). renderer/ is outside the coverage-
    measured scope, so these are assertion-only (no coverage-floor effect). */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, cleanup, act } from '@testing-library/react';
 import {
   annVisible,
   annAbove,
@@ -23,6 +23,8 @@ import {
   applyDOMHighlights,
   snapRangeToWords,
 } from './annotation-engine.jsx';
+import { AnnotationStore } from '../stores/annotation-store.js';
+import { NoteStore } from '../stores/note-store.js';
 
 describe('snapRangeToWords (A2)', () => {
   it('walks start left out of the middle of a word', () => {
@@ -158,6 +160,7 @@ describe('HighlightableText overlap precedence', () => {
       get: (k) => store[k] || [],
       subscribe: () => () => {},
       getVersion: () => 0,
+      getVersionForKey: () => 0,
     };
     window.NoteStore = {
       _notes: {},
@@ -321,6 +324,7 @@ describe('dual-render equivalence: HighlightableText ≡ applyDOMHighlights (U11
       get: (k) => store[k] || [],
       subscribe: () => () => {},
       getVersion: () => 0,
+      getVersionForKey: () => 0,
     };
     window.NoteStore = {
       _notes: {},
@@ -422,5 +426,59 @@ describe('dual-render equivalence: HighlightableText ≡ applyDOMHighlights (U11
       expect(sigReact[i].color).toBe('hl-pink');
       expect(sigDom[i].color).toBe('hl-pink');
     }
+  });
+});
+
+// ── F1+F2: keyed re-render fan-out (the 176→1 regression lock) ──
+describe('HighlightableText — F1+F2 keyed re-render fan-out', () => {
+  beforeEach(() => {
+    AnnotationStore._resetForTests({ forceLoaded: true });
+    NoteStore._resetForTests({ forceLoaded: true });
+    /** @type {any} */ (window).AnnotationStore = AnnotationStore;
+    /** @type {any} */ (window).NoteStore = NoteStore;
+  });
+  afterEach(() => {
+    cleanup();
+    AnnotationStore._resetForTests({ forceLoaded: true });
+    NoteStore._resetForTests({ forceLoaded: true });
+    delete (/** @type {any} */ (window)).AnnotationStore;
+    delete (/** @type {any} */ (window)).NoteStore;
+  });
+
+  // HighlightableText calls AnnotationStore.get(hlKey) once per render, so a
+  // re-render is observable as a fresh get(key). getSnapshot reads
+  // getVersionForKey (not get), so only real RE-RENDERS land in the spy.
+  it('adding an annotation to one verse re-renders ONLY that verse, not its sibling', () => {
+    render(
+      <div>
+        <HighlightableText text="alpha alpha" hlKey="k:A" />
+        <HighlightableText text="beta beta" hlKey="k:B" />
+      </div>
+    );
+    const getSpy = vi.spyOn(AnnotationStore, 'get');
+    act(() => { AnnotationStore.add('k:A', { id: 'x1', start: 0, end: 5 }); });
+    const reRead = getSpy.mock.calls.map((c) => c[0]);
+    expect(reRead).toContain('k:A');     // the edited verse re-rendered
+    expect(reRead).not.toContain('k:B'); // the sibling did NOT (was all-verses on the old global counter)
+    getSpy.mockRestore();
+  });
+
+  it('a cross-key replaceAll re-renders EVERY verse (bulk-op correctness)', () => {
+    render(
+      <div>
+        <HighlightableText text="alpha alpha" hlKey="k:A" />
+        <HighlightableText text="beta beta" hlKey="k:B" />
+      </div>
+    );
+    const getSpy = vi.spyOn(AnnotationStore, 'get');
+    act(() => {
+      AnnotationStore.replaceAll({
+        'k:A': [{ id: 'y1', groupId: 'y1', kind: 'highlight', color: 'yellow', start: 0, end: 5, text: 'alpha', created: 1, updated: 1 }],
+      });
+    });
+    const reRead = getSpy.mock.calls.map((c) => c[0]);
+    expect(reRead).toContain('k:A');
+    expect(reRead).toContain('k:B'); // bulk op bumps _crossKeyVersion → both re-render
+    getSpy.mockRestore();
   });
 });
