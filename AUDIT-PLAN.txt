@@ -124,6 +124,83 @@
 ───────────────────────────────────────────────────────────────────────────
  PROGRESS LOG
 ───────────────────────────────────────────────────────────────────────────
+ 2026-06-03 — PILE A BATCH (owner: "finish everything / close the plan"). Every
+ item SOURCE-VERIFIED FIRST by a 16-agent read-only pass, then one focused
+ commit. 10 DONE + 3 ADJUDICATED; 2 flagged-for-owner; 1 deferred. All gated
+ (lint --max-warnings 0 + tsc + vitest + build + Kotlin testDebugUnitTest+jacoco)
+ + pushed; web-observable items preview-verified. vitest 1797 → 1851.
+   • UX5        (5142c5f) — first-use tab-switcher coachmark. localStorage flag,
+     NOT a new IDB store (that needs a DB_VERSION bump to persist). +6 tests.
+   • UX4+UX10   (f15345c) — Garden swipe-to-flip + Bible swipe-to-change-chapter;
+     per-file gardenSwipeDir/bibleSwipeDir helpers. +13 tests; UX10 confirmed
+     live (Genesis 1<->2 swipe, vertical drag inert).
+   • E5         (cb4579b) — degraded-storage banner. The audit's 1-line "add a
+     _pickScenario case" was dead code: plumbed storesDegraded through Storage-
+     Health's report (5 sites, mirrors safariGateBlocked) so the banner (which
+     subscribes only to StorageHealth) can see cached-store degraded state. +8.
+   • T7         (94d01cc) — boot-with-degraded-store integration test; asserts
+     the import REFUSES (the "banner" the audit named is E5, a separate layer) +
+     the E5 flag end-to-end. +2.
+   • E4         (dbead10) — crash-loop guard. The audit's location.reload() reset
+     is a no-op (the bad screen lives in IDB, not the LS shim); fix = a
+     sessionStorage WINDOWED counter + a recover flag consumed synchronously in
+     useSavedState on the next boot. No app.jsx lines. +6.
+   • F3         (c1d5746) — _findLetter 15 scans/render → 1 (active volume via
+     COL_BY_LETTER_SC.get(screen).volKey; NO useMemo — the lazy-corpus staleness
+     trap). The 15-name fan-out moved to screen-routes; app.jsx 798→787 (frees
+     canary headroom). Preview: Volume One letter renders via actL('one').
+   • P7pwa      (37a8c1d) — SW-update reload deferred to next-visible for HIDDEN
+     tabs (no longer yanks a backgrounded reader). +3 (first sw-register test).
+   • F1+F2      (167a785) — keyed per-verse re-render (176→1). The audit said
+     React.memo; that's a NON-FIX (can't stop a child's own useSyncExternalStore
+     re-render). Real fix = getVersionForKey(hlKey) keyed snapshot + _bumpKey + a
+     cross-key generation counter (bulk ops still re-render all); memo added as a
+     complement. Dual-render equivalence STAYS GREEN; +8 incl. a real-store
+     fan-out lock. Live on Genesis 1: a highlight paints ONLY the edited verse.
+   • CQ6        (09c6dd5) — var-useState → const [x,setX]; dropped 5 disables
+     (not the audit's 4 — the conversions stabilized the setters, which freed the
+     mount-only flush effect's disable too). eslint --max-warnings 0 = the gate.
+   • T5         (575d925) — extracted MainActivity's tap device→CSS-px conversion
+     + the crash-loop decision into a framework-free MainActivityLogic + 11 JUnit
+     tests; JaCoCo coveredClasses untouched (the test still protects the logic —
+     no coverage-gate risk).
+   ADJUDICATED (verify-first caught the audit/agent premise was wrong or the fix
+   net-negative; owner pre-blessed adjudicate-with-reasoning):
+   • J7  → PREMISE INACTIVE. save() is wired ONLY to the preview Save button
+     (where previewBlobRef is always set); there is NO save-while-recording
+     trigger anywhere in the UI, so save()'s `stage==='recording'` branch is dead
+     and pendingSaveRef is never set during recording → the deferred-persist
+     data-loss window is NOT reachable. (Both the audit AND the verification agent
+     assumed a trigger that doesn't exist.) Like A8 — revisit only if a save-
+     while-recording affordance is ever added.
+   • CQ5 → NET-NEGATIVE. app.jsx is at the canary (787/800 after F3); ~90 prop +
+     28 hook JSDoc lines blow it, and adding app.jsx to tsconfig flips checkJs on
+     a classic-script file resolving 30+ free globals → a tsc error flood.
+     strict:false makes the gain marginal; the high-value surfaces (hooks/stores/
+     utils/renderer/ui) are already typed (CQ4 added journal-helpers).
+   • PF4 → NET-NEGATIVE / focused-session. The audit's "null window.BIBLE_*"
+     silently reverts the whole Bible to NKJV — the ACTIVE display translation
+     shares those globals, read at render time by translateVerse +
+     lookupVersesFromBooks. A safe design frees only the 6 NON-active codes +
+     keeps/refetches the active one offline — a multi-file cross-bundle change on
+     the un-linted cold-boot search.js. Not a batch item.
+   FLAGGED FOR OWNER (normal-use VISIBLE deltas, NOT in the prior approved set —
+   awaiting a nod; verified specs ready to implement):
+   • UX1+UX2 — changes what Back does (Surprise→Home instead of a stray index;
+     clear the search anchor so the result-list scroll restores). The audit's
+     other 2 UX2 bullets are NO-OPS (search already has a scroll key via the
+     getScrollKey fallback; searchScope is already preserved) — the real fix is
+     just the surpriseAnchor clears + a fromSurprise tabField.
+   • A1+A5   — fixes a latent React-DOM mutation crash on Bible verse notes, but
+     the note icon MOVES from phrase-end to verse-end (where link/bookmark icons
+     already sit). Scope-only (the audit's alternative) is a REGRESSION (strips
+     icons from every Bible/Matthew/study verse, and the smoke gate wouldn't
+     catch it) — must ship the React <NoteIcon> + the scoped imperative passes
+     TOGETHER, with a Bible-verse note seeded into smoke.js.
+   DEFERRED (focused session): PF6 lazy bundle-e — verified feasible but L (new
+   esbuild bundle + SW precache + screen-routes typeof-guards + an app.jsx
+   subscription refactor to stay <800) for a parse-time-only ~55 KB win.
+
  2026-06-02 — Wave 1 (P0) COMPLETE — all gated + verified, pushed to main:
    • SC1        (698c95b) — WTLB bare-BOOKS ReferenceError guard + prettify
      fallback; same-class app.jsx handleScriptureSelect hardened (grep-audit:
@@ -598,7 +675,7 @@
    Exit: Kotlin tests + on-device: recording pauses Spotify; double-start cannot
      strand the mode.
 
- [F1+F2] Per-verse re-render fan-out + zero React.memo       STATUS: OPEN
+ [F1+F2] Per-verse re-render fan-out + zero React.memo       STATUS: DONE (167a785, 2026-06-03 — keyed getVersionForKey snapshot + _bumpKey + memo; see PILE A BATCH)
    SEV: Med-High   VERDICT: CONFIRMED (empirically: 176 re-renders on Psalm 119)
    Evidence: each verse's HighlightableText subscribes to AnnotationStore AND
      NoteStore via useSyncExternalStore against a SINGLE global per-store version
@@ -1293,9 +1370,14 @@
 ───────────────────────────────────────────────────────────────────────────
  STATE: the 8.5 EXIT BAR was met long ago (all P0/P1 + search + backup + PF1).
  This is the P2/P3-TAIL polish. The backup re-architecture (P3–P5,
- BACKUP-STREAMING-PLAN.txt) is fully DONE + emulator-verified. The audit tail is
- ~half closed (see the P2/P3-TAIL CLOSE-OUT progress entry above for the exact
- done/adjudicated/remaining split). Working tree clean; everything pushed; CI green.
+ BACKUP-STREAMING-PLAN.txt) is fully DONE + emulator-verified. UPDATE 2026-06-03:
+ the PILE A BATCH landed (10 DONE + 3 ADJUDICATED — see the newest PROGRESS LOG
+ entry at the top for the exact per-item split + commits). What REMAINS:
+   • Flagged-for-owner (visible deltas, need a nod): UX1+UX2, A1+A5.
+   • Deferred focused session: PF6 (lazy bundle-e — L, app.jsx-refactor).
+   • PILE B (native/device + the highest-risk refactors), unchanged: UX3 router,
+     UX9 per-tab resume, A4 O(n²) apply, PF3 virtualization, N4/N6/N7/N8 (Kotlin).
+ Working tree clean; everything pushed; CI green.
 
  HOW TO CONTINUE: pick from PILE A (safe, in-batch). One item = one focused commit
  with the FULL gate (the pre-commit runs lint+tsc+vitest+build+rebuild-bundles+
