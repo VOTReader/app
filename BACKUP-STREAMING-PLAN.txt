@@ -322,8 +322,14 @@
  2026-06-02 — P5 DONE (docs). CLAUDE.md current-state rewritten (backup bullet =
    P1–P4 DONE + the format spec + emulator matrix; test count 1797; SAF walk noted
    emulator-verified), this plan's phases + progress log closed, HISTORY.md landed
-   entry added, AUDIT-PLAN.txt S4/S5 closed. Remaining (tracked, low-priority): fold
-   the shared store-read between applyV3 and applyImportPayload into one helper.
+   entry added, AUDIT-PLAN.txt S4/S5 closed.
+ 2026-06-02 — P5 cleanup DONE: the shared store-read between applyV3 and
+   applyImportPayload is folded into three module-private helpers (_reseedLsData,
+   _applyStoresAndFlags, _awaitDurability) — single source of truth for the LS
+   reseed + v2-shape store/flag apply + U1 barrier; only the media step (v2 base64
+   vs v3 streamed frames) + applyImportPayload's V1 fallback stay distinct.
+   Behavior-preserving (36 backup tests unchanged; verified in the minified preview
+   bundle). vitest 1797/71, tsc + eslint clean. NOTHING left open.
    ═══ BACKUP-STREAMING RE-ARCHITECTURE COMPLETE (P0–P5). ═══
 ═══════════════════════════════════════════════════════════════════════════
 
