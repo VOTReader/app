@@ -335,6 +335,47 @@
      test:coverage exit 0, tsc + eslint clean. (Recording-complete path is mic-
      gated → verified by the mocked-recorder bridge test, not headless preview.)
 
+ 2026-06-02 — P2/P3-TAIL CLOSE-OUT (owner: "do all of these, close out the plan";
+   flag any behavior/presentation change) — each verified + per-item committed +
+   pushed, CI-green. Closed this batch:
+   • CQ3 — CLAUDE.md stops quoting drift-prone counts (kept only the gated ≤800
+     app.jsx canary + historical deltas). SC8 + A3 — already-fixed-in-code comments,
+     marked done.
+   • B2 — cache:'npm' in ci.yml + deploy-web.yml + an actions/cache for puppeteer's
+     Chromium. PF2 — minify bundle-a's 3 pure-DATA members (books-restored/
+     matthew-plain/matthew-nkjv) → bundle-a 838,473→685,381 B (−153 KB cold boot);
+     vm canonical-sha256 proved all 3 globals VALUE-identical raw↔min; no
+     CORPUS_VERSION bump (bundle-a isn't in the corpus-version gate).
+   • PF5 — Garden image cache LRU-bounded (GARDEN_CACHE_MAX=12) + a gardenCrawled
+     Set done-marker (survives eviction) + Save-Data/2g crawl gate. +3 tests.
+   • A7 — applyDOMHighlights clamps stored offsets to the current text length like
+     the React path (no post-corpus-edit divergence). +2 tests; dual-render
+     equivalence held. F6 — documented the two render architectures (consolidation
+     declined). UX7 — tab-close UNDO TOAST (owner-chosen over a confirm tap):
+     closeTab snapshots + restoreClosedTab re-inserts; .vot-toast-undo CSS (clickable,
+     z-index above the overview). +3 tests. UX8 — hide the 0%-wide tab progress bar.
+   • ADJUDICATED (no action, with reasoning — recorded at each item): B3 (committed
+     bundles are intentional; the rebuild-on-src/data alt is unsafe), B7 (deliberate
+     pre-commit/CI split), A6 (stacked-highlight chooser is an optional feature, not
+     a bug), and the earlier B4.
+   • OWNER UX DECISIONS (for the flagged set): APPROVED UX3/UX4/UX5/UX10/UX7/E5;
+     SKIP UX6 (owner likes the welcome splash — DO NOT TOUCH IT); UX7 done.
+
+   REMAINING (open) — split by how they must be done:
+   • PILE A (safe / in-batch-able, the next continuation): E4 (crash-loop guard),
+     E5 (degraded-storage banner — APPROVED), UX4+UX10 (swipe — APPROVED), UX5
+     (tab-switcher hint — APPROVED), UX1+UX2 (Surprise-back / search-scroll nav),
+     J7 (save-while-recording persist), F1+F2+F3 (React.memo per-verse / _findLetter),
+     P7pwa, T5+T7 (tests), CQ5+CQ6 (app.jsx typing / var-useState), A1+A5 (note-icon
+     React path), PF4 (free+precache alt-translations — the reload-on-demand trap),
+     PF6 (code-split heavy screens).
+   • PILE B (needs a FOCUSED / device session — do NOT rush in a batch): UX3 (rewrite
+     the 13-branch back-router through navOrigin), UX9 (per-tab resume — reading-
+     position/tab-model change), A4 (rewrite the O(n²) annotation apply), PF3 (list
+     virtualization), N4/N6/N7/N8 (Kotlin robustness — each needs the build→install→
+     drive emulator loop, vot_api28). A8 stays a device-confirm-only (premise inactive).
+   See the HANDOFF below the STATUS line for full context + gotchas.
+
 ═══════════════════════════════════════════════════════════════════════════
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
 ═══════════════════════════════════════════════════════════════════════════
@@ -1246,6 +1287,61 @@
          prevents the window + synchronous rebase. Effectively nil.
  • CQ9 — probe-file half refuted (as T8); worktree-gitignore gap harmless
          (registered worktrees don't pollute git status).
+
+───────────────────────────────────────────────────────────────────────────
+ HANDOFF (2026-06-02, mid-close-out — read before continuing the audit)
+───────────────────────────────────────────────────────────────────────────
+ STATE: the 8.5 EXIT BAR was met long ago (all P0/P1 + search + backup + PF1).
+ This is the P2/P3-TAIL polish. The backup re-architecture (P3–P5,
+ BACKUP-STREAMING-PLAN.txt) is fully DONE + emulator-verified. The audit tail is
+ ~half closed (see the P2/P3-TAIL CLOSE-OUT progress entry above for the exact
+ done/adjudicated/remaining split). Working tree clean; everything pushed; CI green.
+
+ HOW TO CONTINUE: pick from PILE A (safe, in-batch). One item = one focused commit
+ with the FULL gate (the pre-commit runs lint+tsc+vitest+build+rebuild-bundles+
+ corpus-version automatically — just `git commit` and it gates). Verify web-
+ observable changes in the preview (clear the SW first — see gotchas); Kotlin/native
+ (PILE B) on the vot_api28 emulator. VERIFY EACH FINDING AGAINST SOURCE FIRST — the
+ audit's own suggested fixes are sometimes wrong (search suggest:true was; UX9's
+ READING_SCREENS allowlist is the inverse set) and several "open" items turned out
+ already-fixed-in-code (SC8, A3, CQ4). Adjudicate-with-reasoning is a valid close
+ for a net-negative finding (see B3/B7/A6/UX9) — don't force a regression-risky
+ change on load-bearing code for a marginal/Low gain.
+
+ OWNER DIRECTIVES (sticky): "finish everything / close the plan", BUT flag anything
+ that changes visible behavior/presentation before doing it. Flagged set resolved:
+ APPROVED UX3/UX4/UX5/UX10/UX7/E5; **SKIP UX6 — the owner likes the welcome splash
+ as-is; DO NOT modify the splash.** UX7 (tab-close undo toast) is DONE.
+
+ GOTCHAS (learned this session):
+  • PREVIEW SW CACHE — after any rebuild the PWA serves STALE bundles; in
+    preview_eval run the clean-slate snippet (unregister SWs + delete caches +
+    reload) BEFORE testing, or globals read undefined / old code runs.
+  • bundle-a is the COLD-BOOT path — a parse error there = black screen on WV69.
+    PF2 only minified its pure-DATA members (target=chrome69 = no new syntax);
+    vendors (react/react-dom/flexsearch read top-level `this`) + search.js stay RAW.
+  • esbuild minify ASCII-escapes non-ASCII (\xB9) — VALUE-identical but a naive
+    deepStrictEqual on raw-vs-min vm globals FALSE-fails; use a canonical-JSON/sha
+    compare (see the PF2 verification).
+  • `navigator.connection` isn't in the TS lib — cast `/** @type {any} */(navigator)`.
+  • The base .vot-toast is pointer-events:none — a clickable toast (UX7 undo) needs
+    a variant class with pointer-events:auto; its z-index 9998 sits above the tabs
+    overview (400).
+  • MEMOIZATION TRAPS (why F3/F5 weren't done blindly): F3 (_findLetter) memoized on
+    [letterId] alone goes STALE when the lazy VOT corpus loads later (same letterId,
+    null cached) — needs a corpus-loaded dep; F5 (ROUTES useMemo) is a ~100-dep
+    footgun (miss one → stale closure) for a cheap object build — the real cost is
+    F1/F2 (per-verse re-render), do THAT instead.
+  • EMULATOR (PILE B / native): AVD vot_api28 (WV69 = Chrome 69.0.3497.100); adb at
+    C:/Users/corbi/AppData/Local/Android/Sdk/platform-tools/; APK at
+    D:\VOTReader-build\app\outputs\apk\debug\app-debug.apk (NOT app/build). MSYS
+    mangles /sdcard paths in git-bash — prefix `export MSYS_NO_PATHCONV=1`. A CDP-
+    over-WebSocket eval helper pattern (Node 24 global WebSocket + adb forward
+    tcp:9222 localabstract:webview_devtools_remote_<pid>) drives the WV; the
+    build→install→drive loop is ~minutes/cycle.
+  • The annotation engine has a DUAL-RENDER EQUIVALENCE test — any change to
+    applyDOMHighlights / HighlightableText must keep it green (it pins per-char
+    paint + tap-winner parity between the React + imperative paths).
 
 ═══════════════════════════════════════════════════════════════════════════
  END — AUDIT-PLAN.txt   (status column to be kept current as items land)
