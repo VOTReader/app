@@ -12,7 +12,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 **The app is feature-complete and shipping.** One JS codebase runs as the Android APK and as a desktop PWA (live + installable + full-offline at https://votreader.github.io/VOTReader-studio/). Every quality/uplift phase is closed — **Q3–Q8, N1, NK, P6–P11, W1–W9, U0–U22, N2** (one-line index below; full detail in **HISTORY.md**). **~1797 vitest** tests / 71 files (counts drift — verify, don't trust); CI green across build + lint (`--max-warnings 0`) + typecheck + vitest+coverage(floor) + Kotlin `testDebugUnitTest`+jacoco + headless 12-screen smoke. Pre-commit/CI also gate check_balance, schema-validate, corpus-version, CSP-hash, and the ≤800-line app.jsx canary.
 
-**Architecture quick-facts.** `function App()` in `src/app.jsx` (~798 lines, ≤800 canary). ~200 ES modules (33 hooks, 42 ui/components, 26 screens, 15 sheets — CQ3: these drift, verify against the tree); all 53 screens dispatch from `buildScreenRoutes(deps)` in `src/ui/screen-routes.jsx`. **7 bundles** in `dist/`: `bundle-a` ~816 KB (react/react-dom + small data + search — critical path); `bundle-a-bible` ~4.6 MB / `bundle-a-matthew` ~492 KB / `bundle-a-vot` ~2.2 MB (lazy corpora via `__load*Corpus()`, **minified — PF1**); `bundle-b` ~227 KB (stores/hooks/journal/scripture-resolution/platform-bridge/StorageHealth/SW/DiagnosticLog); `bundle-c` ~14 KB (renderer); `bundle-d` ~343 KB (screens/sheets/utils incl. backup.js/App/AppShell). b/c/d minified (U2), lazy corpora minified (PF1); **`--target=chrome69` is mandatory** (Permanent Rule 6). Cold-boot blocking path (a+b+c+d) ≈ 1.40 MB (PF1 cuts the lazy corpus parse, not this path).
+**Architecture quick-facts.** `function App()` in `src/app.jsx` (≤800-line canary gate — the one line count worth trusting, because it's enforced). ~200 ES modules spread across `hooks/`, `ui/components/`, `ui/screens/`, `ui/sheets/` — **don't trust an exact module/line/file count quoted in any doc; they drift every commit, so `ls`/`wc` the tree when you need a number** (CQ3). All 53 screens dispatch from `buildScreenRoutes(deps)` in `src/ui/screen-routes.jsx`. **7 bundles** in `dist/`: `bundle-a` ~816 KB (react/react-dom + small data + search — critical path); `bundle-a-bible` ~4.6 MB / `bundle-a-matthew` ~492 KB / `bundle-a-vot` ~2.2 MB (lazy corpora via `__load*Corpus()`, **minified — PF1**); `bundle-b` ~227 KB (stores/hooks/journal/scripture-resolution/platform-bridge/StorageHealth/SW/DiagnosticLog); `bundle-c` ~14 KB (renderer); `bundle-d` ~343 KB (screens/sheets/utils incl. backup.js/App/AppShell). b/c/d minified (U2), lazy corpora minified (PF1); **`--target=chrome69` is mandatory** (Permanent Rule 6). Cold-boot blocking path (a+b+c+d) ≈ 1.40 MB (PF1 cuts the lazy corpus parse, not this path).
 
 **AUDIT-PLAN execution — Waves 1–3 closed + a large Wave 4+ batch landed (2026-06-02).** A SECOND deep adversarial audit (15 subsystem agents + 15 independent verification agents, every finding re-checked against source) rated the post-UPLIFT app **7.5/10** and produced **`AUDIT-PLAN.txt`** — the canonical tracker (≈108 verified items, P0–P3) for the 7.5→8.5+ remediation. Waves 1–3 + PF1 + a ~22-commit overnight batch are DONE, all gated + pushed (the highest-risk render/nav/storage items are explicitly DEFERRED for owner review — see below):
 - **Wave 1 — P0 (data loss + reachable crashes):** **SC1** (`698c95b`) `typeof`-guard the WTLB `{{nav:}}` bare-`BOOKS` ReferenceError (+ same-class app.jsx site). **J1/J2/J4** (`f0f7eab`) the journal editor flushes on `pagehide`/`visibilitychange:hidden` + saves a media insert IMMEDIATELY — closes a real silent-data-loss window on the Android background-kill path (debounced edits + freshly-added photo/voice memo were lost + the blob orphaned); +`JournalEditorScreen.test.jsx` (4 cases, real store, non-vacuous). **E1/E2/E3** (`00912b1`) a failed lazy-corpus load now shows a **Retry** affordance (was a permanent "Loading…" dead-end) + logs it, and a global `window.onerror`/`unhandledrejection` now feeds DiagnosticLog (the only failure trace under no-telemetry). Browser-verified in preview.
@@ -106,7 +106,7 @@ D:/VOTReader-studio/
 │   └── SMOKE.md                       # smoke harness docs
 ├── app/src/main/
 │   ├── assets/
-│   │   ├── index.html                 # 522 lines — boot infra + data constants + bundle load sequence (App() lives in src/app.jsx)
+│   │   ├── index.html                 # boot infra + data constants + bundle load sequence (App() lives in src/app.jsx)
 │   │   ├── app.css                    # static CSS (no template literal)
 │   │   ├── manifest.json              # W3 PWA manifest (standalone, gold theme)
 │   │   ├── service-worker.js          # W3 SW — core + corpus cache buckets
@@ -114,23 +114,23 @@ D:/VOTReader-studio/
 │   │   ├── icons/                     # W3 PWA icons (512/192/180/32/16px)
 │   │   ├── dist/                      # 7 bundles, regenerated by npm run build
 │   │   └── src/
-│   │       ├── app.jsx                # function App() — 798 lines (≤800 canary gate; P11)
+│   │       ├── app.jsx                # function App() — ≤800-line canary gate (P11)
 │   │       ├── data/                  # scripture-resolution.js + 29 raw corpus files
 │   │       ├── stores/                # 11 stores + _entry-b.js
 │   │       ├── renderer/              # annotation-engine, dom-links, dom-bookmarks, dom-journal-chip + _entry.js
 │   │       ├── ui/
 │   │       │   ├── screen-routes.jsx  # buildScreenRoutes factory — the 53-entry ROUTES table
-│   │       │   ├── screens/           # 21 screens (incl. MatthewChapterView, BibleStudyChapterView)
-│   │       │   ├── components/        # 25 shared components (incl. AppShellOverlays, AppShellSheets, HolyDaysPlaylistHeader)
+│   │       │   ├── screens/           # reading + index + hub screens (incl. MatthewChapterView, BibleStudyChapterView)
+│   │       │   ├── components/        # shared components (incl. AppShellOverlays, AppShellSheets, HolyDaysPlaylistHeader)
 │   │       │   ├── sheets/            # 17 sheets/pickers
 │   │       │   └── _entry-d.js        # esbuild entry for bundle-d
 │   │       ├── utils/                 # 15 helper bundles (incl. backup.js U1, storage-health.js, sw-register.js, diagnostic-log.js)
-│   │       ├── hooks/                 # 28 App() hooks (P6 + P7a–k + P11 dom-annotation-sync/keyboard-inset)
+│   │       ├── hooks/                 # App() hooks (P6 + P7a–k + P11 dom-annotation-sync/keyboard-inset)
 │   │       ├── components/            # ExpandableText, ErrorBoundary
 │   │       └── styles/                # journal-styles
 │   └── java/com/votreader/sacredui/
-│       ├── MainActivity.kt              # WebView shell + lifecycle + BridgeHost impl (773 lines)
-│       ├── AppInterface.kt              # 20 @JavascriptInterface methods (window.AndroidBridge)
+│       ├── MainActivity.kt              # WebView shell + lifecycle + BridgeHost impl
+│       ├── AppInterface.kt              # @JavascriptInterface methods (window.AndroidBridge; incl. v3 backup bridge)
 │       ├── BridgeHost.kt                # Abstraction over Activity surface for AppInterface
 │       ├── JsBridge.kt                  # Type-safe wrapper around evaluateJavascript
 │       ├── JsEvent.kt                   # Sealed registry of native-to-JS callbacks

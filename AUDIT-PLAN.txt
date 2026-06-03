@@ -825,7 +825,14 @@
    MainActivity.kt 886 (773), app.jsx 798 (770); AND under-counts ui components
    42 (25), screens 26 (21), modules 201 ("135+"). Exact-OK: vitest 1638/63,
    ROUTES 53, AppInterface 20, bundle sizes (~d=344). SEV: Med [CONFIRMED] →
-   regenerate counts from a script or stop quoting exacts.
+   regenerate counts from a script or stop quoting exacts.   STATUS: DONE
+   DONE (2026-06-02): stopped quoting drift-prone exacts in CLAUDE.md (the
+   finding's preferred fix). The current-state "Architecture quick-facts" + the
+   file-structure tree no longer cite module/line/file counts that drift every
+   commit (proven: MainActivity 773→927 + index.html 522→664 from the v3 work
+   alone, hooks claimed 33 vs actual 56); kept only the ≤800 app.jsx canary (it's
+   gate-enforced, so it's the one trustworthy number) + historical deltas. CQ1
+   already fixed the ARCHITECTURE.md App() count.
  [CQ4] journal-helpers.js (494 lines, 12 consumers) untyped — only scripture-
    resolution.js from src/data is in tsconfig. SEV: Med [CONFIRMED] → add
    journal-helpers.js (+ letter-linking.js) to the tsconfig include.
@@ -856,10 +863,15 @@
    ([[no-comment-breadcrumbs]]). No picker built (that's a feature, out of scope).
  [SC8] Stale header comment "Bundled into bundle-b" — splitIntoVerses actually
    ships in bundle-d (_entry-d.js:63). src/utils/scripture-parse.js:4. SEV: Triv
-   [CONFIRMED] → fix the comment.
+   [CONFIRMED] → fix the comment.   STATUS: DONE
+   DONE (2026-06-02): scripture-parse.js:4 already corrected to "Bundled into
+   bundle-d via _entry-d.js (SC8: was wrongly documented as bundle-b…)".
  [A3] Test comment claims "structurally identical DOM" but the paths differ in mark
    count (9 vs 7); signature() checks per-char paint/tap-winner only. annotation-
-   engine.test.jsx:254-256. SEV: Low(doc) [CONFIRMED] → correct the comment.
+   engine.test.jsx:254-256. SEV: Low(doc) [CONFIRMED] → correct the comment.   STATUS: DONE
+   DONE (2026-06-02): the DUAL-RENDER EQUIVALENCE header comment already carries the
+   A3 correction ("NOT byte-identical structure — … e.g. 9 vs 7 … signature() checks
+   only the rendered paint/tap result").
 
  --- Build / CI / tooling ---
  [B1] Manual globals-regen SPOF — a new window-global needs `npm run lint:globals`
