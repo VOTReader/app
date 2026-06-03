@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 404 distinct identifiers.
+// Total: 405 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -302,6 +302,7 @@ export const projectGlobals = {
   findNoteIconInsertionPoint: "readonly",
   firstVerseOfRef: "readonly",
   formatBytes: "readonly",
+  formatImportSpaceWarning: "readonly",
   gardenCacheKey: "readonly",
   gardenImageCache: "readonly",
   gardenIsCached: "readonly",

@@ -199,11 +199,14 @@
      replace (stream/put FIRST, prune stale AFTER) so a mid-stream truncation never
      wipes existing media. Kotlin + JS tests added. See the STATUS entry below for
      the full emulator matrix.
- P4  Back-compat (import legacy v1/v2) + remove the hard caps + soft free-space
-     warning + reconcile S5. Full cross-platform matrix: web↔web, web↔Android,
-     Android↔Android, legacy→v3.
- P5  Docs: CLAUDE.md current-state, HISTORY.md, AUDIT-PLAN.txt S4/S5 closure,
-     the export-format spec.
+ P4  DONE — back-compat (legacy v1/v2 import is built into BOTH platforms: web sniffs
+     isContainerMagic, Android sniffs natively in beginV3Import → "legacy:") + caps
+     reconciled (v3 uncapped; legacy 50 MB cap correctly retained on the whole-file
+     read) + soft free-space advisory (formatImportSpaceWarning) + S5 reconciled.
+     Cross-platform matrix proven: web↔Android byte-exact (both directions, emulator),
+     legacy→v3 sniff (both platforms).
+ P5  DONE — docs: CLAUDE.md current-state, HISTORY.md, AUDIT-PLAN.txt S4/S5 closure,
+     the export-format spec (this file's header + backup-container.js + the P3 entry).
 
  VERIFICATION BAR (non-negotiable for the only-backup path):
   • Byte-exact media round-trip (sha256 each blob in == out) at >1 GB synthetic.
@@ -304,6 +307,24 @@
         SAF → valid v3 container + "Backup saved." toast. Import button → SAF open
         picker launches; clean cancel.
    NEXT: P4 (cap reconciliation + optional soft free-space warning) + P5 (docs).
+ 2026-06-02 — P4 DONE (caps reconciled + soft free-space advisory). The hard caps
+   existed ONLY to dodge OOM; v3 streaming makes OOM impossible, so the v3 export/
+   import path is now UNCAPPED on both platforms (buildV3Manifest/applyV3 have no
+   limit; S5's aggregate cap is dropped on v3 — bounded per-blob). The 50 MB caps
+   (platform-bridge WEB_MAX_IMPORT_BYTES / StorageManager MAX_IMPORT_SIZE) correctly
+   REMAIN — they now bind only the LEGACY non-streaming whole-file v1/v2 read, which
+   genuinely loads the file into heap. In place of a hard refusal, added a SOFT,
+   advisory heads-up: formatImportSpaceWarning(mediaTotal, navigator.storage.estimate())
+   surfaces a non-blocking note in the import confirm when the backup's media likely
+   won't fit the device's remaining IDB budget (Chromium-61+ estimate → works on WV69).
+   +5 vitest; the v2 100 MB media-limit message is gone from the active path (v2 export
+   wiring removed; buildExportPayload stays exported for rollback). vitest 1797/71 green.
+ 2026-06-02 — P5 DONE (docs). CLAUDE.md current-state rewritten (backup bullet =
+   P1–P4 DONE + the format spec + emulator matrix; test count 1797; SAF walk noted
+   emulator-verified), this plan's phases + progress log closed, HISTORY.md landed
+   entry added, AUDIT-PLAN.txt S4/S5 closed. Remaining (tracked, low-priority): fold
+   the shared store-read between applyV3 and applyImportPayload into one helper.
+   ═══ BACKUP-STREAMING RE-ARCHITECTURE COMPLETE (P0–P5). ═══
 ═══════════════════════════════════════════════════════════════════════════
 
 ───────────────────────────────────────────────────────────────────────────

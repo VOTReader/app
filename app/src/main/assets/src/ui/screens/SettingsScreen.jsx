@@ -613,8 +613,23 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       if (mediaCount) summaryParts.push(`${mediaCount} media items`);
       const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(', ')}.` : '';
 
+      // Soft, advisory free-space heads-up (P4). v3 streaming is uncapped, so a huge
+      // backup is no longer refused; instead warn (don't block) if its media likely
+      // won't fit in the device's remaining IDB budget. Best-effort: navigator.storage
+      // .estimate is Chromium-61+ (works on the WV69 floor); a v3 manifest carries each
+      // blob's `size`, so the total is exact. ADVISORY — a real write failure is still
+      // caught (S3). Absent on a v2 legacy payload (media is base64, no size array).
+      let spaceNote = '';
+      try {
+        const mediaTotal = Array.isArray(parsed.media)
+          ? parsed.media.reduce((s, m) => s + (m && typeof m.size === 'number' ? m.size : 0), 0) : 0;
+        if (mediaTotal > 0 && navigator.storage && typeof navigator.storage.estimate === 'function') {
+          spaceNote = formatImportSpaceWarning(mediaTotal, await navigator.storage.estimate());
+        }
+      } catch (_e) { /* advisory only — never blocks the import */ }
+
       const proceed = window.confirm(
-        `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote} This cannot be undone.\n\nContinue?`
+        `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote}${spaceNote} This cannot be undone.\n\nContinue?`
       );
       if (!proceed) return;
 

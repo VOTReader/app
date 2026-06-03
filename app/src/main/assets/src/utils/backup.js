@@ -625,8 +625,8 @@ export async function applyV3(manifest, entries, ctx) {
     for (const id of existingIds) { if (!streamedIds[id]) await mediaStore.delete(id); }
   } catch (e) { console.warn('prune stale media failed', e); }
 
-  // (4) U1 DURABILITY BARRIER — same as applyImportPayload (media already durable;
-  // JournalMediaStore.put is awaited above). whenSaved never rejects.
+  // (4) U1 DURABILITY BARRIER — media already durable (JournalMediaStore.put is
+  // awaited above). whenSaved never rejects.
   const saveResults = await Promise.all(
     Object.values(storesMap).map(({ store }) => _whenSaved(store))
       .concat(Object.values(flagMap).map((s) => _whenSaved(s)))
@@ -634,4 +634,32 @@ export async function applyV3(manifest, entries, ctx) {
   const writeFailures = saveResults.filter((ok) => !ok).length;
 
   return { importFailures, writeFailures, skippedStores };
+}
+
+/**
+ * Soft, ADVISORY free-space check for an import (P4). v3 streaming removed the hard
+ * import/export caps (they existed only to dodge OOM, which streaming makes
+ * impossible — the v3 path is now uncapped on both platforms; the legacy 50 MB caps
+ * correctly remain only on the non-streaming whole-file v1/v2 read). In their place,
+ * this returns a human-readable heads-up string IF the backup's media likely won't
+ * fit in the device's remaining IndexedDB budget, or '' if it should fit / can't be
+ * determined. ADVISORY ONLY — the caller surfaces it in the confirm dialog but never
+ * blocks; the user owns their device's limits, and a genuine write failure is still
+ * caught + reported (S3 / the U1 barrier).
+ *
+ * @param {number} mediaTotalBytes - sum of the backup's media sizes (manifest.media[].size)
+ * @param {{ quota?: number, usage?: number } | null | undefined} estimate - a
+ *   navigator.storage.estimate() result (Chromium-61+, works on the WV69 floor)
+ * @returns {string} a warning to append to the confirm message, or ''
+ */
+export function formatImportSpaceWarning(mediaTotalBytes, estimate) {
+  if (!mediaTotalBytes || mediaTotalBytes <= 0 || !estimate) return '';
+  const quota = typeof estimate.quota === 'number' ? estimate.quota : 0;
+  const usage = typeof estimate.usage === 'number' ? estimate.usage : 0;
+  const free = quota - usage;
+  if (free <= 0 || mediaTotalBytes <= free) return '';
+  const mb = (n) => (n / (1024 * 1024)).toFixed(n >= 1024 * 1024 * 1024 ? 0 : 1) + ' MB';
+  return '\n\nNote: this backup’s media is about ' + mb(mediaTotalBytes) +
+    ', but only about ' + mb(free) + ' appears free on this device. The import may not ' +
+    'complete; free up space first if you can.';
 }

@@ -973,6 +973,13 @@
    + whole-payload JSON.stringify peaks multi-hundred-MB. backup.js:185-188,
    SettingsScreen.jsx:441. SEV: Med [CONFIRMED] → lower the practical media ceiling
    (30-40 MB) until streaming export lands, or stream the JSON to the writer.
+   CLOSED (2026-06-02) — SUPERSEDED by the v3 STREAMING re-architecture (owner
+   directive: GB-scale, NOT by lowering the ceiling — lowering would be a regression).
+   Canonical: BACKUP-STREAMING-PLAN.txt (P0–P5, COMPLETE + emulator-verified). Export
+   now streams the v3 container (one media blob in memory at a time, no base64 on disk,
+   64-bit lengths) on BOTH platforms — web via openExportSink/writeContainer, Android
+   via the native chunked bridge. The v2 buildExportPayload 100 MB ceiling is no longer
+   on the active export path (v2 stays exported only for rollback). No OOM; no cap.
  [S5] Import has no aggregate media cap (per-record 100 MB only) → a hand-edited
    backup with many large records OOMs. backup.js:351-368. SEV: Low [CONFIRMED] →
    track cumulative decoded bytes, abort past a sane total.
@@ -989,6 +996,12 @@
    path that bypasses the file cap, on the only-backup surface. +2 backup.test.js
    tests (cap-hit stops at 2 of 3 records / default cap is a no-op). Gates: vitest
    1740/70 test:coverage exit 0 (backup.js 87.6/77.5/100/91.6), tsc + eslint clean.
+   RECONCILED (2026-06-02, P4): on the v3 STREAMING import (applyV3) there is NO
+   aggregate cap — streaming holds one blob at a time, so the cumulative-decode OOM
+   this cap defends against cannot occur. The S5 cap stays ONLY on applyImportPayload
+   (the legacy v1/v2 whole-file decode), where it's still correct. Replaced the hard
+   refusal with a SOFT advisory (formatImportSpaceWarning, navigator.storage.estimate)
+   that WARNS in the import confirm but never blocks. See BACKUP-STREAMING-PLAN.txt P4.
  [S6] Import confirm says "REPLACE all your current data" but stores absent from
    the payload are KEPT, not wiped. backup.js:301-302, SettingsScreen.jsx:509.
    SEV: Low [CONFIRMED] → reword "overwrite the data types in this backup".

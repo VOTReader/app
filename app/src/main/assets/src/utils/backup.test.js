@@ -30,7 +30,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
   blobToBase64, base64ToBlob, buildExportPayload, applyImportPayload,
-  buildV3Manifest, applyV3, DEFAULT_MEDIA_LIMIT_BYTES,
+  buildV3Manifest, applyV3, DEFAULT_MEDIA_LIMIT_BYTES, formatImportSpaceWarning,
 } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
 
@@ -767,4 +767,32 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     const restoredBytes = new Uint8Array(await rec.blob.arrayBuffer());
     expect(Array.from(restoredBytes)).toEqual(Array.from(mediaBytes));
   }, 20000);
+});
+
+/* ─────────────────────────────────────────────────────────────────────
+   formatImportSpaceWarning (P4 — soft, advisory free-space heads-up)
+   ───────────────────────────────────────────────────────────────────── */
+describe('formatImportSpaceWarning', () => {
+  const MB = 1024 * 1024;
+  it('returns empty when there is no media to weigh', () => {
+    expect(formatImportSpaceWarning(0, { quota: 10 * MB, usage: 0 })).toBe('');
+  });
+  it('returns empty when no estimate is available', () => {
+    expect(formatImportSpaceWarning(5 * MB, null)).toBe('');
+    expect(formatImportSpaceWarning(5 * MB, undefined)).toBe('');
+  });
+  it('returns empty when the media comfortably fits the free budget', () => {
+    // 5 MB media, 100 MB free → fits.
+    expect(formatImportSpaceWarning(5 * MB, { quota: 200 * MB, usage: 100 * MB })).toBe('');
+  });
+  it('warns (does not block) when the media exceeds the free budget', () => {
+    // 500 MB media, ~50 MB free → warn.
+    const w = formatImportSpaceWarning(500 * MB, { quota: 200 * MB, usage: 150 * MB });
+    expect(w).toContain('Note:');
+    expect(w).toContain('500.0 MB');     // media size
+    expect(w).toContain('free up space');
+  });
+  it('returns empty when free space cannot be determined (no quota/usage)', () => {
+    expect(formatImportSpaceWarning(5 * MB, {})).toBe('');
+  });
 });
