@@ -156,7 +156,12 @@ export function validateImportEnvelope(parsed) {
   // V2 adds stores + media. `data` is required; stores/media optional.
   if (!isPlainObject(parsed.data)) errs.push('"data" must be an object');
   if (parsed.stores !== undefined && !isPlainObject(parsed.stores)) errs.push('"stores" must be an object');
-  if (parsed.media !== undefined && !isPlainObject(parsed.media)) errs.push('"media" must be an object');
+  // media is an OBJECT in v1/v2 (id → {data:base64,…}) but an ARRAY of metadata
+  // in the v3 streaming manifest (the bytes live in the container frames, not
+  // here); accept either so the same envelope check guards both formats.
+  if (parsed.media !== undefined && !isPlainObject(parsed.media) && !Array.isArray(parsed.media)) {
+    errs.push('"media" must be an object or array');
+  }
   return errs;
 }
 

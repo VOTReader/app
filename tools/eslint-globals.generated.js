@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 399 distinct identifiers.
+// Total: 404 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -280,6 +280,7 @@ export const projectGlobals = {
   applyDOMLinks: "readonly",
   applyImportPayload: "readonly",
   applyNoteIcons: "readonly",
+  applyV3: "readonly",
   bibleHlKey: "readonly",
   bkmId: "readonly",
   bookCategory: "readonly",
@@ -287,6 +288,7 @@ export const projectGlobals = {
   buildNavIndex: "readonly",
   buildScreenRoutes: "readonly",
   buildSourceEndpoint: "readonly",
+  buildV3Manifest: "readonly",
   clearLegacyLs: "readonly",
   clearSuppressNextHistoryPush: "readonly",
   colLetterArr: "readonly",
@@ -318,6 +320,7 @@ export const projectGlobals = {
   idbDelete: "readonly",
   idbPut: "readonly",
   idbReadAll: "readonly",
+  isContainerMagic: "readonly",
   isHiddenManna: "readonly",
   jrnId: "readonly",
   jrnPinIcon: "readonly",
@@ -349,6 +352,7 @@ export const projectGlobals = {
   parseRefStr: "readonly",
   parseScriptureRef: "readonly",
   persistLink: "readonly",
+  readContainer: "readonly",
   relativeDate: "readonly",
   renderCommentaryCite: "readonly",
   renderTextWithScripRefs: "readonly",
@@ -407,5 +411,6 @@ export const projectGlobals = {
   validateImportEnvelope: "readonly",
   validateMediaRecord: "readonly",
   validateStorePayload: "readonly",
+  writeContainer: "readonly",
   wtlbHlKey: "readonly",
 };

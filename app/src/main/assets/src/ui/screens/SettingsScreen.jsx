@@ -413,7 +413,56 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     'vot-garden-warning-acked':  GardenWarningFlagStore,
   });
 
+  // Web export uses the v3 STREAMING container (GB-scale — never holds the whole
+  // payload in memory; one blob at a time). Android keeps the proven v2 path
+  // until its native streaming lands (P3), so the only-backup mechanism is never
+  // broken mid-port. BACKUP-STREAMING-PLAN.txt.
+  const _exportV3Web = async () => {
+    try {
+      _showToast('Preparing export…', 0);
+      const built = await buildV3Manifest({
+        storesMap: _exportableStores(),
+        flagMap: _flagStores(),
+        idbAdapter: IDBAdapter,
+        mediaStore: JournalMediaStore,
+        diagnosticLog: diagnosticLog,
+      });
+      if (!built.ok) {
+        // buildV3Manifest fails LOUD (U6) on a store/media read failure — abort
+        // rather than write a misleading, incomplete backup. (No media-limit case:
+        // v3 streams, so there is no size cap.)
+        hideToast(_TOAST_ID);
+        _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+        return;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      const filename = `votreader-backup-${stamp}.votbak`;
+      // The destination picker takes over the screen; drop the "Preparing…" toast.
+      hideToast(_TOAST_ID);
+      const sink = await PlatformBridge.openExportSink(filename);
+      if (!sink) return; // user cancelled the picker — stay quiet
+      _showToast('Saving backup…', 0);
+      try {
+        // Stream the container to the sink: only one media blob is in memory at
+        // any moment, so this scales to whatever the device can store.
+        await writeContainer(built.manifest, built.mediaEntries, sink.write);
+        await sink.close();
+        hideToast(_TOAST_ID);
+        _showToast('Backup saved.');
+      } catch (e) {
+        hideToast(_TOAST_ID);
+        console.warn('export write failed', e);
+        _showToast('Export failed while writing. Please try again.');
+      }
+    } catch (e) {
+      console.warn('export failed', e);
+      hideToast(_TOAST_ID);
+      _showToast('Export failed. See console for details.');
+    }
+  };
+
   const exportPersonalData = async () => {
+    if (!PlatformBridge.isAndroid) { await _exportV3Web(); return; }
     try {
       _showToast('Preparing export…', 0);
 
@@ -471,6 +520,108 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   };
 
   const importPersonalData = () => {
+    // Shared import tail: confirm dialog + degraded-store guard + apply + result
+    // toast + reload. `parsed` is the v2 JSON payload OR the v3 manifest (same
+    // envelope shape); applyFn(storesMap, flagMap) → { importFailures,
+    // writeFailures, skippedStores }. ONE source of truth for both formats.
+    const _confirmDegradeApplyReload = async (parsed, applyFn) => {
+      const exportVersion = parsed.exportVersion || 1;
+      const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
+      // Forward-compat: warn but proceed with the keys this client understands.
+      const forwardCompatNote = exportVersion > 3
+        ? '\n\nNOTE: This backup was created with a newer version of VOTReader. Some data may not be imported.'
+        : '';
+      // Summarize what's about to land for the confirm dialog.
+      const summaryParts = [];
+      if (parsed.stores && typeof parsed.stores === 'object') {
+        const annData = parsed.stores['vot-annotations'];
+        const annKeys = annData && typeof annData === 'object' ? Object.keys(annData).length : 0;
+        const bkms = Array.isArray(parsed.stores['vot-bookmarks']) ? parsed.stores['vot-bookmarks'].length : 0;
+        const jrn = parsed.stores['vot-journal'] && Array.isArray(parsed.stores['vot-journal'].list)
+          ? parsed.stores['vot-journal'].list.length : 0;
+        if (annKeys) summaryParts.push(`${annKeys} annotated keys`);
+        if (bkms) summaryParts.push(`${bkms} bookmarks`);
+        if (jrn) summaryParts.push(`${jrn} journal entries`);
+      }
+      // media is an object (v2) or an array of metadata (v3) — count either.
+      const mediaCount = Array.isArray(parsed.media) ? parsed.media.length
+        : (parsed.media && typeof parsed.media === 'object' ? Object.keys(parsed.media).length : 0);
+      if (mediaCount) summaryParts.push(`${mediaCount} media items`);
+      const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(', ')}.` : '';
+
+      const proceed = window.confirm(
+        `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote} This cannot be undone.\n\nContinue?`
+      );
+      if (!proceed) return;
+
+      _showToast('Importing… please wait.', 0);
+
+      const storesMap = _exportableStores();
+      const flagMap = _flagStores();
+
+      // Guard: if any store is 'degraded' (IDB hydration timed out), the apply
+      // would queue in memory and be lost on the upcoming reload.
+      const hasDegraded = Object.values(storesMap).some(({ store }) => store.getState() === 'degraded')
+        || Object.values(flagMap).some((s) => s.getState() === 'degraded');
+      if (hasDegraded) {
+        hideToast(_TOAST_ID);
+        _showToast('Storage is temporarily unavailable. Please try again in a moment.');
+        return;
+      }
+
+      // Apply + WAIT for every write to durably land before reloading (U1
+      // barrier). applyFn SKIPS any section that fails shape validation so a
+      // corrupt section can't overwrite good data.
+      const { importFailures, writeFailures, skippedStores } = await applyFn(storesMap, flagMap);
+
+      hideToast(_TOAST_ID);
+
+      // S3: a write FAILING is not a validation skip — the imported data is in
+      // the caches but did NOT durably land, so a reload would mix it with OLD
+      // IDB data. Do NOT reload; keep the page up and ask the user to retry.
+      if (writeFailures > 0) {
+        _showToast(`Import incomplete — ${writeFailures} store${writeFailures > 1 ? 's' : ''} failed to save. Please retry the import and don't close the app.`);
+        return;
+      }
+
+      const problems = [];
+      if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? 's' : ''}`);
+      if (skippedStores.length > 0) {
+        problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? 's' : ''} skipped (invalid: ${skippedStores.join(', ')})`);
+      }
+      if (problems.length) {
+        _showToast(`Import completed — ${problems.join('; ')} (check console). Reloading…`, 0);
+      } else {
+        _showToast('Import complete. Reloading…', 0);
+      }
+      // Short delay lets the toast render before reload (durability already guaranteed).
+      setTimeout(() => window.location.reload(), 600);
+    };
+
+    // v3 streaming container import (web): read the file, validate, apply via applyV3.
+    const _importV3Container = async (file) => {
+      let read;
+      try { read = await readContainer(file); }
+      catch (e) {
+        console.warn('v3 container read failed', e);
+        _showToast('This backup file is corrupt or incomplete and could not be read.');
+        return;
+      }
+      const { manifest, entries } = read;
+      const envelopeErrors = validateImportEnvelope(manifest);
+      if (envelopeErrors.length) {
+        console.warn('import envelope invalid:', envelopeErrors);
+        _showToast('This file does not look like a VOTReader backup.');
+        return;
+      }
+      await _confirmDegradeApplyReload(manifest, (storesMap, flagMap) => applyV3(manifest, entries, {
+        storesMap: storesMap,
+        flagMap: flagMap,
+        mediaStore: JournalMediaStore,
+        validateStorePayload: validateStorePayload,
+      }));
+    };
+
     const _doImport = async (jsonText) => {
       try {
         const parsed = JSON.parse(jsonText);
@@ -480,117 +631,64 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           _showToast('This file does not look like a VOTReader backup.');
           return;
         }
-        const exportVersion = parsed.exportVersion || 1;
-        const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
-
-        // V3+ forward-compat: warn but proceed with the keys this
-        // client understands. Per PLAN W2.6 (c).
-        const forwardCompatNote = exportVersion > 2
-          ? '\n\nNOTE: This backup was created with a newer version of VOTReader. Some data may not be imported.'
-          : '';
-
-        // Summarize what's about to land for the confirm dialog.
-        const summaryParts = [];
-        if (exportVersion >= 2 && parsed.stores && typeof parsed.stores === 'object') {
-          const annData = parsed.stores['vot-annotations'];
-          const annKeys = annData && typeof annData === 'object' ? Object.keys(annData).length : 0;
-          const bkms = Array.isArray(parsed.stores['vot-bookmarks']) ? parsed.stores['vot-bookmarks'].length : 0;
-          const jrn = parsed.stores['vot-journal'] && Array.isArray(parsed.stores['vot-journal'].list)
-            ? parsed.stores['vot-journal'].list.length : 0;
-          if (annKeys) summaryParts.push(`${annKeys} annotated keys`);
-          if (bkms) summaryParts.push(`${bkms} bookmarks`);
-          if (jrn) summaryParts.push(`${jrn} journal entries`);
-        }
-        const mediaCount = parsed.media && typeof parsed.media === 'object' ? Object.keys(parsed.media).length : 0;
-        if (mediaCount) summaryParts.push(`${mediaCount} media items`);
-        const summary = summaryParts.length ? ` This backup contains ${summaryParts.join(', ')}.` : '';
-
-        const proceed = window.confirm(
-          `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote} This cannot be undone.\n\nContinue?`
-        );
-        if (!proceed) return;
-
-        _showToast('Importing… please wait.', 0);
-
-        // Pre-flight: build store maps once (reused in V2 and V1 paths).
-        const storesMap = _exportableStores();
-        const flagMap = _flagStores();
-
-        // Guard: if any store is 'degraded' (IDB hydration timed out),
-        // replaceAll/set/setAll would queue in memory via _shouldDefer
-        // and the queued ops would be lost on the upcoming reload.
-        const hasDegraded = Object.values(storesMap).some(({ store }) => store.getState() === 'degraded')
-          || Object.values(flagMap).some((s) => s.getState() === 'degraded');
-        if (hasDegraded) {
-          hideToast(_TOAST_ID);
-          _showToast('Storage is temporarily unavailable. Please try again in a moment.');
-          return;
-        }
-
-        // Apply the payload (LS reseed + stores + flags + media) and WAIT for
-        // every write to durably land in IDB before reloading (U1 barrier:
-        // _save() is fire-and-forget, so returning early would let the reload
-        // tear down the page mid-transaction and silently drop the imported
-        // data). applyImportPayload SKIPS any section that fails shape
-        // validation so a corrupt section can't overwrite good data.
-        const { importFailures, writeFailures, skippedStores } = await applyImportPayload(parsed, {
+        await _confirmDegradeApplyReload(parsed, (storesMap, flagMap) => applyImportPayload(parsed, {
           storesMap: storesMap,
           flagMap: flagMap,
           mediaStore: JournalMediaStore,
           validateStorePayload: validateStorePayload,
           validateMediaRecord: validateMediaRecord,
-        });
-
-        hideToast(_TOAST_ID);
-
-        // S3: a store's IDB write FAILING (writeFailures) is NOT the same as a
-        // validation skip (skippedStores keep their old data safely) or a
-        // per-record media failure (importFailures). On a write failure the
-        // imported data is in the in-memory caches but did NOT durably land, so
-        // a reload would re-hydrate those stores from OLD IDB data and mix it
-        // with the imported rest — an inconsistent restore. Do NOT reload; keep
-        // the page up (the caches still hold what was imported) and ask the user
-        // to retry rather than tearing down into a half-imported state.
-        if (writeFailures > 0) {
-          _showToast(`Import incomplete — ${writeFailures} store${writeFailures > 1 ? 's' : ''} failed to save. Please retry the import and don't close the app.`);
-          return;
-        }
-
-        const problems = [];
-        if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? 's' : ''}`);
-        if (skippedStores.length > 0) {
-          problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? 's' : ''} skipped (invalid: ${skippedStores.join(', ')})`);
-        }
-        if (problems.length) {
-          _showToast(`Import completed — ${problems.join('; ')} (check console). Reloading…`, 0);
-        } else {
-          _showToast('Import complete. Reloading…', 0);
-        }
-        // Durability is already guaranteed above; this short delay only lets the
-        // toast render before reload (was a 1500ms BLIND timer that raced the
-        // writes — U1).
-        setTimeout(() => window.location.reload(), 600);
+        }));
       } catch (err) {
         console.warn('import failed', err);
         hideToast(_TOAST_ID);
         _showToast('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
       }
     };
-    window.__onImportFile = (b64OrNull, errCode) => {
-      window.__onImportFile = null;
-      if (!b64OrNull) {
-        // errCode is only set for a real failure (never for a user cancel,
-        // which stays a bare null). 'too_large' gets a specific, actionable
-        // message; any other failure stays silent, as before.
-        if (errCode === 'too_large') {
-          _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
+    // Android keeps the proven v2 picker (native v3 streaming import lands in P3):
+    // openFilePicker → __onImportFile(base64) → legacy _doImport.
+    if (PlatformBridge.isAndroid) {
+      window.__onImportFile = (b64OrNull, errCode) => {
+        window.__onImportFile = null;
+        if (!b64OrNull) {
+          // errCode is only set for a real failure (never for a user cancel).
+          // 'too_large' gets a specific message; any other failure stays silent.
+          if (errCode === 'too_large') {
+            _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
+          }
+          return;
         }
-        return;
+        try { _doImport(atob(b64OrNull)); }
+        catch (_e) { _showToast('Import failed: could not decode file.'); }
+      };
+      PlatformBridge.openFilePicker();
+      return;
+    }
+
+    // Web: pick a File, sniff the first bytes, route a v3 container vs a legacy
+    // v1/v2 JSON backup. pickImportFile() opens the picker synchronously in this
+    // user gesture (the async IIFE runs sync up to the first await).
+    (async () => {
+      try {
+        const file = await PlatformBridge.pickImportFile();
+        if (!file) return; // user cancelled
+        const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+        if (isContainerMagic(head)) {
+          await _importV3Container(file);
+        } else {
+          // Legacy JSON. Guard the whole-file text read against a pathological
+          // non-backup pick (v3 is the GB-scale path; legacy backups are small).
+          if (file.size > 300 * 1024 * 1024) {
+            _showToast('That file is too large to be a VOTReader backup.');
+            return;
+          }
+          await _doImport(await file.text());
+        }
+      } catch (e) {
+        console.warn('import failed', e);
+        hideToast(_TOAST_ID);
+        _showToast('Import failed: ' + (e && e.message ? e.message : 'invalid file'));
       }
-      try { _doImport(atob(b64OrNull)); }
-      catch (_e) { _showToast('Import failed: could not decode file.'); }
-    };
-    PlatformBridge.openFilePicker();
+    })();
   };
 
   /**

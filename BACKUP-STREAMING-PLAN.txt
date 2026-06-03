@@ -175,9 +175,18 @@
      exactly). v3 is built ENTIRELY ALONGSIDE v2 (buildExportPayload/applyImport-
      Payload untouched); folding the shared store-read/apply is the tracked P5
      cleanup. NEXT: P2 (wire the web I/O).
- P2  Web I/O: FS Access API export + File.stream import, wired through
-     PlatformBridge; preview-verified end-to-end with a multi-hundred-MB
-     synthetic dataset (real blobs in fake-IDB).
+ P2  DONE — Web I/O wired + verified. P2a: PlatformBridge.openExportSink /
+     pickImportFile (FS Access API + fallback). P2b: SettingsScreen export →
+     buildV3Manifest → openExportSink → writeContainer (v3 .votbak); import →
+     pickImportFile → sniff isContainerMagic → readContainer + applyV3 (v3) OR
+     legacy JSON path (back-compat sniff folded in); shared confirm/degraded/
+     result/reload helper; validateImportEnvelope relaxed to accept the v3
+     media-array. Android branch unchanged (v2, until P3). P2c: PREVIEW-VERIFIED
+     in the real runtime — full build→write→read→apply byte-exact over real
+     IndexedDB; the real Export BUTTON wrote a valid v3 container (media
+     byte-exact); the real Import BUTTON applied a container's data to the store;
+     Settings renders clean, 0 console errors. (Real OS file-picker dialog itself
+     is manual — not headless-automatable.)
  P3  Android native streaming: StorageManager framed read/write (same format, in
      Kotlin) + the chunked bridge methods + AppInterface + JsEvent + MainActivity
      pickers + a FileReader (WV69-safe) blob-slice reader on the JS side + Kotlin
@@ -232,4 +241,17 @@
    platform-bridge tests (FS-API delegation, cancel→null, fallback bytes, android
    reject). vitest 1770/71 test:coverage exit 0, tsc + eslint clean. NEXT: P2b —
    wire SettingsScreen export/import (web branch) + the legacy-vs-v3 import sniff.
+ 2026-06-02 — P2b + P2c DONE (P2 COMPLETE): SettingsScreen export branches web→v3
+   (buildV3Manifest → openExportSink → writeContainer, .votbak) / Android→v2
+   (unchanged); import branches web→pickImportFile + isContainerMagic sniff →
+   readContainer+applyV3 OR legacy JSON path / Android→v2; a shared
+   _confirmDegradeApplyReload helper backs both formats; validateImportEnvelope
+   relaxed to accept the v3 media-array (+test); buildV3Manifest/applyV3/
+   writeContainer/readContainer/isContainerMagic globalized via _entry-d.js.
+   VERIFIED in preview (real runtime, real IndexedDB): full pipeline byte-exact;
+   the real Export button produced a valid v3 container (seeded media byte-exact);
+   the real Import button applied a container to the store; Settings renders, 0
+   console errors. Gates: vitest 1771/71 test:coverage exit 0, tsc + eslint clean,
+   build green. Manual residual: the OS file-picker dialog (not headless-drivable).
+   NEXT: P3 — Android native framing + chunked bridge (emulator-verified).
 ═══════════════════════════════════════════════════════════════════════════

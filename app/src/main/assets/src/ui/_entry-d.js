@@ -65,7 +65,8 @@ import {
 import { normalizeForHighlight, splitWithHighlight, highlightExcerptInDom } from '../utils/highlight.jsx';
 import { renderTextWithScripRefs } from '../utils/render-text.jsx';
 import { srchGroupKey } from '../utils/search.js';
-import { buildExportPayload, applyImportPayload } from '../utils/backup.js';
+import { buildExportPayload, applyImportPayload, buildV3Manifest, applyV3 } from '../utils/backup.js';
+import { writeContainer, readContainer, isContainerMagic } from '../utils/backup-container.js';
 
 // ── Late stores + data ──────────────────────────────────────────────────
 import {
@@ -199,7 +200,8 @@ Object.assign(window, {
   normalizeForHighlight, splitWithHighlight, highlightExcerptInDom,
   renderTextWithScripRefs,
   srchGroupKey,
-  buildExportPayload, applyImportPayload,
+  buildExportPayload, applyImportPayload, buildV3Manifest, applyV3,
+  writeContainer, readContainer, isContainerMagic,
   // Late stores + data
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
   openThumbDB, idbPut, idbDelete, idbReadAll,

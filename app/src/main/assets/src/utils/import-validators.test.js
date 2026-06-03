@@ -104,6 +104,12 @@ describe('validateImportEnvelope', () => {
   it('accepts a valid V2 envelope', () => {
     expect(validateImportEnvelope({ app: 'VOTReader', exportVersion: 2, data: {}, stores: {}, media: {} })).toEqual([]);
   });
+  it('accepts a v3 manifest envelope (media is an ARRAY of metadata)', () => {
+    expect(validateImportEnvelope({
+      app: 'VOTReader', exportVersion: 3, data: {}, stores: {},
+      media: [{ id: 'm1', mime: 'image/png', size: 10 }],
+    })).toEqual([]);
+  });
   it('accepts a V1 envelope (no exportVersion)', () => {
     expect(validateImportEnvelope({ app: 'VOTReader', data: {} })).toEqual([]);
   });

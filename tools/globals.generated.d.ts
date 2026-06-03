@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 399 distinct identifiers.
+// Total: 404 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -281,6 +281,7 @@ declare const applyDOMHighlights: any;
 declare const applyDOMLinks: any;
 declare const applyImportPayload: any;
 declare const applyNoteIcons: any;
+declare const applyV3: any;
 declare const bibleHlKey: any;
 declare const bkmId: any;
 declare const bookCategory: any;
@@ -288,6 +289,7 @@ declare const buildExportPayload: any;
 declare const buildNavIndex: any;
 declare const buildScreenRoutes: any;
 declare const buildSourceEndpoint: any;
+declare const buildV3Manifest: any;
 declare const clearLegacyLs: any;
 declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
@@ -319,6 +321,7 @@ declare const hydrateAllStores: any;
 declare const idbDelete: any;
 declare const idbPut: any;
 declare const idbReadAll: any;
+declare const isContainerMagic: any;
 declare const isHiddenManna: any;
 declare const jrnId: any;
 declare const jrnPinIcon: any;
@@ -350,6 +353,7 @@ declare const parseRefRanges: any;
 declare const parseRefStr: any;
 declare const parseScriptureRef: any;
 declare const persistLink: any;
+declare const readContainer: any;
 declare const relativeDate: any;
 declare const renderCommentaryCite: any;
 declare const renderTextWithScripRefs: any;
@@ -408,6 +412,7 @@ declare const useThumbnails: any;
 declare const validateImportEnvelope: any;
 declare const validateMediaRecord: any;
 declare const validateStorePayload: any;
+declare const writeContainer: any;
 declare const wtlbHlKey: any;
 
 // Window runtime bridges (window.__pendingHighlight, window.__closeSheet,
