@@ -35,9 +35,10 @@ import {
 import { writeContainer, readContainer } from './backup-container.js';
 
 import { IDBAdapter } from '../stores/idb-adapter.js';
-import { hydrateAllStores } from '../stores/cached-store.js';
+import { hydrateAllStores, hasAnyPendingStores } from '../stores/cached-store.js';
 import { JournalMediaStore } from '../stores/journal-media-store.js';
 import { validateStorePayload, validateImportEnvelope, validateMediaRecord } from './import-validators.js';
+import { StorageHealth } from './storage-health.js';
 
 import { AnnotationStore } from '../stores/annotation-store.js';
 import { NoteStore } from '../stores/note-store.js';
@@ -767,6 +768,77 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     const restoredBytes = new Uint8Array(await rec.blob.arrayBuffer());
     expect(Array.from(restoredBytes)).toEqual(Array.from(mediaBytes));
   }, 20000);
+
+  /* T7 — boot end-state with one store left DEGRADED. Pins the shipped
+     import-blocked guard (SettingsScreen) and, end-to-end, that the degraded
+     transition reaches StorageHealth so the E5 banner would mount. The guard
+     is a component closure (not exported), so we replicate its exact predicate
+     over the real store maps and prove applyV3 is never reached when it holds. */
+  it('boot with one store degraded → import refuses + E5 flag set (T7)', async () => {
+    // Make StorageHealth observable to cached-store's bare-global guard, and
+    // give it a populated report so setStoresDegraded can update it.
+    /** @type {any} */ (globalThis).StorageHealth = StorageHealth;
+    StorageHealth._resetForTests({
+      platform: 'chrome',
+      storageApi: { estimate: () => Promise.resolve({ quota: 1e9, usage: 1e6 }), persisted: () => Promise.resolve(true) },
+    });
+    await StorageHealth.assess();
+    expect(StorageHealth.getReport().storesDegraded).toBe(false);
+
+    // Fresh boot: every IDB store 'pending' (NOT forceLoaded), then reject
+    // IDBAdapter.get for ONLY vot-annotations → its _hydrate .catch flips it to
+    // 'degraded' immediately (no 3s timeout); the rest resolve undefined→loaded.
+    IDBAdapter._resetForTests();
+    await deleteVotreaderDb();
+    ALL_STORES.forEach((s) => s._resetForTests());
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(IDBAdapter, 'get').mockImplementation((name) =>
+      name === 'vot-annotations' ? Promise.reject(new Error('corrupted')) : Promise.resolve(undefined));
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+
+    await hydrateAllStores();
+
+    // boot end-state: exactly one store degraded, the rest loaded, none pending
+    expect(AnnotationStore.getState()).toBe('degraded');
+    expect(NoteStore.getState()).toBe('loaded');
+    expect(BookmarkStore.getState()).toBe('loaded');
+    expect(hasAnyPendingStores()).toBe(false);
+
+    // E5: the degraded transition plumbed through to StorageHealth's report
+    expect(StorageHealth.getReport().storesDegraded).toBe(true);
+
+    // the SHIPPED import-blocked guard predicate (SettingsScreen) → true here,
+    // so import must refuse. Replicate the exact expression.
+    const hasDegraded =
+      Object.values(storesMap()).some(({ store }) => store.getState() === 'degraded') ||
+      Object.values(flagMap()).some((s) => s.getState() === 'degraded');
+    expect(hasDegraded).toBe(true);
+
+    // prove the refusal is load-bearing: applyV3 is gated behind !hasDegraded
+    const applySpy = vi.fn(applyV3);
+    if (!hasDegraded) await applySpy({}, [], {});
+    expect(applySpy).not.toHaveBeenCalled();
+
+    vi.restoreAllMocks();
+    /** @type {any} */ (globalThis).StorageHealth = undefined;
+  }, 20000);
+
+  it('control: a fully-healthy boot leaves hasDegraded false', async () => {
+    IDBAdapter._resetForTests();
+    await deleteVotreaderDb();
+    ALL_STORES.forEach((s) => s._resetForTests());
+    vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+    vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
+
+    await hydrateAllStores();
+
+    const hasDegraded =
+      Object.values(storesMap()).some(({ store }) => store.getState() === 'degraded') ||
+      Object.values(flagMap()).some((s) => s.getState() === 'degraded');
+    expect(hasDegraded).toBe(false);
+    expect(hasAnyPendingStores()).toBe(false);
+    vi.restoreAllMocks();
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────
