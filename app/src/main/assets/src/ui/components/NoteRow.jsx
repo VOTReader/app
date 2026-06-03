@@ -13,7 +13,7 @@ export function NoteRow({ note, onTap }) {
   })[note.color] || '#ffd700';
   const Exp = typeof JrnExpandable !== 'undefined' ? JrnExpandable : null;
   const bodyText = note.body || '';
-  const anchorText = note.fullText || '';
+  const anchorText = (note.fullText || '').replace(/([,;:!?])([A-Z])/g, '$1 $2');
   return (
     <div
       className="note-row"

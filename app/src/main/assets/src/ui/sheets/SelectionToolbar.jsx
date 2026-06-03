@@ -2,6 +2,26 @@
    SelectionToolbar — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+function hlDisplayText(container, tcText, start, end) {
+  if (!container) return tcText.slice(start, end);
+  var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  var off = 0, parts = [], prevBlock = null;
+  while (walker.nextNode()) {
+    var n = walker.currentNode;
+    var nLen = n.textContent.length;
+    var nEnd = off + nLen;
+    if (nEnd > start && off < end) {
+      var block = n.parentElement;
+      while (block && block !== container && block.tagName !== 'DIV' && block.tagName !== 'P') block = block.parentElement;
+      if (prevBlock && block !== prevBlock) parts.push('\n');
+      prevBlock = block;
+      parts.push(n.textContent.slice(Math.max(0, start - off), Math.min(nLen, end - off)));
+    }
+    off = nEnd;
+  }
+  return parts.join('') || tcText.slice(start, end);
+}
+
 export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
   const [pos, setPos] = React.useState({ x: 0, y: 0 });
@@ -339,7 +359,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         AnnotationStore.add(hlKey, {
           id: hlId(), groupId: groupId, kind: kind,
           start: snap.start, end: snap.end, color: color,
-          text: containerText.slice(snap.start, snap.end),
+          text: hlDisplayText(container, containerText, snap.start, snap.end),
           created: Date.now()
         });
       });
@@ -361,7 +381,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       AnnotationStore.add(selInfo.hlKey, {
         id: id, groupId: id, kind: kind,
         start: snap.start, end: snap.end,
-        color: color, text: containerText.slice(snap.start, snap.end),
+        color: color, text: hlDisplayText(container, containerText, snap.start, snap.end),
         created: Date.now()
       });
     }
@@ -474,7 +494,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           AnnotationStore.add(hlKey, {
             id: hlId(), groupId: groupId, kind: def.style,
             start: snap.start, end: snap.end, color: def.color,
-            text: containerText.slice(snap.start, snap.end),
+            text: hlDisplayText(container, containerText, snap.start, snap.end),
             created: Date.now()
           });
         });
@@ -504,7 +524,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         AnnotationStore.add(selInfo.hlKey, {
           id: id, groupId: id, kind: def.style,
           start: snap.start, end: snap.end,
-          color: def.color, text: containerText.slice(snap.start, snap.end),
+          color: def.color, text: hlDisplayText(container, containerText, snap.start, snap.end),
           created: Date.now()
         });
       }
