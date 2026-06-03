@@ -101,7 +101,11 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                 <div className="tab-card-eyebrow">Tab {i + 1} / {total}</div>
                 <div className="tab-card-title">{title}</div>
                 <div className="tab-card-subtitle">{subtitle}</div>
-                {tabHasProgressBar(t) && (
+                {/* UX8: only show the progress bar once there's REAL progress.
+                    A 0%-wide bar read as "unread" even for a short tab the user
+                    had read fully (it never scrolled, so pct stayed 0); an absent
+                    bar is the honest signal for "no tracked progress yet". */}
+                {tabHasProgressBar(t) && pctLive > 0 && (
                   <div className="tab-card-progress">
                     <div className="tab-card-progress-fill" style={{ width: `${Math.round(pctLive * 100)}%` }} />
                   </div>

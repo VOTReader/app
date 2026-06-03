@@ -1183,11 +1183,26 @@
    close stays instant (no friction); just recoverable now. Gates: vitest 1805/build.
  [UX8] Tab-card progress bar renders 0% for short/unscrolled reading tabs (reads as
    "unread"). TabsOverview.jsx:104-108. SEV: Med [CONFIRMED] → hide the bar when
-   pct===0 and no scrollPosition recorded.
+   pct===0 and no scrollPosition recorded.   STATUS: DONE
+   DONE (2026-06-02): the progress bar now renders only when pctLive > 0 — a
+   0%-wide bar read as "unread" even for a short tab the user had read fully (it
+   never scrolled, so pct stayed 0). An absent bar is the honest "no tracked
+   progress yet" signal (the plan's preferred fix). TabsOverview.jsx.
  [UX9] Reading-dot gated by a hardcoded 15-element denylist (a new screen joins the
    wrong side); resume target is the global activeReadKey (NOT per-tab) → cross-tab
    bleed. app.jsx:724; use-reading-position-nav.js:176-201. SEV: Med-High
-   [CONFIRMED] → denylist→allowlist; scope activeReadKey per-tab.
+   [CONFIRMED] → denylist→allowlist; scope activeReadKey per-tab.   STATUS: DEFERRED (focused)
+   JUDGMENT (2026-06-02): two parts, BOTH risky to rush in a batch — DEFERRED for a
+   focused pass (flagged to owner). (a) denylist→allowlist: the obvious allowlist
+   (READING_SCREENS) is the WRONG set (those are the reading screens, where the dot
+   should NOT show; it also includes garden-view, which the denylist excludes), and
+   a hand-built hub/home allowlist would drop the dot from a hub by omission — a
+   worse regression than the Low-likelihood "new screen joins by omission". (b)
+   per-tab activeReadKey is a genuine cross-tab correctness item, but it's a
+   FEATURE-level change to the resume model: the tab model tracks scrollPositions,
+   not a per-tab "last-read key", so it needs extending the tab schema + the dwell
+   tracker — a deliberate design change on the load-bearing reading-position system,
+   not a safe in-batch edit. Owner-aware focused session recommended.
  [UX10] No swipe-to-change-chapter on mobile (3 redundant tap affordances; desktop
    has arrow keys, mobile none). BibleChapterView.jsx:43-58,199-233. SEV: Low-Med
    [CONFIRMED] → swipe-left/right on the chapter body (reuse the boundary handlers).
