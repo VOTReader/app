@@ -71,6 +71,7 @@ function _randomIndex(max) {
 /**
  * @param {{
  *   setSurpriseAnchor: (v: any) => void,
+ *   setFromSurprise: (v: boolean) => void,
  *   setBookId: (v: any) => void,
  *   setChapterNum: (v: any) => void,
  *   setScreen: (v: any) => void,
@@ -82,7 +83,7 @@ function _randomIndex(max) {
  * @returns {{ handleSurprise: () => void }}
  */
 export function useSurprise({
-  setSurpriseAnchor,
+  setSurpriseAnchor, setFromSurprise,
   setBookId, setChapterNum, setScreen, setLetterId,
   setActiveReadKey, setLastReadForVol, selectStudyChapter,
 }) {
@@ -118,6 +119,9 @@ export function useSurprise({
     }
     const pick = pool[_randomIndex(pool.length)];
     setSurpriseAnchor(null);
+    // UX1: flag the jump so Android-back returns Home, not the chapter index of
+    // a book the user never chose. The back router consumes + clears the flag.
+    setFromSurprise(true);
     if (pick._k === 'matthew') {
       setBookId('matthew'); setChapterNum(pick.num); setScreen('matthew-ch');
     } else if (pick._k === 'bible') {

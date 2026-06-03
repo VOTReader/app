@@ -53,6 +53,7 @@ afterEach(() => {
 
 const baseProps = () => ({
   setSurpriseAnchor: vi.fn(),
+  setFromSurprise: vi.fn(),
   setBookId: vi.fn(),
   setChapterNum: vi.fn(),
   setScreen: vi.fn(),
@@ -85,6 +86,7 @@ describe('useSurprise — branch dispatch', () => {
     setRandomIndex(0, 5);  // first item: matthew ch 1
     act(() => { result.current.handleSurprise(); });
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    expect(props.setFromSurprise).toHaveBeenCalledWith(true); // UX1: flag the jump for back→Home
     expect(props.setBookId).toHaveBeenCalledWith('matthew');
     expect(props.setChapterNum).toHaveBeenCalledWith(1);
     expect(props.setScreen).toHaveBeenCalledWith('matthew-ch');
@@ -114,6 +116,7 @@ describe('useSurprise — branch dispatch', () => {
     setRandomIndex(4, 5);  // 5th item: col two / wide
     act(() => { result.current.handleSurprise(); });
     expect(props.setLetterId).toHaveBeenCalledWith('wide');
+    expect(props.setFromSurprise).toHaveBeenCalledWith(true); // UX1: flagged on every branch
     expect(props.setScreen).toHaveBeenCalledWith('vot-letter');
     expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:two', expect.any(Function));
     const commitFn = props.setActiveReadKey.mock.calls[0][1];

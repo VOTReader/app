@@ -121,11 +121,11 @@ import {
  * @returns {void}
  */
 export function useAndroidBack({
-  screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb,
+  screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb, fromSurprise,
   tabsOverviewOpen, journalEntryId, fromLetterRef,
   setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
-  setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh,
-  setTabsOverviewOpen,
+  setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh, setFromSurprise,
+  setTabsOverviewOpen, setSurpriseAnchor,
   cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
   goStudiesHome, goVolumesHome, goJournalViewer,
   getStudyById,  // App()-local helper; threaded so the bible-study-chapter
@@ -143,6 +143,7 @@ export function useAndroidBack({
   const fromMatthewChRef = useRefMirror(fromMatthewCh);
   const studyIdRef = useRefMirror(studyId);
   const fromWtlbRef = useRefMirror(fromWtlb);
+  const fromSurpriseRef = useRefMirror(fromSurprise);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
   const journalEntryIdRef = useRefMirror(journalEntryId);
 
@@ -187,12 +188,12 @@ export function useAndroidBack({
       if (s === "scripture-genre") {goScripturesHome();return "true";} else
       if (s === "scriptures-home") {goHome();return "true";} else
       if (s === "volumes-home") {goHome();return "true";} else
-      if (s === "matthew-ch") {if (fromSearchRef.current) {setFromSearch(false);setScreen("search");} else {setChapterNum(null);setScreen("matthew-idx");}return "true";} else
+      if (s === "matthew-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {setChapterNum(null);setScreen("matthew-idx");}return "true";} else
       if (s === "matthew-idx") {if (fromStudiesRef.current) {setFromStudies(false);goStudiesHome();} else {goHome();}return "true";} else
       if (s === "studies-home") {goHome();return "true";} else
       if (s === "bible-study-index") {goStudiesHome();return "true";} else
-      if (s === "bible-study-chapter") {if (fromSearchRef.current) {setFromSearch(false);setScreen("search");return "true";}const cur = getStudyById(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
-      if (s === "bible-ch") {if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current) {setFromSearch(false);setScreen("search");} else {const bid = bookIdRef.current;
+      if (s === "bible-study-chapter") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");return "true";}const cur = getStudyById(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
+      if (s === "bible-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {const bid = bookIdRef.current;
         /* Q8 lazy: BOOKS lives in bundle-a-bible. If the user is on bible-ch
            via saved-tab cold-boot before __loadBibleCorpus resolves, BOOKS
            is undeclared and a bare BOOKS[bid] throws ReferenceError (optional
@@ -207,8 +208,9 @@ export function useAndroidBack({
       // Letter screens: unified back via COLLECTIONS registry
       { const col = COL_BY_LETTER_SC.get(s);
       if (col) {
-        if (fromMatthewChRef.current) {setFromMatthewCh(null);setScreen("matthew-ch");}
-        else if (fromSearchRef.current) {setFromSearch(false);setScreen("search");}
+        if (fromSurpriseRef.current) {setFromSurprise(false);goHome();}
+        else if (fromMatthewChRef.current) {setFromMatthewCh(null);setScreen("matthew-ch");}
+        else if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");}
         else if (fromStudiesRef.current) {setFromStudies(false);setScreen("bible-study-chapter");}
         else if (col.indexScreen) {setScreen(col.indexScreen);}
         else {goHome();}
@@ -219,7 +221,7 @@ export function useAndroidBack({
       return "false";
     };
     return () => {delete window.handleAndroidBack;};
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/tabsOverviewOpenRef/journalEntryIdRef + fromLetterRef from useFromLetterStack — all 11 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell/getStudyById same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/fromSurpriseRef/tabsOverviewOpenRef/journalEntryIdRef + fromLetterRef from useFromLetterStack — all 12 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell/getStudyById same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
   }, []);
 
   /* ═══════════════════════════════════════════════════════════════════════

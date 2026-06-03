@@ -81,7 +81,7 @@ export const DEFAULT_TAB = {
   surpriseAnchor: null,
   fromLetterStack: [],
   titleFocusHidden: false, headingsFocusHidden: false,
-  fromMatthewCh: null, fromWtlb: null, fromSearch: false,
+  fromMatthewCh: null, fromWtlb: null, fromSearch: false, fromSurprise: false,
   searchQuery: '', searchOrigin: null, searchScope: null, searchContext: null,
   navOrigin: null,
   gardenPage: 1,

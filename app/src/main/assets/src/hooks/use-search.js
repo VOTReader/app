@@ -268,6 +268,10 @@ export function useSearch({
 
   // ── goSearchOrigin (back from search) ───────────────────────────────────
   const goSearchOrigin = () => {
+    // UX2: clear the search verse-anchor so the restored reading screen gets no
+    // stray highlight pulse and useScrollMemory's scroll-restore isn't blocked
+    // (its Effect 3 early-returns while a surpriseAnchor is set).
+    setSurpriseAnchor(null);
     const o = searchOriginRef.current;
     if (o) {
       setSearchOrigin(null);

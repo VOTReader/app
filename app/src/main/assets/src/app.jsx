@@ -273,6 +273,7 @@ function App() {
   // owned by useSearch (P7c, called below).
   const [fromSearch, setFromSearch] = tabField('fromSearch');
   const [fromWtlb, setFromWtlb] = tabField('fromWtlb');
+  const [fromSurprise, setFromSurprise] = tabField('fromSurprise');
   const [navOrigin, setNavOrigin] = tabField('navOrigin');
 
   /* AppShell-level leftover effects + small state (P7k — closes Phase 1).
@@ -585,7 +586,7 @@ function App() {
 
   /* handleSurprise → src/hooks/use-surprise.js (P7j). */
   const { handleSurprise } = useSurprise({
-    setSurpriseAnchor,
+    setSurpriseAnchor, setFromSurprise,
     setBookId, setChapterNum, setScreen, setLetterId,
     setActiveReadKey, setLastReadForVol, selectStudyChapter,
   });
@@ -621,11 +622,11 @@ function App() {
      nav-helper glue + cancelDwell + the fromLetter stack. Called here,
      after every nav helper it threads (goStudiesHome is the last one). */
   useAndroidBack({
-    screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb,
+    screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb, fromSurprise,
     tabsOverviewOpen, journalEntryId, fromLetterRef,
     setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
-    setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh,
-    setTabsOverviewOpen,
+    setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh, setFromSurprise,
+    setTabsOverviewOpen, setSurpriseAnchor,
     cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
     goStudiesHome, goVolumesHome, goJournalViewer,
     getStudyById,

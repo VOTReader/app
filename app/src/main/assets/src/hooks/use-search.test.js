@@ -310,6 +310,7 @@ describe('useSearch — goSearchOrigin', () => {
     // are called with null because o.bookId !== undefined → null is fine).
     expect(props2.setScreen).toHaveBeenCalledWith('vol-two-letter');
     expect(props2.setLetterId).toHaveBeenCalledWith('wide-path');
+    expect(props2.setSurpriseAnchor).toHaveBeenCalledWith(null); // UX2: clear the verse anchor
   });
 
   it('falls back to goHome when no origin captured', () => {
@@ -317,6 +318,7 @@ describe('useSearch — goSearchOrigin', () => {
     act(() => { result.current.goSearchOrigin(); });
     expect(props.goHome).toHaveBeenCalledTimes(1);
     expect(props.setScreen).not.toHaveBeenCalled();  // no restore happened
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null); // UX2: cleared on the fallback path too
   });
 });
 
