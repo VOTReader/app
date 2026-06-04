@@ -23,6 +23,111 @@ SUBSYSTEM SCORECARD (agent self-ratings)
 
 
 ================================================================================
+HANDOFF  (READ FIRST)  --  state as of commit 28fc2a8, 2026-06-04
+================================================================================
+
+WHAT THIS FILE IS
+  The canonical tracker for remediating the blind adversarial audit (14 Opus
+  agents). 59 actionable items. Section 1 = priority index (do-in-order), Section
+  3 = full per-item detail, Section 4 = by-design/no-action, PROGRESS LOG (below)
+  = dated per-batch record of what landed. One execution session has run.
+
+STATE: 29 DONE + 4 adjudicated, in 13 commits, ALL pushed to main, every commit
+  green through the full pre-commit gate chain (lint/tsc/vitest/build/corpus +
+  Kotlin testDebugUnitTest when .kt changed).
+  DONE (29): SRCH-1/2/3/4/6, JRNL-1, JRNL-2, PERF-1/2/3, SW-1/2/4, SEC-1/2/3,
+    BAK-2/4, CORP-1/3, NTV-2/4, SCRIP-1/3, STORE-3, SHELL-2, ANN-2, BLD-3/4.
+  ADJUDICATED not-done (reasons in PROGRESS LOG + GOTCHA 1): SRCH-5, ANN-3,
+    SCRIP-2 (render-guard net-negative), NTV-3 (already correct).
+  Commits: a5f2196 search . 56bba5e quickwins . e7d29da corpus . 86cf422 backup .
+    9911e37 sw . 1f1428d security . c4a92c3 text/scripture . a7c6f91 kotlin .
+    3992f6e tooling . 8978d16 memory . bd8fe4e journal . 28fc2a8 perf3 .
+    (+ f70024e tracker doc-fix.)
+
+NEXT PRIORITIES (each deserves its OWN focused session)
+  1. STORE-1 (the last P0) -- cross-tab whole-store clobber. RISKIEST remaining:
+     it is in the core CachedStore._save path that EVERY store rides on. Stopgaps
+     (merge-before-flush; BroadcastChannel re-hydrate) each have real edge cases;
+     the clean fix is per-record keying (a schema change). Needs careful merge-
+     semantics design + a 2-tab test harness. PWA-only (Android = single WebView,
+     immune). REUSE the JRNL-1 shape (GOTCHA 10) for the precious-data discipline.
+  2. TEST-1 (High) -- the Android v3 backup DRIVER (_exportV3Android /
+     _importV3Android in SettingsScreen.jsx) has ZERO tests + is outside coverage,
+     and is the only-backup path on the primary platform. Extract it into an
+     injectable module; round-trip a multi-frame export->import through a fake
+     bridge asserting byte-identity (mirror StorageManagerTest.kt).
+  3. Medium cluster: PERF-4/5/6, ANN-1, BAK-1, STORE-2/4, NTV-1, JRNL-3, CORP-2,
+     BLD-1/2, TEST-2/3/4/5/6, BAK-3/5, JRNL-5.
+
+METHOD THAT WORKED (keep using it)
+  Per item: (a) VERIFY the finding vs CURRENT source -- line numbers drift, and
+  some findings are incomplete or WRONG (GOTCHA 1). (b) PROVE the fix -- a real-
+  module/real-corpus test, and preview_eval for any user-visible BEHAVIOR change.
+  (c) GATE locally, then commit (the hook re-runs everything). (d) Batch by area,
+  one commit per batch, push, tick the Section-1 checkbox + add a PROGRESS LOG line.
+
+GOTCHAS  (load-bearing -- these bit, or nearly did)
+  1. THE AUDIT CAN BE INCOMPLETE OR WRONG -- re-derive + PROVE every fix.
+     - SEARCH: the agent's "stop indexing ref" was necessary but NOT sufficient.
+       A passing FIXTURE test did not prove it; real-corpus preview showed verses
+       STILL buried (Lord/God saturate letter TITLES; a super-common term overflows
+       the per-term cap). Real fix = index-based coverage + a contiguous-token
+       PHRASE boost + an AND-search of the content terms.
+     - SCRIP-2's suggested render-guard was NET-NEGATIVE: BOOKS is the LAZY corpus
+       (undefined on a cold WTLB read), so gating the {{nav:}} link on BOOKS[bookId]
+       would render the VALID esther link inert. Right fix = a build-time validator.
+     - NTV-3 was already correct (zoom disabled; restoreState forcing currentScale=1f
+       is right and is what the N4 emulator verification relies on).
+  2. PREVIEW + THE SEARCH INDEX CACHE. The clean-slate snippet clears SW caches +
+     the Cache API but NOT IndexedDB. The search index lives in the vot-search-cache
+     IDB. To verify search you MUST also indexedDB.deleteDatabase('vot-search-cache')
+     + reload, or the OLD index loads and you wrongly conclude the fix failed. The
+     SCHEMA_VERSION 13->14 bump invalidates it on real CLIENTS; preview needs the
+     manual delete.
+  3. THE PRE-COMMIT HOOK IS THE FULL GATE: check_balance + validate-schemas (when
+     src/data/*.js staged) + eslint --max-warnings 0 + tsc + vitest + build +
+     corpus-version, AND :app:testDebugUnitTest + jacoco when any .kt is staged. A
+     commit passes everything or fails -- run gates locally FIRST. Fast Kotlin check:
+     ./gradlew :app:compileDebugKotlin .
+  4. --max-warnings 0 => a react-hooks/exhaustive-deps WARNING fails CI. A COMPONENT-
+     SCOPE function referenced in a []-deps effect trips it; INLINE the handler inside
+     the effect (see JournalEditorScreen onHide), do not make a separate function used
+     only there.
+  5. GLOBALS REGEN. A new window-global (e.g. gardenTierLimits, added in _entry-d.js)
+     needs `npm run lint:globals` (or `npm run lint`) to regenerate
+     tools/eslint-globals.generated.js + .d.ts (it went 409->410); the pre-commit does
+     NOT auto-regenerate -- stage them. CONVERSELY a top-level UPPER_CASE const in a
+     src/data/*.test.js is HARVESTED as a false global (the REBUKE_LABEL incident) --
+     use lowercase names in src/data test files.
+  6. CORPUS_VERSION IS MANUAL. Any byte change to a corpus bundle (books/matthew/VOT,
+     incl. volume-seven.js) must bump CORPUS_VERSION in service-worker.js or the gate
+     fails (bumped c6->c7 for CORP-1). CACHE_VERSION (core shell) auto-rotates and
+     EXCLUDES the corpus bundles by design. After SW-1 it hashes 30 core assets (was
+     19 -- it had silently dropped ~10).
+  7. DO NOT --no-verify (used once on a txt-only doc commit where the hook no-ops;
+     still, let the hook run).
+  8. IGNORE .claude/worktrees/* (leftover audit-agent copies). Edit the real files
+     under app/src/main/. Never touch app/build/ or the C: OneDrive junction.
+  9. SEARCH ENGINE = app/src/main/assets/search.js (NOT .../assets/assets/, and
+     src/data/search-engine.js does NOT exist -- the wrapper is window.VotSearch
+     inline in search.js). It is OUTSIDE eslint/tsc/coverage; tests are
+     search-engine.test.js + the new search-ranking.test.js (faithful cross-corpus
+     fixture). A search.js edit needs SCHEMA_VERSION bumped if the index shape changes.
+ 10. PRECIOUS-DATA PATTERN (JRNL-1, reuse for STORE-1): IDB writes are fire-and-forget
+     (not awaited), so a background-kill loses them. The durable primitive is a
+     SYNCHRONOUS localStorage write on pagehide/visibilitychange:hidden, reconciled on
+     next open with a (draft.ts >= last-save) AND (content-differs) guard so it can
+     NEVER clobber newer content. A recovered draft is KEPT until re-saved.
+
+KEY COMMANDS
+  npm run lint | typecheck | test | smoke:ci ;  python check_balance.py ;
+  npm run validate:data ;  node tools/check-corpus-version.js .
+  Preview: preview_start "app" (port 8090, Cache-Control:no-store). To verify SEARCH:
+  clear SW regs + caches AND indexedDB.deleteDatabase('vot-search-cache'), then reload,
+  then __loadBibleCorpus()/__loadVotCorpus()/__loadMatthewCorpus() + VotSearch.init().
+
+
+================================================================================
 PROGRESS LOG
 ================================================================================
 2026-06-04  BATCH 1 — SEARCH (SRCH-1,2,3,4,6 DONE; SRCH-5 deferred).  commit <pending>
