@@ -38,7 +38,7 @@ var buildError = null;
 // ─── IndexedDB cache ───
 // Bump SCHEMA_VERSION when doc shape changes OR tokenizer config changes;
 // cache is invalidated automatically because the signature includes this.
-var SCHEMA_VERSION = 13;                    // bumped 2026-06-01 (U22) — stop indexing section headings / inline topic breaks / chapter titles (curated editorial metadata, not scripture content); forces cached indexes to rebuild without those docs + the 'heading' field
+var SCHEMA_VERSION = 14;                    // bumped 2026-06-04 (SRCH-1/SRCH-4) — stop indexing the 'ref' field (it carried the collection LABEL on every volume doc, so a common query word + the 2.5x ref boost buried the actual verse); + NFD diacritic folding in kjvEncode. Forces cached indexes to rebuild without 'ref'. (Prior: 13 = U22 dropped section headings / inline topic breaks / chapter titles + the 'heading' field.)
 var ALT_TRANSLATIONS = ['kjv', 'asv', 'web', 'bsb', 'hnv', 'lsv', 'ylt'];
 
 // ─── Archaic/modern pronoun normalization (bidirectional) ───
@@ -58,10 +58,13 @@ var ARCHAIC_NORMALIZE = {
 
 function kjvEncode(str) {
   if (typeof str !== 'string' || !str) return [];
-  // Lowercase, strip non-alphanumerics to spaces, split, then map archaic
-  // tokens to their modern equivalents. Returns a token array — FlexSearch
-  // 0.7 expects encode() to return an array of tokens (not a pre-joined string).
-  var tokens = str.toLowerCase().replace(/[^a-z0-9\s]+/g, ' ').split(/\s+/);
+  // Lowercase, fold diacritics (NFD → strip combining marks, SRCH-4), strip
+  // non-alphanumerics to spaces, split, then map archaic tokens to their modern
+  // equivalents. Returns a token array — FlexSearch 0.7 expects encode() to
+  // return an array of tokens (not a pre-joined string). NFD folding is a no-op
+  // on the ASCII corpus (index unchanged) but lets an accented query — e.g.
+  // "resurrección" — match its ASCII-folded form.
+  var tokens = str.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9\s]+/g, ' ').split(/\s+/);
   var out = [];
   for (var i = 0; i < tokens.length; i++) {
     var t = tokens[i];
@@ -805,11 +808,14 @@ function createDb() {
       id: 'id',
       index: [
         { field: 'text',    tokenize: 'forward', resolution: 9, encode: kjvEncode },
-        { field: 'title',   tokenize: 'forward', resolution: 9, encode: kjvEncode },
-        // U22: 'heading' is intentionally NOT indexed — section headings / inline
-        // topic breaks are curated editorial dividers, not scripture content, so
-        // they must not produce matches. (Heading stays in docStore for display.)
-        { field: 'ref',     tokenize: 'forward', resolution: 9, encode: kjvEncode }
+        // 'heading' (U22) and 'ref' (SRCH-1) are intentionally NOT indexed. Both
+        // carry the collection LABEL on every volume doc (e.g. "A Testament Against
+        // The World: The Lord's Rebuke"), so indexing them let a common query word
+        // match — and the 2.5x ref boost RANK — every doc in a collection ahead of
+        // the actual verse. Reference-style queries already resolve to a direct-nav
+        // card BEFORE text search (executeSearch), so 'ref' full-text only added
+        // noise. Both stay in docStore for display. Keep this in sync with `fields`.
+        { field: 'title',   tokenize: 'forward', resolution: 9, encode: kjvEncode }
       ]
     },
     optimize: true,
@@ -833,8 +839,7 @@ async function buildIndex(code, corpus, options) {
     db.add({
       id: d.id,
       text: d._searchText || d.text || '',
-      title: d.title || '',
-      ref: d.ref || ''
+      title: d.title || ''
     });
     // Strip the index-only field before storing — keeps docStore (and IndexedDB
     // cache) from bloating with all 7+ translations per verse.
@@ -1359,6 +1364,23 @@ function parseTextQuery(q) {
 //   limit: number,
 //   fuzzy: 0..2
 // }
+// Contiguous-token phrase match: does `text` contain `qTokens` as a contiguous run?
+// Tokenized via kjvEncode, so it is punctuation- AND archaic-immune ("be still, and
+// know" matches the query "be still and know"; "thou art" matches "you are"). Used to
+// lift a remembered verse above docs that merely scatter the same common words. SRCH-2.
+function phraseTokenMatch(text, qTokens) {
+  if (!text || !qTokens || qTokens.length < 2) return false;
+  var toks = kjvEncode(text);
+  var n = toks.length, m = qTokens.length;
+  if (m > n) return false;
+  for (var i = 0; i + m <= n; i++) {
+    var ok = true;
+    for (var j = 0; j < m; j++) { if (toks[i + j] !== qTokens[j]) { ok = false; break; } }
+    if (ok) return true;
+  }
+  return false;
+}
+
 async function executeSearch(query, options) {
   options = options || {};
   var limit = options.limit || 200;
@@ -1402,40 +1424,51 @@ async function executeSearch(query, options) {
   // SR2: a PHRASE is one AND'd search (its words must co-occur, then the exact
   // post-filter applies); a non-phrase query is searched TERM-BY-TERM and the
   // matches UNION'd (OR) — see the field loop below.
-  var searchUnits = p.phrase ? [p.phrase] : filtered;
+  // Build the search UNITS and, in parallel, two bookkeeping arrays:
+  //   unitOrigin[i] = index of the ORIGINAL query term this unit belongs to
+  //                   (a synonym maps to the term it expanded from) — lets us count
+  //                   true per-term COVERAGE from the index hits (SRCH-2).
+  //   literalUnit[i] = is this unit the literal term, not a synonym? (SRCH-3)
   // SR4: optional scripture-aware synonym expansion (settings.searchSynonyms,
-  // default on). Each non-phrase term also matches its synonym group, OR'd in
-  // for recall ("mercy" finds "compassion", "shepherd" finds "pastor"). Exact
-  // matches still rank FIRST — the coverage multiplier + per-term accumulation
-  // below score on the ORIGINAL `filtered` terms, so a synonym-only hit gets
-  // base score and lands below the literal matches. Phrases are exempt.
-  if (options.synonyms !== false && !p.phrase && D.SYNONYM_MAP) {
-    var expandedUnits = [];
+  // default on). Each non-phrase term ALSO searches its synonym group, OR'd in for
+  // recall ("mercy" finds "compassion", "shepherd" finds "pastor"); the literal
+  // term always outranks a synonym-only hit (SRCH-3). Phrases are exempt.
+  var searchUnits = [];
+  var unitOrigin = [];
+  var literalUnit = [];
+  var didExpand = false;
+  if (p.phrase) {
+    searchUnits = [p.phrase]; unitOrigin = [0]; literalUnit = [true];
+  } else {
     var seenUnit = Object.create(null);
-    for (var sui = 0; sui < filtered.length; sui++) {
-      var baseTerm = String(filtered[sui]).toLowerCase();
-      if (!seenUnit[baseTerm]) { seenUnit[baseTerm] = true; expandedUnits.push(filtered[sui]); }
-      var grp = D.SYNONYM_MAP[baseTerm];
-      if (grp) {
-        for (var gsi = 0; gsi < grp.length; gsi++) {
-          var syn = String(grp[gsi]).toLowerCase();
-          if (!seenUnit[syn]) { seenUnit[syn] = true; expandedUnits.push(syn); }
+    var useSyn = (options.synonyms !== false && D.SYNONYM_MAP);
+    for (var ti = 0; ti < filtered.length; ti++) {
+      var baseTerm = String(filtered[ti]).toLowerCase();
+      if (!seenUnit[baseTerm]) { seenUnit[baseTerm] = true; searchUnits.push(filtered[ti]); unitOrigin.push(ti); literalUnit.push(true); }
+      if (useSyn) {
+        var grp = D.SYNONYM_MAP[baseTerm];
+        if (grp) {
+          for (var gsi = 0; gsi < grp.length; gsi++) {
+            var syn = String(grp[gsi]).toLowerCase();
+            if (!seenUnit[syn]) { seenUnit[syn] = true; searchUnits.push(syn); unitOrigin.push(ti); literalUnit.push(false); didExpand = true; }
+          }
         }
       }
     }
-    if (expandedUnits.length) searchUnits = expandedUnits;
   }
 
-  // SR1: U22 dropped the 'heading' field from the index (createDb), so searching
-  // index:'heading' threw on EVERY query (caught + logged per corpus, the 2.0
-  // boost dead). Removed — the field no longer exists.
+  // SR1/SRCH-1: only INDEXED fields may be searched — searching a non-indexed
+  // field throws on every query (caught + logged). 'heading' (U22) and 'ref'
+  // (SRCH-1) are not indexed (see createDb), and 'ref' carried the collection
+  // label that buried verses. Keep this list in sync with createDb's index.
   var fields = [
     { name: 'title',   boost: 3.0 },
-    { name: 'ref',     boost: 2.5 },
     { name: 'text',    boost: 1.0 }
   ];
   var perFieldLimit = Math.min(Math.max(limit * 4, 400), 1500);
   var scoreMap = Object.create(null);  // compound key: "corpus|docId"
+  var literalHit = Object.create(null); // SRCH-3: keys that matched a LITERAL (non-synonym) term
+  var termMask = Object.create(null);  // SRCH-2: bitmask of which original terms each key matched
   var docLookup = Object.create(null); // compound key → doc
 
   for (var ec = 0; ec < activeCorpora.length; ec++) {
@@ -1474,6 +1507,42 @@ async function executeSearch(query, options) {
           var rankScore = (perFieldLimit - r) / perFieldLimit;
           scoreMap[key] = (scoreMap[key] || 0) + (f.boost * rankScore);
           if (!docLookup[key]) docLookup[key] = slot.docStore[ids[r]];
+          if (literalUnit[ui]) literalHit[key] = true;
+          if (unitOrigin[ui] < 31) termMask[key] = (termMask[key] || 0) | (1 << unitOrigin[ui]);
+        }
+      }
+    }
+  }
+
+  // SRCH-2 recall fix: a SUPER-common term ("lord", "god") can overflow the per-term
+  // cap above, so the target verse may have matched only the RARE term(s) in the union
+  // — losing coverage credit and the phrase boost. An AND-search of the content terms
+  // returns the (bounded) INTERSECTION directly, independent of per-term caps, so the
+  // full-coverage docs (and the remembered-verse phrase) are recovered regardless.
+  if (!p.phrase && filtered.length > 1) {
+    var andQ = filtered.join(' ');
+    var fullMask = (filtered.length >= 31) ? 0x7fffffff : ((1 << filtered.length) - 1);
+    for (var ac = 0; ac < activeCorpora.length; ac++) {
+      var aslot = engines[activeCorpora[ac]];
+      if (!aslot || !aslot.db) continue;
+      for (var af = 0; af < fields.length; af++) {
+        var araw;
+        try { araw = aslot.db.search(andQ, { index: fields[af].name, limit: perFieldLimit }); }
+        catch (e) { continue; }
+        if (!araw) continue;
+        var aids = [];
+        if (Array.isArray(araw)) {
+          for (var arr2 = 0; arr2 < araw.length; arr2++) {
+            var aen = araw[arr2];
+            if (aen && typeof aen === 'object' && aen.result) { for (var aei = 0; aei < aen.result.length; aei++) aids.push(aen.result[aei]); }
+            else if (typeof aen === 'string' || typeof aen === 'number') aids.push(aen);
+          }
+        }
+        for (var aii = 0; aii < aids.length; aii++) {
+          var akey = activeCorpora[ac] + '|' + aids[aii];
+          if (!docLookup[akey]) docLookup[akey] = aslot.docStore[aids[aii]];
+          if (scoreMap[akey] == null) scoreMap[akey] = fields[af].boost * 0.5;
+          termMask[akey] = (termMask[akey] || 0) | fullMask;   // AND proved every term present
         }
       }
     }
@@ -1506,33 +1575,47 @@ async function executeSearch(query, options) {
     if (kDoc && KIND_BOOST[kDoc.kind]) scoreMap[rankedIds[ki]] *= KIND_BOOST[kDoc.kind];
   }
 
-  // Term-coverage multiplier: docs containing more of the query terms rank higher.
-  // Without this, FlexSearch's per-field rank can let a 1-of-3-terms match
-  // outrank a 3-of-3-terms match (e.g. searching "weak and helpless" would let
-  // a doc with only "and" beat a doc with all three words).
-  // Skipped for verses because they're indexed against multiple translations
-  // but doc.text only contains the displayed (NKJV) text — coverage check
-  // would falsely demote verses matched via KJV/ASV phrasing.
-  if (filtered.length > 1) {
-    for (var cri = 0; cri < rankedIds.length; cri++) {
-      var crDoc = docLookup[rankedIds[cri]];
-      if (!crDoc || crDoc.kind === 'verse') continue;
-      var combinedLower = ((crDoc.text || '') + ' ' + (crDoc.title || '') + ' ' + (crDoc.heading || '') + ' ' + (crDoc.ref || '')).toLowerCase();
-      var matched = 0;
-      for (var tlc = 0; tlc < filtered.length; tlc++) {
-        var t = filtered[tlc].toLowerCase();
-        if (combinedLower.indexOf(t) >= 0) { matched++; continue; }
-        // Match archaic variants too — "you" finds "thee/thou/ye" and vice versa
-        var vars = ARCHAIC_EXPAND[t];
-        if (vars) {
-          for (var vi = 0; vi < vars.length; vi++) {
-            if (vars[vi] !== t && combinedLower.indexOf(vars[vi]) >= 0) { matched++; break; }
-          }
-        }
-      }
-      var coverage = matched / filtered.length;
-      // 0% coverage → 1x (no boost), 100% coverage → 4x boost
-      scoreMap[rankedIds[cri]] *= (1 + coverage * 3);
+  // SRCH-2 (term COVERAGE): for a multi-word query, the count of DISTINCT query
+  // terms a doc matched is the PRIMARY ranking signal (see the sort below) — a doc
+  // matching MORE of the query's words outranks one matching fewer, regardless of
+  // field/kind boost. This is the standard, expected behavior and the fix for the
+  // real defect: in this corpus "Lord" is pervasive in letter TITLES, so a title
+  // match (title 3.0 x title-kind 2.0 = 6x) on ONE common word otherwise buries the
+  // actual verse that contains the user's WHOLE phrase. Coverage is counted from the
+  // INDEX hits (termMask) — accurate across ALL translations, unlike a string scan
+  // of the NKJV-only doc.text (which is why verses can be tiered safely now).
+  // SRCH-2: rank by the two signals that actually FIND a remembered verse —
+  // (a) term COVERAGE (how many DISTINCT query words a doc matched, counted from the
+  // index hits → accurate across all translations) and (b) PHRASE proximity (the
+  // words appear TOGETHER). A hard coverage tier alone failed here: in this devotional
+  // corpus thousands of docs contain the same common words ("lord" + "shepherd"), so
+  // they shared the top tier and the verse — one of thousands of "lord" hits — scored
+  // low inside it. A gentle coverage multiplier + a decisive phrase boost is robust.
+  var covCount = Object.create(null);
+  for (var cci = 0; cci < rankedIds.length; cci++) {
+    var cm = termMask[rankedIds[cci]] || 0;
+    var cn = 0;
+    while (cm) { cm &= (cm - 1); cn++; }   // popcount = distinct query terms matched
+    covCount[rankedIds[cci]] = cn;
+  }
+  // Phrase tokens = the FULL query (incl. stopwords), only for multi-word non-phrase
+  // queries. The phrase check is gated to FULL-coverage docs (a contiguous run needs
+  // every content term present), so only a small subset is ever tokenized.
+  var qTokens = (!p.phrase && filtered.length > 1) ? kjvEncode(query) : null;
+  for (var ri2 = 0; ri2 < rankedIds.length; ri2++) {
+    var k2 = rankedIds[ri2];
+    var cc = covCount[k2] || 0;
+    if (cc > 1) scoreMap[k2] *= (1 + (cc - 1) * 2);            // cov2→3x, cov3→5x, …
+    if (qTokens && cc === filtered.length) {
+      var d2 = docLookup[k2];
+      if (d2 && phraseTokenMatch((d2.text || '') + ' ' + (d2.title || ''), qTokens)) scoreMap[k2] *= 6;
+    }
+  }
+  // SRCH-3: demote synonym-only hits (matched no literal query term) so the exact
+  // word always outranks its expansions; recall is preserved (the hit stays, lower).
+  if (didExpand) {
+    for (var soi = 0; soi < rankedIds.length; soi++) {
+      if (!literalHit[rankedIds[soi]]) scoreMap[rankedIds[soi]] *= 0.5;
     }
   }
   rankedIds.sort(function (a, b) { return scoreMap[b] - scoreMap[a]; });

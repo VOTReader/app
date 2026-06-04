@@ -59,6 +59,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (!buildInfo.ready) return;
     const q = (query || '').trim();
     if (!q) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
+    // SRCH-6: a 1-char query floods the forward tokenizer with hundreds of title
+    // prefix hits ("a" → every "A Warning"/"ABASEMENT"…). Require ≥2 alphanumerics
+    // before the full search; the suggest box (above) still reacts at 1 char.
+    if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       window.VotSearch.search(q, {

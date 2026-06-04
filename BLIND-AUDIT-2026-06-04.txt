@@ -1,0 +1,834 @@
+================================================================================
+VOTReader — BLIND ADVERSARIAL AUDIT — FULL ACTIONABLE ITEM LIST
+Date: 2026-06-04
+Method: 14 independent Opus agents, blind (no prose docs), read-only, each
+        finding PROVEN by exercising the real code with adversarial input.
+================================================================================
+
+HOW TO READ THIS FILE
+  - Every actionable item appears ONCE in full, under its subsystem (Section 3),
+    with a stable ID, severity, file:line, problem, and concrete fix.
+  - Section 1 is the priority-ordered index (IDs only) — your "do-this-in-order".
+  - Section 2 is the cross-cutting dedup map (items multiple agents flagged —
+    a strong priority signal).
+  - Section 4 lists items the agents adjudicated NO-ACTION / by-design, captured
+    so nothing is lost but clearly separated from work.
+  - Tags:  [Cx]=Critical [H]=High [M]=Medium [L]=Low  | (V)=Verified (Hyp)=Hypothesis
+  - Effort: (1line) (S=small) (M=medium) (L=large)
+
+SUBSYSTEM SCORECARD (agent self-ratings)
+  Security 9.0 | Backup 9.0 | Native 9.0 | Corpus 9.0 | App-shell 9.0
+  Build 8.5 | Annotation 8.5 | Scripture/routing 8.5 | Tests 8.0 | Journal 8.0
+  Storage 7.5 | Service-worker 7.5 | Runtime-perf 7.5 | SEARCH 4.0
+
+
+================================================================================
+PROGRESS LOG
+================================================================================
+2026-06-04  BATCH 1 — SEARCH (SRCH-1,2,3,4,6 DONE; SRCH-5 deferred).  commit <pending>
+  search.js + SearchScreen.jsx + new search-ranking.test.js (5 cases, real engine
+  over a faithful cross-corpus fixture). Verified on the REAL corpus via preview_eval.
+  - SRCH-1: de-indexed the `ref` field (it carried the collection label on every
+    volume doc) + bumped SCHEMA_VERSION 13→14 (auto-invalidates cached indexes).
+  - SRCH-2: term coverage is now a real ranking signal, counted from INDEX hits
+    (accurate across all translations; the old code skipped verses entirely).
+  - KEY FINDING (preview-only, the audit was incomplete): de-indexing `ref` ALONE did
+    NOT fix the real corpus — in this devotional corpus "Lord"/"God" are pervasive in
+    letter TITLES (title 3.0 × title-kind 2.0 = 6×), which buried verses; AND a super-
+    common term overflows the per-term cap so the verse lost coverage credit. Real fix:
+    (a) gentle coverage multiplier, (b) a punctuation-immune contiguous-token PHRASE
+    boost (×6), (c) an AND-search of the content terms to recover the bounded
+    intersection regardless of per-term caps. Result: every remembered-verse query
+    (in indexed phrasing) now returns the verse at rank #0/#1; title queries ("The Wide
+    Path", "Grafted In") still return their letter; 4–19 ms/query.
+  - SRCH-3: synonym-only hits demoted 0.5× (literal always leads; recall preserved).
+  - SRCH-4: NFD diacritic folding in kjvEncode. SRCH-6: min-2-alnum guard in SearchScreen.
+  Gates: build + lint(409, no drift) + typecheck + 1883 vitest + smoke:ci all green.
+  SRCH-5 (cross-kind dedup) intentionally deferred — collapsing verse vs footnote-quote
+  removes information; not clearly an improvement.
+
+================================================================================
+SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
+================================================================================
+
+P0 — real user-facing defect / reachable data loss
+  [x] SRCH-1   Search ranking buries the verse you searched for (CRITICAL)
+  [ ] STORE-1  Cross-tab whole-store clobber — silent loss of committed data
+  [ ] JRNL-1   Journal background-kill flush is not durable (loss window)
+
+P1 — High: budget-device memory, stale-serve, broken core feature, untested only-backup
+  [x] SRCH-2   Verses excluded from term-coverage multiplier
+  [x] SRCH-3   Synonym expansion over-broad + defaults ON
+  [ ] PERF-1   html2canvas rasterizes the whole scrolled chapter (memory spike)
+  [ ] PERF-2   Garden decoded-bitmap residency ~0.5–1.3 GB at high tiers
+  [ ] SW-1     CACHE_VERSION hash omits ~10 precached assets (stale-serve forever)
+  [ ] TEST-1   Android v3 backup DRIVER loop has zero tests + outside coverage
+
+P2 — Medium: correctness, perf cliffs, process gates, test gaps
+  [ ] STORE-2  Orphan-sweep TOCTOU deletes a freshly-inserted media blob
+  [ ] BAK-1    Legacy v2 import wipes existing media BEFORE decoding (destructive)
+  [ ] ANN-1    applyDOMHighlights is O(N^2) per container
+  [ ] SCRIP-1  Unknown persisted screen → permanent blank screen, no recovery
+  [ ] JRNL-3   Audio waveform samples stored inline at full resolution
+  [ ] NTV-1    Unbounded whole-file heap read on record-stop + no recording cap
+  [ ] PERF-3   translateVerse O(n^2) per chapter under non-NKJV translation
+  [ ] PERF-4/SHELL-1  LinkIcon/BookmarkIcon global-version re-render fan-out
+  [ ] CORP-1   Dead in-app "Also read" tap-through (wrong collection label)
+  [ ] CORP-2   validate-schemas.js never resolves cross-ref link targets
+  [ ] BLD-1    Web deploy publishes with ZERO build gates / no CI dependency
+  [ ] BLD-2    APK packages committed dist/ with no build-time freshness check
+  [ ] TEST-2   Service-worker runtime fetch/activate strategy untested
+  [ ] TEST-3   sw-register.js update-prompt flow ~half covered
+  [ ] TEST-4   Coverage `include` scopes out the largest code bodies (honesty)
+
+P3 — Low / hardening / nits / small wins
+  [x] SRCH-4   No diacritic (NFD) folding
+  [ ] SRCH-5   Same verse duplicated across corpora (no cross-kind dedup)
+  [x] SRCH-6   1-char queries return 400 junk title hits
+  [ ] SCRIP-2  {{nav:bookId:ch}} tokens get zero validation
+  [ ] SCRIP-3  Multi-ref (semicolon) tokens unparseable (dict-key crutch)
+  [ ] STORE-3  Media put() caches object URL pre-commit (abort leaves stale URL)
+  [ ] STORE-4  Failed _save() keeps unsaved value, never retries
+  [ ] BAK-2    v3 media frame w/o `size` skips truncation guard
+  [ ] BAK-3    Store apply incremental, no cross-store rollback
+  [ ] BAK-4    Trailing bytes after last frame silently ignored
+  [ ] BAK-5    Add Android chunked-bridge round-trip regression test
+  [ ] ANN-2    snapRangeToWords can leave start on a lone surrogate
+  [ ] ANN-3    applyNoteIcons leaves bounded text-node fragmentation
+  [ ] JRNL-2   Media-insert → entry-reference orphan window (cross-session)
+  [ ] JRNL-5   Add an editor durability-level test
+  [ ] NTV-2    GardenImageCache.download() unbounded read (no Content-Length cap)
+  [ ] NTV-3    restoreState resets currentScale=1f (zoom-math desync window)
+  [ ] NTV-4    getZoomScale() has a false @Suppress("unused")
+  [ ] SW-2     Query-string navigations miss cached shell offline
+  [ ] SW-4     corpusFirst caches redirected same-origin responses
+  [ ] SEC-1    offline.html ships no CSP + inline onclick handler
+  [ ] SEC-2    toast.js innerHTML foot-gun (currently safe, contract risk)
+  [ ] SEC-3    settings.fontScale → CSS var, import-restorable (clamp)
+  [ ] CORP-3   check_balance.py dash check too narrow (\d–\d only)
+  [ ] SHELL-2  Thumbnail scroll-poll interval runs for app lifetime when tabs off
+  [ ] SHELL-3  Lazy-corpus loader invoked during render, not in an effect
+  [ ] SHELL-4  Reading-screen components not React.memo'd
+  [ ] PERF-5   applyDOMLinks/Bookmarks lack the A4 signature-skip
+  [ ] PERF-6   Long chapters: no windowing (content-visibility:auto mitigation)
+  [ ] TEST-5   journal-store.js search/scan paths untested
+  [ ] TEST-6   Smoke gate asserts content too coarsely
+  [ ] BLD-3    minify-bundle.mjs emits 0-byte file on empty input, exits 0
+  [ ] BLD-4    Stale "WV69 floor" comments throughout shipped code
+  [ ] BLD-5    Raw-shipped assets (alt-translations, search.js) ship un-minified
+
+NO-ACTION / BY-DESIGN (Section 4 — captured, not work)
+  ANN-4, SCRIP-4, JRNL-4, SW-3
+
+
+================================================================================
+SECTION 2 — CROSS-CUTTING DEDUP MAP (flagged by 2+ agents = priority signal)
+================================================================================
+
+  LinkIcon/BookmarkIcon keyed reactivity .. SHELL-1 (Low) + PERF-4 (Medium)
+      → canonical fix lives at PERF-4; same one-shot change resolves both.
+  Android v3 backup driver coverage ....... TEST-1 (High) + BAK-5 (test ask)
+  SW CACHE_VERSION hash hole .............. SW-1 (the bug) + TEST-2/positive test
+  Cross-ref link resolution / build gate .. CORP-2 (validator) + SCRIP-2 ({{nav:}} build-time check)
+  Journal durability ...................... JRNL-1 (the gap) + JRNL-5 (the missing test)
+  Recording / waveform media weight ....... NTV-1 (cap + heap) + JRNL-3 (downsample)
+  Garden memory ........................... PERF-2 (decoded bitmaps) + NTV-2 (download read cap)
+
+
+================================================================================
+SECTION 3 — FULL ITEMIZED LIST (by subsystem)
+================================================================================
+
+--------------------------------------------------------------------------------
+BUILD & BUNDLING  (rating 8.5)
+--------------------------------------------------------------------------------
+
+[ ] BLD-1  [M](V)  Web deploy publishes to production with ZERO build gates  (S)
+    Where: .github/workflows/deploy-web.yml:34-48,67-118
+    Problem: deploy triggers on push:main with no workflow_run/needs/if gating on
+      ci.yml and invokes 0 gate commands. A green `npm run build` that violates a
+      DIFFERENT gate ships to the live PWA. Sharpest case: a corpus edit without a
+      CORPUS_VERSION bump fails CI but NOT deploy → every installed PWA stuck on
+      stale scripture forever.
+    Fix: gate the deploy job — `on: workflow_run: {workflows:[CI], types:[completed],
+      branches:[main]}` + `if: github.event.workflow_run.conclusion == 'success'`;
+      OR inline the cheap checks as deploy steps:
+      `npm run check:csp && node tools/check-corpus-version.js --check && npm run validate:data`;
+      OR require the `build` check in branch protection.
+
+[ ] BLD-2  [M](V)  APK packages committed dist/ with no build-time freshness check (M)
+    Where: app/build.gradle.kts (no asset-regen task)
+    Problem: AGP packages app/src/main/assets/ (incl. committed bundles) as-is;
+      nothing runs tools/build.py / npm run build before assembling. A local edit +
+      `gradle assembleDebug` without a clean commit ships an APK whose bundles don't
+      reflect the edit; CI catches staleness only later, after the wrong APK may be
+      sideloaded.
+    Fix: add a gradle `preBuild.dependsOn` task that shells
+      `python tools/build.py && npm run build:b/c/d/e/css`; OR at minimum a verify
+      task that fails assembly when `git diff --quiet app/src/main/assets/dist` is dirty.
+
+[ ] BLD-3  [L](V)  minify-bundle.mjs emits a 0-byte file on empty input, exits 0  (1line)
+    Where: tools/minify-bundle.mjs:27-34
+    Problem: empty input → exit 0, 0-byte output, no guard. build.py only checks
+      returncode. A truncated/emptied source would silently ship an empty corpus
+      bundle (only backstop is the corpus-version CHANGE detector, not emptiness).
+    Fix: after buildSync, assert statSync(file).size > 0 (ideally > 50% of input for
+      corpus bundles) and process.exit(1) otherwise. (Broken SYNTAX is already
+      handled — esbuild exits 1 and leaves the input uncorrupted.)
+
+[ ] BLD-4  [L](V)  Stale "WV69 floor" comments post-date the chrome69→108 lift  (S)
+    Where: backup-container.js:74, platform-bridge.js:141-143, tools/build.py:9
+      + minify_in_place docstring (says --target=chrome69 while code passes chrome108)
+    Problem: comments mislead a future reader about the real floor; behavior is correct.
+    Fix: sweep chrome69 / WV69 / WebView-69 / WV-69 comment references → chrome108.
+
+[ ] BLD-5  [L](V)  Raw-shipped assets ship un-minified (size win)  (S)
+    Where: deploy copies bible-*.js, bible-studies.js, search.js, search-data.js raw;
+      bundle-a's search.js is raw too.
+    Problem: pure data + vendored search engine bypass esbuild entirely → larger
+      transfer/parse. Correctness is fine; this is a size optimization only.
+    Fix: add a minify pass for these raw assets (they're shipped, just not on the
+      cold-boot blocking path), or leave as accepted tradeoff.
+
+--------------------------------------------------------------------------------
+APP SHELL, HOOKS & RE-RENDERS  (rating 9.0)
+--------------------------------------------------------------------------------
+
+[ ] SHELL-1 [L](V)  LinkIcon/BookmarkIcon subscribe to whole-store version  (S)
+    Where: ui/components/LinkIcon.jsx:8-11, ui/components/BookmarkIcon.jsx:8-11
+    Problem: both subscribe to Store.getVersion() (whole-store generation) while
+      sibling HighlightableText was migrated (F1+F2) to keyed getVersionForKey().
+      One bookmark/link change re-renders every icon in the chapter (~176 on Ps 119).
+      Low here (leaf SVG/null) but see PERF-4 (Medium, full reasoning).
+    Fix: snapshot LinkStore.getVersionForKey(hlKey)/BookmarkStore.getVersionForKey(hlKey);
+      ensure mutators call _bumpKey(hlKey); reconcile the prefix-key (getForKeyPrefix) shape.
+    NOTE: canonical item is PERF-4 — fixing one fixes both.
+
+[ ] SHELL-2 [L](V)  Thumbnail scroll-poll interval runs for app lifetime when tabs off (1line)
+    Where: hooks/use-thumbnails.js:171-191
+    Problem: setInterval(attach,400)+scroll listener attach unconditionally; only the
+      inner capture early-returns on !tabsEnabled. With tabs off (common/default), a
+      400ms interval + scroll listener stay live forever doing no useful work (battery).
+    Fix: early-return from the effect body when !tabsEnabled (keep tabsEnabled in deps).
+
+[ ] SHELL-3 [L](V)  Lazy-corpus loader invoked during render, not in an effect  (S)
+    Where: ui/screen-routes.jsx:168 (_corpusView calls loadFn() mid-render)
+    Problem: render-phase side effect. SAFE today only because __load*Corpus() is
+      idempotent and notifies asynchronously (never during the render call). Latent
+      footgun: a future sync-notify change would warn/loop.
+    Fix (optional): move kick-off into a useEffect keyed on active screen, OR leave
+      with a comment documenting the async-only-notification dependency.
+
+[ ] SHELL-4 [L](V)  Reading-screen components not React.memo'd  (M)
+    Where: BibleChapterView / ChapterView / MatthewChapterView (none of ~53 screens memo'd)
+    Problem: a settings toggle (font scale, reading dot) while a chapter is open forces
+      a full re-render + reconcile of the entire verse tree though content is unchanged.
+    Fix: React.memo the heavy reading views. CAVEAT: ROUTES factory prop-identity churn
+      must be addressed for memo to actually hold; weigh against [[respect-production-code]].
+
+--------------------------------------------------------------------------------
+STORAGE & HYDRATION INTEGRITY  (rating 7.5)
+--------------------------------------------------------------------------------
+
+[ ] STORE-1 [H](V)  Cross-tab whole-store clobber — last-writer-wins, total granularity (M)
+    Where: cached-store.js:280-298 + idb-adapter.js:224-266 (no BroadcastChannel/
+      storage-event/navigator.locks anywhere — grep = 0)
+    Problem: each tab hydrates once and never re-reads IDB; every write flushes the
+      tab's ENTIRE cache under one key 'v'. Two PWA tabs: Tab A adds X (→IDB); Tab B
+      (stale cache) later adds Y, writing its whole stale cache and destroying X.
+      PROVEN with two store instances over one shared fake-indexeddb. PWA-surface only
+      (APK is single-WebView, immune). This is the only finding that loses ALREADY-
+      COMMITTED data with no user mistake beyond opening two tabs.
+    Fix: BroadcastChannel('vot-store') ping on _save() → sibling re-hydrates affected
+      store; OR navigator.locks + read-modify-merge before flush; OR (stopgap) re-get()
+      from IDB + shallow-merge before each put so distinct-key edits don't stomp.
+      (Full fix wants per-record keying instead of one 'v' blob — schema change.)
+
+[ ] STORE-2 [M](V)  Orphan-sweep TOCTOU deletes a freshly-inserted media blob  (S)
+    Where: journal-media-store.js:278-286 (pruneOrphans) + app.jsx:533-554 (sweep)
+      + JournalEditorScreen.jsx:320-330 / JournalRecordingSheet.jsx:296 (blob put
+      resolves BEFORE the referencing block is saved)
+    Problem: the 4s boot sweep snapshots referenced ids synchronously (app.jsx:547),
+      then pruneOrphans does its own async allIds() read and deletes ids-not-in-set.
+      A photo taken in that window is durable in IDB but absent from the snapshot →
+      deleted. PROVEN: seeded KEEP, captured ['KEEP'], put('NEWPHOTO'), prune → NEWPHOTO
+      gone. (isReady() guard covers the degraded case, not this loaded-concurrent case.)
+    Fix: make pruneOrphans time-cutoff aware — only delete records whose `created`
+      (already stored, line 139) predates the sweep start; OR re-read collectAllMediaIds()
+      inside prune right before deleting and union with referencedIds.
+
+[ ] STORE-3 [L](V)  Media put() caches object URL pre-commit (abort leaves stale URL) (1line)
+    Where: journal-media-store.js:149-153
+    Problem: req.onsuccess does _urlCache[id]=createObjectURL(blob) but the promise
+      resolves on `complete`. A commit-time abort (e.g. Quota) rejects put() correctly
+      but leaves a cached URL for a blob that wasn't persisted; objectUrl(id) returns it
+      this session, masking the failure until reload. In-memory only, self-heals on boot.
+    Fix: move the _urlCache[record.id]=… line into the `complete` handler (line 153).
+
+[ ] STORE-4 [L](V)  Failed _save() keeps unsaved value, never retries  (S)
+    Where: cached-store.js:289-297
+    Problem: _save() is fire-and-forget; on rejection it logs + fires
+      StorageHealth.onWriteFailure (toast + READONLY tier) but does NOT roll back _cache
+      or retry. A transient Quota blip that later clears silently drops the edit
+      (unlike hydration's _backgroundRetry). whenSaved() catches it only at export/import.
+    Fix (optional): on onWriteFailure schedule a bounded re-_save() retry (mirror
+      _backgroundRetry linear backoff); OR have onWriteSuccess-recovery re-flush latest cache.
+
+--------------------------------------------------------------------------------
+BACKUP / EXPORT / IMPORT  (rating 9.0)
+--------------------------------------------------------------------------------
+
+[ ] BAK-1  [M](V)  Legacy v2 import wipes existing media BEFORE decoding (destructive) (S)
+    Where: backup.js:523-527 (applyImportPayload)
+    Problem: v2/v1 path deletes ALL existing media up front, THEN loops decoding base64.
+      A record that passes the shallow head-sniff but fails full base64ToBlob decode is
+      caught per-record — but the user's prior media is already gone with nothing
+      replacing it. Contradicts the v3 path's fail-safe ordering. PROVEN: v2 payload with
+      one record `'A'.repeat(101)` → both pre-existing blobs deleted, importFailures:1.
+      Reachable: both platforms still route legacy backups here.
+    Fix: mirror applyV3 — decode every record into a staging map (or put under new ids)
+      FIRST, only delete stale/un-replaced ids AFTER the loop succeeds (decode-all →
+      clear → put), so a decode failure aborts before any delete.
+
+[ ] BAK-2  [L](V)  v3 media frame without `size` skips truncation/corruption guard  (1line)
+    Where: backup-container.js:151
+    Problem: the frame-vs-manifest length check is gated on `typeof media[i].size ===
+      'number'`. An entry lacking numeric size silently accepts whatever length the frame
+      header claims — the codec's main corruption defense is bypassed for that entry.
+      App backups always emit size, so latent; a hand-edited/corrupt manifest loses it.
+      PROVEN with media:[{id:'nosize'}].
+    Fix: treat missing/non-numeric size as a HARD envelope error for v3 manifests
+      (app-owned manifest; absent size is itself corruption); OR fall back to the
+      Android cross-check (readTotal !== declared).
+
+[ ] BAK-3  [L](V)  Store apply incremental, no cross-store rollback  (M)
+    Where: backup.js:402-417 (_applyStoresAndFlags, used by applyV3 + applyImportPayload)
+    Problem: stores written one at a time; if A succeeds and B throws, A's change persists
+      (via the U1 barrier) — a partially-applied import, no spanning transaction. Heavily
+      mitigated (each payload shape-validated before write; counted as importFailures).
+      PROVEN: B throws → importFailures:1, A applied not reverted.
+    Fix: acceptable as-is given the validation gate; if hardening, snapshot each store
+      before write and restore on any failure, OR surface importFailures>0 prominently
+      (it currently still reloads).
+
+[ ] BAK-4  [L](V)  Trailing bytes after last declared frame silently ignored  (1line)
+    Where: backup-container.js:144 (loop bounded by media.length)
+    Problem: extra frames/garbage appended past manifest.media.length read as valid;
+      trailing bytes never checked. Benign (arguably good forward-compat) but a
+      corrupt/truncated-then-reappended file won't be flagged. PROVEN.
+    Fix (optional): assert `off === blob.size` after the loop; warn/throw on leftovers.
+
+[ ] BAK-5  [M] test  Add Android chunked-bridge round-trip regression to the gated suite (M)
+    Where: Kotlin v3Import* framing + JS async-gen reassembly (SettingsScreen.jsx:801-827)
+    Problem: web readContainer is exhaustively unit-tested, but the Android chunked path
+      (the GB-scale path most users hit) has no automated coverage. (See also TEST-1.)
+    Fix: add size-mismatch throw, truncated final frame, and EOF-mid-frame → "truncated"
+      cases driving the real framing.
+
+--------------------------------------------------------------------------------
+ANNOTATION ENGINE & RENDERER  (rating 8.5)
+--------------------------------------------------------------------------------
+
+[ ] ANN-1  [M](V)  applyDOMHighlights is O(N^2) in annotations-per-container  (M)
+    Where: annotation-engine.jsx:516-555
+    Problem: per annotation, per overlap sub-range, it rebuilds a FRESH full text-node
+      list of the entire container via createTreeWalker (line 523). As earlier
+      annotations splitText-fragment the container, each walk visits more nodes. PROVEN
+      quadratic: N=10→100, 20→400, 40→1600, 80→6400, 160→25600 node-visits (x4 per
+      doubling). Runs in the post-commit pass on every store mutation. Mitigant
+      (verified): every [data-hl-dom] container is one paragraph/block, so N is
+      per-paragraph; the cliff bites only at ~50+ annotations in ONE paragraph.
+    Fix: build the container's text-node offset table ONCE per applyDOMHighlights call
+      (before the annotation loop), map global→local offsets, re-sync only nodes a
+      splitText changes; OR wrap each range with a single Range + surroundContents/
+      extractContents instead of re-walking.
+
+[ ] ANN-2  [L](V)  snapRangeToWords can leave start on a lone surrogate (mid-codepoint) (1line)
+    Where: annotation-engine.jsx:36-47
+    Problem: offsets index by UTF-16 code unit; the loop never repairs a `start` already
+      between a surrogate pair. PROVEN: snapRangeToWords('ab😀cd',3,5) → start:3 (lone
+      trailing surrogate); a downstream splitText(3) cleaves the emoji. Corpus is
+      ASCII Bible/letter text; only journal annotations could theoretically hit it.
+    Fix: after computing start, if text.charCodeAt(start) is a trailing surrogate
+      (0xDC00-0xDFFF), decrement once. (Note: \w includes '_', over-snaps through
+      underscores — benign for this corpus.)
+
+[ ] ANN-3  [L](V)  applyNoteIcons leaves bounded text-node fragmentation A4-skip never
+                    normalizes  (1line)
+    Where: annotation-engine.jsx:304-326
+    Problem: findNoteIconInsertionPoint splitText()s; applyNoteIcons removes the icon
+      but never normalize()s, and applyDOMHighlights returns at the A4 sig-check before
+      its own normalize(). PROVEN self-limiting at exactly +1 node (NOT a leak) — cosmetic.
+    Fix (optional): container.normalize() at the top of applyNoteIcons after removing icons.
+
+--------------------------------------------------------------------------------
+SEARCH  (rating 4.0 — the weakest subsystem; most-used feature)
+--------------------------------------------------------------------------------
+
+[ ] SRCH-1  [Cx](V)  Default multi-word search buries the target verse  (M)
+    Where: search.js:812 (ref indexed), 1432-1436 (ref boosted 2.5x), 1455-1478 (OR-union)
+    Problem: every doc's `ref` carries its collection's descriptive label (e.g. all ~30
+      Lord's Rebuke docs share "A Testament Against The World: The Lord's Rebuke"); ref is
+      indexed + boosted 2.5x; non-phrase queries are term-by-term OR-union'd. Common words
+      make letter/title docs outrank the actual verse. MEASURED on the REAL corpus in the
+      DEFAULT mode SearchScreen uses:
+        "the lord is my shepherd"     → Ps 23:1  NOT in top 400
+        "for god so loved the world"  → John 3:16 rank 82
+        "in the beginning god created"→ Gen 1:1  rank 392
+        "love is patient love is kind"→ 1 Cor 13 rank 330
+        "shepherd" → Ps 23:1 rank 59/136 ; "lord shepherd" → Ps 23:1 falls OFF list
+      Same queries in corpus:'scriptures' → rank 1 (8/10): the engine FINDS them; the
+      cross-corpus merge + ref/title boost destroys ranking.
+    Fix: stop indexing the `ref` field entirely (a parsed chapter:verse query already
+      short-circuits to a direct-nav card at line 1378, so ref full-text adds only noise);
+      OR strip the collection-label prefix from indexed ref and keep only the locator.
+      Either alone restores rank-1 verse hits in the default `all` corpus.
+    ALSO: drop `ref` from the fields boost list (search.js:1432).
+
+[ ] SRCH-2  [H](V)  Verses excluded from the term-coverage multiplier  (S)
+    Where: search.js:1519  (`if (!crDoc || crDoc.kind === 'verse') continue;`)
+    Problem: the up-to-4x coverage multiplier (1516-1535) that rewards docs containing
+      more query terms SKIPS verses. So a 3-of-3-term verse loses to a 1-of-3-term prose
+      doc. PROVEN: "love joy peace" → Galatians 5:22 at #142, behind 4 WTLB/Blessed bodies.
+      The inline "Exact matches still rank FIRST" comment (1402-1411) is DISPROVEN for
+      multi-word verse queries.
+    Fix: apply the coverage multiplier to verses computed against the verse's own indexed
+      _searchText (all translations), not the NKJV-only doc.text; OR give verses a coverage
+      proxy from FlexSearch per-term hit counts. Pair with length-normalization so long
+      diffuse bodies don't win on incidental term presence.
+
+[ ] SRCH-3  [H](V)  Synonym expansion over-broad + defaults ON  (S)
+    Where: search-data.js:413,419,420,422,431 + search.js:1412
+    Problem: groups conflate distinct concepts: ['anxious','anxiety','worry','worried',
+      'fear','fearful','afraid'], ['heart','soul','mind','inner being'], ['light',
+      'illumination','brightness'], ['water','waters','sea','ocean'], ['friend','brother',
+      'neighbor']. With default-on, "fear" → 188/400 results contain NO "fear". Synonyms
+      also worsen verse-finding ("i can do all things through christ" 369→off-list).
+    Fix: split the broad emotion/cosmology/relationship sets into tighter groups; OR demote
+      synonym-only hits with a sub-1.0 multiplier; consider defaulting synonyms OFF for
+      multi-word queries.
+
+[ ] SRCH-4  [L](V)  No diacritic (NFD) folding  (1line)
+    Where: search.js:64 (kjvEncode strips non-alnum AFTER toLowerCase, no NFD)
+    Problem: accented input is shredded: "resurrección" → 0 hits. Irrelevant for the
+      ASCII NKJV corpus; any accented transliteration a user pastes silently fails.
+    Fix: str.normalize('NFD').replace(/[̀-ͯ]/g,'') before the alnum strip.
+
+[ ] SRCH-5  [L](V)  Same verse duplicated across corpora (no cross-kind dedup)  (S)
+    Where: search.js:1580
+    Problem: "loved the world" returns both `footnote|John 3:16 (Vol Two L12)` and
+      `verse|John 3:16`. Dedup key is kind|ref|text-prefix; differing kind/ref-suffix
+      means identical verse text isn't collapsed. Cosmetic.
+    Fix: add a secondary dedup on normalized text when the leading 60 chars are identical.
+
+[ ] SRCH-6  [L](V)  1-character queries return 400 junk title hits  (1line)
+    Where: SearchScreen.jsx:51 (fires at q.length>=1) + search.js forward tokenizer
+    Problem: "a" → 400 results (all "A Warning"/"ABASEMENT"… via 1-char forward token).
+      ("x"/punctuation correctly return 0.)
+    Fix: require >=2 non-stopword chars before running the full search (the suggest box
+      may still react at 1).
+
+--------------------------------------------------------------------------------
+SCRIPTURE RESOLUTION & ROUTING  (rating 8.5)
+--------------------------------------------------------------------------------
+
+[ ] SCRIP-1 [M](V)  Unknown persisted screen value → permanent blank screen, no recovery (1line)
+    Where: use-saved-state.js:80-97 (_validateTabState) + app.jsx:749
+      (`<ErrorBoundary key={screen}>{ROUTES[screen]?.() ?? null}</ErrorBoundary>`)
+    Problem: _validateTabState's 13 rules coerce screens MISSING supporting state, but
+      never check the screen is a KNOWN route. A persisted/corrupted/legacy screen string
+      that isn't a route and isn't caught by the 13 rules → ROUTES[screen] undefined →
+      ?.() short-circuits → ?? null renders nothing. Blank ≠ throw, so E4 crash-loop
+      recovery never fires → user stuck. `saved.screen || 'home'` only catches falsy.
+      PROVEN: {screen:'vot-eight-letter',...}, {screen:'reader',...}, {screen:'garden',...}
+      all pass the validator and dispatch to BLANK. Low trigger probability (IDB schema
+      skew/corruption) but unrecoverable.
+    Fix: add one allow-list line at the end of _validateTabState:
+      `if (!KNOWN_SCREENS.has(s.screen)) s.screen = 'home';`  (KNOWN_SCREENS = route-key
+      set from COLLECTIONS + the static route list, or exported from screen-routes).
+
+[ ] SCRIP-2 [L](V)  {{nav:bookId:ch}} tokens get zero validation  (S)
+    Where: WtlbEntryView.jsx:163-176 (navMatch regex requires only digits for ch)
+    Problem: bookId not verified against BOOKS, ch not range-checked. A typo'd target
+      navigates to bible-ch with null book/chapter → blank screen, no message. Malformed
+      tokens render the raw {{nav:…}} as visible body text. Live impact currently nil
+      (only 1 {{nav:}} in the corpus — {{nav:esther:7}} — and it's valid); authoring gap.
+    Fix: validate `typeof BOOKS!=='undefined' && BOOKS[bookId]` (and chapter-in-range)
+      before rendering the link active; else inert text. ADD a build-time corpus validator
+      over {{nav:}} tokens (mirror validateFootnoteMarkers in tools/validate-schemas.js)
+      so a typo fails CI. (See CORP-2.)
+
+[ ] SCRIP-3 [L](V)  Multi-ref (semicolon-joined) tokens unparseable (dict-key crutch)  (S)
+    Where: scripture-resolution.js:107-136 (parseRefStr matches a single ref)
+    Problem: a compound ref returns null from all resolvers. The one live instance
+      `{{ref:Isaiah 40:13; Romans 11:34}}` renders ONLY because that exact string is a
+      hardcoded key in WTLB_SCRIPTURES with pre-baked text; prune that entry and the cite
+      silently degrades to "not available". Graceful, no crash.
+    Fix (optional): split on `;`/`,` in lookupVersesFromBooks and concatenate resolved
+      parts so compound refs resolve without the dict crutch.
+
+--------------------------------------------------------------------------------
+JOURNAL  (rating 8.0)
+--------------------------------------------------------------------------------
+
+[ ] JRNL-1  [H](V)  Pagehide/visibilitychange flush is NOT durable  (M)
+    Where: JournalEditorScreen.jsx:146-164 + cached-store.js:280-306
+    Problem: the background-kill defense (commitSave on pagehide/visibilitychange:hidden)
+      calls JournalStore.update() → _save() → IDBAdapter.put(), which is async fire-and-
+      forget; nothing awaits oncomplete. INSTRUMENTED: after update() returns inside the
+      listener, whenSaved() is still pending — the transaction has not committed. Android
+      onPause() (MainActivity.kt:902-905) only webView.onPause() (pauses JS), no native
+      flush/grace. So the exact OOM-kill-before-write loss J1/J2 targets STILL has a window
+      (+ can orphan a just-inserted media reference). The test (JournalEditorScreen.test
+      .jsx:17-20) notes "_save's IDB write is a no-op here" → the durability gap is
+      structurally UNTESTED.
+    Fix: on pagehide/hidden, synchronously write a single-entry crash-recovery BREADCRUMB
+      of the in-progress entry to localStorage (survives the kill; the store already has
+      the lsShim pattern for exactly this), and reconcile/clear it on next editor mount.
+      (Awaiting whenSaved() in the listener is NOT sufficient — listeners can't block the kill.)
+
+[ ] JRNL-2  [M](V)  Media-insert → entry-reference orphan window (cross-session)  (—)
+    Where: JournalEditorScreen.jsx:315-343 + 102-124
+    Problem: blob put() is durable FIRST, then the block insert + immediate-save effect
+      runs on the next tick via the same fire-and-forget IDB write. A kill between
+      blob-durable and reference-durable orphans the blob. In-session harmless (in-memory
+      list includes the block; sweep gated on isReady()); cross-session the next boot
+      sweep reclaims it → wasted space, not data loss. Same root cause as JRNL-1.
+    Fix: resolved by the JRNL-1 durability fix.
+
+[ ] JRNL-3  [M](V)  Audio waveform `samples` stored inline at full resolution  (S)
+    Where: JournalRecordingSheet.jsx:193-199, 286-307
+    Problem: amplitude polled every 80ms, pushed unbounded; persistRecording stores the
+      FULL samples array. A 5-min clip ≈ 3750 floats ≈ 18 KB inline in the entry — but
+      the waveform UI only ever renders 48 bars. Because the whole journal list is one IDB
+      value re-serialized on every _save() (every debounced keystroke), long voice memos
+      inflate EVERY autosave and EVERY export with data never displayed at that resolution.
+    Fix: downsample to ~48-64 buckets before onSave.
+
+[ ] JRNL-5  [M] test  Add an editor durability-level test  (S)
+    Where: JournalEditorScreen.test.jsx (current J1/J2 tests stub IDB write to a no-op)
+    Problem: the real loss vector (JRNL-1) is unguarded because the test validates only
+      the in-memory cache flush.
+    Fix: assert the flush path awaits/realizes an IDB commit OR writes the breadcrumb.
+
+--------------------------------------------------------------------------------
+ANDROID / KOTLIN NATIVE  (rating 9.0)
+--------------------------------------------------------------------------------
+
+[ ] NTV-1  [M](V)  Unbounded whole-file heap read on record-stop + NO recording cap  (S)
+    Where: NativeAudioRecorder.kt:151 (f.readBytes()) + AppInterface.kt:186
+    Problem: stop() reads the entire .m4a into a ByteArray, then Base64.encodeToString
+      (~1.33x copy), then the string crosses the bridge (3rd copy + JS decode). NO length
+      cap anywhere (setMaxDuration never called; JS sheet has no limit — grep 0 hits). At
+      96 kbps ≈ 720 KB/min; an hour ≈ 43 MB raw → ~57 MB base64, all copies live during
+      stop(). Violates Permanent Rule 5 (no whole-blob into heap) — the one native path
+      that does, while the v3 backup path is exemplary streaming.
+    Fix: call mr.setMaxDuration(<30-60 min cap>) in start() (native-enforced, cheap);
+      ideally also frame the stop payload through the chunked-base64 bridge, OR write the
+      .m4a to a temp file the JS reads via URL.createObjectURL instead of base64-over-bridge.
+
+[ ] NTV-2  [L](V)  GardenImageCache.download() unbounded read (no Content-Length cap)  (1line)
+    Where: GardenImageCache.kt:145 (conn.inputStream.use { it.readBytes() })
+    Problem: no Content-Length ceiling. Host allowlist (line 73/232) blocks SSRF, but a
+      compromised/oversized GitHub asset is read fully into heap on the WebView bg thread;
+      the 800 MB MAX_BYTES cap runs AFTER the write, off-path. (Ultra images ~8.3 MB.)
+    Fix: check conn.contentLength against a sane per-image ceiling (32-64 MB) before readBytes().
+
+[ ] NTV-3  [L](V)  restoreState resets currentScale=1f (zoom-math desync window)  (1line)
+    Where: MainActivity.kt:355-356
+    Problem: on savedInstanceState!=null, restoreState may restore a non-1.0 pinch scale,
+      but vm.currentScale=1f is forced. onScaleChanged re-syncs on the next scale event
+      (self-heals), but in the window a takeScreenshot/resetZoom computes against the wrong
+      baseline. Zoom disabled by default (setSupportZoom(false)) → small impact.
+    Fix: don't reset (let onScaleChanged populate) OR read the actual restored scale.
+
+[ ] NTV-4  [L](V)  getZoomScale() has a false @Suppress("unused")  (1line)
+    Where: AppInterface.kt:224
+    Problem: it IS used (platform-bridge.js:123). Harmless but factually wrong; could
+      mislead a future R8/dead-code audit.
+    Fix: drop the @Suppress("unused").
+
+--------------------------------------------------------------------------------
+SERVICE WORKER / PWA / OFFLINE  (rating 7.5)
+--------------------------------------------------------------------------------
+
+[ ] SW-1  [H](V)  CACHE_VERSION hash input incomplete — ~10 precached assets excluded  (M)
+    Where: tools/sync-sw-version.js:41 + service-worker.js:58-60
+    Problem: the hash regex-scrapes '([^']+)' string literals out of CORE_ASSETS; the
+      best-effort comment (lines 58-60) contains apostrophes (weren't, wouldn't) that
+      desync quote-pairing. From ./icons/icon-180.png onward, real paths are NOT extracted.
+      Result: offline.html, splash.jpg, all six study-*.jpg, icon-180/32/16.png are
+      precached but excluded from CACHE_VERSION → editing any of them computes the SAME
+      hash → "no change" → CI passes → every installed PWA serves the OLD asset until some
+      OTHER hashed asset incidentally rotates the version. PROVEN by mutating each file
+      (version stayed v1.0.2-32e5c7d59c) vs the in-set index.html control (rotated).
+      Only 19 path-literals (all <= icon-512-maskable.png) feed the hash.
+    Fix: stop regex-scraping comment-polluted source. (a) parse CORE_ASSETS from the actual
+      SW module (export/import the array); OR (b) tighten the extractor to only
+      '\./...'-shaped tokens AND assert extracted-count == literal-entry-count (fail loudly
+      on mismatch); OR (c) move the apostrophe-bearing comment out of the array literal.
+      ADD a test asserting offline.html + a study image are in the hashed set. (See TEST-2.)
+
+[ ] SW-2  [L](V)  Query-string navigations miss the cached shell offline  (1line)
+    Where: service-worker.js:188-189 (coreFirst uses caches.match(request), no ignoreSearch)
+    Problem: an offline navigation to …/index.html?x=1 or …/?utm=… misses the precached
+      ./index.html → falls through to offline.html instead of booting the app. Low: the SPA
+      pushState uses an empty URL (never changes its own URL); only reachable via an
+      external deep link carrying a query string.
+    Fix: for request.mode==='navigate', try caches.match('./index.html',{ignoreSearch:true})
+      before the offline page.
+
+[ ] SW-4  [L](V)  corpusFirst caches redirected same-origin responses  (1line)
+    Where: service-worker.js:210-213
+    Problem: cache.put gated on response.ok but not !response.redirected. Corpus URLs are
+      exact same-origin paths with no expected redirect → unreachable in practice; noted.
+    Fix (defensive): also skip when response.redirected.
+
+--------------------------------------------------------------------------------
+SECURITY  (rating 9.0)
+--------------------------------------------------------------------------------
+
+[ ] SEC-1  [L](V)  offline.html ships no CSP + inline onclick handler  (S)
+    Where: offline.html:60
+    Problem: the SW serves this on a navigation-miss-while-offline. Unlike index.html it
+      has no CSP meta and uses inline onclick="window.location.reload()". Zero dynamic
+      content today (no reachable injection), but it's the one served HTML outside the
+      hash-locked policy — a future edit adding dynamic content would have no CSP backstop.
+    Fix: add the same restrictive CSP meta tag; replace the inline onclick with an
+      addEventListener in a hashed/'self' script.
+
+[ ] SEC-2  [L](V)  toast.js innerHTML foot-gun (currently safe, contract risk)  (S)
+    Where: toast.js:87 (showToast({html}) → el.innerHTML = html; JSDoc says caller escapes)
+    Problem: all 8 call sites pass static literals / app constants (no user/corpus string
+      reaches it today). Risk is purely a future caller passing journal/note/import text.
+    Fix: change the contract to el.textContent=text for the common path; offer an explicit
+      htmlTrusted opt-in (or escape) for the few literal-HTML callers; keep the "no user
+      content" invariant under test.
+
+[ ] SEC-3  [L](Hyp)  settings.fontScale → CSS var, import-restorable  (1line)
+    Where: use-settings.js:161 (setProperty("--font-scale", String(settings.fontScale||"1")))
+    Problem: settings is part of vot-state, which a malicious backup can restore, so
+      fontScale is attacker-influenceable. It's String()-coerced into a CSS custom-property
+      VALUE — cannot execute script, invalid value ignored. Not XSS; noted for completeness.
+    Fix: clamp to the known set {"1","1.15","1.3","1.5"} at apply time (the UI already
+      restricts it; this hardens the import path).
+
+--------------------------------------------------------------------------------
+CORPUS DATA INTEGRITY  (rating 9.0)
+--------------------------------------------------------------------------------
+
+[ ] CORP-1  [M](V)  Dead in-app "Also read" tap-through — wrong collection label  (1line, data)
+    Where: volume-seven.js:11468 (+ its Holy-Days clone)
+    Problem: the footnote link uses collection "The Lord's Rebuke" (the display label),
+      but the tap-through registry is keyed by registryLabel = "A Testament Against The
+      World: The Lord's Rebuke" (scripture-resolution.js:48). So resolveVotLetter returns
+      null and openInAppLetter early-returns → the rendered "Also read" button is a silent
+      no-op. VERIFIED: of 72 rebuke cross-refs, 71 use the correct full label, this 1
+      doesn't; target letter exists. Surfaces in Volume Seven AND Holy Days. External url
+      on the same footnote still works (degrades, not breaks).
+    Fix: change the collection string to "A Testament Against The World: The Lord's Rebuke".
+      (CORPUS_VERSION: volume-seven is in bundle-a-vot — verify against the gate, bump if flagged.)
+
+[ ] CORP-2  [L](V)  validate-schemas.js never resolves cross-reference link targets  (M, test)
+    Where: tools/validate-schemas.js:232-236 (type:"note" checked only for non-empty text)
+    Problem: the validator never checks that link.collection/letterTitle/metaAddendumLink/
+      letter-link actually resolves to a real letter — exactly why the CORP-1 70-to-1
+      inconsistency reached main green. (It IS strict on Format-A ref→nkjv: 558/558 resolve,
+      0 blank, 0 orphan.)
+    Fix: add a cross-reference resolution pass — build the registry from registryLabel +
+      title, ERROR on any unresolved link/seeAlso/metaAddendumLink/letter-link. (The probe
+      logic the agent wrote — a faithful registry replica — is directly portable.) This
+      converts CORP-1's class from invisible to a commit-blocker. (Pairs with SCRIP-2's
+      {{nav:}} build-time check.)
+
+[ ] CORP-3  [L](V)  check_balance.py dash check too narrow (\d–\d only)  (1line)
+    Where: check_balance.py:58-60
+    Problem: catches en/em dashes only DIRECTLY between two digits; a spaced range
+      "12:18 – 20" would slip. No actual defect today (the 11 spaced hits are all the
+      PERMITTED em-dash compound separator; 0 en-dashes), but fragile.
+    Fix (hardening): widen to \d\s*[–—]\s*\d and exclude the known " — " compound separator.
+
+--------------------------------------------------------------------------------
+TEST SUITE & COVERAGE  (rating 8.0)
+--------------------------------------------------------------------------------
+
+[ ] TEST-1  [H](V)  Android v3 backup DRIVER loop has zero JS tests + outside coverage  (M)
+    Where: ui/screens/SettingsScreen.jsx (_exportV3Android / _importV3Android)
+    Problem: the codec is byte-exact tested both sides and the bridge SURFACE is pinned,
+      but the JS driver that slices blobs into <=512KB FileReader reads, base64s at the
+      boundary, loops v3ExportChunk/v3ImportReadChunk, and threads JsEvent callbacks has
+      NEITHER a unit test NOR coverage (ui/screens excluded from `include`). This is the
+      only-backup path for years of journal on the primary platform; an off-by-one frame
+      boundary / dropped final partial chunk passes the entire suite.
+    Fix: extract the driver loop into a testable module (inject the bridge + a slicer);
+      add a JS test that round-trips a multi-frame export→import through a fake bridge and
+      asserts byte-identity (mirror StorageManagerTest). (See BAK-5.)
+
+[ ] TEST-2  [M](V)  Service-worker runtime fetch/activate strategy untested  (S)
+    Where: service-worker.js:169-221 vs service-worker.test.js (asserts only typeof===
+      'function' for fetch/activate/message)
+    Problem: offline cache-first serving, corpus cache-on-use put, navigate→offline.html
+      fallback, cross-origin pass-through, and activate old-cache eviction (the
+      CORPUS_VERSION bust) have NO assertions. A regression that cached an opaque response,
+      broke the navigate fallback, or stopped evicting stale corpus caches ships green.
+    Fix: drive the captured fetch handler with a FakeRequest for (a) cached core asset →
+      from cache, (b) corpus bundle miss → fetched + cache.put, (c) mode:'navigate' network
+      failure → offline.html, (d) cross-origin → not intercepted; drive activate to assert
+      stale vot-core-*/vot-corpus-* deletion. (Also covers the SW-1 positive test.)
+
+[ ] TEST-3  [M](V)  sw-register.js update-prompt flow ~half covered  (S)
+    Where: sw-register.js:75-79, 98-119 (57.69% stmts / 37.14% branches; no per-file floor)
+    Problem: the test stubs register() to {waiting:null, installing:null}, so only the
+      controllerchange→reload path is tested; the "new SW detected → update toast →
+      re-promptable" detection (the load-bearing UX) is uncovered and masked by the aggregate.
+    Fix: a test where register() resolves with a `waiting` worker (and one where `installing`
+      transitions to `installed` with an existing controller) asserting the update callback fires.
+
+[ ] TEST-4  [M](V)  Coverage `include` scopes out the largest code bodies (honesty)  (S)
+    Where: vitest.config.js:35-43
+    Problem: the measured denominator is only hooks/stores/utils/renderer + scripture-
+      resolution.js. EXCLUDED entirely: the ~83-file ui/ tree (incl. the TEST-1 driver),
+      the ~1700-line assets/search.js, and data/*. So the headline % reflects a curated
+      subset; large swaths are guarded only by smoke + lint. (Floors are NOT gamed — the
+      ~10pt margin + ratchet log + T3 per-file floors show genuine discipline.)
+    Fix: state the scope honestly; consider adding targeted coverage for the highest-risk
+      excluded files (the v3 driver, search ranking) rather than the whole ui/ tree.
+
+[ ] TEST-5  [L](V)  journal-store.js search/scan paths untested  (S)
+    Where: journal-store.js:507-523, 574-616 (51.82% stmts / 42.48% branches)
+    Problem: the per-file floor (50) prevents silent regression and the TESTED half is the
+      right half (delete cascade + degraded-hydration atomicity + notebook prune). The
+      untested half is lower-risk read/query paths.
+    Fix (optional): add query/search-path tests and ratchet the per-file floor.
+
+[ ] TEST-6  [L](V)  Smoke gate asserts content too coarsely  (S)
+    Where: tools/smoke.js:328-343
+    Problem: T2 upgraded smoke to per-step content assertions (real improvement), but they
+      are existence-level: Search asserts only that an <input type=search> exists (not that
+      a query RETURNS results); Bible asserts /Genesis|Old Testament/ in text (satisfiable
+      by the index without verse rendering). No step types a query, saves an annotation, or
+      exercises export/import. A regression breaking search RESULTS, chapter-verse rendering
+      on a non-sampled book, or the backup buttons passes smoke.
+    Fix: add a step that types into search and asserts >=1 result card; add a step that opens
+      a known chapter and asserts a gold verse-sup renders.
+
+--------------------------------------------------------------------------------
+RUNTIME PERFORMANCE & MEMORY  (rating 7.5)
+--------------------------------------------------------------------------------
+
+[ ] PERF-1  [H](V)  html2canvas(document.body) rasterizes the entire scrolled chapter  (M)
+    Where: platform-bridge.js:550-562 (webTakeScreenshot) + use-thumbnails.js:176,211
+    Problem: passes document.body at scale:min(devicePixelRatio,2) → a canvas of
+      bodyWidth x fullScrollHeight x scale^2 x 4 bytes + a cloned DOM. Long chapter (Ps 119
+      ~950 elements, body 5000-8000px) at 2x → ~10000px-tall offscreen canvas, tens-to->100
+      MB transient. The maxDim:1440 downscale happens AFTER the full-res canvas exists.
+      Fires on scroll-stop (300ms) AND 350ms after every nav → recurs constantly while
+      reading. (Android unaffected — native PixelCopy captures only the viewport.)
+    Fix: cap html2canvas working size up front (windowWidth/windowHeight = viewport, or
+      render at scale:1 then downscale); OR skip the after-nav capture and only capture on
+      an explicit tab-overview open.
+
+[ ] PERF-2  [H](V)  Garden decoded-bitmap residency huge at Native/Ultra tiers  (S)
+    Where: garden.js:52 (GARDEN_CACHE_MAX=12), :130-134 (new Image() per page) +
+      GardenView.jsx:96-102 (preload current+5) + :108-144 (background crawler preloads
+      every page of the tier)
+    Problem: the cap bounds COUNT at 12, but a decoded bitmap is full JPEG resolution in
+      RGBA regardless of display size: Standard 2880px ≈ 44 MB each → 12 ≈ 525 MB; Ultra
+      4600px ≈ 112 MB each → 12 ≈ 1.3 GB. The crawler keeps warming pages; current+5
+      forces 6 simultaneous decodes. On a 2-3 GB device Native/Ultra OOM/thrash.
+    Fix: scale GARDEN_CACHE_MAX down by tier (12 mobile, 4 native, 2 ultra); gate Ultra/
+      Native behind navigator.deviceMemory; reduce the +5-ahead preload to +1/+2 on high tiers.
+
+[ ] PERF-3  [M](V)  translateVerse O(n^2) per chapter under any non-NKJV translation  (S)
+    Where: data/translations.js:62-64 (linear scan to find each verse's .n), called inline
+      in BibleChapterView.jsx:171 / ChapterView.jsx .map, unmemoized
+    Problem: alt-translation data is {bookId:{chNum:[{n,text}]}}, so finding each verse is a
+      linear scan; re-runs for every verse on every parent re-render. Ps 119 (176 verses) ≈
+      15,600 comparisons per render. NKJV short-circuits to verse.text (only translation-
+      switchers pay it — but they pay it on every chapter re-render).
+    Fix: build a per-chapter {verseNum → text} index once, memoize on [bookId,chNum,
+      translation], O(1) lookup (15,600 → 176).
+
+[ ] PERF-4  [M](V)  LinkIcon/BookmarkIcon global-version re-render fan-out  (S)
+    Where: ui/components/LinkIcon.jsx:8-15, ui/components/BookmarkIcon.jsx:8-12
+    Problem: both useSyncExternalStore(()=>Store.getVersion()). link-store.js /
+      bookmark-store.js have NO getVersionForKey/_bumpKey (grep = 0), so they only bump the
+      global _version. Adding/removing one bookmark on Ps 119 re-renders all 176 LinkIcon +
+      176 BookmarkIcon, each re-running a full-array .filter() — defeats the F1+F2 isolation
+      the annotation path got. (= the canonical fix for SHELL-1.)
+    Fix: extend the _bumpKey/getVersionForKey pattern to LinkStore + BookmarkStore; have the
+      icons subscribe per-key (reconcile the prefix-key matching first).
+
+[ ] PERF-5  [L](V)  applyDOMLinks/applyDOMBookmarks lack the A4 signature-skip  (S)
+    Where: dom-links.js:55-62 (querySelectorAll('[data-hl-dom]') → getForKeyPrefix +
+      container.normalize() per block, unconditionally); use-dom-annotation-sync.js:96-100
+      runs all five passes on every one of the four store version bumps
+    Problem: applyDOMHighlights got the data-hl-sig early-out; links/bookmarks did not, so
+      every highlight edit re-filters + normalize()s every [data-hl-dom] block of a long
+      letter. Bounded by block count, not per-frame.
+    Fix: mirror the annDomSig skip for links/bookmarks, OR scope the pass to the changed key.
+
+[ ] PERF-6  [L](V)  Long chapters render in one synchronous pass, no windowing  (M/accepted)
+    Where: BibleChapterView.jsx:169-190
+    Problem: Ps 119 mounts ~704 useSyncExternalStore subscriptions + ~950 DOM nodes in one
+      commit. Steady-state is fine (stable subscribe callbacks, memo'd HighlightableText);
+      cost is the initial mount/commit on chapter open. PF3 windowing was deliberately
+      dropped to protect scroll-to-verse/scroll-memory (reasonable).
+    Fix: content-visibility:auto (now reachable on the chrome108 floor) is the cheap
+      mitigation IF open-time jank shows on real hardware. Structural ceiling, not a defect.
+
+
+================================================================================
+SECTION 4 — ADJUDICATED NO-ACTION / BY-DESIGN (captured so nothing is lost)
+================================================================================
+
+ANN-4  [L](V)  Character-offset model mis-targets if markup shifts under a stored
+       annotation (annotation-engine.jsx:489 / SelectionToolbar.jsx:53-61). Inherent to
+       any non-anchored offset model; GOVERNED by the CORPUS_VERSION-bump policy (corpus
+       edits are deliberate + versioned). Within a stable DOM, create-offset == apply-offset
+       (proven). Not actionable beyond the existing policy.
+
+SCRIP-4 [L](V)  Bare numbered-book names without ordinal (Peter, Samuel, Kings, Cor, Tim…)
+       and a few spaced forms (John 3 : 16, John3:16) resolve to null (findBook,
+       scripture-resolution.js:186-226). These are degenerate/ambiguous inputs (which of
+       1/2 Peter?), so null→"not found" is arguably CORRECT. No fix unless typed-search UX
+       wants disambiguation.
+
+JRNL-4 [L](V)  Entry delete cascades annotations/bookmarks/links immediately but NOT media
+       blobs (journal-store.js:347-373); relies on the 4s boot sweep to reclaim them.
+       Deliberate shared-media protection for journal→journal embeds; no dangling reference,
+       export only egresses referenced blobs. Acceptable BY DESIGN; noted because the
+       cascade is otherwise advertised as complete.
+
+SW-3   [L](V)  No clients.claim() → the first-ever load is network-served; offline begins on
+       the next navigation/reload (service-worker.js:141-155). Standard, and CONSISTENT with
+       the deliberate "no skipWaiting, user controls timing" philosophy (claiming would
+       contradict it). Documented tradeoff. No fix unless instant first-load offline is wanted.
+
+
+================================================================================
+SECTION 5 — SUMMARY COUNTS  (by severity tag; 59 actionable + 4 no-action = 63 total)
+================================================================================
+  Critical (1): SRCH-1
+  High     (8): SRCH-2, SRCH-3, STORE-1, JRNL-1, PERF-1, PERF-2, SW-1, TEST-1
+  Medium  (16): BLD-1, BLD-2, STORE-2, BAK-1, BAK-5, ANN-1, SCRIP-1, JRNL-2, JRNL-3,
+                JRNL-5, NTV-1, PERF-3, PERF-4, TEST-2, TEST-3, TEST-4
+  Low     (34): BLD-3, BLD-4, BLD-5, SHELL-1, SHELL-2, SHELL-3, SHELL-4, STORE-3, STORE-4,
+                BAK-2, BAK-3, BAK-4, ANN-2, ANN-3, SRCH-4, SRCH-5, SRCH-6, SCRIP-2, SCRIP-3,
+                NTV-2, NTV-3, NTV-4, SW-2, SW-4, SEC-1, SEC-2, SEC-3, CORP-1, CORP-2, CORP-3,
+                TEST-5, TEST-6, PERF-5, PERF-6
+  No-action (4): ANN-4, SCRIP-4, JRNL-4, SW-3
+
+  Per-subsystem actionable: BLD 5 | SHELL 4 | STORE 4 | BAK 5 | ANN 3 | SRCH 6 | SCRIP 3 |
+    JRNL 4 | NTV 4 | SW 3 | SEC 3 | CORP 3 | TEST 6 | PERF 6  = 59
+
+  Quick wins (1line / small effort, high signal): SCRIP-1, STORE-3, NTV-4, NTV-3, SRCH-6,
+    SRCH-4, BAK-2, BAK-4, ANN-2, ANN-3, SHELL-2, CORP-1, CORP-3, SEC-3, BLD-3, BLD-4.
+
+  Highest-leverage single change: SRCH-1 (stop indexing the `ref` field) — restores the
+  app's most-used feature (find a verse by typing it) in one edit.
+
+  NOTE on CORP-2: severity tag is Low, but leverage is Medium — it is the validator gap
+  that let CORP-1 (and the SCRIP-2 class) ship; worth prioritizing above its tag.
+================================================================================
+END

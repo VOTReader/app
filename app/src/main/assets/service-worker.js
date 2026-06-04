@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-32e5c7d59c';
+const CACHE_VERSION = 'v1.0.2-81f14d2bfb';
 const CORPUS_VERSION = 'c6'; // c5→c6 (2026-06-02): PF1 — the lazy corpus bundles (bundle-a-bible/matthew/vot.js) are now esbuild-minified (~3.3 MB smaller; data byte-identical, only whitespace/syntax shrunk). Re-fetch the smaller corpus.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
