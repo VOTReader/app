@@ -776,11 +776,25 @@
    Fix: null window.BIBLE_* after the index build consumes them; add bible-*.js to
      a lazy SW precache list.
 
- [PF3] Zero list virtualization                              SEV: Med  [CONFIRMED]
+ [PF3] Zero list virtualization                              SEV: Med  [CONFIRMED]   STATUS: TODO — owner chose FULL virtualization (next session)
    Evidence: grep for any windowing primitive across src = 0. Long lists render
      all rows (WTLB Part Two 203, Psalms 150, Psalm 119 = 176 verses).
    Fix: windowed render via a manual IntersectionObserver sentinel (no dep, CSP-
      clean) for the lists >100 rows.
+   OWNER CALL (2026-06-03): do the FULL, correct virtualization — NOT a partial
+     index-only pass, NOT adjudicate. CRITICAL CONSTRAINT (why it's a focused
+     session): a naive IntersectionObserver windowing BREAKS the on-mount
+     scroll-to-target + scroll-restore that EVERY long list relies on —
+     ChapterIndex.jsx:7-11 scrolls the current chapter card into view;
+     BibleChapterView.jsx:34-36 jumps to a verse (getElementById('v-N') +
+     scrollIntoView); useScrollMemory restores scrollTop/pct (use-scroll-memory.js).
+     A correct virtualization MUST preserve all three: render only the visible
+     window but keep the full scroll height (spacers / estimated row heights), and
+     on mount compute the target row's position to scroll there + render the window
+     around it. Heaviest + highest-value target = the 176-verse reader
+     (BibleChapterView/ChapterView), where each verse is a store-subscribing
+     HighlightableText. NOTE: F1+F2 already fixed the per-verse RE-RENDER fan-out
+     (176→1); PF3 is about the INITIAL mount + DOM size, not re-render.
 
  [PF5] Garden crawl force-loads all 209 + never evicts       SEV: Med  [PARTIAL]
    Evidence: GardenView.jsx:90-118 crawls pages 1..209 on open into the module-
@@ -823,7 +837,7 @@
      esbuild --minify: 234→156 KB (−80 KB / −33%).
    Fix: add a CSS minify step (and/or inline critical home CSS).
 
- [A4] Annotation apply pass ~O(n^2), main-thread, all conts  SEV: Med  [CONFIRMED]
+ [A4] Annotation apply pass ~O(n^2), main-thread, all conts  SEV: Med  [CONFIRMED]   STATUS: DONE (6a3467a, PILE B)
    Evidence: applyDOMHighlights re-walks the whole container via createTreeWalker
      per sub-range per annotation against a tree that fragments each pass
      (annotation-engine.jsx:388-400); the full pipeline re-runs for ALL on-screen
@@ -832,6 +846,20 @@
      bigger cost; matters on long letters on a budget device.
    Fix: build the text-node offset table ONCE per container and reuse across sub-
      ranges/annotations; scope the re-apply to the container(s) whose hlKey changed.
+   DONE (2026-06-03): did the FAN-OUT half (the finding's bigger cost). New
+     annDomSig(anns) folds every field the paint reads (id/start/end/kind/color/
+     groupId/created + note-ness) into a per-container signature stored as
+     data-hl-sig on the frozen [data-hl-dom] element; applyDOMHighlights now skips
+     a block whose signature is unchanged since its last paint, so a store bump
+     for ONE block no longer re-walks every block on the page. Sig set only at a
+     clean exit (mid-paint throw re-processes next pass); the frozen container
+     clears sig WITH marks on re-render; first paint always processes (dual-render
+     test unaffected). +5 tests; preview-verified live (same-anns re-apply SKIPS
+     via a surviving sentinel; recolor re-processes). ADJUDICATED the offset-table-
+     once-per-container half: the per-sub-range re-walk exists because splitText
+     fragments the tree mid-pass; reusing one table needs a sweep-line rewrite of
+     the most load-bearing render path (dual-render-gated) for a marginal win (n
+     small/block, and the fan-out it'd save is now the skipped path). Not worth it.
 
  [A1+A5] applyNoteIcons unscoped, mutates React DOM no-guard SEV: Med/Low [CONFIRMED]
    Evidence: applyNoteIcons queries the WHOLE document for mark.hl-note
