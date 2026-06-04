@@ -105,11 +105,11 @@ function _platformLabel(platform) {
 }
 
 /* ── v3 streaming backup — Android byte plumbing (BACKUP-STREAMING-PLAN P3) ──
-   The Android WebView-69 floor lacks Blob.arrayBuffer()/.stream() (Chromium-76
-   APIs) and Blob.text(), so the JS side cannot use the web backup-container.js
-   codec; it reads blob slices via FileReader.readAsArrayBuffer and base64s them
-   for the string bridge (native owns the binary framing). These helpers are
-   WV69-safe (FileReader + chunked String.fromCharCode/btoa/atob — all ancient).
+   The Android SAF path base64s blob slices for the STRING bridge (@JavascriptInterface
+   methods pass strings; native owns the binary framing), so it does NOT use the web
+   backup-container.js codec. It reads slices via FileReader.readAsArrayBuffer — a
+   conservative carry-over from the retired WV69 floor; at the chrome108 floor
+   Blob.arrayBuffer could replace it, but base64-for-the-string-bridge stands either way.
    base64 is the transient bridge encoding ONLY — never written to disk. */
 
 // Per-chunk size for the bridge: 512 KB raw → ~683 KB base64 per call. Keeps
@@ -127,7 +127,7 @@ function _u8ToBase64(u8) {
   return btoa(binary);
 }
 
-/** Standard base64 → Uint8Array (WV69 atob + charCodeAt). */
+/** Standard base64 → Uint8Array (atob + charCodeAt). */
 function _base64ToU8(b64) {
   const binary = atob(b64);
   const u8 = new Uint8Array(binary.length);
@@ -135,7 +135,7 @@ function _base64ToU8(b64) {
   return u8;
 }
 
-/** Read one Blob slice to base64 via FileReader (WV69-safe — no Blob.arrayBuffer). */
+/** Read one Blob slice to base64 via FileReader (the Android string bridge needs base64). */
 function _blobSliceToBase64(blobSlice) {
   return new Promise((resolve, reject) => {
     const fr = new FileReader();
@@ -516,7 +516,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   };
 
   // Android export uses the v3 STREAMING container via the native chunked bridge
-  // (the WebView-69 floor can't run the web codec — see backup-container.js /
+  // (Android streams natively rather than via the web codec — see backup-container.js /
   // StorageManager.kt; native owns the framing). buildV3Manifest is SHARED with
   // the web path; only the container WRITE differs. Peak memory is one
   // ANDROID_V3_CHUNK slice, so this scales to whatever the device can store.
@@ -626,7 +626,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // Soft, advisory free-space heads-up (P4). v3 streaming is uncapped, so a huge
       // backup is no longer refused; instead warn (don't block) if its media likely
       // won't fit in the device's remaining IDB budget. Best-effort: navigator.storage
-      // .estimate is Chromium-61+ (works on the WV69 floor); a v3 manifest carries each
+      // .estimate is Chromium-61+; a v3 manifest carries each
       // blob's `size`, so the total is exact. ADVISORY — a real write failure is still
       // caught (S3). Absent on a v2 legacy payload (media is base64, no size array).
       let spaceNote = '';

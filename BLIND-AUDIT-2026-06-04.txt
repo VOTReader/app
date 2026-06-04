@@ -137,6 +137,18 @@ PROGRESS LOG
     emulator verification relies on exactly this. Removing it adds risk for a hypothetical.
   NTV-1 (recording-length cap) is a separate Medium item, still open.
 
+2026-06-04  BATCH 9 - TOOLING + COMMENT ACCURACY (BLD-3, BLD-4 DONE).  commit <pending>
+  - BLD-3: minify-bundle.mjs asserts the minified output is non-zero AND >=20% of input
+    (corpus minify retains ~60-75%), so a truncated/emptied source can't silently ship an
+    empty bundle (esbuild exits 0 on it). Verified: full build passes the guard x3.
+  - BLD-4: swept stale chrome69/WV69 floor references in shipped comments after the
+    chrome69->108 lift (build.py, backup.js, backup-container.js, platform-bridge.js,
+    SettingsScreen.jsx). The present-tense-false claims ("the WV69 floor lacks Blob.
+    arrayBuffer" - 108 HAS it; "--target=chrome69" - build passes chrome108) corrected; the
+    one remaining mention is an accurate "retired WV69 floor" historical note. Comment-only
+    -> minified bundles byte-identical (CACHE_VERSION unmoved).
+  Gates: lint + typecheck + build green.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -203,8 +215,8 @@ P3 — Low / hardening / nits / small wins
   [ ] PERF-6   Long chapters: no windowing (content-visibility:auto mitigation)
   [ ] TEST-5   journal-store.js search/scan paths untested
   [ ] TEST-6   Smoke gate asserts content too coarsely
-  [ ] BLD-3    minify-bundle.mjs emits 0-byte file on empty input, exits 0
-  [ ] BLD-4    Stale "WV69 floor" comments throughout shipped code
+  [x] BLD-3    minify-bundle.mjs emits 0-byte file on empty input, exits 0
+  [x] BLD-4    Stale "WV69 floor" comments throughout shipped code
   [ ] BLD-5    Raw-shipped assets (alt-translations, search.js) ship un-minified
 
 NO-ACTION / BY-DESIGN (Section 4 — captured, not work)

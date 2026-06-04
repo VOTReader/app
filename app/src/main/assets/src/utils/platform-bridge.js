@@ -138,10 +138,9 @@ const androidImpl = {
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
   // openExportSink/pickImportFile are the WEB v3 file primitives (FS Access API
-  // / sliceable Blob). They are NOT the Android path: the WebView-69 floor lacks
-  // Blob.arrayBuffer/.stream, and an import can't expose a GB file as a lazy
-  // random-access Blob, so Android streams through the native chunked bridge
-  // below instead (native owns the framing — see backup-container.js /
+  // / sliceable Blob). They are NOT the Android path: a SAF import can't expose a
+  // GB file as a lazy random-access Blob, so Android streams through the native
+  // chunked bridge below instead (native owns the framing — see backup-container.js /
   // StorageManager.kt). SettingsScreen branches on isAndroid and never calls
   // these two on Android; they reject loudly if something ever does.
   openExportSink: () => Promise.reject(new Error('openExportSink: web-only — Android uses the v3 chunked bridge (v3Export*)')),

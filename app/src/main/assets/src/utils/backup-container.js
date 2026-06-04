@@ -50,7 +50,7 @@ const READ_CHUNK = 1024 * 1024;
 
 /** Encode a JS number (0 .. 2^53-1, i.e. every real file size — far past the 4 GB
  *  point a 32-bit zip would overflow) as 8 big-endian bytes WITHOUT BigInt (keeps
- *  the chrome69 bundle target happy). Exported for direct boundary testing. */
+ *  the chrome108 bundle target happy). Exported for direct boundary testing. */
 export function encodeUint64BE(n) {
   const b = new Uint8Array(8);
   const dv = new DataView(b.buffer);

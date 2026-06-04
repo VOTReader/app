@@ -6,8 +6,8 @@ ES-module → IIFE bundles. This script emits the classic-script bundle-a.js
 bundle-a stays UNMINIFIED — its vendored UMD libs (react/react-dom/flexsearch)
 read top-level `this`, which esbuild's minify would break (PF2). The corpus
 bundles are pure `var X = {...}` data with no top-level `this`, so they ARE
-minified here (PF1 — esbuild --minify --target=chrome69 after the concat,
-~3.3 MB saved; globals-preserving + chrome69-safe + data-identical, verified).
+minified here (PF1 — esbuild --minify --target=chrome108 after the concat,
+~3.3 MB saved; globals-preserving + chrome108-safe + data-identical, verified).
 
 CLUSTER OWNERSHIP:
   A — vendor + small data + search engine (raw)            (Python concat — this script)

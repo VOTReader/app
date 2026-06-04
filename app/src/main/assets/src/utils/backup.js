@@ -41,7 +41,7 @@ export const DEFAULT_DATA_LS_KEYS = ['vot-state'];
  * loads the whole blob into a single string via FileReader, which would
  * OOM on >1 MB media on budget devices (see CLAUDE.md rule 5). 8192 is
  * below the String.fromCharCode.apply argument-count limit on every
- * engine we target (chrome69+).
+ * engine we target (chrome108+).
  * @param {Blob} blob
  * @returns {Promise<string>}
  */
@@ -675,7 +675,7 @@ export async function applyV3(manifest, entries, ctx) {
  *
  * @param {number} mediaTotalBytes - sum of the backup's media sizes (manifest.media[].size)
  * @param {{ quota?: number, usage?: number } | null | undefined} estimate - a
- *   navigator.storage.estimate() result (Chromium-61+, works on the WV69 floor)
+ *   navigator.storage.estimate() result (Chromium-61+)
  * @returns {string} a warning to append to the confirm message, or ''
  */
 export function formatImportSpaceWarning(mediaTotalBytes, estimate) {

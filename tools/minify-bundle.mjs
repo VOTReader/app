@@ -17,12 +17,15 @@
  * (no top-level `this`) are passed here; bundle-a stays raw (PF2).
  */
 import { buildSync } from 'esbuild';
+import { statSync } from 'fs';
 
 const file = process.argv[2];
 if (!file) {
   console.error('usage: node tools/minify-bundle.mjs <file>');
   process.exit(1);
 }
+
+const sizeBefore = statSync(file).size;
 
 buildSync({
   entryPoints: [file],
@@ -32,3 +35,14 @@ buildSync({
   target: 'chrome108',
   logLevel: 'warning',
 });
+
+// BLD-3: a minify that emits an empty (or implausibly tiny) file is a SILENT failure —
+// esbuild exits 0 having overwritten the source with nothing useful, and only the
+// corpus-version CHANGE detector (not an emptiness check) would notice downstream. Guard
+// it: minified corpus bundles retain ~60-75% of their bytes, so anything below 20% (or 0)
+// means a truncated/emptied input slipped through — refuse rather than ship it.
+const sizeAfter = statSync(file).size;
+if (sizeAfter === 0 || (sizeBefore > 1024 && sizeAfter < sizeBefore * 0.2)) {
+  console.error(`[minify] ${file}: output ${sizeAfter} bytes is implausibly small vs input ${sizeBefore} — refusing to ship a truncated bundle.`);
+  process.exit(1);
+}
