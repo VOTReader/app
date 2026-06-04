@@ -124,6 +124,36 @@
 ───────────────────────────────────────────────────────────────────────────
  PROGRESS LOG
 ───────────────────────────────────────────────────────────────────────────
+ 2026-06-03 — N4/N6/N7/N8 NATIVE ROBUSTNESS (PILE B; owner: "do the commits").
+ Fixes authored earlier this session, VERIFIED here before commit: code-read +
+ forced Kotlin recompile (:app:compileDebugKotlin --rerun-tasks) + :app:test-
+ DebugUnitTest, then the vot_api28 emulator. One commit 2520f5b, gated by the
+ pre-commit Kotlin testDebugUnitTest+jacoco. EMULATOR EVIDENCE (Android 9 /
+ WebView Chromium 69.0.3497.100, the floor): boots + renders (Settings + lazy
+ bundle-e), 0 JS parse errors, no native crash.
+   • N4 (2520f5b) — vm.currentScale=1f after restoreState() AND the crash-recovery
+     rebuild. The ViewModel survives an Activity recreate but the fresh WebView is
+     1.0x, so a stale cached scale makes the screenshot path's zoomBy(1f/scale)
+     un-zoom a 1.0 view. VERIFIED: getZoomScale()==1 at boot AND across a forced
+     Activity-destroy->restoreState cycle (same pid => ViewModel retained = the
+     real desync scenario). Covers the only two restore/rebuild sites.
+   • N7 (2520f5b) — AtomicBoolean single-flight on captureScreenshot; a concurrent
+     binder call returns "" at once; try/finally releases on timeout OR throw.
+     VERIFIED: two SEQUENTIAL takeScreenshot calls both return ~94KB (94879/94879
+     boot, 94579/94579 post-restore) — a broken finally would stick the 2nd at "".
+   • N8 (2520f5b) — retry-view logs Timber.w (expected recovery, still WARN-captured
+     by BoundedLogTree) + documents the detached-but-live webView. The reference is
+     KEPT — the audit's "park it" would break the rebuild-first webViewProvider
+     invariant. Shares the N4 reset across both recovery paths.
+   • N6 (2520f5b) — ProGuard keep rules for JsEvent$* + BoundedLogTree$LogEntry.
+     DONE-PARTIAL / dormant: isMinifyEnabled=false runs no R8, so the rules are
+     inert + unverifiable until N2.1b. Full closure (the bridge contract run against
+     the MINIFIED APK) stays owned by N2.1b.
+   NOT stageable on a headless debug emulator (documented, NOT gaps): N8 retry-view
+   (needs 2+ renderer crashes/60s; the URL allowlist blocks chrome://crash), N7 true
+   concurrency, N6 R8. PILE B remaining: UX9 per-tab resume, PF3 virtualization
+   (A4 landed 6a3467a; N4/N6/N7/N8 now closed).
+
  2026-06-03 — PILE A BATCH (owner: "finish everything / close the plan"). Every
  item SOURCE-VERIFIED FIRST by a 16-agent read-only pass, then one focused
  commit. 13 DONE + 3 ADJUDICATED; 0 deferred. The 2 visible items first
@@ -1252,17 +1282,25 @@
  [N4] vm.currentScale can desync from the restored WebView zoom; only the
    screenshot path reads it live (self-healing bracket) — resetZoom/setZoomEnabled
    are dead-from-JS (Garden uses CSS-transform zoom). SEV: Low [PARTIAL] → reset
-   currentScale=1 on restoreState, or read the live scale.
+   currentScale=1 on restoreState, or read the live scale.   STATUS: DONE
+   (2520f5b) — currentScale=1f at both restore/rebuild sites; emulator vot_api28/
+   WV69 getZoomScale()==1 across a forced restoreState cycle.
  [N6] JsEvent / getCrashLog JSON shape have no ProGuard keep rules; BridgeContract
    Test runs on UNMINIFIED classes. Dormant (isMinifyEnabled=false). SEV: Low
    [CONFIRMED] → when N2.1b enables minify, run the bridge contract against the
-   minified APK.
+   minified APK.   STATUS: DONE-PARTIAL (2520f5b) — keep rules for JsEvent$* +
+   BoundedLogTree$LogEntry added (correct syntax/target) but DORMANT (no R8 in
+   debug); the contract-vs-minified-APK run stays owned by N2.1b.
  [N7] captureScreenshot runBlocking on the binder thread has no single-flight guard
    (captures serialize on Main anyway; no live concurrent caller). MainActivity.kt:
    155-160. SEV: Low-Med [CONFIRMED] → optional AtomicBoolean single-flight.
+   STATUS: DONE (2520f5b) — AtomicBoolean compareAndSet + try/finally release;
+   emulator-verified (2 sequential takeScreenshot both return ~94KB).
  [N8] Retry-view leaves a detached-but-live webView field (stray bridge calls are
    benign no-ops; documented). MainActivity.kt:695-712. SEV: Low(info) [CONFIRMED]
-   → optional: park the detached reference.
+   → optional: park the detached reference.   STATUS: DONE (2520f5b) — Timber.w
+   + documented detached-but-live; reference KEPT (parking would break the
+   rebuild-first webViewProvider). N8 retry-view not runtime-stageable headless.
 
  --- Journal (lower) ---
  [J3] Web audio path uses readAsDataURL on the assembled blob (rule-5 violation;
@@ -1438,8 +1476,8 @@
  entry at the top for the exact per-item split + commits). What REMAINS:
    • Flagged-for-owner (visible deltas, need a nod): UX1+UX2, A1+A5.
    • Deferred focused session: PF6 (lazy bundle-e — L, app.jsx-refactor).
-   • PILE B (native/device + the highest-risk refactors), unchanged: UX3 router,
-     UX9 per-tab resume, A4 O(n²) apply, PF3 virtualization, N4/N6/N7/N8 (Kotlin).
+   • PILE B (native/device + the highest-risk refactors): UX9 per-tab resume,
+     PF3 virtualization. (UX3 055b674; A4 6a3467a; N4/N6/N7/N8 2520f5b — all DONE.)
  Working tree clean; everything pushed; CI green.
 
  HOW TO CONTINUE: pick from PILE A (safe, in-batch). One item = one focused commit
