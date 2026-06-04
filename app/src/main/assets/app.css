@@ -109,7 +109,17 @@
       .sh-banner-danger .sh-banner-btn-primary { background: rgba(192,57,43,0.12); }
       .sh-banner-dismiss {
         background: none; border: none; color: rgba(240,230,210,0.6);
-        font-size: 1rem; cursor: pointer; padding: 0.2rem; line-height: 1;
+        font-size: 1rem; cursor: pointer; line-height: 1; padding: 0.2rem;
+        position: relative; /* W10-lite (WL4): anchor the hit-area overlay */
+      }
+      /* W10-lite (WL4) — expand the ✕ tap target to 44x44 (was ~19x22, the one
+         sub-24px interactive control the audit found) WITHOUT changing the
+         visible footprint or the banner height: an absolutely-positioned
+         overlay centered on the glyph. Clicks land on the button (the ::after
+         is its own child box), so no JS or markup change is needed. */
+      .sh-banner-dismiss::after {
+        content: ''; position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%); width: 44px; height: 44px;
       }
       body.light .sh-banner-gold {
         background: rgba(247,242,232,0.97); color: #2a2018;
@@ -313,6 +323,16 @@
           transition-duration: 0.01ms !important;
           scroll-behavior: auto !important;
         }
+      }
+      /* W10-lite (WL2c) — preserve annotation highlight colors in forced-colors
+         / Windows High Contrast mode. The 10-color palette IS the information
+         (which highlight is which), so the marks opt out of the forced system
+         palette that would otherwise collapse them all to one color; the note
+         icon opts out too so its gold stays legible. Everything else (chrome,
+         body text, buttons) still follows forced-colors to honor the user's
+         contrast choice. Highlights are <mark> elements (annotation-engine). */
+      @media (forced-colors: active) {
+        mark[class*="hl-"], .hl-note-icon { forced-color-adjust: none; }
       }
 
       /* ── TOP NAV ── */
