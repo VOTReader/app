@@ -58,6 +58,21 @@ PROGRESS LOG
     early-returns when tabs are off instead of running for the app's lifetime.
   Gates: build + lint + typecheck + 1883 vitest + smoke:ci green; canary app.jsx 782/800.
 
+2026-06-04  BATCH 3 — CORPUS INTEGRITY (CORP-1, CORP-3 DONE; CORP-2 deferred).  commit <pending>
+  - CORP-1: volume-seven.js footnote "Also read" link collection label "The Lord's
+    Rebuke" → "A Testament Against The World: The Lord's Rebuke" (its registryLabel).
+    PROVEN by code-read: index.html:495-496 keys VOT_LETTER_REGISTRY by registryLabel+
+    "::"+title; resolveVotLetter (letter-linking.js:32) looks up collection+"::"+title.
+    The link now resolves (was a silent no-op in Volume Seven AND its Holy-Days clone).
+    CORPUS_VERSION c6→c7 (corpus bytes changed); corpus-version.lock updated.
+  - CORP-3: check_balance.py dash check widened — EN dash (never legitimate) is now
+    caught spaced OR unspaced ("12:18 – 20" used to slip); EM dash stays unspaced-only
+    so the sanctioned " — " compound separator (may precede a decimal marker) isn't
+    false-flagged. Verified with a 5-case probe.
+  Gates: check_balance + validate(0 err) + 1883 vitest + smoke:ci green.
+  CORP-2 (validator cross-ref resolution pass — the gap that let CORP-1 ship) deferred:
+  it's Medium effort (build the registry in the validator), not a quick win — queued.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -84,7 +99,7 @@ P2 — Medium: correctness, perf cliffs, process gates, test gaps
   [ ] NTV-1    Unbounded whole-file heap read on record-stop + no recording cap
   [ ] PERF-3   translateVerse O(n^2) per chapter under non-NKJV translation
   [ ] PERF-4/SHELL-1  LinkIcon/BookmarkIcon global-version re-render fan-out
-  [ ] CORP-1   Dead in-app "Also read" tap-through (wrong collection label)
+  [x] CORP-1   Dead in-app "Also read" tap-through (wrong collection label)
   [ ] CORP-2   validate-schemas.js never resolves cross-ref link targets
   [ ] BLD-1    Web deploy publishes with ZERO build gates / no CI dependency
   [ ] BLD-2    APK packages committed dist/ with no build-time freshness check
@@ -116,7 +131,7 @@ P3 — Low / hardening / nits / small wins
   [ ] SEC-1    offline.html ships no CSP + inline onclick handler
   [ ] SEC-2    toast.js innerHTML foot-gun (currently safe, contract risk)
   [ ] SEC-3    settings.fontScale → CSS var, import-restorable (clamp)
-  [ ] CORP-3   check_balance.py dash check too narrow (\d–\d only)
+  [x] CORP-3   check_balance.py dash check too narrow (\d–\d only)
   [x] SHELL-2  Thumbnail scroll-poll interval runs for app lifetime when tabs off
   [ ] SHELL-3  Lazy-corpus loader invoked during render, not in an effect
   [ ] SHELL-4  Reading-screen components not React.memo'd

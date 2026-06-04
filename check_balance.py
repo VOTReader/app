@@ -54,8 +54,14 @@ def check_balance(text):
     return b, br, p
 
 def check_dashes_in_ranges(text):
-    """Find non-ASCII dashes between digits — these break verse-range parser."""
-    en = re.findall(r'\d' + EN_DASH + r'\d', text)
+    """Find non-ASCII dashes between digits — these break the verse-range parser."""
+    # CORP-3: EN dash is NEVER a legitimate verse-range separator, so catch it
+    # whether or not it is spaced ("12:18 – 20" used to slip the digit-adjacent check).
+    en = re.findall(r'\d\s*' + EN_DASH + r'\s*\d', text)
+    # EM dash: only the digit-ADJACENT form is a bad range separator. The spaced
+    # " — " form is the SANCTIONED compound-value separator (Permanent Rule 1) and
+    # may legitimately precede a decimal verse marker ("Exodus 12:6 — 7. text"),
+    # so leave the spaced form unflagged.
     em = re.findall(r'\d' + EM_DASH + r'\d', text)
     return len(en) + len(em)
 

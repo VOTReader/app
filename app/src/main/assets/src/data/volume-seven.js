@@ -11465,7 +11465,7 @@ var LETTERS_V7 = [
         "type": "note",
         "text": "See: \"THE CUP OF THE WRATH OF MY FURY IS COME TO THE FULL\"",
         "url": "https://www.thevolumesoftruth.com/THE_CUP_OF_THE_WRATH_OF_MY_FURY_IS_COME_TO_THE_FULL",
-        "link": { "collection": "The Lord's Rebuke", "letterTitle": "THE CUP OF THE WRATH OF MY FURY IS COME TO THE FULL" }
+        "link": { "collection": "A Testament Against The World: The Lord's Rebuke", "letterTitle": "THE CUP OF THE WRATH OF MY FURY IS COME TO THE FULL" }
       }
     },
     "nkjv": {
