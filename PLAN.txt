@@ -376,6 +376,28 @@ Current state (audited 2026-05-28):
   │ Ship this. Defer everything in W10.1-W10.5 not listed here.        │
   └──────────────────────────────────────────────────────────────────┘
 
+  STATUS — SHIPPED 2026-06-03. All W10-lite items landed; the full
+  W10.1-W10.5 AA suite stays DEFERRED per the rationale in this block.
+    WL1  Text Size control ........ DONE (da050c8) — Settings selector +
+         --font-scale root multiplier; journal-styles.js (87) +
+         HighlightsScreen.jsx (14) px->rem for uniform scaling; lsShim +
+         boot script apply the persisted scale pre-mount (no FOUC). Preview-
+         verified set->live->persist->cold-boot on chrome + reading surface;
+         0 horizontal overflow at 375px/1.5x; 1878 vitest pass.
+    WL2  Motion + visual ........... DONE — reduced-motion + :focus-visible
+         landed in the prior W10-lite pass; WL2c forced-colors (highlight
+         color preservation in Windows High Contrast) added (0cd9075).
+    WL3  Contrast audit ........... DONE (prior pass) — dark theme AA-clean;
+         light --link-blue darkened to clear AA (3.15->4.60:1).
+    WL4  Touch-target audit ....... DONE (0cd9075) — app already AA (24px:
+         color dots/style btns/journal/nav all clear); the one sub-24px
+         control (storage-banner dismiss) given a 44px hit area via an
+         ::after overlay. AA-compliant 24-30px targets deliberately NOT
+         pushed to AAA 44px (risk vs. an able-bodied audience; WL1 scaling
+         already enlarges text targets).
+    WL5  Glyph aria-labels ........ DONE (prior pass) — icon-only buttons
+         labelled. Remaining screen-reader/role work stays deferred.
+
   WHY LITE: audience = 20+ readers, all sighted/hearing/able-bodied, some
   older. Screen-reader semantics (W10.4), modal focus traps (W10.2), and
   keyboard-only nav + roving tabindex (W10.1d/W10.3) serve populations with
