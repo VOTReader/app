@@ -162,6 +162,18 @@ PROGRESS LOG
     global (409->410); +2 tests. Verified: real-module unit test + smoke + lint.
   Gates: lint(410) + typecheck + 1894 vitest + smoke:ci green.
 
+2026-06-04  BATCH 11 - JOURNAL DURABILITY (JRNL-1 DONE; JRNL-2 resolved).  commit bd8fe4e
+  P0 precious-data. The pagehide/visibilitychange flush (J2) updates the in-memory cache,
+  but JournalStore.update -> _save is fire-and-forget, so a background-kill before the IDB
+  write lands still loses the last edits. Fix: on background-hide, ALSO write a SYNCHRONOUS
+  localStorage draft (survives a process kill). On editor open, recover it ONLY when it's
+  for this entry, at least as recent as the last durable save (draft.ts >= entry.updated),
+  and its content differs - so a stale/already-saved draft can NEVER clobber newer content.
+  A recovered draft is KEPT (a 2nd kill before re-save recovers again); a stale one is
+  consumed. +3 tests (write-on-hide, recover-newer, discard-stale). JRNL-2 resolved by the
+  same fix (the draft captures the just-inserted block's mediaId synchronously).
+  Gates: lint + typecheck + 1897 vitest (+3) + smoke:ci green.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -169,7 +181,7 @@ SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 P0 — real user-facing defect / reachable data loss
   [x] SRCH-1   Search ranking buries the verse you searched for (CRITICAL)
   [ ] STORE-1  Cross-tab whole-store clobber — silent loss of committed data
-  [ ] JRNL-1   Journal background-kill flush is not durable (loss window)
+  [x] JRNL-1   Journal background-kill flush is not durable (loss window)
 
 P1 — High: budget-device memory, stale-serve, broken core feature, untested only-backup
   [x] SRCH-2   Verses excluded from term-coverage multiplier
@@ -210,7 +222,7 @@ P3 — Low / hardening / nits / small wins
   [ ] BAK-5    Add Android chunked-bridge round-trip regression test
   [x] ANN-2    snapRangeToWords can leave start on a lone surrogate
   [ ] ANN-3    applyNoteIcons leaves bounded text-node fragmentation
-  [ ] JRNL-2   Media-insert → entry-reference orphan window (cross-session)
+  [x] JRNL-2   Media-insert → entry-reference orphan window (cross-session)
   [ ] JRNL-5   Add an editor durability-level test
   [x] NTV-2    GardenImageCache.download() unbounded read (no Content-Length cap)
   [ ] NTV-3    restoreState resets currentScale=1f (zoom-math desync window)
