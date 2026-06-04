@@ -38,9 +38,25 @@ if (!block) {
   console.error('[sw-version] could not find the CORE_ASSETS array in service-worker.js');
   process.exit(1);
 }
-const paths = [...block[1].matchAll(/'([^']+)'/g)]
+// SW-1: strip comments from the array body FIRST. An apostrophe in prose (e.g.
+// "wouldn't" in a CORE_ASSETS comment) would otherwise be read as a string
+// delimiter, desyncing the '…' quote-pairing and silently dropping every asset
+// after it from the hash — so editing those assets would never bust the cache.
+const blockText = block[1]
+  .replace(/\/\*[\s\S]*?\*\//g, '')   // block comments
+  .replace(/\/\/[^\n]*/g, '');        // line comments
+const paths = [...blockText.matchAll(/'([^']+)'/g)]
   .map((m) => m[1])
   .filter((p) => p !== './'); // the directory index is served by index.html
+// Self-check: every CORE_ASSETS entry is a './'-prefixed literal, so the count of
+// "'./" path-starts must equal paths.length + 1 (the filtered-out './' index). A
+// mismatch means the parser desynced — fail LOUD rather than silently hash a SUBSET
+// and ship stale assets to every installed client.
+const pathStarts = (blockText.match(/'\.\//g) || []).length;
+if (paths.length !== pathStarts - 1) {
+  console.error(`[sw-version] CORE_ASSETS parse desync: extracted ${paths.length} path(s) but found ${pathStarts} './' start(s). Refusing to write a CACHE_VERSION that would hash only a subset of the cached assets.`);
+  process.exit(1);
+}
 
 const hash = createHash('sha256');
 let counted = 0;

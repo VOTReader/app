@@ -82,6 +82,21 @@ PROGRESS LOG
     append / corruption signal); the declared frames still read exactly.
   Gates: 1885 vitest (+2) + lint + typecheck green.
 
+2026-06-04  BATCH 5 — SERVICE WORKER (SW-1, SW-2, SW-4 DONE).  commit <pending>
+  - SW-1 (High): sync-sw-version.js extracted CORE_ASSETS paths with /'([^']+)'/ over
+    the array body INCLUDING its comments, so an apostrophe in prose ("wouldn't",
+    service-worker.js:60) desynced the quote-pairing and silently DROPPED 11 precached
+    assets (icon-180/32/16, splash.jpg, 6 study images, offline.html) from the content
+    hash — editing any of them would never bust the cache. Fix: strip // and /* */
+    comments before extracting + a self-check that FAILS LOUD if the extracted path
+    count != the './' path-starts. Hashed assets 19 → 30 (verified by the count jump;
+    the 11 recovered are exactly the previously-dropped set).
+  - SW-2: offline navigations carrying a query string (…/index.html?x=1) now fall back
+    to the precached shell (ignoreSearch) before the offline page, so deep links boot.
+  - SW-4: corpusFirst no longer caches a REDIRECTED response (captive-portal/proxy
+    guard) under the corpus URL.
+  Gates: build (30 assets) + 1885 vitest + smoke:ci green.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -96,7 +111,7 @@ P1 — High: budget-device memory, stale-serve, broken core feature, untested on
   [x] SRCH-3   Synonym expansion over-broad + defaults ON
   [ ] PERF-1   html2canvas rasterizes the whole scrolled chapter (memory spike)
   [ ] PERF-2   Garden decoded-bitmap residency ~0.5–1.3 GB at high tiers
-  [ ] SW-1     CACHE_VERSION hash omits ~10 precached assets (stale-serve forever)
+  [x] SW-1     CACHE_VERSION hash omits ~10 precached assets (stale-serve forever)
   [ ] TEST-1   Android v3 backup DRIVER loop has zero tests + outside coverage
 
 P2 — Medium: correctness, perf cliffs, process gates, test gaps
@@ -135,8 +150,8 @@ P3 — Low / hardening / nits / small wins
   [ ] NTV-2    GardenImageCache.download() unbounded read (no Content-Length cap)
   [ ] NTV-3    restoreState resets currentScale=1f (zoom-math desync window)
   [ ] NTV-4    getZoomScale() has a false @Suppress("unused")
-  [ ] SW-2     Query-string navigations miss cached shell offline
-  [ ] SW-4     corpusFirst caches redirected same-origin responses
+  [x] SW-2     Query-string navigations miss cached shell offline
+  [x] SW-4     corpusFirst caches redirected same-origin responses
   [ ] SEC-1    offline.html ships no CSP + inline onclick handler
   [ ] SEC-2    toast.js innerHTML foot-gun (currently safe, contract risk)
   [ ] SEC-3    settings.fontScale → CSS var, import-restorable (clamp)

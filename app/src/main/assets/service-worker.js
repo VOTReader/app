@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-2ff6a7086b';
+const CACHE_VERSION = 'v1.0.2-510eb52c24';
 const CORPUS_VERSION = 'c7'; // c6→c7 (2026-06-04): CORP-1 — volume-seven footnote "Also read" link collection label fixed ("The Lord's Rebuke" → its registryLabel) so the tap-through resolves. (c5→c6 2026-06-02: PF1 minified the lazy corpus bundles.)
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -194,6 +194,11 @@ async function coreFirst(request) {
     return response;
   } catch (_e) {
     if (request.mode === 'navigate') {
+      // SW-2: a deep link carrying a query string (…/index.html?x=1, …/?utm=…) misses
+      // the exact-match cache; fall back to the precached shell (ignoreSearch) so the
+      // app still boots offline, before serving the offline page.
+      const shell = await caches.match('./index.html', { ignoreSearch: true });
+      if (shell) return shell;
       const offline = await caches.match('./offline.html');
       if (offline) return offline;
     }
@@ -207,7 +212,11 @@ async function corpusFirst(request) {
 
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    // SW-4: don't cache a REDIRECTED response — corpus URLs are exact same-origin
+    // file paths with no expected redirect, so a redirect signals something unusual
+    // (a captive portal / proxy); caching it would pin the wrong bytes under the
+    // corpus URL. response.ok already excludes 4xx/5xx.
+    if (response.ok && !response.redirected) {
       const cache = await caches.open(CORPUS_CACHE);
       cache.put(request, response.clone());
     }
