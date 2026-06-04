@@ -126,11 +126,11 @@
 ───────────────────────────────────────────────────────────────────────────
  2026-06-03 — PILE A BATCH (owner: "finish everything / close the plan"). Every
  item SOURCE-VERIFIED FIRST by a 16-agent read-only pass, then one focused
- commit. 12 DONE + 3 ADJUDICATED; 1 deferred (PF6). The 2 visible items first
+ commit. 13 DONE + 3 ADJUDICATED; 0 deferred. The 2 visible items first
  flagged for a nod (UX1+UX2, A1+A5) were then APPROVED and landed — see the
  "LANDED AFTER OWNER APPROVAL" block below. All gated (lint --max-warnings 0 +
  tsc + vitest + build + Kotlin testDebugUnitTest+jacoco) + pushed; web-observable
- items preview-verified. vitest 1797 → 1860. PILE A is now CLOSED.
+ items preview-verified. vitest 1797 → 1864. PILE A is now CLOSED (PF6 too).
    • UX5        (5142c5f) — first-use tab-switcher coachmark. localStorage flag,
      NOT a new IDB store (that needs a DB_VERSION bump to persist). +6 tests.
    • UX4+UX10   (f15345c) — Garden swipe-to-flip + Bible swipe-to-change-chapter;
@@ -206,9 +206,16 @@
      Genesis 1: the icon lands immediately after the highlighted phrase, 0 console
      errors. (smoke.js Bible-seed judged redundant — the new unit test guards the
      React-path icon in CI.)
-   DEFERRED (focused session): PF6 lazy bundle-e — verified feasible but L (new
-   esbuild bundle + SW precache + screen-routes typeof-guards + an app.jsx
-   subscription refactor to stay <800) for a parse-time-only ~55 KB win.
+   PF6 (0ca8ce4) — DONE in a focused follow-up. Settings/Search/Garden code-split
+   into a new lazy bundle-e (54 KB), injected on first navigation via the existing
+   __makeLazyLoader factory; bundle-d 365→302 KB (a boot-PARSE win — bundle-e is
+   still SW-precached in CORE_ASSETS for offline). The 3 inline corpus
+   subscriptions + the new bundle-e one folded into useLazyBundles() (App()
+   788→777, under the canary). screen-routes typeof-guards fire the loader DURING
+   render so a cold boot restored INTO a lazy screen resolves too (verified).
+   smoke.js + gen-eslint-globals + the pre-commit re-stage list updated. Preview
+   (boot loads a/b/c/d only; Settings nav + boot-into-Settings both render) +
+   headless smoke:ci PASS.
 
  2026-06-02 — Wave 1 (P0) COMPLETE — all gated + verified, pushed to main:
    • SC1        (698c95b) — WTLB bare-BOOKS ReferenceError guard + prettify
@@ -796,12 +803,20 @@
    re-touch doesn't grow). Android Garden is unaffected (native per-page disk cache).
    Gates: tsc/eslint/vitest 1800/build green.
 
- [PF6] bundle-d ships all 53 screens, parser-blocking        SEV: Low-Med [CONFIRMED]
+ [PF6] bundle-d ships all 53 screens, parser-blocking        SEV: Low-Med [CONFIRMED]   STATUS: DONE (0ca8ce4)
    Evidence: index.html:582 loads bundle-d (344 KB, 97 imports, all screens) with
      no defer/async; only the landing screen renders first. bundle-a also carries
      547 KB scripture-display data needed only on scripture open.
    Fix: code-split heavy non-home screens (Journal editor, Settings, Search,
      Garden) into a lazy bundle-e injected on first navigation.
+   DONE (2026-06-03): Settings/Search/Garden split into bundle-e (54 KB), lazy-
+     loaded via the __makeLazyLoader('screens-e',…) factory; bundle-d 365→302 KB.
+     Journal editor was NOT split (already in bundle-b, not d). The 3 route thunks
+     became typeof-guarded _corpusView wrappers (fire the loader during render →
+     boot-into-lazy-screen works); App()'s 3 corpus subscriptions + the bundle-e
+     one folded into useLazyBundles() (788→777, under canary). bundle-e in
+     CORE_ASSETS (precached + content-hashed) but NOT CRITICAL (boot doesn't need
+     it). +4 vitest; preview + headless smoke:ci verified.
 
  [PF7] app.css 234 KB render-blocking + unminified           SEV: Low  [CONFIRMED]
    Evidence: index.html:72 <link rel=stylesheet>; no CSS-minify step. Measured
