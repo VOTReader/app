@@ -100,3 +100,32 @@ describe('useAndroidBack — UX2 search-anchor clear', () => {
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
   });
 });
+
+describe('useAndroidBack — UX3 index-screen origin + safe fallthrough', () => {
+  for (const idx of ['notes-index', 'links-index', 'bookmarks-index', 'highlights-index', 'journal-home']) {
+    it(`back from ${idx} restores navOrigin (not a hardcoded Library)`, () => {
+      const props = baseProps({ screen: idx });
+      renderHook(() => useAndroidBack(props));
+      const res = window.handleAndroidBack();
+      expect(res).toBe('true');
+      expect(props.goNavOrigin).toHaveBeenCalledTimes(1);
+      expect(props.setScreen).not.toHaveBeenCalledWith('library');
+    });
+  }
+
+  it('at the root (home), Back returns "false" so the platform exits / shows the root toast', () => {
+    const props = baseProps({ screen: 'home' });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('false');
+    expect(props.goHome).not.toHaveBeenCalled();
+  });
+
+  it('an unlisted (non-home) screen falls back to Home instead of exiting the app', () => {
+    const props = baseProps({ screen: 'some-future-screen' });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.goHome).toHaveBeenCalledTimes(1);
+  });
+});

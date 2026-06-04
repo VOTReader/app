@@ -359,7 +359,7 @@ export function buildScreenRoutes({
     'highlights-index': () => typeof HighlightsScreen !== 'undefined' && (
       <HighlightsScreen
         onSettings={goSettings}
-        onBack={() => setScreen('library')}
+        onBack={goNavOrigin}
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
@@ -376,7 +376,7 @@ export function buildScreenRoutes({
     'journal-home': () => typeof JournalHubScreen !== 'undefined' && (
       <JournalHubScreen
         onSettings={goSettings}
-        onBack={() => setScreen('library')}
+        onBack={goNavOrigin}
         onHome={goHome}
         onOpenEntry={(eid) => goJournalViewer(eid)}
         onEditEntry={(eid) => goJournalEditor(eid)}
@@ -431,7 +431,7 @@ export function buildScreenRoutes({
     'notes-index': () => (
       <NotesIndexScreen
         onSettings={goSettings}
-        onBack={() => setScreen('library')}
+        onBack={goNavOrigin}
         onHome={goHome}
         onOpenNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false })}
         onNavigateToSource={(endpoint, meta) => {
@@ -449,7 +449,7 @@ export function buildScreenRoutes({
     'links-index': () => (
       <LinksScreen
         onSettings={goSettings}
-        onBack={() => setScreen('library')}
+        onBack={goNavOrigin}
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
@@ -472,7 +472,7 @@ export function buildScreenRoutes({
     'bookmarks-index': () => (
       <BookmarksScreen
         onSettings={goSettings}
-        onBack={() => setScreen('library')}
+        onBack={goNavOrigin}
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {

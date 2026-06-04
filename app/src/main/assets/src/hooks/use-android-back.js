@@ -176,11 +176,15 @@ export function useAndroidBack({
       if (s === "settings") {goNavOrigin();return "true";} else
       if (s === "history") {goNavOrigin();return "true";} else
       if (s === "about") {AboutSeenFlagStore.set();goNavOrigin();return "true";} else
-      if (s === "notes-index") {setScreen("library");return "true";} else
-      if (s === "links-index") {setScreen("library");return "true";} else
-      if (s === "bookmarks-index") {setScreen("library");return "true";} else
-      if (s === "highlights-index") {setScreen("library");return "true";} else
-      if (s === "journal-home") {setScreen("library");return "true";} else
+      // UX3: index/hub screens (reached via goNotesIndex/etc., which _captureOrigin)
+      // back through goNavOrigin — to the reading screen the user opened them from,
+      // not a hardcoded Library. (goNavOrigin restores the captured origin, or
+      // goHome() when none — matching settings/history/about above.)
+      if (s === "notes-index") {goNavOrigin();return "true";} else
+      if (s === "links-index") {goNavOrigin();return "true";} else
+      if (s === "bookmarks-index") {goNavOrigin();return "true";} else
+      if (s === "highlights-index") {goNavOrigin();return "true";} else
+      if (s === "journal-home") {goNavOrigin();return "true";} else
       if (s === "journal-viewer") {setScreen("journal-home");return "true";} else
       if (s === "journal-editor") {goJournalViewer(journalEntryIdRef.current);return "true";} else
       if (s === "library") {goHome();return "true";} else
@@ -218,7 +222,11 @@ export function useAndroidBack({
       }}
       // Index screens + garden: all go back to volumes-home
       if (COL_BY_INDEX_SC.has(s) || s === "garden-view") {goVolumesHome();return "true";}
-      return "false";
+      // UX3: home is the only true root — return "false" so the platform handles
+      // Back there (native finish() / web root-exit toast). Any OTHER unlisted
+      // screen falls back to Home rather than exiting the app from a stray screen.
+      if (s === "home") return "false";
+      goHome();return "true";
     };
     return () => {delete window.handleAndroidBack;};
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/fromSurpriseRef/tabsOverviewOpenRef/journalEntryIdRef + fromLetterRef from useFromLetterStack — all 12 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell/getStudyById same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
