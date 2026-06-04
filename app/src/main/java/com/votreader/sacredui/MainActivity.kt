@@ -48,6 +48,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 import androidx.webkit.WebViewClientCompat
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.math.abs
@@ -70,6 +71,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     private val vm: MainViewModel by viewModels()
 
     private lateinit var webView: WebView
+    private val screenshotInFlight = AtomicBoolean(false)
     // Audio session management for voice recording. startAudioSession() puts
     // the device into MODE_IN_COMMUNICATION so the WebView's AudioRecord can
     // reliably acquire the mic on Android 8+ (Pixel/Samsung); endAudioSession()
@@ -166,15 +168,15 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         this, Manifest.permission.RECORD_AUDIO
     ) == PackageManager.PERMISSION_GRANTED
     override fun captureScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String {
-        // The JS-facing API is synchronous (returns the base64 directly),
-        // so we runBlocking on this binder thread until the coroutine
-        // resolves. Inside, the work hops to Dispatchers.Main for the
-        // WebView reads + PixelCopy request; the 2-second timeout is the
-        // same cap the CountDownLatch version enforced.
-        return runBlocking {
-            withTimeoutOrNull(2_000L) {
-                captureScreenshotSuspend(topCropDp, maxDim, jpegQuality)
-            } ?: ""
+        if (!screenshotInFlight.compareAndSet(false, true)) return ""
+        return try {
+            runBlocking {
+                withTimeoutOrNull(2_000L) {
+                    captureScreenshotSuspend(topCropDp, maxDim, jpegQuality)
+                } ?: ""
+            }
+        } finally {
+            screenshotInFlight.set(false)
         }
     }
 
@@ -350,6 +352,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
+            vm.currentScale = 1f
         } else {
             // Fresh cold start (not a config-change restore). All UI assets
             // are bundled in the APK and served locally by WebViewAssetLoader,
@@ -622,9 +625,10 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 // same fresh instance; the retry path just defers
                 // attaching + loading until the user taps.
                 webView = createConfiguredWebView()
+                vm.currentScale = 1f
 
                 if (decision.showRetryView) {
-                    Timber.e("Renderer crashed %d times in 60s. Showing retry view.", vm.renderRecoveryCount)
+                    Timber.w("Renderer crashed %d times in 60s. Showing retry view; webView is live but detached until user taps.", vm.renderRecoveryCount)
                     showRendererCrashRetryView()
                     return true
                 }

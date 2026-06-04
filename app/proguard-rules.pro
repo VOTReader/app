@@ -16,3 +16,17 @@
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
+
+# ── JsEvent sealed class ────────────────────────────────────────────────
+# Subclass names aren't used reflectively today (fn values are string
+# literals), but keeping the hierarchy prevents R8 from collapsing or
+# inlining the sealed members if a future change adds reflection or
+# serialization. Dormant until isMinifyEnabled=true (N2.1b).
+-keep class com.votreader.sacredui.JsEvent { *; }
+-keep class com.votreader.sacredui.JsEvent$* { *; }
+
+# ── BoundedLogTree.LogEntry ──────────────────────────────────────────────
+# toJson() accesses fields directly (not via reflection), so R8 renaming
+# is transparent. Kept as insurance so the data class survives any future
+# serialization path unchanged.
+-keep class com.votreader.sacredui.BoundedLogTree$LogEntry { *; }
