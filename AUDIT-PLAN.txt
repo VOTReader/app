@@ -473,7 +473,7 @@
  P0 — DATA LOSS & REACHABLE CRASHES  [✓ ALL DONE — Wave 1, 2026-06-02]
 ═══════════════════════════════════════════════════════════════════════════
 
- [J1] Journal media-insert lost on background-kill          STATUS: OPEN
+ [J1] Journal media-insert lost on background-kill          STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED
    Evidence: JournalMediaStore.put durably stores the blob, but the block that
      references its mediaId persists only via the editor's 1.2s debounce
@@ -491,7 +491,7 @@
      after insertAtCursor in onFileChosen + onRecordingSaved (:290-311).
    Exit: edit→background→reopen round-trip preserves media+text (preview + device).
 
- [J2] Journal text edits lost on background-kill            STATUS: OPEN
+ [J2] Journal text edits lost on background-kill            STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED
    Evidence/Problem: same mechanism as J1 for plain text — every keystroke rides
      the 1.2s debounce; no background flush (JournalEditorScreen.jsx:102-127).
@@ -499,7 +499,7 @@
    Fix: same pagehide/visibility handler covers J1+J2.
    Exit: covered with J1.
 
- [J4] Orphan sweep deletes a put-but-unflushed blob         STATUS: OPEN
+ [J4] Orphan sweep deletes a put-but-unflushed blob         STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: Med   VERDICT: CONFIRMED
    Evidence: the 4s-deferred boot sweep is gated on JournalStore.isReady()
      (app.jsx:561 — guards the HYDRATION race, not the FLUSH race);
@@ -511,7 +511,7 @@
      created in the last N seconds.
    Exit: covered with J1; add a regression test for "put-then-sweep keeps blob".
 
- [SC1] Reachable ReferenceError in WTLB nav-link            STATUS: OPEN
+ [SC1] Reachable ReferenceError in WTLB nav-link            STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED (sandbox-reproduced)
    Evidence: WtlbEntryView.jsx:155 `const bookTitle = BOOKS[bookId]?.title ||
      bookId` reads the BARE global BOOKS (declared `var BOOKS` only in the lazy
@@ -527,7 +527,7 @@
      resolves.
    Exit: tsc+build+vitest; preview the WTLB entry cold (no bible) → no throw.
 
- [E1] Corpus-load failure = permanent "Loading…" dead-end   STATUS: OPEN
+ [E1] Corpus-load failure = permanent "Loading…" dead-end   STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED
    Evidence: index.html:209-214 script.onerror rejects + nulls _promise, but the
      render paths re-fire the loader with NO .catch and no error UI: _wrapVot
@@ -543,7 +543,7 @@
      (the loader already nulls _promise, so re-calling load() retries cleanly).
    Exit: simulate a corpus 404 in preview → user sees Retry, not a spinner.
 
- [E2] No global error capture (onerror/unhandledrejection)  STATUS: OPEN
+ [E2] No global error capture (onerror/unhandledrejection)  STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED
    Evidence: codebase-wide grep = zero window.onerror / unhandledrejection. The
      only addEventListener('error') (index.html:140) pushes to a smoke-harness
@@ -555,7 +555,7 @@
      <script>, like the resource-error one) → DiagnosticLog.error('uncaught', …).
    Exit: throw a test error in an async effect → appears in getCrashLog export.
 
- [E3] Corpus failure writes nothing to the diagnostic log   STATUS: OPEN
+ [E3] Corpus failure writes nothing to the diagnostic log   STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: Med   VERDICT: CONFIRMED  (compounds E1/E2)
    Evidence: the lazy loader logs DiagnosticLog.timing('corpus',…) on SUCCESS
      only (index.html:203-204); the onerror branch (:209-214) logs nothing.
@@ -569,7 +569,7 @@
  NOTE: the search engine lives at app/src/main/assets/search.js + search-data.js
  (classic scripts concatenated into bundle-a.js), NOT src/data/search.js.
 
- [SR1] `heading` field throws on EVERY query               STATUS: OPEN
+ [SR1] `heading` field throws on EVERY query               STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED (sandbox-reproduced against flexsearch 0.7.41)
    Evidence: executeSearch iterates a field list including {name:'heading',
      boost:2.0} (search.js:1403-1408) and calls db.search(term,{index:'heading'})
@@ -581,7 +581,7 @@
      and srchGroupKey :24, both now unreachable).
    Exit: a search produces 0 console warns; SR8 test pins it.
 
- [SR2] Multi-word queries strict-AND → silent zero results  STATUS: OPEN
+ [SR2] Multi-word queries strict-AND → silent zero results  STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED (sandbox: "beginning void light" → 0)
    Evidence: the per-field db.search passes only {index,limit} (search.js:1420);
      FlexSearch Document.search defaults to intersection (AND). Verses are short,
@@ -592,7 +592,7 @@
      rank. Single biggest result-quality win available.
    Exit: "beginning void light" returns Genesis 1 verses; SR8 pins it.
 
- [SR3] No relevance ranking (insertion order)               STATUS: OPEN
+ [SR3] No relevance ranking (insertion order)               STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED (sandbox: shuffled-insert returns insert order)
    Evidence: rankScore=(perFieldLimit-r)/perFieldLimit (search.js:1437) assumes
      result index r reflects relevance, but FlexSearch 0.7 (resolution:9) returns
@@ -604,7 +604,7 @@
      only ranking signal.
    Exit: a relevance smoke assertion (a known passage ranks above a sparse hit).
 
- [SR4] ~100 lines dead relevance code; stale hero copy       STATUS: OPEN
+ [SR4] ~100 lines dead relevance code; stale hero copy       STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: Med   VERDICT: CONFIRMED (corrected detail)
    Evidence: SYNONYM_GROUPS/SYNONYM_MAP (search-data.js:381-441), stemWord
      (:445-464), phoneticKey (:467-483) are defined but NOT in the
@@ -616,7 +616,7 @@
      SearchScreen.jsx:259-260 hero copy ("headings").
    Exit: no dead exports; hero copy matches indexed fields.
 
- [SR5] Search-before-corpus caches a near-empty index        STATUS: OPEN
+ [SR5] Search-before-corpus caches a near-empty index        STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: Med   VERDICT: CONFIRMED
    Evidence: SearchScreen.jsx:21 calls VotSearch.init() on mount with no corpus-
      readiness guard; init() builds both engines immediately reading bare
@@ -628,7 +628,7 @@
      load-state and dropActive()+ensureIndex() when they resolve.
    Exit: open Search pre-corpus → after load, index reflects full corpus.
 
- [SR8 / T1] Search engine 0% tested + outside coverage       STATUS: OPEN
+ [SR8 / T1] Search engine 0% tested + outside coverage       STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED
    Evidence: search.js is 1714 lines / 72 KB; the only search test
      (src/hooks/use-search.test.js) MOCKS window.VotSearch. The engine is OUTSIDE
@@ -640,7 +640,7 @@
      Add app/src/main/assets/search.js to the coverage include.
    Exit: search.test.js green; engine coverage measured.
 
- [S2] JournalMediaStore has no tx.onabort → import can hang  STATUS: OPEN
+ [S2] JournalMediaStore has no tx.onabort → import can hang  STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: Med   VERDICT: CONFIRMED  (highest-value storage fix)
    Evidence: put/get/delete/list/allIds settle only on req.onsuccess/onerror with
      NO tx.onabort/tx.onerror (journal-media-store.js:127-223), unlike the
@@ -653,7 +653,7 @@
      the S3 toast already reports.
    Exit: a forced-abort media put rejects (test) instead of hanging.
 
- [S3] Partial-failure import still auto-reloads              STATUS: OPEN
+ [S3] Partial-failure import still auto-reloads              STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: Med   VERDICT: CONFIRMED
    Evidence: on writeFailures>0 the code only appends to the toast and still
      setTimeout(reload,600) unconditionally (SettingsScreen.jsx:546-559) → failed
@@ -662,7 +662,7 @@
      "Import incomplete — retry, do not navigate away" state.
    Exit: simulated write-failure import does not auto-reload.
 
- [S1] Export reads stale IDB (no whenSaved flush)            STATUS: OPEN
+ [S1] Export reads stale IDB (no whenSaved flush)            STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: Low-Med (demoted)   VERDICT: CONFIRMED
    Evidence: buildExportPayload reads each store via idbAdapter.get (backup.js:
      165) with no whenSaved() flush; exportPersonalData doesn't flush either
@@ -672,7 +672,7 @@
    Fix: await Promise.all(stores.map(s=>s.whenSaved())) before buildExportPayload.
    Exit: edit-then-export round-trip includes the edit (test).
 
- [N1+N2] Audio session lifecycle (focus + double-start)      STATUS: OPEN
+ [N1+N2] Audio session lifecycle (focus + double-start)      STATUS: N2 DONE (29dc4bc); N1 audio-focus owed a device walk
    SEV: Med   VERDICT: CONFIRMED (N1 strand-half DEMOTED to Low)
    Evidence: (a) no requestAudioFocus(AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
      anywhere (grep=0) → recording bleeds other apps' audio. This is the still-
@@ -721,7 +721,7 @@
    Exit: bundles shrink as measured; app boots + renders on the API-28 emulator
      (WebView 69) with 0 parse errors; APK shrinks.
 
- [T2] Smoke gate proves "didn't crash", not "rendered right" STATUS: OPEN
+ [T2] Smoke gate proves "didn't crash", not "rendered right" STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: High   VERDICT: CONFIRMED
    Evidence: tools/smoke.js:291 is the only fn() call; its boolean return (the
      per-step content regex, e.g. /Genesis/) is DISCARDED; reached = !onHome() &&
@@ -731,7 +731,7 @@
      && !st.crashed && !detail` (treat undefined as "no assertion" for back-compat).
    Exit: a deliberately-blanked screen fails smoke.
 
- [T3] Coverage gate is one global mean (gameable)            STATUS: OPEN
+ [T3] Coverage gate is one global mean (gameable)            STATUS: DONE (P0–P3 wave — see PROGRESS LOG)
    SEV: Med-High   VERDICT: CONFIRMED (live run reproduced 46/38 on journal-store)
    Evidence: aggregate 61.29/52.25/65.37/65.18 vs floor 60/51/64/64
      (vitest.config.js:239-244), masking journal-store.js 46/38/58/50, dom-links
