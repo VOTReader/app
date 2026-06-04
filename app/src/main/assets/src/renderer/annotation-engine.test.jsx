@@ -21,6 +21,7 @@ import {
   renderSubRanges,
   HighlightableText,
   applyDOMHighlights,
+  annDomSig,
   snapRangeToWords,
 } from './annotation-engine.jsx';
 import { AnnotationStore } from '../stores/annotation-store.js';
@@ -533,5 +534,78 @@ describe('HighlightableText — A1+A5 inline note icon', () => {
     fireEvent.click(container.querySelector('.hl-note-icon'));
     expect(opened).toEqual(['g1']);
     delete (/** @type {any} */ (window)).__openNote;
+  });
+});
+
+// ── A4: per-container signature scopes the re-apply ──
+describe('applyDOMHighlights — A4 signature skip', () => {
+  let store;
+  beforeEach(() => {
+    store = {};
+    window.AnnotationStore = { get: (k) => store[k] || [] };
+    window.NoteStore = { _notes: {}, get: (gid) => window.NoteStore._notes[gid] || null };
+  });
+  afterEach(() => {
+    document.body.innerHTML = '';
+    delete window.AnnotationStore;
+    delete window.NoteStore;
+  });
+  const setup = (text) => {
+    document.body.innerHTML = '<span data-hl-key="k" data-hl-dom>' + text + '</span>';
+    return document.querySelector('[data-hl-key="k"]');
+  };
+
+  it('annDomSig folds the DOM-affecting fields; empty → "", changes on any field', () => {
+    expect(annDomSig([])).toBe('');
+    const a = [ann({ id: 'x', color: 'yellow', start: 0, end: 5, created: 1 })];
+    expect(annDomSig(a)).toBe(annDomSig(a.slice()));               // deterministic
+    expect(annDomSig(a)).not.toBe(annDomSig([ann({ id: 'x', color: 'blue', start: 0, end: 5, created: 1 })]));   // color
+    expect(annDomSig(a)).not.toBe(annDomSig([ann({ id: 'x', color: 'yellow', start: 0, end: 6, created: 1 })])); // end
+  });
+
+  it('a re-apply with the SAME annotations skips (does not re-create the marks)', () => {
+    store['k'] = [ann({ id: 'a', color: 'yellow', start: 0, end: 5, created: 1 })];
+    const c = setup('Hello world');
+    applyDOMHighlights();
+    const mark = c.querySelector('mark.hl-yellow[data-hl-id="a"]');
+    expect(mark).not.toBeNull();
+    expect(c.getAttribute('data-hl-sig')).not.toBe('');
+    mark.setAttribute('data-sentinel', '1'); // a re-process would replace this node
+    applyDOMHighlights();                     // unchanged anns → skip
+    expect(c.querySelector('mark[data-hl-id="a"]').getAttribute('data-sentinel')).toBe('1');
+  });
+
+  it('a re-apply after an annotation CHANGE re-processes (sentinel gone, new paint)', () => {
+    store['k'] = [ann({ id: 'a', color: 'yellow', start: 0, end: 5, created: 1 })];
+    const c = setup('Hello world');
+    applyDOMHighlights();
+    c.querySelector('mark[data-hl-id="a"]').setAttribute('data-sentinel', '1');
+    store['k'] = [ann({ id: 'a', color: 'blue', start: 0, end: 5, created: 1 })]; // recolor → sig changes
+    applyDOMHighlights();
+    const m = c.querySelector('mark[data-hl-id="a"]');
+    expect(m.classList.contains('hl-blue')).toBe(true);
+    expect(m.getAttribute('data-sentinel')).toBeNull();
+  });
+
+  it('a re-apply after a NOTE is toggled on the group re-processes (hl-note appears)', () => {
+    store['k'] = [ann({ id: 'a', color: 'yellow', groupId: 'g', start: 0, end: 5, created: 1 })];
+    const c = setup('Hello world');
+    applyDOMHighlights();
+    expect(c.querySelector('mark.hl-note')).toBeNull();
+    window.NoteStore._notes['g'] = { groupId: 'g', text: 'memo' }; // note-ness → sig changes
+    applyDOMHighlights();
+    expect(c.querySelector('mark.hl-note[data-hl-id="a"]')).not.toBeNull();
+  });
+
+  it('clearing the annotations re-processes once (marks removed), then skips', () => {
+    store['k'] = [ann({ id: 'a', color: 'yellow', start: 0, end: 5, created: 1 })];
+    const c = setup('Hello world');
+    applyDOMHighlights();
+    expect(c.querySelector('mark.hl-dom')).not.toBeNull();
+    store['k'] = [];                       // removed
+    applyDOMHighlights();
+    expect(c.querySelector('mark.hl-dom')).toBeNull();
+    expect(c.getAttribute('data-hl-sig')).toBe('');
+    expect(c.textContent).toBe('Hello world');
   });
 });

@@ -418,6 +418,27 @@ export function applyActiveNoteState() {
     .forEach(el => el.classList.add('is-active'));
 }
 
+/* A4: a deterministic signature of everything applyDOMHighlights's paint reads
+   for a container — every annotation's id/start/end/kind/color/groupId/created
+   (the sort + nesting inputs) PLUS its note-ness (NoteStore membership, which
+   toggles the hl-note class + the icon anchor). If a container's signature is
+   unchanged since its last paint, the painted marks are already correct, so the
+   whole unwrap/re-walk/re-wrap pass can be skipped. Unit-separator delimiters
+   (U+241F field, U+241E record) can't collide with any field value. */
+export function annDomSig(anns) {
+  if (!anns || !anns.length) return '';
+  var parts = [];
+  for (var i = 0; i < anns.length; i++) {
+    var a = anns[i];
+    var note = (typeof NoteStore !== 'undefined' && NoteStore.get(a.groupId)) ? '1' : '0';
+    parts.push(
+      a.id + '␟' + a.start + '␟' + a.end + '␟' + (a.kind || '') +
+      '␟' + (a.color || '') + '␟' + a.groupId + '␟' + (a.created || 0) + '␟' + note
+    );
+  }
+  return parts.join('␞');
+}
+
 export function applyDOMHighlights() {
   // (U8) Scope the sweep to [data-hl-dom] containers at query time — matching
   // applyDOMLinks / applyDOMBookmarks. This drops a DEAD guard: the previous
@@ -429,6 +450,19 @@ export function applyDOMHighlights() {
   // happens in the selector, so unannotated containers cost nothing here.
   document.querySelectorAll('[data-hl-key][data-hl-dom]').forEach(function(container) {
     var hlKey = container.getAttribute('data-hl-key');
+    var anns = AnnotationStore.get(hlKey);
+
+    // A4: scope the re-apply. useDomAnnotationSync re-runs this over EVERY
+    // [data-hl-dom] block on any of 4 store bumps; skip a block whose annotation
+    // set is UNCHANGED since its last paint (its marks are already correct). The
+    // sig lives on the frozen container (StaticSubtree), so it clears WITH the
+    // marks on a re-render (screen/letter/corpus change) — and the FIRST paint
+    // has no prior sig, so it always processes (the dual-render test is
+    // unaffected). The sig is set only at a CLEAN exit below, so a mid-paint
+    // throw (the try/catch in useDomAnnotationSync) re-processes next pass.
+    var sig = annDomSig(anns);
+    if (sig === container.getAttribute('data-hl-sig')) return;
+
     var existing = container.querySelectorAll('mark.hl-dom');
     for (var i = 0; i < existing.length; i++) {
       var mark = existing[i];
@@ -439,8 +473,7 @@ export function applyDOMHighlights() {
     container.querySelectorAll('.hl-note-icon').forEach(function(el) { el.remove(); });
     container.normalize();
 
-    var anns = AnnotationStore.get(hlKey);
-    if (!anns.length) return;
+    if (!anns.length) { container.setAttribute('data-hl-sig', sig); return; }
 
     // Newest LAST so a more-recent annotation nests INNERMOST — it both paints
     // on top (its mark wraps the text last) and is the natural tap target.
@@ -459,7 +492,7 @@ export function applyDOMHighlights() {
       var e = Math.max(0, Math.min(a.end, fullLen));
       return s < e ? Object.assign({}, a, { start: s, end: e }) : null;
     }).filter(Boolean);
-    if (!sorted.length) return;
+    if (!sorted.length) { container.setAttribute('data-hl-sig', sig); return; }
 
     var groupSeen = {};
 
@@ -537,6 +570,8 @@ export function applyDOMHighlights() {
         }
       }
     }
+    // A4: record the signature for this clean paint so an unchanged re-apply skips.
+    container.setAttribute('data-hl-sig', sig);
   });
 }
 
