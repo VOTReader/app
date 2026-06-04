@@ -35,7 +35,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-zIgP1GH38bpC/W9siuymsRqDqkMmZZcbfBWshzc/3Rc=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -122,7 +122,7 @@
   body.light { background: #f7f2e8; }</style>
 </head>
 <body>
-  <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");var cf=document.getElementById("custom-fonts");if(cf&&(!s.settings||s.settings.fontStyle!=="modern"))cf.disabled=true;}catch(e){}</script>
+  <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");var cf=document.getElementById("custom-fonts");if(cf&&(!s.settings||s.settings.fontStyle!=="modern"))cf.disabled=true;var fsc=s.settings&&s.settings.fontScale;if(fsc&&fsc!=="1")document.documentElement.style.setProperty("--font-scale",String(fsc));}catch(e){}</script>
   <div id="root"></div>
   <!-- Cluster A: vendor + (most) corpus + search engine (26 files, ~4.6 MB).
        Concatenated by tools/build.py — DO NOT edit dist/bundle-a.js by hand.

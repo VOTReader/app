@@ -113,6 +113,7 @@ export function useSettings({ savedSettings, theme }) {
       historyInNav: false,
       showScrollNotch: false,
       arrowLayout: "split", // "split" | "right" | "left" | "nav" | "off"
+      fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>
       ...savedS,
       ...migrated // migration wins over stale saved values
     };
@@ -153,6 +154,11 @@ export function useSettings({ savedSettings, theme }) {
     // handles the initial state; this effect handles runtime toggles.
     const customFontsEl = /** @type {HTMLStyleElement | null} */ (document.getElementById("custom-fonts"));
     if (customFontsEl) customFontsEl.disabled = settings.fontStyle !== "modern";
+    // WL1 — text-size scale. Mirror settings.fontScale onto the --font-scale
+    // CSS var on <html>; app.css multiplies it into the root font-size so all
+    // rem/em sizing scales. The index.html boot script sets the initial value
+    // pre-mount (no FOUC); this handles live changes from the Settings selector.
+    document.documentElement.style.setProperty("--font-scale", String(settings.fontScale || "1"));
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
     // status bar + navigator.wakeLock fire-and-forget for the screen-on

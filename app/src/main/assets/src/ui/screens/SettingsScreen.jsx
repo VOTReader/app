@@ -2,6 +2,16 @@
    SettingsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* WL1 — Text Size options for the SelectField in the Text & Translation
+   section. The id is the raw --font-scale multiplier (string) applied to the
+   root font-size; "1" = the app's standard size. */
+const TEXT_SIZE_OPTIONS = [
+  { id: "1", label: "Standard", desc: "The app's standard reading size." },
+  { id: "1.15", label: "Large", desc: "15% larger text throughout." },
+  { id: "1.3", label: "Larger", desc: "30% larger text throughout." },
+  { id: "1.5", label: "Largest", desc: "50% larger text throughout." },
+];
+
 /* Tiny per-row confirm helpers. Each owns its own confirm state and
    renders either the row's button OR the standardized ConfirmStrip in
    the slot below the row. Defined at module scope (not inside
@@ -970,6 +980,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             desc="Use Cinzel headings and EB Garamond body text instead of your device's built-in serif font. The classic look is larger and more familiar; modern is more elegant."
             checked={settings.fontStyle === "modern"}
             onToggle={() => onSetting("fontStyle", settings.fontStyle === "modern" ? "classic" : "modern")}
+          />
+          <SelectField
+            eyebrow="Text & Translation"
+            title="Text Size"
+            label="Text Size"
+            desc="Scale all text larger for easier reading. Affects every screen. Independent of your device's own font-size setting."
+            value={settings.fontScale || "1"}
+            options={TEXT_SIZE_OPTIONS}
+            onChange={(v) => onSetting("fontScale", v)}
           />
           <SettingsRow
             label="Chapter Titles"

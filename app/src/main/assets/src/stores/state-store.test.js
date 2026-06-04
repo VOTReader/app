@@ -1,7 +1,7 @@
 /* StateStore — lsShim + set/get + version contract tests.
    ─────────────────────────────────────────────────────────
    StateStore is the only store with a dual-write path: full state goes
-   to IDB, reduced {theme, settings.fontStyle} shim goes to localStorage
+   to IDB, reduced {theme, settings.fontStyle, settings.fontScale} shim goes to localStorage
    for the synchronous boot-script read at index.html:73. The shim is
    the critical surface — if it breaks, the user sees a wrong-theme
    flash (FOUC) on every page load.
@@ -119,6 +119,18 @@ describe('StateStore — lsShim', () => {
     StateStore.set({ theme: 'dark', settings: { fontStyle: 'classic' } });
     const shim = JSON.parse(localStorage.getItem('vot-state'));
     expect(shim.settings.fontStyle).toBe('classic');
+  });
+
+  it('fontScale round-trips through the shim (WL1 text-size, read pre-mount)', () => {
+    StateStore.set({ theme: 'dark', settings: { fontStyle: 'classic', fontScale: '1.5' } });
+    const shim = JSON.parse(localStorage.getItem('vot-state'));
+    expect(shim.settings.fontScale).toBe('1.5');
+  });
+
+  it('drops undefined fontScale from shim', () => {
+    StateStore.set({ theme: 'dark', settings: { fontStyle: 'classic' } });
+    const shim = JSON.parse(localStorage.getItem('vot-state'));
+    expect(shim.settings.fontScale).toBeUndefined();
   });
 
   it('LS shim is overwritten on every set()', () => {

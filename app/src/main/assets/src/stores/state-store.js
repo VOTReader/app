@@ -16,11 +16,12 @@
 
    Solution: the W2.2 lsShim hook. Every StateStore.set() writes the
    full state to IDB AND a reduced copy to localStorage containing
-   ONLY the two paths the boot script reads:
+   ONLY the paths the boot script reads:
 
      localStorage['vot-state'] = JSON.stringify({
        theme: full?.theme,
-       settings: { fontStyle: full?.settings?.fontStyle },
+       settings: { fontStyle: full?.settings?.fontStyle,
+                   fontScale: full?.settings?.fontScale },
      });
 
    The reduced shape is grepped from the literal boot-script code —
@@ -68,20 +69,23 @@ import { CachedStore, extendStore } from './cached-store.js';
  */
 
 /**
- * Reduce the full state to the two paths the boot script reads at
- * index.html line 73 — `s.theme` and `s.settings.fontStyle`. Anything
- * else is kept in IDB only. Returning these as a stable shape (always
- * `theme` + always `settings.fontStyle` keys, even when undefined)
- * keeps the LS payload predictable for the boot script.
+ * Reduce the full state to the paths the boot script reads pre-mount —
+ * `s.theme`, `s.settings.fontStyle`, and `s.settings.fontScale` (WL1
+ * text-size: applied to the --font-scale CSS var before React mounts so
+ * larger text does not flash in at the standard size). Anything else is
+ * kept in IDB only. Returning these as a stable shape (always `theme` +
+ * always `settings.fontStyle` + `settings.fontScale` keys, even when
+ * undefined) keeps the LS payload predictable for the boot script.
  *
  * @param {VotState | null | undefined} full
- * @returns {{ theme: string | undefined, settings: { fontStyle: string | undefined } }}
+ * @returns {{ theme: string | undefined, settings: { fontStyle: string | undefined, fontScale: string | undefined } }}
  */
 function _bootScriptShim(full) {
   return {
     theme: full && full.theme,
     settings: {
       fontStyle: full && full.settings && full.settings.fontStyle,
+      fontScale: full && full.settings && full.settings.fontScale,
     },
   };
 }

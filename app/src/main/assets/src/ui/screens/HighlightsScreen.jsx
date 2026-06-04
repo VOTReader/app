@@ -9,27 +9,27 @@
   var R = [];
   R.push('.hlx-screen { padding: 0 0 90px; }');
   R.push('.hlx-header { padding: 18px 22px 4px; }');
-  R.push('.hlx-eyebrow { font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold-dim); display: block; }');
-  R.push('.hlx-title { font-family: var(--font-cinzel); color: var(--gold); font-size: 22px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 2px; }');
-  R.push('.hlx-count { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: 13px; }');
+  R.push('.hlx-eyebrow { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold-dim); display: block; }');
+  R.push('.hlx-title { font-family: var(--font-cinzel); color: var(--gold); font-size: 1.375rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 2px; }');
+  R.push('.hlx-count { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: 0.8125rem; }');
   R.push('.hlx-controls { padding: 10px 18px 6px; display: flex; flex-direction: column; gap: 10px; }');
-  R.push('.hlx-search { background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: 14px; outline: none; box-sizing: border-box; }');
+  R.push('.hlx-search { background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: 0.875rem; outline: none; box-sizing: border-box; }');
   R.push('body.light .hlx-search { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }');
   R.push('.hlx-search:focus { border-color: var(--gold); }');
   R.push('.hlx-sort-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }');
-  R.push('.hlx-sort-label { font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); }');
-  R.push('.hlx-sort-btn { background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; }');
+  R.push('.hlx-sort-label { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); }');
+  R.push('.hlx-sort-btn { background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; }');
   R.push('.hlx-sort-btn.active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold); }');
   R.push('.hlx-sort-btn:hover { color: var(--gold); }');
   // Filter rows (Type chips + Color dots), each with a leading label.
   R.push('.hlx-filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 4px; }');
-  R.push('.hlx-type-chip { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
+  R.push('.hlx-type-chip { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
   R.push('.hlx-type-chip.active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold); }');
   R.push('.hlx-type-chip:hover { color: var(--gold); }');
   // Granular color-filter dots (mirror the highlight/underline picker).
   // Explicit box-sizing + appearance reset + flex:0 0 auto so the
   // <button> never collapses to a sliver inside the flex row.
-  R.push('.hlx-color-all { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
+  R.push('.hlx-color-all { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
   R.push('.hlx-color-all.active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold); }');
   R.push('.hlx-color-dot { appearance: none; -webkit-appearance: none; box-sizing: border-box; width: 24px; height: 24px; min-width: 24px; flex: 0 0 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.15); cursor: pointer; padding: 0; margin: 0; line-height: 0; font-size: 0; transition: transform 0.1s, border-color 0.12s; }');
   R.push('.hlx-color-dot:hover { transform: scale(1.12); }');
@@ -43,14 +43,14 @@
   R.push('.hlx-swatch.is-underline { background: transparent !important; border-radius: 0; height: 0; margin-top: 10px; border: none; border-bottom: 3px solid; width: 16px; }');
   R.push('.hlx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }');
   R.push('.hlx-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }');
-  R.push('.hlx-source { font-family: var(--font-cinzel); font-size: 13px; color: var(--gold); letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%; }');
-  R.push('.hlx-kind { font-family: var(--font-cinzel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); border: 1px solid var(--gold-border); border-radius: 999px; padding: 1px 7px; }');
-  R.push('.hlx-text { font-family: var(--font-garamond); font-style: italic; font-size: 14px; color: var(--cream-dim); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }');
+  R.push('.hlx-source { font-family: var(--font-cinzel); font-size: 0.8125rem; color: var(--gold); letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%; }');
+  R.push('.hlx-kind { font-family: var(--font-cinzel); font-size: 0.5625rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); border: 1px solid var(--gold-border); border-radius: 999px; padding: 1px 7px; }');
+  R.push('.hlx-text { font-family: var(--font-garamond); font-style: italic; font-size: 0.875rem; color: var(--cream-dim); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }');
   R.push('body.light .hlx-text { color: #5a4f3d; }');
-  R.push('.hlx-date { font-family: var(--font-cinzel); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 2px; }');
+  R.push('.hlx-date { font-family: var(--font-cinzel); font-size: 0.5625rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 2px; }');
   R.push('.hlx-empty { padding: 60px 30px; text-align: center; }');
-  R.push('.hlx-empty-title { font-family: var(--font-cinzel); color: var(--gold); font-size: 18px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }');
-  R.push('.hlx-empty-hint { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: 15px; line-height: 1.5; max-width: 320px; margin: 0 auto; }');
+  R.push('.hlx-empty-title { font-family: var(--font-cinzel); color: var(--gold); font-size: 1.125rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }');
+  R.push('.hlx-empty-hint { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: 0.9375rem; line-height: 1.5; max-width: 320px; margin: 0 auto; }');
   var el = document.createElement('style');
   el.id = 'hlx-styles';
   el.textContent = R.join('\n');
