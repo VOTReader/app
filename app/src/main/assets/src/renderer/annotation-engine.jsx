@@ -43,6 +43,12 @@ export function snapRangeToWords(text, start, end) {
   // split mid-snap. Hyphen last = literal.
   const isWord = (c) => !!c && /[\w’'-]/.test(c);
   while (start > 0 && isWord(text[start - 1]) && isWord(text[start])) start--;
+  // ANN-2: never leave `start` on a lone TRAILING surrogate (the low half of an
+  // emoji / astral codepoint) — a downstream splitText(start) would cleave the glyph.
+  // Back up to the codepoint boundary. (Corpus is ASCII; only a journal annotation
+  // could realistically reach this.)
+  const cc = text.charCodeAt(start);
+  if (cc >= 0xDC00 && cc <= 0xDFFF && start > 0) start--;
   return { start, end };
 }
 

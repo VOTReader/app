@@ -46,6 +46,14 @@ describe('snapRangeToWords (A2)', () => {
   it('clamps out-of-range offsets', () => {
     expect(snapRangeToWords('abc', -5, 99)).toEqual({ start: 0, end: 3 });
   });
+  it('ANN-2: backs start off a lone trailing surrogate (no mid-emoji split)', () => {
+    // 'ab😀cd' — the emoji is a surrogate PAIR at indices 2-3. A start of 3 (the low
+    // surrogate) would splitText mid-glyph; it must back up to the codepoint boundary.
+    const r = snapRangeToWords('ab😀cd', 3, 5);
+    expect(r.start).toBe(2);
+    const cc = 'ab😀cd'.charCodeAt(r.start);
+    expect(cc >= 0xDC00 && cc <= 0xDFFF).toBe(false); // no longer a trailing surrogate
+  });
 });
 
 /** Minimal annotation factory. */

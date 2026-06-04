@@ -304,6 +304,13 @@ describe('lookupVersesFromBooks', () => {
       '16. For God so loved the world 17. For God did not send His Son to condemn 18. He who believes is not condemned'
     );
   });
+  it('SCRIP-3: resolves a compound ";"-joined ref by resolving each part', () => {
+    expect(lookupVersesFromBooks('Genesis 1:1; Psalms 23:1')).toBe('In the beginning The Lord is my shepherd');
+    // a single ref is unchanged
+    expect(lookupVersesFromBooks('John 3:16')).toBe('For God so loved the world');
+    // a COMMA list stays one ref's verse list (NOT split into distinct refs — parseRefStr owns it)
+    expect(lookupVersesFromBooks('1 Corinthians 13:4,5')).toBe('Love suffers long');
+  });
 });
 
 /* ── resolveVerseText ─────────────────────────────────────────── */

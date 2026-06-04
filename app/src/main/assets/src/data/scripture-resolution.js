@@ -334,6 +334,18 @@ export function findEntryContext(id, kindHint) {
  * @returns {string | null}
  */
 export function lookupVersesFromBooks(ref) {
+  // SCRIP-3: a compound ref ("Isaiah 40:13; Romans 11:34") holds multiple DISTINCT
+  // references joined by ';'. Resolve each and join, so a compound token resolves from
+  // the BOOKS corpus without depending on a hardcoded combined-key entry in a letter's
+  // scriptures dict. (Commas are NOT split — parseRefStr already treats "3:16,17" as a
+  // single ref's verse list.)
+  if (typeof ref === 'string' && ref.indexOf(';') >= 0) {
+    const parts = ref.split(';').map((r) => r.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      const texts = parts.map((r) => lookupVersesFromBooks(r)).filter(Boolean);
+      return texts.length ? texts.join(' ') : null;
+    }
+  }
   const p = parseRefStr(ref);
   if (!p || p.verse == null) return null;
   const bookKey = findBook(p.rawBook);

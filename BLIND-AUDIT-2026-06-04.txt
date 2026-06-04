@@ -110,6 +110,20 @@ PROGRESS LOG
     1.5} before it lands in the --font-scale CSS var.
   Gates: lint + typecheck + 1891 vitest (+6) + smoke:ci green.
 
+2026-06-04  BATCH 7 - TEXT/SCRIPTURE ROBUSTNESS (ANN-2, SCRIP-3 DONE; ANN-3, SCRIP-2 adjudicated).  commit <pending>
+  - ANN-2: snapRangeToWords backs `start` off a lone trailing surrogate, so a journal
+    annotation starting mid-emoji can't splitText through the glyph. +1 test.
+  - SCRIP-3: lookupVersesFromBooks splits a ';'-joined compound ref ("Isaiah 40:13;
+    Romans 11:34") and resolves each part from BOOKS - no longer depends on a hardcoded
+    combined-key dict entry. Commas are NOT split (parseRefStr owns verse lists). +1 test.
+  - ANN-3 SKIPPED: the agent itself verified it's cosmetic (bounded +1 node, NOT a leak);
+    adding container.normalize() risks the working DOM for no defect [[respect-production-code]].
+  - SCRIP-2 ADJUDICATED: the render-guard the audit suggested is NET-NEGATIVE - BOOKS is
+    the LAZY corpus (undefined on a cold WTLB read), so gating the link on BOOKS[bookId]
+    would render the VALID {{nav:esther:7}} link inert until the corpus loads. The correct
+    fix is a build-time {{nav:}} validator (no runtime risk) - folded into CORP-2 (queued).
+  Gates: 101 (annotation+scripture) tests green; full chain via pre-commit.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -149,14 +163,14 @@ P3 — Low / hardening / nits / small wins
   [ ] SRCH-5   Same verse duplicated across corpora (no cross-kind dedup)
   [x] SRCH-6   1-char queries return 400 junk title hits
   [ ] SCRIP-2  {{nav:bookId:ch}} tokens get zero validation
-  [ ] SCRIP-3  Multi-ref (semicolon) tokens unparseable (dict-key crutch)
+  [x] SCRIP-3  Multi-ref (semicolon) tokens unparseable (dict-key crutch)
   [x] STORE-3  Media put() caches object URL pre-commit (abort leaves stale URL)
   [ ] STORE-4  Failed _save() keeps unsaved value, never retries
   [x] BAK-2    v3 media frame w/o `size` skips truncation guard
   [ ] BAK-3    Store apply incremental, no cross-store rollback
   [x] BAK-4    Trailing bytes after last frame silently ignored
   [ ] BAK-5    Add Android chunked-bridge round-trip regression test
-  [ ] ANN-2    snapRangeToWords can leave start on a lone surrogate
+  [x] ANN-2    snapRangeToWords can leave start on a lone surrogate
   [ ] ANN-3    applyNoteIcons leaves bounded text-node fragmentation
   [ ] JRNL-2   Media-insert → entry-reference orphan window (cross-session)
   [ ] JRNL-5   Add an editor durability-level test
