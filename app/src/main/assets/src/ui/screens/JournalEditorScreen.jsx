@@ -2,6 +2,29 @@
    JournalEditorScreen — Cluster B (esbuild bundle-b.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* JRNL-1 — a synchronous localStorage draft of the in-progress entry. localStorage.setItem
+   is synchronous and survives a process kill, so it is the only thing that reliably
+   persists the last edits when Android OOM-kills a BACKGROUNDED WebView before the async
+   IDB write lands (JournalStore.update -> _save is fire-and-forget). Single slot, keyed
+   internally by entryId; written on background-hide, recovered + consumed on re-open. */
+var JOURNAL_DRAFT_KEY = 'vot-journal-draft';
+function _readJournalDraft() {
+  try { var s = localStorage.getItem(JOURNAL_DRAFT_KEY); return s ? JSON.parse(s) : null; }
+  catch (_e) { return null; }
+}
+function _writeJournalDraft(eid, title, blocks, mood) {
+  try {
+    localStorage.setItem(JOURNAL_DRAFT_KEY, JSON.stringify({ entryId: eid, title: title, blocks: blocks, mood: mood, ts: Date.now() }));
+  } catch (_e) { /* quota / unavailable — draft recovery is best-effort */ }
+}
+function _clearJournalDraft() {
+  try { localStorage.removeItem(JOURNAL_DRAFT_KEY); } catch (_e) { /* unavailable */ }
+}
+/** Content signature for draft-vs-stored comparison (title + blocks + mood only). */
+function _journalSig(o) {
+  return JSON.stringify([(o && o.title) || '', (o && o.blocks) || [], (o && o.mood) || null]);
+}
+
 export function JournalEditorScreen(props) {
   var useState = React.useState;
   var useEffect = React.useEffect;
@@ -11,9 +34,25 @@ export function JournalEditorScreen(props) {
   var entryId = props.entryId;
   var onBack = props.onBack;
 
-  var initial = useMemo(function() {
-    return entryId ? JournalStore.get(entryId) : null;
+  // JRNL-1: on open, recover a background-draft whose edits never reached IDB. Restore
+  // ONLY when the draft is for THIS entry, is at least as recent as the last durable save
+  // (draft.ts >= entry.updated), AND its content actually differs — so a stale or
+  // already-saved draft can never clobber newer stored content. A recovered draft is KEPT
+  // (a 2nd kill before the recovered edits are re-saved recovers again); a stale/identical
+  // one is consumed by the effect below.
+  var loaded = useMemo(function() {
+    var entry = entryId ? JournalStore.get(entryId) : null;
+    if (!entryId) return { initial: entry, draftAction: 'none' };
+    var draft = _readJournalDraft();
+    if (!draft || draft.entryId !== entryId) return { initial: entry, draftAction: 'none' };
+    var entryUpdated = (entry && entry.updated) || 0;
+    var hasNewerEdits = !!entry && draft.ts >= entryUpdated && _journalSig(draft) !== _journalSig(entry);
+    if (hasNewerEdits) {
+      return { initial: Object.assign({}, entry, { title: draft.title, blocks: draft.blocks, mood: draft.mood }), draftAction: 'keep' };
+    }
+    return { initial: entry, draftAction: 'clear' };
   }, [entryId]);
+  var initial = loaded.initial;
 
   // Local working state — we don't re-derive from JournalStore on every
   // render because that would clobber in-progress edits.
@@ -144,14 +183,30 @@ export function JournalEditorScreen(props) {
   // commitSave is hoisted and reads always-current refs, so these mount-only
   // listeners never capture stale state.)
   useEffect(function() {
-    function onVisibility() { if (document.visibilityState === 'hidden') commitSave(); }
-    window.addEventListener('pagehide', commitSave);
+    // JRNL-1: on background-hide, the best-effort async save (commitSave) AND a SYNCHRONOUS
+    // localStorage draft that survives an OOM-kill of the backgrounded WebView (commitSave's
+    // IDB write may not land). onHide reads always-current refs, so the mount-only []-deps
+    // listeners never capture stale state.
+    function onHide() {
+      commitSave();
+      var eid = entryIdRef.current;
+      if (eid) _writeJournalDraft(eid, titleRef.current, blocksRef.current, moodRef.current);
+    }
+    function onVisibility() { if (document.visibilityState === 'hidden') onHide(); }
+    window.addEventListener('pagehide', onHide);
     document.addEventListener('visibilitychange', onVisibility);
     return function() {
-      window.removeEventListener('pagehide', commitSave);
+      window.removeEventListener('pagehide', onHide);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+
+  // JRNL-1: consume a draft that was stale/identical at open. A RECOVERED draft (see
+  // `loaded`) is deliberately KEPT so a kill before the recovered edits are re-saved can
+  // recover again; only stale/already-saved drafts for THIS entry are cleared here.
+  useEffect(function() {
+    if (loaded.draftAction === 'clear') _clearJournalDraft();
+  }, [loaded]);
 
   function commitSave() {
     // Synchronous immediate save — Done nav, textarea blur, or page background.

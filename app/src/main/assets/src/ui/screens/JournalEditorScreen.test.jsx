@@ -110,4 +110,52 @@ describe('JournalEditorScreen — background-kill data safety', () => {
     const saved = JournalStore.get(entry.id);
     expect(saved.blocks.some((b) => b.type === 'audio' && b.mediaId === 'm_test')).toBe(true);
   });
+
+  // JRNL-1 — the in-memory cache flush (J2) is NOT durable: JournalStore.update -> _save
+  // is fire-and-forget, so a background-kill before the IDB write lands still loses the
+  // edits. A synchronous localStorage draft survives the kill and is recovered on re-open.
+  it('JRNL-1 — writes a synchronous localStorage draft of the latest edits on background-hide', () => {
+    const entry = JournalStore.add({ title: 'orig', blocks: [JournalHelpers.newBlock('p', { text: 'first' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited title' } });
+    fireEvent.change(document.querySelector('.jrn-block-textarea'), { target: { value: 'edited body' } });
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+
+    const draft = JSON.parse(localStorage.getItem('vot-journal-draft'));
+    expect(draft.entryId).toBe(entry.id);
+    expect(draft.title).toBe('edited title');
+    expect(draft.blocks.find((b) => b.type === 'p').text).toBe('edited body');
+  });
+
+  it('JRNL-1 — on open, recovers a draft whose NEWER edits never reached the store (the kill case)', () => {
+    const entry = JournalStore.add({ title: 'orig', blocks: [JournalHelpers.newBlock('p', { text: 'old body' })] });
+    // A draft a prior backgrounded session wrote, that a kill prevented from persisting:
+    // NEWER than the entry's last durable save, DIFFERENT content.
+    localStorage.setItem('vot-journal-draft', JSON.stringify({
+      entryId: entry.id,
+      title: 'recovered title',
+      blocks: [JournalHelpers.newBlock('p', { text: 'recovered body' })],
+      mood: null,
+      ts: (entry.updated || 0) + 5000,
+    }));
+
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+
+    expect(document.querySelector('.jrn-editor-title').value).toBe('recovered title');
+    expect(document.querySelector('.jrn-block-textarea').value).toBe('recovered body');
+  });
+
+  it('JRNL-1 — discards a STALE draft (older than the last save) and keeps the stored content', () => {
+    const entry = JournalStore.add({ title: 'current title', blocks: [JournalHelpers.newBlock('p', { text: 'current body' })] });
+    // OLDER than the entry's last durable save → the store was saved more recently; ignore + consume.
+    localStorage.setItem('vot-journal-draft', JSON.stringify({
+      entryId: entry.id, title: 'stale', blocks: [JournalHelpers.newBlock('p', { text: 'stale body' })], mood: null,
+      ts: (entry.updated || 0) - 5000,
+    }));
+
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+
+    expect(document.querySelector('.jrn-editor-title').value).toBe('current title');
+    expect(localStorage.getItem('vot-journal-draft')).toBeNull();
+  });
 });
