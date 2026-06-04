@@ -11,9 +11,9 @@
  * platform binary internally, so this is byte-identical and works on every OS.
  *
  * Options mirror the verified CLI exactly:
- *   esbuild <file> --minify --target=chrome69 --allow-overwrite --outfile=<file>
- * --target=chrome69 is MANDATORY (Permanent Rule 6) — it transpiles any syntax
- * newer than the Android 8/9 WebView floor. Only the pure-data corpus bundles
+ *   esbuild <file> --minify --target=chrome108 --allow-overwrite --outfile=<file>
+ * --target=chrome108 is the WebView floor (Permanent Rule 6) — it caps the syntax
+ * esbuild emits to what Chromium 108 parses. Only the pure-data corpus bundles
  * (no top-level `this`) are passed here; bundle-a stays raw (PF2).
  */
 import { buildSync } from 'esbuild';
@@ -29,6 +29,6 @@ buildSync({
   outfile: file,
   allowOverwrite: true,
   minify: true,
-  target: 'chrome69',
+  target: 'chrome108',
   logLevel: 'warning',
 });

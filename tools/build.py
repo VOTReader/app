@@ -149,7 +149,7 @@ D = []  # intentionally empty; esbuild owns bundle-d.js
 
 def _minify_content(content, label):
     """Minify ONE JS source string via esbuild (PF2) and return it. Same options
-    as the PF1 corpus minify (minify + target=chrome69, bundle:false → top-level
+    as the PF1 corpus minify (minify + target=chrome108, bundle:false → top-level
     globals preserved, value-identical). Used for the pure-data bundle-a members.
     """
     fd, tmp = tempfile.mkstemp(suffix='.js')
@@ -207,12 +207,11 @@ def bundle(name, files):
 def minify_in_place(name):
     """Minify a just-built bundle in place with esbuild (PF1).
 
-    --target=chrome69 is MANDATORY (Permanent Rule 6): it transpiles any syntax
-    newer than Chromium 69 so the bundle still PARSES on the Android 8/9 WebView
-    floor. ONLY the lazy corpus bundles (bundle-a-bible/matthew/vot.js) are passed
-    here — they are pure `var X = {...}` data with no top-level `this`, so the
-    bundle-a UMD-`this` trap (PF2) does not apply and minify is provably safe
-    (globals preserved, data byte-identical, 0 optional-chaining in output).
+    --target=chrome108 is the WebView floor (Permanent Rule 6): it caps the syntax
+    esbuild emits to what Chromium 108 parses. ONLY the lazy corpus bundles
+    (bundle-a-bible/matthew/vot.js) are passed here — they are pure `var X = {...}`
+    data with no top-level `this`, so the bundle-a UMD-`this` trap (PF2) does not
+    apply and minify is provably safe (globals preserved, data byte-identical).
     bundle-a itself stays raw because its vendored UMD libs DO read top-level
     `this`.
     """

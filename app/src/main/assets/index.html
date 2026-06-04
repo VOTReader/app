@@ -35,7 +35,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-BiBVmFw3ZhrU/PBwRHXqD0BNSiXHr8TDXQwQFLL9rxo=' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -74,65 +74,6 @@
     @font-face { font-family: 'EB Garamond'; font-weight: 400 800; font-style: italic; src: url('fonts/eb-garamond-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
   </style>
   <link rel="stylesheet" href="dist/app.min.css" />
-  <script>
-    /* ── Old-WebView polyfills — MUST be the very first script ──────────────
-       minSdk 26 (Android 8) ships System WebView as old as Chromium ~58, and
-       a non-Play-updated Android 9 ships Chromium 69 (verified on an API-28
-       emulator). A few runtime APIs the app uses are newer than that floor,
-       and an unguarded reference throws at parse/exec time and BLACK-SCREENS
-       the whole app. (The esbuild `--target=chrome69` flag handles modern
-       SYNTAX like ?. / ?? — these are runtime APIs it can't transpile.)
-       Each polyfill is feature-detected (no-op on a modern WebView):
-         - globalThis            (Chromium 71)
-         - Promise.allSettled    (Chromium 76) — used by store hydration (boot)
-         - Promise.any           (Chromium 85) — used by idb-adapter / health
-       Kept tiny + spec-faithful; this is the one place such shims live. */
-    (function(){
-      if (typeof globalThis === 'undefined') {
-        try {
-          // Standard self-reference fallback for engines without globalThis.
-          Object.defineProperty(Object.prototype, '__magic__', {
-            get: function(){ return this; }, configurable: true
-          });
-          __magic__.globalThis = __magic__;            // eslint-disable-line
-          delete Object.prototype.__magic__;
-        } catch (e) {
-          if (typeof window !== 'undefined') window.globalThis = window;
-        }
-      }
-      var P = (typeof Promise !== 'undefined') ? Promise : null;
-      if (P && typeof P.allSettled !== 'function') {
-        P.allSettled = function(iterable){
-          return P.all(Array.prototype.map.call(iterable, function(p){
-            return P.resolve(p).then(
-              function(v){ return { status: 'fulfilled', value: v }; },
-              function(r){ return { status: 'rejected', reason: r }; }
-            );
-          }));
-        };
-      }
-      if (P && typeof P.any !== 'function') {
-        P.any = function(iterable){
-          var arr = Array.prototype.slice.call(iterable);
-          return new P(function(resolve, reject){
-            if (arr.length === 0) { reject(new Error('All promises were rejected')); return; }
-            var errs = new Array(arr.length), remaining = arr.length;
-            arr.forEach(function(p, i){
-              P.resolve(p).then(resolve, function(e){
-                errs[i] = e;
-                if (--remaining === 0) {
-                  var agg = (typeof AggregateError === 'function')
-                    ? new AggregateError(errs, 'All promises were rejected')
-                    : new Error('All promises were rejected');
-                  reject(agg);
-                }
-              });
-            });
-          });
-        };
-      }
-    })();
-  </script>
   <script>
     /* Resource-load error capture — feeds tools/smoke.js so the harness
        can surface stale-path / 404 regressions that the regular console
