@@ -295,7 +295,19 @@
          that killed keyboard focus app-wide. */
       button:focus:not(:focus-visible), a:focus:not(:focus-visible), [role="button"]:focus:not(:focus-visible) { outline: none; }
       button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
-    
+      /* W10-lite — honor the OS "reduce motion" setting (vestibular a11y).
+         Near-zero (not 0) keeps animationend/transitionend firing, so JS that
+         awaits a transition (sheet close, toast fade) never hangs; scroll jumps
+         become instant instead of smooth (lands at the same target). */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
+
       /* ── TOP NAV ── */
       /* ── SCREEN LAYOUT (nav stays put, content scrolls) ── */
       .screen-layout {

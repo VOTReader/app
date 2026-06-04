@@ -87,6 +87,7 @@ export function AppShellOverlays({
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               onClick={dismissWelcome}
+              aria-label="Close"
               style={{
                 margin: 'calc(var(--inset-top, 0px) + 1rem) 1rem 0 0',
                 background: 'rgba(0,0,0,0.55)', border: '1.5px solid rgba(255,255,255,0.35)',

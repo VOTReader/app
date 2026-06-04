@@ -146,7 +146,7 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
             header dot OR the ⋯ menu's "Change color" item. */}
         {showColors ? (
           <div className="note-sheet-menu-colors">
-            <button className="ann-chip-back" onClick={() => setShowColors(false)} title="Back">‹</button>
+            <button className="ann-chip-back" onClick={() => setShowColors(false)} title="Back" aria-label="Back">‹</button>
             {curStyle === 'highlight' && (
               <button
                 className={"ann-chip-color-btn" + (color === 'blank' ? ' active' : '')}

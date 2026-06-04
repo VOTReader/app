@@ -141,7 +141,7 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
         )}
         {mode === 'colors' && (
           <div className="ann-chip-colors">
-            <button className="ann-chip-back" onClick={() => setMode('main')} title="Back">‹</button>
+            <button className="ann-chip-back" onClick={() => setMode('main')} title="Back" aria-label="Back">‹</button>
             {HL_COLORS.map(c => (
               <button
                 key={c}
@@ -155,7 +155,7 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
         )}
         {mode === 'style' && (
           <div className="ann-chip-colors">
-            <button className="ann-chip-back" onClick={() => setMode('main')} title="Back">‹</button>
+            <button className="ann-chip-back" onClick={() => setMode('main')} title="Back" aria-label="Back">‹</button>
             <button
               className={'sel-style-btn' + (kind !== 'underline' && kind !== 'squiggle' ? ' active' : '')}
               onClick={() => restyle('highlight')}
