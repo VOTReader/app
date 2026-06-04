@@ -249,7 +249,7 @@
         --tap-ref:        var(--gold-dim);
         --tap-ref-sub:    var(--gold-border);
         --tap-ref-active: var(--gold);
-        --link-blue:   #4a90b8;
+        --link-blue:   #387493;   /* W10-lite: darkened from #4a90b8 (3.15:1) to clear WCAG AA 4.5:1 on the light bg (4.60:1) */
         --accent-pink: #c2185b;
         --input-text:  #2a2520;   /* near-black with brown tint, softer than #000 */
       }
