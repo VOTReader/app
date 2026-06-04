@@ -142,15 +142,16 @@ export var JournalMediaStore = (function() {
       return tx('readwrite').then(function(store) {
         return new Promise(function(resolve, reject) {
           var req = store.put(record);
-          // Pre-warm the URL cache on the request, but RESOLVE only once the tx
-          // COMMITS — so a put the caller awaits (e.g. the import) is genuinely
-          // durable. (req.onsuccess fires before commit; an abort after it used
-          // to look like success.)
-          req.onsuccess = function() {
-            try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
-          };
           req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
-          store.transaction.addEventListener('complete', function() { resolve(record.id); });
+          // STORE-3: cache the object URL AND resolve only once the tx COMMITS, so a
+          // put the caller awaits (e.g. the import) is genuinely durable. req.onsuccess
+          // fires BEFORE commit; caching the URL there left a live URL pointing at a
+          // blob that a commit-time abort (e.g. quota) actually rolled back — masking
+          // the failure for the rest of the session.
+          store.transaction.addEventListener('complete', function() {
+            try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (_e) { /* best-effort; degrade silently if unsupported or quota hit */ }
+            resolve(record.id);
+          });
           guardTx(store, reject);
         });
       });

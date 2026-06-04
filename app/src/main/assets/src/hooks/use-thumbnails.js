@@ -169,6 +169,11 @@ export function useThumbnails({
   // ── Scroll-stop capture effect ─────────────────────────────────────────
   // Keep tab thumbnails fresh: capture on scroll-stop (300ms idle).
   React.useEffect(() => {
+    // SHELL-2: when tabs are off (a common/default config) there is nothing to
+    // capture, so don't run the 400ms re-attach poll + scroll listener for the
+    // app's lifetime. The effect re-runs when tabsEnabled flips (it's a dep), so
+    // turning tabs on re-establishes the listener.
+    if (!tabsEnabled) return undefined;
     let scrollTimer = null;
     let currentEl = null;
     const onScroll = () => {
@@ -188,7 +193,7 @@ export function useThumbnails({
       clearInterval(poll); clearTimeout(scrollTimer);
       if (currentEl) currentEl.removeEventListener("scroll", onScroll);
     };
-  }, [captureActiveTabThumbnail]);
+  }, [captureActiveTabThumbnail, tabsEnabled]);
 
   // ── Aspect-ratio CSS var effect ────────────────────────────────────────
   // Keep tab-card aspect ratio in sync with the viewport so

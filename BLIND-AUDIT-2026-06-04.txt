@@ -47,6 +47,17 @@ PROGRESS LOG
   SRCH-5 (cross-kind dedup) intentionally deferred — collapsing verse vs footnote-quote
   removes information; not clearly an improvement.
 
+2026-06-04  BATCH 2 — QUICK WINS (SCRIP-1, STORE-3, SHELL-2 DONE).  commit <pending>
+  - SCRIP-1: app.jsx dispatch falls back to ROUTES.home for an unknown/legacy persisted
+    screen (was a permanently blank, unrecoverable screen; blank ≠ crash so E4 never
+    fired). Authoritative — uses the real ROUTES, no drift. Preview-verified: planting
+    screen='vot-eight-letter' now boots to Home.
+  - STORE-3: JournalMediaStore.put caches the object URL on tx COMMIT, not on req
+    success — a commit-time abort no longer leaves a live URL to a rolled-back blob.
+  - SHELL-2: the thumbnail scroll-poll effect (400ms interval + scroll listener) now
+    early-returns when tabs are off instead of running for the app's lifetime.
+  Gates: build + lint + typecheck + 1883 vitest + smoke:ci green; canary app.jsx 782/800.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -68,7 +79,7 @@ P2 — Medium: correctness, perf cliffs, process gates, test gaps
   [ ] STORE-2  Orphan-sweep TOCTOU deletes a freshly-inserted media blob
   [ ] BAK-1    Legacy v2 import wipes existing media BEFORE decoding (destructive)
   [ ] ANN-1    applyDOMHighlights is O(N^2) per container
-  [ ] SCRIP-1  Unknown persisted screen → permanent blank screen, no recovery
+  [x] SCRIP-1  Unknown persisted screen → permanent blank screen, no recovery
   [ ] JRNL-3   Audio waveform samples stored inline at full resolution
   [ ] NTV-1    Unbounded whole-file heap read on record-stop + no recording cap
   [ ] PERF-3   translateVerse O(n^2) per chapter under non-NKJV translation
@@ -87,7 +98,7 @@ P3 — Low / hardening / nits / small wins
   [x] SRCH-6   1-char queries return 400 junk title hits
   [ ] SCRIP-2  {{nav:bookId:ch}} tokens get zero validation
   [ ] SCRIP-3  Multi-ref (semicolon) tokens unparseable (dict-key crutch)
-  [ ] STORE-3  Media put() caches object URL pre-commit (abort leaves stale URL)
+  [x] STORE-3  Media put() caches object URL pre-commit (abort leaves stale URL)
   [ ] STORE-4  Failed _save() keeps unsaved value, never retries
   [ ] BAK-2    v3 media frame w/o `size` skips truncation guard
   [ ] BAK-3    Store apply incremental, no cross-store rollback
@@ -106,7 +117,7 @@ P3 — Low / hardening / nits / small wins
   [ ] SEC-2    toast.js innerHTML foot-gun (currently safe, contract risk)
   [ ] SEC-3    settings.fontScale → CSS var, import-restorable (clamp)
   [ ] CORP-3   check_balance.py dash check too narrow (\d–\d only)
-  [ ] SHELL-2  Thumbnail scroll-poll interval runs for app lifetime when tabs off
+  [x] SHELL-2  Thumbnail scroll-poll interval runs for app lifetime when tabs off
   [ ] SHELL-3  Lazy-corpus loader invoked during render, not in an effect
   [ ] SHELL-4  Reading-screen components not React.memo'd
   [ ] PERF-5   applyDOMLinks/Bookmarks lack the A4 signature-skip

@@ -746,7 +746,12 @@ function App() {
           inner boundary, the only recovery is reload. With it, the
           user can navigate away to a working screen and either clear
           the bad data via Settings or re-import a good backup. */}
-      <ErrorBoundary key={screen}>{ROUTES[screen]?.() ?? null}</ErrorBoundary>
+      {/* SCRIP-1: an unknown/legacy persisted screen (IDB schema skew, a removed
+          route) isn't caught by _validateTabState's rules; without a fallback it
+          renders null — a permanently blank, unrecoverable screen (blank ≠ crash, so
+          E4 recovery never fires). Fall back to home (authoritative — the real ROUTES,
+          no drift) so the app is always navigable. */}
+      <ErrorBoundary key={screen}>{(ROUTES[screen] || ROUTES.home)?.() ?? null}</ErrorBoundary>
       <AnnotationDomSync screen={screen} letterId={letterId} noteSheetTarget={noteSheetTarget} setNoteSheetTarget={setNoteSheetTarget} />
 
 
