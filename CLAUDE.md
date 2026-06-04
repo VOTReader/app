@@ -8,7 +8,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 ---
 
-## Current state (2026-06-02)
+## Current state (2026-06-03)
 
 **The app is feature-complete and shipping.** One JS codebase runs as the Android APK and as a desktop PWA (live + installable + full-offline at https://votreader.github.io/VOTReader-studio/). Every quality/uplift phase is closed — **Q3–Q8, N1, NK, P6–P11, W1–W9, U0–U22, N2** (one-line index below; full detail in **HISTORY.md**). **~1797 vitest** tests / 71 files (counts drift — verify, don't trust); CI green across build + lint (`--max-warnings 0`) + typecheck + vitest+coverage(floor) + Kotlin `testDebugUnitTest`+jacoco + headless 12-screen smoke. Pre-commit/CI also gate check_balance, schema-validate, corpus-version, CSP-hash, and the ≤800-line app.jsx canary.
 
@@ -43,6 +43,8 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 
 Reverse-chronological; each landed CI-green + deployed.
 
+- **WebView floor lift → chrome108 + R8 + W10-lite a11y** (06-03) — retired the chrome69 floor (boot polyfills removed, Permanent Rule 6 rewritten, verification floor → `vot_api34`/WV113); release R8 + `isShrinkResources` ON (closes N6; APK 27.7→19.98 MB); GitHub Actions → Node-24; `prefers-reduced-motion` + a WCAG-AA contrast fix (light-theme link-blue). HISTORY.md landmark.
+- **AUDIT-PLAN — fully resolved (PILE B)** (06-03) — N4/N6/N7/N8 native robustness (emulator-verified) + PF3 dropped + UX9 adjudicated; every P0–P3 item now DONE or adjudicated-with-reason.
 - **N2** (06-01) — 2nd native-review: proguard keep-rule fix + oversize-import message; 10 dispositioned.
 - **U0–U22 UPLIFT** (06-01, Waves 1–5) — 7→8/10: import durability, export fail-loud, minify, search-load, App() re-render, html2canvas-lazy, Garden allowlist, CSP hash-lock, coverage/CI-smoke/contract/PWA. Canonical: **UPLIFT-PLAN.txt**.
 - **Android 8/9 black-screen + SAF export** (06-01) — `--target=chrome69` + boot polyfills; SAF export on every device; emulator-verified.
