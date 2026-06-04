@@ -149,6 +149,19 @@ PROGRESS LOG
     -> minified bundles byte-identical (CACHE_VERSION unmoved).
   Gates: lint + typecheck + build green.
 
+2026-06-04  BATCH 10 - MEMORY / BUDGET-DEVICE (PERF-1, PERF-2 DONE).  commit <pending>
+  - PERF-1: webTakeScreenshot captured document.body (full scroll height) at
+    scale=min(dpr,2) - a long chapter allocated a ~4x-larger transient canvas (tens of
+    MB), recurring on scroll-stop + after every nav. Now scale:1 (the result downscales
+    to maxDim:1440 regardless), bounding the spike on 2-3 GB devices.
+  - PERF-2: the Garden decoded-bitmap LRU cap was a FIXED 12 - but a bitmap's RAM scales
+    with resolution^2, so Ultra (4600px ~112 MB each) reached ~1.3 GB resident. Made the
+    cap AND the priority preload look-ahead PER TIER: mobile 12/5, standard 8/5, native
+    6/3, ultra 4/2 (cap >= ahead+2 so the priority window never evicts the page in view).
+    Resident bitmap RAM now ~0.3-0.45 GB at any tier. gardenTierLimits() exposed as a
+    global (409->410); +2 tests. Verified: real-module unit test + smoke + lint.
+  Gates: lint(410) + typecheck + 1894 vitest + smoke:ci green.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -161,8 +174,8 @@ P0 — real user-facing defect / reachable data loss
 P1 — High: budget-device memory, stale-serve, broken core feature, untested only-backup
   [x] SRCH-2   Verses excluded from term-coverage multiplier
   [x] SRCH-3   Synonym expansion over-broad + defaults ON
-  [ ] PERF-1   html2canvas rasterizes the whole scrolled chapter (memory spike)
-  [ ] PERF-2   Garden decoded-bitmap residency ~0.5–1.3 GB at high tiers
+  [x] PERF-1   html2canvas rasterizes the whole scrolled chapter (memory spike)
+  [x] PERF-2   Garden decoded-bitmap residency ~0.5–1.3 GB at high tiers
   [x] SW-1     CACHE_VERSION hash omits ~10 precached assets (stale-serve forever)
   [ ] TEST-1   Android v3 backup DRIVER loop has zero tests + outside coverage
 

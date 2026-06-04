@@ -9,6 +9,7 @@ import {
   gardenImageCache,
   gardenCrawled,
   GARDEN_CACHE_MAX,
+  gardenTierLimits,
 } from './garden.js';
 
 describe('getGardenTier', () => {
@@ -58,14 +59,25 @@ describe('gardenCacheKey', () => {
 });
 
 describe('gardenPreload LRU + crawled set (PF5)', () => {
-  it('bounds the live decoded-image cache to GARDEN_CACHE_MAX', () => {
+  it('bounds the live decoded-image cache to the per-tier cap (PERF-2)', () => {
+    const stdCap = gardenTierLimits('standard').cap;
+    expect(stdCap).toBeLessThan(GARDEN_CACHE_MAX); // standard now holds fewer than the old fixed 12
     const N = GARDEN_CACHE_MAX + 6;
     for (let p = 1; p <= N; p++) gardenPreload(p, 'standard');
-    // resident decoded bitmaps never exceed the cap (the ~700 MB unbounded-crawl fix)
-    expect(Object.keys(gardenImageCache).length).toBeLessThanOrEqual(GARDEN_CACHE_MAX);
+    // resident decoded bitmaps never exceed the STANDARD cap (the ~700 MB unbounded-crawl fix)
+    expect(Object.keys(gardenImageCache).length).toBeLessThanOrEqual(stdCap);
     // the most-recent page stays resident; the oldest was evicted (LRU order)
     expect(gardenImageCache[gardenCacheKey(N, 'standard')]).toBeTruthy();
     expect(gardenImageCache[gardenCacheKey(1, 'standard')]).toBeUndefined();
+  });
+  it('PERF-2 invariant: every tier cap >= look-ahead + 2, and higher-res tiers hold fewer', () => {
+    for (const t of ['mobile', 'standard', 'native', 'ultra']) {
+      const { cap, ahead } = gardenTierLimits(t);
+      expect(cap).toBeGreaterThanOrEqual(ahead + 2);     // priority window never evicts the current page
+      expect(cap).toBeLessThanOrEqual(GARDEN_CACHE_MAX);
+    }
+    expect(gardenTierLimits('ultra').cap).toBeLessThan(gardenTierLimits('native').cap);
+    expect(gardenTierLimits('native').cap).toBeLessThan(gardenTierLimits('standard').cap);
   });
   it('records EVERY fetched page in gardenCrawled even after its bitmap is evicted', () => {
     const N = GARDEN_CACHE_MAX + 6;

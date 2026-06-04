@@ -548,7 +548,12 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality) {
   try {
     const canvas = await h2c(document.body, {
       backgroundColor: bg,
-      scale: Math.min(/** @type {any} */ (window).devicePixelRatio || 1, 2),
+      // PERF-1: capture at scale 1, NOT devicePixelRatio×2. The result is downscaled to
+      // maxDim:1440 below regardless, so a DPR×2 capture of the WHOLE scrolled body (a
+      // long chapter is many thousands of px tall) just allocated a ~4× larger transient
+      // canvas (tens of MB) for zero visible gain — and this fires on every scroll-stop
+      // and after every nav. scale:1 keeps the spike bounded on a 2-3 GB device.
+      scale: 1,
       useCORS: true,
       logging: false,
       allowTaint: false,

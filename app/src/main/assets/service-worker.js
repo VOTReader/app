@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-bb2e1b8b91';
+const CACHE_VERSION = 'v1.0.2-1608197a06';
 const CORPUS_VERSION = 'c7'; // c6→c7 (2026-06-04): CORP-1 — volume-seven footnote "Also read" link collection label fixed ("The Lord's Rebuke" → its registryLabel) so the tap-through resolves. (c5→c6 2026-06-02: PF1 minified the lazy corpus bundles.)
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;

@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 409 distinct identifiers.
+// Total: 410 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -312,6 +312,7 @@ declare const gardenCrawled: any;
 declare const gardenImageCache: any;
 declare const gardenIsCached: any;
 declare const gardenPreload: any;
+declare const gardenTierLimits: any;
 declare const gardenUrl: any;
 declare const getEchoesForVerse: any;
 declare const getGardenTier: any;

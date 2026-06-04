@@ -2,7 +2,7 @@
    GardenView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export const GARDEN_PRELOAD_AHEAD = 5;
+export const GARDEN_PRELOAD_AHEAD = 5; // default; the EFFECTIVE per-tier value is gardenTierLimits(tier).ahead (PERF-2)
 export const GARDEN_CRAWL_DELAY = 500;
 const MAX_ZOOM = 5;
 const DOUBLE_TAP_MS = 300;
@@ -93,10 +93,13 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
     applyZoom();
   }, [page, tier, applyZoom]);
 
-  // Priority preload: current page + 5 ahead (immediate, no throttle)
+  // Priority preload: current page + a per-tier look-ahead (immediate, no throttle).
+  // PERF-2: the ahead count scales DOWN for higher-res tiers so a burst of huge Ultra
+  // decodes can't spike memory; it's bounded so the priority window fits the LRU cap.
   React.useEffect(() => {
     gardenPreload(page, tier);
-    for (let i = page + 1; i <= Math.min(page + GARDEN_PRELOAD_AHEAD, GARDEN_TOTAL); i++) {
+    const ahead = gardenTierLimits(tier).ahead;
+    for (let i = page + 1; i <= Math.min(page + ahead, GARDEN_TOTAL); i++) {
       gardenPreload(i, tier);
     }
   }, [page, tier]);
@@ -123,7 +126,7 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
       if (crawlPage > GARDEN_TOTAL) return;
 
       const cur = pageRef.current;
-      if (crawlPage >= cur && crawlPage <= cur + GARDEN_PRELOAD_AHEAD) {
+      if (crawlPage >= cur && crawlPage <= cur + gardenTierLimits(tier).ahead) {
         crawlPage++;
       }
 

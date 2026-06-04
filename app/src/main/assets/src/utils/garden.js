@@ -50,6 +50,20 @@ export const gardenImageCache = {};
  *  and without a bound the 209-page background crawl trended ~700 MB of resident
  *  bitmaps that were never evicted. */
 export const GARDEN_CACHE_MAX = 12;
+/** PERF-2 — the LRU bound + priority-preload look-ahead, PER TIER. A decoded bitmap's
+ *  RAM scales with resolution², so a FIXED count let Ultra (4600px ≈ 112 MB each) reach
+ *  ~1.3 GB resident at 12. Scale the count DOWN as resolution climbs so the resident
+ *  total stays ~0.3-0.45 GB on a budget device. INVARIANT: `cap` >= `ahead` + 2, so the
+ *  priority window (current + ahead) plus one prev page never evicts the page in view. */
+const GARDEN_TIER_LIMITS = {
+  mobile:   { cap: 12, ahead: 5 }, // ~2160px ≈ 25 MB  → ~300 MB resident
+  standard: { cap: 8,  ahead: 5 }, // ~2880px ≈ 44 MB  → ~350 MB
+  native:   { cap: 6,  ahead: 3 }, // ~3600px ≈ 70 MB  → ~420 MB
+  ultra:    { cap: 4,  ahead: 2 }, // ~4600px ≈ 112 MB → ~450 MB
+};
+/** Resolve a tier id to its { cap, ahead } limits (falls back to standard).
+ *  @param {string} tierId @returns {{cap:number, ahead:number}} */
+export function gardenTierLimits(tierId) { return GARDEN_TIER_LIMITS[tierId] || GARDEN_TIER_LIMITS.standard; }
 /** LRU order of live cache keys, oldest first. @type {string[]} */
 const _gardenLru = [];
 /** PF5 — the crawl's done-marker: page-keys whose JPEG has been REQUESTED (so the
@@ -67,12 +81,13 @@ function _gardenEvict(key) {
   delete gardenImageCache[key];
 }
 
-/** Mark `key` most-recently-used; evict the oldest beyond GARDEN_CACHE_MAX. */
+/** Mark `key` most-recently-used; evict the oldest beyond the key's per-tier cap (PERF-2). */
 function _gardenTouch(key) {
   const i = _gardenLru.indexOf(key);
   if (i >= 0) _gardenLru.splice(i, 1);
   _gardenLru.push(key);
-  while (_gardenLru.length > GARDEN_CACHE_MAX) {
+  const cap = gardenTierLimits(String(key).split(':')[0]).cap;
+  while (_gardenLru.length > cap) {
     const oldest = _gardenLru.shift();
     if (oldest !== undefined && oldest !== key) _gardenEvict(oldest);
   }
