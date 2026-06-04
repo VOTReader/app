@@ -52,10 +52,14 @@ android {
             // N2.1b: R8 code shrink + obfuscate + optimize. ACTIVATES the dormant
             // keep rules in proguard-rules.pro (AppInterface @JavascriptInterface
             // bridge, JsEvent sealed hierarchy, BoundedLogTree.LogEntry — N6).
-            // isShrinkResources is left OFF: it's a separate risk surface (res/
-            // reflection) and a separate optimization; enable it later once the
-            // minified build is profiled on a real device.
             isMinifyEnabled = true
+            // isShrinkResources strips unused res/ entries. R8's resource shrinker
+            // runs in SAFE mode (resources reached via Resources.getIdentifier()/by
+            // name are retained), and the app's dynamic UI is React-in-WebView (assets/,
+            // never shrunk) — res/ is only the splash/icons/theme. Validated on the
+            // vot_api34/WV113 emulator: minified+shrunk release boots, renders the
+            // welcome + About, no missing-resource errors.
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
