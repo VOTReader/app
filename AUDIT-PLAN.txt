@@ -871,7 +871,7 @@
    Fix: snapshot the pre-jump position (or set a fromSurprise flag) and add a back
      branch returning Home.
 
- [UX3] 13-branch back router, asymmetric, exit-on-fallthrough SEV: High(struct) [CONFIRMED]
+ [UX3] 13-branch back router, asymmetric, exit-on-fallthrough SEV: High(struct) [CONFIRMED]   STATUS: DONE (055b674)
    Evidence: use-android-back.js:175-219 is a hand-maintained if(s===…) chain with
      terminal `return "false"` (=app-exit) for any unlisted screen; index screens
      hardcode →library (:178-182) and screen-routes.jsx:419/437 duplicate it,
@@ -880,6 +880,17 @@
      backs out to library, not the reading screen.
    Fix: drive the index-screen back branches through goNavOrigin (origin already
      captured); make the fallthrough default to goHome() unless genuinely at root.
+   DONE (2026-06-03, first PILE B item): the 5 index/hub branches (notes/links/
+     bookmarks/highlights-index + journal-home) in use-android-back.js AND the 5
+     duplicated screen-routes onBack props now call goNavOrigin (restores the
+     captured origin, or goHome() when none — matching settings/history/about).
+     The terminal `return "false"` is now `if (s==="home") return "false"` (the
+     true root — native finish() / web root-exit toast preserved) else goHome()+
+     "true" (a stray/unlisted screen no longer exits the app). NOT a full router
+     rewrite — the asymmetry was 5 hardcoded branches + the exit fallthrough; the
+     surgical fix removes both without re-architecting the working if-chain. +7
+     use-android-back.test.js; preview-verified (Library→Notes→Back→Library on
+     both the on-screen + hardware path; home→"false"); 0 console errors.
 
  [UX2] Back-from-search loses anchor + result scroll         SEV: Med-High [CONFIRMED]
    Evidence: goSearchOrigin restores only screen/bookId/chapterNum/letterId
