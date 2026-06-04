@@ -53,15 +53,30 @@ export function loadBibleStudies() {
   return _bibleStudiesPromise;
 }
 
+// PERF-3: a SINGLE-entry verse-index cache so translateVerse is O(1) per verse, not O(N)
+// — a full chapter render was O(N²) (each of N verses linear-scanned the N-verse alt
+// array). The reader shows ONE chapter at a time, so a single { n -> text } map keyed by
+// translation:bookId:chNum is enough: it's built once when a chapter is first rendered,
+// hit by every other verse + every re-render, and rebuilt on chapter/translation change —
+// so it can't grow unbounded (alt-translation globals load whole, so no partial staleness).
+let _xlateKey = null;
+let _xlateIdx = null;
+function _verseIndex(data, translation, bookId, chNum) {
+  const key = translation + ':' + bookId + ':' + chNum;
+  if (key === _xlateKey) return _xlateIdx;
+  const verses = data[bookId] && data[bookId][chNum];
+  const idx = Object.create(null);
+  if (verses) { for (let i = 0; i < verses.length; i++) idx[verses[i].n] = verses[i].text; }
+  _xlateKey = key;
+  _xlateIdx = idx;
+  return idx;
+}
+
 export function translateVerse(bookId, chNum, verse, translation) {
   if (!translation || translation === 'nkjv') return verse.text;
   const data = window['BIBLE_' + translation.toUpperCase()];
   if (!data) return verse.text; // not yet loaded → NKJV fallback
-  const verses = data[bookId] && data[bookId][chNum];
-  if (!verses) return verse.text;
-  for (let i = 0; i < verses.length; i++) {
-    if (verses[i].n === verse.n) return verses[i].text;
-  }
-  return verse.text;
+  const t = _verseIndex(data, translation, bookId, chNum)[verse.n];
+  return (t !== undefined) ? t : verse.text;
 }
 
