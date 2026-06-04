@@ -49,7 +49,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // N2.1b: R8 code shrink + obfuscate + optimize. ACTIVATES the dormant
+            // keep rules in proguard-rules.pro (AppInterface @JavascriptInterface
+            // bridge, JsEvent sealed hierarchy, BoundedLogTree.LogEntry — N6).
+            // isShrinkResources is left OFF: it's a separate risk surface (res/
+            // reflection) and a separate optimization; enable it later once the
+            // minified build is profiled on a real device.
+            isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

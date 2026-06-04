@@ -124,6 +124,22 @@
 ───────────────────────────────────────────────────────────────────────────
  PROGRESS LOG
 ───────────────────────────────────────────────────────────────────────────
+ 2026-06-03 — N2.1b: R8 MINIFICATION ENABLED (closes N6). isMinifyEnabled=true on the
+ release build (app/build.gradle.kts; isShrinkResources left OFF — separate risk
+ surface). VALIDATED end-to-end:
+   • R8 build clean (minifyReleaseWithR8 + lintVitalRelease pass). APK 27.7→20.1 MB.
+   • STATIC (the audit's N6 ask = bridge contract vs the MINIFIED APK): mapping.txt
+     confirms AppInterface + its @JavascriptInterface methods (takeScreenshot,
+     v3ExportBegin, …) map to SELF (unrenamed); JsEvent + JsEvent$* + Bounded-
+     LogTree$LogEntry kept by name (the un-kept outer BoundedLogTree correctly
+     renamed to q6). The N6 keep rules work under R8.
+   • RUNTIME: signed the release APK (debug key) + booted a NEW modern emulator
+     (vot_api34, WebView Chromium 113 — the WV69 floor retired with the chrome108
+     lift) → the minified release boots, renders, dismisses the welcome, shows the
+     About screen + StorageHealth banner; 0 crashes / bridge / JS errors in logcat.
+     (Release disables WebView debugging by design → no CDP; verified visually +
+     logcat.) N6 CLOSED. Remaining native queue: N2.2–N2.5 (device-hardware tuning).
+
  2026-06-03 — WEBVIEW FLOOR LIFT chrome69→chrome108 + AUDIT-PLAN CLOSED. Owner
  call: the chrome69 floor was a THEORETICAL device — the app is personal (APK
  sideloaded to modern auto-updating-WebView phones + PWA on evergreen browsers),
@@ -173,10 +189,10 @@
      by BoundedLogTree) + documents the detached-but-live webView. The reference is
      KEPT — the audit's "park it" would break the rebuild-first webViewProvider
      invariant. Shares the N4 reset across both recovery paths.
-   • N6 (2520f5b) — ProGuard keep rules for JsEvent$* + BoundedLogTree$LogEntry.
-     DONE-PARTIAL / dormant: isMinifyEnabled=false runs no R8, so the rules are
-     inert + unverifiable until N2.1b. Full closure (the bridge contract run against
-     the MINIFIED APK) stays owned by N2.1b.
+   • N6 (2520f5b + N2.1b R8) — ProGuard keep rules for JsEvent$* + BoundedLogTree$
+     LogEntry. NOW FULLY DONE: N2.1b enabled R8 and the rules were VALIDATED (see the
+     N2.1b PROGRESS LOG entry above) — mapping.txt confirms the bridge methods +
+     JsEvent$* + LogEntry survive R8 unrenamed; the minified release boots on WV113.
    NOT stageable on a headless debug emulator (documented, NOT gaps): N8 retry-view
    (needs 2+ renderer crashes/60s; the URL allowlist blocks chrome://crash), N7 true
    concurrency, N6 R8. PILE B remaining: UX9 per-tab resume, PF3 virtualization
@@ -1314,9 +1330,11 @@
  [N6] JsEvent / getCrashLog JSON shape have no ProGuard keep rules; BridgeContract
    Test runs on UNMINIFIED classes. Dormant (isMinifyEnabled=false). SEV: Low
    [CONFIRMED] → when N2.1b enables minify, run the bridge contract against the
-   minified APK.   STATUS: DONE-PARTIAL (2520f5b) — keep rules for JsEvent$* +
-   BoundedLogTree$LogEntry added (correct syntax/target) but DORMANT (no R8 in
-   debug); the contract-vs-minified-APK run stays owned by N2.1b.
+   minified APK.   STATUS: DONE (2520f5b keep rules + N2.1b enabled R8) — VALIDATED
+   under R8: minifyReleaseWithR8 clean + mapping.txt confirms AppInterface's
+   @JavascriptInterface methods, JsEvent$*, and BoundedLogTree$LogEntry all map to
+   SELF (unrenamed); the minified release boots + renders + navigates on a WV113
+   emulator. Contract-vs-minified-APK = CLOSED.
  [N7] captureScreenshot runBlocking on the binder thread has no single-flight guard
    (captures serialize on Main anyway; no live concurrent caller). MainActivity.kt:
    155-160. SEV: Low-Med [CONFIRMED] → optional AtomicBoolean single-flight.
