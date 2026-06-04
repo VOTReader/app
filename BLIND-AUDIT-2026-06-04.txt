@@ -73,6 +73,15 @@ PROGRESS LOG
   CORP-2 (validator cross-ref resolution pass — the gap that let CORP-1 ship) deferred:
   it's Medium effort (build the registry in the validator), not a quick win — queued.
 
+2026-06-04  BATCH 4 — BACKUP CODEC HARDENING (BAK-2, BAK-4 DONE).  commit <pending>
+  backup-container.js readContainer + 2 new tests (16 in the codec suite).
+  - BAK-2: a v3 manifest media entry with no numeric `size` now FAILS LOUD instead of
+    silently bypassing the frame-length integrity check. Safe: the v3 builder always
+    emits blob.size (backup.js:314), so a missing size is genuinely corruption.
+  - BAK-4: trailing bytes after the last declared frame now warn (truncation-then-
+    append / corruption signal); the declared frames still read exactly.
+  Gates: 1885 vitest (+2) + lint + typecheck green.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -115,9 +124,9 @@ P3 — Low / hardening / nits / small wins
   [ ] SCRIP-3  Multi-ref (semicolon) tokens unparseable (dict-key crutch)
   [x] STORE-3  Media put() caches object URL pre-commit (abort leaves stale URL)
   [ ] STORE-4  Failed _save() keeps unsaved value, never retries
-  [ ] BAK-2    v3 media frame w/o `size` skips truncation guard
+  [x] BAK-2    v3 media frame w/o `size` skips truncation guard
   [ ] BAK-3    Store apply incremental, no cross-store rollback
-  [ ] BAK-4    Trailing bytes after last frame silently ignored
+  [x] BAK-4    Trailing bytes after last frame silently ignored
   [ ] BAK-5    Add Android chunked-bridge round-trip regression test
   [ ] ANN-2    snapRangeToWords can leave start on a lone surrogate
   [ ] ANN-3    applyNoteIcons leaves bounded text-node fragmentation

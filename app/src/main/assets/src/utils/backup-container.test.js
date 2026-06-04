@@ -7,7 +7,7 @@
    boundary (the whole reason we don't use a 32-bit zip), multi-chunk blobs,
    unicode manifests, and every corruption/truncation guard. */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   writeContainer, readContainer, isContainerMagic,
   encodeUint64BE, decodeUint64BE, CONTAINER_MAGIC,
@@ -138,6 +138,27 @@ describe('integrity + error detection (only-backup path — must fail loud)', ()
     const bad = new TextEncoder().encode('{ x');
     const blob = new Blob([CONTAINER_MAGIC, encodeUint64BE(bad.length), bad]);
     await expect(readContainer(blob)).rejects.toThrow(/not valid JSON/);
+  });
+
+  it('throws on a manifest media entry with no numeric size — the integrity check must not be bypassable (BAK-2)', async () => {
+    const m1 = pattern(40, 4);
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a' }] }; // size omitted
+    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
+    await expect(readContainer(blob)).rejects.toThrow(/no numeric size/);
+  });
+
+  it('warns (but still reads the real frames) on unexpected trailing bytes (BAK-4)', async () => {
+    const m1 = pattern(30, 6);
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [{ id: 'a', size: m1.length }] };
+    const { blob } = await pack(manifest, [{ blob: blobOf(m1) }]);
+    const tampered = new Blob([blob, new Uint8Array([1, 2, 3, 4])]); // 4 extra bytes appended
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { entries } = await readContainer(tampered);
+      expect(entries.length).toBe(1);
+      expect(eqBytes(await bytesOf(entries[0].blob), m1)).toBe(true); // the declared frame still reads exactly
+      expect(warn.mock.calls.some((a) => /trailing byte/.test(String(a[0])))).toBe(true);
+    } finally { warn.mockRestore(); }
   });
 });
 

@@ -148,14 +148,27 @@ export async function readContainer(blob) {
     const dataStart = off;
     off += len;
     if (off > blob.size) throw new Error('backup-container: truncated media frame for ' + (media[i] && media[i].id));
-    if (media[i] && typeof media[i].size === 'number' && media[i].size !== len) {
+    // BAK-2: every v3 manifest media entry MUST declare a numeric size — it is the
+    // codec's primary corruption check (frame length vs declared size). A missing or
+    // non-numeric size is itself corruption (the v3 builder always emits blob.size),
+    // so fail loud instead of silently accepting whatever length the frame claims.
+    if (!media[i] || typeof media[i].size !== 'number') {
+      throw new Error('backup-container: media[' + i + '] has no numeric size in the manifest (corrupt)');
+    }
+    if (media[i].size !== len) {
       throw new Error('backup-container: size mismatch for ' + media[i].id + ' (manifest ' + media[i].size + ', frame ' + len + ')');
     }
     entries.push({
-      id: media[i] ? media[i].id : null,
-      meta: media[i] || null,
+      id: media[i].id,
+      meta: media[i],
       blob: blob.slice(dataStart, dataStart + len),
     });
+  }
+  // BAK-4: a complete container ends exactly at EOF. Extra trailing bytes after the
+  // last declared frame indicate truncation-then-append or corruption. The frames we
+  // needed are all read, so surface it as a warning rather than a hard failure.
+  if (off < blob.size) {
+    console.warn('[backup-container] ' + (blob.size - off) + ' unexpected trailing byte(s) after the last media frame — file may be corrupt.');
   }
   return { manifest, entries };
 }
