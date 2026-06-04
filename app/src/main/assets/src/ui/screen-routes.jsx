@@ -257,7 +257,7 @@ export function buildScreenRoutes({
 
     // ── AppShell / settings / search / home / library (P8b — 20 medium
     //    prop-threading screens folded in; same pattern as P8a). ──
-    'settings': () => (
+    'settings': () => (typeof SettingsScreen !== 'undefined') ? (
       <SettingsScreen
         settings={settings}
         onToggle={toggleSetting}
@@ -272,8 +272,8 @@ export function buildScreenRoutes({
         historyCount={readHistory.length}
         theme={theme} onThemeChange={setTheme}
       />
-    ),
-    'search': () => (
+    ) : _corpusView(window.__screensE, window.__loadScreensE, 'Loading…'),
+    'search': () => (typeof SearchScreen !== 'undefined') ? (
       <SearchScreen
         query={searchQuery}
         onQueryChange={setSearchQuery}
@@ -286,7 +286,7 @@ export function buildScreenRoutes({
         searchContext={searchContext}
         onToggleScope={() => setSearchScope((prev) => prev ? null : searchContext)}
       />
-    ),
+    ) : _corpusView(window.__screensE, window.__loadScreensE, 'Loading…'),
     'home': () => (
       <HomeScreen
         onSelect={handleSelect}
@@ -731,7 +731,7 @@ export function buildScreenRoutes({
       return <LetterView {...sharedViewProps} {...colReadNavProps('hm')} letter={letterShim} volumeLabel="Hidden Manna" onHome={goHomeFromHM} onNavigate={(id) => { setLetterId(id); }} />;
     },
 
-    'garden-view': () => (
+    'garden-view': () => (typeof GardenView !== 'undefined') ? (
       <GardenView
         page={gardenPage}
         onPageChange={(p) => setGardenPage(p)}
@@ -739,6 +739,6 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
         tier={settings.gardenTier || GARDEN_DEFAULT_TIER}
       />
-    ),
+    ) : _corpusView(window.__screensE, window.__loadScreensE, 'Loading…'),
   };
 }

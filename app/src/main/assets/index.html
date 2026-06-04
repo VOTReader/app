@@ -35,7 +35,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-BiBVmFw3ZhrU/PBwRHXqD0BNSiXHr8TDXQwQFLL9rxo=' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-WVTu+Gq7seQMHFegMz0iJskMo45FW2daywxFZPdjlqs=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-BiBVmFw3ZhrU/PBwRHXqD0BNSiXHr8TDXQwQFLL9rxo=' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-+7o5K1NDlblLxzMM5hg+/3XqiNhAAodOuFikDSsWDwA=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -278,6 +278,12 @@
     var vot = window.__makeLazyLoader('vot', 'dist/bundle-a-vot.js', '__finishVotInit');
     window.__votCorpus = vot.corpus;
     window.__loadVotCorpus = vot.load;
+    // PF6: the lazy SCREEN bundle (Settings/Search/Garden split out of bundle-d).
+    // No finishFnInit — bundle-e's IIFE Object.assigns the screens onto window
+    // before _notify() fires, so they're defined the moment the route re-renders.
+    var screensE = window.__makeLazyLoader('screens-e', 'dist/bundle-e.js', null);
+    window.__screensE = screensE.corpus;
+    window.__loadScreensE = screensE.load;
   })();
   </script>
 

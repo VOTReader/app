@@ -134,16 +134,11 @@ import { VolumesHome } from './screens/VolumesHome.jsx';
 import { StudiesHome } from './screens/StudiesHome.jsx';
 import { HistoryScreen } from './screens/HistoryScreen.jsx';
 import { AboutScreen } from './screens/AboutScreen.jsx';
-import { SettingsScreen } from './screens/SettingsScreen.jsx';
 import { HomeScreen } from './screens/HomeScreen.jsx';
-import { SearchScreen } from './screens/SearchScreen.jsx';
 import { BibleStudyIndex } from './screens/BibleStudyIndex.jsx';
 import { BibleStudyChapterView } from './screens/BibleStudyChapterView.jsx';
 import { MatthewChapterView } from './screens/MatthewChapterView.jsx';
 import { ChapterIndex } from './screens/ChapterIndex.jsx';
-import {
-  GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
-} from './screens/GardenView.jsx';
 import { ScriptureGenre } from './screens/ScriptureGenre.jsx';
 import { ScripturesHome } from './screens/ScripturesHome.jsx';
 import {
@@ -228,9 +223,8 @@ Object.assign(window, {
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
   LibraryScreen, NotesIndexScreen,
   VolumesHome, StudiesHome, HistoryScreen, AboutScreen,
-  SettingsScreen, HomeScreen, SearchScreen,
+  HomeScreen,
   BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,
-  GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
   ScriptureGenre, ScripturesHome,
   _linkEndpointCategory, _endpointResolves, _epSearchText,
   LinkRow, LinkRowActionSheet, LinksScreen,

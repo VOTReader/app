@@ -104,6 +104,7 @@ import { useAppShellEffects } from '../hooks/use-app-shell-effects.js';
 import { useDomAnnotationSync } from '../hooks/use-dom-annotation-sync.js';
 import { useKeyboardInset } from '../hooks/use-keyboard-inset.js';
 import { useDocumentTitle } from '../hooks/use-document-title.js';
+import { useLazyBundles } from '../hooks/use-lazy-bundles.js';
 import { useDesktopKeyboard } from '../hooks/use-desktop-keyboard.js';
 import { useStorageInfo } from '../hooks/use-storage-info.js';
 import { formatBytes } from '../utils/format-bytes.js';
@@ -204,6 +205,7 @@ Object.assign(window, {
   useDomAnnotationSync,
   useKeyboardInset,
   useDocumentTitle,
+  useLazyBundles,
   useDesktopKeyboard,
   useStorageInfo,
   formatBytes,

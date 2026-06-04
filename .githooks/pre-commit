@@ -330,6 +330,7 @@ if [ -n "$bundle_source_changed" ]; then
           app/src/main/assets/dist/bundle-b.js \
           app/src/main/assets/dist/bundle-c.js \
           app/src/main/assets/dist/bundle-d.js \
+          app/src/main/assets/dist/bundle-e.js \
           app/src/main/assets/dist/app.min.css \
           app/src/main/assets/index.html \
           app/src/main/assets/service-worker.js

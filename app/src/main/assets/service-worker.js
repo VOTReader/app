@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-70481828fa';
+const CACHE_VERSION = 'v1.0.2-99361a3d59';
 const CORPUS_VERSION = 'c6'; // c5→c6 (2026-06-02): PF1 — the lazy corpus bundles (bundle-a-bible/matthew/vot.js) are now esbuild-minified (~3.3 MB smaller; data byte-identical, only whitespace/syntax shrunk). Re-fetch the smaller corpus.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -30,6 +30,14 @@ const CORE_ASSETS = [
   './dist/bundle-b.js',
   './dist/bundle-c.js',
   './dist/bundle-d.js',
+  // PF6: bundle-e (lazy Settings/Search/Garden screens, split out of bundle-d).
+  // Precached so those screens work OFFLINE, and content-hashed into
+  // CACHE_VERSION (sync-sw-version reads this list) so a code change busts it
+  // like any other bundle. Deliberately NOT in CRITICAL_ASSETS: boot does not
+  // need it (it loads lazily on first navigation), so a deploy hiccup on
+  // bundle-e must not abort the whole SW install — the route degrades to the
+  // _corpusView "Try again" affordance instead.
+  './dist/bundle-e.js',
   // U18: react.min.js / react-dom.min.js / flexsearch.min.js / search.js /
   // search-data.js are NOT listed — they are CONCATENATED into bundle-a.js
   // (build.py) and never loaded standalone, so precaching them was pure

@@ -629,6 +629,10 @@
     var report = { startedAt: new Date().toISOString() };
     try {
       report.appMounted = appMounted();
+      // PF6: Settings/Search/Garden are code-split into the lazy bundle-e; load
+      // it so the globals audit + the screen walk below see those globals
+      // (they're no longer defined at boot).
+      if (typeof root.__loadScreensE === 'function') { try { await root.__loadScreensE(); } catch (_e) {} }
       report.globals = auditGlobals();
       report.dataWiring = auditDataWiring();
       report.screens = walk ? await walkScreens() : 'skipped';

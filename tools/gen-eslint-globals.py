@@ -44,6 +44,10 @@ ENTRY_FILES = [
     ROOT / 'app/src/main/assets/src/stores/_entry-b.js',
     ROOT / 'app/src/main/assets/src/renderer/_entry.js',
     ROOT / 'app/src/main/assets/src/ui/_entry-d.js',
+    # PF6: bundle-e's lazy screens (Settings/Search/Garden) are window-globalized
+    # here too, so they're recognized as globals at their typeof-guarded route
+    # call sites in screen-routes.jsx.
+    ROOT / 'app/src/main/assets/src/ui/_entry-e.js',
 ]
 INDEX_HTML = ROOT / 'app/src/main/assets/index.html'
 DATA_DIR = ROOT / 'app/src/main/assets/src/data'

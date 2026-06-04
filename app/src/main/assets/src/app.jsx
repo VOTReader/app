@@ -387,23 +387,12 @@ function App() {
     activeReadKey, settings, readItems,
   });
 
-  // Q8 lazy-load: BOOKS + MATTHEW may be undefined until their respective
-  // __load*Corpus() loaders resolve. Subscribe to both so App() re-renders
-  // when either becomes defined; until then ALL_BOOKS is sparse and
-  // book/chapter stay null (the bible-ch/matthew-ch/idx routes show a
-  // loading state).
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.subscribe(cb) : () => {}), []),
-    () => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined' ? window.__matthewCorpus.subscribe(cb) : () => {}), []),
-    () => (typeof window.__matthewCorpus !== 'undefined' ? window.__matthewCorpus.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(cb) : () => {}), []),
-    () => (typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0)
-  );
+  // Q8/PF6 lazy-load: BOOKS / MATTHEW / the VOT corpora — and the lazy screen
+  // bundle (Settings/Search/Garden, PF6) — are undefined until their loaders
+  // resolve. useLazyBundles subscribes App() to all four so a loading route
+  // swaps to the real screen the moment each arrives. (Folded out of App()
+  // into a bundle-b hook to keep this file under its 800-line canary.)
+  useLazyBundles();
   const _MATTHEW = (typeof MATTHEW !== 'undefined') ? MATTHEW : null;
   const ALL_BOOKS = {
     ...(_MATTHEW ? { matthew: _MATTHEW } : {}),
