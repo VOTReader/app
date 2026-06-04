@@ -124,6 +124,34 @@
 ───────────────────────────────────────────────────────────────────────────
  PROGRESS LOG
 ───────────────────────────────────────────────────────────────────────────
+ 2026-06-03 — WEBVIEW FLOOR LIFT chrome69→chrome108 + AUDIT-PLAN CLOSED. Owner
+ call: the chrome69 floor was a THEORETICAL device — the app is personal (APK
+ sideloaded to modern auto-updating-WebView phones + PWA on evergreen browsers),
+ so the floor cost real syntax/feature/velocity tax for no reachable user.
+ Commit 1a7ae7f (branch chore/lift-webview-floor):
+   • esbuild --target chrome69→chrome108 on build:b/c/d/e/css + the corpus minify
+     (minify-bundle.mjs); removed the now-native boot polyfills (globalThis C71 /
+     Promise.allSettled C76 / Promise.any C85) → CSP script-src 9→8 hashes;
+     CACHE_VERSION rehashed; Permanent Rule 6 rewritten (the floor is now a
+     chrome108 RUNTIME-API contract — esbuild still transpiles syntax down; the
+     vot_api28/WV69 emulator black-screens BY DESIGN).
+   • Deliberately NOT done (velocity, not churn): no bulk ?./?? rewrite (organic as
+     files are touched); the v3 backup FileReader 512KB-slice path is LEFT ALONE —
+     Blob.arrayBuffer() would load whole blobs into heap = an OOM regression on
+     GB-scale backups; only Blob.stream() preserves the chunking, and then it's
+     purely cosmetic, so it's not worth touching live backup-integrity code.
+   • Corpora byte-identical (pure data minify) → NO CORPUS_VERSION bump. Verified:
+     npm run build green (8 CSP hashes, CACHE_VERSION v1.0.2-ca2cf0b334); smoke:ci
+     PASS (0 console.error / resource404 / crashed / unreached); live preview mounts
+     with allSettled/Promise.any/globalThis/structuredClone/Blob.arrayBuffer/Array.at
+     all NATIVE.
+ The last two PILE B items CLOSED (no code, by decision): PF3 DROPPED (no jank on
+ any real device; windowing risks the load-bearing scroll-to-verse + scroll-memory
+ path for a theoretical gain; content-visibility:auto is the cheap fallback now that
+ the floor allows it). UX9 ADJUDICATED ((a) defunct inverse-set fix — keep the
+ denylist; (b) recoverable nit needing a tab-schema redesign, not worth the risk).
+ AUDIT-PLAN is now FULLY RESOLVED — every P0–P3 item DONE or adjudicated-with-reason.
+
  2026-06-03 — N4/N6/N7/N8 NATIVE ROBUSTNESS (PILE B; owner: "do the commits").
  Fixes authored earlier this session, VERIFIED here before commit: code-read +
  forced Kotlin recompile (:app:compileDebugKotlin --rerun-tasks) + :app:test-
@@ -806,25 +834,23 @@
    Fix: null window.BIBLE_* after the index build consumes them; add bible-*.js to
      a lazy SW precache list.
 
- [PF3] Zero list virtualization                              SEV: Med  [CONFIRMED]   STATUS: TODO — owner chose FULL virtualization (next session)
+ [PF3] Zero list virtualization                              SEV: Med  [CONFIRMED]   STATUS: DROPPED (won't-do, 2026-06-03)
    Evidence: grep for any windowing primitive across src = 0. Long lists render
      all rows (WTLB Part Two 203, Psalms 150, Psalm 119 = 176 verses).
    Fix: windowed render via a manual IntersectionObserver sentinel (no dep, CSP-
      clean) for the lists >100 rows.
-   OWNER CALL (2026-06-03): do the FULL, correct virtualization — NOT a partial
-     index-only pass, NOT adjudicate. CRITICAL CONSTRAINT (why it's a focused
-     session): a naive IntersectionObserver windowing BREAKS the on-mount
-     scroll-to-target + scroll-restore that EVERY long list relies on —
-     ChapterIndex.jsx:7-11 scrolls the current chapter card into view;
-     BibleChapterView.jsx:34-36 jumps to a verse (getElementById('v-N') +
-     scrollIntoView); useScrollMemory restores scrollTop/pct (use-scroll-memory.js).
-     A correct virtualization MUST preserve all three: render only the visible
-     window but keep the full scroll height (spacers / estimated row heights), and
-     on mount compute the target row's position to scroll there + render the window
-     around it. Heaviest + highest-value target = the 176-verse reader
-     (BibleChapterView/ChapterView), where each verse is a store-subscribing
-     HighlightableText. NOTE: F1+F2 already fixed the per-verse RE-RENDER fan-out
-     (176→1); PF3 is about the INITIAL mount + DOM size, not re-render.
+   OWNER REVERSAL (2026-06-03): DROP — do NOT virtualize. The earlier "do the FULL
+     virtualization" call was reversed after weighing it against reality: no scroll-
+     jank is observed on any real device, the item is P3, and BOTH viable paths touch
+     the most load-bearing rendering code there is — the on-mount scroll-to-target +
+     jump-to-verse + useScrollMemory restore that EVERY long list relies on
+     (ChapterIndex.jsx:7-11, BibleChapterView.jsx:34-36, use-scroll-memory.js) — for a
+     gain that is theoretical on the letters people actually read (<100 rows). The real
+     cost was the per-verse RE-RENDER fan-out, and F1+F2 already fixed that (176→1).
+     ESCAPE HATCH if a real device ever janks: the chrome108 floor-lift (2026-06-03)
+     makes `content-visibility:auto` (C85) viable — a one-property, keeps-every-verse-
+     in-the-DOM fallback (still test against scroll-to-verse + scroll-memory; needs
+     contain-intrinsic-size). Reach for THAT before windowing.
 
  [PF5] Garden crawl force-loads all 209 + never evicts       SEV: Med  [PARTIAL]
    Evidence: GardenView.jsx:90-118 crawls pages 1..209 on open into the module-
@@ -1410,7 +1436,7 @@
  [UX9] Reading-dot gated by a hardcoded 15-element denylist (a new screen joins the
    wrong side); resume target is the global activeReadKey (NOT per-tab) → cross-tab
    bleed. app.jsx:724; use-reading-position-nav.js:176-201. SEV: Med-High
-   [CONFIRMED] → denylist→allowlist; scope activeReadKey per-tab.   STATUS: DEFERRED (focused)
+   [CONFIRMED] → denylist→allowlist; scope activeReadKey per-tab.   STATUS: ADJUDICATED (2026-06-03)
    JUDGMENT (2026-06-02): two parts, BOTH risky to rush in a batch — DEFERRED for a
    focused pass (flagged to owner). (a) denylist→allowlist: the obvious allowlist
    (READING_SCREENS) is the WRONG set (those are the reading screens, where the dot
@@ -1422,6 +1448,13 @@
    not a per-tab "last-read key", so it needs extending the tab schema + the dwell
    tracker — a deliberate design change on the load-bearing reading-position system,
    not a safe in-batch edit. Owner-aware focused session recommended.
+   ADJUDICATION (2026-06-03, owner velocity call): CLOSED, not implemented. (a) is a
+     DEFUNCT fix — the proposed allowlist is the inverse set + net-negative; the
+     denylist stays. (b) is a real but RECOVERABLE UX nit (resume can target another
+     tab's last-read; no data loss, no crash) whose correct fix is a feature-level
+     tab-schema + dwell-tracker redesign of load-bearing reading-position code — not
+     worth that risk for a P-low nit on a shipping personal app. Reopen as an explicit
+     "per-tab resume" feature only if it becomes a felt annoyance in real use.
  [UX10] No swipe-to-change-chapter on mobile (3 redundant tap affordances; desktop
    has arrow keys, mobile none). BibleChapterView.jsx:43-58,199-233. SEV: Low-Med
    [CONFIRMED] → swipe-left/right on the chapter body (reuse the boundary handlers).
@@ -1474,10 +1507,10 @@
  BACKUP-STREAMING-PLAN.txt) is fully DONE + emulator-verified. UPDATE 2026-06-03:
  the PILE A BATCH landed (10 DONE + 3 ADJUDICATED — see the newest PROGRESS LOG
  entry at the top for the exact per-item split + commits). What REMAINS:
-   • Flagged-for-owner (visible deltas, need a nod): UX1+UX2, A1+A5.
-   • Deferred focused session: PF6 (lazy bundle-e — L, app.jsx-refactor).
-   • PILE B (native/device + the highest-risk refactors): UX9 per-tab resume,
-     PF3 virtualization. (UX3 055b674; A4 6a3467a; N4/N6/N7/N8 2520f5b — all DONE.)
+   • NOTHING — AUDIT-PLAN is FULLY RESOLVED. PILE A closed (incl. UX1+UX2, A1+A5,
+     PF6). PILE B closed: UX3 055b674; A4 6a3467a; N4/N6/N7/N8 2520f5b (DONE);
+     PF3 DROPPED + UX9 ADJUDICATED (2026-06-03). WebView floor lifted
+     chrome69→chrome108 (1a7ae7f). Every P0–P3 item DONE or adjudicated-with-reason.
  Working tree clean; everything pushed; CI green.
 
  HOW TO CONTINUE: pick from PILE A (safe, in-batch). One item = one focused commit
