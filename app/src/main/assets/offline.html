@@ -11,6 +11,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- SEC-1: this is the one served HTML document outside index.html's hash-locked
+       CSP. It renders zero dynamic content and loads nothing external, so lock it down
+       hard — no scripts at all (the retry control is a plain link, below). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" />
   <title>VOTReader — Offline</title>
   <style>
     body {
@@ -38,7 +42,9 @@
       line-height: 1.6;
       margin-bottom: 1.5rem;
     }
-    button {
+    .retry {
+      display: inline-block;
+      text-decoration: none;
       background: none;
       border: 1px solid #b8860b;
       color: #b8860b;
@@ -48,7 +54,7 @@
       cursor: pointer;
       letter-spacing: 0.08em;
     }
-    button:active {
+    .retry:active {
       background: rgba(184, 134, 11, 0.15);
     }
   </style>
@@ -57,7 +63,7 @@
   <div class="offline-card">
     <h1>VOTReader</h1>
     <p>You are offline. Open the app while connected to the internet to cache content for offline use.</p>
-    <button onclick="window.location.reload()">Try Again</button>
+    <a class="retry" href="./index.html">Try Again</a>
   </div>
 </body>
 </html>

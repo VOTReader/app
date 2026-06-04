@@ -97,6 +97,19 @@ PROGRESS LOG
     guard) under the corpus URL.
   Gates: build (30 assets) + 1885 vitest + smoke:ci green.
 
+2026-06-04  BATCH 6 - WEB SECURITY (SEC-1, SEC-2, SEC-3 DONE).  commit <pending>
+  - SEC-1: offline.html (the one served HTML outside index.html's hash-locked CSP) now
+    carries a restrictive CSP meta (default-src 'none'; style-src 'unsafe-inline') and
+    the inline onclick is replaced by a plain <a href="./index.html"> retry link - no
+    script at all. (It's in the SW content-hash now, so future edits bust the cache.)
+  - SEC-2: showToast gains a SAFE textContent path (opts.text) - the documented default
+    for dynamic strings; opts.html (innerHTML) is reserved for trusted static markup.
+    Migrated the storage-health write-fail toast to text. New toast.test.js (6 cases,
+    0->covered) pins that text can't inject markup.
+  - SEC-3: settings.fontScale is import-restorable; clamp to the known set {1,1.15,1.3,
+    1.5} before it lands in the --font-scale CSS var.
+  Gates: lint + typecheck + 1891 vitest (+6) + smoke:ci green.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -152,9 +165,9 @@ P3 — Low / hardening / nits / small wins
   [ ] NTV-4    getZoomScale() has a false @Suppress("unused")
   [x] SW-2     Query-string navigations miss cached shell offline
   [x] SW-4     corpusFirst caches redirected same-origin responses
-  [ ] SEC-1    offline.html ships no CSP + inline onclick handler
-  [ ] SEC-2    toast.js innerHTML foot-gun (currently safe, contract risk)
-  [ ] SEC-3    settings.fontScale → CSS var, import-restorable (clamp)
+  [x] SEC-1    offline.html ships no CSP + inline onclick handler
+  [x] SEC-2    toast.js innerHTML foot-gun (currently safe, contract risk)
+  [x] SEC-3    settings.fontScale → CSS var, import-restorable (clamp)
   [x] CORP-3   check_balance.py dash check too narrow (\d–\d only)
   [x] SHELL-2  Thumbnail scroll-poll interval runs for app lifetime when tabs off
   [ ] SHELL-3  Lazy-corpus loader invoked during render, not in an effect

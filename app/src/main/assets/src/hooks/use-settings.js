@@ -158,7 +158,10 @@ export function useSettings({ savedSettings, theme }) {
     // CSS var on <html>; app.css multiplies it into the root font-size so all
     // rem/em sizing scales. The index.html boot script sets the initial value
     // pre-mount (no FOUC); this handles live changes from the Settings selector.
-    document.documentElement.style.setProperty("--font-scale", String(settings.fontScale || "1"));
+    // SEC-3: clamp to the known set — settings (incl. fontScale) are import-restorable
+    // from a backup, and an out-of-range value would land in the --font-scale CSS var.
+    const _fs = String(settings.fontScale);
+    document.documentElement.style.setProperty("--font-scale", (_fs === "1.15" || _fs === "1.3" || _fs === "1.5") ? _fs : "1");
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
     // status bar + navigator.wakeLock fire-and-forget for the screen-on

@@ -471,7 +471,7 @@ function _notifyWriteFailureToast() {
   showToast({
     id: WRITE_FAIL_TOAST_ID,
     className: 'vot-toast',
-    html: "Couldn't save your last change — device storage may be full. Open Settings → Storage, or export a backup.",
+    text: "Couldn't save your last change — device storage may be full. Open Settings → Storage, or export a backup.",
     durationMs: 6000,
     ariaLive: 'assertive',
   });

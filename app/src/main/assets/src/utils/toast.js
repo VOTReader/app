@@ -53,8 +53,13 @@ const _hideTimers = new Map();
  *
  * @param {object} opts
  * @param {string} opts.id          - stable DOM id (e.g. 'vot-toast-info')
- * @param {string} opts.html        - content (innerHTML; caller is
- *                                    responsible for escaping)
+ * @param {string} [opts.text]      - content set via textContent (SAFE — the
+ *                                    recommended path for any dynamic/runtime
+ *                                    string). Takes precedence over opts.html.
+ * @param {string} [opts.html]      - content set via innerHTML — TRUSTED STATIC
+ *                                    markup ONLY (e.g. a <b>/<button>/styled
+ *                                    <span>). NEVER pass user/corpus text here;
+ *                                    use opts.text instead. (SEC-2)
  * @param {string} [opts.className] - CSS class (defaults to opts.id)
  * @param {number} [opts.durationMs] - auto-hide after this many ms;
  *                                     0 or negative = no auto-hide
@@ -82,9 +87,14 @@ export function showToast(opts) {
     el.setAttribute('aria-live', ariaLive);
     document.body.appendChild(el);
   }
-  // Update content; force reflow so the .show transition kicks in even
-  // when called on an already-visible toast.
-  el.innerHTML = html;
+  // Update content; force reflow so the .show transition kicks in even when called on
+  // an already-visible toast. SEC-2: textContent (opts.text) is the safe default for any
+  // dynamic string; opts.html is for TRUSTED static markup only.
+  if (opts && opts.text != null) {
+    el.textContent = opts.text;
+  } else {
+    el.innerHTML = html;
+  }
   void el.offsetHeight;
   el.classList.add('show');
 
