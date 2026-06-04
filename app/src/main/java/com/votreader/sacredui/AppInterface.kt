@@ -221,7 +221,6 @@ class AppInterface(
     }
 
     @JavascriptInterface
-    @Suppress("unused")
     fun getZoomScale(): Float = vm.currentScale
 
     @JavascriptInterface

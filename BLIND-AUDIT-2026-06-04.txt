@@ -124,6 +124,19 @@ PROGRESS LOG
     fix is a build-time {{nav:}} validator (no runtime risk) - folded into CORP-2 (queued).
   Gates: 101 (annotation+scripture) tests green; full chain via pre-commit.
 
+2026-06-04  BATCH 8 - KOTLIN NATIVE (NTV-2, NTV-4 DONE; NTV-3 adjudicated).  commit <pending>
+  Verified: gradle :app:compileDebugKotlin EXIT=0.
+  - NTV-2: GardenImageCache.download() rejects an asset whose declared Content-Length
+    exceeds a 48 MB per-image ceiling BEFORE reading it into heap (Ultra pages max ~8.3
+    MB) - guards a budget device against a huge/compromised asset past the host allowlist.
+  - NTV-4: removed the false @Suppress("unused") on getZoomScale (it IS used via the JS
+    bridge; 30 other @JavascriptInterface methods carry no such suppress; no warnings-as-
+    errors so the build stays clean).
+  - NTV-3 ADJUDICATED keep-as-is: restoreState forcing currentScale=1f is CORRECT - zoom
+    is disabled (setSupportZoom(false)) so a non-1.0 scale can't be restored, and the N4
+    emulator verification relies on exactly this. Removing it adds risk for a hypothetical.
+  NTV-1 (recording-length cap) is a separate Medium item, still open.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -174,9 +187,9 @@ P3 — Low / hardening / nits / small wins
   [ ] ANN-3    applyNoteIcons leaves bounded text-node fragmentation
   [ ] JRNL-2   Media-insert → entry-reference orphan window (cross-session)
   [ ] JRNL-5   Add an editor durability-level test
-  [ ] NTV-2    GardenImageCache.download() unbounded read (no Content-Length cap)
+  [x] NTV-2    GardenImageCache.download() unbounded read (no Content-Length cap)
   [ ] NTV-3    restoreState resets currentScale=1f (zoom-math desync window)
-  [ ] NTV-4    getZoomScale() has a false @Suppress("unused")
+  [x] NTV-4    getZoomScale() has a false @Suppress("unused")
   [x] SW-2     Query-string navigations miss cached shell offline
   [x] SW-4     corpusFirst caches redirected same-origin responses
   [x] SEC-1    offline.html ships no CSP + inline onclick handler

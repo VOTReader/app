@@ -142,6 +142,13 @@ class GardenImageCache(cacheRoot: File) {
                 Timber.tag("GardenCache").w("download HTTP %d for %s", code, url)
                 return null
             }
+            // NTV-2: reject an oversized asset by its declared Content-Length BEFORE
+            // reading it into heap (-1 = unknown falls through; GitHub sets it).
+            val declared = conn.contentLength
+            if (declared > MAX_DOWNLOAD_BYTES) {
+                Timber.tag("GardenCache").w("download too large (Content-Length %d) for %s", declared, url)
+                return null
+            }
             val bytes = conn.inputStream.use { it.readBytes() }
             if (bytes.isEmpty()) null else bytes
         } catch (e: Exception) {
@@ -247,5 +254,11 @@ class GardenImageCache(cacheRoot: File) {
         // tier larger than Ultra. cacheDir is OS-evictable under storage
         // pressure regardless, so this is a soft ceiling on a soft store.
         private const val MAX_BYTES = 800L * 1024 * 1024
+
+        // NTV-2: per-IMAGE ceiling, checked against the declared Content-Length BEFORE
+        // a download is read into heap. Ultra pages are ~3.5 MB (max ~8.3 MB on device),
+        // so 48 MB is a generous backstop guarding a budget device against a huge or
+        // compromised asset that slipped past the host allowlist.
+        private const val MAX_DOWNLOAD_BYTES = 48 * 1024 * 1024
     }
 }
