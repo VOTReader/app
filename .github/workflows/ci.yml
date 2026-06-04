@@ -1,15 +1,13 @@
 name: CI
 
-# ── MAINTENANCE: Node 24 Actions migration (do before 2026-09-16) ──
-# GitHub is retiring the Node 20 Actions runtime — runs are forced to
-# Node 24 on 2026-06-16, and Node 20 is removed from runners 2026-09-16.
-# The actions pinned below (checkout@v4, setup-node@v4, setup-python@v5,
-# setup-java@v4, gradle/actions/setup-gradle@v4, upload-artifact@v4) run
-# on Node 20 and emit a deprecation warning every run; after 2026-09-16
-# they WILL fail. Fix: bump every `uses:` HERE and in deploy-web.yml to
-# its current Node-24 major (verify latest at fix time — e.g.
-# checkout/setup-node -> v5, setup-python -> v6). Warning only today, so
-# non-urgent — but it is a hard deadline.
+# ── MAINTENANCE: Node 24 Actions migration — DONE 2026-06-03 ──
+# GitHub is retiring the Node 20 Actions runtime (runs forced to Node 24 on
+# 2026-06-16; Node 20 removed from runners 2026-09-16). Every `uses:` here and
+# in deploy-web.yml was bumped to its current Node-24 major, verified against the
+# GitHub releases API at fix time: checkout@v6, setup-node@v6, setup-python@v6,
+# setup-java@v5, gradle/actions/setup-gradle@v6, cache@v5, upload-artifact@v7
+# (deploy-web also: configure-pages@v6, upload-pages-artifact@v5, deploy-pages@v5).
+# Only stable inputs are used, so the major jumps are behavior-compatible.
 # Ref: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
 
 # CI pipeline:
@@ -38,10 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node (pinned via .nvmrc — matches local)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'   # B2 — restore ~/.npm keyed on package-lock.json (skips re-fetch each push)
@@ -50,7 +48,7 @@ jobs:
       # so `npm ci` reuses it across pushes instead of re-downloading the browser
       # the smoke:ci render walk drives. The path is puppeteer's default cache dir.
       - name: Cache puppeteer Chromium
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/puppeteer
           key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -58,7 +56,7 @@ jobs:
       # `npm run build` invokes `python tools/build.py` (which generates
       # bundle-a.js) — setup-python guarantees a `python` on PATH.
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
@@ -183,10 +181,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up JDK 21 (matches gradle/gradle-daemon-jvm.properties)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -194,7 +192,7 @@ jobs:
       # Cache the Gradle daemon's caches + wrapper download so subsequent
       # CI runs don't re-download AGP 9.2.1 + Robolectric every time.
       - name: Set up Gradle (with build cache)
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Run :app:testDebugUnitTest (JUnit 5 + Robolectric)
         # Zero-tolerance gate. Any failing Kotlin test fails CI, mirroring
@@ -213,7 +211,7 @@ jobs:
 
       - name: Upload test + coverage reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kotlin-test-and-coverage-report
           path: |
