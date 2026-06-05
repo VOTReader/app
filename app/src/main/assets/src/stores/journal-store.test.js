@@ -401,3 +401,42 @@ describe('JournalStore.pruneNotebook — cascade from journal-notebook deletion'
     expect(nullnb.notebookIds).toBeNull();
   });
 });
+
+/* ──────────────────────────────────────────────────────────────
+   TEST-5 — query + scan read paths (search / media reference scans)
+   ────────────────────────────────────────────────────────────── */
+describe('JournalStore — query + scan paths (TEST-5)', () => {
+  it('search matches title, block text, and tags; empty query returns all', () => {
+    JournalStore.add({ title: 'Morning Prayer', blocks: [{ type: 'text', text: 'gratitude and peace' }], tags: ['gratitude'] });
+    JournalStore.add({ title: 'Evening', blocks: [{ type: 'text', text: 'a quiet reflection' }], tags: ['reflection'] });
+    expect(JournalStore.search('').length).toBe(2);                                  // empty → all
+    expect(JournalStore.search('morning').map((e) => e.title)).toEqual(['Morning Prayer']); // title hit
+    expect(JournalStore.search('quiet').map((e) => e.title)).toEqual(['Evening']);          // block-text hit
+    expect(JournalStore.search('reflection').map((e) => e.title)).toEqual(['Evening']);      // tag hit
+    expect(JournalStore.search('nonexistent')).toEqual([]);
+  });
+
+  it('collectAllMediaIds gathers image + audio mediaIds across entries', () => {
+    JournalStore.add({ blocks: [{ type: 'image', mediaId: 'm1' }, { type: 'text', text: 'x' }] });
+    JournalStore.add({ blocks: [{ type: 'audio', mediaId: 'm2' }] });
+    JournalStore.add({ blocks: [{ type: 'text', text: 'no media' }] });
+    expect(JournalStore.collectAllMediaIds().sort()).toEqual(['m1', 'm2']);
+  });
+
+  it('isMediaReferencedElsewhere is true only when ANOTHER entry embeds the blob', () => {
+    const a = JournalStore.add({ blocks: [{ type: 'image', mediaId: 'shared' }] });
+    const b = JournalStore.add({ blocks: [{ type: 'image', mediaId: 'shared' }] });
+    expect(JournalStore.isMediaReferencedElsewhere('shared', a.id)).toBe(true);     // b still embeds it
+    JournalStore.remove(b.id);
+    expect(JournalStore.isMediaReferencedElsewhere('shared', a.id)).toBe(false);    // only a remains
+    expect(JournalStore.isMediaReferencedElsewhere(null, a.id)).toBe(false);        // falsy id short-circuits
+  });
+
+  it('allByCreated sorts newest-created first', () => {
+    const older = JournalStore.add({ title: 'older' });
+    const newer = JournalStore.add({ title: 'newer' });
+    /** @type {any} */ (JournalStore.get(older.id)).created = 1000;
+    /** @type {any} */ (JournalStore.get(newer.id)).created = 2000;
+    expect(JournalStore.allByCreated().map((e) => e.title)).toEqual(['newer', 'older']);
+  });
+});

@@ -32,6 +32,16 @@ export default defineConfig({
       // App() and the ui/ tree are out of Q5 scope — the App() decomposition
       // phase opens them up. Without this scope, coverage would average
       // across the entire untested ui/ tree and the gate would be meaningless.
+      //
+      // TEST-4 (scope honesty): the measured denominator is hooks/stores/utils/
+      // renderer + scripture-resolution.js ONLY. DELIBERATELY EXCLUDED — and
+      // guarded by the headless smoke walk + lint, NOT by coverage: the ~83-file
+      // ui/ tree, the ~1700-line vendored assets/search.js, and data/*. So the
+      // headline % is an honest number for the LOGIC tier, not whole-app coverage.
+      // When an excluded body is high-risk, the fix is to MOVE it into a covered
+      // scope + test it (TEST-1 did exactly this — the v3 backup DRIVER was lifted
+      // from ui/screens into utils/backup-android.js, now 97% covered), rather than
+      // dropping the whole ui/ tree into the denominator and diluting the floor.
       include: [
         'app/src/main/assets/src/hooks/**/*.{js,jsx}',
         'app/src/main/assets/src/stores/**/*.{js,jsx}',
@@ -258,7 +268,10 @@ export default defineConfig({
         // <mark> removal); the only lines left uncovered are the unreachable
         // hasBlockBetween defensive `return true` (dom-links:251, dom-bookmarks:225).
         'app/src/main/assets/src/stores/journal-store.js': {
-          statements: 50, branches: 41, functions: 60, lines: 54,
+          // TEST-5 added the search / collectAllMediaIds / isMediaReferencedElsewhere /
+          // allByCreated query-path tests, lifting this from ~51/42/62/56. Ratcheted
+          // to lock the gain (never lower; per-file floors are safe to set tight).
+          statements: 65, branches: 54, functions: 74, lines: 70,
         },
         'app/src/main/assets/src/renderer/dom-links.js': {
           statements: 98, branches: 96, functions: 100, lines: 98,
