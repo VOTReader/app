@@ -124,8 +124,25 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
     setDrilledNbId(null);
   };
 
+  // ── Hierarchical back: a drilled-in notebook is its own navigation level ──
+  // Unwind it to the Notebooks list before Back leaves the screen, so no level
+  // is skipped. popDrill is the single source of that transition — used by the
+  // nav-bar back arrow, the in-content ‹ button, AND the global back router
+  // (Android hardware back / web Escape), which calls window.__screenBack.
+  const popDrill = () => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); };
+  const handleNavBack = () => { if (drilledNbId) { popDrill(); } else { onBack(); } };
+  React.useEffect(() => {
+    // Register the screen-back interceptor only while drilled in. When not
+    // drilled, no interceptor → the global router falls through to its normal
+    // notes-index → origin route. See use-android-back.js §(1b).
+    if (!drilledNbId) return undefined;
+    const fn = () => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); return true; };
+    window.__screenBack = fn;
+    return () => { if (window.__screenBack === fn) window.__screenBack = null; };
+  }, [drilledNbId]);
+
   return (
-    <ScreenLayout navChildren={LibraryNav({ onBack: onBack, onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}>
+    <ScreenLayout navChildren={LibraryNav({ onBack: handleNavBack, onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}>
       <div className="notes-index-screen">
         <div className="notes-index-header">
           <h1 className="notes-index-title">My Notes</h1>
@@ -148,7 +165,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
         {drilledNbId && (
           <>
             <div className="nb-drilled-header">
-              <button className="nb-drilled-back" onClick={() => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); }} title="Back to Notebooks" aria-label="Back to Notebooks">‹</button>
+              <button className="nb-drilled-back" onClick={popDrill} title="Back to Notebooks" aria-label="Back to Notebooks">‹</button>
               {renaming
                 ? <input
                     className="nb-drilled-rename"

@@ -33,6 +33,15 @@
    │ 13. anything else                         → "false" (Android exits)   │
    └───────────────────────────────────────────────────────────────────────┘
 
+   (1b) SCREEN-INTERNAL LEVEL — a screen with its own navigation level (e.g.
+        NotesIndexScreen drilled into a notebook) registers a window.__screenBack
+        interceptor while that level is active. The router calls it right after
+        the sheet / tabs-overlay checks and BEFORE the per-screen routing, so an
+        internal level is unwound (back to the notebooks list) before Back leaves
+        the screen — no parent-level skip. Cross-bundle, so it is a window slot,
+        the same shape as window.__closeSheet. The interceptor returns true when
+        it consumed the press.
+
    OWNS:
      - window.handleAndroidBack    wired in a []-deps effect, with a
                                    `delete` cleanup (invariant 6).
@@ -160,6 +169,12 @@ export function useAndroidBack({
       }
       cancelDwell();
       const s = screenRef.current;
+      // A screen with an internal navigation level (e.g. NotesIndexScreen
+      // drilled into a notebook) registers window.__screenBack while that level
+      // is active. Unwind it FIRST so Back doesn't skip straight out to the
+      // parent screen. Returns true when it consumed the press. Cross-bundle,
+      // so it's a window slot — same pattern as window.__closeSheet above.
+      if (typeof window.__screenBack === 'function' && window.__screenBack()) return "true";
       const stack = fromLetterRef.current;
       if (LETTER_SCREEN_SET.has(s) && stack && stack.length > 0) {
         const fl = stack[stack.length - 1];

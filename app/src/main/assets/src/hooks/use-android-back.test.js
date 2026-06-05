@@ -24,6 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   delete window.handleAndroidBack;
+  delete window.__screenBack;
   vi.restoreAllMocks();
 });
 
@@ -112,6 +113,27 @@ describe('useAndroidBack — UX3 index-screen origin + safe fallthrough', () => 
       expect(props.setScreen).not.toHaveBeenCalledWith('library');
     });
   }
+
+  it('a registered window.__screenBack consumes the press (drilled-in level) — no parent skip', () => {
+    const props = baseProps({ screen: 'notes-index' });
+    renderHook(() => useAndroidBack(props));
+    const interceptor = vi.fn(() => true);
+    window.__screenBack = interceptor;
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(interceptor).toHaveBeenCalledTimes(1);
+    expect(props.goNavOrigin).not.toHaveBeenCalled();   // did NOT skip out to the parent
+    expect(props.setScreen).not.toHaveBeenCalledWith('library');
+  });
+
+  it('a window.__screenBack that returns false lets the normal route proceed', () => {
+    const props = baseProps({ screen: 'notes-index' });
+    renderHook(() => useAndroidBack(props));
+    window.__screenBack = vi.fn(() => false);   // not drilled in — nothing to unwind
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.goNavOrigin).toHaveBeenCalledTimes(1);   // fell through to notes-index → origin
+  });
 
   it('at the root (home), Back returns "false" so the platform exits / shows the root toast', () => {
     const props = baseProps({ screen: 'home' });
