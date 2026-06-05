@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 410 distinct identifiers.
+// Total: 413 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -293,6 +293,7 @@ declare const buildNavIndex: any;
 declare const buildScreenRoutes: any;
 declare const buildSourceEndpoint: any;
 declare const buildV3Manifest: any;
+declare const classifyV3ImportBegin: any;
 declare const clearLegacyLs: any;
 declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
@@ -365,6 +366,7 @@ declare const renderTextWithScripRefs: any;
 declare const resolveVerseText: any;
 declare const resolveVotLetter: any;
 declare const root: any;
+declare const runV3AndroidExport: any;
 declare const scrollKeyForTab: any;
 declare const searchNavIndex: any;
 declare const showToast: any;
@@ -415,6 +417,7 @@ declare const useTabActions: any;
 declare const useTabs: any;
 declare const useTapThrough: any;
 declare const useThumbnails: any;
+declare const v3AndroidImportEntries: any;
 declare const validateImportEnvelope: any;
 declare const validateMediaRecord: any;
 declare const validateStorePayload: any;

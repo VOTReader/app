@@ -104,49 +104,9 @@ function _platformLabel(platform) {
   }
 }
 
-/* ── v3 streaming backup — Android byte plumbing (BACKUP-STREAMING-PLAN P3) ──
-   The Android SAF path base64s blob slices for the STRING bridge (@JavascriptInterface
-   methods pass strings; native owns the binary framing), so it does NOT use the web
-   backup-container.js codec. It reads slices via FileReader.readAsArrayBuffer — a
-   conservative carry-over from the retired WV69 floor; at the chrome108 floor
-   Blob.arrayBuffer could replace it, but base64-for-the-string-bridge stands either way.
-   base64 is the transient bridge encoding ONLY — never written to disk. */
-
-// Per-chunk size for the bridge: 512 KB raw → ~683 KB base64 per call. Keeps
-// peak heap bounded on budget devices regardless of total blob/backup size.
-const ANDROID_V3_CHUNK = 512 * 1024;
-
-/** Uint8Array → standard base64. Builds the binary string in 32 KB sub-chunks
- *  so String.fromCharCode.apply never blows the call-stack on a big slice. */
-function _u8ToBase64(u8) {
-  let binary = '';
-  const STEP = 0x8000; // 32 KB — safely under the apply() arg-count limit
-  for (let i = 0; i < u8.length; i += STEP) {
-    binary += String.fromCharCode.apply(null, u8.subarray(i, i + STEP));
-  }
-  return btoa(binary);
-}
-
-/** Standard base64 → Uint8Array (atob + charCodeAt). */
-function _base64ToU8(b64) {
-  const binary = atob(b64);
-  const u8 = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
-  return u8;
-}
-
-/** Read one Blob slice to base64 via FileReader (the Android string bridge needs base64). */
-function _blobSliceToBase64(blobSlice) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => {
-      try { resolve(_u8ToBase64(new Uint8Array(/** @type {ArrayBuffer} */ (fr.result)))); }
-      catch (e) { reject(e); }
-    };
-    fr.onerror = () => reject(fr.error || new Error('blob read failed'));
-    fr.readAsArrayBuffer(blobSlice);
-  });
-}
+/* The Android v3 streaming backup DRIVER (chunk size + base64 helpers + the
+   export/import loops) lives in utils/backup-android.js — a covered, unit-tested
+   module (TEST-1). The functions arrive here as globals via _entry-d.js. */
 
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
   // Q8: BOOKS + VOT corpora are lazy. PROGRESS_GROUPS reads BOOKS[...] keys
@@ -518,11 +478,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // Android export uses the v3 STREAMING container via the native chunked bridge
   // (Android streams natively rather than via the web codec — see backup-container.js /
   // StorageManager.kt; native owns the framing). buildV3Manifest is SHARED with
-  // the web path; only the container WRITE differs. Peak memory is one
-  // ANDROID_V3_CHUNK slice, so this scales to whatever the device can store.
+  // the web path; only the container WRITE differs. Peak memory is one 512 KB
+  // bridge slice, so this scales to whatever the device can store. The streaming
+  // loop itself lives in utils/backup-android.js (runV3AndroidExport — TEST-1).
   // BACKUP-STREAMING-PLAN P3.
   const _exportV3Android = async () => {
-    let opened = false;
     try {
       _showToast('Preparing export…', 0);
       const built = await buildV3Manifest({
@@ -551,35 +511,20 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       });
       if (ready === 'cancelled') return;                 // user dismissed the picker
       if (ready !== 'ok') throw new Error('picker: ' + ready);
-      opened = true;
       _showToast('Saving backup…', 0);
-      // 2. Write magic + manifest frame (native frames it — the manifest is the
-      //    structured stores + per-blob METADATA only, bounded to MBs).
-      let r = PlatformBridge.v3ExportBegin(JSON.stringify(built.manifest));
-      if (r !== 'ok') throw new Error('begin: ' + r);
-      // 3. Stream each media blob in <=ANDROID_V3_CHUNK slices — one slice in
-      //    memory at a time (FileReader read; native decodes + appends raw bytes).
-      for (const entry of built.mediaEntries) {
-        const blob = entry.blob;
-        r = PlatformBridge.v3ExportWriteBlob(String(blob.size));
-        if (r !== 'ok') throw new Error('writeBlob: ' + r);
-        for (let pos = 0; pos < blob.size; pos += ANDROID_V3_CHUNK) {
-          const b64 = await _blobSliceToBase64(blob.slice(pos, Math.min(pos + ANDROID_V3_CHUNK, blob.size)));
-          r = PlatformBridge.v3ExportChunk(b64);
-          if (r !== 'ok') throw new Error('chunk: ' + r);
-        }
-      }
-      // 4. Commit (flush + close).
-      r = PlatformBridge.v3ExportFinish(true);
-      if (r !== 'ok') throw new Error('finish: ' + r);
-      opened = false;
+      // Stream the v3 container through the native bridge: the manifest frame,
+      // then each media blob in <=512 KB base64 slices, then commit. On any
+      // failure the driver aborts the open sink (v3ExportFinish(false)) so no
+      // truncated, misleading backup survives (utils/backup-android.js — TEST-1).
+      await runV3AndroidExport({
+        bridge: PlatformBridge,
+        manifestJson: JSON.stringify(built.manifest),
+        mediaEntries: built.mediaEntries,
+      });
       hideToast(_TOAST_ID);
       _showToast('Backup saved.');
     } catch (e) {
       console.warn('android v3 export failed', e);
-      // Abort: close + delete the partial file so no truncated, misleading
-      // backup is left behind (the only backup must fail clean).
-      if (opened) { try { PlatformBridge.v3ExportFinish(false); } catch (_e) { /* best-effort */ } }
       hideToast(_TOAST_ID);
       _showToast('Export failed while writing. Please try again.');
     }
@@ -757,29 +702,30 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         _showToast('Import failed: could not read file.');
         return;
       }
-      if (begin.indexOf('error:') === 0) {
+      const sniff = classifyV3ImportBegin(begin);
+      if (sniff.kind === 'error') {
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
-        if (begin.slice(6) === 'too_large') {
+        if (sniff.reason === 'too_large') {
           _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
         } else {
           _showToast('This backup file is corrupt or incomplete and could not be read.');
         }
         return;
       }
-      if (begin.indexOf('legacy:') === 0) {
+      if (sniff.kind === 'legacy') {
         // Legacy v1/v2 JSON — already fully read by native; route to the v2 applier.
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
-        await _doImport(begin.slice(7));
+        await _doImport(sniff.json);
         return;
       }
-      if (begin.indexOf('v3:') !== 0) {
+      if (sniff.kind !== 'v3') {
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
         _showToast('This file does not look like a VOTReader backup.');
         return;
       }
       // 3. Parse + validate the v3 manifest.
       let manifest;
-      try { manifest = JSON.parse(begin.slice(3)); }
+      try { manifest = JSON.parse(sniff.manifestJson); }
       catch (e) {
         console.warn('v3 import manifest parse failed', e);
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
@@ -795,36 +741,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       }
       // 4. Stream the media frames as an async-gen of {id, meta, blob}; applyV3
       //    consumes it, reassembling each blob bounded (one frame at a time) from
-      //    <=ANDROID_V3_CHUNK base64 chunks. A frame-length / size mismatch or a
-      //    truncation throws — applyV3's fail-safe ordering keeps existing media.
-      const media = Array.isArray(manifest.media) ? manifest.media : [];
-      const entries = (async function* () {
-        for (let i = 0; i < media.length; i++) {
-          const meta = media[i];
-          const sizeStr = PlatformBridge.v3ImportNextBlob();
-          if (sizeStr.indexOf('error:') === 0) throw new Error('nextBlob: ' + sizeStr.slice(6));
-          const declared = Number(sizeStr);
-          if (meta && typeof meta.size === 'number' && meta.size !== declared) {
-            throw new Error('size mismatch for ' + meta.id + ' (manifest ' + meta.size + ', frame ' + declared + ')');
-          }
-          const parts = [];
-          let readTotal = 0;
-          for (;;) {
-            const chunk = PlatformBridge.v3ImportReadChunk(ANDROID_V3_CHUNK);
-            if (chunk === '') break;                       // current frame fully read
-            if (chunk.indexOf('error:') === 0) throw new Error('readChunk: ' + chunk.slice(6));
-            const u8 = _base64ToU8(chunk);
-            parts.push(u8);
-            readTotal += u8.length;
-          }
-          if (readTotal !== declared) throw new Error('truncated frame for ' + (meta && meta.id));
-          yield {
-            id: meta ? meta.id : null,
-            meta: meta || null,
-            blob: new Blob(parts, { type: (meta && meta.mime) || 'application/octet-stream' }),
-          };
-        }
-      })();
+      //    <=512 KB base64 chunks. A size mismatch or truncation throws — applyV3's
+      //    fail-safe ordering keeps existing media (utils/backup-android.js — TEST-1).
+      const entries = v3AndroidImportEntries({
+        bridge: PlatformBridge,
+        media: Array.isArray(manifest.media) ? manifest.media : [],
+      });
       // 5. Confirm + degraded-guard + apply + reload (shared helper). Close the
       //    native stream no matter what (success, cancel at the confirm, or error).
       try {

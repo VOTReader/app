@@ -32,12 +32,13 @@ WHAT THIS FILE IS
   3 = full per-item detail, Section 4 = by-design/no-action, PROGRESS LOG (below)
   = dated per-batch record of what landed. One execution session has run.
 
-STATE: 30 DONE + 4 adjudicated, in 14 commits, ALL pushed to main, every commit
+STATE: 31 DONE + 4 adjudicated, in 16 commits, ALL pushed to main, every commit
   green through the full pre-commit gate chain (lint/tsc/vitest/build/corpus +
-  Kotlin testDebugUnitTest when .kt changed). ALL THREE P0s NOW CLOSED.
-  DONE (30): SRCH-1/2/3/4/6, JRNL-1, JRNL-2, PERF-1/2/3, SW-1/2/4, SEC-1/2/3,
-    BAK-2/4, CORP-1/3, NTV-2/4, SCRIP-1/3, STORE-1 (BATCH 13), STORE-3, SHELL-2,
-    ANN-2, BLD-3/4.
+  Kotlin testDebugUnitTest when .kt changed). ALL THREE P0s + the only-backup test
+  gap NOW CLOSED.
+  DONE (31): SRCH-1/2/3/4/6, JRNL-1, JRNL-2, PERF-1/2/3, SW-1/2/4, SEC-1/2/3,
+    BAK-2/4, CORP-1/3, NTV-2/4, SCRIP-1/3, STORE-1 (BATCH 13), TEST-1 (BATCH 14),
+    STORE-3, SHELL-2, ANN-2, BLD-3/4.
   ADJUDICATED not-done (reasons in PROGRESS LOG + GOTCHA 1): SRCH-5, ANN-3,
     SCRIP-2 (render-guard net-negative), NTV-3 (already correct).
   Commits: a5f2196 search . 56bba5e quickwins . e7d29da corpus . 86cf422 backup .
@@ -46,16 +47,14 @@ STATE: 30 DONE + 4 adjudicated, in 14 commits, ALL pushed to main, every commit
     e7681a6 store1 (BATCH 13, the last P0).  (+ f70024e tracker doc-fix.)
 
 NEXT PRIORITIES (each deserves its OWN focused session)
-  (STORE-1 — the last P0 — is DONE as of BATCH 13. All three P0s are now closed.)
-  1. TEST-1 (High) -- the Android v3 backup DRIVER (_exportV3Android /
-     _importV3Android in SettingsScreen.jsx) has ZERO tests + is outside coverage,
-     and is the only-backup path on the primary platform. Extract it into an
-     injectable module; round-trip a multi-frame export->import through a fake
-     bridge asserting byte-identity (mirror StorageManagerTest.kt).
-  2. Medium cluster: PERF-4/5/6, ANN-1, BAK-1, STORE-2/4, NTV-1, JRNL-3, CORP-2,
+  (STORE-1 [P0, BATCH 13] + TEST-1 [High, BATCH 14] both DONE — all three P0s plus
+   the only-backup test gap are closed. Remaining work is all P2/P3.)
+  1. Medium cluster: PERF-4/5/6, ANN-1, BAK-1, STORE-2/4, NTV-1, JRNL-3, CORP-2,
      BLD-1/2, TEST-2/3/4/5/6, BAK-3/5, JRNL-5.
-     NB STORE-2 (orphan-sweep TOCTOU) + STORE-4 (failed _save no-retry) remain —
-     they are independent of STORE-1's cross-tab fix.
+     Good next picks (small, independent, well-scoped): BAK-1 (legacy v2 import wipes
+     existing media BEFORE decoding — destructive; mirror applyV3's decode-all-then-swap)
+     or STORE-2 (orphan-sweep TOCTOU deletes a freshly-inserted media blob — time-cutoff
+     the prune). STORE-4 (failed _save no-retry) is also independent of the STORE-1 fix.
 
 METHOD THAT WORKED (keep using it)
   Per item: (a) VERIFY the finding vs CURRENT source -- line numbers drift, and
@@ -325,6 +324,35 @@ PROGRESS LOG
   Gates: lint(410, no drift) + typecheck + 1937 vitest + coverage(exit 0, store-merge.js
   95/91/100/98) + build + smoke:ci all green.
 
+2026-06-04  BATCH 14 - TEST-1 — Android v3 backup DRIVER extracted + tested.  commit <pending>
+  The only-backup path on the primary platform — the JS loop that slices each media blob into
+  <=512KB FileReader reads, base64s at the bridge boundary, loops v3ExportChunk/v3ImportRead-
+  Chunk, reassembles frames — had ZERO tests and sat OUTSIDE coverage (it lived inline in
+  ui/screens/SettingsScreen.jsx, an excluded scope). An off-by-one frame boundary / dropped
+  final partial chunk would have passed the whole suite.
+  - EXTRACT: lifted the chunk const + base64 helpers + the export loop (runV3AndroidExport) +
+    the import sniff (classifyV3ImportBegin) + the import async-gen (v3AndroidImportEntries) into
+    utils/backup-android.js — a COVERED scope (utils/ is in `include`, ui/screens is not), with
+    the bridge + slicer + decoder injectable. Globalized via _entry-d.js (3 new window-globals;
+    lint:globals 410→413). SettingsScreen now DELEGATES the loops; the SAF picker + toasts +
+    confirm + applyV3 + close stay. Behavior-preserving: the export's `opened` abort flag folds
+    into the driver (the sink is open by contract when runV3AndroidExport is called, so it owns
+    the finish(false) abort).
+  - PROVEN: backup-android.test.js (15 cases). A fake-native bridge models StorageManager.kt
+    (base64 at the boundary, raw bytes internally), so export→import is a TRUE round-trip.
+    BYTE-IDENTITY across the boundary-arithmetic sizes (empty / sub-chunk / exact-chunk / chunk+1
+    [the off-by-one] / multi-chunk+tail) at a 1KB chunk forcing multi-frame; order+count+mime
+    preserved; the PRODUCTION FileReader slicer exercised (no injection). Failure modes: a
+    begin/writeBlob/chunk/finish bridge error rejects AND aborts (finish(false)); import
+    size-mismatch / truncated-frame / nextBlob-error / readChunk-error throw. classifyV3Import-
+    Begin: error/legacy/v3/unknown. backup-android.js coverage 97.56/82.69/88.88/98.41.
+  - Real-bundle preview: the 3 driver globals are wired + functional (the sniff helper classifies
+    v3/legacy in the LIVE bundle); Settings renders (Export/Import present, lazy bundle-e mounts);
+    0 console errors. (Android SAF can't run in web preview; the round-trip test is the proof.)
+  - NB: BAK-5 (backup-container.js WEB codec truncation/EOF cases) is RELATED but a different
+    module — still open.
+  Gates: lint(413) + typecheck + 1952 vitest + coverage(exit 0) + build + smoke:ci all green.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
@@ -340,7 +368,7 @@ P1 — High: budget-device memory, stale-serve, broken core feature, untested on
   [x] PERF-1   html2canvas rasterizes the whole scrolled chapter (memory spike)
   [x] PERF-2   Garden decoded-bitmap residency ~0.5–1.3 GB at high tiers
   [x] SW-1     CACHE_VERSION hash omits ~10 precached assets (stale-serve forever)
-  [ ] TEST-1   Android v3 backup DRIVER loop has zero tests + outside coverage
+  [x] TEST-1   Android v3 backup DRIVER loop has zero tests + outside coverage
 
 P2 — Medium: correctness, perf cliffs, process gates, test gaps
   [ ] STORE-2  Orphan-sweep TOCTOU deletes a freshly-inserted media blob
@@ -934,7 +962,10 @@ CORPUS DATA INTEGRITY  (rating 9.0)
 TEST SUITE & COVERAGE  (rating 8.0)
 --------------------------------------------------------------------------------
 
-[ ] TEST-1  [H](V)  Android v3 backup DRIVER loop has zero JS tests + outside coverage  (M)
+[x] TEST-1  [H](V)  Android v3 backup DRIVER loop has zero JS tests + outside coverage  (M)
+    DONE (BATCH 14): driver extracted to utils/backup-android.js (a COVERED scope) + a
+    15-case round-trip test through a fake-native bridge asserting byte-identity across the
+    off-by-one frame boundaries. backup-android.js 97.56/82.69/88.88/98.41. See PROGRESS LOG.
     Where: ui/screens/SettingsScreen.jsx (_exportV3Android / _importV3Android)
     Problem: the codec is byte-exact tested both sides and the bridge SURFACE is pinned,
       but the JS driver that slices blobs into <=512KB FileReader reads, base64s at the
