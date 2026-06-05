@@ -1,10 +1,12 @@
-// @ts-nocheck — loads classic-script globals via eval; constructs fixture literals
-/* AUDIT-PLAN SR8/T1 — the FlexSearch engine (app/src/main/assets/search.js,
-   ~1,700 lines) had ZERO tests, and it sits OUTSIDE eslint/tsc/coverage scope
-   (it's a classic script concatenated into bundle-a, not an ES module), so the
-   runtime was its only check. This suite loads the REAL engine — the vendored
-   flexsearch.min.js + search-data.js + search.js — over a tiny in-memory Bible
-   fixture and pins the query behaviors SR1/SR2 fixed:
+// @ts-nocheck — loads dep globals via eval, the engine via import; fixture literals
+/* AUDIT-PLAN SR8/T1 + SRCH-COV — the FlexSearch engine (app/src/main/assets/
+   search.js, ~1,830 lines) had ZERO tests. It still sits outside eslint/tsc (a
+   classic IIFE concatenated into bundle-a, not an ES module), but SRCH-COV pulled
+   it INTO the coverage scope: this suite now loads it via `import` (not eval) so
+   v8 instruments it, and vitest.config gives it a per-file floor. The suite loads
+   the REAL engine — vendored flexsearch.min.js + search-data.js (still eval'd, to
+   set their window globals first) + an `import` of search.js — over a tiny
+   in-memory Bible fixture and pins the query behaviors SR1/SR2 fixed:
 
      SR1  the 'heading' field was dropped from the index (U22) but still searched,
           so every query threw (caught + warn-logged). A query must now run with
