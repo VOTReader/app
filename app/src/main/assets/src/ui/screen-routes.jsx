@@ -165,6 +165,15 @@ export function buildScreenRoutes({
         </div>
       );
     }
+    // SHELL-3: this kicks the lazy-corpus load from inside a route's RENDER
+    // function (the ROUTES factory produces elements, not a component body, so
+    // there is no useEffect home here without a structural App↔routes refactor).
+    // It is SAFE as a render-phase side effect ONLY because the loader is (a)
+    // IDEMPOTENT — re-calling while a load is in flight is a no-op (it nulls
+    // _promise and re-arms only on failure) — and (b) ASYNC-NOTIFY ONLY — it
+    // never setState/bumps synchronously during this render, so a discarded
+    // concurrent render can't loop or warn. Both invariants are load-bearing: a
+    // future loader that notifies synchronously would turn this into a render loop.
     if (typeof loadFn === 'function') loadFn();
     return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>{loadingLabel}</div>;
   };
