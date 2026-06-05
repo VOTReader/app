@@ -45,6 +45,30 @@ const GLOBAL_TO_REGISTRY = new Map(COLLECTIONS.map((c) => [c.globalName, c.regis
 // VOT collection but the WRONG key — the CORP-1 class — and must fail.
 const VOT_REGISTRY_LABELS = new Set(COLLECTIONS.map((c) => c.registryLabel));
 const VOT_DISPLAY_LABELS = new Set(COLLECTIONS.map((c) => c.label));
+// Casing- + apostrophe-insensitive registry, for catching near-miss labels:
+// "A Testament Against the World..." (lowercase 'the'), "Words to Live By..."
+// (lowercase 'to'), "Letters From Timothy", a curly apostrophe, etc. — which
+// match neither the exact registryLabel nor the display label, but are clearly
+// a mistyped registryLabel (the CORP-1 class).
+const _normLabel = (s) => String(s).toLowerCase().replace(/[‘’ʼ]/g, "'");
+const NORM_TO_REGISTRY = new Map(COLLECTIONS.map((c) => [_normLabel(c.registryLabel), c.registryLabel]));
+
+/**
+ * Recursively collect every letter-link segment's {collection, letterTitle}
+ * anywhere in a nested structure — Format-D studies nest blocks several levels
+ * deep, so a flat block/segment walk misses them.
+ * @param {any} node
+ * @param {Array<{collection:string, letterTitle:string, where:string}>} out
+ */
+function collectLetterLinksDeep(node, out) {
+  if (Array.isArray(node)) { for (const x of node) collectLetterLinksDeep(x, out); return; }
+  if (node && typeof node === 'object') {
+    if (node.t === 'letter-link' && node.link && typeof node.link.collection === 'string' && typeof node.link.letterTitle === 'string') {
+      out.push({ collection: node.link.collection, letterTitle: node.link.letterTitle, where: 'bible-studies letter-link' });
+    }
+    for (const k of Object.keys(node)) collectLetterLinksDeep(node[k], out);
+  }
+}
 
 /**
  * Every (collection, letterTitle) cross-reference a letter carries: footnote
@@ -1378,6 +1402,12 @@ function runCli() {
   const xrefRegistry = new Set();
   /** @type {Array<{ collection: string, letterTitle: string, where: string }>} */
   const xrefs = [];
+  // Format-D (Bible Studies) letter-link cross-refs. Checked as WARNINGS, not
+  // errors: the study renderer navigates by letterId+screen (Segments path b),
+  // so seg.link here is currently UNUSED — a casing variant is latent, not a live
+  // dead link. Surfaced so it can't silently rot if the renderer ever switches.
+  /** @type {Array<{ collection: string, letterTitle: string, where: string }>} */
+  const studyXrefs = [];
   const registerTitle = (rl, item) => { if (rl && item && typeof item.title === 'string') xrefRegistry.add(rl + '::' + item.title); };
   const add = (result, n) => {
     totals.errors += result.errors.length;
@@ -1477,6 +1507,7 @@ function runCli() {
     const result = validateFormatD(studies, { strict, fileName: label });
     add(result, studies.length);
     emit(result, label, studies.length, 'studies', '');
+    collectLetterLinksDeep(studies, studyXrefs);   // CORP-2 (Format D, warn-only)
   }
 
   // ── Format E (translations / Study Bible / ref dicts) ──
@@ -1597,12 +1628,30 @@ function runCli() {
       xrefVotChecked++;
       console.error(`  ERROR: dead cross-ref [${x.where}] → "${x.collection}::${x.letterTitle}" — collection is the DISPLAY label; resolveVotLetter keys by registryLabel, so this "Also read" is a silent no-op (the CORP-1 class). Use the COLLECTIONS registryLabel.`);
       xrefErrors++;
+    } else if (NORM_TO_REGISTRY.has(_normLabel(x.collection))) {
+      xrefVotChecked++;
+      console.error(`  ERROR: dead cross-ref [${x.where}] → "${x.collection}::${x.letterTitle}" — collection is a casing/apostrophe variant of "${NORM_TO_REGISTRY.get(_normLabel(x.collection))}"; use the exact registryLabel (the CORP-1 class).`);
+      xrefErrors++;
     }
     // else: collection is not a VOT collection (Bible-Study / external link) → not a letter cross-ref; skip.
   }
   totals.errors += xrefErrors;
   totals.items += xrefVotChecked;
   console.log(`  ${xrefVotChecked} VOT-letter cross-refs checked (of ${xrefs.length} link objects) — ${xrefErrors === 0 ? 'OK' : 'FAIL'} (${xrefErrors} unresolved)`);
+  // Format-D study links — WARN (not error) on a casing/display variant of a real
+  // registryLabel (the seg.link is currently unused, so it's latent not live).
+  let studyWarns = 0;
+  for (const x of studyXrefs) {
+    if (VOT_REGISTRY_LABELS.has(x.collection)) continue;          // exact registryLabel → fine
+    const variant = NORM_TO_REGISTRY.get(_normLabel(x.collection));
+    if (variant || VOT_DISPLAY_LABELS.has(x.collection)) {
+      console.warn(`  WARN:  [${x.where}] collection "${x.collection}" should be the exact registryLabel${variant ? ` "${variant}"` : ''} — harmless today (study links nav by letterId+screen) but a latent dead-link if the renderer ever uses seg.link.`);
+      studyWarns++;
+    }
+    // else: collection isn't a VOT collection at all (Bible-Study self-ref) → skip.
+  }
+  totals.warnings += studyWarns;
+  console.log(`  ${studyXrefs.length} Format-D study links checked — ${studyWarns} casing/label warning(s).`);
 
   console.log(`\n=== TOTALS: ${totals.items} items validated, ${totals.errors} errors, ${totals.warnings} warnings ===`);
   if (strict && totals.errors > 0) process.exit(1);
