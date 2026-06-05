@@ -156,16 +156,25 @@ export function useScrollMemory({
   }, [flushScrollToActiveTab]);
 
   // ── Effect 3: screen-change → update key + restore saved scroll ────────
-  // Both branches set scrollTop synchronously (catches fast desktop
-  // engines) AND via requestAnimationFrame (catches Android WebView,
-  // where the browser finalises layout AFTER the React commit — a bare
-  // setTimeout(0) fires before that layout pass and gets overridden by
-  // the WebView's scroll-maintenance). Both branches return cleanup so
-  // a rapid re-fire doesn't race with a stale rAF.
+  // Applies the target scrollTop synchronously AND again inside a
+  // requestAnimationFrame: the sync write handles the common case; the rAF
+  // re-applies after the post-commit layout pass, in case the content swap
+  // (old entry → new entry) shifted the scroll offset first. Cleanup cancels
+  // a stale rAF so a rapid re-fire can't fight the next restore.
   React.useEffect(() => {
     const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId);
     scrollKeyRef.current = key;
-    if (surpriseAnchor) return;
+    // surpriseAnchor is ALWAYS a verse anchor ({type:'verse'}) and is consumed
+    // for scroll positioning ONLY by the bible-ch / matthew-ch screens (they
+    // scrollIntoView the verse, so this effect must not fight them by resetting
+    // to top). On any OTHER screen a set anchor is stale: a verse search/link
+    // leaves it set, and navigating to a WTLB / Blessed / Holy-Days entry never
+    // clears it (their nav lacks the letter/bible clearSurprise), so a bare
+    // `if (surpriseAnchor) return` would early-return on EVERY subsequent WTLB
+    // nav — permanently killing scroll-reset AND scroll-restore there while
+    // letters/chapters (which clear the anchor) work. Only honor it where it
+    // actually drives the scroll.
+    if (surpriseAnchor && (screen === 'bible-ch' || screen === 'matthew-ch')) return;
 
     const saved = activeTab && activeTab.scrollPositions && activeTab.scrollPositions[key];
     // Support both new { y, pct } shape and legacy plain number for backcompat

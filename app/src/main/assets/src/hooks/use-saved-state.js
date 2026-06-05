@@ -140,6 +140,27 @@ export function useSavedState() {
           if (Array.isArray(s.tabs)) s.tabs.forEach((t) => { t.screen = 'home'; });
         }
       } catch (_e) { /* sessionStorage unavailable — nothing to recover */ }
+      // One-time scroll-memory heal (2026-06-05). A prior bug let a stale
+      // verse surpriseAnchor (set by a Bible-verse search/link) survive a
+      // jump to a WTLB / Blessed / Holy-Days entry — those screens never
+      // cleared it the way letters & chapters do. With the anchor set, the
+      // scroll-memory effect early-returned, so the content-swap CARRYOVER
+      // scroll got saved as that entry's "position"; the entry then restored
+      // to the bottom on every later visit. The Effect-3 fix in
+      // use-scroll-memory.js stops new corruption (it now honours the anchor
+      // only on the bible-ch / matthew-ch screens that actually consume it),
+      // but the already-persisted bad positions would keep restoring. Clear
+      // every tab's scrollPositions ONCE so existing installs start clean.
+      // Scroll memory is ephemeral session data, so a one-time reset-to-top
+      // is harmless. The mount-time usePersistedState write re-persists the
+      // cleared shape immediately, and the flag prevents a re-run.
+      try {
+        if (!localStorage.getItem('vot-scrollheal-1')) {
+          localStorage.setItem('vot-scrollheal-1', '1');
+          if (s.scrollPositions) s.scrollPositions = {};
+          if (Array.isArray(s.tabs)) s.tabs.forEach((t) => { if (t && t.scrollPositions) t.scrollPositions = {}; });
+        }
+      } catch (_e) { /* localStorage unavailable — skip heal */ }
       _validateTabState(s);
       if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
       return s;

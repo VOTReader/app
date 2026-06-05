@@ -493,5 +493,48 @@ describe('_validateTabState — 13 coercion rules', () => {
       // useMemo with [] deps — same object reference across renders.
       expect(result.current).toBe(firstResult);
     });
+
+    // ── One-time scroll-memory heal (2026-06-05) ─────────────────────
+    // A prior bug let a stale verse surpriseAnchor survive onto WTLB /
+    // Blessed / Holy-Days entries, where the scroll-memory effect then
+    // early-returned and the content-swap carryover scroll got saved as
+    // the entry's "position" — so it restored to the bottom forever. The
+    // hook clears every tab's scrollPositions ONCE (flag-gated) so already-
+    // corrupted installs start clean; the Effect-3 fix stops new corruption.
+    describe('scroll-memory heal (vot-scrollheal-1)', () => {
+      it('clears top-level + every tab scrollPositions once, and sets the flag', () => {
+        StateStore._cache = /** @type {any} */ ({
+          screen: 'home',
+          scrollPositions: { 'wtlb-x': { y: 600 } },
+          tabs: [
+            { screen: 'wtlb-two-entry', letterId: 'a', scrollPositions: { 'wtlb-a': { y: 715 } } },
+            { screen: 'home', scrollPositions: { 'letter-b': { y: 40 } } },
+          ],
+        });
+
+        const { result } = renderHook(() => useSavedState());
+
+        expect(result.current.scrollPositions).toEqual({});
+        expect(result.current.tabs[0].scrollPositions).toEqual({});
+        expect(result.current.tabs[1].scrollPositions).toEqual({});
+        // other fields untouched
+        expect(result.current.tabs[0].letterId).toBe('a');
+        // flag set so it never re-runs
+        expect(localStorage.getItem('vot-scrollheal-1')).toBe('1');
+      });
+
+      it('does NOT clear scrollPositions when the heal flag is already set', () => {
+        localStorage.setItem('vot-scrollheal-1', '1');
+        StateStore._cache = /** @type {any} */ ({
+          screen: 'home',
+          tabs: [{ screen: 'wtlb-two-entry', letterId: 'a', scrollPositions: { 'wtlb-a': { y: 715 } } }],
+        });
+
+        const { result } = renderHook(() => useSavedState());
+
+        // Already healed once — memory persists normally on later boots.
+        expect(result.current.tabs[0].scrollPositions).toEqual({ 'wtlb-a': { y: 715 } });
+      });
+    });
   });
 });
