@@ -1014,6 +1014,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             disabledReason="Turn on History to enable this."
           />
           <SettingsRow
+            label="Bookmark Button in Top Nav"
+            desc="Show the bookmark icon in the top nav of chapter and letter views for one-tap bookmarking of the whole passage. When off, you can still bookmark by selecting text, and your saved bookmarks remain under Library."
+            checked={settings.showBookmarkNav !== false}
+            onToggle={() => onToggle("showBookmarkNav")}
+          />
+          <SettingsRow
             label="Keep Screen On While Reading"
             desc="Don't let the screen dim or lock while the app is open. Helpful for long reading sessions; turn off to save battery. Has no effect on desktop browsers."
             checked={settings.keepScreenOn !== false}

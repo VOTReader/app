@@ -284,6 +284,10 @@
          setting is on. Index/home screens have their own history button that
          stays visible regardless of this flag. */
       body:not(.history-in-nav) .nav-history-reading { display: none; }
+      /* Bookmark button: hidden in the top nav when "Bookmark Button in Top
+         Nav" is off. Saved bookmarks stay reachable from Library; this only
+         hides the per-chapter quick-bookmark icon. */
+      body.no-bookmark-nav .nav-bookmark-btn { display: none; }
       body.light .mode-toggle { background: rgba(247,242,232,0.97); }
       body.light .hero-bg { display: none; }
 
