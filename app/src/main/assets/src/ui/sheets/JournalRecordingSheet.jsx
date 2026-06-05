@@ -17,6 +17,34 @@
 
 import { PlatformBridge } from '../../utils/platform-bridge.js';
 
+/** Bars stored for a saved voice-memo waveform (JRNL-3). Matches the live
+ *  display count; bounds the inline waveform data to a constant size. */
+const WAVE_STORE_BARS = 48;
+
+/**
+ * Max-pool a raw amplitude array down to `buckets` bars (JRNL-3). Peaks survive
+ * (max, not average) so the stored waveform keeps its visual shape; the result
+ * represents the WHOLE clip rather than the last N raw samples. Returns the
+ * input unchanged when it's already at/under `buckets`, and null/[] passthrough.
+ * @param {number[] | null | undefined} arr
+ * @param {number} buckets
+ * @returns {number[] | null}
+ */
+export function downsampleWave(arr, buckets) {
+  if (!arr || !arr.length) return arr ? arr.slice() : null;
+  if (arr.length <= buckets) return arr.slice();
+  const out = [];
+  const size = arr.length / buckets;
+  for (let i = 0; i < buckets; i++) {
+    const start = Math.floor(i * size);
+    const end = Math.floor((i + 1) * size);
+    let peak = 0;
+    for (let j = start; j < end && j < arr.length; j++) { if (arr[j] > peak) peak = arr[j]; }
+    out.push(peak);
+  }
+  return out;
+}
+
 export function JournalRecordingSheet({ onSave, onClose }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
@@ -173,13 +201,21 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       accumulatedMsRef.current = 0;
       setStage('recording');
 
-      // Seconds counter — auto-stops at 5 min (preserved from production)
+      // Seconds counter — auto-stops at MAX_RECORDING_SECONDS. NTV-1: this IS the
+      // recording length cap (the blind audit's "no cap anywhere" was wrong — it
+      // grepped for setMaxDuration and missed this inline foreground stop). It
+      // bounds the native stop() whole-file read: 96 kbps × 5 min ≈ 3.6 MB, well
+      // within budget-device heap, so the audit's unbounded-43 MB/hour scenario
+      // cannot occur on the foreground path. (A native setMaxDuration/File backstop
+      // for a backgrounded recording past the cap is device-walk-gated — it touches
+      // the OEM MediaRecorder auto-stop behavior the native path exists to avoid.)
+      var MAX_RECORDING_SECONDS = 300; // 5 min
       tickRef.current = setInterval(function() {
         var sinceResume = Date.now() - startTimeRef.current;
         var totalMs = accumulatedMsRef.current + sinceResume;
         var s = Math.floor(totalMs / 1000);
         setSeconds(s);
-        if (s >= 300) {
+        if (s >= MAX_RECORDING_SECONDS) {
           previewDurationRef.current = s;
           stopRecording();
         }
@@ -290,9 +326,16 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       setStage('error');
       return;
     }
-    var samplesOut = (samplesAccumRef.current && samplesAccumRef.current.length)
-      ? samplesAccumRef.current.slice()
-      : (waveFinal && waveFinal.length ? waveFinal.slice() : null);
+    // JRNL-3: the amplitude poll accumulates one sample every 80ms (~3750 floats
+    // for a 5-min clip), but the waveform UI only ever renders ~48 bars. Storing
+    // the full array inflates EVERY journal autosave (the whole list is one IDB
+    // value re-serialized on each _save) + every export with data never displayed
+    // at that resolution. Max-pool down to WAVE_STORE_BARS buckets (peaks survive,
+    // representing the WHOLE clip) before persisting.
+    var rawSamples = (samplesAccumRef.current && samplesAccumRef.current.length)
+      ? samplesAccumRef.current
+      : (waveFinal && waveFinal.length ? waveFinal : null);
+    var samplesOut = downsampleWave(rawSamples, WAVE_STORE_BARS);
     JournalMediaStore.put({
       type: 'audio',
       blob: blob,
