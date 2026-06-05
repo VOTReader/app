@@ -26,6 +26,13 @@
      - delete vs edit                       → keep the edit (never lose content)
      - edit vs edit (same id both sides)    → newer `updated` wins
 
+   NOTE on delete-vs-edit: "keep the edit" means a record one tab DELETES while
+   another tab concurrently EDITS is RESURRECTED (with the edit's content). This
+   is a deliberate bias — for precious, hand-authored content, silently losing an
+   edit is worse than a record reappearing — but it is a real, observable
+   behavior: if you delete an entry in one tab and edit it in another, it comes
+   back. (Concurrent edit of a just-deleted record is rare in single-user use.)
+
    Records are matched by `.id` (arrays) or object key (maps). Conflict
    resolution reads `updated` (fallback `created`); records with NO timestamp
    (e.g. immutable links — add/delete only) are treated as never-edited, so
