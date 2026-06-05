@@ -31,6 +31,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeArrayStore } from './store-merge.js';
 
 /**
  * A bookmark record — see the file header schema for field semantics.
@@ -55,7 +56,7 @@ import { CachedStore, extendStore } from './cached-store.js';
 export function bkmId() { return 'bkm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
 
 export const BookmarkStore = extendStore(
-  CachedStore('vot-bookmarks', /** @type {Bookmark[]} */ ([]), { idb: true }),
+  CachedStore('vot-bookmarks', /** @type {Bookmark[]} */ ([]), { idb: true, crossTabMerge: mergeArrayStore }),
   {
     /**
      * Look up a bookmark by id.

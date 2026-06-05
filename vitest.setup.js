@@ -70,3 +70,42 @@ for (const name of _bridgeStubs) {
     window[name] = _noop;
   }
 }
+
+// (3) navigator.locks shim (STORE-1). jsdom has no Web Locks API, but the
+//     cross-tab-safe store flush (cached-store.js _saveMerged) serializes its
+//     read-merge-write through navigator.locks.request(). A faithful minimal
+//     shim: an exclusive per-name mutex backed by a promise chain, so two
+//     "tabs" (two store instances) sharing a mocked IDB serialize exactly as
+//     they would in a real PWA. Real production navigator.locks is native on
+//     the chrome108 floor; this only fills the test gap.
+if (typeof navigator !== 'undefined' && navigator && !navigator.locks) {
+  /** @type {Map<string, Promise<any>>} */
+  const _lockTails = new Map();
+  const locks = {
+    /**
+     * @param {string} name
+     * @param {any} optsOrCb
+     * @param {any} [maybeCb]
+     * @returns {Promise<any>}
+     */
+    request(name, optsOrCb, maybeCb) {
+      const cb = typeof optsOrCb === 'function' ? optsOrCb : maybeCb;
+      const prev = _lockTails.get(name) || Promise.resolve();
+      let releaseChain;
+      const chain = new Promise((r) => { releaseChain = r; });
+      _lockTails.set(name, chain);
+      // cb runs only after the previous holder settles; the returned promise
+      // carries cb's result/rejection. The chain releases (success OR failure)
+      // so one rejection can't deadlock the lock.
+      const run = prev.then(() => cb({ name, mode: 'exclusive' }));
+      run.then(() => releaseChain(), () => releaseChain());
+      chain.then(() => { if (_lockTails.get(name) === chain) _lockTails.delete(name); });
+      return run;
+    },
+  };
+  try { navigator.locks = locks; }
+  catch (_e) {
+    try { Object.defineProperty(navigator, 'locks', { value: locks, configurable: true }); }
+    catch (_e2) { /* environment refuses — merge path falls back to blob write */ }
+  }
+}

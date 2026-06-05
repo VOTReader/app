@@ -32,11 +32,12 @@ WHAT THIS FILE IS
   3 = full per-item detail, Section 4 = by-design/no-action, PROGRESS LOG (below)
   = dated per-batch record of what landed. One execution session has run.
 
-STATE: 29 DONE + 4 adjudicated, in 13 commits, ALL pushed to main, every commit
+STATE: 30 DONE + 4 adjudicated, in 14 commits, ALL pushed to main, every commit
   green through the full pre-commit gate chain (lint/tsc/vitest/build/corpus +
-  Kotlin testDebugUnitTest when .kt changed).
-  DONE (29): SRCH-1/2/3/4/6, JRNL-1, JRNL-2, PERF-1/2/3, SW-1/2/4, SEC-1/2/3,
-    BAK-2/4, CORP-1/3, NTV-2/4, SCRIP-1/3, STORE-3, SHELL-2, ANN-2, BLD-3/4.
+  Kotlin testDebugUnitTest when .kt changed). ALL THREE P0s NOW CLOSED.
+  DONE (30): SRCH-1/2/3/4/6, JRNL-1, JRNL-2, PERF-1/2/3, SW-1/2/4, SEC-1/2/3,
+    BAK-2/4, CORP-1/3, NTV-2/4, SCRIP-1/3, STORE-1 (BATCH 13), STORE-3, SHELL-2,
+    ANN-2, BLD-3/4.
   ADJUDICATED not-done (reasons in PROGRESS LOG + GOTCHA 1): SRCH-5, ANN-3,
     SCRIP-2 (render-guard net-negative), NTV-3 (already correct).
   Commits: a5f2196 search . 56bba5e quickwins . e7d29da corpus . 86cf422 backup .
@@ -45,19 +46,16 @@ STATE: 29 DONE + 4 adjudicated, in 13 commits, ALL pushed to main, every commit
     (+ f70024e tracker doc-fix.)
 
 NEXT PRIORITIES (each deserves its OWN focused session)
-  1. STORE-1 (the last P0) -- cross-tab whole-store clobber. RISKIEST remaining:
-     it is in the core CachedStore._save path that EVERY store rides on. Stopgaps
-     (merge-before-flush; BroadcastChannel re-hydrate) each have real edge cases;
-     the clean fix is per-record keying (a schema change). Needs careful merge-
-     semantics design + a 2-tab test harness. PWA-only (Android = single WebView,
-     immune). REUSE the JRNL-1 shape (GOTCHA 10) for the precious-data discipline.
-  2. TEST-1 (High) -- the Android v3 backup DRIVER (_exportV3Android /
+  (STORE-1 — the last P0 — is DONE as of BATCH 13. All three P0s are now closed.)
+  1. TEST-1 (High) -- the Android v3 backup DRIVER (_exportV3Android /
      _importV3Android in SettingsScreen.jsx) has ZERO tests + is outside coverage,
      and is the only-backup path on the primary platform. Extract it into an
      injectable module; round-trip a multi-frame export->import through a fake
      bridge asserting byte-identity (mirror StorageManagerTest.kt).
-  3. Medium cluster: PERF-4/5/6, ANN-1, BAK-1, STORE-2/4, NTV-1, JRNL-3, CORP-2,
+  2. Medium cluster: PERF-4/5/6, ANN-1, BAK-1, STORE-2/4, NTV-1, JRNL-3, CORP-2,
      BLD-1/2, TEST-2/3/4/5/6, BAK-3/5, JRNL-5.
+     NB STORE-2 (orphan-sweep TOCTOU) + STORE-4 (failed _save no-retry) remain —
+     they are independent of STORE-1's cross-tab fix.
 
 METHOD THAT WORKED (keep using it)
   Per item: (a) VERIFY the finding vs CURRENT source -- line numbers drift, and
@@ -288,13 +286,52 @@ PROGRESS LOG
     pins correctness + the rebuild-on-change (no stale cross-chapter result).
   Gates: lint(410) + typecheck + 1902 vitest + smoke:ci green.
 
+2026-06-04  BATCH 13 - STORE-1 (the last P0) — cross-tab whole-store clobber.  commit <pending>
+  New store-merge.js (3-way merge brain) + cached-store.js _saveMerged + wiring of the 8
+  precious stores. PWA-only (Android = single WebView, immune): every IDB store flushes its
+  WHOLE cache under key 'v' and hydrates once at boot, so a 2nd tab silently clobbers a
+  sibling's committed records (Tab A commits X; Tab B, cache pre-X, writes its stale whole-
+  cache → X destroyed). The ONLY finding that loses already-committed data with no user
+  mistake beyond opening two tabs.
+  - FIX: precious stores opt into crossTabMerge. _save routes through _saveMerged — a
+    per-store navigator.locks mutex serializes a read-merge-write: re-read the freshly
+    committed 'v', 3-way-merge the local cache onto it against a _base ancestor (set at
+    hydrate + after each merge-flush), put, adopt merged. The ancestor distinguishes a
+    delete ('in base, gone from theirs, we didn't touch it') from a sibling add ('in
+    theirs, never in base') — so neither clobber NOR delete-resurrection occurs. Same-
+    record conflicts resolve by newer `updated`. Worst case (merge throws / no Web Locks)
+    degrades to today's blob write — never worse. Non-merge stores keep the byte-identical
+    old path (zero hot-path change). A sibling's pulled-in records trigger a bump ONLY when
+    IDB actually diverged from base, so the solo-tab path (incl. F1+F2 keyed annotations)
+    adds no re-render.
+  - SCOPE: 8 protected — journal, journal-notebooks, notebooks, annotations (segment-bucket
+    merge), notes, links (immutable add/delete-only), bookmarks, journal-index (id-list
+    union). 10 low-stakes EXCLUDED by design (3 flags, recent-nav/history/home-order MRU,
+    vot-state [lastScreen is per-tab], journal-stats [derived], note-default, prophecy-cards
+    [cosmetic expand state]) — recoverable/self-healing, not worth lock+merge cost.
+    prophecy-cards is NOT precious (re-derived from the audit's "keyed object" label — a
+    GOTCHA-1 catch).
+  - PROVEN: store-merge.test.js (30 cases — full conflict matrix, immutable links, ann
+    buckets, import-reduces-to-imported) + cross-tab-merge.test.js (5 cases, 2-tab harness
+    over one shared mock IDB + the lock shim: UNPROTECTED path REPRODUCES the clobber [X
+    lost]; PROTECTED keeps both, honors deletes w/o resurrection, serializes a true race,
+    adopts the sibling). Real-env preview (real IndexedDB + real Web Locks): a simulated
+    sibling's record SURVIVED the real JournalStore's flush; all 3 coexisted; persisted
+    across reload; _base re-established on hydrate; 0 console errors.
+  - GOTCHA for next agent: jsdom has no navigator.locks — vitest.setup.js now ships a
+    faithful per-name mutex shim. Merge stores need _base, set only on the 'loaded'
+    transition; pending/degraded writes are queued (never call _save), so "merge-flush
+    only after _base is set" holds.
+  Gates: lint(410, no drift) + typecheck + 1937 vitest + coverage(exit 0, store-merge.js
+  95/91/100/98) + build + smoke:ci all green.
+
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
 ================================================================================
 
 P0 — real user-facing defect / reachable data loss
   [x] SRCH-1   Search ranking buries the verse you searched for (CRITICAL)
-  [ ] STORE-1  Cross-tab whole-store clobber — silent loss of committed data
+  [x] STORE-1  Cross-tab whole-store clobber — silent loss of committed data
   [x] JRNL-1   Journal background-kill flush is not durable (loss window)
 
 P1 — High: budget-device memory, stale-serve, broken core feature, untested only-backup
@@ -471,7 +508,11 @@ APP SHELL, HOOKS & RE-RENDERS  (rating 9.0)
 STORAGE & HYDRATION INTEGRITY  (rating 7.5)
 --------------------------------------------------------------------------------
 
-[ ] STORE-1 [H](V)  Cross-tab whole-store clobber — last-writer-wins, total granularity (M)
+[x] STORE-1 [H](V)  Cross-tab whole-store clobber — last-writer-wins, total granularity (M)
+    DONE (BATCH 13): per-store navigator.locks read-merge-write + 3-way merge vs a _base
+    ancestor (store-merge.js); 8 precious stores opted in. The audit's "per-record keying
+    schema change" was the higher-risk path — the merge layer lives in the ONE _save site
+    instead, leaving the non-merge hot path byte-identical. See PROGRESS LOG BATCH 13.
     Where: cached-store.js:280-298 + idb-adapter.js:224-266 (no BroadcastChannel/
       storage-event/navigator.locks anywhere — grep = 0)
     Problem: each tab hydrates once and never re-reads IDB; every write flushes the

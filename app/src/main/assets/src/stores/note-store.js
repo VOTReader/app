@@ -6,6 +6,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeMapStore } from './store-merge.js';
 
 /**
  * A note record — exists iff its group's kind === 'note' in AnnotationStore.
@@ -27,7 +28,7 @@ import { CachedStore, extendStore } from './cached-store.js';
 /* NoteStore — note bodies as first-class records keyed by groupId.
    A note exists iff its group's kind === 'note'. */
 export const NoteStore = extendStore(
-  CachedStore('vot-notes', /** @type {Record<string, Note>} */ ({}), { idb: true }),
+  CachedStore('vot-notes', /** @type {Record<string, Note>} */ ({}), { idb: true, crossTabMerge: mergeMapStore }),
   {
     /**
      * Look up a note by its groupId.

@@ -11,6 +11,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeAnnotationsStore } from './store-merge.js';
 
 /**
  * A single annotation segment. Multi-paragraph annotations share a
@@ -42,7 +43,7 @@ import { CachedStore, extendStore } from './cached-store.js';
    ('highlight' | 'underline' | 'note') and a groupId (always present;
    single-segment annotations get a unique groupId == id at create time). */
 export const AnnotationStore = extendStore(
-  CachedStore('vot-annotations', /** @type {AnnotationData} */ ({}), { idb: true }),
+  CachedStore('vot-annotations', /** @type {AnnotationData} */ ({}), { idb: true, crossTabMerge: mergeAnnotationsStore }),
   {
     /**
      * All annotation segments anchored at `key`. Empty array if none.

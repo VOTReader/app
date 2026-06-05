@@ -28,6 +28,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeArrayStore } from './store-merge.js';
 
 /**
  * A link endpoint (either source or target). The `key` is the hlKey
@@ -80,7 +81,7 @@ export function hlId() { return 'hl_' + Date.now() + '_' + Math.random().toStrin
 export function lnkId() { return 'lnk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
 
 export const LinkStore = extendStore(
-  CachedStore('vot-links', /** @type {Link[]} */ ([]), { idb: true }),
+  CachedStore('vot-links', /** @type {Link[]} */ ([]), { idb: true, crossTabMerge: mergeArrayStore }),
   {
     /**
      * State-aware load. Three branches:

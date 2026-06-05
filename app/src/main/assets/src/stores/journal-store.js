@@ -41,6 +41,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeListStore } from './store-merge.js';
 
 /**
  * A journal entry. Block contents are intentionally `any[]` — block shape
@@ -110,7 +111,7 @@ export function jrnId() {
 }
 
 export var JournalStore = extendStore(
-  CachedStore('vot-journal', /** @type {JournalStoreData} */ ({ list: [] }), { idb: true }),
+  CachedStore('vot-journal', /** @type {JournalStoreData} */ ({ list: [] }), { idb: true, crossTabMerge: mergeListStore }),
   {
     /**
      * All entries, newest first by `updated` (falling back to `created`).
@@ -543,7 +544,7 @@ export var JournalStore = extendStore(
 
 /* ── Notebook store: parallel to NotebookStore, separate localStorage key. ── */
 export var JournalNotebookStore = extendStore(
-  CachedStore('vot-journal-notebooks', /** @type {JournalNotebookStoreData} */ ({ list: [] }), { idb: true }),
+  CachedStore('vot-journal-notebooks', /** @type {JournalNotebookStoreData} */ ({ list: [] }), { idb: true, crossTabMerge: mergeListStore }),
   {
     /**
      * All journal-notebooks sorted by sortIndex, then created.

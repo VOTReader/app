@@ -44,6 +44,18 @@ import { IDBAdapter } from './idb-adapter.js';
 const _idbStoreRegistry = new Set();
 
 /**
+ * STORE-1: is the Web Locks API present? The cross-tab-safe flush serializes
+ * its read-merge-write through `navigator.locks`. Native on the chrome108
+ * floor; if a host lacks it (very old PWA browser, or a bare test env without
+ * the shim), merge stores fall back to the blob write — no crash, just the
+ * pre-STORE-1 last-writer-wins on that host.
+ * @returns {boolean}
+ */
+function _locksAvailable() {
+  return typeof navigator !== 'undefined' && !!navigator.locks && typeof navigator.locks.request === 'function';
+}
+
+/**
  * Configuration object accepted by the third arg of CachedStore().
  *
  * @typedef {{
@@ -54,6 +66,7 @@ const _idbStoreRegistry = new Set();
  *   legacyLsKey?: string | null,
  *   schemaVersion?: number,
  *   migrations?: Record<number, (old: any) => any>,
+ *   crossTabMerge?: (base: any, ours: any, theirs: any) => any,
  * }} CachedStoreOpts
  */
 
@@ -101,6 +114,10 @@ const _idbStoreRegistry = new Set();
  *   _hydratePromise: Promise<void> | null,
  *   _load(): T,
  *   _save(): void,
+ *   _saveMerged(): void,
+ *   _crossTabMerge: ((base: T | null, ours: T | null, theirs: T | null) => T) | null,
+ *   _base: T | null,
+ *   _baseStr: string | null,
  *   _lastWrite: Promise<any> | null,
  *   raw(): T,
  *   _version: number,
@@ -193,6 +210,17 @@ export function CachedStore(storageKey, defaultVal, opts) {
    * the persisted version trails `schemaVersion`. See `_migrateIfNeeded`.
    */
   const migrations = (opts.migrations && typeof opts.migrations === 'object') ? opts.migrations : {};
+  /**
+   * STORE-1 cross-tab-safe flush strategy. When set (precious stores only),
+   * `_save()` re-reads the freshly-committed IDB value and 3-way-merges the
+   * local cache onto it under a per-store navigator.locks mutex, instead of
+   * blind whole-cache last-writer-wins (which silently clobbers a sibling
+   * tab's committed records). Signature `(base, ours, theirs) => merged`,
+   * returning the store's native cache shape. Absent ⇒ today's exact blob
+   * write (zero behavior change for the low-stakes stores). See store-merge.js.
+   * @type {((base: any, ours: any, theirs: any) => any) | null}
+   */
+  const crossTabMerge = (typeof opts.crossTabMerge === 'function') ? opts.crossTabMerge : null;
   /** Meta-store key holding this store's persisted schema version. */
   const schemaMetaKey = 'schema:' + idbStoreName;
   /** Linear-backoff schedule (ms) for background IDB retries when
@@ -231,6 +259,14 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _schemaVersion: schemaVersion,
     _migrations: migrations,
     _schemaMetaKey: schemaMetaKey,
+    _crossTabMerge: crossTabMerge,
+    /** STORE-1: the IDB snapshot this tab last synced with — the common
+     *  ancestor for the 3-way cross-tab merge (set at hydrate + after each
+     *  merge-flush). Null until first hydrate, and forever for non-merge
+     *  stores. `_baseStr` caches its JSON for a cheap "did a sibling diverge?"
+     *  check on each flush. */
+    _base: /** @type {any} */ (null),
+    _baseStr: /** @type {string | null} */ (null),
     _state: /** @type {StoreState} */ (useIdb ? 'pending' : 'loaded'),
     _queue: [],
     _replaying: false,
@@ -276,10 +312,16 @@ export function CachedStore(storageKey, defaultVal, opts) {
      * Suppressed during `_replaying` (batched single flush at end of
      * replay) and during `_applyingPending` (pending-mode writes are
      * not durable until the eventual rebase).
+     *
+     * STORE-1: a store with `crossTabMerge` set routes through `_saveMerged`
+     * (serialized read-merge-write) instead of this blind blob write, so a
+     * second PWA tab can't clobber committed records. No merge store uses
+     * `lsShim`, so the merge path needs no LS branch.
      */
     _save() {
       if (this._replaying || this._applyingPending) return;
       if (useIdb) {
+        if (this._crossTabMerge && _locksAvailable()) { this._saveMerged(); return; }
         const cacheToWrite = this._cache;
         if (cacheToWrite !== null) {
           // U1: keep the raw put promise so whenSaved() can await durability
@@ -309,6 +351,62 @@ export function CachedStore(storageKey, defaultVal, opts) {
         console.warn('localStorage write failed for', storageKey, e);
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'localStorage write failed: ' + storageKey + ' — ' + ((e && e.name) || e));
       }
+    },
+
+    /**
+     * STORE-1: cross-tab-safe IDB flush for stores with a `crossTabMerge`
+     * strategy. Serializes a read-merge-write under a per-store
+     * navigator.locks mutex (so two PWA tabs can't interleave a
+     * read-modify-write) and 3-way-merges the local cache onto the FRESHLY
+     * committed IDB value (so a sibling tab's records survive instead of being
+     * clobbered by this tab's stale whole-cache). `_base` is the common
+     * ancestor that lets the merge tell a delete apart from a never-seen add.
+     *
+     * Reached only in the 'loaded' state (pending/degraded writes are queued by
+     * `_shouldDefer` and never call `_save`), so `_base` is always set first by
+     * `_rebaseAndPromote`. Worst case (merge throws) degrades to writing the
+     * local cache — identical to the pre-STORE-1 behavior, never worse.
+     */
+    _saveMerged() {
+      const self = this;
+      const name = idbStoreName;
+      const p = navigator.locks.request('vot-store:' + name, function () {
+        return IDBAdapter.get(name, 'v').then(function (theirsRaw) {
+          const theirs = (theirsRaw === undefined) ? null : theirsRaw;
+          // ── synchronous merge + adopt: no `await` between reading `_cache`
+          //    and reassigning it, so a concurrent in-place mutation of the old
+          //    cache object is captured by this merge, never silently dropped.
+          const ours = self._cache;
+          let merged;
+          let pulledRemote = false;
+          try {
+            merged = self._crossTabMerge(self._base, ours, theirs);
+            // Did a sibling commit anything since our last sync? Compare the
+            // fresh committed value to our cached base signature (free — we
+            // captured `_baseStr` at the last sync). Drives the surface-bump.
+            pulledRemote = (theirs !== null) && (JSON.stringify(theirs) !== self._baseStr);
+          } catch (e) {
+            console.warn('cross-tab merge failed for', name, '— writing local cache', e);
+            merged = ours;
+          }
+          self._cache = /** @type {any} */ (merged);
+          try { self._baseStr = JSON.stringify(merged); self._base = JSON.parse(self._baseStr); }
+          catch (_e) { self._baseStr = null; self._base = /** @type {any} */ (merged); }
+          // ── end synchronous section
+          return IDBAdapter.put(name, 'v', merged).then(function () {
+            // Surface a sibling's pulled-in records. ONLY when a sibling actually
+            // diverged — the solo-tab hot path adds no extra re-render, so the
+            // F1+F2 keyed-annotation optimization is preserved.
+            if (pulledRemote) self._bump();
+          });
+        });
+      });
+      this._lastWrite = p;
+      p.catch(function (err) {
+        console.error('IDB merged write failed for', name, err);
+        if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB merged write failed: ' + name + ' — ' + ((err && err.name) || err));
+        if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+      });
     },
 
     /**
@@ -670,6 +768,14 @@ export function CachedStore(storageKey, defaultVal, opts) {
      */
     _rebaseAndPromote(loadedData) {
       this._cache = /** @type {any} */ ((loadedData !== undefined && loadedData !== null) ? loadedData : copyDefault());
+      // STORE-1: snapshot the just-synced IDB state as the 3-way merge base
+      // BEFORE the queue replays onto _cache (a CLONE, so replay's in-place
+      // mutation of _cache can't bleed into base). For non-merge stores this
+      // is a no-op. From here every flush merges its delta onto fresh IDB.
+      if (this._crossTabMerge) {
+        try { this._baseStr = JSON.stringify(this._cache); this._base = JSON.parse(this._baseStr); }
+        catch (_e) { this._baseStr = null; this._base = null; }
+      }
       this._state = 'loaded';
       // E5: this store recovered — clear the degraded banner ONLY if no other
       // store is still degraded (the setter no-ops when unchanged).
@@ -736,6 +842,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
       this._replaying = false;
       this._applyingPending = false;
       this._hydratePromise = null;
+      this._base = null;          // STORE-1: clear the merge ancestor
+      this._baseStr = null;
       const forceLoaded = opts && opts.forceLoaded === true;
       this._state = (forceLoaded || !useIdb) ? 'loaded' : 'pending';
     },

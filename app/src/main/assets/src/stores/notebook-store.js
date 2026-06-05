@@ -7,6 +7,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeListStore } from './store-merge.js';
 import { NoteStore } from './note-store.js';
 
 /**
@@ -35,7 +36,7 @@ import { NoteStore } from './note-store.js';
    note. A note can live in 0, 1, or many notebooks (multi-membership
    via NoteStore.notebookIds[]). */
 export const NotebookStore = extendStore(
-  CachedStore('vot-notebooks', /** @type {NotebookStoreData} */ ({ list: [] }), { idb: true }),
+  CachedStore('vot-notebooks', /** @type {NotebookStoreData} */ ({ list: [] }), { idb: true, crossTabMerge: mergeListStore }),
   {
     /**
      * All notebooks sorted by sortIndex, then created. Returns a copy

@@ -33,6 +33,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeJournalIndexStore } from './store-merge.js';
 
 /**
  * Reverse-index shape: refKey → array of journal-entry ids that
@@ -42,7 +43,7 @@ import { CachedStore, extendStore } from './cached-store.js';
  */
 
 export var JournalIndexStore = extendStore(
-  CachedStore('vot-journal-index', /** @type {JournalIndexData} */ ({}), { idb: true }),
+  CachedStore('vot-journal-index', /** @type {JournalIndexData} */ ({}), { idb: true, crossTabMerge: mergeJournalIndexStore }),
   {
     /**
      * Journal-entry ids that reference `refKey`. Returns a defensive copy
