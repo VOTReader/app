@@ -43,7 +43,7 @@ STATE: 30 DONE + 4 adjudicated, in 14 commits, ALL pushed to main, every commit
   Commits: a5f2196 search . 56bba5e quickwins . e7d29da corpus . 86cf422 backup .
     9911e37 sw . 1f1428d security . c4a92c3 text/scripture . a7c6f91 kotlin .
     3992f6e tooling . 8978d16 memory . bd8fe4e journal . 28fc2a8 perf3 .
-    (+ f70024e tracker doc-fix.)
+    e7681a6 store1 (BATCH 13, the last P0).  (+ f70024e tracker doc-fix.)
 
 NEXT PRIORITIES (each deserves its OWN focused session)
   (STORE-1 — the last P0 — is DONE as of BATCH 13. All three P0s are now closed.)
@@ -286,7 +286,7 @@ PROGRESS LOG
     pins correctness + the rebuild-on-change (no stale cross-chapter result).
   Gates: lint(410) + typecheck + 1902 vitest + smoke:ci green.
 
-2026-06-04  BATCH 13 - STORE-1 (the last P0) — cross-tab whole-store clobber.  commit <pending>
+2026-06-04  BATCH 13 - STORE-1 (the last P0) — cross-tab whole-store clobber.  commit e7681a6
   New store-merge.js (3-way merge brain) + cached-store.js _saveMerged + wiring of the 8
   precious stores. PWA-only (Android = single WebView, immune): every IDB store flushes its
   WHOLE cache under key 'v' and hydrates once at boot, so a 2nd tab silently clobbers a
