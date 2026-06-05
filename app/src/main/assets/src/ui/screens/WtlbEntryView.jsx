@@ -2,6 +2,9 @@
    WtlbEntryView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { useSwipeNav } from '../../hooks/use-swipe-nav.js';
+
+
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
     corpus loads — "esther" → "Esther". BOOKS[id].title is preferred when
     available; this only keeps the inline link from showing a raw lowercase id. */
@@ -99,6 +102,9 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
 
   const prevEntry = entry.prevEntry;
   const nextEntry = entry.nextEntry;
+  const goPrev = () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary();
+  const goNext = () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary();
+  const swipe = useSwipeNav(goNext, goPrev);
 
   const _attrCollectionLabel = (volStr) => {
     if (!volStr) return null;
@@ -245,7 +251,7 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
         </div>
       </header>
 
-      <div className="page-wrapper">
+      <div className="page-wrapper" onTouchStart={swipe.onTouchStart} onTouchEnd={swipe.onTouchEnd}>
         <div className="content-layout">
           <main className="letter-body" ref={wtlbMainRef}>
             {entry.paragraphs.map((p, pi) => {

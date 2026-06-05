@@ -2,6 +2,9 @@
    ChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { useSwipeNav } from '../../hooks/use-swipe-nav.js';
+
+
 export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
@@ -36,6 +39,9 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   }, [surpriseAnchor]);
   const prevCh = book.chapters.find((c) => c.num === chapter.num - 1);
   const nextCh = book.chapters.find((c) => c.num === chapter.num + 1);
+  const goPrevCh = () => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary();
+  const goNextCh = () => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary();
+  const swipe = useSwipeNav(goNextCh, goPrevCh);
   const verses = chapter.verses || [];
 
   useMarkAsRead(markAsReadEnabled, onMarkRead);
@@ -125,7 +131,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       </header>
 
       <div className="page-wrapper">
-        <div className="chapter-body">
+        <div className="chapter-body" onTouchStart={swipe.onTouchStart} onTouchEnd={swipe.onTouchEnd}>
           {mode === "pdf" ? (
             /* ── PDF MODE: clean flowing verse text + study panels below ── */
             <>

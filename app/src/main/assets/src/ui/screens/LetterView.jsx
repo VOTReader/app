@@ -2,6 +2,8 @@
    LetterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { useSwipeNav } from '../../hooks/use-swipe-nav.js';
+
 export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
@@ -13,6 +15,10 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
   const hasProphecyGroups = letter.blocks.some((b) => b.type === "prophecy-group");
 
   const mainRef = React.useRef(null);
+
+  const goPrev = () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary();
+  const goNext = () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary();
+  const swipe = useSwipeNav(goNext, goPrev);
 
   useMarkAsRead(markAsReadEnabled, onMarkRead);
 
@@ -189,7 +195,7 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
         </div>
       </header>
 
-      <div className="page-wrapper">
+      <div className="page-wrapper" onTouchStart={swipe.onTouchStart} onTouchEnd={swipe.onTouchEnd}>
         <div className="letter-meta">
           <div className="meta-date">{letter.date}</div>
           <div className="meta-from">{letter.from}</div>
