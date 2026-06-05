@@ -32,30 +32,30 @@ WHAT THIS FILE IS
   3 = full per-item detail, Section 4 = by-design/no-action, PROGRESS LOG (below)
   = dated per-batch record of what landed. One execution session has run.
 
-STATE: 31 DONE + 4 adjudicated, in 16 commits, ALL pushed to main, every commit
-  green through the full pre-commit gate chain (lint/tsc/vitest/build/corpus +
-  Kotlin testDebugUnitTest when .kt changed). ALL THREE P0s + the only-backup test
-  gap NOW CLOSED.
-  DONE (31): SRCH-1/2/3/4/6, JRNL-1, JRNL-2, PERF-1/2/3, SW-1/2/4, SEC-1/2/3,
-    BAK-2/4, CORP-1/3, NTV-2/4, SCRIP-1/3, STORE-1 (BATCH 13), TEST-1 (BATCH 14),
-    STORE-3, SHELL-2, ANN-2, BLD-3/4.
-  ADJUDICATED not-done (reasons in PROGRESS LOG + GOTCHA 1): SRCH-5, ANN-3,
-    SCRIP-2 (render-guard net-negative), NTV-3 (already correct).
-  Commits: a5f2196 search . 56bba5e quickwins . e7d29da corpus . 86cf422 backup .
-    9911e37 sw . 1f1428d security . c4a92c3 text/scripture . a7c6f91 kotlin .
-    3992f6e tooling . 8978d16 memory . bd8fe4e journal . 28fc2a8 perf3 .
-    e7681a6 store1 (BATCH 13, the last P0) . c2a42c8 test1 (BATCH 14).
-    (+ f70024e + STORE-1/TEST-1 tracker doc-fixes.)
+STATE: ★ FULLY RESOLVED ★ — every actionable item is DONE, ADJUDICATED-with-reason,
+  or already-SATISFIED, across 21 commits, ALL pushed to main, every commit green
+  through the full pre-commit gate chain (lint/tsc/vitest/build/corpus + Kotlin
+  testDebugUnitTest when .kt changed). All three P0s + the only-backup test gap +
+  the entire P1/P2/P3 cluster are closed.
+  DONE (42): SRCH-1/2/3/4/6, JRNL-1/2/3, PERF-1/2/3, SW-1/2/4, SEC-1/2/3, BAK-1/2/4,
+    CORP-1/2/3, NTV-2/4, SCRIP-1/3, STORE-1/2/3/4, TEST-1/2/3/4/5, SHELL-2/3, ANN-2,
+    BLD-1/3/4. (BATCH 13 STORE-1; 14 TEST-1; 15 = the whole remaining cluster.)
+  ADJUDICATED (14, reasons in the PROGRESS LOG + GOTCHA 1): SRCH-5, ANN-1/3, SCRIP-2,
+    NTV-1/3, PERF-4/5/6, SHELL-1/4, BAK-3, BLD-2/5. (SHELL-1 == PERF-4.)
+  SATISFIED-already (2): BAK-5 (by TEST-1), JRNL-5 (by JRNL-1).  NO-ACTION (4): ANN-4,
+    SCRIP-4, JRNL-4, SW-3.
+  Commits: a5f2196 . 56bba5e . e7d29da . 86cf422 . 9911e37 . 1f1428d . c4a92c3 .
+    a7c6f91 . 3992f6e . 8978d16 . bd8fe4e . 28fc2a8 . e7681a6 store1 . c2a42c8 test1 .
+    4d2db94 batchA . 12db8d3 batchB . 67e70c1 batchC . a08db30 batchD+F . 3cf2a88 batchE .
+    (+ tracker doc-fixes.)
+  CORP-2 BONUS: the new validator cross-ref pass CAUGHT + fixed a SECOND CORP-1-class
+  dead link (the holy-days.js "CUP OF THE WRATH" footnote clone), CORPUS_VERSION c7->c8.
 
-NEXT PRIORITIES (each deserves its OWN focused session)
-  (STORE-1 [P0, BATCH 13] + TEST-1 [High, BATCH 14] both DONE — all three P0s plus
-   the only-backup test gap are closed. Remaining work is all P2/P3.)
-  1. Medium cluster: PERF-4/5/6, ANN-1, BAK-1, STORE-2/4, NTV-1, JRNL-3, CORP-2,
-     BLD-1/2, TEST-2/3/4/5/6, BAK-3/5, JRNL-5.
-     Good next picks (small, independent, well-scoped): BAK-1 (legacy v2 import wipes
-     existing media BEFORE decoding — destructive; mirror applyV3's decode-all-then-swap)
-     or STORE-2 (orphan-sweep TOCTOU deletes a freshly-inserted media blob — time-cutoff
-     the prune). STORE-4 (failed _save no-retry) is also independent of the STORE-1 fix.
+NEXT PRIORITIES
+  NONE — the blind audit is fully resolved. Optional follow-ups (NOT audit items):
+  the device-walk verifications for the items adjudicated as device-gated (NTV-1
+  native recording backstop — OEM MediaRecorder auto-stop; the standing N2.x / U1
+  hardware walks in tools/n1-smoke-walk.md). Everything ship-blocking is closed.
 
 METHOD THAT WORKED (keep using it)
   Per item: (a) VERIFY the finding vs CURRENT source -- line numbers drift, and
@@ -353,6 +353,50 @@ PROGRESS LOG
   - NB: BAK-5 (backup-container.js WEB codec truncation/EOF cases) is RELATED but a different
     module — still open.
   Gates: lint(413) + typecheck + 1952 vitest + coverage(exit 0) + build + smoke:ci all green.
+
+2026-06-04  BATCH 15 — THE ENTIRE REMAINING CLUSTER (owner: "finish the entire audit").
+  commits 4d2db94 (A) . 12db8d3 (B) . 67e70c1 (C) . a08db30 (D+F) . 3cf2a88 (E).
+  Every open P2/P3 item is now DONE, ADJUDICATED-with-reason, or already-SATISFIED —
+  the blind audit is FULLY RESOLVED. Split:
+  DONE (11): BAK-1 (legacy v2 import fail-safe REPLACE — put-then-prune-stale mirroring
+    applyV3, so a corrupt record can't wipe existing media; +2 tests). STORE-2 (orphan-
+    sweep cutoff — pruneOrphans never deletes a record `created` >= the sweep-start
+    snapshot; +2 tests). STORE-4 (bounded deduped write-retry on a transient IDB failure;
+    +2 tests). TEST-2 (SW fetch/activate runtime — cached-core / corpus cache-on-use /
+    SW-4 redirect-skip / SW-2 navigate-offline / cross-origin / stale-cache eviction; +7).
+    TEST-3 (sw-register update-prompt — already-waiting + updatefound->installed + no-
+    first-install-prompt; +3). TEST-5 (journal-store query/scan paths; per-file floor
+    51/42/62/56 -> 65/54/74/70). TEST-4 (coverage-scope honesty stated in vitest.config).
+    SHELL-3 (documented the deliberate render-phase lazy-corpus load + its 2 invariants).
+    JRNL-3 (downsample the stored waveform to 48 max-pooled bars; +4 tests). BLD-1 (gate
+    the web deploy on check:corpus + validate:data + check:csp before publish). CORP-2
+    (validate-schemas cross-ref RESOLUTION pass keyed off COLLECTIONS — ERRORs on a
+    display-label/dead VOT-letter link, skips Bible-Study/external links; it CAUGHT a
+    second CORP-1-class bug — the holy-days.js clone of the "CUP OF THE WRATH" footnote
+    still used the display label — FIXED, CORPUS_VERSION c7->c8).
+  ADJUDICATED (10, net-negative / accepted / premise-wrong — full reasons in each commit):
+    BAK-3 (importFailures already surfaced; spanning-txn rollback net-negative). TEST-6
+    (full-corpus search + 4.6MB lazy-bible render is gate-fragile; already unit-covered).
+    PERF-4/SHELL-1 (icons' bidirectional-arbitrary-prefix + dual-endpoint matching doesn't
+    map to per-key versioning without stale-icon risk; bounded cheap leaf re-renders).
+    PERF-5 (correct sig-skip must couple to the highlight reshape sig; bounded per-block
+    cost). ANN-1 (per-paragraph N; cliff only at 50+ ann in ONE para; offset-table reuse
+    already AUDIT-PLAN-A4-adjudicated). PERF-6 (audit's own accepted structural ceiling;
+    content-visibility risks the scroll-to-verse path PF3 was dropped to protect). SHELL-4
+    (React.memo a no-op without the ROUTES prop-identity refactor — the audit's own
+    caveat). NTV-1 (GOTCHA-1: the "no cap anywhere" premise is WRONG — the JS sheet already
+    auto-stops at 5 min [s>=300], bounding the read to ~3.6MB; made the cap discoverable;
+    native backstop is device-walk-gated OEM behavior). BLD-2 (committed bundles kept
+    fresh by the pre-commit + CI; residual gap dev-local-only; gradle Py/Node shell-out
+    adds build-env coupling). BLD-5 (Low size-only; gzip covers most; lazy off-critical-
+    path; data-file minify needs PF1-level byte-identical proof).
+  SATISFIED-already (2): BAK-5 (the TEST-1 round-trip already covers size-mismatch +
+    truncated/EOF-mid-frame). JRNL-5 (the JRNL-1 commit already shipped the breadcrumb-
+    write + recovery + stale-no-clobber durability suite, JournalEditorScreen.test.jsx:117-160).
+  METHOD held throughout: verify-vs-source (GOTCHA-1 caught NTV-1 + JRNL-5 stale premises +
+    the CORP-2 Bible-Study false positives), prove (real tests / real-corpus run), gate +
+    batch-commit-push. Gates each batch: lint + typecheck + 1976 vitest + coverage(exit 0,
+    journal-store floor ratcheted) + build + smoke:ci all green.
 
 ================================================================================
 SECTION 1 — PRIORITY-ORDERED INDEX (do in this order)
