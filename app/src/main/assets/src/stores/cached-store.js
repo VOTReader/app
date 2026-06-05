@@ -56,6 +56,23 @@ function _locksAvailable() {
 }
 
 /**
+ * STORE-1: a deep, independent snapshot of a store value, used for the 3-way
+ * merge `_base` ancestor (which must NOT alias the live `_cache`, since stores
+ * mutate it in place). Prefers structuredClone (native on the chrome108 floor,
+ * one pass, no string intermediary) over a JSON round-trip. Store values are
+ * IDB-persisted, so they are structured-cloneable by construction.
+ * @param {any} v
+ * @returns {any}
+ */
+function _cloneSnapshot(v) {
+  if (v === null || typeof v !== 'object') return v;
+  if (typeof structuredClone === 'function') {
+    try { return structuredClone(v); } catch (_e) { /* fall through to JSON */ }
+  }
+  try { return JSON.parse(JSON.stringify(v)); } catch (_e) { return v; }
+}
+
+/**
  * Configuration object accepted by the third arg of CachedStore().
  *
  * @typedef {{
@@ -117,7 +134,6 @@ function _locksAvailable() {
  *   _saveMerged(): void,
  *   _crossTabMerge: ((base: T | null, ours: T | null, theirs: T | null) => T) | null,
  *   _base: T | null,
- *   _baseStr: string | null,
  *   _lastWrite: Promise<any> | null,
  *   raw(): T,
  *   _version: number,
@@ -266,11 +282,9 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _crossTabMerge: crossTabMerge,
     /** STORE-1: the IDB snapshot this tab last synced with — the common
      *  ancestor for the 3-way cross-tab merge (set at hydrate + after each
-     *  merge-flush). Null until first hydrate, and forever for non-merge
-     *  stores. `_baseStr` caches its JSON for a cheap "did a sibling diverge?"
-     *  check on each flush. */
+     *  merge-flush, via _cloneSnapshot). Null until first hydrate, and forever
+     *  for non-merge stores. */
     _base: /** @type {any} */ (null),
-    _baseStr: /** @type {string | null} */ (null),
     _state: /** @type {StoreState} */ (useIdb ? 'pending' : 'loaded'),
     _queue: [],
     _replaying: false,
@@ -395,27 +409,21 @@ export function CachedStore(storageKey, defaultVal, opts) {
           //    cache object is captured by this merge, never silently dropped.
           const ours = self._cache;
           let merged;
-          let pulledRemote = false;
           try {
             merged = self._crossTabMerge(self._base, ours, theirs);
-            // Did a sibling commit anything since our last sync? Compare the
-            // fresh committed value to our cached base signature (free — we
-            // captured `_baseStr` at the last sync). Drives the surface-bump.
-            pulledRemote = (theirs !== null) && (JSON.stringify(theirs) !== self._baseStr);
           } catch (e) {
             console.warn('cross-tab merge failed for', name, '— writing local cache', e);
             merged = ours;
           }
           self._cache = /** @type {any} */ (merged);
-          try { self._baseStr = JSON.stringify(merged); self._base = JSON.parse(self._baseStr); }
-          catch (_e) { self._baseStr = null; self._base = /** @type {any} */ (merged); }
+          self._base = /** @type {any} */ (_cloneSnapshot(merged));   // new ancestor for the next merge
           // ── end synchronous section
-          return IDBAdapter.put(name, 'v', merged).then(function () {
-            // Surface a sibling's pulled-in records. ONLY when a sibling actually
-            // diverged — the solo-tab hot path adds no extra re-render, so the
-            // F1+F2 keyed-annotation optimization is preserved.
-            if (pulledRemote) self._bump();
-          });
+          // No subscriber re-render here: STORE-1 is LOSS-PREVENTION, not live
+          // cross-tab sync. A sibling's pulled-in records are now in `_cache`
+          // (consistent + safe) and surface on the next ordinary bump / reload.
+          // Skipping the bump keeps the hot path cheap — no per-save full-store
+          // serialization, and the F1+F2 keyed-annotation isolation is preserved.
+          return IDBAdapter.put(name, 'v', merged);
         });
       });
       this._lastWrite = p;
@@ -793,8 +801,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
       // mutation of _cache can't bleed into base). For non-merge stores this
       // is a no-op. From here every flush merges its delta onto fresh IDB.
       if (this._crossTabMerge) {
-        try { this._baseStr = JSON.stringify(this._cache); this._base = JSON.parse(this._baseStr); }
-        catch (_e) { this._baseStr = null; this._base = null; }
+        this._base = _cloneSnapshot(this._cache);
       }
       this._state = 'loaded';
       // E5: this store recovered — clear the degraded banner ONLY if no other
@@ -863,7 +870,6 @@ export function CachedStore(storageKey, defaultVal, opts) {
       this._applyingPending = false;
       this._hydratePromise = null;
       this._base = null;          // STORE-1: clear the merge ancestor
-      this._baseStr = null;
       if (this._writeRetryTimer != null) { clearTimeout(this._writeRetryTimer); this._writeRetryTimer = null; }  // STORE-4
       this._writeRetryAttempt = 0;
       const forceLoaded = opts && opts.forceLoaded === true;
