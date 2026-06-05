@@ -128,3 +128,39 @@ describe('search engine — parser sanity', () => {
     expect((r && r.results) || []).toEqual([]);
   });
 });
+
+describe('search engine — G2: folding, coverage, direct-ref, punctuation', () => {
+  it('SRCH-4: an accented query folds (NFD) to match unaccented text', async () => {
+    // "begínning" (precomposed í) must fold to "beginning" on both the query
+    // AND index side and still hit Genesis 1:1.
+    expect((await refs('begínning')).some((ref) => /Genesis 1:1/.test(ref))).toBe(true);
+    expect((await refs('créated')).some((ref) => /Genesis 1:1/.test(ref))).toBe(true);
+  });
+
+  it('SRCH-2: a full-coverage verse outranks a partial-coverage one', async () => {
+    // "God created" — both terms in Genesis 1:1; only "God" in Genesis 1:3.
+    const r = await refs('God created');
+    expect(r[0]).toMatch(/Genesis 1:1/);
+    const v1 = r.findIndex((ref) => /Genesis 1:1/.test(ref));
+    const v3 = r.findIndex((ref) => /Genesis 1:3/.test(ref));
+    if (v3 > -1) expect(v1).toBeLessThan(v3);    // full coverage ranks above partial
+  });
+
+  it('a book chapter:verse query parses to a reference, a plain word to text', async () => {
+    const r = await VotSearch.search('genesis 1:1');
+    expect(r.parsed.kind).not.toBe('text');   // recognized as a ref → UI direct-nav short-circuit
+    const r2 = await VotSearch.search('light');
+    expect(r2.parsed.kind).toBe('text');       // a plain word is a text query
+    expect(r2.parsed.terms).toContain('light');
+  });
+
+  it('matches a word adjacent to punctuation (tokenizer strips it)', async () => {
+    // Genesis 1:2 has "form, and void;" — "void" (followed by ';') must match.
+    expect((await refs('void')).some((ref) => /Genesis 1:2/.test(ref))).toBe(true);
+  });
+
+  it('a punctuation-only query returns nothing without throwing', async () => {
+    const r = await VotSearch.search('!!! ;;; ...');
+    expect((r && r.results) || []).toEqual([]);
+  });
+});
