@@ -156,11 +156,12 @@ export function useScrollMemory({
   }, [flushScrollToActiveTab]);
 
   // ── Effect 3: screen-change → update key + restore saved scroll ────────
-  // ASYMMETRIC CLEANUP IS INTENTIONAL: the savedY branch returns a cleanup
-  // to cancel the timer; the scroll-to-top branch uses a 0 ms setTimeout
-  // with no cleanup return — this is deliberate (fires immediately, no
-  // cleanup benefit). DO NOT add a cleanup return to the scroll-to-top
-  // branch.
+  // Both branches set scrollTop synchronously (catches fast desktop
+  // engines) AND via requestAnimationFrame (catches Android WebView,
+  // where the browser finalises layout AFTER the React commit — a bare
+  // setTimeout(0) fires before that layout pass and gets overridden by
+  // the WebView's scroll-maintenance). Both branches return cleanup so
+  // a rapid re-fire doesn't race with a stale rAF.
   React.useEffect(() => {
     const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId);
     scrollKeyRef.current = key;
@@ -170,12 +171,10 @@ export function useScrollMemory({
     // Support both new { y, pct } shape and legacy plain number for backcompat
     const savedY = saved == null ? null :
     typeof saved === 'number' ? saved : typeof saved.y === 'number' ? saved.y : null;
-    if (typeof savedY === 'number' && savedY > 0) {
-      const timer = setTimeout(() => {if (__scrollEl) __scrollEl.scrollTop = savedY;}, 0);
-      return () => clearTimeout(timer);
-    }
-    // Fresh screen / no saved position → top
-    setTimeout(() => {if (__scrollEl) __scrollEl.scrollTop = 0;}, 0);
+    const target = typeof savedY === 'number' && savedY > 0 ? savedY : 0;
+    if (__scrollEl) __scrollEl.scrollTop = target;
+    const raf = requestAnimationFrame(() => { if (__scrollEl) __scrollEl.scrollTop = target; });
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
 
