@@ -140,6 +140,10 @@ function _locksAvailable() {
  *   _rebaseAndPromote(loadedData: T | undefined | null): void,
  *   _applyToPendingCache(opName: string, args: any[]): void,
  *   _backgroundRetry(): void,
+ *   _scheduleWriteRetry(): void,
+ *   _clearWriteRetry(): void,
+ *   _writeRetryTimer: any,
+ *   _writeRetryAttempt: number,
  *   _resetForTests(opts?: { forceLoaded?: boolean }): void,
  * }} CachedStoreBase
  */
@@ -273,6 +277,11 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _applyingPending: false,
     _hydratePromise: /** @type {Promise<void> | null} */ (null),
     _lastWrite: /** @type {Promise<any> | null} */ (null),
+    /** STORE-4: a single pending write-retry timer + its attempt counter. A
+     *  failed fire-and-forget write schedules a bounded re-flush; a success
+     *  clears it. Null when no retry is pending. */
+    _writeRetryTimer: /** @type {any} */ (null),
+    _writeRetryAttempt: 0,
 
     /**
      * Sync read. LS-mode: lazy init from localStorage. IDB-mode loaded:
@@ -330,12 +339,20 @@ export function CachedStore(storageKey, defaultVal, opts) {
           // awaiter still observes whether the write succeeded or failed.
           const writePromise = IDBAdapter.put(idbStoreName, 'v', cacheToWrite);
           this._lastWrite = writePromise;
-          writePromise.catch(function (err) {
+          const self = this;
+          writePromise.then(function () {
+            // STORE-4: the latest cache is durable — cancel any pending failure-retry.
+            self._clearWriteRetry();
+          }, function (err) {
             console.error('IDB write failed for', idbStoreName, err);
             // W7.4: bare-global (typeof) guard mirrors the StorageHealth line
             // below — cached-store deliberately holds no imports (see header).
             if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB write failed: ' + idbStoreName + ' — ' + ((err && err.name) || err));
             if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+            // STORE-4: a fire-and-forget write that fails used to drop the edit
+            // silently if no later mutation re-flushed it. Schedule a bounded
+            // re-flush of the LATEST cache so a transient quota/abort blip recovers.
+            self._scheduleWriteRetry();
           });
         }
         if (lsShim) {
@@ -402,10 +419,13 @@ export function CachedStore(storageKey, defaultVal, opts) {
         });
       });
       this._lastWrite = p;
-      p.catch(function (err) {
+      p.then(function () {
+        self._clearWriteRetry();   // STORE-4: merged write durable — cancel any pending retry
+      }, function (err) {
         console.error('IDB merged write failed for', name, err);
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'IDB merged write failed: ' + name + ' — ' + ((err && err.name) || err));
         if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+        self._scheduleWriteRetry();   // STORE-4: bounded re-flush on a transient failure
       });
     },
 
@@ -844,6 +864,8 @@ export function CachedStore(storageKey, defaultVal, opts) {
       this._hydratePromise = null;
       this._base = null;          // STORE-1: clear the merge ancestor
       this._baseStr = null;
+      if (this._writeRetryTimer != null) { clearTimeout(this._writeRetryTimer); this._writeRetryTimer = null; }  // STORE-4
+      this._writeRetryAttempt = 0;
       const forceLoaded = opts && opts.forceLoaded === true;
       this._state = (forceLoaded || !useIdb) ? 'loaded' : 'pending';
     },
@@ -888,6 +910,38 @@ export function CachedStore(storageKey, defaultVal, opts) {
         });
       };
       setTimeout(tick, this._backgroundRetryDelays[0]);
+    },
+
+    /**
+     * STORE-4: schedule a bounded re-flush after a failed IDB write. A
+     * fire-and-forget `_save()` that rejects used to drop the edit silently
+     * unless a LATER mutation happened to re-flush the whole cache; a transient
+     * quota/abort blip that then cleared lost that edit. This re-runs `_save()`
+     * (which re-flushes the CURRENT cache, not the failed snapshot) on the linear-
+     * backoff schedule, deduped to one chain and capped at the schedule length.
+     * A successful write clears it (`_clearWriteRetry`). After the cap we give up;
+     * StorageHealth (READONLY tier + toast) and whenSaved() at export still report
+     * a persistent failure. No-op for LS-only stores.
+     */
+    _scheduleWriteRetry() {
+      if (!useIdb) return;
+      if (this._writeRetryTimer != null) return;   // a retry chain is already pending
+      const delays = this._backgroundRetryDelays;
+      if (!delays.length) return;
+      const attempt = this._writeRetryAttempt || 0;
+      if (attempt >= delays.length) return;         // bounded — stop after the schedule
+      const self = this;
+      this._writeRetryTimer = setTimeout(function () {
+        self._writeRetryTimer = null;
+        self._writeRetryAttempt = attempt + 1;
+        self._save();   // re-flush latest cache; its success/failure clears or re-schedules
+      }, delays[attempt]);
+    },
+
+    /** STORE-4: a durable write cancels the pending retry + resets the counter. */
+    _clearWriteRetry() {
+      if (this._writeRetryTimer != null) { clearTimeout(this._writeRetryTimer); this._writeRetryTimer = null; }
+      this._writeRetryAttempt = 0;
     },
   };
   // Auto-register IDB-backed stores so HydrationGate / hydrateAllStores

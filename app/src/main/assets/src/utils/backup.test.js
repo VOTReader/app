@@ -395,6 +395,52 @@ describe('applyImportPayload', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  it('BAK-1: a corrupt media record does NOT wipe existing media (fail-safe replace)', async () => {
+    // Two photos already on device; the backup updates BOTH, but the 2nd record
+    // passes validation yet fails to decode ('A'.repeat(101) → atob throws). Pre-fix,
+    // the up-front "clear ALL media" wiped both before the decode loop, so the 2nd
+    // photo was lost. Post-fix, a mentioned id keeps its existing copy on failure.
+    const store = {
+      old1: { id: 'old1', blob: new Blob([new Uint8Array([1, 2, 3])]), type: 'image' },
+      old2: { id: 'old2', blob: new Blob([new Uint8Array([4, 5, 6])]), type: 'audio' },
+    };
+    const media = {
+      _store: store,
+      allIds: async () => Object.keys(store),
+      delete: async (id) => { delete store[id]; },
+      put: async (rec) => { store[rec.id] = rec; },
+    };
+    const res = await applyImportPayload(
+      { exportVersion: 2, stores: {}, media: {
+        old1: { data: 'aGk=', type: 'image', mime: 'image/png', size: 2, created: 1 },        // valid → replaced ('hi')
+        old2: { data: 'A'.repeat(101), type: 'audio', mime: 'audio/webm', size: 3, created: 2 }, // FAILS atob decode
+      } },
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate, validateMediaRecord: okValidate },
+    );
+    expect(res.importFailures).toBe(1);                            // old2's decode failed
+    expect(Object.keys(store).sort()).toEqual(['old1', 'old2']);   // BOTH present — no destructive pre-clear
+    expect(Array.from(new Uint8Array(await store.old2.blob.arrayBuffer()))).toEqual([4, 5, 6]); // old2 ORIGINAL survives
+    expect(Array.from(new Uint8Array(await store.old1.blob.arrayBuffer()))).toEqual([104, 105]); // old1 replaced with 'hi'
+  });
+
+  it('BAK-1: prunes media absent from the backup (exact replace for the clean case)', async () => {
+    const store = {
+      keep: { id: 'keep', blob: new Blob([new Uint8Array([1])]), type: 'image' },
+      drop: { id: 'drop', blob: new Blob([new Uint8Array([2])]), type: 'image' },
+    };
+    const media = {
+      _store: store,
+      allIds: async () => Object.keys(store),
+      delete: async (id) => { delete store[id]; },
+      put: async (rec) => { store[rec.id] = rec; },
+    };
+    await applyImportPayload(
+      { exportVersion: 2, stores: {}, media: { keep: { data: 'aGk=', type: 'image', mime: 'image/png', size: 2, created: 1 } } },
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate, validateMediaRecord: okValidate },
+    );
+    expect(Object.keys(store)).toEqual(['keep']);   // 'drop' (not in backup) pruned; exact replace
+  });
+
   it('S5: stops importing media once the aggregate decoded-byte cap is hit', async () => {
     const put = vi.fn(async () => {});
     const okB64 = 'QUJDREVG'; // 8 base64 chars → ~6 decoded bytes each

@@ -208,6 +208,26 @@ describe('JournalMediaStore — pruneOrphans() — the user-data deleter contrac
     expect(await JournalMediaStore.get('m3')).toBeNull();
   });
 
+  it('STORE-2: never prunes a record created AT/AFTER the sweep cutoff (TOCTOU guard)', async () => {
+    // A photo captured AFTER the boot sweep's synchronous snapshot but read by
+    // the async prune pass: durable in IDB, absent from `referencedIds`. Without
+    // the cutoff it would be reclaimed (data loss). Stamp it in the far future to
+    // stand in for "newer than the sweep started".
+    await JournalMediaStore.put({ id: 'm_fresh', type: 'image', blob: makeBlob(8, 'image/jpeg'), created: 9_000_000_000_000 });
+    const cutoff = 8_000_000_000_000; // after m1/m2/m3 (real now), before m_fresh
+    const removed = await JournalMediaStore.pruneOrphans([], cutoff);
+    expect(removed).toBe(3);                                         // m1/m2/m3 (pre-cutoff, unreferenced) pruned
+    expect(await JournalMediaStore.get('m_fresh')).not.toBeNull();   // post-cutoff blob SURVIVES
+    expect(await JournalMediaStore.get('m1')).toBeNull();
+  });
+
+  it('STORE-2: omitting the cutoff keeps the legacy prune-all-unreferenced behavior', async () => {
+    await JournalMediaStore.put({ id: 'm_fresh', type: 'image', blob: makeBlob(8, 'image/jpeg'), created: 9_000_000_000_000 });
+    const removed = await JournalMediaStore.pruneOrphans([]);        // no cutoff → no time guard
+    expect(removed).toBe(4);                                         // m1/m2/m3 + m_fresh all pruned
+    expect(await JournalMediaStore.get('m_fresh')).toBeNull();
+  });
+
   it('does not crash when the referenced list includes unknown ids', async () => {
     // The set has 'm_never' which doesn't exist + 'm1' which does.
     // The unknown id is just ignored on the filter side; m2+m3 still get

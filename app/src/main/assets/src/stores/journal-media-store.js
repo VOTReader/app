@@ -273,16 +273,43 @@ export var JournalMediaStore = (function() {
      * Remove every blob NOT referenced by `referencedIds`. Returns the
      * count of removed records (for diagnostic logging). Used by the
      * orphan-cleanup pass on app start.
+     *
+     * STORE-2: the boot sweep snapshots `referencedIds` SYNCHRONOUSLY, but this
+     * prune reads IDB asynchronously — a photo captured in that window is durable
+     * in IDB yet absent from the snapshot, so deleting "ids not in the set" would
+     * reclaim a just-taken photo (TOCTOU data loss). When `cutoffMs` is given (the
+     * sweep start time), a record created AT/AFTER it is NEVER pruned: it is too
+     * new to be a real orphan (it may be referenced by an entry that post-dates the
+     * snapshot). We read id+`created` in ONE cursor pass, then delete via delete()
+     * (which keeps the object-URL cache clean). Omitting cutoffMs keeps the legacy
+     * "prune every unreferenced id" behavior.
      * @param {string[]} referencedIds
+     * @param {number} [cutoffMs]  sweep-start timestamp; records `created` >= this survive
      * @returns {Promise<number>}
      */
-    pruneOrphans: function(referencedIds) {
+    pruneOrphans: function(referencedIds, cutoffMs) {
       /** @type {Record<string, boolean>} */
       var set = {};
       (referencedIds || []).forEach(function(id) { set[id] = true; });
+      var cutoff = (typeof cutoffMs === 'number') ? cutoffMs : Infinity;
       var self = this;
-      return this.allIds().then(function(ids) {
-        var toRemove = ids.filter(function(id) { return !set[id]; });
+      return tx('readonly').then(function(store) {
+        return new Promise(function(resolve, reject) {
+          /** @type {string[]} */
+          var toRemove = [];
+          var req = store.openCursor();
+          req.onsuccess = function(e) {
+            var cursor = /** @type {IDBCursorWithValue | null} */ (/** @type {IDBRequest} */ (e.target).result);
+            if (!cursor) { resolve(toRemove); return; }
+            var rec = cursor.value || {};
+            var created = (typeof rec.created === 'number') ? rec.created : 0;
+            if (!set[rec.id] && created < cutoff) toRemove.push(rec.id);
+            cursor.continue();
+          };
+          req.onerror = function() { reject(req.error); };
+          guardTx(store, reject);
+        });
+      }).then(function(toRemove) {
         return Promise.all(toRemove.map(function(id) { return self.delete(id); })).then(function() { return toRemove.length; });
       });
     },

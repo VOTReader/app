@@ -518,13 +518,17 @@ export async function applyImportPayload(parsed, ctx) {
     }
   }
 
-  // (3) Apply media → JournalMediaStore (v2 only). Clear existing media
-  //     first so this is a true REPLACE.
+  // (3) Apply media → JournalMediaStore (v2 only). BAK-1 FAIL-SAFE REPLACE
+  //     (mirror applyV3): decode + put each record (put = overwrite by id)
+  //     WITHOUT clearing existing media up front, then PRUNE only the ids ABSENT
+  //     from this backup AFTER the loop. The pre-fix order (clear ALL media, THEN
+  //     decode) destroyed the user's prior media whenever ANY single per-record
+  //     base64 decode failed — the only backup must never lose data on a partial /
+  //     corrupt import. Now a validation / cap / decode failure leaves that id's
+  //     existing copy intact (the backup MENTIONS the id, so it's never pruned);
+  //     only ids the backup OMITS are removed, an exact REPLACE for the clean case.
   if (exportVersion >= 2 && parsed.media && typeof parsed.media === 'object') {
-    try {
-      const existingIds = await mediaStore.allIds();
-      for (const id of existingIds) await mediaStore.delete(id);
-    } catch (e) { console.warn('clear existing media failed', e); }
+    const backupIds = Object.keys(parsed.media);
     // S5: aggregate decoded-byte guard. validateMediaRecord caps EACH record
     // (100 MB), but a hand-edited backup can carry many sub-cap records that sum
     // to GBs; our own export refuses a backup whose TOTAL decoded media exceeds
@@ -537,7 +541,7 @@ export async function applyImportPayload(parsed, ctx) {
     // so the caller's summary toast reports them.
     let totalMediaBytes = 0;
     let mediaCapHit = false;
-    for (const id of Object.keys(parsed.media)) {
+    for (const id of backupIds) {
       const record = parsed.media[id];
       const mediaViolations = validateMediaRecord(id, record);
       if (mediaViolations.length) {
@@ -567,6 +571,15 @@ export async function applyImportPayload(parsed, ctx) {
     if (mediaCapHit) {
       console.warn('import: media aggregate cap (' + mediaTotalLimitBytes + ' bytes) reached; some media skipped');
     }
+    // Prune stale media — present on the device but NOT mentioned by this backup —
+    // for an exact REPLACE. An id the backup mentions is NEVER pruned (its existing
+    // copy survives even if the new record failed to decode), so a corrupt backup
+    // can't wipe data.
+    try {
+      const inBackup = new Set(backupIds);
+      const existingIds = await mediaStore.allIds();
+      for (const id of existingIds) { if (!inBackup.has(id)) await mediaStore.delete(id); }
+    } catch (e) { console.warn('prune stale media failed', e); }
   }
 
   // (4) U1 DURABILITY BARRIER — wait for every imported store's IDB write to land

@@ -616,6 +616,49 @@ describe('CachedStore W2.2 — hydration timeout → degraded → recovery (Vect
   });
 });
 
+describe('CachedStore STORE-4 — bounded write-retry on a transient failure', () => {
+  beforeEach(() => {
+    localStorage.clear?.();
+    _resetStoreRegistry();
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    window.StorageHealth = { onWriteFailure: vi.fn() };   // swallow the health hook
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    delete window.StorageHealth;
+  });
+
+  it('a failed write schedules a retry that re-flushes + clears on recovery', async () => {
+    const putSpy = vi.spyOn(IDBAdapter, 'put')
+      .mockRejectedValueOnce(new Error('quota'))  // the first write fails
+      .mockResolvedValue(undefined);              // the retry succeeds
+    const store = createTestStore('vot-test-store4', { idb: true });
+    store._resetForTests({ forceLoaded: true });
+    store.add({ id: 'a', label: 'A' });           // _save → put rejects
+    await Promise.resolve(); await Promise.resolve();   // flush the rejection → onErr → schedule
+    expect(putSpy).toHaveBeenCalledTimes(1);
+    expect(store._writeRetryTimer).not.toBeNull();       // retry pending
+    await vi.advanceTimersByTimeAsync(5000);             // first backoff slot → retry fires + succeeds
+    expect(putSpy).toHaveBeenCalledTimes(2);
+    expect(store._writeRetryTimer).toBeNull();           // cleared on success
+    expect(store._writeRetryAttempt).toBe(0);
+  });
+
+  it('gives up after the 4-slot backoff schedule when the failure persists', async () => {
+    const putSpy = vi.spyOn(IDBAdapter, 'put').mockRejectedValue(new Error('quota'));
+    const store = createTestStore('vot-test-store4-perm', { idb: true });
+    store._resetForTests({ forceLoaded: true });
+    store.add({ id: 'a', label: 'A' });
+    await vi.advanceTimersByTimeAsync(120000);           // covers all 4 backoff slots (5+10+30+60s)
+    // 1 initial write + 4 bounded retries, then it stops (no infinite loop).
+    expect(putSpy).toHaveBeenCalledTimes(5);
+    expect(store._writeRetryTimer).toBeNull();
+  });
+});
+
 describe('CachedStore W2.2 — batched replay (Flag 2: single save + single bump)', () => {
   beforeEach(() => { localStorage.clear?.(); _resetStoreRegistry(); vi.restoreAllMocks(); });
   afterEach(() => { vi.restoreAllMocks(); });

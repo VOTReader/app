@@ -544,8 +544,12 @@ function App() {
           console.info('Journal media orphan sweep skipped — store not ready (' + JournalStore.getState() + ')');
           return;
         }
+        // STORE-2: stamp the snapshot moment and pass it as the prune cutoff so a
+        // blob captured AFTER this snapshot (but read by prune's async IDB pass)
+        // is never reclaimed — it's too new to be a real orphan.
+        const sweepStart = Date.now();
         const referenced = JournalStore.collectAllMediaIds();
-        JournalMediaStore.pruneOrphans(referenced).then((n) => {
+        JournalMediaStore.pruneOrphans(referenced, sweepStart).then((n) => {
           if (n) console.info('Journal media orphan sweep removed', n, 'blob(s)');
         }).catch((e) => console.warn('Journal media orphan sweep failed', e));
       } catch (e) { console.warn('Journal media orphan sweep threw', e); }
