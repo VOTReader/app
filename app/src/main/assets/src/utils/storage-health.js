@@ -371,6 +371,16 @@ async function _assessImpl() {
   var pct = (quota != null && usage != null && quota > 0) ? usage / quota : null;
   var remaining = (quota != null && usage != null) ? quota - usage : null;
   var persistedBool = persisted === true;
+  // On the installed Android APK the WebView's IndexedDB/localStorage live in the
+  // app's PRIVATE data dir (android:allowBackup="false") — durable app data, NOT
+  // subject to the browser's best-effort eviction that navigator.storage.persisted()
+  // reflects. The API reports false there (no installed-PWA / site-engagement
+  // heuristic can grant persistence inside a WebView), but nothing "cleans up" that
+  // data: it's gone only on uninstall or a manual Settings → Clear data. Treat it
+  // as persisted so the "protect your data from browser cleanup" banner + the
+  // Settings "Protect now" nag — both browser-tab concerns that read FALSE on the
+  // APK and whose persist() request can't be granted there anyway — don't fire.
+  if (platform === PLATFORM.ANDROID_WEBVIEW) persistedBool = true;
 
   var privateModeLikely = (
     platform === PLATFORM.SAFARI_TAB || platform === PLATFORM.SAFARI_PWA
@@ -386,7 +396,7 @@ async function _assessImpl() {
     platform: platform,
     quota: quota,
     usage: usage,
-    persisted: persisted != null ? !!persisted : null,
+    persisted: persistedBool,
     percentUsed: pct,
     remaining: remaining,
     risks: risks,

@@ -170,6 +170,19 @@ describe('tier computation', () => {
     expect(r.tier).toBe(TIER.CAUTION);
   });
 
+  it('android-webview: persisted=false does NOT force caution (app-private storage is durable)', async () => {
+    // On the installed APK the WebView's data is durable app-private storage,
+    // so navigator.storage.persisted() returning false is meaningless — the
+    // tier must stay healthy and report persisted:true (no false alarm).
+    StorageHealth._resetForTests({
+      platform: PLATFORM.ANDROID_WEBVIEW,
+      storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
+    });
+    const r = await StorageHealth.assess();
+    expect(r.tier).toBe(TIER.HEALTHY);
+    expect(r.persisted).toBe(true);
+  });
+
   it('caution: safari-tab platform', async () => {
     StorageHealth._resetForTests({
       platform: PLATFORM.SAFARI_TAB,
@@ -285,6 +298,16 @@ describe('risk flags', () => {
     const r = await StorageHealth.assess();
     expect(r.risks).toContain(RISK.SAFARI_7DAY);
     expect(r.risks).toContain(RISK.NOT_PERSISTED);
+  });
+
+  it('android-webview: persisted=false does NOT raise the not-persisted risk (no "protect my data" banner on the APK)', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.ANDROID_WEBVIEW,
+      storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
+    });
+    const r = await StorageHealth.assess();
+    expect(r.risks).not.toContain(RISK.NOT_PERSISTED);
+    expect(r.persisted).toBe(true);
   });
 
   it('safari-pwa → ios-pwa-isolate risk', async () => {
