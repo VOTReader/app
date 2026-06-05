@@ -81,6 +81,19 @@ jobs:
       - name: Install dependencies (npm ci — exact lockfile)
         run: npm ci
 
+      - name: Gate — re-run CI's blocking publish checks (BLD-1)
+        # The deploy publishes STRAIGHT to the live PWA. Before this step it
+        # invoked zero gates, so a commit that builds but violates a DIFFERENT
+        # gate shipped anyway — sharpest case: a corpus edit that skips the manual
+        # CORPUS_VERSION bump fails CI but still deployed, leaving every installed
+        # PWA stuck on stale scripture (the SW corpus-cache key never rotates).
+        # Re-run the cheap blocking checks against the committed state; a non-zero
+        # exit aborts the deploy before anything is published.
+        run: |
+          npm run check:corpus     # CORPUS_VERSION matches the corpus-bundle hash
+          npm run validate:data    # Format A/B/C/D schema integrity
+          npm run check:csp        # index.html inline-script CSP hashes in sync
+
       - name: Build bundles + sync SW version
         # `npm run build` regenerates dist/ and syncs the SW CACHE_VERSION
         # from package.json (build:sw), so the deployed SW always carries

@@ -24,6 +24,59 @@ import { createContext, runInNewContext } from 'vm';
 import { resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils/scripture-parse.js';
+import { COLLECTIONS } from '../app/src/main/assets/src/data/scripture-resolution.js';
+
+// ── CORP-2: cross-reference resolution ───────────────────────────
+// The in-app letter registry (built at index.html runtime) keys every letter by
+// `registryLabel + '::' + title`, and resolveVotLetter looks up `collection +
+// '::' + letterTitle` from a cross-ref. A cross-ref whose `collection` is the
+// DISPLAY label instead of the registryLabel silently fails to resolve — the
+// CORP-1 dead "Also read" ("The Lord's Rebuke" vs "A Testament Against The World:
+// The Lord's Rebuke"). The validator never checked this, so it shipped green.
+// GLOBAL_TO_REGISTRY is the faithful registry-label map (off COLLECTIONS, the
+// single source); walkLetterXrefs collects every structured cross-ref a letter
+// carries; the runner registers all titles, then ERRORs on any that won't resolve.
+const GLOBAL_TO_REGISTRY = new Map(COLLECTIONS.map((c) => [c.globalName, c.registryLabel]));
+// A cross-ref is a VOT-LETTER link only when its `collection` names a real VOT
+// collection (by registryLabel OR display label). Links whose collection is
+// neither — e.g. a Bible-Study reference `{collection,letterTitle}` that is just
+// a study title + an external `url` — resolve through a DIFFERENT path and are
+// NOT checked here (else they false-positive). A display-label collection IS a
+// VOT collection but the WRONG key — the CORP-1 class — and must fail.
+const VOT_REGISTRY_LABELS = new Set(COLLECTIONS.map((c) => c.registryLabel));
+const VOT_DISPLAY_LABELS = new Set(COLLECTIONS.map((c) => c.label));
+
+/**
+ * Every (collection, letterTitle) cross-reference a letter carries: footnote
+ * `seeAlso` / footnote `link` / `metaAddendumLink` / `letter-link` segments.
+ * External (url-only) links are skipped — only internal letter targets resolve.
+ * @param {any} letter
+ * @returns {Array<{ collection: string, letterTitle: string, where: string }>}
+ */
+function walkLetterXrefs(letter) {
+  /** @type {Array<{ collection: string, letterTitle: string, where: string }>} */
+  const out = [];
+  const push = (lnk, where) => {
+    if (lnk && typeof lnk === 'object' && typeof lnk.collection === 'string' && typeof lnk.letterTitle === 'string') {
+      out.push({ collection: lnk.collection, letterTitle: lnk.letterTitle, where });
+    }
+  };
+  const fns = (letter && letter.footnotes && typeof letter.footnotes === 'object') ? letter.footnotes : {};
+  for (const num of Object.keys(fns)) {
+    const fn = fns[num];
+    if (fn && fn.seeAlso) push(fn.seeAlso, `footnote ${num} seeAlso`);
+    if (fn && fn.link) push(fn.link, `footnote ${num} link`);
+  }
+  if (letter && letter.metaAddendumLink) push(letter.metaAddendumLink, 'metaAddendumLink');
+  const blocks = (letter && Array.isArray(letter.blocks)) ? letter.blocks : [];
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const segs = blocks[bi] && Array.isArray(blocks[bi].segments) ? blocks[bi].segments : [];
+    for (let si = 0; si < segs.length; si++) {
+      if (segs[si] && segs[si].t === 'letter-link') push(segs[si].link, `block ${bi} letter-link`);
+    }
+  }
+  return out;
+}
 
 // ── valid enum sets ──────────────────────────────────────────────
 
@@ -1320,6 +1373,12 @@ function runCli() {
   );
 
   const totals = { items: 0, errors: 0, warnings: 0 };
+  // CORP-2: registry of resolvable letter targets (registryLabel::title) + the
+  // cross-refs to verify against it once every collection has loaded.
+  const xrefRegistry = new Set();
+  /** @type {Array<{ collection: string, letterTitle: string, where: string }>} */
+  const xrefs = [];
+  const registerTitle = (rl, item) => { if (rl && item && typeof item.title === 'string') xrefRegistry.add(rl + '::' + item.title); };
   const add = (result, n) => {
     totals.errors += result.errors.length;
     totals.warnings += result.warnings.length;
@@ -1345,6 +1404,13 @@ function runCli() {
     const result = validateFormatA(letters, { strict, fileName: label });
     add(result, letters.length);
     emit(result, label, letters.length, 'letters', preface ? ' + preface' : '');
+    // CORP-2: register this collection's titles + collect its cross-refs.
+    const rl = GLOBAL_TO_REGISTRY.get(entry.arrayVar);
+    if (rl) {
+      registerTitle(rl, preface);
+      if (preface) for (const x of walkLetterXrefs(preface)) xrefs.push(x);
+      for (const L of letters) { registerTitle(rl, L); for (const x of walkLetterXrefs(L)) xrefs.push(x); }
+    }
   }
 
   // ── Format B ──
@@ -1360,6 +1426,10 @@ function runCli() {
     const result = validateFormatB(entries, { strict, fileName: label, scriptures });
     add(result, entries.length);
     emit(result, label, entries.length, 'entries', '');
+    // CORP-2: WTLB / Blessed entries are cross-ref TARGETS (register their titles);
+    // their own cross-refs are text-embedded attributions, not structured links.
+    const rlB = GLOBAL_TO_REGISTRY.get(entry.arrayVar);
+    if (rlB) for (const e of entries) registerTitle(rlB, e);
   }
 
   // ── Holy Days (hybrid) ──
@@ -1373,6 +1443,10 @@ function runCli() {
       const result = validateHolyDays(entries, { strict, fileName: label });
       add(result, entries.length);
       emit(result, label, entries.length, 'entries', '');
+      // CORP-2: Holy Days clones are both targets AND carry Format-A cross-refs
+      // (their footnotes/seeAlso point back at the originals).
+      const rlH = GLOBAL_TO_REGISTRY.get(HOLY_DAYS_FILE.arrayVar);
+      if (rlH) for (const e of entries) { registerTitle(rlH, e); for (const x of walkLetterXrefs(e)) xrefs.push(x); }
     } else if (entries !== undefined) {
       loadErr(label, `variable "${HOLY_DAYS_FILE.arrayVar}" is not an array`);
     }
@@ -1508,6 +1582,27 @@ function runCli() {
     if (dict) checkFn(dict, basename(src.file));
   }
   console.log(`  ${fnChecked} footnote values — ${fnErrors === 0 ? 'OK' : 'FAIL'} (${fnErrors} errors)`);
+
+  // ── CORP-2: cross-reference resolution (runs last — every collection loaded) ──
+  console.log('\nCross-reference resolution (CORP-2):');
+  let xrefErrors = 0;
+  let xrefVotChecked = 0;
+  for (const x of xrefs) {
+    if (xrefRegistry.has(x.collection + '::' + x.letterTitle)) { xrefVotChecked++; continue; } // resolves
+    if (VOT_REGISTRY_LABELS.has(x.collection)) {
+      xrefVotChecked++;
+      console.error(`  ERROR: dead cross-ref [${x.where}] → "${x.collection}::${x.letterTitle}" — collection is a real registryLabel but no letter has that title (renamed/removed letter, or a typo).`);
+      xrefErrors++;
+    } else if (VOT_DISPLAY_LABELS.has(x.collection)) {
+      xrefVotChecked++;
+      console.error(`  ERROR: dead cross-ref [${x.where}] → "${x.collection}::${x.letterTitle}" — collection is the DISPLAY label; resolveVotLetter keys by registryLabel, so this "Also read" is a silent no-op (the CORP-1 class). Use the COLLECTIONS registryLabel.`);
+      xrefErrors++;
+    }
+    // else: collection is not a VOT collection (Bible-Study / external link) → not a letter cross-ref; skip.
+  }
+  totals.errors += xrefErrors;
+  totals.items += xrefVotChecked;
+  console.log(`  ${xrefVotChecked} VOT-letter cross-refs checked (of ${xrefs.length} link objects) — ${xrefErrors === 0 ? 'OK' : 'FAIL'} (${xrefErrors} unresolved)`);
 
   console.log(`\n=== TOTALS: ${totals.items} items validated, ${totals.errors} errors, ${totals.warnings} warnings ===`);
   if (strict && totals.errors > 0) process.exit(1);
