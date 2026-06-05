@@ -143,11 +143,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     if (storageInfo.status === 'unavailable') return 'Persistence API unavailable on this browser.';
     if (storageInfo.persisted) return 'Active — your data is protected from automatic browser cleanup.';
     if (storageInfo.persistDenied) return 'Browser denied protection. Export regularly as a backup.';
-    return 'Not active — tap "Protect now" to request protection from automatic browser cleanup.';
+    if (storageInfo.persistable) return 'Not active — tap "Protect now" to request protection from automatic browser cleanup.';
+    // Not persisted, but there's no user-actionable persistence lever here
+    // (installed app / Android APK / a Chromium browser that auto-decided /
+    // Safari — whose real safeguard is "Add to Home Screen"). The data still
+    // lives on this device; the honest guidance is to keep a backup.
+    return 'Your data is saved on this device. Export a backup regularly to keep it safe.';
   })();
-  const showProtectButton = storageInfo.status === 'ready'
-    && !storageInfo.persisted
-    && !storageInfo.persistDenied;
+  const showProtectButton = storageInfo.status === 'ready' && storageInfo.persistable;
 
   // "Your data" = the bytes of the user's OWN content (the set Export
   // backs up): annotations, notes, journal + media, bookmarks, links,

@@ -18,6 +18,7 @@
        usage: number | null,
        persisted: boolean | null,
        persistDenied: boolean,
+       persistable: boolean,
        requestPersist: () => Promise<void>,
      }
    ═══════════════════════════════════════════════════════════════════════ */
@@ -29,6 +30,7 @@
  *   usage: number | null,
  *   persisted: boolean | null,
  *   persistDenied: boolean,
+ *   persistable: boolean,
  *   requestPersist: () => Promise<void>,
  * }} StorageInfo
  */
@@ -52,6 +54,15 @@ export function useStorageInfo() {
       ? /** @type {'unavailable'} */ ('unavailable')
       : /** @type {'ready'} */ ('ready');
 
+  // "persistable" = there's a user-actionable way to secure persistence here
+  // (a prompt engine like Firefox, not installed/standalone, not the APK).
+  // Mirrors the not-persisted risk — the single source of truth in
+  // StorageHealth — so the Settings "Protect now" button + wording stay in
+  // lockstep with the banner. Read as the literal risk id because the stubbed
+  // test global may not expose RISK.
+  const persistable = Array.isArray(report.risks)
+    && report.risks.indexOf('not-persisted') !== -1;
+
   const requestPersist = React.useCallback(async () => {
     var granted = await StorageHealth.requestPersistence();
     if (!granted) setPersistDenied(true);
@@ -63,6 +74,7 @@ export function useStorageInfo() {
     usage: report.usage,
     persisted: report.persisted,
     persistDenied: persistDenied,
+    persistable: persistable,
     requestPersist: requestPersist,
   };
 }

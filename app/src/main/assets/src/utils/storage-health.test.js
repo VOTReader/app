@@ -28,6 +28,24 @@ function mockStorage(opts = {}) {
   };
 }
 
+/**
+ * Helper: a REALISTIC mock where a granted persist() flips persisted() to true
+ * on the next read — exactly how a real browser behaves. Lets us prove the full
+ * silent-upgrade chain (persist → re-assess → persisted=true), which the static
+ * mockStorage can't (its persisted() is fixed independent of persist()).
+ */
+function mockStorageGrantable(opts = {}) {
+  let _persisted = opts.persisted ?? false;
+  return {
+    estimate: vi.fn().mockResolvedValue({
+      quota: opts.quota ?? 2_000_000_000,
+      usage: opts.usage ?? 100_000_000,
+    }),
+    persisted: vi.fn(() => Promise.resolve(_persisted)),
+    persist: vi.fn(() => { _persisted = true; return Promise.resolve(true); }),
+  };
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: false });
   vi.mocked(showToast).mockClear();
@@ -161,13 +179,32 @@ describe('tier computation', () => {
     expect(r.tier).toBe(TIER.CAUTION);
   });
 
-  it('caution: not persisted', async () => {
+  it('caution: not persisted on a prompt engine (Firefox), not installed', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.FIREFOX,
+      storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
+    });
+    const r = await StorageHealth.assess();
+    expect(r.tier).toBe(TIER.CAUTION);
+  });
+
+  it('NOT caution: not persisted on Chromium (silently upgradable, no user-clickable lever)', async () => {
     StorageHealth._resetForTests({
       platform: PLATFORM.CHROME,
       storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
     });
     const r = await StorageHealth.assess();
-    expect(r.tier).toBe(TIER.CAUTION);
+    expect(r.tier).toBe(TIER.HEALTHY);
+  });
+
+  it('NOT caution: not persisted on a prompt engine when INSTALLED (standalone)', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.FIREFOX,
+      standalone: true,
+      storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
+    });
+    const r = await StorageHealth.assess();
+    expect(r.tier).toBe(TIER.HEALTHY);
   });
 
   it('android-webview: persisted=false does NOT force caution (app-private storage is durable)', async () => {
@@ -290,14 +327,14 @@ describe('tier computation', () => {
    ═══════════════════════════════════════════════════════════════════ */
 
 describe('risk flags', () => {
-  it('safari-tab → safari-7day + not-persisted risks', async () => {
+  it('safari-tab → safari-7day risk but NOT not-persisted (persist() does not stop the 7-day sweep)', async () => {
     StorageHealth._resetForTests({
       platform: PLATFORM.SAFARI_TAB,
       storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
     });
     const r = await StorageHealth.assess();
     expect(r.risks).toContain(RISK.SAFARI_7DAY);
-    expect(r.risks).toContain(RISK.NOT_PERSISTED);
+    expect(r.risks).not.toContain(RISK.NOT_PERSISTED);
   });
 
   it('android-webview: persisted=false does NOT raise the not-persisted risk (no "protect my data" banner on the APK)', async () => {
@@ -308,6 +345,44 @@ describe('risk flags', () => {
     const r = await StorageHealth.assess();
     expect(r.risks).not.toContain(RISK.NOT_PERSISTED);
     expect(r.persisted).toBe(true);
+  });
+
+  it('firefox (not installed) + persisted=false → not-persisted risk (the one place a button can grant it)', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.FIREFOX,
+      storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
+    });
+    const r = await StorageHealth.assess();
+    expect(r.risks).toContain(RISK.NOT_PERSISTED);
+  });
+
+  it('chromium (not installed) + persisted=false → NO not-persisted risk (silent upgrade, no user lever)', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.CHROME,
+      storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
+    });
+    const r = await StorageHealth.assess();
+    expect(r.risks).not.toContain(RISK.NOT_PERSISTED);
+  });
+
+  it('installed PWA (standalone) suppresses the not-persisted risk even on a prompt engine', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.FIREFOX,
+      standalone: true,
+      storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
+    });
+    const r = await StorageHealth.assess();
+    expect(r.risks).not.toContain(RISK.NOT_PERSISTED);
+  });
+
+  it('installed PWA (standalone) suppresses the safari-7day risk', async () => {
+    StorageHealth._resetForTests({
+      platform: PLATFORM.SAFARI_TAB,
+      standalone: true,
+      storageApi: mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false }),
+    });
+    const r = await StorageHealth.assess();
+    expect(r.risks).not.toContain(RISK.SAFARI_7DAY);
   });
 
   it('safari-pwa → ios-pwa-isolate risk', async () => {
@@ -440,12 +515,14 @@ describe('assess', () => {
     expect(r.usage).toBeNull();
   });
 
-  it('persisted() rejects → treated as false', async () => {
+  it('persisted() rejects → treated as false (→ caution on a prompt engine)', async () => {
     const api = {
       estimate: vi.fn().mockResolvedValue({ quota: 1_000_000_000, usage: 100_000_000 }),
       persisted: vi.fn().mockRejectedValue(new Error('denied')),
     };
-    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: api });
+    // Firefox: a prompt engine, so persisted=false legitimately yields caution
+    // (Chromium would stay healthy — not-persisted there is the silent-upgrade path).
+    StorageHealth._resetForTests({ platform: PLATFORM.FIREFOX, storageApi: api });
     const r = await StorageHealth.assess();
     expect(r.persisted).toBe(false);
     expect(r.tier).toBe(TIER.CAUTION);
@@ -685,7 +762,7 @@ describe('reassessIfCautious', () => {
 
   it('re-assesses when tier is caution', async () => {
     const api = mockStorage({ quota: 2_000_000_000, usage: 100_000_000, persisted: false });
-    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: api });
+    StorageHealth._resetForTests({ platform: PLATFORM.FIREFOX, storageApi: api });
     await StorageHealth.assess();
     expect(StorageHealth.getReport().tier).toBe(TIER.CAUTION);
     api.estimate.mockClear();
@@ -749,6 +826,80 @@ describe('requestPersistence', () => {
     const result = await StorageHealth.requestPersistence();
     expect(result).toBe(false);
   });
+
+  it('already persisted → returns true WITHOUT a redundant persist() call', async () => {
+    const api = mockStorage({ persisted: true });
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: api });
+    await StorageHealth.assess();
+    api.persist.mockClear();
+    const result = await StorageHealth.requestPersistence();
+    expect(result).toBe(true);
+    expect(api.persist).not.toHaveBeenCalled();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   ensurePersistence (silent, prompt-free auto-grant) + standalone
+   ═══════════════════════════════════════════════════════════════════ */
+
+describe('ensurePersistence (silent auto-grant)', () => {
+  it('Chromium + not persisted → silently calls persist() and flips to persisted', async () => {
+    const api = mockStorageGrantable({ persisted: false });
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: api });
+    await StorageHealth.assess();
+    expect(StorageHealth.getReport().persisted).toBe(false);
+
+    await StorageHealth.ensurePersistence();
+    expect(api.persist).toHaveBeenCalledTimes(1);
+    expect(StorageHealth.getReport().persisted).toBe(true);
+  });
+
+  it('Firefox (prompt engine) → does NOT silently persist (would surprise the user)', async () => {
+    const api = mockStorage({ persisted: false, persistResult: true });
+    StorageHealth._resetForTests({ platform: PLATFORM.FIREFOX, storageApi: api });
+    await StorageHealth.assess();
+    await StorageHealth.ensurePersistence();
+    expect(api.persist).not.toHaveBeenCalled();
+  });
+
+  it('Safari → does NOT silently persist (avoids false "protected" while the 7-day sweep still applies)', async () => {
+    const api = mockStorage({ persisted: false, persistResult: true });
+    StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB, storageApi: api });
+    await StorageHealth.assess();
+    await StorageHealth.ensurePersistence();
+    expect(api.persist).not.toHaveBeenCalled();
+  });
+
+  it('already persisted → no-op (no redundant persist call)', async () => {
+    const api = mockStorage({ persisted: true });
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: api });
+    await StorageHealth.assess();
+    api.persist.mockClear();
+    await StorageHealth.ensurePersistence();
+    expect(api.persist).not.toHaveBeenCalled();
+  });
+
+  it('start() silently secures persistence on Chromium', async () => {
+    const api = mockStorageGrantable({ persisted: false });
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: api });
+    StorageHealth.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.persist).toHaveBeenCalledTimes(1);
+    expect(StorageHealth.getReport().persisted).toBe(true);
+    StorageHealth.stop();
+  });
+});
+
+describe('standalone / installed detection', () => {
+  it('_isStandalone honors the test override', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage(), standalone: true });
+    expect(StorageHealth._isStandalone()).toBe(true);
+  });
+
+  it('_isStandalone defaults to false in a plain (non-standalone) environment', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+    expect(StorageHealth._isStandalone()).toBe(false);
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -782,6 +933,11 @@ describe('checkFirstDataCreation', () => {
 
   it('Safari PWA → shouldBlock false (PWA is safe from 7-day eviction)', () => {
     StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_PWA });
+    expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(false);
+  });
+
+  it('installed (standalone) Safari → shouldBlock false (Home Screen / Add to Dock is exempt)', () => {
+    StorageHealth._resetForTests({ platform: PLATFORM.SAFARI_TAB, standalone: true });
     expect(StorageHealth.checkFirstDataCreation().shouldBlock).toBe(false);
   });
 

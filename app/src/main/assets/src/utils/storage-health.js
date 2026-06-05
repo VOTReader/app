@@ -181,6 +181,19 @@ let _visibilityHandler = null;
  */
 let _storageApiOverride = null;
 
+/**
+ * Test-only override for the installed-PWA / standalone check. null = detect
+ * for real (display-mode media query + navigator.standalone).
+ * @type {boolean | null}
+ */
+let _standaloneOverride = null;
+
+/**
+ * Guards _ensurePersistence so concurrent assess/resume cycles don't fire
+ * overlapping persist() calls. Self-clears in a finally.
+ */
+let _persistInFlight = false;
+
 /* ─── Internal helpers ──────────────────────────────────────────────── */
 
 function _bump() {
@@ -239,6 +252,67 @@ function _detectPlatform(uaOverride) {
 }
 
 /**
+ * Is the app running as an INSTALLED PWA / standalone window (any engine)?
+ * Installed apps are exempt from the eviction concerns the not-persisted banner
+ * warns about: Chromium auto-grants persistence on install, and an iOS app added
+ * to the Home Screen is exempt from Safari's 7-day ITP storage sweep. Detected
+ * via the display-mode media query (Chromium/Firefox/desktop) plus the legacy
+ * navigator.standalone (iOS Safari). Defensive — matchMedia can be absent in
+ * non-browser/test environments, and a bad media string can throw.
+ *
+ * @returns {boolean}
+ */
+function _isStandalone() {
+  if (_standaloneOverride !== null) return _standaloneOverride;
+  if (typeof window === 'undefined') return false;
+  try {
+    var mm = window.matchMedia;
+    if (typeof mm === 'function') {
+      if (mm('(display-mode: standalone)').matches) return true;
+      if (mm('(display-mode: window-controls-overlay)').matches) return true;
+      if (mm('(display-mode: minimal-ui)').matches) return true;
+      if (mm('(display-mode: fullscreen)').matches) return true;
+    }
+  } catch (_e) { /* matchMedia unavailable/buggy — fall through */ }
+  try {
+    if (/** @type {any} */ (navigator).standalone === true) return true;
+  } catch (_e) { /* navigator.standalone access threw — ignore */ }
+  return false;
+}
+
+/**
+ * Engines where persist() is granted via a USER PROMPT — so a banner/Settings
+ * button can actually secure persistence. Firefox is the only mainstream one.
+ * Chromium grants silently by heuristic (no prompt, no user-clickable lever);
+ * WebKit/Safari auto-grants but its real eviction lever is "Add to Home Screen"
+ * (the 7-day ITP sweep, which persist() does NOT stop). So the not-persisted
+ * "Protect my data" banner is only honest/actionable on the prompt engines.
+ *
+ * @param {string} platform
+ * @returns {boolean}
+ */
+function _persistRequiresPrompt(platform) {
+  return platform === PLATFORM.FIREFOX;
+}
+
+/**
+ * Engines where persist() resolves WITHOUT a user prompt — safe to attempt
+ * SILENTLY on startup to upgrade best-effort → persistent for free. Chromium
+ * only: it grants automatically for installed PWAs / bookmarked / high-engagement
+ * sites and otherwise returns false, never showing UI. Firefox is excluded (it
+ * prompts — must be user-initiated). Safari is excluded on purpose: a silent
+ * grant would flip persisted→true and FALSELY reassure in Settings while the
+ * 7-day ITP sweep still applies to non-installed sites. The Android APK is
+ * excluded (data already durable; persist() is a no-op there).
+ *
+ * @param {string} platform
+ * @returns {boolean}
+ */
+function _persistIsSilent(platform) {
+  return platform === PLATFORM.CHROME || platform === PLATFORM.EDGE;
+}
+
+/**
  * Pure tier computation from storage metrics + platform state.
  *
  * @param {number | null} quota
@@ -247,9 +321,10 @@ function _detectPlatform(uaOverride) {
  * @param {string} platform
  * @param {boolean} writeFailed
  * @param {boolean} privateModeLikely
+ * @param {boolean} standalone
  * @returns {string}
  */
-function _computeTier(quota, usage, persisted, platform, writeFailed, privateModeLikely) {
+function _computeTier(quota, usage, persisted, platform, writeFailed, privateModeLikely, standalone) {
   if (writeFailed) return TIER.READONLY;
 
   var pct = (quota != null && usage != null && quota > 0) ? usage / quota : null;
@@ -262,8 +337,12 @@ function _computeTier(quota, usage, persisted, platform, writeFailed, privateMod
   if (quota != null && quota < LOW_QUOTA_BYTES) return TIER.WARNING;
 
   if (pct != null && pct >= CAUTION_PERCENT) return TIER.CAUTION;
-  if (persisted === false) return TIER.CAUTION;
-  if (platform === PLATFORM.SAFARI_TAB) return TIER.CAUTION;
+  // Not-persisted only counts as a caution where the user can actually fix it
+  // (a prompt engine) and isn't already installed/standalone. On Chromium it's
+  // the normal best-effort steady state (silently upgraded — see _ensurePersistence);
+  // on Safari the 7-day caution is raised by the SAFARI_TAB check below instead.
+  if (persisted === false && _persistRequiresPrompt(platform) && !standalone) return TIER.CAUTION;
+  if (platform === PLATFORM.SAFARI_TAB && !standalone) return TIER.CAUTION;
 
   return TIER.HEALTHY;
 }
@@ -277,16 +356,21 @@ function _computeTier(quota, usage, persisted, platform, writeFailed, privateMod
  * @param {boolean} writeFailed
  * @param {boolean} privateModeLikely
  * @param {number | null} prevQuota
+ * @param {boolean} standalone
  * @returns {string[]}
  */
-function _computeRisks(platform, persisted, quota, writeFailed, privateModeLikely, prevQuota) {
+function _computeRisks(platform, persisted, quota, writeFailed, privateModeLikely, prevQuota, standalone) {
   var risks = [];
 
-  if (platform === PLATFORM.SAFARI_TAB) risks.push(RISK.SAFARI_7DAY);
+  if (platform === PLATFORM.SAFARI_TAB && !standalone) risks.push(RISK.SAFARI_7DAY);
   if (platform === PLATFORM.SAFARI_PWA) risks.push(RISK.IOS_PWA_ISOLATE);
   if (quota != null && quota < LOW_QUOTA_BYTES) risks.push(RISK.LOW_QUOTA);
   if (quota != null && quota < CRITICAL_QUOTA_BYTES) risks.push(RISK.CRITICAL_QUOTA);
-  if (persisted === false) risks.push(RISK.NOT_PERSISTED);
+  // not-persisted is only a surfaced risk where it's actionable: a prompt engine
+  // (Firefox) and not already installed/standalone. The Android APK never reaches
+  // here (persistedBool is forced true in _assessImpl); Chromium is upgraded
+  // silently; Safari's real lever is the 7-day flow above, not persist().
+  if (persisted === false && _persistRequiresPrompt(platform) && !standalone) risks.push(RISK.NOT_PERSISTED);
   if (privateModeLikely) risks.push(RISK.PRIVATE_MODE);
   if (writeFailed) risks.push(RISK.WRITE_FAILED);
   if (prevQuota != null && quota != null && quota < prevQuota) risks.push(RISK.QUOTA_DECLINING);
@@ -386,9 +470,10 @@ async function _assessImpl() {
     platform === PLATFORM.SAFARI_TAB || platform === PLATFORM.SAFARI_PWA
   ) && quota != null && quota < PRIVATE_SAFARI_QUOTA_HEURISTIC;
 
+  var standalone = _isStandalone();
   var prevQuota = _report ? _report.quota : null;
-  var tier = _computeTier(quota, usage, persistedBool, platform, _writeFailedThisSession, privateModeLikely);
-  var risks = _computeRisks(platform, persistedBool, quota, _writeFailedThisSession, privateModeLikely, prevQuota);
+  var tier = _computeTier(quota, usage, persistedBool, platform, _writeFailedThisSession, privateModeLikely, standalone);
+  var risks = _computeRisks(platform, persistedBool, quota, _writeFailedThisSession, privateModeLikely, prevQuota, standalone);
 
   /** @type {StorageHealthReport} */
   var report = {
@@ -540,20 +625,59 @@ function _reassessIfCautious() {
 }
 
 /**
+ * Low-level persist() call. Feature-detects, swallows errors, returns the
+ * boolean grant result. Does NOT re-assess — callers decide.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function _doPersist() {
+  var storage = _getStorageApi();
+  if (!storage || typeof storage.persist !== 'function') return false;
+  try {
+    return !!(await storage.persist());
+  } catch (_e) { return false; }
+}
+
+/**
  * Request persistent storage from the browser. Returns true on grant.
- * MUST be called from a user-gesture onClick handler (Firefox silently
- * fails otherwise).
+ * MUST be called from a user-gesture onClick handler — on Firefox persist()
+ * shows a permission prompt the engine ties to a user activation. Short-circuits
+ * (no redundant call) when storage is already persistent, and re-assesses on
+ * grant so the report/UI reflect the upgrade. A denial doesn't re-assess
+ * (nothing changed; the caller's local persistDenied state surfaces it).
  *
  * @returns {Promise<boolean>}
  */
 async function _requestPersistence() {
-  var storage = _getStorageApi();
-  if (!storage || typeof storage.persist !== 'function') return false;
+  if (_report && _report.persisted === true) return true;
+  var granted = await _doPersist();
+  if (granted) await _assess();
+  return granted;
+}
+
+/**
+ * Proactively + SILENTLY secure persistence where the engine grants it without
+ * a prompt (Chromium — see _persistIsSilent). Idempotent and self-limiting:
+ * no-ops once persisted, in-flight-guarded, and skips prompt engines, so it's
+ * safe to call on startup AND on every visibility-resume (engagement may cross
+ * Chromium's auto-grant threshold mid-session). This is the robustness win —
+ * persistence is upgraded for free instead of waiting for the user to discover
+ * the Settings button. On Firefox (prompt engine) and Safari (7-day lever is
+ * install, not persist) this is a deliberate no-op.
+ *
+ * @returns {Promise<void>}
+ */
+async function _ensurePersistence() {
+  if (_persistInFlight) return;
+  if (_report && _report.persisted === true) return;
+  if (!_persistIsSilent(_getPlatform())) return;
+  _persistInFlight = true;
   try {
-    var granted = await storage.persist();
-    if (granted) _assess();
-    return !!granted;
-  } catch (_e) { return false; }
+    var granted = await _doPersist();
+    if (granted) await _assess();
+  } finally {
+    _persistInFlight = false;
+  }
 }
 
 /**
@@ -567,6 +691,9 @@ async function _requestPersistence() {
 function _checkFirstDataCreation() {
   var platform = _getPlatform();
   if (platform !== PLATFORM.SAFARI_TAB) return { shouldBlock: false };
+  // Installed (Home Screen / Add to Dock) Safari apps are exempt from the 7-day
+  // ITP sweep, so the warning would be a false alarm there.
+  if (_isStandalone()) return { shouldBlock: false };
   if (_safariWarningShownThisSession) return { shouldBlock: false };
   if (_sessionDismissals.has('safari-7day')) return { shouldBlock: false };
   _safariWarningShownThisSession = true;
@@ -625,7 +752,9 @@ function _setStoresDegraded(v) {
  */
 function _start() {
   if (_refreshIntervalId) return;
-  _assess();
+  // Silently secure persistence (Chromium) right after the first assessment,
+  // so installed/engaged users are protected without ever seeing a prompt.
+  _assess().then(_ensurePersistence);
 
   _refreshIntervalId = setInterval(function () {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
@@ -635,7 +764,14 @@ function _start() {
   if (typeof document !== 'undefined') {
     _visibilityHandler = function () {
       if (document.visibilityState !== 'visible') return;
-      if (Date.now() - _lastAssessedAt > STALE_THRESHOLD_MS) _assess();
+      // Re-attempt the silent persist on resume — Chromium may have crossed its
+      // auto-grant engagement threshold since load. _ensurePersistence self-guards
+      // (no-op once persisted / off prompt engines), so this is cheap.
+      if (Date.now() - _lastAssessedAt > STALE_THRESHOLD_MS) {
+        _assess().then(_ensurePersistence);
+      } else {
+        _ensurePersistence();
+      }
     };
     document.addEventListener('visibilitychange', _visibilityHandler);
   }
@@ -661,7 +797,7 @@ function _stop() {
  * platform and storageApi to enable deterministic tests without
  * global mocking.
  *
- * @param {{ platform?: string, storageApi?: any }} [opts]
+ * @param {{ platform?: string, storageApi?: any, standalone?: boolean }} [opts]
  */
 function _resetForTests(opts) {
   _stop();
@@ -677,7 +813,9 @@ function _resetForTests(opts) {
   _safariGateBlocked = false;
   _storesDegraded = false;
   _assessInFlight = null;
+  _persistInFlight = false;
   _storageApiOverride = (opts && opts.storageApi) || null;
+  _standaloneOverride = (opts && typeof opts.standalone === 'boolean') ? opts.standalone : null;
 }
 
 /* ─── Export ─────────────────────────────────────────────────────────── */
@@ -693,6 +831,7 @@ export const StorageHealth = {
   onWriteSuccess: _onWriteSuccess,
   reassessIfCautious: _reassessIfCautious,
   requestPersistence: _requestPersistence,
+  ensurePersistence: _ensurePersistence,
   checkFirstDataCreation: _checkFirstDataCreation,
   dismissScenario: _dismissScenario,
   isDismissed: _isDismissed,
@@ -701,6 +840,7 @@ export const StorageHealth = {
   stop: _stop,
   _resetForTests: _resetForTests,
   _detectPlatform: _detectPlatform,
+  _isStandalone: _isStandalone,
   TIER: TIER,
   PLATFORM: PLATFORM,
   RISK: RISK,

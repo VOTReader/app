@@ -118,6 +118,26 @@ describe('useStorageInfo — persisted state', () => {
   });
 });
 
+describe('useStorageInfo — persistable (Settings button gating)', () => {
+  it('not-persisted risk present → persistable:true', () => {
+    _report = _makeReport({ persisted: false, risks: ['not-persisted'] });
+    const { result } = renderHook(() => useStorageInfo());
+    expect(result.current.persistable).toBe(true);
+  });
+
+  it('no not-persisted risk → persistable:false (e.g. Chromium / installed / APK)', () => {
+    _report = _makeReport({ persisted: false, risks: [] });
+    const { result } = renderHook(() => useStorageInfo());
+    expect(result.current.persistable).toBe(false);
+  });
+
+  it('missing risks array → persistable:false (defensive)', () => {
+    _report = _makeReport({ persisted: false, risks: undefined });
+    const { result } = renderHook(() => useStorageInfo());
+    expect(result.current.persistable).toBe(false);
+  });
+});
+
 describe('useStorageInfo — requestPersist', () => {
   it('granted → persisted flips to true, persistDenied stays false', async () => {
     _requestPersistResult = true;
