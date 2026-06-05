@@ -103,6 +103,11 @@ without saving `prev` first will lose any sheet behind it. Greppable
 guard: `prev = window.__closeSheet` must appear in every sheet's
 setup effect.
 
+### `__screenBack` (screen-internal back interceptor)
+- **Setter:** `ui/screens/NotesIndexScreen.jsx` — registered in a `useEffect` ONLY while drilled into a notebook (`window.__screenBack = fn`; cleanup `if (window.__screenBack === fn) window.__screenBack = null`).
+- **Consumer:** `src/hooks/use-android-back.js` — called right after the sheet / tabs-overlay checks and BEFORE per-screen routing; returns `"true"`-path when it consumed the press, so an internal navigation level (e.g. a drilled notebook → Notebooks list) is unwound before Back leaves the screen instead of skipping out to the parent.
+- **Why a window slot:** the back router lives in bundle-b and the screen state in bundle-d; bundles don't share module state, so the interceptor rides on `window` exactly like `__closeSheet`.
+
 ---
 
 ## 3. Navigation glue (set in `index.html`'s App() block)
