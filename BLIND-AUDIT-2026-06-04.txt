@@ -44,7 +44,8 @@ STATE: 31 DONE + 4 adjudicated, in 16 commits, ALL pushed to main, every commit
   Commits: a5f2196 search . 56bba5e quickwins . e7d29da corpus . 86cf422 backup .
     9911e37 sw . 1f1428d security . c4a92c3 text/scripture . a7c6f91 kotlin .
     3992f6e tooling . 8978d16 memory . bd8fe4e journal . 28fc2a8 perf3 .
-    e7681a6 store1 (BATCH 13, the last P0).  (+ f70024e tracker doc-fix.)
+    e7681a6 store1 (BATCH 13, the last P0) . c2a42c8 test1 (BATCH 14).
+    (+ f70024e + STORE-1/TEST-1 tracker doc-fixes.)
 
 NEXT PRIORITIES (each deserves its OWN focused session)
   (STORE-1 [P0, BATCH 13] + TEST-1 [High, BATCH 14] both DONE — all three P0s plus
@@ -324,7 +325,7 @@ PROGRESS LOG
   Gates: lint(410, no drift) + typecheck + 1937 vitest + coverage(exit 0, store-merge.js
   95/91/100/98) + build + smoke:ci all green.
 
-2026-06-04  BATCH 14 - TEST-1 — Android v3 backup DRIVER extracted + tested.  commit <pending>
+2026-06-04  BATCH 14 - TEST-1 — Android v3 backup DRIVER extracted + tested.  commit c2a42c8
   The only-backup path on the primary platform — the JS loop that slices each media blob into
   <=512KB FileReader reads, base64s at the bridge boundary, loops v3ExportChunk/v3ImportRead-
   Chunk, reassembles frames — had ZERO tests and sat OUTSIDE coverage (it lived inline in
