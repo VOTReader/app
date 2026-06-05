@@ -112,6 +112,7 @@ export function useSettings({ savedSettings, theme }) {
       searchEnabled: true, historyEnabled: true,
       historyInNav: false,
       showBookmarkNav: true,
+      showThemeBtn: true,
       showScrollNotch: false,
       arrowLayout: "split", // "split" | "right" | "left" | "nav" | "off"
       fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>
@@ -145,6 +146,7 @@ export function useSettings({ savedSettings, theme }) {
     document.body.classList.toggle("no-history", settings.historyEnabled === false);
     document.body.classList.toggle("history-in-nav", !!settings.historyInNav);
     document.body.classList.toggle("no-bookmark-nav", settings.showBookmarkNav === false);
+    document.body.classList.toggle("no-theme-nav", settings.showThemeBtn === false);
     document.body.classList.toggle("arrows-right", settings.arrowLayout === 'right');
     document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');

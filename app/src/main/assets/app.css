@@ -264,18 +264,24 @@
         --input-text:  #2a2520;   /* near-black with brown tint, softer than #000 */
       }
       body.light .top-nav { background: rgba(247,242,232,0.95); }
-      /* Push the right-cluster (Settings → History → Theme → Search) to the right edge.
-         On index screens, Settings is the first of the cluster, so auto-margin on it
-         absorbs the free space between HomeBtn and the cluster. On reading screens,
-         .nav-arrows has its own margin-left: auto that does the same job. On screens
-         without a settings gear (e.g. SettingsScreen itself), an inline style on the
-         first right-cluster button takes over. */
-      .top-nav .settings-gear-btn { margin-left: auto; }
-      /* When the user has hidden the gear (default), take it out of layout
-         and push the next nav button to the right edge so the cluster still
-         hugs the right side. HomeScreen has no gear at all, so this is a no-op there. */
+      /* ── Right-cluster alignment ──────────────────────────────────────────
+         Back + Home stay on the LEFT; every other nav control hugs the RIGHT,
+         on every screen and in every settings combination. The push comes from
+         ONE always-visible anchor — margin-right:auto absorbs all free space to
+         the anchor's right. The anchor is the Home button when present; the few
+         index landings with no Home button (Scriptures/Volumes/Studies) use
+         their back button instead. SearchScreen is exempt: its filling search
+         input is the right-hand content, not an icon cluster.
+         The old approach hung the auto-margin off the gear / .nav-arrows, but
+         those are display:none in the default config (gear hidden, arrows
+         "split"), so the anchor landed on a hidden element and the cluster
+         bunched left. Do NOT re-introduce a second auto-margin anywhere in
+         .top-nav — two competing auto-margins split the gap and the cluster
+         floats instead of hugging the right. */
+      .top-nav .nav-search-btn[title="Home"] { margin-right: auto; }
+      .top-nav .nav-home:not(:has(~ [title="Home"])):not(:has(~ .srch-input-row)) { margin-right: auto; }
+      /* Gear is hidden in the top nav by default (toggle: "Settings Gear in Top Nav"). */
       body.no-gear .settings-gear-btn { display: none; }
-      body.no-gear .top-nav .settings-gear-btn + * { margin-left: auto; }
       /* Search + history can be disabled in Settings. Target by title attr to
          avoid editing every button instance. */
       body.no-search .nav-search-btn[title="Search"] { display: none; }
@@ -288,6 +294,9 @@
          Nav" is off. Saved bookmarks stay reachable from Library; this only
          hides the per-chapter quick-bookmark icon. */
       body.no-bookmark-nav .nav-bookmark-btn { display: none; }
+      /* Theme switcher: hidden in the top nav when "Theme Button in Top Nav" is
+         off. Theme stays changeable via the Light Theme setting (Text & Translation). */
+      body.no-theme-nav .nav-theme-btn { display: none; }
       body.light .mode-toggle { background: rgba(247,242,232,0.97); }
       body.light .hero-bg { display: none; }
 
@@ -415,7 +424,7 @@
         min-height: 44px; display: flex; align-items: center;
       }
       @media (hover: hover) { .nav-volume:hover { opacity: 1; } }
-      .nav-arrows { display: flex; gap: 0.3rem; margin-left: auto; flex-shrink: 0; }
+      .nav-arrows { display: flex; gap: 0.3rem; flex-shrink: 0; }
       .nav-btn {
         font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.1em;
         color: var(--cream-muted); background: transparent;

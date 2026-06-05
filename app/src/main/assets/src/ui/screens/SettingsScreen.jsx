@@ -862,7 +862,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         <>
           <button className="nav-home nav-back-icon" onClick={onBack} title="Back" aria-label="Back">‹</button>
           <HomeBtn />
-          <button className="nav-search-btn" onClick={onHistory} title="History" style={{ marginLeft: 'auto' }}>
+          <button className="nav-search-btn" onClick={onHistory} title="History">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
               <polyline points="1 4 1 10 7 10" />
               <path d="M3.51 15a9 9 0 1 0 .49-5.01" />
@@ -905,6 +905,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             desc="Use Cinzel headings and EB Garamond body text instead of your device's built-in serif font. The classic look is larger and more familiar; modern is more elegant."
             checked={settings.fontStyle === "modern"}
             onToggle={() => onSetting("fontStyle", settings.fontStyle === "modern" ? "classic" : "modern")}
+          />
+          <SettingsRow
+            label="Light Theme"
+            desc="Switch between the dark (default) and light reading themes. Also available as the sun/moon icon in the top nav, unless you hide it under Reading Experience."
+            checked={theme === "light"}
+            onToggle={() => onThemeChange(theme === "light" ? "dark" : "light")}
           />
           <SelectField
             eyebrow="Text & Translation"
@@ -1018,6 +1024,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             desc="Show the bookmark icon in the top nav of chapter and letter views for one-tap bookmarking of the whole passage. When off, you can still bookmark by selecting text, and your saved bookmarks remain under Library."
             checked={settings.showBookmarkNav !== false}
             onToggle={() => onToggle("showBookmarkNav")}
+          />
+          <SettingsRow
+            label="Theme Button in Top Nav"
+            desc="Show the sun/moon theme switcher in the top nav. When off, switch themes from the Light Theme control under Text & Translation."
+            checked={settings.showThemeBtn !== false}
+            onToggle={() => onToggle("showThemeBtn")}
           />
           <SettingsRow
             label="Keep Screen On While Reading"
