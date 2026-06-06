@@ -44,6 +44,58 @@ function HistoryClearRow({ historyCount, onClearHistory }) {
   );
 }
 
+/* NavChip — compact pill toggle for the Top-Nav Buttons group. */
+function NavChip({ label, checked, onToggle, disabled = false }) {
+  return (
+    <label className={"settings-chip" + (disabled ? " settings-row-disabled" : "")}>
+      <span className="settings-chip-label">{label}</span>
+      <span className="settings-toggle">
+        <input type="checkbox" checked={checked} disabled={!!disabled} onChange={disabled ? undefined : onToggle} />
+        <span className="settings-toggle-track" />
+        <span className="settings-toggle-thumb" />
+      </span>
+    </label>
+  );
+}
+
+/* DataInfoRow — compact label + value (+ optional action button) for "Your Data". */
+function DataInfoRow({ label, value = null, children = null }) {
+  return (
+    <div className="settings-row">
+      <div className="settings-row-head">
+        <span className="settings-row-label">{label}</span>
+        <span className="settings-row-grow" />
+        {children}
+      </div>
+      {value != null && value !== '' && <div className="settings-data-value">{value}</div>}
+    </div>
+  );
+}
+
+/* DataActionRow — label + ⓘ-revealed description + action button. */
+function DataActionRow({ label, desc = null, children = null }) {
+  const [showDesc, setShowDesc] = React.useState(false);
+  return (
+    <div className="settings-row">
+      <div className="settings-row-head">
+        <span className="settings-row-label">{label}</span>
+        {desc && (
+          <button
+            type="button"
+            className="settings-info-btn"
+            aria-label={showDesc ? "Hide description" : "Show description"}
+            aria-expanded={showDesc}
+            onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
+          >i</button>
+        )}
+        <span className="settings-row-grow" />
+        {children}
+      </div>
+      {showDesc && desc && <div className="settings-row-desc">{desc}</div>}
+    </div>
+  );
+}
+
 function SectionClearBtn({ label, disabled, onClear }) {
   const [confirming, setConfirming] = React.useState(false);
   if (confirming) {
@@ -890,280 +942,254 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         </div>
 
         <div className="settings-section">
-          <div className="settings-section-label">Text & Translation</div>
-          <SelectField
-            eyebrow="Text & Translation"
-            title="Bible Translation"
-            label="Bible Translation"
-            desc="Verse text for the 66-book reading flow. Section headings stay in place across translations. Does not affect the Matthew Study Bible, which uses its own curated text."
-            value={settings.translation || "nkjv"}
-            options={TRANSLATION_OPTIONS}
-            onChange={(v) => onSetting("translation", v)}
-          />
-          <SettingsRow
-            label="Modern Fonts"
-            desc="Use Cinzel headings and EB Garamond body text instead of your device's built-in serif font. The classic look is larger and more familiar; modern is more elegant."
-            checked={settings.fontStyle === "modern"}
-            onToggle={() => onSetting("fontStyle", settings.fontStyle === "modern" ? "classic" : "modern")}
-          />
-          <SettingsRow
-            label="Light Theme"
-            desc="Switch between the dark (default) and light reading themes. Also available as the sun/moon icon in the top nav, unless you hide it under Reading Experience."
-            checked={theme === "light"}
-            onToggle={() => onThemeChange(theme === "light" ? "dark" : "light")}
-          />
-          <SelectField
-            eyebrow="Text & Translation"
-            title="Text Size"
-            label="Text Size"
-            desc="Scale all text larger for easier reading. Affects every screen. Independent of your device's own font-size setting."
-            value={settings.fontScale || "1"}
-            options={TEXT_SIZE_OPTIONS}
-            onChange={(v) => onSetting("fontScale", v)}
-          />
-          <SettingsRow
-            label="Chapter Titles"
-            desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."
-            checked={settings.showChapterTitle !== false}
-            onToggle={() => onToggle("showChapterTitle")}
-          />
-          <SettingsRow
-            label="Section Headings"
-            desc="Show inline topic breaks between verses (e.g. 'The Fall', 'The Call of Abraham'). Applies universally. Tap any heading in a chapter for a per-session focus mode."
-            checked={settings.showSectionHeadings !== false}
-            onToggle={() => onToggle("showSectionHeadings")}
-          />
-          <SettingsRow
-            label="Restored Names"
-            desc="Uses the proper Name of The Father (YAHUWAH) and The Son (YahuShua) in chapter titles and section headings — only where the underlying verses bear the Name. Verse text itself is never altered."
-            checked={!!settings.restoredNames}
-            onToggle={() => onToggle("restoredNames")}
-            disabled={settings.showChapterTitle === false && settings.showSectionHeadings === false}
-            disabledReason="Turn on Chapter Titles or Section Headings to use Restored Names — the Names only appear in those."
-          />
-        </div>
-
-        <div className="settings-section">
-          <div className="settings-section-label">Reading Experience</div>
-          <SelectField
-            eyebrow="Reading Experience"
-            title="Chapter Arrows"
-            label="Chapter & Letter Arrows"
-            desc="Where the previous/next arrows live in a chapter or letter view."
-            value={settings.arrowLayout || "split"}
-            options={ARROW_LAYOUT_OPTIONS}
-            onChange={(v) => onSetting("arrowLayout", v)}
-          />
-          <SelectField
-            eyebrow="Reading Experience"
-            title="Scripture Browser"
-            label="Scripture Browser"
-            desc="How books are organized on the Scriptures screen."
-            value={settings.scriptureLayout || "genre"}
-            options={SCRIPTURE_LAYOUT_OPTIONS}
-            onChange={(v) => onSetting("scriptureLayout", v)}
-          />
-          <SettingsRow
-            label="Inline Reference Echoes"
-            desc="In the Matthew Study Bible's inline mode, when a reference spans multiple verse ranges (e.g. verses 1-5 and 10-15), show a compact echo pill at the end of each additional range that scrolls back to the full note. Helps you see what references relate to as you read."
-            checked={settings.showInlineEchoes !== false}
-            onToggle={() => onToggle("showInlineEchoes")}
-          />
-          <SettingsRow
-            label="Scrollbar Content Marker"
-            desc="A small notch on the scrollbar showing where the reading content ends and the footnotes or navigation area begins."
-            checked={!!settings.showScrollNotch}
-            onToggle={() => onToggle("showScrollNotch")}
-          />
-          <SettingsRow
-            label="Reading Position Dot"
-            desc="A pulsing gold dot in the upper right that takes you back to where you were last reading."
-            checked={settings.showReadingDot}
-            onToggle={() => onToggle("showReadingDot")}
-          />
-          {settings.showReadingDot && (
+          <div className="settings-section-label">Appearance</div>
+          <div className="settings-card">
             <SelectField
-              label="Reading Dot Dwell Time"
-              desc="How long you must stay on a page before the reading dot updates to that position. Shorter = updates faster; longer = requires more settled reading."
-              value={settings.dwellMs || "20000"}
-              options={[
-                { id: "3000",  label: "3 seconds",  desc: "Updates almost immediately" },
-                { id: "5000",  label: "5 seconds",  desc: "Very quick" },
-                { id: "10000", label: "10 seconds", desc: "Quick" },
-                { id: "15000", label: "15 seconds", desc: "Moderate" },
-                { id: "20000", label: "20 seconds", desc: "Standard (default)" },
-                { id: "30000", label: "30 seconds", desc: "Relaxed" },
-                { id: "45000", label: "45 seconds", desc: "Deliberate" },
-                { id: "60000", label: "60 seconds", desc: "Requires a full minute on the page" }
-              ]}
-              onChange={(v) => onSetting("dwellMs", v)}
+              eyebrow="Appearance"
+              title="Bible Translation"
+              label="Bible Translation"
+              desc="Verse text for the 66-book reading flow. Section headings stay in place across translations. Does not affect the Matthew Study Bible, which uses its own curated text."
+              value={settings.translation || "nkjv"}
+              options={TRANSLATION_OPTIONS}
+              onChange={(v) => onSetting("translation", v)}
             />
-          )}
-          <SettingsRow
-            label="Random Letter Button"
-            desc="A breathing dice icon on the home screen that opens a random chapter or letter when tapped."
-            checked={settings.showSurpriseButton}
-            onToggle={() => onToggle("showSurpriseButton")}
-          />
-          <SettingsRow
-            label="Settings Gear in Top Nav"
-            desc="Show the gear icon in the top nav of every reading screen for quick access. When off, Settings is only reachable from the home screen."
-            checked={settings.showSettingsGear}
-            onToggle={() => onToggle("showSettingsGear")}
-          />
-          <SettingsRow
-            label="History in Top Nav"
-            desc="Show the history button (clock icon) in the top nav of chapter and letter views. When off, History is still reachable from the home screen."
-            checked={!!settings.historyInNav}
-            onToggle={() => onToggle("historyInNav")}
-            disabled={settings.historyEnabled === false}
-            disabledReason="Turn on History to enable this."
-          />
-          <SettingsRow
-            label="Bookmark Button in Top Nav"
-            desc="Show the bookmark icon in the top nav of chapter and letter views for one-tap bookmarking of the whole passage. When off, you can still bookmark by selecting text, and your saved bookmarks remain under Library."
-            checked={settings.showBookmarkNav !== false}
-            onToggle={() => onToggle("showBookmarkNav")}
-          />
-          <SettingsRow
-            label="Theme Button in Top Nav"
-            desc="Show the sun/moon theme switcher in the top nav. When off, switch themes from the Light Theme control under Text & Translation."
-            checked={settings.showThemeBtn !== false}
-            onToggle={() => onToggle("showThemeBtn")}
-          />
-          <SettingsRow
-            label="Keep Screen On While Reading"
-            desc="Don't let the screen dim or lock while the app is open. Helpful for long reading sessions; turn off to save battery. Has no effect on desktop browsers."
-            checked={settings.keepScreenOn !== false}
-            onToggle={() => onToggle("keepScreenOn")}
-          />
+            <SelectField
+              eyebrow="Appearance"
+              title="Text Size"
+              label="Text Size"
+              desc="Scale all text larger for easier reading. Affects every screen. Independent of your device's own font-size setting."
+              value={settings.fontScale || "1"}
+              options={TEXT_SIZE_OPTIONS}
+              onChange={(v) => onSetting("fontScale", v)}
+            />
+            <SettingsRow
+              label="Modern Fonts"
+              desc="Use Cinzel headings and EB Garamond body text instead of your device's built-in serif font. The classic look is larger and more familiar; modern is more elegant."
+              checked={settings.fontStyle === "modern"}
+              onToggle={() => onSetting("fontStyle", settings.fontStyle === "modern" ? "classic" : "modern")}
+            />
+            <SettingsRow
+              label="Light Theme"
+              desc="Switch between the dark (default) and light reading themes. Also available as the sun/moon icon in the top nav, unless you hide it under Top-Nav Buttons."
+              checked={theme === "light"}
+              onToggle={() => onThemeChange(theme === "light" ? "dark" : "light")}
+            />
+          </div>
         </div>
 
         <div className="settings-section">
-          <div className="settings-section-label">Tabs, Search & History</div>
-          <SettingsRow
-            label="Tabs"
-            desc="Run up to 999 independent reading places in parallel — flip between a chapter, a letter, a study, and back. All tabs share settings, theme, mark-as-read, history, and reading progress. Disabling preserves all your open tabs — they'll be waiting when you turn it back on."
-            checked={!!settings.tabsEnabled}
-            onToggle={() => onToggle("tabsEnabled")}
-          />
-          <SettingsRow
-            label="Search"
-            desc="Full-text search across all 66 books + Volumes. When off, the search button is hidden everywhere."
-            checked={settings.searchEnabled !== false}
-            onToggle={() => onToggle("searchEnabled")}
-          />
-          <SettingsRow
-            label="Filter Stop Words in Search"
-            desc="On (default): strip filler words (the, is, of, and, this, that, etc.) from queries of 5+ words so results focus on meaningful terms. Off: match every word exactly as typed. Turn off if a search is missing results you know are there — especially with KJV-style phrasing."
-            checked={settings.searchUseStopWords !== false}
-            onToggle={() => onToggle("searchUseStopWords")}
-            disabled={settings.searchEnabled === false}
-            disabledReason="Turn on Search to enable this."
-          />
-          <SettingsRow
-            label="Synonym Search"
-            desc="On (default): also match scripture synonyms — searching 'mercy' finds 'compassion', 'shepherd' finds 'pastor', 'faith' finds 'belief' and 'trust'. Exact-word matches always rank first. Off: match only the words you type."
-            checked={settings.searchSynonyms !== false}
-            onToggle={() => onToggle("searchSynonyms")}
-            disabled={settings.searchEnabled === false}
-            disabledReason="Turn on Search to enable this."
-          />
-          <SettingsRow
-            label="History"
-            desc="Keep a running list of chapters and letters you've visited. When off, recording stops and the history button is hidden. Existing history is preserved."
-            checked={settings.historyEnabled !== false}
-            onToggle={() => onToggle("historyEnabled")}
-          />
-          <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
+          <div className="settings-section-label">Reading</div>
+          <div className="settings-card">
+            <SettingsRow
+              label="Chapter Titles"
+              desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."
+              checked={settings.showChapterTitle !== false}
+              onToggle={() => onToggle("showChapterTitle")}
+            />
+            <SettingsRow
+              label="Section Headings"
+              desc="Show inline topic breaks between verses (e.g. 'The Fall', 'The Call of Abraham'). Applies universally. Tap any heading in a chapter for a per-session focus mode."
+              checked={settings.showSectionHeadings !== false}
+              onToggle={() => onToggle("showSectionHeadings")}
+            />
+            <SettingsRow
+              label="Restored Names"
+              desc="Uses the proper Name of The Father (YAHUWAH) and The Son (YahuShua) in chapter titles and section headings — only where the underlying verses bear the Name. Verse text itself is never altered."
+              checked={!!settings.restoredNames}
+              onToggle={() => onToggle("restoredNames")}
+              disabled={settings.showChapterTitle === false && settings.showSectionHeadings === false}
+              disabledReason="Turn on Chapter Titles or Section Headings to use Restored Names — the Names only appear in those."
+            />
+            <SelectField
+              eyebrow="Reading"
+              title="Chapter Arrows"
+              label="Chapter & Letter Arrows"
+              desc="Where the previous/next arrows live in a chapter or letter view."
+              value={settings.arrowLayout || "split"}
+              options={ARROW_LAYOUT_OPTIONS}
+              onChange={(v) => onSetting("arrowLayout", v)}
+            />
+            <SelectField
+              eyebrow="Reading"
+              title="Scripture Browser"
+              label="Scripture Browser"
+              desc="How books are organized on the Scriptures screen."
+              value={settings.scriptureLayout || "genre"}
+              options={SCRIPTURE_LAYOUT_OPTIONS}
+              onChange={(v) => onSetting("scriptureLayout", v)}
+            />
+            <SettingsRow
+              label="Inline Reference Echoes"
+              desc="In the Matthew Study Bible's inline mode, when a reference spans multiple verse ranges (e.g. verses 1-5 and 10-15), show a compact echo pill at the end of each additional range that scrolls back to the full note. Helps you see what references relate to as you read."
+              checked={settings.showInlineEchoes !== false}
+              onToggle={() => onToggle("showInlineEchoes")}
+            />
+            <SettingsRow
+              label="Scrollbar Content Marker"
+              desc="A small notch on the scrollbar showing where the reading content ends and the footnotes or navigation area begins."
+              checked={!!settings.showScrollNotch}
+              onToggle={() => onToggle("showScrollNotch")}
+            />
+            <SettingsRow
+              label="Reading Position Dot"
+              desc="A pulsing gold dot in the upper right that takes you back to where you were last reading."
+              checked={settings.showReadingDot}
+              onToggle={() => onToggle("showReadingDot")}
+            />
+            {settings.showReadingDot && (
+              <SelectField
+                eyebrow="Reading"
+                title="Reading Dot Dwell Time"
+                label="Reading Dot Dwell Time"
+                desc="How long you must stay on a page before the reading dot updates to that position. Shorter = updates faster; longer = requires more settled reading."
+                value={settings.dwellMs || "20000"}
+                options={[
+                  { id: "3000",  label: "3 seconds",  desc: "Updates almost immediately" },
+                  { id: "5000",  label: "5 seconds",  desc: "Very quick" },
+                  { id: "10000", label: "10 seconds", desc: "Quick" },
+                  { id: "15000", label: "15 seconds", desc: "Moderate" },
+                  { id: "20000", label: "20 seconds", desc: "Standard (default)" },
+                  { id: "30000", label: "30 seconds", desc: "Relaxed" },
+                  { id: "45000", label: "45 seconds", desc: "Deliberate" },
+                  { id: "60000", label: "60 seconds", desc: "Requires a full minute on the page" }
+                ]}
+                onChange={(v) => onSetting("dwellMs", v)}
+              />
+            )}
+            <SettingsRow
+              label="Random Letter Button"
+              desc="A breathing dice icon on the home screen that opens a random chapter or letter when tapped."
+              checked={settings.showSurpriseButton}
+              onToggle={() => onToggle("showSurpriseButton")}
+            />
+            <SettingsRow
+              label="Keep Screen On While Reading"
+              desc="Don't let the screen dim or lock while the app is open. Helpful for long reading sessions; turn off to save battery. Has no effect on desktop browsers."
+              checked={settings.keepScreenOn !== false}
+              onToggle={() => onToggle("keepScreenOn")}
+            />
+          </div>
+        </div>
 
+        <div className="settings-section">
+          <div className="settings-section-label">Top-Nav Buttons</div>
+          <div className="settings-card">
+            <div className="settings-chip-note">Which icons appear in the top bar of chapter and letter views.</div>
+            <div className="settings-chips">
+              <NavChip label="Settings Gear" checked={settings.showSettingsGear} onToggle={() => onToggle("showSettingsGear")} />
+              <NavChip label="History" checked={!!settings.historyInNav} disabled={settings.historyEnabled === false} onToggle={() => onToggle("historyInNav")} />
+              <NavChip label="Bookmark" checked={settings.showBookmarkNav !== false} onToggle={() => onToggle("showBookmarkNav")} />
+              <NavChip label="Theme" checked={settings.showThemeBtn !== false} onToggle={() => onToggle("showThemeBtn")} />
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-section">
+          <div className="settings-section-label">Search, Tabs &amp; History</div>
+          <div className="settings-card">
+            <SettingsRow
+              label="Search"
+              desc="Full-text search across all 66 books + Volumes. When off, the search button is hidden everywhere."
+              checked={settings.searchEnabled !== false}
+              onToggle={() => onToggle("searchEnabled")}
+            />
+            <SettingsRow
+              label="Synonym Search"
+              desc="On (default): also match scripture synonyms — searching 'mercy' finds 'compassion', 'shepherd' finds 'pastor', 'faith' finds 'belief' and 'trust'. Exact-word matches always rank first. Off: match only the words you type."
+              checked={settings.searchSynonyms !== false}
+              onToggle={() => onToggle("searchSynonyms")}
+              disabled={settings.searchEnabled === false}
+              disabledReason="Turn on Search to enable this."
+            />
+            <SettingsRow
+              label="Filter Stop Words in Search"
+              desc="On (default): strip filler words (the, is, of, and, this, that, etc.) from queries of 5+ words so results focus on meaningful terms. Off: match every word exactly as typed. Turn off if a search is missing results you know are there — especially with KJV-style phrasing."
+              checked={settings.searchUseStopWords !== false}
+              onToggle={() => onToggle("searchUseStopWords")}
+              disabled={settings.searchEnabled === false}
+              disabledReason="Turn on Search to enable this."
+            />
+            <SettingsRow
+              label="Tabs"
+              desc="Run up to 999 independent reading places in parallel — flip between a chapter, a letter, a study, and back. All tabs share settings, theme, mark-as-read, history, and reading progress. Disabling preserves all your open tabs — they'll be waiting when you turn it back on."
+              checked={!!settings.tabsEnabled}
+              onToggle={() => onToggle("tabsEnabled")}
+            />
+            <SettingsRow
+              label="History"
+              desc="Keep a running list of chapters and letters you've visited. When off, recording stops and the history button is hidden. Existing history is preserved."
+              checked={settings.historyEnabled !== false}
+              onToggle={() => onToggle("historyEnabled")}
+            />
+          </div>
+          <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
         </div>
 
         <div className="settings-section">
           <div className="settings-section-label">A Return to The Garden</div>
-          <SelectField
-            eyebrow="A Return to The Garden"
-            title="Image Quality"
-            label="Image Quality"
-            desc="Changing this re-downloads images at the selected quality next time you view them."
-            value={settings.gardenTier || GARDEN_DEFAULT_TIER}
-            options={GARDEN_TIERS.map((t) => ({
-              id: t.id,
-              label: `${t.label} · ${t.size}`,
-              desc: `${t.res} · ${t.desc}`
-            }))}
-            onChange={(v) => onSetting("gardenTier", v)}
-          />
+          <div className="settings-card">
+            <SelectField
+              eyebrow="A Return to The Garden"
+              title="Image Quality"
+              label="Image Quality"
+              desc="Changing this re-downloads images at the selected quality next time you view them."
+              value={settings.gardenTier || GARDEN_DEFAULT_TIER}
+              options={GARDEN_TIERS.map((t) => ({
+                id: t.id,
+                label: `${t.label} · ${t.size}`,
+                desc: `${t.res} · ${t.desc}`
+              }))}
+              onChange={(v) => onSetting("gardenTier", v)}
+            />
+          </div>
         </div>
 
         <div className="settings-section">
           <div className="settings-section-label">Your Data</div>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <div className="settings-row-label">Platform</div>
-              <div className="settings-row-desc">{_platformLabel(StorageHealth.getPlatform())}</div>
-            </div>
-          </div>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <div className="settings-row-label">Total app data</div>
-              <div className="settings-row-desc">{appDataDisplayText}</div>
-            </div>
-          </div>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <div className="settings-row-label">Your data</div>
-              <div className="settings-row-desc">{userDataDisplayText}</div>
-            </div>
-          </div>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <div className="settings-row-label">Protection</div>
-              <div className="settings-row-desc">{protectionDisplayText}</div>
-            </div>
-            {showProtectButton && (
-              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); storageInfo.requestPersist(); }}>Protect now</button>
+          <div className="settings-card">
+            <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
+            <DataInfoRow label="Total app data" value={appDataDisplayText} />
+            <DataInfoRow label="Your data" value={userDataDisplayText} />
+            <DataInfoRow label="Protection" value={protectionDisplayText}>
+              {showProtectButton && (
+                <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); storageInfo.requestPersist(); }}>Protect now</button>
+              )}
+            </DataInfoRow>
+            <DataActionRow
+              label="Export Your Data"
+              desc="Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as a single JSON file. No credentials or login info — just your data. Save the file anywhere you control."
+            >
+              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); exportPersonalData(); }}>Export</button>
+            </DataActionRow>
+            <DataActionRow
+              label="Import from Backup"
+              desc="Restore a previously exported JSON file. Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten."
+            >
+              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); importPersonalData(); }}>Import</button>
+            </DataActionRow>
+            {/* Diagnostic-log status row. Renders only when entries exist
+                (Android: native BoundedLogTree merged with the JS DiagnosticLog;
+                web: the JS DiagnosticLog). Hidden on a clean session to reduce
+                UI noise. */}
+            {diagnosticLog.length > 0 && (
+              <DataActionRow
+                label="Diagnostic Log"
+                desc={`${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? 'entry' : 'entries'} captured (warnings, errors, and timings; content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`}
+              >
+                <span className="settings-row-value">{diagnosticLog.length} {diagnosticLog.length === 1 ? 'entry' : 'entries'}</span>
+              </DataActionRow>
             )}
+            <DataActionRow
+              label="Clear All Personal Data"
+              desc="Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup."
+            >
+              <button className="settings-clear-btn danger" onClick={(e) => { e.stopPropagation(); setWipeText(''); setWipeConfirm(true); }}>Clear All My Data</button>
+            </DataActionRow>
           </div>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <div className="settings-row-label">Export Your Data</div>
-              <div className="settings-row-desc">Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as a single JSON file. No credentials or login info — just your data. Save the file anywhere you control.</div>
-            </div>
-            <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); exportPersonalData(); }}>Export</button>
-          </div>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <div className="settings-row-label">Import from Backup</div>
-              <div className="settings-row-desc">Restore a previously exported JSON file. Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten.</div>
-            </div>
-            <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); importPersonalData(); }}>Import</button>
-          </div>
-          {/* Diagnostic-log status row. Renders only when entries exist
-              (Android: native BoundedLogTree merged with the JS DiagnosticLog;
-              web: the JS DiagnosticLog). Hidden on a clean session to reduce
-              UI noise. */}
-          {diagnosticLog.length > 0 && (
-            <div className="settings-row">
-              <div className="settings-row-text">
-                <div className="settings-row-label">Diagnostic Log</div>
-                <div className="settings-row-desc">
-                  {`${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? 'entry' : 'entries'} captured (warnings, errors, and timings; content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`}
-                </div>
-              </div>
-            </div>
-          )}
           {(() => {
             const closeWipe = () => { setWipeConfirm(false); setWipeText(''); };
             return (
               <>
-                <div className="settings-row">
-                  <div className="settings-row-text">
-                    <div className="settings-row-label">Clear All Personal Data</div>
-                    <div className="settings-row-desc">Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup.</div>
-                  </div>
-                  <button className="settings-clear-btn danger" onClick={(e) => { e.stopPropagation(); setWipeText(''); setWipeConfirm(true); }}>Clear All My Data</button>
-                </div>
                 {wipeConfirm && (
                   <div
                     className="note-sheet-overlay"
@@ -1220,12 +1246,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         <div className="settings-section">
           <div className="settings-section-label">Mark as Read</div>
-          <SettingsRow
-            label="Mark as Read"
-            desc="Chapters and letters you've read past 90% are marked with a checkmark. Progress stops recording when this is off, but what's already saved is kept."
-            checked={settings.markAsRead}
-            onToggle={() => onToggle("markAsRead")}
-          />
+          <div className="settings-card">
+            <SettingsRow
+              label="Mark as Read"
+              desc="Chapters and letters you've read past 90% are marked with a checkmark. Progress stops recording when this is off, but what's already saved is kept."
+              checked={settings.markAsRead}
+              onToggle={() => onToggle("markAsRead")}
+            />
+          </div>
           {settings.markAsRead && (
             <div className="progress-table">
               {PROGRESS_GROUPS.map((grp) => {

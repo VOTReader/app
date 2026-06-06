@@ -1621,22 +1621,48 @@
     .settings-ornament-line { flex:1; height:1px; background:linear-gradient(to right,transparent,var(--gold-border),transparent); }
     .settings-ornament-line.r { background:linear-gradient(to left,transparent,var(--gold-border),transparent); }
     .settings-ornament-diamond { width:6px; height:6px; background:var(--gold-dim); transform:rotate(45deg); flex-shrink:0; }
-    .settings-section { width:100%; max-width:520px; margin-bottom:2rem; }
+    .settings-section { width:100%; max-width:520px; margin-bottom:1.5rem; }
     .settings-section-label { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
-    .settings-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.2rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; margin-bottom:0.6rem; }
-    .settings-row-text { flex:1; }
-    .settings-row-label { font-family:'Cinzel',serif; font-size:0.85rem; letter-spacing:0.06em; color:var(--cream); margin-bottom:0.25rem; }
-    .settings-row-desc { font-size:0.88rem; color:var(--cream-muted); font-style:italic; line-height:1.45; }
+    /* ── Compact card layout (Settings redesign — Option B) ───────────────
+       Each section's controls live in ONE bordered card; rows are separated
+       by thin dividers, and each row's long description is hidden by default
+       and revealed on demand by the ⓘ button. Far denser than the old
+       one-bordered-box-per-row layout. */
+    .settings-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; overflow:hidden; }
+    .settings-row { display:flex; flex-direction:column; align-items:stretch; gap:0; padding:0; margin:0; background:none; border:none; border-radius:0; border-bottom:1px solid rgba(232,192,80,0.13); }
+    .settings-card > .settings-row:last-child { border-bottom:none; }
+    .settings-row-head { display:flex; align-items:center; gap:0.5rem; padding:0.62rem 0.95rem; min-height:46px; }
+    .settings-row-grow { flex:1 1 auto; min-width:0.5rem; }
+    .settings-row-text { flex:1; min-width:0; }
+    .settings-row-label { font-family:'Cinzel',serif; font-size:0.82rem; letter-spacing:0.05em; color:var(--cream); }
+    .settings-row-value { font-size:0.84rem; color:var(--gold); font-style:italic; text-align:right; }
+    .settings-row-desc { font-size:0.82rem; color:var(--cream-muted); font-style:italic; line-height:1.45; padding:0 0.95rem 0.72rem; }
+    .settings-data-value { font-size:0.8rem; color:var(--gold-dim); font-style:italic; line-height:1.45; padding:0 0.95rem 0.66rem; }
+    .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; flex-shrink:0; padding:0; line-height:1; border:1px solid var(--gold-border); border-radius:50%; background:transparent; color:var(--gold-dim); font-family:'Cinzel',serif; font-style:italic; font-size:0.6rem; cursor:pointer; }
+    @media (hover:hover){ .settings-info-btn:hover{ color:var(--gold); border-color:var(--gold-dim); } }
+    .settings-info-btn[aria-expanded="true"]{ color:var(--gold); border-color:var(--gold); background:var(--gold-faint); }
+    /* Compact select trigger — the label stays in place; value + chevron open the sheet */
+    .settings-select-trigger { display:flex; align-items:center; gap:0.35rem; background:transparent; border:none; cursor:pointer; padding:0; font-family:inherit; max-width:60%; }
+    .settings-select-chev { color:var(--gold-dim); font-size:1.05rem; line-height:1; flex-shrink:0; }
+    @media (hover:hover){ .settings-select-trigger:hover .settings-row-value{ color:var(--gold-bright); } }
+    /* Top-Nav button chips */
+    .settings-chip-note { font-size:0.76rem; color:var(--cream-muted); font-style:italic; padding:0.65rem 0.95rem 0; }
+    .settings-chips { display:flex; flex-wrap:wrap; gap:0.45rem; padding:0.7rem 0.95rem 0.8rem; }
+    .settings-chip { display:flex; align-items:center; gap:0.5rem; border:1px solid var(--gold-border); border-radius:20px; padding:0.3rem 0.5rem 0.3rem 0.7rem; background:transparent; cursor:pointer; }
+    @media (hover:hover){ .settings-chip:hover{ border-color:var(--gold-dim); } }
+    .settings-chip-label { font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.04em; color:var(--cream); }
+    .settings-chip .settings-toggle { width:34px; height:20px; }
+    .settings-chip .settings-toggle-thumb { width:14px; height:14px; }
+    .settings-chip .settings-toggle input:checked ~ .settings-toggle-thumb { transform:translateX(14px); }
     /* Disabled (dependent) row state — kept visible but clearly inactive */
     .settings-row-disabled { opacity:0.48; filter:saturate(0.55); transition:opacity 0.25s ease, filter 0.25s ease; }
-    .settings-row-disabled .settings-row-label { color:var(--cream-muted); }
+    .settings-row-disabled .settings-row-label, .settings-row-disabled .settings-chip-label { color:var(--cream-muted); }
     .settings-row-disabled .settings-toggle-track { background:var(--cream-muted) !important; opacity:0.35 !important; }
     .settings-row-disabled .settings-toggle { cursor:not-allowed; }
     .settings-row-disabled-hint {
-      font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.16em; text-transform:uppercase;
-      color:var(--gold-dim); margin-top:0.45rem; line-height:1.5;
-      padding-left:0.55rem; border-left:1px solid var(--gold-border);
+      font-family:'Cinzel',serif; font-size:0.56rem; letter-spacing:0.14em; text-transform:uppercase;
+      color:var(--gold-dim); line-height:1.5; padding:0 0.95rem 0.62rem;
     }
     .settings-toggle { position:relative; width:44px; height:26px; flex-shrink:0; }
     .settings-toggle input { opacity:0; width:0; height:0; position:absolute; }

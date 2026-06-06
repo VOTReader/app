@@ -4,6 +4,7 @@
 
 export function SelectField({ eyebrow, title, label, desc, value, options, onChange }) {
   const [open, setOpen] = React.useState(false);
+  const [showDesc, setShowDesc] = React.useState(false);
   const selected = options.find((o) => o.id === value) || options[0];
 
   React.useEffect(() => {
@@ -14,18 +15,25 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
   }, [open]);
 
   return (
-    <div className="settings-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
-      <div className="settings-row-text" style={{ marginBottom: "0.7rem" }}>
-        <div className="settings-row-label">{label}</div>
-        <div className="settings-row-desc">{desc}</div>
+    <div className="settings-row">
+      <div className="settings-row-head">
+        <span className="settings-row-label">{label}</span>
+        {desc && (
+          <button
+            type="button"
+            className="settings-info-btn"
+            aria-label={showDesc ? "Hide description" : "Show description"}
+            aria-expanded={showDesc}
+            onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
+          >i</button>
+        )}
+        <span className="settings-row-grow" />
+        <button type="button" className="settings-select-trigger" onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+          <span className="settings-row-value">{selected.label}</span>
+          <span className="settings-select-chev">{"›"}</span>
+        </button>
       </div>
-      <button className="select-field" onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
-        <div className="select-field-body">
-          <span className="select-field-label">{selected.label}</span>
-          {selected.desc ? <span className="select-field-caption">{selected.desc}</span> : null}
-        </div>
-        <span className="select-field-chevron">{"›"}</span>
-      </button>
+      {showDesc && desc && <div className="settings-row-desc">{desc}</div>}
       {open && (
         <>
           <div className="select-sheet-backdrop open" onClick={() => setOpen(false)} />
