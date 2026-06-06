@@ -286,10 +286,12 @@
          avoid editing every button instance. */
       body.no-search .nav-search-btn[title="Search"] { display: none; }
       body.no-history .nav-search-btn[title="History"] { display: none; }
-      /* Reading-view history button: only show when the "History in Top Nav"
-         setting is on. Index/home screens have their own history button that
-         stays visible regardless of this flag. */
-      body:not(.history-in-nav) .nav-history-reading { display: none; }
+      /* History button in the top nav: shown only when "History in Top Nav" is
+         on. Universal across EVERY nav (reading / index / settings / about) —
+         matched by title, not a per-screen class — so the toggle is the single
+         source of truth. History stays reachable from the Home "Recently
+         Visited" card, which is not a nav button and so is unaffected. */
+      body:not(.history-in-nav) .nav-search-btn[title="History"] { display: none; }
       /* Bookmark button: hidden in the top nav when "Bookmark Button in Top
          Nav" is off. Saved bookmarks stay reachable from Library; this only
          hides the per-chapter quick-bookmark icon. */
