@@ -623,24 +623,23 @@ export async function applyV3(manifest, entries, ctx) {
   // (1) Reseed the LS shim keys from the manifest's `data`.
   _reseedLsData(manifest && manifest.data, dataLsKeys);
 
-  // (2) Apply stores + flags (v3 is always v2-shape — no V1 fallback; SHARED with
-  // applyImportPayload's v2 branch). The media step below also adds to importFailures.
-  const stores = (manifest && manifest.stores) || {};
-  const applied = _applyStoresAndFlags(stores, storesMap, flagMap, validateStorePayload);
-  let importFailures = applied.importFailures;
-  const skippedStores = applied.skippedStores;
-
-  // (3) REPLACE media — FAIL-SAFE ordering. Stream each frame's Blob in FIRST
-  // (put = overwrite by id), recording every id streamed. Existing media is NOT
-  // cleared up front: if the stream fails partway (a truncated / corrupt
-  // container — reachable on the Android path, which reads frames straight off
-  // the file; the web readContainer pre-validates every frame so it can't fail
-  // there), the for-await throws BEFORE the prune below, leaving the prior media
-  // INTACT rather than wiped. The only backup must never destroy data on a
-  // partial import (BACKUP-STREAMING-PLAN verification bar). The manifest — and
-  // therefore every store — was read atomically upstream, so the sole thing that
-  // can truncate after a valid manifest is a media frame, which this handles
-  // non-destructively. No base64, no aggregate cap — streaming is bounded per-blob.
+  // (2) REPLACE media FIRST (BAK1) — the media stream is the ONLY step that can
+  // throw on a truncated/corrupt container: the Android path reads frames straight
+  // off the file, so a short/truncated frame throws from the `for await` ITSELF
+  // (only the put is try-wrapped, not the iteration); the web readContainer
+  // pre-validates every frame, so it can't fail there. Running media BEFORE the
+  // store apply means such a truncation throws with the device's STORES still the
+  // old, consistent data — instead of leaving stores durably overwritten while
+  // media + the UI stay old and the import reports "failed" (a silent half-import
+  // on the user's ONLY backup). It is also the correct dependency order: import the
+  // referent (blobs) before the referrer (journal entries that point at them).
+  //
+  // FAIL-SAFE within media too: stream each frame's Blob in FIRST (put = overwrite
+  // by id), recording every id streamed; existing media is NOT cleared up front, so
+  // a partial stream throws BEFORE the prune below and leaves prior media INTACT
+  // rather than wiped (BACKUP-STREAMING-PLAN verification bar). No base64, no
+  // aggregate cap — streaming is bounded per-blob (GB-scale safe).
+  let importFailures = 0;
   /** @type {Record<string, boolean>} */
   const streamedIds = {};
   for await (const entry of entries) {
@@ -664,8 +663,16 @@ export async function applyV3(manifest, entries, ctx) {
     for (const id of existingIds) { if (!streamedIds[id]) await mediaStore.delete(id); }
   } catch (e) { console.warn('prune stale media failed', e); }
 
+  // (3) Apply stores + flags — only AFTER media fully landed, so a media truncation
+  // can't leave stores half-overwritten (BAK1). v3 is always v2-shape (no V1
+  // fallback; SHARED with applyImportPayload's v2 branch via _applyStoresAndFlags).
+  const stores = (manifest && manifest.stores) || {};
+  const applied = _applyStoresAndFlags(stores, storesMap, flagMap, validateStorePayload);
+  importFailures += applied.importFailures;
+  const skippedStores = applied.skippedStores;
+
   // (4) U1 DURABILITY BARRIER — media already durable (JournalMediaStore.put is
-  // awaited above). whenSaved never rejects.
+  // awaited above), stores' _save fired synchronously in (3). whenSaved never rejects.
   const saveResults = await Promise.all(
     Object.values(storesMap).map(({ store }) => _whenSaved(store))
       .concat(Object.values(flagMap).map((s) => _whenSaved(s)))

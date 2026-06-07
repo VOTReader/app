@@ -65,7 +65,7 @@ P0  real correctness, user-facing
   ERR2  [LOW]  Alt-translation load failure swallowed, no diagnostic trace       DONE
   NAV1  [HIGH] Android hardware-back consults wrong modal registry (~10 surfaces)DONE
   STOR1 [HIGH] Cross-tab: deleting last annotation on an anchor resurrects it    DONE
-  BAK1  [MED]  Android truncated-import overwrites stores then reports "failed"   OPEN
+  BAK1  [MED]  Android truncated-import overwrites stores then reports "failed"   DONE
 
 P1  high value, low-moderate risk
   PERF1 [HIGH] ~506 KB deferrable corpus on the synchronous cold-boot path       OPEN
@@ -306,6 +306,17 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  BAK1 landed (commit pending): applyV3 now streams media BEFORE applying
+            stores. The media stream is the only step that can throw on a truncated
+            Android container (frames read off the file; the `for await` itself
+            throws, only the put is try-wrapped), so running it first means a
+            truncation leaves stores as the OLD consistent data — making the
+            "import failed" message accurate instead of a silent half-import on the
+            user's only backup. Correct dependency order too (blobs before journal).
+            Rejected the audit's "drain all frames up front" (would defeat streaming
+            + reintroduce the GB-scale OOM v3 avoids). +1 test (mid-stream throw
+            leaves stores UNAPPLIED — RED under old order); 72 backup tests pass.
+            No SettingsScreen change needed — the existing message is now correct.
 2026-06-07  NAV1 landed (commit pending): handleAndroidBack now consults
             modalRegistry FIRST (dismiss topmost, consume press) — mirroring the
             web Escape order — so Android hardware-back over a registered surface

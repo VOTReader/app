@@ -615,6 +615,23 @@ describe('applyV3', () => {
     expect(Object.keys(media._store).sort()).toEqual(['new1', 'old1', 'old2']);
   });
 
+  it('BAK1: a mid-stream media truncation leaves STORES UNAPPLIED (no half-import)', async () => {
+    // Media streams BEFORE the store apply, so an Android-path truncation throws
+    // with the device's stores still the OLD data — instead of durably overwriting
+    // them and THEN reporting "import failed" (the user would lose data the message
+    // claims is untouched). RED under the old stores-first order.
+    const ann = destStore('replaceAll');
+    async function* truncated() {
+      yield { id: 'new1', meta: { mime: 'image/png' }, blob: blobOf(new Uint8Array([1, 2])) };
+      throw new Error('truncated frame');
+    }
+    await expect(applyV3(
+      { stores: { 'vot-annotations': { k: [{ id: 'a' }] } } }, truncated(),
+      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: destMedia(), validateStorePayload: okValidate },
+    )).rejects.toThrow(/truncated/);
+    expect(ann.calls).toEqual([]);   // stores were NOT written — the import didn't half-land
+  });
+
   it('reports writeFailures when a store durability barrier resolves false', async () => {
     const ann = destStore('replaceAll', { saved: false });
     const res = await applyV3(
