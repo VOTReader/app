@@ -21,6 +21,7 @@ import {
   renderSubRanges,
   HighlightableText,
   applyDOMHighlights,
+  applyNoteIcons,
   annDomSig,
   snapRangeToWords,
 } from './annotation-engine.jsx';
@@ -650,5 +651,37 @@ describe('HighlightableText — ANN1 multi-verse note paints one icon (the last 
   it('the LAST spanned verse renders exactly one note icon', () => {
     const { container } = render(<HighlightableText text="world" hlKey="k:v2" />);
     expect(container.querySelectorAll('.hl-note-icon').length).toBe(1);
+  });
+});
+
+describe('ANN4 — applyNoteIcons normalizes the imperative container', () => {
+  afterEach(() => {
+    document.querySelectorAll('[data-hl-dom]').forEach((c) => c.remove());
+  });
+
+  it('heals fragmented adjacent text nodes (no accumulation across passes)', () => {
+    const c = document.createElement('p');
+    c.setAttribute('data-hl-dom', '');
+    c.setAttribute('data-hl-key', 'letter:x:0');
+    c.innerHTML = '<mark class="hl-mark hl-note hl-yellow" data-group-id="gn">noted</mark>';
+    // Simulate a prior icon insertion's splitText leftovers: two ADJACENT text
+    // nodes after the mark (the exact fragmentation ANN4 must heal).
+    c.appendChild(document.createTextNode(' tail'));
+    c.appendChild(document.createTextNode('more'));
+    document.body.appendChild(c);
+
+    applyNoteIcons();
+
+    // After the normalize, no two text nodes sit directly adjacent — the ' tail'
+    // and 'more' fragments merged. (Without the ANN4 normalize they'd stay split,
+    // and would keep splitting further on each note toggle.)
+    let adjacentTextPairs = 0;
+    const kids = Array.from(c.childNodes);
+    for (let i = 1; i < kids.length; i++) {
+      if (kids[i].nodeType === 3 && kids[i - 1].nodeType === 3) adjacentTextPairs++;
+    }
+    expect(adjacentTextPairs).toBe(0);
+    expect(c.textContent).toContain('tailmore'); // text preserved, just merged
+    expect(c.querySelectorAll('.hl-note-icon').length).toBe(1); // icon still painted
   });
 });
