@@ -4,6 +4,49 @@ VOTReader — 16-agent Opus code audit + remediation tracker
 ================================================================================
 
 --------------------------------------------------------------------------------
+SESSION HANDOFF — 2026-06-07 (next agent: START HERE)
+--------------------------------------------------------------------------------
+STATE. The audit is done + remediated in 16 commits (all pushed to main). 18
+findings DONE + 3 ADJUDICATED; EVERY P0 closed. 56 lower-priority items still OPEN
+— see SECTION 1 (index) + SECTION 3 (per-item detail). The PROGRESS LOG (bottom)
+is the commit-by-commit record.
+
+GOTCHAS (load-bearing — learned the hard way this session):
+ 1. AUDIT FINDINGS CAN BE WRONG. Re-derive every finding against CURRENT source
+    before fixing — the agent reports' line numbers drift, and two findings were
+    outright false-positives (STOR2: the real "Clear All" deletes whole IDB DBs via
+    _deleteIdbDatabase, NOT a merge path; NAV3: the __goSearch no-deps re-bind is
+    the INTENTIONAL fresh-closure bridge). Prove it, don't trust it.
+ 2. app.jsx is 798/800 (the canary) — effectively FULL. Any app.jsx-touching change
+    must extract a hook first. PowerShell `Measure-Object -Line` UNDERCOUNTS; trust
+    `wc -l` / `npm run check:app-size`.
+ 3. CORPUS_VERSION is now c9. Bumping it (any books/matthew/VOT corpus OR
+    bible-studies.js / bible-<code>.js edit) REQUIRES also bumping
+    CORPUS_CONTENT_VERSION in app/src/main/assets/search.js to match — the
+    corpus-version gate fails CLOSED if they diverge (SRCH1).
+ 4. KEYED RE-RENDER pattern: getVersionForKey/_bumpKey live on the base CachedStore.
+    To stop a whole-page re-render on one edit, call _bumpKey(key) on the store's
+    mutations + subscribe getVersionForKey(key) (done for AnnotationStore + NoteStore
+    [APP1]). Link/Bookmark CAN'T use it — their icons match by KEY PREFIX, so exact-
+    key versioning is unsound (that's why PERF5 was adjudicated).
+ 5. VERIFY: vitest + `npm run lint` (--max-warnings 0) + `npm run typecheck`; the
+    pre-commit then re-runs all gates on commit (it rebuilds bundles + re-stages, so
+    you don't hand-edit dist/). Render check: `npm run smoke:ci`. LIVE preview: do a
+    clean-slate first (unregister SWs + delete caches + reload); to test SEARCH also
+    `indexedDB.deleteDatabase('vot-search-cache')`. Run npm via git-bash (PS blocks
+    npm.ps1). Commits go DIRECT to main; push after each logical unit.
+ 6. NTV1 (Kotlin audio-mode restore) + BLD2 (deploy-gated-on-CI) CANNOT be runtime-
+    verified from this environment — do them where you can watch the emulator/Actions.
+
+NEXT (my recommendation). Cleanest remaining real fix: CORP2 (translation
+completeness gate) — but it needs the translation↔KJV bookId mapping worked out
+(the translations label Matthew "matthew-plain", and validateAgainstReference +
+its `exceptions` allow-list already exist at validate-schemas.js ~1272/1579). After
+that: NAV2 (narrow stale-highlight leak), APP2 (scroll useLayoutEffect — render-
+path, mind the rAF), SRCH2 (search.js stop-word), then the P3 tail. NTV1 + BLD2
+want a device/CI pass.
+
+--------------------------------------------------------------------------------
 HANDOFF (READ FIRST)
 --------------------------------------------------------------------------------
 WHAT THIS IS. On 2026-06-06 a fleet of 16 independent Opus-4.8 agents
