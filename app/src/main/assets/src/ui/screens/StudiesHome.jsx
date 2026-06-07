@@ -2,7 +2,7 @@
    StudiesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function StudiesHome({ studies, studiesLoading, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Q8.2: pre-fire the Matthew Study Bible corpus load. By the time the
   // user picks a study from the list, the 618 KB corpus is already
   // downloading in parallel.
@@ -39,7 +39,7 @@ export function StudiesHome({ studies, studiesLoading, onSelectStudy, onBack, on
           {list.length === 0 && studiesLoading && (
             <div className="sc-sheet-loading" style={{ textAlign: "center", padding: "1.5rem 0" }}>Loading studies…</div>
           )}
-          {list.length === 0 && !studiesLoading && (
+          {list.length === 0 && !studiesLoading && !studiesError && (
             <div className="studies-empty">Letter Studies coming soon.</div>
           )}
           {list.map((s, i) => {
@@ -67,6 +67,12 @@ export function StudiesHome({ studies, studiesLoading, onSelectStudy, onBack, on
               </button>
             );
           })}
+          {studiesError && !studiesLoading && (
+            <div className="studies-empty" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", textAlign: "center" }}>
+              <div>{list.length === 0 ? "Couldn’t load studies." : "Some studies couldn’t load."}</div>
+              <button type="button" onClick={onRetry} style={{ padding: "8px 20px", borderRadius: "999px", border: "1px solid currentColor", background: "transparent", color: "inherit", font: "inherit", cursor: "pointer", opacity: 0.85 }}>Try again</button>
+            </div>
+          )}
           <a className="chapter-card-btn study-external-card" href="https://answersonlygodcangive.com/" target="_blank" rel="noopener noreferrer">
             <span className="chapter-card-num">↗</span>
             <div className="chapter-card-divider" />

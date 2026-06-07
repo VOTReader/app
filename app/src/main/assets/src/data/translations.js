@@ -33,21 +33,37 @@ export function loadTranslation(code) {
     script.src = 'src/data/bible-' + code + '.js';
     script.async = true;
     script.onload = () => {_translationLoaded[code] = true;resolve();};
-    script.onerror = () => {resolve();}; // silent fail — NKJV fallback
+    script.onerror = () => {
+      // ERR2: don't cache the failure — clear the slot so a later open retries,
+      // and trace it (the NKJV fallback is otherwise invisible: the user just
+      // sees their chosen translation silently revert with no explanation).
+      delete _translationPromises[code];
+      try { if (window.DiagnosticLog) window.DiagnosticLog.warn('translation', 'failed to load ' + code); } catch (_e) {}
+      resolve();
+    };
     document.head.appendChild(script);
   });
   return _translationPromises[code];
 }
 
 export function loadBibleStudies() {
-  if (typeof BIBLE_STUDIES !== 'undefined') return Promise.resolve();
+  if (typeof BIBLE_STUDIES !== 'undefined') return Promise.resolve(true);
   if (_bibleStudiesPromise) return _bibleStudiesPromise;
   _bibleStudiesPromise = new Promise((resolve) => {
     const script = document.createElement('script');
     script.src = 'src/data/bible-studies.js';
     script.async = true;
-    script.onload = () => { resolve(); };
-    script.onerror = () => { resolve(); }; // silent fail — STUDIES stays []
+    script.onload = () => resolve(true);
+    script.onerror = () => {
+      // ERR1: do NOT cache the failed promise — null it so a retry (or the next
+      // Studies open) re-attempts the load, instead of stranding the user on a
+      // permanent "Letter Studies coming soon." dead-end. Resolve FALSE so the
+      // caller can surface a "Try again", and trace it (DiagnosticLog is the only
+      // failure record under the no-telemetry policy).
+      _bibleStudiesPromise = null;
+      try { if (window.DiagnosticLog) window.DiagnosticLog.error('studies', 'failed to load bible-studies.js'); } catch (_e) {}
+      resolve(false);
+    };
     document.head.appendChild(script);
   });
   return _bibleStudiesPromise;

@@ -98,6 +98,9 @@ function App() {
   // Value (_studiesTick) is unread; only the setter side effect matters.
   const [_studiesTick, setStudiesTick] = useState(0);
   const [studiesLoading, setStudiesLoading] = useState(false);
+  // ERR1: true when bible-studies.js failed to load — StudiesHome then shows a
+  // "Try again" affordance instead of a permanent "coming soon" dead-end.
+  const [studiesError, setStudiesError] = useState(false);
 
   /* ═══════════════════════════════════════════════════════════════
      SHEET / OVERLAY STATE — tracks which sheets/sidebars are open.
@@ -251,18 +254,27 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time boot reclaim; deliberately runs once on mount, not per translation change (saveToCache self-evicts thereafter).
   }, []);
 
+  // ERR1: shared by the boot effect AND the StudiesHome "Try again" button.
+  // loadBibleStudies resolves false on failure (and nulls its cached promise so a
+  // retry re-attempts), letting us surface a retry instead of stranding the user
+  // on a permanent "Letter Studies coming soon." dead-end.
+  const loadStudies = React.useCallback(() => {
+    setStudiesLoading(true);
+    setStudiesError(false);
+    loadBibleStudies().then((ok) => {
+      setStudiesLoading(false);
+      setStudiesTick((v) => v + 1);
+      if (!ok) setStudiesError(true);
+    });
+  }, []);
   // Lazy-load bible-studies.js the first time the user opens any Studies screen.
   // Covers: Studies home, a study index, or a direct tap-through to a study chapter.
   useEffect(() => {
     const needsStudies = screen === 'studies-home' || screen === 'bible-study-index' || screen === 'bible-study-chapter';
     if (!needsStudies) return;
     if (typeof BIBLE_STUDIES !== 'undefined') return; // already loaded
-    setStudiesLoading(true);
-    loadBibleStudies().then(() => {
-      setStudiesLoading(false);
-      setStudiesTick((v) => v + 1);
-    });
-  }, [screen]);
+    loadStudies();
+  }, [screen, loadStudies]);
   // Per-tab focus-mode overrides. Each tab has independent state.
   const [titleFocusHidden, setTitleFocusHidden] = tabField('titleFocusHidden');
   const [headingsFocusHidden, setHeadingsFocusHidden] = tabField('headingsFocusHidden');
@@ -682,7 +694,7 @@ function App() {
     selectMatthewCh, selectBibleCh, selectStudy, selectStudyChapter,
     getStudyById, getStudyChapter, studyReadKey,
     prevChainEntry, nextChainEntry, goToChainEntryFirst, goToChainEntryLast,
-    studiesLoading, UNIFIED_CHAIN,
+    studiesLoading, studiesError, retryStudies: loadStudies, UNIFIED_CHAIN,
     searchQuery, setSearchQuery, searchScope, setSearchScope, searchContext,
     journalEntryId, createAndEditJournal,
     openInAppLetter, openLinkSidebar, navigateToLink,

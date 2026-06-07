@@ -71,7 +71,7 @@ export function buildScreenRoutes({
   // ── Bible Studies + chain nav ──
   getStudyById, getStudyChapter, studyReadKey,
   prevChainEntry, nextChainEntry, goToChainEntryFirst, goToChainEntryLast,
-  studiesLoading, UNIFIED_CHAIN,
+  studiesLoading, studiesError, retryStudies, UNIFIED_CHAIN,
   // ── Search ──
   searchQuery, setSearchQuery, searchScope, setSearchScope, searchContext,
   // ── Journal ──
@@ -553,6 +553,8 @@ export function buildScreenRoutes({
       <StudiesHome
         studies={UNIFIED_CHAIN}
         studiesLoading={studiesLoading}
+        studiesError={studiesError}
+        onRetry={retryStudies}
         onSelectStudy={(slug) => {
           if (slug === 'matthew-study') {
             setFromStudies(true);

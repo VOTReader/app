@@ -25,7 +25,7 @@
  * bundle and a Linux-CI rebuild produce the same fingerprint.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { createHash } from 'crypto';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -33,10 +33,17 @@ import { fileURLToPath } from 'url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const distDir = resolve(root, 'app/src/main/assets/dist');
+const dataDir = resolve(root, 'app/src/main/assets/src/data');
 const swPath = resolve(root, 'app/src/main/assets/service-worker.js');
 const lockPath = resolve(here, 'corpus-version.lock');
 
 const CORPUS_BUNDLES = ['bundle-a-bible.js', 'bundle-a-matthew.js', 'bundle-a-vot.js'];
+// SW1: bible-studies.js + the bible-<code>.js alt-translations are now served
+// from the STABLE corpus cache (precache + cache-on-use), so — exactly like the
+// dist corpus bundles — a content edit must bump CORPUS_VERSION or cached clients
+// keep the stale data forever. Fold them into the gate's fingerprint. Globbed so
+// a future translation is auto-covered.
+const DATA_CORPUS = readdirSync(dataDir).filter((f) => /^bible-[a-z-]+\.js$/.test(f)).sort();
 const checkOnly = process.argv.includes('--check');
 
 function fail(msg) {
@@ -59,6 +66,10 @@ for (const name of CORPUS_BUNDLES) {
   if (!existsSync(fp)) fail('Missing corpus bundle: ' + name + ' (run `npm run build` first).');
   hash.update(name);
   hash.update(readFileSync(fp).filter((b) => b !== 0x0d));
+}
+for (const name of DATA_CORPUS) {
+  hash.update(name);
+  hash.update(readFileSync(resolve(dataDir, name)).filter((b) => b !== 0x0d));
 }
 const digest = hash.digest('hex').slice(0, 16);
 

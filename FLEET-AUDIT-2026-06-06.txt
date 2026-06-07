@@ -1,0 +1,333 @@
+================================================================================
+FLEET-AUDIT-2026-06-06.txt
+VOTReader — 16-agent Opus code audit + remediation tracker
+================================================================================
+
+--------------------------------------------------------------------------------
+HANDOFF (READ FIRST)
+--------------------------------------------------------------------------------
+WHAT THIS IS. On 2026-06-06 a fleet of 16 independent Opus-4.8 agents
+adversarially audited VOTReader, CODE ONLY (no UI/preview/device walks, no
+accessibility, no splash/visual). Each agent owned one subsystem, verified every
+finding against live source (several reproduced bugs through production code or
+ran the suite), and returned a 1-10 rating + ranked findings. This file is the
+canonical tracker for closing them. The full per-agent reports (more LOW/INFO
+detail than is transcribed here) are in the session transcript.
+
+OVERALL: 8.2/10. An exceptionally well-engineered personal app — visibly the
+product of prior audit passes. The data-lifeline subsystems (journal durability,
+security, backup, storage) are excellent. The gap to 9+ is a small, specific,
+mostly-mapped set of fixes, several found by TWO agents from different angles.
+
+SUBSYSTEM SCORECARD
+  Journal durability .......... 9     App() / hooks / state ....... 8.5
+  Security (local-only) ....... 9     Test-suite quality .......... 8.5
+  Backup / export-import ...... 8.5   Annotation engine ........... 8
+  Build / tooling / CI ........ 8.5   Storage core / cross-tab .... 8
+  Kotlin / Android native ..... 8.5   Scripture resolution ........ 8
+  Data integrity / corpus ..... 8.5   Error handling / resilience . 8
+                                       Performance / memory ........ 7.5
+                                       Service worker / PWA ........ 7
+                                       Navigation / back-stack ..... 7
+
+METHOD (per item): verify current state against source (agents can be stale/
+wrong — re-derive) -> reproduce -> fix -> PROVE (vitest and/or preview clean-
+slate, build, smoke:ci) -> gate green (lint --max-warnings 0, typecheck,
+coverage floor, check_balance, validate-schemas, corpus-version, csp-hash,
+app.jsx <=800 canary) -> commit -> push -> tick this file's PROGRESS LOG.
+
+OUT OF SCOPE (settled owner policy — do NOT add): auth/login, AI/LLM/API-keys,
+cloud sync/server, telemetry/crash-reporting services, multi-user, ACCESSIBILITY
+(separately in-flight), UI/visual/splash redesign, Play Store, old-browser
+polyfills (WebView floor is chrome108 / evergreen).
+
+LOAD-BEARING GOTCHAS
+  - Preview clean-slate to load fresh bundles past the SW cache (unregister SWs +
+    delete caches + reload). To verify SEARCH you must ALSO
+    indexedDB.deleteDatabase('vot-search-cache').
+  - jsdom has no navigator.locks -> vitest.setup.js ships a mutex shim. It is
+    faithful; it does NOT mask STOR1 (that's a merge-ALGORITHM flaw).
+  - A new window-globalized export needs `npm run lint:globals` + re-stage
+    (pre-commit auto-regenerates now, but confirm).
+  - CORPUS_VERSION manual bump on any books/matthew/VOT *and* (newly) on
+    bible-studies.js if it enters the SW corpus cache (SW1).
+  - app.jsx is under an ENFORCED <=800-line canary. Prefer pushing new state/
+    effects into hooks over bloating App().
+  - esbuild --target=chrome108 on build:b/c/d/e/css + corpus minify (Permanent
+    Rule 6). Floor is a RUNTIME-API contract, not just syntax.
+
+--------------------------------------------------------------------------------
+SECTION 1 — PRIORITY INDEX
+--------------------------------------------------------------------------------
+P0  real correctness, user-facing
+  ERR1  [HIGH] Bible-Studies lazy-load failure = permanent silent dead-end       DONE
+  SW1   [HIGH] Studies + 7 alt-translations are network-only (broken offline)    DONE
+  ERR2  [LOW]  Alt-translation load failure swallowed, no diagnostic trace       DONE
+  NAV1  [HIGH] Android hardware-back consults wrong modal registry (~10 surfaces)OPEN
+  STOR1 [HIGH] Cross-tab: deleting last annotation on an anchor resurrects it    OPEN
+  BAK1  [MED]  Android truncated-import overwrites stores then reports "failed"   OPEN
+
+P1  high value, low-moderate risk
+  PERF1 [HIGH] ~506 KB deferrable corpus on the synchronous cold-boot path       OPEN
+  PERF2 [HIGH] Journal media object-URL cache unbounded per session (OOM)        OPEN
+  APP1  [MED]  NoteStore global-bump re-renders whole page (Theme B)             OPEN
+  PERF5 [LOW]  Link/Bookmark icons re-render on any mutation (Theme B)           OPEN
+  NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       OPEN
+  SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    OPEN
+  SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      OPEN
+  STOR2 [MED]  "Clear All Personal Data" leaves residue under sibling-tab write  OPEN
+  SEC1  [LOW]  Runtime-string toasts route to an innerHTML sink                  OPEN
+
+P2  gates + correctness tail
+  BLD1  [MED]  No gate proves minify preserves corpus VALUES                     OPEN
+  BLD2  [MED]  Web deploy publishes independently of CI (thin gate subset)       OPEN
+  CORP1 [MED]  Schema validator does not detect duplicate id slugs              OPEN
+  CORP2 [MED]  Alt-translation Bibles get no completeness cross-check            OPEN
+  ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                OPEN
+  ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             OPEN
+  NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) OPEN
+  NAV3  [MED]  __goSearch bridge effect: no deps, unconditional null on cleanup  OPEN
+  APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     OPEN
+  PERF3 [MED]  Reading screens re-render full verse list on every scroll-flush   OPEN
+  PERF4 [MED]  content-visibility:auto unused (safe win at chrome108 floor)      OPEN
+  TEST1 [MED]  tabs.js + highlight.jsx at 0% coverage (load-bearing pure utils)  OPEN
+  TEST2 [MED]  React 18.2-runtime vs 19.2-test skew unmitigated/unexercised      OPEN
+  SRCH2 [L-M]  Pure-stopword/<=4-word queries skip trimming -> full-corpus scan  OPEN
+  BAK2  [L-M]  Missing manifest media `size`: rejected on web, accepted on Android OPEN
+  BLD3  [L-M]  Pre-commit fails open when staging only a dist bundle / app.jsx   OPEN
+  CORP3 [L-M]  check_balance smart-quote heuristic near-vacuous (esprima saves)  OPEN
+
+P3  small wins / hardening / adjudicate
+  ANN3 [LOW] applyDOMHighlights O(n^2) offset re-walk per sub-range (adjudicate) OPEN
+  ANN4 [LOW] applyNoteIcons fragments text nodes (no normalize on icon path)     OPEN
+  ANN5 [LOW] No test for elementsFromPoint tap-routing winner                    OPEN
+  SRCH3 [LOW] Two volume-ID registries hand-synced, no equality assertion test   OPEN
+  SRCH4 [LOW] Snippet ignores synonym/cross-translation matches (no highlight)   OPEN
+  SRCH5 [LOW] Engine search() has no min-length floor (only UI gates)            OPEN
+  SRCH6 [INFO] Dead code: STOP_WORDS, 'chapter-title'/'heading' kinds, phoneticKey OPEN
+  STOR3 [INFO] _base refreshed only in _saveMerged (benign today; future trap)   OPEN
+  STOR4 [LOW] _saveMerged structuredClone of largest store on every save         OPEN
+  STOR5 [LOW] Lock-unavailable merge fallback is silent (no diagnostic)          OPEN
+  BAK3 [LOW] `counts` integrity block written but never verified on import       OPEN
+  BAK4 [LOW] Legacy import cap asymmetric: 50 MB Android vs 300 MB web           OPEN
+  BAK5 [LOW] Web FS-Access export leaves partial file on mid-stream write fail   OPEN
+  BAK6 [INFO] streamedIds plain-object key-set unreliable for id "__proto__"     OPEN
+  JRNL1 [LOW] Rapid double media-insert relies on debounce for the 2nd block     OPEN
+  JRNL2 [LOW] Recording save() in error stage arms a no-op pendingSaveRef        OPEN
+  JRNL3 [LOW] recordDeletion can drift totalEntries vs real count (cosmetic)     OPEN
+  JRNL4 [INFO] Single-slot draft key safe only via ts>=updated guard (document)  OPEN
+  NAV4 [LOW] Swipe-nav fires on any horizontal touch (no target/intent filter)   OPEN
+  NAV5 [LOW] Browser-back after tab switch backs the screen, not the tab         OPEN
+  NAV6 [INFO] Synchronous double-back reads stale refs (unreachable normally)    OPEN
+  SCR2 [LOW] Fallback mis-resolves comma-list / multi-book refs (dict masks it)  OPEN
+  SCR3 [LOW] Cross-chapter ranges fail to parse (no such refs in corpus today)   OPEN
+  SCR4 [INFO] Book-only refs return null (by design; documented)                 OPEN
+  SW2 [LOW] corpusFirst cache.put is fire-and-forget (may die before commit)     DONE
+  SW3 [LOW] HTTP-cache staleness on network-only data files (subsumed by SW1)    OPEN
+  SW4 [INFO] CORE_CACHE eviction has no self-heal (persist() mitigates)          OPEN
+  APP3 [LOW] useReadingDwell visibility-resume reads stale dwellMs               OPEN
+  APP4 [INFO] Lazy-corpus subscription depends on index.html script order        OPEN
+  APP5 [LOW] vot-state full-serialize write amplification on every scroll-stop   OPEN
+  APP6 [INFO] 800-line canary forces two cohesion seams (documented)            OPEN
+  NTV2 [LOW] Aborted v3 export can orphan a partial file the abort can't delete  OPEN
+  NTV3 [LOW] GardenImageCache.clear() is dead code; Settings wipe unwired        OPEN
+  NTV4 [LOW] Recorder pause()/resume() report success with no active recording   OPEN
+  NTV5 [INFO] getZoomScale() transient during in-flight screenshot (benign)      OPEN
+  NTV6 [INFO] audioSystemService nullability unreachable (benign)                OPEN
+  BLD4 [LOW] esbuild pinned by caret; minifier change would silently re-emit     OPEN
+  BLD5 [INFO] CORPUS_VERSION correctness is transitive through "CI rebuilds"      OPEN
+  SEC2 [LOW] JSON.parse exception message surfaced to user (folded into SEC1)    OPEN
+  CORP4 [LOW] esprima 4.0.1 can't parse ?./?? -> false-positive if added to data OPEN
+  CORP5 [LOW] No num-sequence validation (gaps/dups/order)                       OPEN
+  CORP6 [INFO] audit-footnotes.js is strong but not wired into CI                OPEN
+  TEST3 [LOW] Real-time setTimeout(r,5) monotonic-ts assertions (flake)          OPEN
+  TEST4 [LOW] Device-only compressImage error branches unverified                OPEN
+  TEST5 [LOW] No-navigator.locks merge fallback untested                         OPEN
+  ERR3 [LOW] AppShell chrome renders outside the inner ErrorBoundary             OPEN
+
+--------------------------------------------------------------------------------
+SECTION 2 — THEMES (cross-agent convergences = highest signal)
+--------------------------------------------------------------------------------
+THEME A — Secondary-corpus cache/offline/recovery gap (5 agents converge).
+  The main 3 corpus bundles (Bible/Matthew/VOT) are bulletproof, but Bible
+  Studies + the 7 alt-translations load through the OLDER translations.js path
+  that predates the __makeLazyLoader retry/diagnostics fix and was never
+  migrated. Consequences stack: SW1 (broken offline), ERR1 (silent permanent
+  dead-end), ERR2 (no diagnostic), SRCH1 (stale search cache), SCR1 (silent NKJV
+  under a foreign cite). ONE focused session on translations.js + the SW corpus
+  list + the search-cache signature + a translation allowlist closes a HIGH
+  offline bug, a HIGH dead-end, and three smaller items together.
+
+THEME B — Per-key reactivity only half-applied (3 agents converge).
+  F1/F2 gave AnnotationStore getVersionForKey so one highlight edit re-renders
+  one verse. NoteStore / LinkStore / BookmarkStore still only _bump() globally,
+  so one note/link/bookmark edit re-renders EVERY verse on the page (176 on
+  Psalm 119). APP1 + PERF5. Mechanical extension of a pattern already built.
+
+THEME C — Cross-tab / multi-surface edge cases.
+  Right in the common case, wrong on a 2nd tab / open sheet / emptied bucket:
+  STOR1 (annotation resurrection), STOR2 (Clear-All residue), NAV1 (Android
+  back split-brain).
+
+THEME D — Android native + backup durability tail.
+  NTV1 (audio mode restore), BAK1 (partial-import store overwrite), NTV2
+  (orphaned partial export), BAK2 (cross-platform size asymmetry).
+
+THEME E — Gate completeness.
+  BLD1 (minify value fidelity), BLD2 (deploy gated on CI), CORP1 (dup-id),
+  CORP2 (translation completeness), BLD3/BLD4.
+
+--------------------------------------------------------------------------------
+SECTION 3 — DETAIL (fix direction per item; * = part of a Theme)
+--------------------------------------------------------------------------------
+ERR1* translations.js:42-54 + app.jsx:256-265 + StudiesHome.jsx:42-44. onerror
+  resolve()s AND caches the resolved promise -> studies stay [], "coming soon"
+  forever, never retries, logs nothing. FIX: on error null the cached promise +
+  signal failure; StudiesHome shows "Try again"; DiagnosticLog.error. Lowest-risk
+  shape: mirror the __makeLazyLoader retry/diagnostics contract.
+SW1*  service-worker.js:24-105,188-194 + translations.js:33,47. bible-studies.js
+  (4.4MB) + 7 bible-*.js (~32MB) are network-only; coreFirst never cache.puts a
+  miss. FIX: add bible-studies.js to CORPUS_PRECACHE (bump CORPUS_VERSION); give
+  src/data/bible-*.js a corpusFirst cache-on-use branch; surface load failure.
+ERR2* translations.js:36. loadTranslation onerror swallows silently. FIX:
+  DiagnosticLog.warn('translation','failed '+code) before the NKJV fallback.
+SRCH1* search.js:148-180 dataSignature is structural (lengths) only; never reads
+  CORPUS_VERSION -> a reworded verse serves the old index forever. FIX: fold
+  CORPUS_VERSION (or a content hash) into dataSignature.
+SCR1*  scripture-resolution.js:362-376 + translations.js:33. Tags CJB/GNT/ESV/
+  NLT/NAS/CEB (no bundle) fall through to NKJV silently if the dict key ever
+  misses. FIX: allowlist loadTranslation to the 7 real bundles; on fallback,
+  strip the unsupported tag from the displayed cite.
+
+NAV1  use-android-back.js:165,312. handleAndroidBack checks only __closeSheet;
+  Escape checks only modalRegistry and returns early on Android. Disjoint sets ->
+  back over NoteSheet/SelectionToolbar/BookmarkPopover/Garden-warning/Welcome
+  dismisses AND navigates underneath. FIX: handleAndroidBack consults
+  modalRegistry FIRST (peek().dismiss; return "true"); fold __closeSheet sheets
+  into the registry; collapse both platforms onto one dispatcher.
+STOR1 store-merge.js:165-179 (mergeMapByKey) + annotation-store.js:119,134.
+  Empty-bucket delete does `delete data[key]`; outer merge then reads
+  key-absent-but-base-present-and-theirs-edited as our-delete-loses ->
+  resurrects sibling bucket incl. our just-deleted segment. FIX: when the value
+  merge is a sub-collection merge, coerce absent ours/theirs to empty and ALWAYS
+  run the nested merge vs base[k]; OR AnnotationStore set data[key]=[] not delete.
+STOR2 journal-store.js:519-525 clear() routes through the 3-way merge -> a
+  sibling-added record survives an explicit wipe. FIX: a _saveAuthoritative()
+  that bypasses read-merge and refreshes _base for whole-store overwrites.
+BAK1  backup.js:629-665 + SettingsScreen.jsx:807-820. applyV3 applies+saves
+  stores BEFORE streaming media; on Android a truncated frame throws mid-apply ->
+  stores durably overwritten, media not, UI shows "Import failed", no reload.
+  (Web is immune: readContainer pre-validates all frames.) FIX: on Android drain+
+  integrity-check all frames before applyV3 (mirror web), OR apply media first,
+  OR force a reload on the throw so durable writes + UI agree.
+
+PERF1 build.py:69-70 + index.html:132. bundle-a is 81% corpus: books-restored.js
+  (277KB, backs an OFF-by-default feature) + matthew-plain.js (229KB) are
+  reachable only behind already-lazy walls. FIX: move both behind __makeLazyLoader
+  (replace SettingsScreen's matthew-plain .chapters.length read with literal 28).
+PERF2 journal-media-store.js:259-270,152. _urlCache[id]=createObjectURL never
+  evicts in-session -> ~150-200 photos pin 200-400MB. FIX: LRU (mirror garden
+  _gardenLru) ~20-30 cap, revokeObjectURL on the victim.
+APP1* annotation-engine.jsx:192-195. HighlightableText subscribes NoteStore
+  .getVersion() (global). FIX: add NoteStore _bumpKey(hlKey)+getVersionForKey;
+  subscribe keyed (note class depends only on the verse's own group).
+PERF5* LinkIcon.jsx:8-15 + BookmarkIcon.jsx:9-12 subscribe global versions,
+  unmemoized, getForKey is O(L)/O(B). FIX: getVersionForKey on Link/Bookmark
+  stores + React.memo the icons keyed on hlKey.
+NTV1  MainViewModel.kt:73-79 / MainActivity.kt:902-928. startAudioSession sets
+  MODE_IN_COMMUNICATION; only the JS unmount path restores it -> mid-recording
+  kill leaves the whole device in earpiece routing. FIX: restore audioManager.mode
+  in onCleared (+ onPause-while-recording + onRenderProcessGone).
+
+STOR2/SEC1/etc — see Section 1 one-liners; fix directions:
+SEC1  toast.js:96 innerHTML sink fed runtime strings at SettingsScreen.jsx:444,
+  491-851. No untrusted substring reaches it TODAY (verified) but it's the exact
+  stored-XSS shape. FIX: switch informational toasts to showToast({text});
+  reserve {html} for static markup (SW update prompt's <b>).
+BLD1  minify-bundle.mjs:44 / build.py:240. No gate proves minified corpus ==
+  source values (PF1 proof was one-time/manual). FIX: vitest loading each
+  src/data corpus + its built+minified dist bundle in two vm contexts,
+  deepStrictEqual the globals.
+BLD2  deploy-web.yml:34-101 has no `needs: build`; BLD-1 gate omits test/lint/
+  typecheck/smoke/byte-identity. FIX: add `needs: build` or expand the gate.
+CORP1 validate-schemas.js (~143/472/764). No dup-id detection (the likeliest
+  regression). FIX: per-file Set of ids, ERROR on collision.
+CORP2 validate-schemas.js:1564-1567. The 7 bible-*.js get only contiguity
+  WARNINGS. FIX: validateAgainstReference vs BIBLE_KJV with a known-omission
+  allow-list seeded from today's gaps.
+ANN1  annotation-engine.jsx:238-250 (React) vs :346-414 (DOM). FIX: pass the
+  group's globally-last (hlKey,segIdx) so only the final verse paints the icon.
+ANN2  SelectionToolbar.jsx:413-419. removeHighlight bulk-removes every overlapping
+  group incl. NoteStore.remove. FIX: exclude noted groups, or disclose in the
+  confirm ("Remove 1 highlight and 1 note?").
+NAV2  LetterView.jsx:30-33 / WtlbEntryView.jsx:21-23 peek + conditional clear.
+  FIX: navHandoff.take() + re-stash on id mismatch, or clear unconditionally on
+  reader mount.
+NAV3  use-search.js:264-267 no-deps effect, unconditional null cleanup. FIX: []
+  deps + restore prev (match __closeSheet convention).
+APP2  use-scroll-memory.js:164-188. Scroll restore in a passive effect -> wrong-
+  position flash. FIX: useLayoutEffect (writes scrollTop only).
+PERF3 use-scroll-memory.js:119-123 + screen-routes.jsx (no React.memo). Scroll
+  flush re-renders the whole verse list ~8x/s. FIX: React.memo heavy reading
+  screens; subsumed partly by PERF4.
+PERF4 app.css absent. FIX: content-visibility:auto + contain-intrinsic-size on
+  .verse / .letter-para (DOM-preserving; keeps scroll-to-verse + annotation).
+TEST1 utils/tabs.js + utils/highlight.jsx at 0% in scope. FIX: pure unit tests
+  (tab->key strings; text+needle->segments incl. diacritic/case).
+TEST2 react 19.2.6 tests vs 18.2.0 runtime. FIX: align test React to 18.2 OR a
+  CI smoke under the runtime build; at minimum document.
+SRCH2 search.js:1411-1417 skips trimming when terms<=4. FIX: short-circuit to
+  no-results when the filtered content-term set is all stop-words.
+BAK2  backup-android.js:178 skips the size cross-check when meta.size missing
+  (web throws). FIX: treat missing/non-numeric size as corruption (match BAK-2).
+BLD3  pre-commit:245,272-274 fail open on dist-only / app.jsx-only stages. FIX:
+  always run check:app-size; refuse a dist/ stage with no source change.
+CORP3 check_balance.py:68-81 flags only line-start left-double-quote. FIX: scan
+  any smart quote outside string content, or document as esprima-redundant.
+
+(P3 items: fix directions are the Section 1 one-liners; adjudicate ANN3/STOR4/
+NAV6/APP6 during execution — several may be WONT-DO-with-reason.)
+
+--------------------------------------------------------------------------------
+SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
+--------------------------------------------------------------------------------
+- Journal background-kill durability: synchronous LS draft + immediate media
+  persist + timestamp+content-signature reconcile; tests advance no timers.
+- Security: CSP hash-locked (no unsafe-inline/eval), zero dangerouslySetInnerHTML
+  in app code, WebView locked down, proto-pollution refused, provably no egress.
+- Backup codec: 64-bit length-prefixed framing byte-identical web<->Kotlin,
+  asserted from both sides; fail-loud export; fail-safe media replace.
+- Annotation dual-render per-character equivalence test.
+- Storage rebase-not-clobber hydration; IDB tx settle on oncomplete.
+- Build cross-platform byte-identity engineered (CR-strip hashers + eol=lf).
+- Search ranking (OR-union + AND-recall + coverage/phrase boost) proven non-
+  vacuously; dual-engine isolation; cold-open loads all corpora before init.
+
+--------------------------------------------------------------------------------
+PROGRESS LOG
+--------------------------------------------------------------------------------
+2026-06-06  Fleet audit run (16 Opus agents). Plan authored. Execution started
+            at Theme A (P0). 78 findings catalogued (6 HIGH, 1 MED-as-P0).
+2026-06-06  THEME A core landed (commit pending): ERR1 + ERR2 + SW1 + SW2.
+            - translations.js: loadBibleStudies resolves true/false + nulls its
+              cached promise on failure (kills the permanent dead-end) + traces to
+              DiagnosticLog; loadTranslation clears its cache slot on failure +
+              traces (ERR2).
+            - app.jsx: studiesError state + shared loadStudies (boot effect AND
+              retry); +10 lines (canary 725->735, well under 800).
+            - screen-routes.jsx + StudiesHome.jsx: "Try again" affordance; shows
+              "Couldn't load studies." (empty) or "Some studies couldn't load."
+              (partial — Matthew present, 7 studies failed).
+            - service-worker.js: CORPUS_VERSION c8->c9; precache bible-studies.js +
+              cache-on-use route for /src/data/bible-<code>.js (offline); corpusFirst
+              now awaits the cache.put guarded (SW2).
+            - check-corpus-version.js: gate now also fingerprints bible-studies.js +
+              the 7 bible-<code>.js (globbed) so a content edit must bump
+              CORPUS_VERSION (the new cache members can't go stale-forever).
+            VERIFIED: 2044 vitest pass; smoke:ci 0 crashed/0 console.error; lint
+            (max-warnings 0) + typecheck + csp + corpus-lock green; LIVE PREVIEW —
+            forced a studies-load failure: retry affordance + DiagnosticLog trace
+            rendered (vs old silent "coming soon"), then "Try again" recovered all
+            7 studies + Matthew and cleared the error.
+            REMAINING in Theme A: SRCH1 (search cache CORPUS_VERSION), SCR1
+            (translation-bundle allowlist).

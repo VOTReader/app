@@ -15,8 +15,8 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-9f7c474367';
-const CORPUS_VERSION = 'c8'; // c7→c8 (2026-06-04): CORP-2 — fixed the SAME CORP-1 dead-link class in the holy-days.js clone of the "CUP OF THE WRATH" footnote (display label → registryLabel); now caught by the validator's new cross-ref resolution pass. (c6→c7: CORP-1 in volume-seven. c5→c6: PF1 minified the lazy corpus bundles.)
+const CACHE_VERSION = 'v1.0.2-8c69702319';
+const CORPUS_VERSION = 'c9'; // c8→c9 (2026-06-06): SW1 — bible-studies.js + the bible-<code>.js alt-translations now enter the corpus cache (precache studies + cache-on-use translations) so Studies + alt-translations work OFFLINE; their bytes are now covered by tools/check-corpus-version.js. (c7→c8: CORP-2 holy-days dead-link clone. c6→c7: CORP-1 volume-seven. c5→c6: PF1 minified the lazy corpus bundles.)
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
@@ -102,6 +102,12 @@ const CORPUS_PRECACHE = [
   './dist/bundle-a-bible.js',
   './dist/bundle-a-matthew.js',
   './dist/bundle-a-vot.js',
+  // SW1: Bible Studies is raw-injected as src/data/bible-studies.js (not a dist
+  // bundle), so the reader's "works fully offline" promise used to miss it.
+  // Precache it into the stable corpus cache. (The 7 alt-translation
+  // bible-<code>.js are ~32 MB total — too much to precache — so they
+  // cache-on-use via corpusFirst when the user actually opens one.)
+  './src/data/bible-studies.js',
 ];
 
 // ── Install: pre-cache critical shell + full corpus ─────────────
@@ -177,7 +183,12 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   const filename = url.pathname.split('/').pop();
-  if (CORPUS_BUNDLES.has(filename)) {
+  // SW1: the dist corpus bundles AND the raw-injected corpus DATA files
+  // (src/data/bible-studies.js + the bible-<code>.js alt-translations) are served
+  // from the stable corpus cache, so Studies + alt-translations work offline like
+  // the rest of the reader (studies precached on install; translations on use).
+  const isCorpusData = /\/src\/data\/bible-[a-z-]+\.js$/.test(url.pathname);
+  if (CORPUS_BUNDLES.has(filename) || isCorpusData) {
     event.respondWith(corpusFirst(event.request));
     return;
   }
@@ -218,7 +229,11 @@ async function corpusFirst(request) {
     // corpus URL. response.ok already excludes 4xx/5xx.
     if (response.ok && !response.redirected) {
       const cache = await caches.open(CORPUS_CACHE);
-      cache.put(request, response.clone());
+      // SW2: await the put so respondWith keeps the SW alive until the corpus
+      // bytes are committed — a fire-and-forget put can be killed mid-write,
+      // forcing a re-fetch. Guard it so a cache-write failure (e.g. quota) still
+      // serves the response we already hold.
+      try { await cache.put(request, response.clone()); } catch (_e) { /* still serve */ }
     }
     return response;
   } catch (_e) {
