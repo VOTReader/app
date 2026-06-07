@@ -25,6 +25,14 @@ export function loadTranslation(code) {
   // 2–4 lowercase letters; an unknown-but-safe code just 404s → NKJV fallback.
   // Defense-in-depth over script-src 'self' + the same-origin string wrap.
   if (!/^[a-z]{2,8}$/.test(code)) return Promise.resolve();
+  // SCR1: only codes with a shipped bible-<code>.js bundle are loadable. Corpus
+  // nkjv keys carry tags for translations with NO bundle (CJB/GNT/ESV/NLT/NAS/CEB);
+  // those resolve from the per-letter dict directly. If the dict ever misses, skip
+  // the doomed 404 fetch — which would render NKJV text under a foreign (CJB) cite —
+  // and let translateVerse fall back to NKJV cleanly. TRANSLATION_OPTIONS
+  // (index.html) is the single source of truth for shipped translations; guarded
+  // so jsdom tests that never ran index.html behave exactly as before.
+  if (typeof TRANSLATION_OPTIONS !== 'undefined' && !TRANSLATION_OPTIONS.some((o) => o.id === code)) return Promise.resolve();
   const globalName = 'BIBLE_' + code.toUpperCase();
   if (window[globalName]) {_translationLoaded[code] = true;return Promise.resolve();}
   if (_translationPromises[code]) return _translationPromises[code];

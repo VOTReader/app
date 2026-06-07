@@ -74,7 +74,7 @@ P1  high value, low-moderate risk
   PERF5 [LOW]  Link/Bookmark icons re-render on any mutation (Theme B)           OPEN
   NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       OPEN
   SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    OPEN
-  SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      OPEN
+  SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      DONE
   STOR2 [MED]  "Clear All Personal Data" leaves residue under sibling-tab write  OPEN
   SEC1  [LOW]  Runtime-string toasts route to an innerHTML sink                  OPEN
 
@@ -331,3 +331,18 @@ PROGRESS LOG
             7 studies + Matthew and cleared the error.
             REMAINING in Theme A: SRCH1 (search cache CORPUS_VERSION), SCR1
             (translation-bundle allowlist).
+2026-06-06  SCR1 landed (commit pending): translations.js loadTranslation now
+            allowlists `code` against TRANSLATION_OPTIONS (the page's single source
+            of truth for shipped translations) so an unbundled tag (CJB/GNT/ESV/…)
+            skips the doomed 404 + silent-NKJV-under-foreign-cite, jsdom-guarded.
+            GOTCHA noted: app.jsx canary is now 798/800 (the Theme-A studiesError/
+            loadStudies wiring filled it). PowerShell `Measure-Object -Line`
+            UNDERCOUNTS — trust `wc -l` / check-app-size (split('\n').length-1).
+            Any further app.jsx-touching item must EXTRACT first (e.g. fold the
+            studies-load concern into useBibleStudies to reclaim ~13 lines).
+            SRCH1 SCOPED (not a rushed edit): search.js dataSignature keys on
+            SCHEMA_VERSION + structural lengths only, so a same-length reword serves
+            a stale cached index forever. The page has NO CORPUS_VERSION global
+            (it lives only in service-worker.js). Correct fix = expose CORPUS_VERSION
+            to the page (build-injected) + a sync gate (extend check-corpus-version
+            to assert page==SW), then fold it into dataSignature. Designed next.
