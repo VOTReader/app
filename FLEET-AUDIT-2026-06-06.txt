@@ -63,7 +63,7 @@ P0  real correctness, user-facing
   ERR1  [HIGH] Bible-Studies lazy-load failure = permanent silent dead-end       DONE
   SW1   [HIGH] Studies + 7 alt-translations are network-only (broken offline)    DONE
   ERR2  [LOW]  Alt-translation load failure swallowed, no diagnostic trace       DONE
-  NAV1  [HIGH] Android hardware-back consults wrong modal registry (~10 surfaces)OPEN
+  NAV1  [HIGH] Android hardware-back consults wrong modal registry (~10 surfaces)DONE
   STOR1 [HIGH] Cross-tab: deleting last annotation on an anchor resurrects it    DONE
   BAK1  [MED]  Android truncated-import overwrites stores then reports "failed"   OPEN
 
@@ -306,6 +306,19 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  NAV1 landed (commit pending): handleAndroidBack now consults
+            modalRegistry FIRST (dismiss topmost, consume press) — mirroring the
+            web Escape order — so Android hardware-back over a registered surface
+            (NoteSheet, SelectionToolbar, the chip, bookmark/multi-note popovers,
+            NotebookPickerSheet, JournalInboundSheet, ConfirmStrips) dismisses it
+            instead of dismiss-AND-navigate. modalRegistry now IMPORTED (both files
+            are bundle-b) not read as a bare global. BONUS: also fixes the web
+            browser-BACK-button (popstate) path → all three dispatchers unified.
+            +3 tests; 43 back-nav/modal-registry tests pass; lint+typecheck clean.
+            FOLLOW-ON NAV1b (smaller, deferred): the inline Garden-warning /
+            disable-tabs overlays still aren't registered (back navigates under
+            them); the welcome splash is owner-OFF-LIMITS — do not touch.
+
 2026-06-06  Fleet audit run (16 Opus agents). Plan authored. Execution started
             at Theme A (P0). 78 findings catalogued (6 HIGH, 1 MED-as-P0).
 2026-06-06  THEME A core landed (commit pending): ERR1 + ERR2 + SW1 + SW2.

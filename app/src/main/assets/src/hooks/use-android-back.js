@@ -33,6 +33,15 @@
    │ 13. anything else                         → "false" (Android exits)   │
    └───────────────────────────────────────────────────────────────────────┘
 
+   (1a) MODAL REGISTRY (NAV1) — BEFORE step 1, handleAndroidBack consults the
+        modalRegistry (the z-ordered registry of open modals: NoteSheet,
+        SelectionToolbar, the annotation chip, the bookmark/multi-note popovers,
+        NotebookPickerSheet, JournalInboundSheet, ConfirmStrips). If one is open it
+        dismisses the topmost and consumes the press — the SAME inventory the web
+        Escape dispatcher uses, so Android hardware-back can't dismiss-AND-navigate
+        over a registered surface. (__closeSheet sheets are a disjoint, older
+        inventory still handled at step 1; the two never overlap.)
+
    (1b) SCREEN-INTERNAL LEVEL — a screen with its own navigation level (e.g.
         NotesIndexScreen drilled into a notebook) registers a window.__screenBack
         interceptor while that level is active. The router calls it right after
@@ -113,6 +122,7 @@ import {
   disarm as _rootExitDisarm,
   isArmed as _rootExitIsArmed,
 } from '../utils/root-exit-toast.js';
+import { modalRegistry } from './use-modal-registry.js';
 
 /**
  * Wire window.handleAndroidBack — the function Kotlin's MainActivity calls
@@ -162,6 +172,19 @@ export function useAndroidBack({
   // bible-study-chapter so tap-throughs INTO a study unwind correctly.
   React.useEffect(() => {
     window.handleAndroidBack = () => {
+      // NAV1: the modal registry (z-ordered) is the SAME inventory the web Escape
+      // dispatcher dismisses — NoteSheet, SelectionToolbar, the annotation chip,
+      // the bookmark/multi-note popovers, NotebookPickerSheet, JournalInboundSheet,
+      // ConfirmStrips. On Android, hardware-back is the ONLY dispatcher, so it must
+      // consult the registry FIRST too — else a back-press over one of those
+      // surfaces falls through to screen routing and dismisses AND navigates (the
+      // exact bug the registry exists to prevent on web). Dismiss the topmost and
+      // consume the press. (The registry is populated on every platform; only the
+      // Escape *listener* is web-gated.)
+      if (modalRegistry.isAnyOpen()) {
+        const top = modalRegistry.peek();
+        if (top && typeof top.dismiss === 'function') { top.dismiss(); return "true"; }
+      }
       if (window.__closeSheet) {window.__closeSheet();window.__closeSheet = null;return "true";}
       if (tabsOverviewOpenRef.current) {
         setTabsOverviewOpen(false);

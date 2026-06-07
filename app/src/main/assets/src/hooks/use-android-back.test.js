@@ -9,8 +9,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useAndroidBack } from './use-android-back.js';
+import { modalRegistry } from './use-modal-registry.js';
 
 beforeEach(() => {
+  modalRegistry._reset(); // module-level singleton — clear between runs (NAV1)
   /** @type {any} */ (globalThis).LETTER_SCREEN_SET = new Set(['vot-one-letter', 'vot-letter']);
   /** @type {any} */ (globalThis).COL_BY_LETTER_SC = new Map([
     ['vot-one-letter', { indexScreen: 'vot-one-index', volKey: 'one' }],
@@ -149,5 +151,39 @@ describe('useAndroidBack — UX3 index-screen origin + safe fallthrough', () => 
     const res = window.handleAndroidBack();
     expect(res).toBe('true');
     expect(props.goHome).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useAndroidBack — NAV1 modal registry consumes hardware-back', () => {
+  it('an open registered modal is dismissed by Back and does NOT navigate the screen underneath', () => {
+    // bible-ch WOULD route to bible-idx — prove the registered modal wins first.
+    const props = baseProps({ screen: 'bible-ch', bookId: 'genesis' });
+    renderHook(() => useAndroidBack(props));
+    const dismiss = vi.fn();
+    modalRegistry.register({ id: 'note-sheet', dismiss });
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(props.setScreen).not.toHaveBeenCalled();   // did NOT dismiss-AND-navigate
+    expect(props.goHome).not.toHaveBeenCalled();
+  });
+
+  it('with no modal open, Back routes normally (empty registry falls through)', () => {
+    const props = baseProps({ screen: 'bible-ch', bookId: 'genesis' });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.setScreen).toHaveBeenCalledWith('bible-idx');   // normal route
+  });
+
+  it('dismisses the TOPMOST modal when several are registered (z-order)', () => {
+    const props = baseProps({ screen: 'home' });
+    renderHook(() => useAndroidBack(props));
+    const lower = vi.fn(), upper = vi.fn();
+    modalRegistry.register({ id: 'a', dismiss: lower });
+    modalRegistry.register({ id: 'b', dismiss: upper });   // b registered last = topmost
+    window.handleAndroidBack();
+    expect(upper).toHaveBeenCalledTimes(1);
+    expect(lower).not.toHaveBeenCalled();
   });
 });
