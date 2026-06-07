@@ -135,6 +135,13 @@ describe('useTapThrough — goToLetterFromMatthew', () => {
     expect(navHandoff.peek('pendingHighlight')).toBeNull();
   });
 
+  it('NAV2: a STUDY dest with an excerpt does NOT set pendingHighlight (no reader → no stale-pulse leak)', () => {
+    navHandoff.set('pendingHighlight', { stale: true });
+    const { result } = setup({ chapterNum: 7 });
+    act(() => { result.current.goToLetterFromMatthew('study-bundle', 'The Lamb of God', 'find me'); });
+    expect(navHandoff.peek('pendingHighlight')).toBeNull();   // cleared, not left set with the study id
+  });
+
   it('unknown letter → no-op (no setters fire, defensive guard)', () => {
     const { result, props } = setup({ chapterNum: 5 });
     act(() => { result.current.goToLetterFromMatthew('unknown', 'Not A Real Letter'); });
@@ -189,6 +196,13 @@ describe('useTapThrough — openInAppLetter', () => {
     expect(props.setStudyId).toHaveBeenCalledWith('lamb-of-god');
     expect(props.setStudyChapterId).toHaveBeenCalledWith('lamb-1');
     expect(props.setLetterId).not.toHaveBeenCalled();  // NOT the non-study branch
+  });
+
+  it('NAV2: a STUDY dest with an excerpt does NOT set pendingHighlight', () => {
+    navHandoff.set('pendingHighlight', { stale: true });
+    const { result } = setup({ screen: 'vot-letter', letterId: 'src' });
+    act(() => { result.current.openInAppLetter({ collection: 'study-bundle', letterTitle: 'The Lamb of God', excerpt: 'find me' }); });
+    expect(navHandoff.peek('pendingHighlight')).toBeNull();
   });
 
   it('source snapshot uses current props at call time (re-render captures latest)', () => {

@@ -124,7 +124,11 @@ export function useTapThrough({
       sourceLetterTitle: `Matthew ${chapterNum}`,
       sourceVolumeLabel: null,
     });
-    if (excerpt) {
+    // NAV2: only a LetterView / WtlbEntryView destination consumes pendingHighlight.
+    // A study chapter (bible-study-chapter) has no reader, so setting the slot there
+    // would leave it to LINGER — a later letter with a colliding id would then pulse
+    // a stale highlight. Clear it for non-consumable destinations instead.
+    if (excerpt && !dest.isStudy) {
       window.navHandoff.set('pendingHighlight', { excerpt: excerpt, letterId: dest.id });
     } else {
       window.navHandoff.clear('pendingHighlight');
@@ -173,7 +177,9 @@ export function useTapThrough({
       sourceVolumeLabel: meta && meta.sourceVolumeLabel ? meta.sourceVolumeLabel : null,
       destSnapshot: destSnapshot,
     });
-    if (target.excerpt) {
+    // NAV2: see goToLetterFromMatthew — only a letter/wtlb destination consumes
+    // pendingHighlight; a study chapter would leave the slot lingering (stale pulse).
+    if (target.excerpt && !dest.isStudy) {
       window.navHandoff.set('pendingHighlight', { excerpt: target.excerpt, letterId: dest.id });
     } else {
       window.navHandoff.clear('pendingHighlight');

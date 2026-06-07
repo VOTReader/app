@@ -38,13 +38,11 @@ GOTCHAS (load-bearing — learned the hard way this session):
  6. NTV1 (Kotlin audio-mode restore) + BLD2 (deploy-gated-on-CI) CANNOT be runtime-
     verified from this environment — do them where you can watch the emulator/Actions.
 
-NEXT (my recommendation). CORP2 is now DONE (validateTranslationCompleteness vs
-KJV, presence-only, no allow-list needed). Remaining real fixes: NAV2 (narrow
-stale-highlight leak via the pendingHighlight navHandoff slot — LetterView.jsx:30
-peeks + conditionally clears), APP2 (scroll useLayoutEffect — render-path, mind the
-existing rAF in use-scroll-memory Effect 3), SRCH2 (search.js stop-word skip),
+NEXT (my recommendation). CORP2 + NAV2 are now DONE. Remaining real fixes: APP2
+(scroll useLayoutEffect — render-path, mind the existing rAF in use-scroll-memory
+Effect 3), SRCH2 (search.js stop-word skip — short-circuit an all-stopword query),
 TEST2 (React 18.2-runtime vs 19-test skew — mostly documentation). Then the P3
-tail. NTV1 + BLD2 want a device/CI pass.
+tail (SRCH3-6, JRNL1-3, NTV2-4, etc.). NTV1 + BLD2 want a device/CI pass.
 
 --------------------------------------------------------------------------------
 HANDOFF (READ FIRST)
@@ -128,7 +126,7 @@ P2  gates + correctness tail
   CORP2 [MED]  Alt-translation Bibles get no completeness cross-check            DONE
   ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                DONE
   ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             DONE
-  NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) OPEN
+  NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) DONE
   NAV3  [MED]  __goSearch bridge effect: no deps, unconditional null on cleanup  ADJUD
   APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     OPEN
   PERF3 [MED]  Reading screens re-render full verse list on every scroll-flush   OPEN
@@ -349,6 +347,13 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  NAV2 landed (commit pending): only LetterView + WtlbEntryView consume
+            the navHandoff 'pendingHighlight' slot (grep-verified), but the two set
+            sites (goToLetterFromMatthew, openInAppLetter) set it for EVERY dest
+            incl. a study chapter (no reader) — so it lingered until the next
+            goHome/back, and a later letter with a colliding id would pulse a stale
+            highlight. Gated the set on !dest.isStudy (study dest clears instead).
+            +2 tests; 15 tap-through tests green.
 2026-06-07  CORP2 landed (commit pending): new validateTranslationCompleteness(map,
             BIBLE_KJV) — presence-only — runs on each of the 7 alt-translations in
             the Format E section and ERRORs on a book/chapter the KJV reference has
