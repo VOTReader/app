@@ -640,11 +640,13 @@ export async function applyV3(manifest, entries, ctx) {
   // rather than wiped (BACKUP-STREAMING-PLAN verification bar). No base64, no
   // aggregate cap — streaming is bounded per-blob (GB-scale safe).
   let importFailures = 0;
-  /** @type {Record<string, boolean>} */
-  const streamedIds = {};
+  // BAK6: a Set (not a plain object) — a media id of "__proto__"/"constructor"
+  // would make object-key bookkeeping (streamedIds[id]) silently lie.
+  /** @type {Set<string>} */
+  const streamedIds = new Set();
   for await (const entry of entries) {
     const m = entry.meta || {};
-    streamedIds[entry.id] = true;  // intended import — recorded even if the put fails
+    streamedIds.add(entry.id);  // intended import — recorded even if the put fails
     try {
       await mediaStore.put({
         id: entry.id, type: m.type, blob: entry.blob,
@@ -660,7 +662,7 @@ export async function applyV3(manifest, entries, ctx) {
   // it is NOT pruned (its existing copy is preserved; the failure is in importFailures).
   try {
     const existingIds = await mediaStore.allIds();
-    for (const id of existingIds) { if (!streamedIds[id]) await mediaStore.delete(id); }
+    for (const id of existingIds) { if (!streamedIds.has(id)) await mediaStore.delete(id); }
   } catch (e) { console.warn('prune stale media failed', e); }
 
   // (3) Apply stores + flags — only AFTER media fully landed, so a media truncation

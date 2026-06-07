@@ -133,6 +133,7 @@ function _cloneSnapshot(v) {
  *   _save(): void,
  *   _saveMerged(): void,
  *   _crossTabMerge: ((base: T | null, ours: T | null, theirs: T | null) => T) | null,
+ *   _warnedNoLocks: boolean,
  *   _base: T | null,
  *   _lastWrite: Promise<any> | null,
  *   raw(): T,
@@ -280,6 +281,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _migrations: migrations,
     _schemaMetaKey: schemaMetaKey,
     _crossTabMerge: crossTabMerge,
+    _warnedNoLocks: false,   // STOR5: one-shot guard for the locks-unavailable trace
     /** STORE-1: the IDB snapshot this tab last synced with — the common
      *  ancestor for the 3-way cross-tab merge (set at hydrate + after each
      *  merge-flush, via _cloneSnapshot). Null until first hydrate, and forever
@@ -344,7 +346,17 @@ export function CachedStore(storageKey, defaultVal, opts) {
     _save() {
       if (this._replaying || this._applyingPending) return;
       if (useIdb) {
-        if (this._crossTabMerge && _locksAvailable()) { this._saveMerged(); return; }
+        if (this._crossTabMerge) {
+          if (_locksAvailable()) { this._saveMerged(); return; }
+          // STOR5: navigator.locks missing → this merge store silently degrades to
+          // the pre-STORE-1 blind blob write (a 2nd tab can clobber). Native on the
+          // chrome108 floor, so unreachable today; trace it ONCE per store if a
+          // sub-floor host ever hits it, instead of degrading with no record.
+          if (!this._warnedNoLocks) {
+            this._warnedNoLocks = true;
+            try { if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', 'navigator.locks unavailable — cross-tab merge off (blind blob write)'); } catch (_e) { /* logging must never break a save */ }
+          }
+        }
         const cacheToWrite = this._cache;
         if (cacheToWrite !== null) {
           // U1: keep the raw put promise so whenSaved() can await durability

@@ -76,7 +76,7 @@ P1  high value, low-moderate risk
   SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    DONE
   SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      DONE
   STOR2 [MED]  "Clear All Personal Data" leaves residue under sibling-tab write  OPEN
-  SEC1  [LOW]  Runtime-string toasts route to an innerHTML sink                  OPEN
+  SEC1  [LOW]  Runtime-string toasts route to an innerHTML sink                  DONE
 
 P2  gates + correctness tail
   BLD1  [MED]  No gate proves minify preserves corpus VALUES                     OPEN
@@ -107,11 +107,11 @@ P3  small wins / hardening / adjudicate
   SRCH6 [INFO] Dead code: STOP_WORDS, 'chapter-title'/'heading' kinds, phoneticKey OPEN
   STOR3 [INFO] _base refreshed only in _saveMerged (benign today; future trap)   OPEN
   STOR4 [LOW] _saveMerged structuredClone of largest store on every save         OPEN
-  STOR5 [LOW] Lock-unavailable merge fallback is silent (no diagnostic)          OPEN
+  STOR5 [LOW] Lock-unavailable merge fallback is silent (no diagnostic)          DONE
   BAK3 [LOW] `counts` integrity block written but never verified on import       OPEN
   BAK4 [LOW] Legacy import cap asymmetric: 50 MB Android vs 300 MB web           OPEN
   BAK5 [LOW] Web FS-Access export leaves partial file on mid-stream write fail   OPEN
-  BAK6 [INFO] streamedIds plain-object key-set unreliable for id "__proto__"     OPEN
+  BAK6 [INFO] streamedIds plain-object key-set unreliable for id "__proto__"     DONE
   JRNL1 [LOW] Rapid double media-insert relies on debounce for the 2nd block     OPEN
   JRNL2 [LOW] Recording save() in error stage arms a no-op pendingSaveRef        OPEN
   JRNL3 [LOW] recordDeletion can drift totalEntries vs real count (cosmetic)     OPEN
@@ -306,6 +306,16 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  Hardening batch (commit pending): SEC1 + STOR5 + BAK6.
+            - SEC1: SettingsScreen._showToast → showToast({text}) (textContent),
+              not {html} (innerHTML); its ~30 callers pass runtime status strings,
+              never trusted markup — closes the latent stored-XSS shape. No visible
+              change (plain text renders identically).
+            - STOR5: locks-unavailable merge fallback now traces once/store via
+              DiagnosticLog (was silent). Unreachable on chrome108; sub-floor only.
+            - BAK6: applyV3 streamedIds is now a Set, not a plain object (a media id
+              of "__proto__"/"constructor" would make streamedIds[id] lie).
+            145 backup+cached-store+cross-tab+toast tests pass; lint+typecheck clean.
 2026-06-07  PERF2 landed (commit pending): JournalMediaStore._urlCache (id->blob:URL)
             was unbounded — only delete() freed an entry, so browsing years of
             photos/voice-memos pinned hundreds of MB of decoded blobs. Converted to

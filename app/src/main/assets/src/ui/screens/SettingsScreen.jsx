@@ -441,8 +441,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // per [[consolidate-dont-duplicate]] via the showToast utility.
 
   const _TOAST_ID = 'vot-toast-info';
-  const _showToast = (html, durationMs) => showToast({
-    id: _TOAST_ID, className: 'vot-toast', html: html, durationMs: durationMs == null ? 3500 : durationMs,
+  // SEC1: route through textContent (opts.text), NOT innerHTML. Every caller here
+  // passes a runtime-built status string (e.g. 'Import failed: ' + err.message,
+  // 'could not read: ' + built.problems.join(', ')). None is trusted static markup,
+  // so the innerHTML path was a latent stored-XSS shape (harmless today, but the
+  // day a filename / journal title / file fragment is appended it becomes live).
+  const _showToast = (msg, durationMs) => showToast({
+    id: _TOAST_ID, className: 'vot-toast', text: msg, durationMs: durationMs == null ? 3500 : durationMs,
   });
 
   // The base64 codecs + the export-payload build + the import-apply data
