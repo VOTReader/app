@@ -142,7 +142,7 @@ P3  small wins / hardening / adjudicate
   ANN3 [LOW] applyDOMHighlights O(n^2) offset re-walk per sub-range (adjudicate) OPEN
   ANN4 [LOW] applyNoteIcons fragments text nodes (no normalize on icon path)     OPEN
   ANN5 [LOW] No test for elementsFromPoint tap-routing winner                    OPEN
-  SRCH3 [LOW] Two volume-ID registries hand-synced, no equality assertion test   OPEN
+  SRCH3 [LOW] Two volume-ID registries hand-synced, no equality assertion test   DONE
   SRCH4 [LOW] Snippet ignores synonym/cross-translation matches (no highlight)   OPEN
   SRCH5 [LOW] Engine search() has no min-length floor (only UI gates)            OPEN
   SRCH6 [INFO] Dead code: STOP_WORDS, 'chapter-title'/'heading' kinds, phoneticKey OPEN
@@ -347,6 +347,12 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  SRCH3 landed (commit pending, test-only): the engine stamps doc.volumeId
+            from VotSearchData.VOLUME_COLLECTIONS[].id; use-search routes via
+            COL_BY_SEARCH_ID (scripture-resolution) — two hand-kept registries.
+            Added a cross-registry assertion (every VOLUME_COLLECTIONS id resolves
+            in COL_BY_SEARCH_ID) so a future drift fails the gate instead of
+            dead-ending a collection's results on tap. 43 search-engine tests green.
 2026-06-07  SRCH2 landed (commit pending): executeSearch kept stop-words for any
             <=4-word query, so a pure-grammar-glue query ("the", "of the") matched
             ~every verse + built/sorted tens of thousands of hits (heaviest path)
