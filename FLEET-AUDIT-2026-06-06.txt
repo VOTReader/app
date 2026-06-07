@@ -6,10 +6,22 @@ VOTReader — 16-agent Opus code audit + remediation tracker
 --------------------------------------------------------------------------------
 SESSION HANDOFF — 2026-06-07 (next agent: START HERE)
 --------------------------------------------------------------------------------
-STATE. The audit is done + remediated in 16 commits (all pushed to main). 18
-findings DONE + 3 ADJUDICATED; EVERY P0 closed. 56 lower-priority items still OPEN
-— see SECTION 1 (index) + SECTION 3 (per-item detail). The PROGRESS LOG (bottom)
-is the commit-by-commit record.
+STATE. The audit is done + remediated in 24 commits (all pushed to main). 25
+findings DONE + 3 ADJUDICATED; EVERY P0 + P1 + P2 closed, plus the valuable P3
+(SRCH2/SRCH3, BAK4, NAV4). ~49 LOWER-priority items still OPEN — see SECTION 1
+(index) + SECTION 3 (per-item detail). The PROGRESS LOG (bottom) is the commit-by-
+commit record. The remaining tail is genuinely lower-value/risky/supervised:
+  - PERF1 [HIGH-value, HIGH-risk]: defer ~506 KB (books-restored.js + matthew-
+    plain.js) off the cold-boot bundle-a into lazy loaders. Best perf trade, but it
+    touches build.py + index.html + the consumers (BibleChapterView/ChapterIndex/
+    SettingsScreen/tabs.js, all typeof-guarded) + SW precache + a CORPUS_VERSION
+    bump — and wants a real device COLD-BOOT check. A focused session, not a tail.
+  - NTV1-4 (Kotlin) + BLD2 (deploy-on-CI): need a device/Actions run to verify.
+  - BLD1 (minify-value gate), PERF3/PERF4 (render-path), TEST2-5: medium/test work.
+  - The rest are LOW/INFO — several are ADJUDICATE candidates (SRCH6 dead-code on the
+    critical path = net-negative; ERR3 needs app.jsx room [798/800]; CORP5 redundant
+    with the prev/next chain; SCR2/SCR3 latent-only; NAV6/NTV5/NTV6/APP4/etc benign).
+    Don't grind these per-item; batch the genuinely-useful few, drop/adjudicate rest.
 
 GOTCHAS (load-bearing — learned the hard way this session):
  1. AUDIT FINDINGS CAN BE WRONG. Re-derive every finding against CURRENT source
