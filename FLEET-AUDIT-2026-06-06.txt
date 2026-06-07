@@ -73,7 +73,7 @@ P1  high value, low-moderate risk
   APP1  [MED]  NoteStore global-bump re-renders whole page (Theme B)             OPEN
   PERF5 [LOW]  Link/Bookmark icons re-render on any mutation (Theme B)           OPEN
   NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       OPEN
-  SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    OPEN
+  SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    DONE
   SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      DONE
   STOR2 [MED]  "Clear All Personal Data" leaves residue under sibling-tab write  OPEN
   SEC1  [LOW]  Runtime-string toasts route to an innerHTML sink                  OPEN
@@ -306,6 +306,14 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  SRCH1 landed (commit pending) — THEME A now fully CLOSED. search.js
+            gains CORPUS_CONTENT_VERSION ('c9'), folded into dataSignature so a
+            content-only corpus edit (same-length reword) busts the search cache
+            (was purely structural — lengths/counts). check-corpus-version.js fails
+            closed if CORPUS_CONTENT_VERSION != CORPUS_VERSION, so the corpus-edit
+            → CORPUS_VERSION bump also rebuilds the index and they can't diverge.
+            108 search tests + corpus gate + build + smoke:ci (0 console errors,
+            critical-path bundle-a) all green.
 2026-06-07  BAK1 landed (commit pending): applyV3 now streams media BEFORE applying
             stores. The media stream is the only step that can throw on a truncated
             Android container (frames read off the file; the `for await` itself

@@ -39,6 +39,16 @@ var buildError = null;
 // Bump SCHEMA_VERSION when doc shape changes OR tokenizer config changes;
 // cache is invalidated automatically because the signature includes this.
 var SCHEMA_VERSION = 14;                    // bumped 2026-06-04 (SRCH-1/SRCH-4) — stop indexing the 'ref' field (it carried the collection LABEL on every volume doc, so a common query word + the 2.5x ref boost buried the actual verse); + NFD diacritic folding in kjvEncode. Forces cached indexes to rebuild without 'ref'. (Prior: 13 = U22 dropped section headings / inline topic breaks / chapter titles + the 'heading' field.)
+// SRCH1: corpus CONTENT version — distinct from SCHEMA_VERSION (doc shape /
+// tokenizer config). dataSignature is otherwise STRUCTURAL (array lengths +
+// verse/book counts), so a content-preserving edit — a reworded or typo-fixed
+// verse of the SAME length — keeps the signature identical and serves a STALE
+// cached index forever. Folding this in busts the search cache on any corpus edit,
+// the same way CORPUS_VERSION busts the SW corpus cache. MUST equal
+// service-worker.js CORPUS_VERSION; tools/check-corpus-version.js fails the build
+// if they diverge, so a corpus edit (which forces a CORPUS_VERSION bump) can't
+// silently leave the search index stale.
+var CORPUS_CONTENT_VERSION = 'c9';
 var ALT_TRANSLATIONS = ['kjv', 'asv', 'web', 'bsb', 'hnv', 'lsv', 'ylt'];
 
 // ─── Archaic/modern pronoun normalization (bidirectional) ───
@@ -151,6 +161,7 @@ function dataSignature(code, corpus) {
   // Non-bible content signature (identical across translations)
   var parts = [
     'sv' + SCHEMA_VERSION,
+    'cv:' + CORPUS_CONTENT_VERSION,   // SRCH1 — busts the cache on a content-only corpus edit
     'cp:' + corpus,
     'tr:' + code,
     'mt' + (typeof MATTHEW !== 'undefined' && MATTHEW.chapters ? MATTHEW.chapters.length : 0),
