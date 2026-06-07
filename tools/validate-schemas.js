@@ -150,6 +150,7 @@ export function validateFormatA(letters, opts = {}) {
     return { errors, warnings };
   }
 
+  const seenIds = new Set();   // CORP1 — catch duplicate slug ids (the likeliest regression)
   for (let i = 0; i < letters.length; i++) {
     const letter = letters[i];
     if (!letter || typeof letter !== 'object' || Array.isArray(letter)) {
@@ -163,6 +164,10 @@ export function validateFormatA(letters, opts = {}) {
     // ── required top-level fields ───────────────────────────────
     if (typeof id !== 'string' || id.length === 0) {
       errors.push(`${prefix}: missing or empty "id" (string)`);
+    } else if (seenIds.has(id)) {
+      errors.push(`${prefix}: CORP1 — duplicate "id" "${id}" (already used by an earlier entry; a slug collision misroutes nav / bookmarks / notes)`);
+    } else {
+      seenIds.add(id);
     }
     if (typeof letter.title !== 'string' || letter.title.length === 0) {
       errors.push(`${prefix}: missing or empty "title" (string)`);
@@ -481,11 +486,16 @@ export function validateFormatB(entries, opts = {}) {
     return { errors, warnings };
   }
 
+  const seenIds = new Set();   // CORP1 — catch duplicate slug ids
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
       errors.push(`${fileName}: entry[${i}] is not a plain object`);
       continue;
+    }
+    if (typeof entry.id === 'string' && entry.id.length > 0) {
+      if (seenIds.has(entry.id)) errors.push(`${fileName}: ${ctxItem('entry', i, entry.id)}: CORP1 — duplicate "id" "${entry.id}" (already used by an earlier entry)`);
+      else seenIds.add(entry.id);
     }
     validateFormatBEntry(entry, `${fileName}: ${ctxItem('entry', i, entry.id)}`, errors, warnings, scriptures);
   }
@@ -771,6 +781,7 @@ export function validateFormatD(studies, opts = {}) {
     return { errors, warnings };
   }
 
+  const seenIds = new Set();   // CORP1 — catch duplicate slug ids
   for (let i = 0; i < studies.length; i++) {
     const study = studies[i];
     const prefix = `${fileName}: ${ctxItem('study', i, study && study.id)}`;
@@ -780,6 +791,10 @@ export function validateFormatD(studies, opts = {}) {
     }
     if (typeof study.id !== 'string' || study.id.length === 0) {
       errors.push(`${prefix}: missing or empty "id" (string)`);
+    } else if (seenIds.has(study.id)) {
+      errors.push(`${prefix}: CORP1 — duplicate "id" "${study.id}" (already used by an earlier study)`);
+    } else {
+      seenIds.add(study.id);
     }
     if (typeof study.title !== 'string' || study.title.length === 0) {
       errors.push(`${prefix}: missing or empty "title" (string)`);

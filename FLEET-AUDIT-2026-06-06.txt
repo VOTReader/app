@@ -81,7 +81,7 @@ P1  high value, low-moderate risk
 P2  gates + correctness tail
   BLD1  [MED]  No gate proves minify preserves corpus VALUES                     OPEN
   BLD2  [MED]  Web deploy publishes independently of CI (thin gate subset)       OPEN
-  CORP1 [MED]  Schema validator does not detect duplicate id slugs              OPEN
+  CORP1 [MED]  Schema validator does not detect duplicate id slugs              DONE
   CORP2 [MED]  Alt-translation Bibles get no completeness cross-check            OPEN
   ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                OPEN
   ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             OPEN
@@ -306,6 +306,11 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  CORP1 landed (commit pending): validate-schemas Format A/B/D validators
+            now track a per-file Set of seen ids and ERROR on a duplicate slug (the
+            likeliest corpus regression — copy-paste a letter, forget the id; it
+            misroutes nav/bookmarks/notes). Live corpus still 1589 items / 0 errors.
+            +4 tests (A/B/D dup + a distinct-ids control); gated in pre-commit + CI.
 2026-06-07  TEST1 landed (commit pending): +tabs.test.js (21) + highlight.test.jsx
             covering the previously-0%-covered load-bearing pure utils —
             tabContentKey/scrollKeyForTab (tab dedup + scroll-memory keys),

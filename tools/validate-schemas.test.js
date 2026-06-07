@@ -1431,3 +1431,23 @@ describe('validateFootnoteMarkers', () => {
     expect(r.errors).toEqual([]);
   });
 });
+
+// ── CORP1 — duplicate id slug detection (the likeliest corpus regression) ──
+describe('CORP1 — duplicate id detection', () => {
+  it('Format A: flags a duplicate letter id slug', () => {
+    const r = validateFormatA([validLetter({ id: 'dup' }), validLetter({ id: 'dup' })]);
+    expect(r.errors.some((e) => /duplicate "id" "dup"/.test(e))).toBe(true);
+  });
+  it('Format A: distinct ids produce no duplicate error', () => {
+    const r = validateFormatA([validLetter({ id: 'a' }), validLetter({ id: 'b' })]);
+    expect(r.errors).toEqual([]);
+  });
+  it('Format B: flags a duplicate entry id slug', () => {
+    const r = validateFormatB([{ id: 'dup', title: 'A', paragraphs: [] }, { id: 'dup', title: 'B', paragraphs: [] }]);
+    expect(r.errors.some((e) => /duplicate "id" "dup"/.test(e))).toBe(true);
+  });
+  it('Format D: flags a duplicate study id slug', () => {
+    const r = validateFormatD([{ id: 'dup', title: 'A', parts: [] }, { id: 'dup', title: 'B', parts: [] }]);
+    expect(r.errors.some((e) => /duplicate "id" "dup"/.test(e))).toBe(true);
+  });
+});
