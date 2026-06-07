@@ -24,6 +24,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "validate:data": "node tools/validate-schemas.js --strict",
+    "check:footnotes": "node tools/audit-footnotes.js --check",
     "check:app-size": "node tools/check-app-size.js",
     "check:corpus": "node tools/check-corpus-version.js"
   },
