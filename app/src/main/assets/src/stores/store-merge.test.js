@@ -206,6 +206,28 @@ describe('pre-built per-store strategies', () => {
     expect(Object.keys(out).sort()).toEqual(['bible:gen:1:1', 'bible:gen:1:2']);
   });
 
+  it('STOR1: deleting our last segment is NOT resurrected by a sibling edit to the same hlKey', () => {
+    // Tab A holds s1 under K (base). A sibling adds s2 → committed K:[s1,s2]. Tab A
+    // then removes s1, emptying the bucket, so AnnotationStore deletes the key (K
+    // absent from ours). The merge must honor our member-delete of s1 while keeping
+    // the sibling's s2 — NOT resurrect the whole [s1,s2] bucket.
+    const seg = (id, updated) => ({ id, groupId: id, kind: 'highlight', updated, created: updated });
+    const base = { 'bible:gen:1:1': [seg('s1', 1)] };
+    const ours = {};                                                   // we deleted s1 → bucket gone
+    const theirs = { 'bible:gen:1:1': [seg('s1', 1), seg('s2', 2)] };  // sibling added s2
+    const out = mergeAnnotationsStore(base, ours, theirs);
+    expect(ids(out['bible:gen:1:1'] || [])).toEqual(['s2']);          // s1 stays deleted, s2 survives
+  });
+
+  it('STOR1: a whole-bucket delete is honored when the sibling did not touch it (no empty key)', () => {
+    const seg = (id, updated) => ({ id, groupId: id, kind: 'highlight', updated, created: updated });
+    const base = { 'bible:gen:1:1': [seg('s1', 1)] };
+    const ours = {};                                          // we deleted the only segment
+    const theirs = { 'bible:gen:1:1': [seg('s1', 1)] };       // sibling unchanged
+    const out = mergeAnnotationsStore(base, ours, theirs);
+    expect(out['bible:gen:1:1']).toBeUndefined();             // honored delete, no empty bucket left behind
+  });
+
   it('mergeJournalIndexStore unions entry-id lists per refKey', () => {
     const base = { 'verse:gen:1:1': ['e0'] };
     const ours = { 'verse:gen:1:1': ['e0', 'eY'] };   // our entry references it

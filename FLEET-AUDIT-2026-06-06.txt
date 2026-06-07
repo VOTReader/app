@@ -64,7 +64,7 @@ P0  real correctness, user-facing
   SW1   [HIGH] Studies + 7 alt-translations are network-only (broken offline)    DONE
   ERR2  [LOW]  Alt-translation load failure swallowed, no diagnostic trace       DONE
   NAV1  [HIGH] Android hardware-back consults wrong modal registry (~10 surfaces)OPEN
-  STOR1 [HIGH] Cross-tab: deleting last annotation on an anchor resurrects it    OPEN
+  STOR1 [HIGH] Cross-tab: deleting last annotation on an anchor resurrects it    DONE
   BAK1  [MED]  Android truncated-import overwrites stores then reports "failed"   OPEN
 
 P1  high value, low-moderate risk
@@ -340,7 +340,16 @@ PROGRESS LOG
             UNDERCOUNTS — trust `wc -l` / check-app-size (split('\n').length-1).
             Any further app.jsx-touching item must EXTRACT first (e.g. fold the
             studies-load concern into useBibleStudies to reclaim ~13 lines).
-            SRCH1 SCOPED (not a rushed edit): search.js dataSignature keys on
+2026-06-06  STOR1 landed (commit pending): mergeMapByKey gains a `subMerge` mode
+            (used only by mergeAnnotationsStore) that merges annotation buckets
+            member-wise over the UNION of keys with absent sides coerced to empty —
+            so emptying a bucket (deleting the last segment → key removed) honors
+            the member-delete instead of resurrecting the whole sibling bucket.
+            Empty buckets pruned. Flat (notes) + union (journal-index) maps keep
+            key-presence semantics. Localized to store-merge.js (no annotation-store
+            change). +2 tests (resurrection repro was RED pre-fix); 136 store tests
+            green; lint + typecheck clean.
+            ── SRCH1 SCOPED (not a rushed edit): search.js dataSignature keys on
             SCHEMA_VERSION + structural lengths only, so a same-length reword serves
             a stale cached index forever. The page has NO CORPUS_VERSION global
             (it lives only in service-worker.js). Correct fix = expose CORPUS_VERSION

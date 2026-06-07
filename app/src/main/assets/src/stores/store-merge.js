@@ -156,16 +156,36 @@ export function mergeRecordsById(base, ours, theirs) {
  * (annotations — pass a bucket value-merge), and id-list maps (journal-index —
  * pass a union value-merge).
  *
+ * subMerge (STOR1): when the value is itself a mergeable SUB-COLLECTION (the
+ * annotation segment buckets), a key present on only one side is NOT a
+ * whole-bucket delete-vs-edit — it means "every member on the absent side is
+ * gone". In that mode we run `valueMerge` over the UNION of keys with each
+ * absent side coerced to undefined (→ the value-merge reads it as empty), so a
+ * member the local tab deleted is honored even when a sibling concurrently
+ * edited the same bucket — instead of resurrecting the whole bucket (and our
+ * just-deleted segment with it). A bucket that merges to empty is pruned. Flat
+ * scalar maps (notes) and union maps (journal-index) keep the default
+ * key-presence semantics, where delete-vs-edit deliberately resurrects.
+ *
  * @param {any} base
  * @param {any} ours
  * @param {any} theirs
  * @param {(baseVal: any, ourVal: any, theirVal: any) => any} [valueMerge]
+ * @param {boolean} [subMerge] treat values as mergeable sub-collections (see above)
  * @returns {Record<string, any>}
  */
-export function mergeMapByKey(base, ours, theirs, valueMerge) {
+export function mergeMapByKey(base, ours, theirs, valueMerge, subMerge) {
   const B = _obj(base), O = _obj(ours), T = _obj(theirs);
   const merge = valueMerge || _defaultValueMerge;
   /** @type {Record<string, any>} */ const out = {};
+  if (subMerge) {
+    for (const k of new Set([...Object.keys(B), ...Object.keys(O), ...Object.keys(T)])) {
+      const merged = merge((k in B) ? B[k] : undefined, (k in O) ? O[k] : undefined, (k in T) ? T[k] : undefined);
+      const empty = merged == null || (Array.isArray(merged) ? merged.length === 0 : Object.keys(merged).length === 0);
+      if (!empty) out[k] = merged;
+    }
+    return out;
+  }
   for (const k of Object.keys(O)) {
     if (k in T) out[k] = merge((k in B) ? B[k] : undefined, O[k], T[k]);   // both → resolve
     else if ((k in B) && !_changed(B[k], O[k])) { /* their delete, unedited → drop */ }
@@ -220,9 +240,12 @@ export function mergeMapStore(base, ours, theirs) {
   return mergeMapByKey(base, ours, theirs);
 }
 
-/** Annotations: `{ hlKey: Annotation[] }` — merge buckets by segment id. */
+/** Annotations: `{ hlKey: Annotation[] }` — merge buckets by segment id.
+    subMerge=true (STOR1): a bucket the local tab emptied (deleting its last
+    segment → the hlKey is removed) merges member-wise against base instead of
+    being resurrected whole by a sibling's concurrent edit to the same hlKey. */
 export function mergeAnnotationsStore(base, ours, theirs) {
-  return mergeMapByKey(base, ours, theirs, function (b, o, t) { return mergeRecordsById(b, o, t); });
+  return mergeMapByKey(base, ours, theirs, function (b, o, t) { return mergeRecordsById(b, o, t); }, true);
 }
 
 /** Journal index: `{ refKey: entryId[] }` — union the id lists per key. */
