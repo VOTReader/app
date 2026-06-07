@@ -15,6 +15,15 @@ export function useSwipeNav(onNext, onPrev) {
   return {
     onTouchStart(e) {
       if (e.touches.length !== 1) { touch.current.x = NaN; return; }
+      // NAV4: ignore a swipe that BEGINS on a tappable element — a drag started on a
+      // link, footnote/scripture ref, or an annotation icon is interaction, not a
+      // page swipe; flipping the chapter/letter under it is jarring. (Plain text and
+      // plain highlights still swipe; a NaN start makes onTouchEnd bail.)
+      const t = e.target;
+      if (t && t.closest && t.closest('a, button, input, textarea, select, .fn-ref, .inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon')) {
+        touch.current.x = NaN;
+        return;
+      }
       touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     },
     onTouchEnd(e) {

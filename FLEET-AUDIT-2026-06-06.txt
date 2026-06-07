@@ -157,7 +157,7 @@ P3  small wins / hardening / adjudicate
   JRNL2 [LOW] Recording save() in error stage arms a no-op pendingSaveRef        OPEN
   JRNL3 [LOW] recordDeletion can drift totalEntries vs real count (cosmetic)     OPEN
   JRNL4 [INFO] Single-slot draft key safe only via ts>=updated guard (document)  OPEN
-  NAV4 [LOW] Swipe-nav fires on any horizontal touch (no target/intent filter)   OPEN
+  NAV4 [LOW] Swipe-nav fires on any horizontal touch (no target/intent filter)   DONE
   NAV5 [LOW] Browser-back after tab switch backs the screen, not the tab         OPEN
   NAV6 [INFO] Synchronous double-back reads stale refs (unreachable normally)    OPEN
   SCR2 [LOW] Fallback mis-resolves comma-list / multi-book refs (dict masks it)  OPEN
@@ -347,6 +347,13 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  NAV4 landed (commit pending): useSwipeNav fired prev/next on any
+            horizontal drag (only an active selection suppressed it), so a drag
+            begun on a link / footnote-ref / annotation icon flipped the chapter
+            underneath. onTouchStart now ignores the gesture when e.target.closest
+            finds a tappable ancestor (a/button/input/.fn-ref/.inline-scrip-ref/the
+            verse-link/bookmark/note icons); plain text + highlights still swipe.
+            +2 hook tests; 8 swipe-nav tests green.
 2026-06-07  BAK4 landed (commit pending): the v3-aware web import capped a legacy
             (v1/v2 JSON) whole-file .text() read at 300 MB while Android caps at 50
             MB (MAX_IMPORT_SIZE) and the older web path at WEB_MAX_IMPORT_BYTES (50
