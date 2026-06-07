@@ -257,3 +257,31 @@ describe('NoteStore — all() / list() invariants', () => {
     expect(NoteStore.list().length).toBe(2);
   });
 });
+
+describe('NoteStore — APP1 keyed reactivity', () => {
+  it("set/remove bump only the note's anchor keys (other verses stay isolated)", () => {
+    const K1 = 'bible:genesis:1:1', K2 = 'bible:genesis:1:2';
+    const k1a = NoteStore.getVersionForKey(K1);
+    const k2a = NoteStore.getVersionForKey(K2);
+    NoteStore.set('g_1', { body: 'x', keys: [K1] });
+    expect(NoteStore.getVersionForKey(K1)).not.toBe(k1a);   // K1's verse re-renders
+    expect(NoteStore.getVersionForKey(K2)).toBe(k2a);       // K2's verse does NOT
+    const k1b = NoteStore.getVersionForKey(K1);
+    NoteStore.remove('g_1');
+    expect(NoteStore.getVersionForKey(K1)).not.toBe(k1b);   // removal re-renders K1
+    expect(NoteStore.getVersionForKey(K2)).toBe(k2a);       // still isolated
+  });
+
+  it('still bumps the global version so the imperative DOM note pass wakes', () => {
+    const g0 = NoteStore.getVersion();
+    NoteStore.set('g_2', { body: 'y', keys: ['bible:genesis:2:1'] });
+    expect(NoteStore.getVersion()).not.toBe(g0);
+  });
+
+  it('a note with no keys falls back to a global bump (every verse re-checks)', () => {
+    const K = 'bible:genesis:3:1';
+    const ka = NoteStore.getVersionForKey(K);
+    NoteStore.set('g_3', { body: 'z' });   // no keys → global bump reaches every key
+    expect(NoteStore.getVersionForKey(K)).not.toBe(ka);
+  });
+});

@@ -70,8 +70,8 @@ P0  real correctness, user-facing
 P1  high value, low-moderate risk
   PERF1 [HIGH] ~506 KB deferrable corpus on the synchronous cold-boot path       OPEN
   PERF2 [HIGH] Journal media object-URL cache unbounded per session (OOM)        DONE
-  APP1  [MED]  NoteStore global-bump re-renders whole page (Theme B)             OPEN
-  PERF5 [LOW]  Link/Bookmark icons re-render on any mutation (Theme B)           OPEN
+  APP1  [MED]  NoteStore global-bump re-renders whole page (Theme B)             DONE
+  PERF5 [LOW]  Link/Bookmark icons re-render on any mutation (Theme B)           ADJUD
   NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       OPEN
   SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    DONE
   SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      DONE
@@ -306,6 +306,22 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  APP1 landed (commit pending) + PERF5 ADJUDICATED — Theme B half-closed.
+            HighlightableText (the Bible/Matthew/Study React path) subscribed to
+            NoteStore.getVersion() (whole-store) → a note edit re-rendered all 176
+            verses. Now NoteStore set/update/remove/toggleNotebook bump only the
+            per-hlKey versions the note anchors to (note.keys, via _bumpKeys), and
+            HighlightableText subscribes getVersionForKey(hlKey). _bumpKey still
+            bumps the GLOBAL version so the imperative DOM note-icon pass
+            (letters/wtlb) still wakes; bulk ops keep global _bump. +3 NoteStore
+            tests; engine mocks gained getVersionForKey; 72 tests green.
+            PERF5 ADJUDICATED (won't-do): LinkIcon/BookmarkIcon match by KEY PREFIX
+            (letter/wtlb selection-range suffixes), so an endpoint key
+            "letter:x:2:10-40" differs from the icon's subscription key "letter:x:2"
+            — exact-key versioning wouldn't wake the right icon. Mixing exact (bible)
+            + prefix (letter) keying adds real complexity + render-path risk for a
+            LOW-value, bounded fan-out (modest link/bookmark counts; getForKey is a
+            cheap O(L) filter). Net-negative, like the dropped PF3.
 2026-06-07  BAK2 landed (commit pending): v3AndroidImportEntries now throws on a
             manifest media entry with no numeric size (was silently accepted on
             Android while web's readContainer rejected it — a cross-platform

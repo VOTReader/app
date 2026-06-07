@@ -176,6 +176,7 @@ describe('HighlightableText overlap precedence', () => {
       get: (gid) => window.NoteStore._notes[gid] || null,
       subscribe: () => () => {},
       getVersion: () => 0,
+      getVersionForKey: () => 0,
     };
   });
   afterEach(() => {
@@ -340,6 +341,7 @@ describe('dual-render equivalence: HighlightableText ≡ applyDOMHighlights (U11
       get: (gid) => window.NoteStore._notes[gid] || null,
       subscribe: () => () => {},
       getVersion: () => 0,
+      getVersionForKey: () => 0,
     };
   });
   afterEach(() => {
@@ -506,6 +508,7 @@ describe('HighlightableText — A1+A5 inline note icon', () => {
       get: (gid) => window.NoteStore._notes[gid] || null,
       subscribe: () => () => {},
       getVersion: () => 0,
+      getVersionForKey: () => 0,
     };
   });
   afterEach(() => {

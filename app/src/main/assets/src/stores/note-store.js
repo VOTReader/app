@@ -31,6 +31,22 @@ export const NoteStore = extendStore(
   CachedStore('vot-notes', /** @type {Record<string, Note>} */ ({}), { idb: true, crossTabMerge: mergeMapStore }),
   {
     /**
+     * APP1: bump only the per-hlKey versions a note anchors to (note.keys), so a
+     * note change re-renders just the verse(s) it touches instead of every verse in
+     * the chapter (HighlightableText subscribes to getVersionForKey, not the whole-
+     * store getVersion). _bumpKey also bumps the global version, so the imperative
+     * DOM note-icon pass (a whole-store getVersion subscriber) still wakes. Falls
+     * back to a global _bump when the note has no keys.
+     * @param {Note | null | undefined} note
+     * @returns {void}
+     */
+    _bumpKeys(note) {
+      const keys = note && Array.isArray(note.keys) ? note.keys : null;
+      if (keys && keys.length) { for (const k of keys) this._bumpKey(k); }
+      else this._bump();
+    },
+
+    /**
      * Look up a note by its groupId.
      * @param {string} groupId
      * @returns {Note | null}
@@ -79,7 +95,7 @@ export const NoteStore = extendStore(
         updated: ts
       };
       this._save();
-      this._bump();
+      this._bumpKeys(data[groupId]);
     },
 
     /**
@@ -94,7 +110,7 @@ export const NoteStore = extendStore(
       if (!data[groupId]) return;
       data[groupId] = { ...data[groupId], ...patch, updated: Date.now() };
       this._save();
-      this._bump();
+      this._bumpKeys(data[groupId]);
     },
 
     /**
@@ -105,9 +121,10 @@ export const NoteStore = extendStore(
     remove(groupId) {
       if (this._shouldDefer('remove', groupId)) return;
       const data = this._load();
+      const note = data[groupId];   // capture keys BEFORE delete so its verses re-check has-note
       delete data[groupId];
       this._save();
-      this._bump();
+      this._bumpKeys(note);
     },
 
     /**
@@ -127,7 +144,7 @@ export const NoteStore = extendStore(
       if (i >= 0) ids.splice(i, 1); else ids.push(notebookId);
       data[groupId] = { ...note, notebookIds: ids, updated: Date.now() };
       this._save();
-      this._bump();
+      this._bumpKeys(data[groupId]);
     },
 
     /**

@@ -187,11 +187,15 @@ export const HighlightableText = React.memo(function HighlightableText({ text, h
     React.useCallback((cb) => AnnotationStore.subscribe(cb), []),
     () => AnnotationStore.getVersionForKey(hlKey)
   );
-  // Also re-render when notes change — a mark's has-note class (the icon +
-  // active marker) depends on whether its group has a NoteStore entry.
+  // Also re-render when notes change — a mark's has-note class (the icon + active
+  // marker) depends on whether its group has a NoteStore entry. APP1: keyed like
+  // the AnnotationStore subscription above, so a note add/edit/remove re-renders
+  // only the verse(s) the note anchors to (NoteStore._bumpKeys bumps each
+  // note.keys), not all 176 in the chapter. Bulk ops (replaceAll / pruneNotebook)
+  // global-bump, which getVersionForKey includes.
   React.useSyncExternalStore(
     React.useCallback((cb) => NoteStore.subscribe(cb), []),
-    () => NoteStore.getVersion()
+    () => NoteStore.getVersionForKey(hlKey)
   );
   const annotations = AnnotationStore.get(hlKey);
   if (!text) return null;
