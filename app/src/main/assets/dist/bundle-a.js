@@ -2380,12 +2380,22 @@ async function executeSearch(query, options) {
 
   var p = parsed;
   var terms = (p.phrase ? p.phrase.split(/\s+/) : p.terms.slice()).concat(p.must);
+  var useStop = options.useStopWords !== false;
+
+  // SRCH2: an all-stop-word query ("the", "of the", "in the") has no searchable
+  // content — it would otherwise match essentially every verse and build/sort tens
+  // of thousands of hits (the heaviest path) for a result the user never wants.
+  // Short-circuit BEFORE the index work when nothing but grammar glue remains.
+  // (Only when the user hasn't disabled stop-word filtering; a query with ANY
+  // content word is left untouched.)
+  if (useStop && terms.length && terms.every(function (t) { return D.STOP_WORDS_TRIMMED.has(t.toLowerCase()); })) {
+    return { parsed: parsed, results: [], parsedTerms: [], textQuery: null };
+  }
 
   // Stop-words: always use trimmed list (grammar glue only, keeps semantic words).
   // Short queries (≤4 words) keep everything regardless.
   // Disabled entirely when options.useStopWords === false — user toggle.
   var filtered;
-  var useStop = options.useStopWords !== false;
   if (!useStop || terms.length <= 4) {
     filtered = terms.slice();
   } else {

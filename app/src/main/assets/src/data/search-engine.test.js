@@ -377,3 +377,19 @@ describe('search engine — volumes corpus doc-building', () => {
     expect(st.volumes.docCount).toBeGreaterThan(0);
   });
 });
+
+describe('search engine — SRCH2 (all-stop-word query short-circuits)', () => {
+  const stopWords = () => [...(globalThis.VotSearchData?.STOP_WORDS_TRIMMED || [])];
+
+  it('an all-stop-word query returns no results (skips the full-corpus scan)', async () => {
+    const stop = stopWords();
+    expect(stop.length).toBeGreaterThan(1);
+    const r = await VotSearch.search(stop.slice(0, 2).join(' '));   // e.g. "the of"
+    expect(((r && r.results) || []).length).toBe(0);
+  });
+
+  it('a stop-word + content word is unaffected (still finds the verse)', async () => {
+    const r = await VotSearch.search(stopWords()[0] + ' light');     // e.g. "the light"
+    expect(((r && r.results) || []).some((m) => /Genesis 1:3/.test((m.doc && m.doc.ref) || ''))).toBe(true);
+  });
+});
