@@ -242,7 +242,13 @@ export const HighlightableText = React.memo(function HighlightableText({ text, h
   const noteIconsBySeg = new Map();
   if (typeof NoteStore !== 'undefined') {
     lastSegByGroup.forEach((segIdx, groupId) => {
-      if (!NoteStore.get(groupId)) return;
+      const note = NoteStore.get(groupId);
+      if (!note) return;
+      // ANN1: a multi-verse note anchors to several hlKeys (note.keys, in document
+      // order). Paint its icon ONLY on the group's globally-last verse — matching
+      // the imperative DOM path's single icon — not once per spanned verse. (A
+      // single-verse or keys-less note has no later verse, so it always paints.)
+      if (Array.isArray(note.keys) && note.keys.length > 1 && note.keys[note.keys.length - 1] !== hlKey) return;
       let color = '';
       const segAtEnd = segments[segIdx];
       if (segAtEnd) {

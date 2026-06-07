@@ -620,3 +620,35 @@ describe('applyDOMHighlights — A4 signature skip', () => {
     expect(c.textContent).toBe('Hello world');
   });
 });
+
+describe('HighlightableText — ANN1 multi-verse note paints one icon (the last verse)', () => {
+  beforeEach(() => {
+    /** @type {any} */ (window).AnnotationStore = {
+      get: (k) => [{ id: 'a_' + k, groupId: 'g1', kind: 'highlight', color: 'yellow', start: 0, end: 5 }],
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+    /** @type {any} */ (window).NoteStore = {
+      // one note spanning two verses, anchored in document order
+      get: (gid) => (gid === 'g1' ? { groupId: 'g1', body: 'a note', keys: ['k:v1', 'k:v2'] } : null),
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    delete (/** @type {any} */ (window)).AnnotationStore;
+    delete (/** @type {any} */ (window)).NoteStore;
+  });
+
+  it('the EARLIER spanned verse renders NO note icon', () => {
+    const { container } = render(<HighlightableText text="hello" hlKey="k:v1" />);
+    expect(container.querySelector('.hl-note-icon')).toBeNull();
+  });
+  it('the LAST spanned verse renders exactly one note icon', () => {
+    const { container } = render(<HighlightableText text="world" hlKey="k:v2" />);
+    expect(container.querySelectorAll('.hl-note-icon').length).toBe(1);
+  });
+});

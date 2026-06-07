@@ -83,7 +83,7 @@ P2  gates + correctness tail
   BLD2  [MED]  Web deploy publishes independently of CI (thin gate subset)       OPEN
   CORP1 [MED]  Schema validator does not detect duplicate id slugs              DONE
   CORP2 [MED]  Alt-translation Bibles get no completeness cross-check            OPEN
-  ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                OPEN
+  ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                DONE
   ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             DONE
   NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) OPEN
   NAV3  [MED]  __goSearch bridge effect: no deps, unconditional null on cleanup  ADJUD
@@ -306,6 +306,13 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  ANN1 landed (commit pending): on the React path HighlightableText runs
+            per-verse, so noteIconsBySeg (from the verse-local lastSegByGroup)
+            painted one note icon PER spanned verse for a multi-verse note (the DOM
+            path paints one). Gated the icon on note.keys (the anchors, document-
+            ordered): paint only when this verse is the group's LAST key. Single-
+            verse/keys-less notes always paint (unchanged). +2 tests; 48 annotation-
+            engine tests green.
 2026-06-07  ANN2 landed (commit pending): the "Remove highlight" ✕ calls
             NoteStore.remove() per overlapping group — silently deleting the note
             BODY — while the confirm only said "Remove this highlight?". Now the
