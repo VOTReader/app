@@ -31,6 +31,10 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   // selection changes so a fresh selection always lands on the normal
   // toolbar (not an inherited mid-confirm state from a prior selection).
   const [confirmingRemove, setConfirmingRemove] = React.useState(false);
+  // ANN2: how many of the overlapping highlights carry a NoteStore body — computed
+  // when the ✕ is pressed — so the confirm can disclose that removing also deletes
+  // the note text (removeHighlight calls NoteStore.remove per group).
+  const [removeNoteCount, setRemoveNoteCount] = React.useState(0);
   React.useEffect(() => { setConfirmingRemove(false); }, [selInfo]);
 
   // W1.5(a.2) — register with the central modal registry while the toolbar
@@ -390,16 +394,19 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     setTimeout(() => { suppressRef.current = false; }, 300);
   }, [selInfo, activeStyle, computeOffset]);
 
-  const removeHighlight = React.useCallback(() => {
-    if (!selInfo) return;
-    suppressRef.current = true;
+  // The groupIds whose annotation overlaps the current selection, across every
+  // touched container. Shared by removeHighlight (what to delete) and the remove
+  // confirm's note-count (ANN2 disclosure) so the two can't drift.
+  const selectionGroups = React.useCallback(() => {
+    /** @type {Set<string>} */
+    const groups = new Set();
+    if (!selInfo) return groups;
     const sel = window.getSelection();
     const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     const containers = selInfo.multiVerse
       ? (selInfo.multiContainers ||
           (range ? Array.from(document.querySelectorAll('[data-hl-key]')).filter(c => range.intersectsNode(c)) : []))
       : [document.querySelector('[data-hl-key="' + (selInfo.hlKey || '').replace(/"/g, '\\"') + '"]')].filter(Boolean);
-    const removedGroups = new Set();
     containers.forEach(function(container) {
       if (!container) return;
       var hlKey = container.dataset.hlKey;
@@ -411,17 +418,23 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         ? (range && container.contains(range.endContainer) ? computeOffset(container, range.endContainer, range.endOffset) : containerLen)
         : selInfo.end;
       AnnotationStore.get(hlKey).forEach(function(h) {
-        if (h.start < end && h.end > start && h.groupId && !removedGroups.has(h.groupId)) {
-          removedGroups.add(h.groupId);
-          AnnotationStore.removeGroup(h.groupId);
-          NoteStore.remove(h.groupId);
-        }
+        if (h.start < end && h.end > start && h.groupId) groups.add(h.groupId);
       });
+    });
+    return groups;
+  }, [selInfo, computeOffset]);
+
+  const removeHighlight = React.useCallback(() => {
+    if (!selInfo) return;
+    suppressRef.current = true;
+    selectionGroups().forEach(function(gid) {
+      AnnotationStore.removeGroup(gid);
+      NoteStore.remove(gid);   // ANN2: the confirm now discloses this note deletion
     });
     window.getSelection().removeAllRanges();
     setVisible(false);
     setTimeout(() => { suppressRef.current = false; }, 300);
-  }, [selInfo, computeOffset]);
+  }, [selInfo, selectionGroups]);
 
   const copyText = React.useCallback(() => {
     if (!selInfo) return;
@@ -701,7 +714,9 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           the toolbar. */}
       {confirmingRemove ? (
         <ConfirmStrip
-          question="Remove this highlight?"
+          question={removeNoteCount > 0
+            ? `Remove this highlight and ${removeNoteCount === 1 ? 'its note' : removeNoteCount + ' notes'}? The note text will be deleted.`
+            : 'Remove this highlight?'}
           yesLabel="Yes, remove"
           onCancel={() => setConfirmingRemove(false)}
           onConfirm={() => { removeHighlight(); setConfirmingRemove(false); }}
@@ -746,7 +761,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             {(selInfo.existingHl || mvHasExisting) && (
               <button
                 className="sel-color-btn sel-color-clear"
-                onClick={() => setConfirmingRemove(true)}
+                onClick={() => {
+                  let n = 0;
+                  selectionGroups().forEach((gid) => { if (typeof NoteStore !== 'undefined' && NoteStore.get(gid)) n += 1; });
+                  setRemoveNoteCount(n);
+                  setConfirmingRemove(true);
+                }}
                 title="Remove highlight"
               >
                 ✕

@@ -81,7 +81,7 @@ beforeEach(() => {
   };
   /** @type {any} */ (globalThis).NoteStore = { get: () => null, set: vi.fn(), remove: vi.fn() };
   /** @type {any} */ (globalThis).BookmarkStore = { add: vi.fn() };
-  /** @type {any} */ (globalThis).ConfirmStrip = () => null;
+  /** @type {any} */ (globalThis).ConfirmStrip = vi.fn(() => null);   // ANN2: capture the question/onConfirm props
   /** @type {any} */ (globalThis).snapRangeToWords = (_t, s, e) => ({ start: s, end: e });
   /** @type {any} */ (globalThis).hlId = () => 'hl_test';
   window.__showAnnChip = vi.fn();
@@ -312,5 +312,47 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     });
     expect(ev.defaultPrevented).toBe(false);
     expect(document.querySelector('.sel-toolbar')).toBeNull();
+  });
+});
+
+describe('SelectionToolbar — ANN2 remove-confirm discloses note deletion', () => {
+  // Raise the toolbar over an EXISTING highlight (so the ✕ shows), then press ✕.
+  async function raiseAndPressClear({ noted }) {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
+    const ann = [{ start: 0, end: 14, groupId: 'g1', kind: 'highlight', color: 'yellow' }];
+    /** @type {any} */ (globalThis).HighlightStore.get = () => ann;   // covers [0,14] → existingHl → ✕ shows
+    /** @type {any} */ (globalThis).AnnotationStore.get = () => ann;  // selectionGroups finds g1
+    /** @type {any} */ (globalThis).NoteStore.get = (g) => (noted && g === 'g1' ? { groupId: 'g1' } : null);
+    mount();
+    stubSelection(rangeOver(c, 0, 14)); // "The Revelation"
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    const clearBtn = document.querySelector('.sel-color-clear');
+    expect(clearBtn).not.toBeNull();
+    act(() => { fire(clearBtn, 'click'); });
+  }
+  const questions = () => /** @type {any} */ (globalThis).ConfirmStrip.mock.calls.map((c) => c[0] && c[0].question);
+
+  it('a NOTED highlight: the confirm warns the note text will be deleted', async () => {
+    await raiseAndPressClear({ noted: true });
+    expect(questions().some((q) => /note/i.test(q || '') && /deleted/i.test(q || ''))).toBe(true);
+  });
+
+  it('an UN-noted highlight: the confirm keeps the plain wording (no false note warning)', async () => {
+    await raiseAndPressClear({ noted: false });
+    expect(questions().some((q) => q === 'Remove this highlight?')).toBe(true);
+    expect(questions().some((q) => /note/i.test(q || ''))).toBe(false);
+  });
+
+  it('confirming removes the highlight AND its note (the disclosed behavior)', async () => {
+    await raiseAndPressClear({ noted: true });
+    const call = /** @type {any} */ (globalThis).ConfirmStrip.mock.calls.find((c) => c[0] && typeof c[0].onConfirm === 'function');
+    expect(call).toBeTruthy();
+    act(() => { call[0].onConfirm(); });
+    expect(/** @type {any} */ (globalThis).AnnotationStore.removeGroup).toHaveBeenCalledWith('g1');
+    expect(/** @type {any} */ (globalThis).NoteStore.remove).toHaveBeenCalledWith('g1');
   });
 });

@@ -84,7 +84,7 @@ P2  gates + correctness tail
   CORP1 [MED]  Schema validator does not detect duplicate id slugs              DONE
   CORP2 [MED]  Alt-translation Bibles get no completeness cross-check            OPEN
   ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                OPEN
-  ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             OPEN
+  ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             DONE
   NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) OPEN
   NAV3  [MED]  __goSearch bridge effect: no deps, unconditional null on cleanup  ADJUD
   APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     OPEN
@@ -306,6 +306,16 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  ANN2 landed (commit pending): the "Remove highlight" ✕ calls
+            NoteStore.remove() per overlapping group — silently deleting the note
+            BODY — while the confirm only said "Remove this highlight?". Now the
+            confirm discloses it ("...and its note? The note text will be deleted.")
+            when any overlapping highlight is noted. Extracted a shared
+            selectionGroups() helper used by both removeHighlight (delete) and the
+            note-count (disclose) so they can't drift; removeHighlight behavior
+            unchanged. removeHighlight was UNTESTED — added the safety net: +3 tests
+            driving the real toolbar→✕→confirm flow (noted warns, un-noted plain,
+            confirm removes highlight AND note); 16 SelectionToolbar tests green.
 2026-06-07  STOR2 + NAV3 ADJUDICATED (audit false-positives, re-derived + proven):
             - STOR2: the agent's premise (user "Clear All" routes through a merge-
               store clear() leaving residue) is WRONG for this app. The user-facing
