@@ -38,13 +38,13 @@ GOTCHAS (load-bearing — learned the hard way this session):
  6. NTV1 (Kotlin audio-mode restore) + BLD2 (deploy-gated-on-CI) CANNOT be runtime-
     verified from this environment — do them where you can watch the emulator/Actions.
 
-NEXT (my recommendation). Cleanest remaining real fix: CORP2 (translation
-completeness gate) — but it needs the translation↔KJV bookId mapping worked out
-(the translations label Matthew "matthew-plain", and validateAgainstReference +
-its `exceptions` allow-list already exist at validate-schemas.js ~1272/1579). After
-that: NAV2 (narrow stale-highlight leak), APP2 (scroll useLayoutEffect — render-
-path, mind the rAF), SRCH2 (search.js stop-word), then the P3 tail. NTV1 + BLD2
-want a device/CI pass.
+NEXT (my recommendation). CORP2 is now DONE (validateTranslationCompleteness vs
+KJV, presence-only, no allow-list needed). Remaining real fixes: NAV2 (narrow
+stale-highlight leak via the pendingHighlight navHandoff slot — LetterView.jsx:30
+peeks + conditionally clears), APP2 (scroll useLayoutEffect — render-path, mind the
+existing rAF in use-scroll-memory Effect 3), SRCH2 (search.js stop-word skip),
+TEST2 (React 18.2-runtime vs 19-test skew — mostly documentation). Then the P3
+tail. NTV1 + BLD2 want a device/CI pass.
 
 --------------------------------------------------------------------------------
 HANDOFF (READ FIRST)
@@ -125,7 +125,7 @@ P2  gates + correctness tail
   BLD1  [MED]  No gate proves minify preserves corpus VALUES                     OPEN
   BLD2  [MED]  Web deploy publishes independently of CI (thin gate subset)       OPEN
   CORP1 [MED]  Schema validator does not detect duplicate id slugs              DONE
-  CORP2 [MED]  Alt-translation Bibles get no completeness cross-check            OPEN
+  CORP2 [MED]  Alt-translation Bibles get no completeness cross-check            DONE
   ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                DONE
   ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             DONE
   NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) OPEN
@@ -349,6 +349,15 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  CORP2 landed (commit pending): new validateTranslationCompleteness(map,
+            BIBLE_KJV) — presence-only — runs on each of the 7 alt-translations in
+            the Format E section and ERRORs on a book/chapter the KJV reference has
+            but the translation lacks. validateTranslationMap only checks the
+            translation's OWN chapters, so a wholly-missing chapter was invisible;
+            now-offline-cached (SW1) corpus must not ship a hole. Single-verse
+            critical-text omissions stay contiguity WARNINGS (no allow-list needed).
+            Live corpus still 1589 items / 0 errors (bookId scheme aligns w/ KJV —
+            verified, no false-positives). +5 tests; 186 validate-schemas green.
 2026-06-07  ANN1 landed (commit pending): on the React path HighlightableText runs
             per-verse, so noteIconsBySeg (from the verse-local lastSegByGroup)
             painted one note icon PER spanned verse for a multi-verse note (the DOM

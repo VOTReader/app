@@ -14,6 +14,7 @@ import {
   validateScriptureDict,
   validateFootnoteMarkers,
   validateStudyBible,
+  validateTranslationCompleteness,
 } from './validate-schemas.js';
 
 // ── helpers ──────────────────────────────────────────────────────
@@ -1449,5 +1450,31 @@ describe('CORP1 — duplicate id detection', () => {
   it('Format D: flags a duplicate study id slug', () => {
     const r = validateFormatD([{ id: 'dup', title: 'A', parts: [] }, { id: 'dup', title: 'B', parts: [] }]);
     expect(r.errors.some((e) => /duplicate "id" "dup"/.test(e))).toBe(true);
+  });
+});
+
+// ── CORP2 — translation completeness (missing book/chapter vs KJV) ──
+describe('validateTranslationCompleteness — CORP2', () => {
+  const ref = { genesis: { '1': [{ n: 1 }], '2': [{ n: 1 }] }, exodus: { '1': [{ n: 1 }] } };
+  it('passes when the translation has every reference book + chapter', () => {
+    const map = { genesis: { '1': [{ n: 1 }], '2': [{ n: 1 }] }, exodus: { '1': [{ n: 1 }] } };
+    expect(validateTranslationCompleteness(map, ref).errors).toEqual([]);
+  });
+  it('errors on a wholly-missing book', () => {
+    const map = { genesis: { '1': [{ n: 1 }], '2': [{ n: 1 }] } }; // no exodus
+    expect(validateTranslationCompleteness(map, ref).errors.some((e) => /missing book "exodus"/.test(e))).toBe(true);
+  });
+  it('errors on a wholly-missing chapter', () => {
+    const map = { genesis: { '1': [{ n: 1 }] }, exodus: { '1': [{ n: 1 }] } }; // genesis ch2 gone
+    expect(validateTranslationCompleteness(map, ref).errors.some((e) => /missing genesis chapter 2/.test(e))).toBe(true);
+  });
+  it('does NOT error on a missing single verse (the contiguity check owns that)', () => {
+    const map = { genesis: { '1': [{ n: 1 }, { n: 3 }], '2': [{ n: 1 }] }, exodus: { '1': [{ n: 1 }] } };
+    expect(validateTranslationCompleteness(map, ref).errors).toEqual([]);
+  });
+  it('skips gracefully (warn, no error) when the reference is unavailable', () => {
+    const r = validateTranslationCompleteness({ genesis: {} }, null);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings.length).toBe(1);
   });
 });

@@ -1323,6 +1323,51 @@ export function validateAgainstReference(books, reference, opts = {}) {
   return { errors, warnings };
 }
 
+/**
+ * CORP2 — a translation MAP (Format E: `{ bookId: { chapNum: [{n,…}] } }`) must
+ * contain every BOOK + CHAPTER the reference (BIBLE_KJV) has. The per-chapter
+ * contiguity check (validateTranslationMap) iterates the translation's OWN
+ * chapters, so it can't see a wholly-MISSING chapter; and now that the
+ * alt-translations are offline-cached (SW1) a dropped chapter would ship + serve
+ * offline. Presence-only: single-verse critical-text omissions are legitimate
+ * variants (validateTranslationMap already WARNs on those gaps) and are NOT
+ * errored here.
+ *
+ * @param {any} map        the translation map under test
+ * @param {any} reference  BIBLE_KJV (same `{ bookId: { chapNum: verses[] } }` shape)
+ * @param {{ fileName?: string }} [opts]
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validateTranslationCompleteness(map, reference, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || '(unknown)';
+  if (!map || typeof map !== 'object' || Array.isArray(map)) {
+    errors.push(`${fileName}: expected a translation map object`);
+    return { errors, warnings };
+  }
+  if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+    warnings.push(`${fileName}: no KJV reference — completeness check skipped`);
+    return { errors, warnings };
+  }
+  for (const bookId of Object.keys(reference)) {
+    const refBook = reference[bookId];
+    if (!refBook || typeof refBook !== 'object') continue;
+    const tBook = map[bookId];
+    if (!tBook || typeof tBook !== 'object') {
+      errors.push(`${fileName}: missing book "${bookId}" (present in the KJV reference)`);
+      continue;
+    }
+    for (const chNum of Object.keys(refBook)) {
+      if (!Array.isArray(refBook[chNum])) continue;
+      if (!Array.isArray(tBook[chNum])) {
+        errors.push(`${fileName}: missing ${bookId} chapter ${chNum} (present in the KJV reference)`);
+      }
+    }
+  }
+  return { errors, warnings };
+}
+
 // ── CLI runner ───────────────────────────────────────────────────
 
 /** @type {Array<{file: string, arrayVar: string, prefaceVar?: string}>} */
@@ -1527,6 +1572,10 @@ function runCli() {
 
   // ── Format E (translations / Study Bible / ref dicts) ──
   console.log('\nFormat E (translations / Study Bible / ref dicts):');
+  // CORP2: load the KJV reference once so each alt-translation can be checked for a
+  // wholly-MISSING book/chapter. Best-effort — completeness is skipped if it won't load.
+  let xlatRef = null;
+  try { xlatRef = loadVar(resolve(dataDir, 'bible-kjv.js'), 'BIBLE_KJV'); } catch (_e) { /* completeness skipped */ }
   for (const entry of FORMAT_E_TRANSLATIONS) {
     const label = basename(entry.file);
     let map;
@@ -1534,6 +1583,14 @@ function runCli() {
     catch (e) { loadErr(label, e.message); continue; }
     if (!map || typeof map !== 'object' || Array.isArray(map)) { loadErr(label, `variable "${entry.varName}" is not an object`); continue; }
     const result = validateTranslationMap(map, { strict, fileName: label });
+    // CORP2: also require every KJV book/chapter to be present (kjv-vs-kjv is
+    // trivially complete, so skip it). Merged into `result` so it counts + prints
+    // on the same line.
+    if (xlatRef && entry.varName !== 'BIBLE_KJV') {
+      const comp = validateTranslationCompleteness(map, xlatRef, { fileName: label });
+      result.errors.push(...comp.errors);
+      result.warnings.push(...comp.warnings);
+    }
     const nBooks = Object.keys(map).length;
     add(result, nBooks);
     emit(result, label, nBooks, 'books', '');
