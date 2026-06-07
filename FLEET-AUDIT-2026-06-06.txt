@@ -75,7 +75,7 @@ P1  high value, low-moderate risk
   NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       OPEN
   SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    DONE
   SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      DONE
-  STOR2 [MED]  "Clear All Personal Data" leaves residue under sibling-tab write  OPEN
+  STOR2 [MED]  "Clear All Personal Data" leaves residue under sibling-tab write  ADJUD
   SEC1  [LOW]  Runtime-string toasts route to an innerHTML sink                  DONE
 
 P2  gates + correctness tail
@@ -86,7 +86,7 @@ P2  gates + correctness tail
   ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                OPEN
   ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             OPEN
   NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) OPEN
-  NAV3  [MED]  __goSearch bridge effect: no deps, unconditional null on cleanup  OPEN
+  NAV3  [MED]  __goSearch bridge effect: no deps, unconditional null on cleanup  ADJUD
   APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     OPEN
   PERF3 [MED]  Reading screens re-render full verse list on every scroll-flush   OPEN
   PERF4 [MED]  content-visibility:auto unused (safe win at chrome108 floor)      OPEN
@@ -306,6 +306,23 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  STOR2 + NAV3 ADJUDICATED (audit false-positives, re-derived + proven):
+            - STOR2: the agent's premise (user "Clear All" routes through a merge-
+              store clear() leaving residue) is WRONG for this app. The user-facing
+              clearAllPersonalData (SettingsScreen.jsx:887) DELETES the whole IDB
+              databases via _deleteIdbDatabase (votreader + vot-journal-media + 2
+              caches) — no merge path. The reachable per-feature clear (Clear
+              History → HistoryStore.clear) is a NON-merge store ({idb:true}, no
+              crossTabMerge) → blind write, no residue. The merge stores' clear()
+              (where the residue exists) have ZERO production callers (grep-proven).
+              So the residue path is unreachable. No fix needed.
+            - NAV3: the __goSearch no-deps re-bind is INTENTIONAL + documented (it
+              re-binds each render so goSearch captures the latest nav state, like
+              __onDwellCommit). The agent's fix ([] deps) would FREEZE a stale
+              closure (a real bug); [goSearch] is equivalent to no-deps (goSearch is
+              a fresh closure per render). Single owner → the "2nd-owner clobber" is
+              moot; per-render churn is one property assignment. Net-negative to
+              change.
 2026-06-07  APP1 landed (commit pending) + PERF5 ADJUDICATED — Theme B half-closed.
             HighlightableText (the Bible/Matthew/Study React path) subscribed to
             NoteStore.getVersion() (whole-store) → a note edit re-rendered all 176
