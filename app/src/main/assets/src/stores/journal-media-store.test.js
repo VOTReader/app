@@ -287,3 +287,28 @@ describe('JournalMediaStore — mediaId()', () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe('JournalMediaStore — objectUrl LRU cap (PERF2)', () => {
+  it('evicts + revokes the least-recently-used URL once over the cap', async () => {
+    const revoked = [];
+    let n = 0;
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = () => 'blob:vot-' + (++n);
+    URL.revokeObjectURL = (u) => { revoked.push(u); };
+    try {
+      // 30 distinct media > the 24-entry cap → the 6 oldest URLs are evicted + revoked
+      // (each pins a blob in heap; the old code never freed one without a delete()).
+      for (let i = 0; i < 30; i++) {
+        await JournalMediaStore.put({ id: 'lru' + i, type: 'image', blob: new Blob([new Uint8Array([i & 255])]) });
+      }
+      expect(revoked.length).toBe(6);
+      // Eviction is invisible: the blob is still in IDB, so objectUrl re-creates a URL.
+      const url = await JournalMediaStore.objectUrl('lru0');
+      expect(typeof url).toBe('string');
+    } finally {
+      URL.createObjectURL = origCreate;
+      URL.revokeObjectURL = origRevoke;
+    }
+  });
+});

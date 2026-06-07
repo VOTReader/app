@@ -69,7 +69,7 @@ P0  real correctness, user-facing
 
 P1  high value, low-moderate risk
   PERF1 [HIGH] ~506 KB deferrable corpus on the synchronous cold-boot path       OPEN
-  PERF2 [HIGH] Journal media object-URL cache unbounded per session (OOM)        OPEN
+  PERF2 [HIGH] Journal media object-URL cache unbounded per session (OOM)        DONE
   APP1  [MED]  NoteStore global-bump re-renders whole page (Theme B)             OPEN
   PERF5 [LOW]  Link/Bookmark icons re-render on any mutation (Theme B)           OPEN
   NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       OPEN
@@ -306,6 +306,13 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  PERF2 landed (commit pending): JournalMediaStore._urlCache (id->blob:URL)
+            was unbounded — only delete() freed an entry, so browsing years of
+            photos/voice-memos pinned hundreds of MB of decoded blobs. Converted to
+            an insertion-ordered Map LRU (cap 24): _cacheUrl evicts+revokes the LRU
+            past the cap, _touchUrl bumps a hit to MRU; objectUrl re-creates on a
+            later miss so eviction is invisible (blob stays in IDB). +1 test
+            (30 puts → 6 oldest revoked); 23 store tests pass.
 2026-06-07  SRCH1 landed (commit pending) — THEME A now fully CLOSED. search.js
             gains CORPUS_CONTENT_VERSION ('c9'), folded into dataSignature so a
             content-only corpus edit (same-length reword) busts the search cache

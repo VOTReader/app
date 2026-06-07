@@ -60,8 +60,30 @@ export var JournalMediaStore = (function() {
   var STORE = 'media';
   /** @type {Promise<IDBDatabase> | null} */
   var _dbPromise = null;
-  /** @type {Record<string, string>} */
-  var _urlCache = {};
+  // PERF2: an LRU of live object URLs (id -> blob: URL). Each entry pins its blob in
+  // heap until revoked, so this was an UNBOUNDED leak — browsing years of photos /
+  // voice-memos accreted hundreds of MB of decoded blobs (only an explicit delete()
+  // ever freed one). The Map's insertion order IS the LRU order (oldest first):
+  // _cacheUrl evicts + revokes the oldest past the cap; _touchUrl moves a hit to the
+  // MRU end. objectUrl() transparently re-creates a URL on a later miss, so eviction
+  // is invisible to callers.
+  /** @type {Map<string, string>} */
+  var _urlCache = new Map();
+  var URL_CACHE_MAX = 24;
+  function _cacheUrl(id, url) {
+    _urlCache.set(id, url);
+    while (_urlCache.size > URL_CACHE_MAX) {
+      var lruId = _urlCache.keys().next().value;   // first inserted = least-recently-used
+      var victim = _urlCache.get(lruId);
+      _urlCache.delete(lruId);
+      try { URL.revokeObjectURL(victim); } catch (_e) { /* best-effort */ }
+    }
+  }
+  function _touchUrl(id) {
+    var url = _urlCache.get(id);
+    _urlCache.delete(id);
+    _urlCache.set(id, url);
+  }
 
   /**
    * Open (or reuse) the IDB connection. Rejects when IndexedDB is
@@ -149,7 +171,7 @@ export var JournalMediaStore = (function() {
           // blob that a commit-time abort (e.g. quota) actually rolled back — masking
           // the failure for the rest of the session.
           store.transaction.addEventListener('complete', function() {
-            try { _urlCache[record.id] = URL.createObjectURL(record.blob); } catch (_e) { /* best-effort; degrade silently if unsupported or quota hit */ }
+            try { _cacheUrl(record.id, URL.createObjectURL(record.blob)); } catch (_e) { /* best-effort; degrade silently if unsupported or quota hit */ }
             resolve(record.id);
           });
           guardTx(store, reject);
@@ -182,9 +204,9 @@ export var JournalMediaStore = (function() {
      */
     delete: function(id) {
       if (!id) return Promise.resolve();
-      if (_urlCache[id]) {
-        try { URL.revokeObjectURL(_urlCache[id]); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
-        delete _urlCache[id];
+      if (_urlCache.has(id)) {
+        try { URL.revokeObjectURL(_urlCache.get(id)); } catch (_e) { /* IndexedDB op — best-effort; degrade silently if unsupported or quota hit */ }
+        _urlCache.delete(id);
       }
       return tx('readwrite').then(function(store) {
         return new Promise(function(resolve, reject) {
@@ -258,12 +280,12 @@ export var JournalMediaStore = (function() {
      */
     objectUrl: function(id) {
       if (!id) return Promise.resolve(null);
-      if (_urlCache[id]) return Promise.resolve(_urlCache[id]);
+      if (_urlCache.has(id)) { _touchUrl(id); return Promise.resolve(_urlCache.get(id)); }
       return this.get(id).then(function(rec) {
         if (!rec || !rec.blob) return null;
         try {
           var url = URL.createObjectURL(rec.blob);
-          _urlCache[id] = url;
+          _cacheUrl(id, url);
           return url;
         } catch (_e) { return null; }
       });
