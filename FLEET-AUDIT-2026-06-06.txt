@@ -8,37 +8,42 @@ SESSION HANDOFF — 2026-06-07 (next agent: START HERE)
 --------------------------------------------------------------------------------
 STATE (after SESSION 2, 2026-06-07b — the TAIL IS NOW CLOSED). The whole audit is
 DONE or ADJUDICATED-with-reason. Session 1 closed every P0+P1+P2 + the valuable P3
-(25 DONE + 3 ADJUD). Session 2 then swept the ~49-item tail: 13 MORE DONE (BLD1,
-BAK3, BAK5, SEC2, ANN4, ANN5, TEST3, TEST5, CORP6, BLD2, NTV3, PERF4, SRCH4) +
-~30 ADJUDICATED with re-derived reasons (each re-checked against current source by a
+(25 DONE + 3 ADJUD). Session 2 then swept the ~49-item tail: 15 MORE DONE (BLD1,
+BAK3, BAK5, SEC2, ANN4, ANN5, TEST3, TEST5, CORP6, BLD2, NTV3, PERF4, SRCH4, ERR3,
+NTV1) + ~31 ADJUDICATED with re-derived reasons (each re-checked against current source by a
 per-cluster agent, then verified by me) + 4 found ALREADY-DONE/SUBSUMED (SW3 by SW1,
 NTV2, TEST2, plus PERF5/NAV3/STOR2 from session 1). See SECTION 1 for the per-item
 status and the 2026-06-07b PROGRESS LOG entry (bottom) for the disposition + reason
 of every item. Verify: vitest + lint + typecheck + gradle :app:testDebugUnitTest all
 green; PERF4 preview-verified on Psalm 119; backup-integrity + bridge changes gated.
 
-ONLY 3 items remain genuinely OPEN — each needs YOU (device/CI/a focused session),
-not more autonomous work:
-  - PERF1 [HIGH-value, HIGH-risk]: defer ~506 KB (books-restored.js + matthew-
-    plain.js) off the cold-boot bundle-a into lazy loaders. Best perf trade, but it
-    touches build.py + index.html + the consumers (BibleChapterView/ChapterIndex/
-    SettingsScreen/tabs.js, all typeof-guarded) + SW precache + a CORPUS_VERSION
-    bump — and wants a real device COLD-BOOT check. A focused session, not a tail.
-  - NTV1 [MED, device]: restore audioManager.mode on teardown so a mid-recording
-    kill doesn't strand the device in MODE_IN_COMMUNICATION. EXACT PATCH in the
-    2026-06-07b log — safe (onRenderProcessGone + onDestroy, guarded on mode); held
-    only because the audio-ROUTING behavior can't be verified without a device.
-  - ERR3 [MED]: AppShell chrome (overlays/sheets/dom-sync/dot) renders only under
-    the NUCLEAR outer ErrorBoundary, so a chrome crash takes down the whole app. Fix
-    = extract an <AppShellChrome> wrapper carrying its OWN ErrorBoundary (also frees
-    app.jsx canary room, currently 798/800). Real, but a focused render-tree
-    extraction with smoke:ci + preview verification — not an autonomous-pass edit.
-  Plus the standing device walks (N2.x audio-tuning, U-series import/Garden) — see
-  tools/n1-smoke-walk.md. BLD2 is DONE but its widened deploy gate wants one green
-  Actions run to confirm (the push that landed it triggers one).
-  GOTCHA confirmed this session: the pre-commit `npm run build` builds from the
-  WORKING TREE, so commit ONE logical change at a time (uncommitted source from a
-  second change bakes into the first commit's bundles → an inconsistent commit).
+NOTHING is left for autonomous work — the audit is FULLY closed. After the owner
+cleared them (2026-06-07b), ERR3 + NTV1 landed too (commits 0b5c64e + e8d6b50):
+  - ERR3 DONE — AppShellOverlays + AppShellSheets each wrap their own return in
+    <ErrorBoundary fallback={null}>, so a render crash in any sheet/overlay vanishes
+    + logs instead of nuking the whole app via the root boundary. NO app.jsx change
+    (still 798/800), no reorder — the cleaner fix than the <AppShellChrome> extraction
+    originally sketched. +3 ErrorBoundary tests; smoke:ci green.
+  - NTV1 DONE — restoreAudioModeIfActive() (guarded on MODE_IN_COMMUNICATION) called
+    from onRenderProcessGone() + onDestroy(); compiles + Kotlin suite green.
+  - PERF1 ADJUDICATED (won't-do): its cold-boot win matters mainly on SLOW devices
+    the owner doesn't have, the app isn't render-intensive, and it's the riskiest
+    remaining change (the synchronous cold-boot path) — net-negative to restructure
+    for a marginal gain against the owner's stated low perf concern (owner call,
+    2026-06-07b). Revisit only if a budget-device audience or a measured cold-boot
+    problem ever appears; the plan (lazy-load books-restored.js + matthew-plain.js
+    via __makeLazyLoader, typeof-guarded consumers, SW precache, CORPUS_VERSION bump)
+    is recorded should that change.
+
+  REMAINING is optional + owner-side + NON-blocking: device CONFIRMATIONS for the two
+  device-touching fixes already shipped — NTV3 (Garden cache empty after Clear-All) +
+  NTV1 (routing returns to speaker after a mid-record crash) — plus the standing manual
+  device walks (N2.x audio-tuning, U-series import/Garden) in tools/n1-smoke-walk.md.
+  BLD2's widened deploy gate already ran GREEN in Actions (confirmed).
+  GOTCHA confirmed this session: the pre-commit `npm run build` builds from the WORKING
+  TREE, so commit ONE logical change at a time (uncommitted source from a second change
+  bakes into the first commit's bundles → an inconsistent commit). Also: don't use
+  backticks in a bash `-m` commit message (command substitution eats the word).
 
 GOTCHAS (load-bearing — learned the hard way this session):
  1. AUDIT FINDINGS CAN BE WRONG. Re-derive every finding against CURRENT source
@@ -138,11 +143,11 @@ P0  real correctness, user-facing
   BAK1  [MED]  Android truncated-import overwrites stores then reports "failed"   DONE
 
 P1  high value, low-moderate risk
-  PERF1 [HIGH] ~506 KB deferrable corpus on the synchronous cold-boot path       OPEN
+  PERF1 [HIGH] ~506 KB deferrable corpus on the synchronous cold-boot path       ADJUD
   PERF2 [HIGH] Journal media object-URL cache unbounded per session (OOM)        DONE
   APP1  [MED]  NoteStore global-bump re-renders whole page (Theme B)             DONE
   PERF5 [LOW]  Link/Bookmark icons re-render on any mutation (Theme B)           ADJUD
-  NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       OPEN
+  NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       DONE
   SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    DONE
   SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      DONE
   STOR2 [MED]  "Clear All Personal Data" leaves residue under sibling-tab write  ADJUD
@@ -213,7 +218,7 @@ P3  small wins / hardening / adjudicate
   TEST3 [LOW] Real-time setTimeout(r,5) monotonic-ts assertions (flake)          DONE
   TEST4 [LOW] Device-only compressImage error branches unverified                ADJUD
   TEST5 [LOW] No-navigator.locks merge fallback untested                         DONE
-  ERR3 [LOW] AppShell chrome renders outside the inner ErrorBoundary             OPEN*
+  ERR3 [LOW] AppShell chrome renders outside the inner ErrorBoundary             DONE
 
 --------------------------------------------------------------------------------
 SECTION 2 — THEMES (cross-agent convergences = highest signal)
@@ -376,6 +381,29 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07c  AUDIT FULLY CLOSED — the 3 items held in 2026-06-07b are now resolved
+            after the owner cleared them (no budget device; "as long as it's well-
+            optimized we're fine; not an intensive app"):
+            - ERR3 DONE (0b5c64e): instead of the originally-sketched <AppShellChrome>
+              extraction (which would have touched app.jsx, at 798/800), the cleaner
+              fix — AppShellOverlays + AppShellSheets each wrap their OWN return in
+              <ErrorBoundary fallback={null}>. ErrorBoundary gained an optional
+              `fallback` (omitted = the existing root panel; null = the crashed chrome
+              vanishes + still logs). A crashed sheet/overlay no longer nukes the app;
+              the screen + rest keep working. NO app.jsx change, no reorder. +3 tests;
+              smoke:ci green (12 screens, annotation round-trips, 0 console errors).
+            - NTV1 DONE (e8d6b50): restoreAudioModeIfActive() — restores
+              vm.previousAudioMode only when mode is still MODE_IN_COMMUNICATION —
+              called from onRenderProcessGone() + onDestroy() (teardown paths where no
+              live recording exists, so it can't disturb a capture; NOT onPause).
+              Kotlin compiles + :app:testDebugUnitTest green. Device-confirm optional.
+            - PERF1 ADJUDICATED (won't-do, owner call): cold-boot win is mainly for
+              slow devices the owner doesn't have; app isn't render-intensive; it's the
+              riskiest remaining change (cold-boot path) → net-negative for a marginal
+              gain. Plan retained in the SESSION HANDOFF if a budget audience appears.
+            Net: every fleet-audit finding is now DONE or ADJUDICATED-with-reason.
+            Optional owner-side: device confirms for NTV3 + NTV1; standing device walks.
+
 2026-06-07b  TAIL CLOSE-OUT (session 2) — the ~49 remaining items swept. Method:
             7 per-cluster agents re-derived every open finding against CURRENT
             source (gotcha #1), I verified + executed. 13 DONE (8 commits, pushed),
