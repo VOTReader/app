@@ -51,6 +51,7 @@ const METHODS = [
   'v3ImportReadChunk',
   'v3ImportClose',
   'getCrashLog',
+  'clearGardenCache',
   'setImmersiveMode',
   'haptic',
   'isAndroid',
@@ -92,6 +93,7 @@ function mockAndroidBridge() {
     v3ImportReadChunk: vi.fn(() => ''),
     v3ImportClose: vi.fn(),
     getCrashLog: vi.fn(() => '[{"ts":0,"tag":"x","msg":"y"}]'),
+    clearGardenCache: vi.fn(),
     setImmersiveMode: vi.fn(),
     haptic: vi.fn(),
   };
@@ -128,7 +130,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     delete (/** @type {any} */ (globalThis.window).AndroidBridge);
   });
 
-  it('exposes exactly the 33 expected keys', () => {
+  it('exposes exactly the 34 expected keys', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);
@@ -152,6 +154,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['haptic', [2]],
     ['startAudioSession', []],
     ['endAudioSession', []],
+    ['clearGardenCache', []],
     ['requestMicPermission', []],
     ['nativeRecordStop', []],
     ['nativeRecordCancel', []],

@@ -57,6 +57,9 @@ class FakeBridgeHost(
     /** Records args passed to captureScreenshot, in call order. */
     val captureScreenshotCalls: MutableList<Triple<Int, Int, Int>> = mutableListOf()
 
+    /** Counts clearGardenCache() calls (NTV3). */
+    var gardenCacheClearCount: Int = 0
+
     override fun postToUi(action: () -> Unit) {
         postedActions.add(action)
         if (executePostedImmediately) action()
@@ -90,4 +93,6 @@ class FakeBridgeHost(
         captureScreenshotCalls.add(Triple(topCropDp, maxDim, jpegQuality))
         return captureScreenshotResult
     }
+
+    override fun clearGardenCache() { gardenCacheClearCount++ }
 }

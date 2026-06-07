@@ -904,6 +904,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
   const clearAllPersonalData = async () => {
     try {
+      // NTV3: wipe the native Garden image disk cache too (Android: cacheDir/garden,
+      // capped at 800 MB — it survived "Clear All" before because the JS wipe only
+      // touched IDB + localStorage). Best-effort + a no-op on web; never block the
+      // data wipe on it.
+      try { PlatformBridge.clearGardenCache(); } catch (_e) { /* best-effort native cache wipe */ }
       _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
       // W2.4 + W2.4-hotfix: Clear ALL user-data IDB databases. The
       // pre-hotfix version fired deleteDatabase() then reloaded

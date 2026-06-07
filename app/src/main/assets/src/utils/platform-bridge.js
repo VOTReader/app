@@ -77,6 +77,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(maxBytes: number) => string} v3ImportReadChunk
  * @property {() => void} v3ImportClose
  * @property {() => string} getCrashLog
+ * @property {() => void} clearGardenCache
  */
 
 /**
@@ -164,6 +165,9 @@ const androidImpl = {
   v3ImportClose: () => /** @type {any} */ (window).AndroidBridge.v3ImportClose(),
   // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
   getCrashLog: () => mergeCrashLog(/** @type {any} */ (window).AndroidBridge.getCrashLog()),
+  // NTV3: wipe the native Garden image disk cache (cacheDir/garden, up to 800 MB).
+  // Called from "Clear All My Data" so the native cache doesn't survive the wipe.
+  clearGardenCache: () => /** @type {any} */ (window).AndroidBridge.clearGardenCache(),
 };
 
 // ── Web impl: placeholders (W1.3 / W1.4 / W1.5 fill in actual behavior) ─
@@ -867,6 +871,9 @@ const webImpl = {
   getZoomScale: () => 1.0,
   // W7.4: the JS DiagnosticLog IS the web crash log (no native log to merge).
   getCrashLog: () => DiagnosticLog.toJSON(),
+  // NTV3: web has no app-managed Garden cache (Garden <img>s are browser
+  // HTTP-cached); "Clear All" deletes the IDB data, so this is a genuine no-op.
+  clearGardenCache: () => {},
 
   // Category 3 — real web impls
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)

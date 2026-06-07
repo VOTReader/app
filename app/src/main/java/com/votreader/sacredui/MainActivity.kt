@@ -145,6 +145,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override val activityWindow: Window get() = window
     override val activeWebView: WebView get() = webView
     override val audioSystemService: AudioManager? get() = audioManager
+    // NTV3: wipe the native Garden image disk cache from the JS "Clear All" flow.
+    override fun clearGardenCache() { gardenCache.clear() }
     override fun postToUi(action: () -> Unit) = runOnUiThread(action)
     override fun launchFilePicker() {
         filePickerLauncher.launch("application/json")
