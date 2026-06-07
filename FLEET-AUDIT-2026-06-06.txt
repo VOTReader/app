@@ -128,7 +128,7 @@ P2  gates + correctness tail
   ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             DONE
   NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) DONE
   NAV3  [MED]  __goSearch bridge effect: no deps, unconditional null on cleanup  ADJUD
-  APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     OPEN
+  APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     DONE
   PERF3 [MED]  Reading screens re-render full verse list on every scroll-flush   OPEN
   PERF4 [MED]  content-visibility:auto unused (safe win at chrome108 floor)      OPEN
   TEST1 [MED]  tabs.js + highlight.jsx at 0% coverage (load-bearing pure utils)  DONE
@@ -347,6 +347,12 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  APP2 landed (commit pending): use-scroll-memory Effect 3 (scroll restore
+            on nav) was a PASSIVE useEffect → ran after paint → the new screen
+            flashed at scroll 0 for a frame. Made it useLayoutEffect (runs before
+            paint). Safe + effective because __scrollEl is a ScreenLayout ref
+            CALLBACK (attached during commit, before this parent layout effect);
+            client-only, no SSR caveat. Sync write + rAF unchanged. 2092 tests pass.
 2026-06-07  NAV2 landed (commit pending): only LetterView + WtlbEntryView consume
             the navHandoff 'pendingHighlight' slot (grep-verified), but the two set
             sites (goToLetterFromMatthew, openInAppLetter) set it for EVERY dest
