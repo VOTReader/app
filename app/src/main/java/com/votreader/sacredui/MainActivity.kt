@@ -601,6 +601,10 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 val crashed = detail?.didCrash() ?: false
                 Timber.w("WebView renderer died (crashed=%b). Recovering.", crashed)
 
+                // NTV1: the JS endAudioSession() can't fire — the renderer that owned
+                // the recording is gone — so restore the audio mode here.
+                restoreAudioModeIfActive()
+
                 val decision = MainActivityLogic.decideRecovery(
                     vm.firstRecoveryMs, vm.renderRecoveryCount, System.currentTimeMillis()
                 )
@@ -901,12 +905,31 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         webView.onResume()
     }
 
+    /**
+     * NTV1: if a recording session is still active when this surface tears down, the
+     * JS endAudioSession() may never fire (renderer crash / activity finish) — leaving
+     * the device stuck in MODE_IN_COMMUNICATION (whole-device earpiece routing) until
+     * something else resets it. Restore the saved prior mode. Guarded on the current
+     * mode AND only called from teardown paths (onRenderProcessGone / onDestroy) where
+     * no live recording can exist, so it can never disturb an in-progress capture.
+     * No-op when audioManager isn't cached yet or the mode was never overridden.
+     */
+    private fun restoreAudioModeIfActive() {
+        val am = audioManager ?: return
+        if (am.mode == AudioManager.MODE_IN_COMMUNICATION) {
+            try { am.mode = vm.previousAudioMode } catch (e: Exception) { Timber.w(e, "restoreAudioMode failed") }
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         webView.onPause()
     }
 
     override fun onDestroy() {
+        // NTV1: restore the audio mode if a recording session was still active
+        // (the activity is finishing; the JS teardown may not have run).
+        restoreAudioModeIfActive()
         // Resolve any in-flight WebView resource requests before the WebView
         // is torn down. A held PermissionRequest / file-chooser callback is
         // bound to this (dying) WebView; leaving it unresolved leaks it and
