@@ -30,7 +30,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
   blobToBase64, base64ToBlob, buildExportPayload, applyImportPayload,
-  buildV3Manifest, applyV3, DEFAULT_MEDIA_LIMIT_BYTES, formatImportSpaceWarning,
+  buildV3Manifest, applyV3, verifyImportCounts, DEFAULT_MEDIA_LIMIT_BYTES, formatImportSpaceWarning,
 } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
 
@@ -324,7 +324,7 @@ describe('applyImportPayload', () => {
         validateStorePayload: okValidate, validateMediaRecord: okValidate,
       },
     );
-    expect(res).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [] });
+    expect(res).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] });
     expect(ann.calls).toEqual([{ k: [] }]);
     expect(wel.set).toHaveBeenCalledTimes(1);
     expect(wel.clear).not.toHaveBeenCalled();
@@ -507,6 +507,62 @@ describe('applyImportPayload', () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────
+   PART 3a — verifyImportCounts (BAK3 — the manifest counts-integrity check)
+   ───────────────────────────────────────────────────────────────────── */
+describe('verifyImportCounts (BAK3)', () => {
+  it('returns [] for a legacy/absent counts block (nothing to verify)', () => {
+    expect(verifyImportCounts({}, 0)).toEqual([]);
+    expect(verifyImportCounts({ counts: null }, 0)).toEqual([]);
+    expect(verifyImportCounts(null, 0)).toEqual([]);
+  });
+
+  it('reconciles a clean manifest (counts match the payload + media applied)', () => {
+    const manifest = {
+      counts: { _media: 2, 'vot-annotations': 1, 'vot-bookmarks': 3 },
+      stores: { 'vot-annotations': { a: [] }, 'vot-bookmarks': [1, 2, 3] },
+    };
+    expect(verifyImportCounts(manifest, 2)).toEqual([]);
+  });
+
+  it('flags fewer media frames applied than declared (silent partial media import)', () => {
+    const manifest = { counts: { _media: 5 }, stores: {} };
+    expect(verifyImportCounts(manifest, 4)).toEqual(['media 4/5']);
+  });
+
+  it('flags a store whose payload disagrees with its declared count (corrupt/edited manifest)', () => {
+    // counts says 3 records but the stores block only carries 1 — a truncated or
+    // hand-edited backup. (A clean export can never produce this; both are derived
+    // from the same payload at build time.)
+    const manifest = { counts: { 'vot-notes': 3 }, stores: { 'vot-notes': { only: 'one' } } };
+    expect(verifyImportCounts(manifest, 0)).toEqual(['vot-notes 1/3']);
+  });
+
+  it('does NOT flag a forward-compat store present in counts+payload but not applied', () => {
+    // A future store the importer doesn't know about still reconciles here, because
+    // we compare the manifest's counts to the manifest's OWN payload — not the live
+    // store. So an unknown store never produces a spurious "didn't restore".
+    const manifest = { counts: { 'vot-future': 2 }, stores: { 'vot-future': [1, 2] } };
+    expect(verifyImportCounts(manifest, 0)).toEqual([]);
+  });
+
+  it('applyV3 surfaces a media shortfall via countMismatches', async () => {
+    // A v3 manifest declaring 2 media frames, but the entries stream yields 1 →
+    // the count check catches the shortfall the streaming success path can't.
+    const media = { allIds: async () => [], delete: async () => {}, put: async () => {} };
+    async function* oneFrame() {
+      // The fake put() ignores the blob, so a plain Uint8Array stands in for it.
+      yield { id: 'm1', meta: { mime: 'image/png', size: 3 }, blob: new Uint8Array([1, 2, 3]) };
+    }
+    const res = await applyV3(
+      { counts: { _media: 2 }, stores: {} },
+      oneFrame(),
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: () => [] },
+    );
+    expect(res.countMismatches).toEqual(['media 1/2']);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────
    PART 3b — applyV3 (the v3 streaming-import applier, P1)
    ───────────────────────────────────────────────────────────────────── */
 describe('applyV3', () => {
@@ -566,7 +622,7 @@ describe('applyV3', () => {
       flagMap: { 'vot-welcomed': wel }, mediaStore: media, validateStorePayload: okValidate,
     });
 
-    expect(res).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [] });
+    expect(res).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] });
     expect(ann.calls).toEqual([{ k: [{ id: 'a' }] }]);     // stores reconstructed exactly
     expect(bkm.calls).toEqual([[{ id: 'b' }]]);
     expect(wel.set).toHaveBeenCalledTimes(1);              // flag reconstructed
@@ -789,7 +845,7 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
       mediaStore: JournalMediaStore,
       validateStorePayload, validateMediaRecord,
     });
-    expect(importRes).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [] });
+    expect(importRes).toEqual({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] });
 
     // ── RELOAD: drop in-memory caches + the IDB connection, re-hydrate ──
     ALL_STORES.forEach((s) => s._resetForTests()); // → 'pending', cache null

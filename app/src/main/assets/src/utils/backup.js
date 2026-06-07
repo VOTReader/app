@@ -443,6 +443,50 @@ async function _awaitDurability(storesMap, flagMap) {
 }
 
 /**
+ * BAK3 — verify the manifest's `counts` integrity block against what actually
+ * landed during import. The counts (per-store record counts + `_media`) are
+ * written at export but, before this, nothing read them: a truncated container,
+ * a partial media decode, or a hand-edited manifest could import with a silent
+ * shortfall on the user's ONLY backup.
+ *
+ * Returns a list of human-readable mismatch strings (empty when everything
+ * reconciles). Pure + side-effect-free so the data path stays testable; the
+ * caller surfaces/logs the result. ADVISORY — a mismatch never fails the import
+ * (a forward-compat store the importer doesn't apply still reconciles here,
+ * because we compare the manifest's counts to the manifest's own payload, not to
+ * the live store). Absent/legacy `counts` (v1 backups) → [] (nothing to verify).
+ *
+ * @param {any} manifest - the manifest/parsed envelope (has .counts, .stores)
+ * @param {number} mediaApplied - media records successfully written this import
+ * @returns {string[]}
+ */
+export function verifyImportCounts(manifest, mediaApplied) {
+  const counts = manifest && manifest.counts;
+  if (!counts || typeof counts !== 'object') return [];
+  const stores = (manifest && manifest.stores) || {};
+  /** @type {string[]} */
+  const mismatches = [];
+  for (const name of Object.keys(counts)) {
+    if (name === '_media') {
+      if (typeof counts._media === 'number' && mediaApplied !== counts._media) {
+        mismatches.push(`media ${mediaApplied}/${counts._media}`);
+      }
+      continue;
+    }
+    const declared = counts[name];
+    if (typeof declared !== 'number') continue;
+    const payload = stores[name];
+    const actual = Array.isArray(payload)
+      ? payload.length
+      : (payload && typeof payload === 'object'
+        ? Object.keys(payload).length
+        : (payload != null ? 1 : 0));
+    if (declared !== actual) mismatches.push(`${name} ${actual}/${declared}`);
+  }
+  return mismatches;
+}
+
+/**
  * @typedef {Object} ApplyImportCtx
  * @property {StoresMap} storesMap
  * @property {FlagMap}   flagMap
@@ -467,7 +511,7 @@ async function _awaitDurability(storesMap, flagMap) {
  *
  * @param {any} parsed                 the parsed backup envelope
  * @param {ApplyImportCtx} ctx
- * @returns {Promise<{ importFailures: number, writeFailures: number, skippedStores: string[] }>}
+ * @returns {Promise<{ importFailures: number, writeFailures: number, skippedStores: string[], countMismatches: string[] }>}
  */
 export async function applyImportPayload(parsed, ctx) {
   const {
@@ -479,6 +523,7 @@ export async function applyImportPayload(parsed, ctx) {
 
   const exportVersion = (parsed && parsed.exportVersion) || 1;
   let importFailures = 0;
+  let mediaApplied = 0; // BAK3 — media records successfully written (counts check)
   // Stores whose payload failed shape validation — skipped (not written)
   // so a corrupt section can't overwrite good data or, for the
   // non-coercing stores (state, home-order), persist garbage.
@@ -566,6 +611,7 @@ export async function applyImportPayload(parsed, ctx) {
           width: record.width, height: record.height, duration: record.duration,
           created: record.created,
         });
+        mediaApplied += 1;
       } catch (e) { importFailures += 1; console.warn('media import failed for', id, e); }
     }
     if (mediaCapHit) {
@@ -586,7 +632,7 @@ export async function applyImportPayload(parsed, ctx) {
   // before returning (the caller reloads right after; media is already durable).
   const writeFailures = await _awaitDurability(storesMap, flagMap);
 
-  return { importFailures, writeFailures, skippedStores };
+  return { importFailures, writeFailures, skippedStores, countMismatches: verifyImportCounts(parsed, mediaApplied) };
 }
 
 /**
@@ -611,7 +657,7 @@ export async function applyImportPayload(parsed, ctx) {
  * @param {any} manifest - the v3 manifest (readContainer().manifest)
  * @param {Iterable<{id:any, meta:any, blob:Blob}> | AsyncIterable<{id:any, meta:any, blob:Blob}>} entries
  * @param {ApplyImportCtx} ctx
- * @returns {Promise<{ importFailures: number, writeFailures: number, skippedStores: string[] }>}
+ * @returns {Promise<{ importFailures: number, writeFailures: number, skippedStores: string[], countMismatches: string[] }>}
  */
 export async function applyV3(manifest, entries, ctx) {
   const {
@@ -640,6 +686,7 @@ export async function applyV3(manifest, entries, ctx) {
   // rather than wiped (BACKUP-STREAMING-PLAN verification bar). No base64, no
   // aggregate cap — streaming is bounded per-blob (GB-scale safe).
   let importFailures = 0;
+  let mediaApplied = 0; // BAK3 — frames successfully written (counts check)
   // BAK6: a Set (not a plain object) — a media id of "__proto__"/"constructor"
   // would make object-key bookkeeping (streamedIds[id]) silently lie.
   /** @type {Set<string>} */
@@ -654,6 +701,7 @@ export async function applyV3(manifest, entries, ctx) {
         width: m.width, height: m.height, duration: m.duration,
         created: m.created,
       });
+      mediaApplied += 1;
     } catch (e) { importFailures += 1; console.warn('media import failed for', entry.id, e); }
   }
   // Reached ONLY after the full stream landed (a throw above skips it): prune the
@@ -681,7 +729,7 @@ export async function applyV3(manifest, entries, ctx) {
   );
   const writeFailures = saveResults.filter((ok) => !ok).length;
 
-  return { importFailures, writeFailures, skippedStores };
+  return { importFailures, writeFailures, skippedStores, countMismatches: verifyImportCounts(manifest, mediaApplied) };
 }
 
 /**

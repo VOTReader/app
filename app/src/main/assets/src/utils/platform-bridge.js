@@ -64,7 +64,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
  * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string) => void} saveToFile
- * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void> } | null>} openExportSink
+ * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
  * @property {() => Promise<Blob | null>} pickImportFile
  * @property {(suggestedName: string) => void} v3ExportOpen
  * @property {(manifestJson: string) => string} v3ExportBegin
@@ -410,10 +410,11 @@ function webSaveToFile(suggestedName, content) {
 // chunked bridge (P3) and implement the SAME { write, close } / File contract.
 
 /**
- * Open a streaming WRITE sink for an export. Returns { write, close }, or null
- * if the user cancelled the destination picker.
+ * Open a streaming WRITE sink for an export. Returns { write, close, abort }, or
+ * null if the user cancelled the destination picker. abort() discards a partial
+ * write on failure (BAK5) so a mid-stream error can't leave a truncated backup.
  * @param {string} suggestedName
- * @returns {Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void> } | null>}
+ * @returns {Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>}
  */
 async function webOpenExportSink(suggestedName) {
   const picker = /** @type {any} */ (window).showSaveFilePicker;
@@ -432,6 +433,11 @@ async function webOpenExportSink(suggestedName) {
     return {
       write: (chunk) => writable.write(chunk),
       close: () => writable.close(),
+      // BAK5: createWritable() commits to the target file only on close()
+      // (temp-swap), so abort() drops the in-progress data and leaves the user's
+      // existing file intact — deterministic cleanup instead of relying on GC of
+      // an unclosed stream. The only backup must never leave a truncated .votbak.
+      abort: () => writable.abort(),
     };
   }
   // Fallback: accumulate chunks, download as a Blob on close. No streaming-to-disk
@@ -441,6 +447,9 @@ async function webOpenExportSink(suggestedName) {
   const chunks = [];
   return {
     write: (chunk) => { chunks.push(chunk.slice()); return Promise.resolve(); },
+    // BAK5: nothing is written to disk until close() triggers the download, so
+    // abort just drops the buffered chunks — no partial file can exist on this path.
+    abort: () => { chunks.length = 0; return Promise.resolve(); },
     close: () => {
       try {
         // Cast: TS lib types Uint8Array as Uint8Array<ArrayBufferLike>, which it
