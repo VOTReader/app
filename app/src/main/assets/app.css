@@ -973,7 +973,9 @@
     /* Push first paragraph below the fixed sticky-nav circles (~57px tall from content top).
        Only applies when circles are visible (not in nav-bar or off mode). */
     body:not(.arrows-nav):not(.arrows-off) .letter-body { padding-top: 4rem; }
-    .letter-para { font-size:1.08rem; line-height:1.8; color:var(--cream); margin-bottom:1.8rem; }
+    /* PERF4: defer off-screen paragraph layout/paint on long letters (DOM-preserving —
+       the imperative [data-hl-dom] annotation passes + scroll-to-highlight still work). */
+    .letter-para { font-size:1.08rem; line-height:1.8; color:var(--cream); margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 140px; }
     .letter-intro { font-size:1.12rem; line-height:1.85; color:var(--cream); margin-bottom:1.8rem; }
     .study-heading { font-family:'Cinzel',serif; font-size:1.05rem; letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; text-align:center; margin:2.6rem 0 1.1rem; line-height:1.4; }
     .study-heading-l3 { font-size:0.82rem; color:var(--gold-dim); letter-spacing:0.18em; margin:2rem 0 0.85rem; }
@@ -1824,7 +1826,14 @@
     .total-row .progress-row-label { color:var(--gold); }
     .total-row .progress-row-tally { color:var(--gold); }
     /* ── SECTION HEADINGS (Bible reader) ── */
-    .section-block { margin-bottom:1.8rem; }
+    /* PERF4: skip layout/paint of off-screen verse sections on long chapters
+       (Psalm 119 = 176 verses). content-visibility:auto is DOM-PRESERVING — the
+       nodes still exist, so scroll-to-verse (getElementById) + the annotation
+       passes work unchanged; only rendering of off-screen sections is deferred.
+       `contain-intrinsic-size: auto <est>` lets the browser remember each section's
+       real height after its first paint, so the placeholder estimate only affects
+       the very first scroll past it (minimal jank). chrome108 floor supports it. */
+    .section-block { margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 500px; }
     .section-heading { font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.7rem; padding-bottom:0.4rem; border-bottom:1px solid var(--gold-border); }
     /* Poetic books (Psalms, Proverbs, etc.) render each verse on its own line */
     .verses-block.is-poetry .verse { display:block; margin-bottom:0.5rem; text-indent:0; padding-left:1.8rem; position:relative; }
