@@ -2,7 +2,7 @@
    HomeScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onInfo, onAbout, history: _history, theme, onThemeChange }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onInfo, onAbout, history: _history, theme, onThemeChange, translation }) {
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all
@@ -20,7 +20,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
 
   const ITEMS_BY_ID = {
     volumes: { id: "volumes", eyebrow: "Prophetic Letters", title: "The Volumes of Truth", detail: "Letters from The Lord, Our God and Savior" },
-    scriptures: { id: "scriptures", eyebrow: "The Holy Bible", title: "The Scriptures of Truth", detail: "Genesis to Revelation · NKJV" },
+    scriptures: { id: "scriptures", eyebrow: "The Holy Bible", title: "The Scriptures of Truth", detail: `Genesis to Revelation · ${translationLabel(translation)}` },
     studies: { id: "studies", eyebrow: "Study Editions", title: "Studies", detail: "Letter Studies · Matthew Study Bible" },
     library: { id: "library", eyebrow: "Personal Study", title: "Library", detail: "Notes, journal & bookmarks" },
     settings: { id: "settings", eyebrow: "App Configuration", title: "Settings", detail: "Display, themes & preferences" },

@@ -624,14 +624,13 @@
       }
       .hero-title {
         font-family: 'Cinzel Decorative', serif;
-        font-size: clamp(2.8rem, 10vw, 5.5rem);
-        color: var(--cream); line-height: 1.12; margin-bottom: 1.6rem;
+        /* Standardized reading-title size — gentle responsive scale that sits
+           just above the index titles (.vol-index-title 2.2rem) and never
+           balloons past 2.6rem. Length-independent: a long title wraps at the
+           same size as a short one (the old .hero-title-long shrink is gone). */
+        font-size: clamp(1.8rem, 5vw, 2.6rem);
+        color: var(--cream); line-height: 1.2; margin-bottom: 1.6rem;
         overflow-wrap: break-word; word-wrap: break-word;
-      }
-      .hero-title.hero-title-long {
-        font-size: clamp(1.4rem, 5.5vw, 2.2rem);
-        font-family: 'Cinzel', serif;
-        line-height: 1.3;
       }
       .hero-subtitle {
         font-family: 'EB Garamond', serif; font-size: 1.05rem; font-style: italic;
@@ -858,7 +857,6 @@
       /* ── ANIMATIONS ── */
     
       @media (max-width: 500px) {
-        .hero-title { font-size: 1.8rem; }
         .vol-index-title { font-size: 1.8rem; }
         .mode-toggle-wrap { bottom: 1rem; right: 1rem; }
         .mode-btn { padding: 0.5rem 0.75rem; font-size: 0.58rem; }

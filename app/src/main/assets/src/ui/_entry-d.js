@@ -77,6 +77,7 @@ import {
 import {
   _translationPromises, _translationLoaded, _bibleStudiesPromise,
   loadTranslation, loadBibleStudies, translateVerse,
+  translationLabel, translationName,
 } from '../data/translations.js';
 
 // ── Components ──────────────────────────────────────────────────────────
@@ -204,6 +205,7 @@ Object.assign(window, {
   openThumbDB, idbPut, idbDelete, idbReadAll,
   _translationPromises, _translationLoaded, _bibleStudiesPromise,
   loadTranslation, loadBibleStudies, translateVerse,
+  translationLabel, translationName,
   // Components
   Segments, ProphecyCard, ProphecyGroup,
   VerseWithNumbers, _fnTextRedundantWithLink,

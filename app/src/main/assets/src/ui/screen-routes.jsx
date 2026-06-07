@@ -308,6 +308,7 @@ export function buildScreenRoutes({
         onInfo={() => setShowWelcome(true)}
         onAbout={goAbout}
         history={readHistory}
+        translation={settings.translation}
         theme={theme} onThemeChange={setTheme}
       />
     ),
@@ -506,6 +507,7 @@ export function buildScreenRoutes({
         onMatthewStudy={() => { setBookId('matthew'); setChapterNum(null); setScreen('matthew-idx'); }}
         theme={theme} onThemeChange={setTheme}
         layout={settings.scriptureLayout}
+        translation={settings.translation}
       />
     ),
     'scripture-genre': () => genreId && (

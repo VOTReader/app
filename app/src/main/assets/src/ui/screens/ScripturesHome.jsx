@@ -2,7 +2,7 @@
    ScripturesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout }) {
+export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, translation }) {
   // Q8: pre-trigger the Bible corpus load when this screen mounts so the
   // user's likely next action (tap a genre tile or book) doesn't pay the
   // full ~7 MB download wait. The subscription re-renders this component
@@ -57,7 +57,7 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
 
   const hero = (
     <>
-      <div className="home-eyebrow">New King James Version</div>
+      <div className="home-eyebrow">{translationName(translation)}</div>
       <h1 className="home-title">The Scriptures of Truth</h1>
       <div className="home-ornament">
         <div className="home-ornament-line" />

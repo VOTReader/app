@@ -185,7 +185,7 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
         <div className={`hero-bg ${studyMode ? "study" : "vol"}`} />
         <div className="hero-content">
           <div className="hero-eyebrow">{volumeLabel || "Volume Two"} {"\xA0\xB7\xA0"} {studyMode ? letter.num === 0 ? "Preface" : `Chapter ${letter.num}` : letter.num === 0 ? "Preface" : `Letter ${letter.num}`}</div>
-          <h1 className={`hero-title${letter.title && letter.title.length > 25 ? " hero-title-long" : ""}`}>{letter.title}</h1>
+          <h1 className="hero-title">{letter.title}</h1>
           {letter.subtitle && <div className="hero-subtitle">{letter.subtitle}</div>}
           <div className="hero-ornament">
             <div className="hero-ornament-line" />

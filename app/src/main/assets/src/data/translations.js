@@ -80,3 +80,37 @@ export function translateVerse(bookId, chNum, verse, translation) {
   return (t !== undefined) ? t : verse.text;
 }
 
+// ── Translation display labels ──────────────────────────────────────────
+// The chrome that names the active Bible version (the home "Scriptures of
+// Truth" card, the Scriptures hero eyebrow) must reflect settings.translation,
+// not a hardcoded "NKJV". Both helpers read TRANSLATION_OPTIONS — the window
+// global defined in index.html and the single source of truth for the list —
+// so a new translation auto-flows everywhere with no extra wiring. Both fall
+// back to the NKJV strings when the code is unknown or the registry isn't
+// loaded (e.g. a jsdom test that never ran index.html).
+
+/**
+ * Short UI tag for a translation code, e.g. "nkjv" -> "NKJV", "kjv" -> "KJV".
+ * @param {string} [code] settings.translation id (default "nkjv")
+ * @returns {string}
+ */
+export function translationLabel(code) {
+  const opts = (typeof TRANSLATION_OPTIONS !== 'undefined') ? TRANSLATION_OPTIONS : null;
+  const found = opts && opts.find((o) => o.id === (code || 'nkjv'));
+  return found ? found.label : 'NKJV';
+}
+
+/**
+ * Full human name for a translation code, e.g. "nkjv" -> "New King James
+ * Version". Derived from the registry `desc` (the part before the " — "
+ * editorial note). Used for the Scriptures hero eyebrow.
+ * @param {string} [code] settings.translation id (default "nkjv")
+ * @returns {string}
+ */
+export function translationName(code) {
+  const opts = (typeof TRANSLATION_OPTIONS !== 'undefined') ? TRANSLATION_OPTIONS : null;
+  const found = opts && opts.find((o) => o.id === (code || 'nkjv'));
+  if (!found) return 'New King James Version';
+  return found.desc.split(/\s[—–-]\s/)[0];
+}
+

@@ -15,7 +15,7 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-1fd991a59c';
+const CACHE_VERSION = 'v1.0.2-9f7c474367';
 const CORPUS_VERSION = 'c8'; // c7→c8 (2026-06-04): CORP-2 — fixed the SAME CORP-1 dead-link class in the holy-days.js clone of the "CUP OF THE WRATH" footnote (display label → registryLabel); now caught by the validator's new cross-ref resolution pass. (c6→c7: CORP-1 in volume-seven. c5→c6: PF1 minified the lazy corpus bundles.)
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
