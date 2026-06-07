@@ -2185,6 +2185,12 @@
       transition:all 0.2s ease;
       overflow:hidden;
       -webkit-tap-highlight-color:transparent;
+      /* pan-y lets the overview scroll when a finger lands on a card; once the
+         long-press drag activates, the move handler preventDefaults to lock it.
+         user-select / touch-callout off kills the native Android long-press
+         menu that used to fire on top of the JS gesture. */
+      touch-action:pan-y;
+      user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
     }
     /* Thumbnail fills the entire card; text sits on top with a scrim */
     .tab-card-thumb-wrap {
@@ -2295,6 +2301,44 @@
       font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.22em;
       text-transform:uppercase;
     }
+
+    /* ── TABS: drag-to-reorder (mirrors Home long-press drag) ───── */
+    .tab-card.pressing {
+      border-color:var(--gold-dim);
+      box-shadow:0 0 14px rgba(200,164,86,0.18), inset 0 0 0 1px rgba(200,164,86,0.15);
+    }
+    /* Hold-progress bar fills along the bottom edge over ~1s */
+    .tab-card.pressing::after {
+      content:''; position:absolute; left:0; bottom:0; height:2px; width:0%;
+      background:linear-gradient(90deg, var(--gold-dim), var(--gold), var(--gold-bright));
+      box-shadow:0 0 8px var(--gold-glow);
+      animation:tabPressFill 1s linear forwards; z-index:4;
+    }
+    @keyframes tabPressFill { to { width:100%; } }
+    /* Ghost — original holds its grid slot, invisible, while the clone flies */
+    .tab-card.dragging { opacity:0 !important; pointer-events:none; }
+    /* Flying clone — fixed-position card that follows the finger */
+    .tab-card.drag-flying {
+      border-color:var(--gold); border-radius:10px; cursor:grabbing;
+      box-shadow:0 20px 44px rgba(0,0,0,0.65), 0 0 32px rgba(200,164,86,0.32), 0 0 0 1px var(--gold);
+    }
+    body.light .tab-card.drag-flying {
+      box-shadow:0 20px 44px rgba(0,0,0,0.18), 0 0 28px rgba(122,92,16,0.28), 0 0 0 1px var(--gold);
+    }
+    /* "Tab actions" (⋮) button — sibling of the × close, offset to its left */
+    .tab-card-menu {
+      position:absolute; top:0.35rem; right:2.45rem;
+      width:1.9rem; height:1.9rem; border-radius:50%;
+      background:rgba(0,0,0,0.55); border:0; cursor:pointer;
+      font-size:1.15rem; line-height:1; color:var(--gold);
+      display:flex; align-items:center; justify-content:center;
+      transition:all 0.18s ease; z-index:3;
+      backdrop-filter:blur(4px);
+      -webkit-tap-highlight-color:transparent;
+    }
+    body.light .tab-card-menu { background:rgba(247,242,232,0.6); color:var(--gold); }
+    .tab-card-menu:active { background:var(--gold-faint); color:var(--gold); }
+    @media (hover:hover) { .tab-card-menu:hover { background:rgba(200,164,86,0.10); color:var(--gold-bright); } }
 
     /* ── TABS: disable-tabs 3-strike dialog ─────────────────────── */
     .disable-tabs-overlay {

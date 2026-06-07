@@ -14,7 +14,7 @@
 
    OWNS:
      - openNewTab / switchToTab / closeTab / closeOtherTabs /
-       closeTabsToTheRight / closeAllTabs / deduplicateTabs
+       closeTabsToTheRight / closeAllTabs / deduplicateTabs / reorderTabs
      - tabActionIdx        long-press target for TabActionSheet
      - disableTabsPromptOpen   the "disable tabs?" dialog gate (raised by
                                 the closeTab 3-strike path)
@@ -42,7 +42,7 @@
      setTabThumbnails — useThumbnails (P6d); closeAllTabs clears them.
 
    RETURNS: { openNewTab, switchToTab, closeTab, closeOtherTabs,
-              closeTabsToTheRight, closeAllTabs, deduplicateTabs,
+              closeTabsToTheRight, closeAllTabs, deduplicateTabs, reorderTabs,
               restoreClosedTab,
               tabActionIdx, setTabActionIdx,
               disableTabsPromptOpen, setDisableTabsPromptOpen,
@@ -74,6 +74,7 @@ const MAX_TABS = 999;
  *   closeTabsToTheRight: (keepIdx: number) => void,
  *   closeAllTabs: () => void,
  *   deduplicateTabs: () => void,
+ *   reorderTabs: (from: number, to: number) => void,
  *   restoreClosedTab: () => void,
  *   tabActionIdx: number | null,
  *   setTabActionIdx: (val: any) => void,
@@ -207,6 +208,26 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
+  // Drag-to-reorder (tabs overview): move the tab at `from` to index `to`,
+  // keeping the SAME tab active afterward. ORDER is the array index, so the
+  // splice IS the move; usePersistedState writes the new order for free.
+  const reorderTabs = React.useCallback((from, to) => {
+    if (from === to) return;
+    setTabs((prev) => {
+      if (from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
+      const next = prev.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      // Keep the previously-active tab active across the move.
+      setActiveTabIdx((cur) => {
+        if (cur === from) return to;
+        if (from < to) return (cur > from && cur <= to) ? cur - 1 : cur;
+        return (cur >= to && cur < from) ? cur + 1 : cur;
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
+  }, []);
   const closeAllTabs = React.useCallback(() => {
     setTabs([{ ...DEFAULT_TAB }]);
     setActiveTabIdx(0);
@@ -241,7 +262,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
 
   return {
     openNewTab, switchToTab, closeTab, closeOtherTabs,
-    closeTabsToTheRight, closeAllTabs, deduplicateTabs,
+    closeTabsToTheRight, closeAllTabs, deduplicateTabs, reorderTabs,
     restoreClosedTab,  // UX7: re-insert the last-closed tab (wired to the undo toast)
     tabActionIdx, setTabActionIdx,
     disableTabsPromptOpen, setDisableTabsPromptOpen,

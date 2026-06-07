@@ -31,7 +31,7 @@ export function AppShellOverlays({
   tabsOverviewOpen, setTabsOverviewOpen,
   tabs, activeTabIdx, tabThumbnails, MAX_TABS,
   switchToTab, closeTab, openNewTab,
-  closeOtherTabs, closeTabsToTheRight, closeAllTabs, deduplicateTabs,
+  closeOtherTabs, closeTabsToTheRight, closeAllTabs, deduplicateTabs, reorderTabs,
   tabActionIdx, setTabActionIdx,
   lastTabCloseStrikesRef,
   // Disable-tabs prompt
@@ -128,7 +128,8 @@ export function AppShellOverlays({
               onSelect={(i) => {lastTabCloseStrikesRef.current = 0;switchToTab(i);setTabsOverviewOpen(false);}}
               onClose={(i) => closeTab(i)}
               onNewTab={() => {lastTabCloseStrikesRef.current = 0;openNewTab();setTabsOverviewOpen(false);}}
-              onLongPress={(i) => setTabActionIdx(i)}
+              onMenu={(i) => setTabActionIdx(i)}
+              onReorder={(from, to) => reorderTabs(from, to)}
               onClearAll={() => { closeAllTabs(); lastTabCloseStrikesRef.current = 0; }}
               onDedupe={() => deduplicateTabs()}
               MAX_TABS={MAX_TABS}

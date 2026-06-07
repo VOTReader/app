@@ -60,3 +60,55 @@ describe('useTabActions — UX7 tab-close undo', () => {
     expect(ts.setTabs).not.toHaveBeenCalled();
   });
 });
+
+/* Drag-to-reorder: reorderTabs splices from->to and remaps activeTabIdx so the
+   previously-active tab stays active. The spy setters don't auto-apply, so we
+   capture the functional updaters and assert their output directly. */
+describe('useTabActions — reorderTabs (drag-to-reorder)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('moves a tab from -> to, preserving the rest of the order', () => {
+    const ts = makeTabState([tab('a'), tab('b'), tab('c')]);
+    const { result } = mount(ts);
+    act(() => { result.current.reorderTabs(0, 2); });
+    const upd = ts.setTabs.mock.calls[0][0];
+    expect(upd([tab('a'), tab('b'), tab('c')]).map((t) => t.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('keeps the moved tab active (active index follows the move)', () => {
+    const ts = makeTabState([tab('a'), tab('b'), tab('c')]); // active = 0 (a)
+    const { result } = mount(ts);
+    act(() => { result.current.reorderTabs(0, 2); });
+    // Applying the setTabs updater triggers the inner setActiveTabIdx.
+    ts.setTabs.mock.calls[0][0]([tab('a'), tab('b'), tab('c')]);
+    expect(ts.setActiveTabIdx.mock.calls[0][0](0)).toBe(2);
+  });
+
+  it('remaps every index correctly for an upward (right->left) move', () => {
+    const ts = makeTabState([tab('a'), tab('b'), tab('c')]);
+    const { result } = mount(ts);
+    act(() => { result.current.reorderTabs(2, 0); });   // [c, a, b]
+    expect(ts.setTabs.mock.calls[0][0]([tab('a'), tab('b'), tab('c')]).map((t) => t.id))
+      .toEqual(['c', 'a', 'b']);
+    const remap = ts.setActiveTabIdx.mock.calls[0][0];
+    expect(remap(2)).toBe(0); // c (the moved one)
+    expect(remap(0)).toBe(1); // a shifts right
+    expect(remap(1)).toBe(2); // b shifts right
+  });
+
+  it('is a no-op when from === to', () => {
+    const ts = makeTabState([tab('a'), tab('b')]);
+    const { result } = mount(ts);
+    act(() => { result.current.reorderTabs(1, 1); });
+    expect(ts.setTabs).not.toHaveBeenCalled();
+  });
+
+  it('guards out-of-range indices (returns prev unchanged, no active remap)', () => {
+    const ts = makeTabState([tab('a'), tab('b')]);
+    const { result } = mount(ts);
+    act(() => { result.current.reorderTabs(0, 5); });
+    const prev = [tab('a'), tab('b')];
+    expect(ts.setTabs.mock.calls[0][0](prev)).toBe(prev);
+    expect(ts.setActiveTabIdx).not.toHaveBeenCalled();
+  });
+});
