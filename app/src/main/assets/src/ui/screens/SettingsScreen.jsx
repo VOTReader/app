@@ -842,10 +842,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         if (isContainerMagic(head)) {
           await _importV3Container(file);
         } else {
-          // Legacy JSON. Guard the whole-file text read against a pathological
-          // non-backup pick (v3 is the GB-scale path; legacy backups are small).
-          if (file.size > 300 * 1024 * 1024) {
-            _showToast('That file is too large to be a VOTReader backup.');
+          // Legacy JSON whole-file text read. BAK4: cap at 50 MB to match Android
+          // (StorageManager.MAX_IMPORT_SIZE) + the other web path
+          // (WEB_MAX_IMPORT_BYTES) — v3 is the GB-scale streaming path, a legacy
+          // v1/v2 backup is always well under this, so a larger pick is a
+          // pathological non-backup that a 300 MB .text() read would OOM on a
+          // budget device.
+          if (file.size > 50 * 1024 * 1024) {
+            _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
             return;
           }
           await _doImport(await file.text());

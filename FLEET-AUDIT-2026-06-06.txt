@@ -150,7 +150,7 @@ P3  small wins / hardening / adjudicate
   STOR4 [LOW] _saveMerged structuredClone of largest store on every save         OPEN
   STOR5 [LOW] Lock-unavailable merge fallback is silent (no diagnostic)          DONE
   BAK3 [LOW] `counts` integrity block written but never verified on import       OPEN
-  BAK4 [LOW] Legacy import cap asymmetric: 50 MB Android vs 300 MB web           OPEN
+  BAK4 [LOW] Legacy import cap asymmetric: 50 MB Android vs 300 MB web           DONE
   BAK5 [LOW] Web FS-Access export leaves partial file on mid-stream write fail   OPEN
   BAK6 [INFO] streamedIds plain-object key-set unreliable for id "__proto__"     DONE
   JRNL1 [LOW] Rapid double media-insert relies on debounce for the 2nd block     OPEN
@@ -347,6 +347,11 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  BAK4 landed (commit pending): the v3-aware web import capped a legacy
+            (v1/v2 JSON) whole-file .text() read at 300 MB while Android caps at 50
+            MB (MAX_IMPORT_SIZE) and the older web path at WEB_MAX_IMPORT_BYTES (50
+            MB). Lowered to 50 MB to match both (a 50-300 MB legacy JSON would OOM
+            on a budget device); v3 streaming stays uncapped. Lint+typecheck clean.
 2026-06-07  SRCH3 landed (commit pending, test-only): the engine stamps doc.volumeId
             from VotSearchData.VOLUME_COLLECTIONS[].id; use-search routes via
             COL_BY_SEARCH_ID (scripture-resolution) — two hand-kept registries.
