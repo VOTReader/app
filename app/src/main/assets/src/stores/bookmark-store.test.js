@@ -21,7 +21,7 @@
        false-match `wtlb-one-extra:1` (which starts with `wtlb-one-`).
 */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BookmarkStore } from './bookmark-store.js';
 
 beforeEach(() => {
@@ -216,7 +216,7 @@ describe('BookmarkStore — getForKeyPrefix()', () => {
 });
 
 describe('BookmarkStore — update()', () => {
-  it('patches an existing bookmark and bumps updated', async () => {
+  it('patches an existing bookmark and bumps updated', () => {
     BookmarkStore.add({
       id: 'b1',
       hlKey: 'bible:genesis:1:1',
@@ -226,9 +226,11 @@ describe('BookmarkStore — update()', () => {
     });
     const before = BookmarkStore.get('b1').updated;
 
-    // Small delay so `updated` ts is strictly newer.
-    await new Promise(r => setTimeout(r, 5));
+    // TEST3: deterministic clock advance (was a real setTimeout(r,5)); restore the
+    // mock before the assertions so a failure can't leak it into later tests.
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(before + 10);
     BookmarkStore.update('b1', { label: 'Patched', thought: 'why' });
+    nowSpy.mockRestore();
 
     const bm = BookmarkStore.get('b1');
     expect(bm.label).toBe('Patched');
