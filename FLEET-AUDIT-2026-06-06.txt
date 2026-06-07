@@ -90,7 +90,7 @@ P2  gates + correctness tail
   APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     OPEN
   PERF3 [MED]  Reading screens re-render full verse list on every scroll-flush   OPEN
   PERF4 [MED]  content-visibility:auto unused (safe win at chrome108 floor)      OPEN
-  TEST1 [MED]  tabs.js + highlight.jsx at 0% coverage (load-bearing pure utils)  OPEN
+  TEST1 [MED]  tabs.js + highlight.jsx at 0% coverage (load-bearing pure utils)  DONE
   TEST2 [MED]  React 18.2-runtime vs 19.2-test skew unmitigated/unexercised      OPEN
   SRCH2 [L-M]  Pure-stopword/<=4-word queries skip trimming -> full-corpus scan  OPEN
   BAK2  [L-M]  Missing manifest media `size`: rejected on web, accepted on Android OPEN
@@ -306,6 +306,13 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  TEST1 landed (commit pending): +tabs.test.js (21) + highlight.test.jsx
+            covering the previously-0%-covered load-bearing pure utils —
+            tabContentKey/scrollKeyForTab (tab dedup + scroll-memory keys),
+            describeTab/tabHasProgressBar, and normalizeForHighlight/
+            splitWithHighlight/highlightExcerptInDom (search-result + excerpt
+            highlighting, incl. smart-quote folding + the 8.4s auto-clear). Test-
+            only, no source change. lint + typecheck clean.
 2026-06-07  Hardening batch (commit pending): SEC1 + STOR5 + BAK6.
             - SEC1: SettingsScreen._showToast → showToast({text}) (textContent),
               not {html} (innerHTML); its ~30 callers pass runtime status strings,
