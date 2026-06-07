@@ -55,3 +55,25 @@ describe('ErrorBoundary — E4 crash-loop guard', () => {
     expect(sessionStorage.getItem('vot-crash-recover')).toBe('1');
   });
 });
+
+describe('ErrorBoundary — ERR3 custom fallback (AppShell chrome boundaries)', () => {
+  it('fallback={null} renders nothing on a crash — no nuclear panel, but still logged', () => {
+    const { container, queryByText } = render(<ErrorBoundary fallback={null}><Boom /></ErrorBoundary>);
+    expect(queryByText('Something went wrong')).toBeNull(); // a crashed sheet/overlay must NOT replace the app
+    expect(container.textContent).toBe('');                 // the crashed chrome subtree quietly vanishes
+    expect(sessionStorage.getItem('vot-crash-count')).toBe('1'); // componentDidCatch still ran (logged + counted)
+  });
+
+  it('a custom fallback element renders in place of the crashed child', () => {
+    const { getByText, queryByText } = render(
+      <ErrorBoundary fallback={<span>chrome unavailable</span>}><Boom /></ErrorBoundary>,
+    );
+    expect(getByText('chrome unavailable')).toBeTruthy();
+    expect(queryByText('Something went wrong')).toBeNull();
+  });
+
+  it('omitting fallback keeps the default panel (screen + root boundary unchanged)', () => {
+    const { getByText } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
+    expect(getByText('Something went wrong')).toBeTruthy();
+  });
+});

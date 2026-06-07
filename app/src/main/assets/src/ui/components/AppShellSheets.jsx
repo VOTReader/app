@@ -112,6 +112,9 @@ export function AppShellSheets({
   });
 
   return (
+    // ERR3: a crash in any sheet/popover is caught HERE (fallback={null} → it
+    // vanishes + logs) instead of escaping to the root boundary and nuking the app.
+    <ErrorBoundary fallback={null}>
     <>
       <SelectionToolbar
         onLinkRequest={openLinkPicker}
@@ -293,5 +296,6 @@ export function AppShellSheets({
         />
       )}
     </>
+    </ErrorBoundary>
   );
 }
