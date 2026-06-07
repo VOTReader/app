@@ -205,6 +205,12 @@ describe('import guards against a corrupt / truncated stream', () => {
     await expect(gen.next()).rejects.toThrow(/size mismatch/);
   });
 
+  it('BAK2: throws when a manifest media entry has no numeric size (parity with the web reader)', async () => {
+    const bridge = { v3ImportNextBlob: () => '10', v3ImportReadChunk: () => '' };
+    const gen = v3AndroidImportEntries({ bridge: /** @type {any} */ (bridge), media: [{ id: 'a', mime: 'image/png' }], chunkSize: 1024 });
+    await expect(gen.next()).rejects.toThrow(/no numeric manifest size/);
+  });
+
   it('throws on a truncated frame (fewer bytes than declared)', async () => {
     let served = false;
     const bridge = {

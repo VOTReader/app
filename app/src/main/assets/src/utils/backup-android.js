@@ -175,7 +175,14 @@ export async function* v3AndroidImportEntries(args) {
     const sizeStr = bridge.v3ImportNextBlob();
     if (sizeStr.indexOf('error:') === 0) throw new Error('nextBlob: ' + sizeStr.slice(6));
     const declared = Number(sizeStr);
-    if (meta && typeof meta.size === 'number' && meta.size !== declared) {
+    // BAK2: the web readContainer requires every manifest media entry to carry a
+    // numeric size — its primary corruption check. Match it here so a dropped /
+    // hand-edited size is rejected on BOTH platforms, instead of being silently
+    // accepted (trusting whatever length the native frame happens to report).
+    if (!meta || typeof meta.size !== 'number') {
+      throw new Error('media[' + i + '] has no numeric manifest size (corrupt)');
+    }
+    if (meta.size !== declared) {
       throw new Error('size mismatch for ' + meta.id + ' (manifest ' + meta.size + ', frame ' + declared + ')');
     }
     /** @type {any[]} */

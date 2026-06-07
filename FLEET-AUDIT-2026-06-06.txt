@@ -93,7 +93,7 @@ P2  gates + correctness tail
   TEST1 [MED]  tabs.js + highlight.jsx at 0% coverage (load-bearing pure utils)  DONE
   TEST2 [MED]  React 18.2-runtime vs 19.2-test skew unmitigated/unexercised      OPEN
   SRCH2 [L-M]  Pure-stopword/<=4-word queries skip trimming -> full-corpus scan  OPEN
-  BAK2  [L-M]  Missing manifest media `size`: rejected on web, accepted on Android OPEN
+  BAK2  [L-M]  Missing manifest media `size`: rejected on web, accepted on Android DONE
   BLD3  [L-M]  Pre-commit fails open when staging only a dist bundle / app.jsx   OPEN
   CORP3 [L-M]  check_balance smart-quote heuristic near-vacuous (esprima saves)  OPEN
 
@@ -306,6 +306,10 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07  BAK2 landed (commit pending): v3AndroidImportEntries now throws on a
+            manifest media entry with no numeric size (was silently accepted on
+            Android while web's readContainer rejected it — a cross-platform
+            integrity asymmetry on the only backup). +1 test; 57 backup tests pass.
 2026-06-07  CORP1 landed (commit pending): validate-schemas Format A/B/D validators
             now track a per-file Set of seen ids and ERROR on a duplicate slug (the
             likeliest corpus regression — copy-paste a letter, forget the id; it
