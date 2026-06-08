@@ -81,18 +81,25 @@ jobs:
       - name: Install dependencies (npm ci — exact lockfile)
         run: npm ci
 
-      - name: Gate — re-run CI's blocking publish checks (BLD-1)
-        # The deploy publishes STRAIGHT to the live PWA. Before this step it
-        # invoked zero gates, so a commit that builds but violates a DIFFERENT
-        # gate shipped anyway — sharpest case: a corpus edit that skips the manual
-        # CORPUS_VERSION bump fails CI but still deployed, leaving every installed
-        # PWA stuck on stale scripture (the SW corpus-cache key never rotates).
-        # Re-run the cheap blocking checks against the committed state; a non-zero
-        # exit aborts the deploy before anything is published.
+      - name: Gate — re-run CI's blocking publish checks (BLD-1 + BLD2)
+        # The deploy publishes STRAIGHT to the live PWA and runs as a SEPARATE
+        # workflow from ci.yml (no cross-workflow `needs:`), so it must re-prove the
+        # blocking gates itself or a commit that fails CI could still publish.
+        # BLD-1 added the data/CSP gates; BLD2 widens it to the correctness gates
+        # that `npm run build` alone does NOT run (lint / typecheck / vitest) — so a
+        # build that compiles but fails a type check or test never reaches the live
+        # PWA. (smoke:ci is intentionally omitted: it needs the puppeteer browser +
+        # is flake-prone; ci.yml runs it on the same push.) A non-zero exit aborts
+        # the deploy before anything is published — the site stays on the prior good
+        # version (the safe failure mode).
         run: |
-          npm run check:corpus     # CORPUS_VERSION matches the corpus-bundle hash
-          npm run validate:data    # Format A/B/C/D schema integrity
-          npm run check:csp        # index.html inline-script CSP hashes in sync
+          npm run check:corpus           # CORPUS_VERSION matches the corpus-bundle hash
+          npm run validate:data          # Format A/B/C/D schema integrity
+          npm run check:footnotes        # CORP6 — no dup/white footnote verse numbers
+          npm run check:csp              # index.html inline-script CSP hashes in sync
+          npm run lint -- --max-warnings 0   # BLD2 — 0 errors + 0 warnings
+          npm run typecheck              # BLD2 — tsc --noEmit
+          npm run test                   # BLD2 — full vitest suite
 
       - name: Build bundles + sync SW version
         # `npm run build` regenerates dist/ and syncs the SW CACHE_VERSION

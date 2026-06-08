@@ -6,10 +6,44 @@ VOTReader — 16-agent Opus code audit + remediation tracker
 --------------------------------------------------------------------------------
 SESSION HANDOFF — 2026-06-07 (next agent: START HERE)
 --------------------------------------------------------------------------------
-STATE. The audit is done + remediated in 16 commits (all pushed to main). 18
-findings DONE + 3 ADJUDICATED; EVERY P0 closed. 56 lower-priority items still OPEN
-— see SECTION 1 (index) + SECTION 3 (per-item detail). The PROGRESS LOG (bottom)
-is the commit-by-commit record.
+STATE (after SESSION 2, 2026-06-07b — the TAIL IS NOW CLOSED). The whole audit is
+DONE or ADJUDICATED-with-reason. Session 1 closed every P0+P1+P2 + the valuable P3
+(25 DONE + 3 ADJUD). Session 2 then swept the ~49-item tail: 15 MORE DONE (BLD1,
+BAK3, BAK5, SEC2, ANN4, ANN5, TEST3, TEST5, CORP6, BLD2, NTV3, PERF4, SRCH4, ERR3,
+NTV1) + ~31 ADJUDICATED with re-derived reasons (each re-checked against current source by a
+per-cluster agent, then verified by me) + 4 found ALREADY-DONE/SUBSUMED (SW3 by SW1,
+NTV2, TEST2, plus PERF5/NAV3/STOR2 from session 1). See SECTION 1 for the per-item
+status and the 2026-06-07b PROGRESS LOG entry (bottom) for the disposition + reason
+of every item. Verify: vitest + lint + typecheck + gradle :app:testDebugUnitTest all
+green; PERF4 preview-verified on Psalm 119; backup-integrity + bridge changes gated.
+
+NOTHING is left for autonomous work — the audit is FULLY closed. After the owner
+cleared them (2026-06-07b), ERR3 + NTV1 landed too (commits 0b5c64e + e8d6b50):
+  - ERR3 DONE — AppShellOverlays + AppShellSheets each wrap their own return in
+    <ErrorBoundary fallback={null}>, so a render crash in any sheet/overlay vanishes
+    + logs instead of nuking the whole app via the root boundary. NO app.jsx change
+    (still 798/800), no reorder — the cleaner fix than the <AppShellChrome> extraction
+    originally sketched. +3 ErrorBoundary tests; smoke:ci green.
+  - NTV1 DONE — restoreAudioModeIfActive() (guarded on MODE_IN_COMMUNICATION) called
+    from onRenderProcessGone() + onDestroy(); compiles + Kotlin suite green.
+  - PERF1 ADJUDICATED (won't-do): its cold-boot win matters mainly on SLOW devices
+    the owner doesn't have, the app isn't render-intensive, and it's the riskiest
+    remaining change (the synchronous cold-boot path) — net-negative to restructure
+    for a marginal gain against the owner's stated low perf concern (owner call,
+    2026-06-07b). Revisit only if a budget-device audience or a measured cold-boot
+    problem ever appears; the plan (lazy-load books-restored.js + matthew-plain.js
+    via __makeLazyLoader, typeof-guarded consumers, SW precache, CORPUS_VERSION bump)
+    is recorded should that change.
+
+  REMAINING is optional + owner-side + NON-blocking: device CONFIRMATIONS for the two
+  device-touching fixes already shipped — NTV3 (Garden cache empty after Clear-All) +
+  NTV1 (routing returns to speaker after a mid-record crash) — plus the standing manual
+  device walks (N2.x audio-tuning, U-series import/Garden) in tools/n1-smoke-walk.md.
+  BLD2's widened deploy gate already ran GREEN in Actions (confirmed).
+  GOTCHA confirmed this session: the pre-commit `npm run build` builds from the WORKING
+  TREE, so commit ONE logical change at a time (uncommitted source from a second change
+  bakes into the first commit's bundles → an inconsistent commit). Also: don't use
+  backticks in a bash `-m` commit message (command substitution eats the word).
 
 GOTCHAS (load-bearing — learned the hard way this session):
  1. AUDIT FINDINGS CAN BE WRONG. Re-derive every finding against CURRENT source
@@ -38,13 +72,11 @@ GOTCHAS (load-bearing — learned the hard way this session):
  6. NTV1 (Kotlin audio-mode restore) + BLD2 (deploy-gated-on-CI) CANNOT be runtime-
     verified from this environment — do them where you can watch the emulator/Actions.
 
-NEXT (my recommendation). CORP2 is now DONE (validateTranslationCompleteness vs
-KJV, presence-only, no allow-list needed). Remaining real fixes: NAV2 (narrow
-stale-highlight leak via the pendingHighlight navHandoff slot — LetterView.jsx:30
-peeks + conditionally clears), APP2 (scroll useLayoutEffect — render-path, mind the
-existing rAF in use-scroll-memory Effect 3), SRCH2 (search.js stop-word skip),
+NEXT (my recommendation). CORP2 + NAV2 are now DONE. Remaining real fixes: APP2
+(scroll useLayoutEffect — render-path, mind the existing rAF in use-scroll-memory
+Effect 3), SRCH2 (search.js stop-word skip — short-circuit an all-stopword query),
 TEST2 (React 18.2-runtime vs 19-test skew — mostly documentation). Then the P3
-tail. NTV1 + BLD2 want a device/CI pass.
+tail (SRCH3-6, JRNL1-3, NTV2-4, etc.). NTV1 + BLD2 want a device/CI pass.
 
 --------------------------------------------------------------------------------
 HANDOFF (READ FIRST)
@@ -111,82 +143,82 @@ P0  real correctness, user-facing
   BAK1  [MED]  Android truncated-import overwrites stores then reports "failed"   DONE
 
 P1  high value, low-moderate risk
-  PERF1 [HIGH] ~506 KB deferrable corpus on the synchronous cold-boot path       OPEN
+  PERF1 [HIGH] ~506 KB deferrable corpus on the synchronous cold-boot path       ADJUD
   PERF2 [HIGH] Journal media object-URL cache unbounded per session (OOM)        DONE
   APP1  [MED]  NoteStore global-bump re-renders whole page (Theme B)             DONE
   PERF5 [LOW]  Link/Bookmark icons re-render on any mutation (Theme B)           ADJUD
-  NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       OPEN
+  NTV1  [MED]  Audio MODE_IN_COMMUNICATION never restored on teardown/kill       DONE
   SRCH1 [MED]  Search index cache invisible to CORPUS_VERSION (stale forever)    DONE
   SCR1  [L-M]  Translation tag with no shipped bundle silently renders NKJV      DONE
   STOR2 [MED]  "Clear All Personal Data" leaves residue under sibling-tab write  ADJUD
   SEC1  [LOW]  Runtime-string toasts route to an innerHTML sink                  DONE
 
 P2  gates + correctness tail
-  BLD1  [MED]  No gate proves minify preserves corpus VALUES                     OPEN
-  BLD2  [MED]  Web deploy publishes independently of CI (thin gate subset)       OPEN
+  BLD1  [MED]  No gate proves minify preserves corpus VALUES                     DONE
+  BLD2  [MED]  Web deploy publishes independently of CI (thin gate subset)       DONE
   CORP1 [MED]  Schema validator does not detect duplicate id slugs              DONE
   CORP2 [MED]  Alt-translation Bibles get no completeness cross-check            DONE
   ANN1  [MED]  Multi-verse note paints N icons (React) vs 1 (DOM)                DONE
   ANN2  [MED]  "Remove highlight" silently deletes overlapping NOTES             DONE
-  NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) OPEN
+  NAV2  [MED]  pendingHighlight navHandoff slot leaks (peek + conditional clear) DONE
   NAV3  [MED]  __goSearch bridge effect: no deps, unconditional null on cleanup  ADJUD
-  APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     OPEN
-  PERF3 [MED]  Reading screens re-render full verse list on every scroll-flush   OPEN
-  PERF4 [MED]  content-visibility:auto unused (safe win at chrome108 floor)      OPEN
+  APP2  [L-M]  Scroll restore in passive effect, not useLayoutEffect (flash)     DONE
+  PERF3 [MED]  Reading screens re-render full verse list on every scroll-flush   ADJUD
+  PERF4 [MED]  content-visibility:auto unused (safe win at chrome108 floor)      DONE
   TEST1 [MED]  tabs.js + highlight.jsx at 0% coverage (load-bearing pure utils)  DONE
-  TEST2 [MED]  React 18.2-runtime vs 19.2-test skew unmitigated/unexercised      OPEN
-  SRCH2 [L-M]  Pure-stopword/<=4-word queries skip trimming -> full-corpus scan  OPEN
+  TEST2 [MED]  React 18.2-runtime vs 19.2-test skew unmitigated/unexercised      ADJUD
+  SRCH2 [L-M]  Pure-stopword/<=4-word queries skip trimming -> full-corpus scan  DONE
   BAK2  [L-M]  Missing manifest media `size`: rejected on web, accepted on Android DONE
-  BLD3  [L-M]  Pre-commit fails open when staging only a dist bundle / app.jsx   OPEN
-  CORP3 [L-M]  check_balance smart-quote heuristic near-vacuous (esprima saves)  OPEN
+  BLD3  [L-M]  Pre-commit fails open when staging only a dist bundle / app.jsx   ADJUD
+  CORP3 [L-M]  check_balance smart-quote heuristic near-vacuous (esprima saves)  ADJUD
 
 P3  small wins / hardening / adjudicate
-  ANN3 [LOW] applyDOMHighlights O(n^2) offset re-walk per sub-range (adjudicate) OPEN
-  ANN4 [LOW] applyNoteIcons fragments text nodes (no normalize on icon path)     OPEN
-  ANN5 [LOW] No test for elementsFromPoint tap-routing winner                    OPEN
-  SRCH3 [LOW] Two volume-ID registries hand-synced, no equality assertion test   OPEN
-  SRCH4 [LOW] Snippet ignores synonym/cross-translation matches (no highlight)   OPEN
-  SRCH5 [LOW] Engine search() has no min-length floor (only UI gates)            OPEN
-  SRCH6 [INFO] Dead code: STOP_WORDS, 'chapter-title'/'heading' kinds, phoneticKey OPEN
-  STOR3 [INFO] _base refreshed only in _saveMerged (benign today; future trap)   OPEN
-  STOR4 [LOW] _saveMerged structuredClone of largest store on every save         OPEN
+  ANN3 [LOW] applyDOMHighlights O(n^2) offset re-walk per sub-range (adjudicate) ADJUD
+  ANN4 [LOW] applyNoteIcons fragments text nodes (no normalize on icon path)     DONE
+  ANN5 [LOW] No test for elementsFromPoint tap-routing winner                    DONE
+  SRCH3 [LOW] Two volume-ID registries hand-synced, no equality assertion test   DONE
+  SRCH4 [LOW] Snippet ignores synonym/cross-translation matches (no highlight)   DONE
+  SRCH5 [LOW] Engine search() has no min-length floor (only UI gates)            ADJUD
+  SRCH6 [INFO] Dead code: STOP_WORDS, 'chapter-title'/'heading' kinds, phoneticKey ADJUD
+  STOR3 [INFO] _base refreshed only in _saveMerged (benign today; future trap)   ADJUD
+  STOR4 [LOW] _saveMerged structuredClone of largest store on every save         ADJUD
   STOR5 [LOW] Lock-unavailable merge fallback is silent (no diagnostic)          DONE
-  BAK3 [LOW] `counts` integrity block written but never verified on import       OPEN
-  BAK4 [LOW] Legacy import cap asymmetric: 50 MB Android vs 300 MB web           OPEN
-  BAK5 [LOW] Web FS-Access export leaves partial file on mid-stream write fail   OPEN
+  BAK3 [LOW] `counts` integrity block written but never verified on import       DONE
+  BAK4 [LOW] Legacy import cap asymmetric: 50 MB Android vs 300 MB web           DONE
+  BAK5 [LOW] Web FS-Access export leaves partial file on mid-stream write fail   DONE
   BAK6 [INFO] streamedIds plain-object key-set unreliable for id "__proto__"     DONE
-  JRNL1 [LOW] Rapid double media-insert relies on debounce for the 2nd block     OPEN
-  JRNL2 [LOW] Recording save() in error stage arms a no-op pendingSaveRef        OPEN
-  JRNL3 [LOW] recordDeletion can drift totalEntries vs real count (cosmetic)     OPEN
-  JRNL4 [INFO] Single-slot draft key safe only via ts>=updated guard (document)  OPEN
-  NAV4 [LOW] Swipe-nav fires on any horizontal touch (no target/intent filter)   OPEN
-  NAV5 [LOW] Browser-back after tab switch backs the screen, not the tab         OPEN
-  NAV6 [INFO] Synchronous double-back reads stale refs (unreachable normally)    OPEN
-  SCR2 [LOW] Fallback mis-resolves comma-list / multi-book refs (dict masks it)  OPEN
-  SCR3 [LOW] Cross-chapter ranges fail to parse (no such refs in corpus today)   OPEN
-  SCR4 [INFO] Book-only refs return null (by design; documented)                 OPEN
+  JRNL1 [LOW] Rapid double media-insert relies on debounce for the 2nd block     ADJUD
+  JRNL2 [LOW] Recording save() in error stage arms a no-op pendingSaveRef        ADJUD
+  JRNL3 [LOW] recordDeletion can drift totalEntries vs real count (cosmetic)     ADJUD
+  JRNL4 [INFO] Single-slot draft key safe only via ts>=updated guard (document)  ADJUD
+  NAV4 [LOW] Swipe-nav fires on any horizontal touch (no target/intent filter)   DONE
+  NAV5 [LOW] Browser-back after tab switch backs the screen, not the tab         ADJUD
+  NAV6 [INFO] Synchronous double-back reads stale refs (unreachable normally)    ADJUD
+  SCR2 [LOW] Fallback mis-resolves comma-list / multi-book refs (dict masks it)  ADJUD
+  SCR3 [LOW] Cross-chapter ranges fail to parse (no such refs in corpus today)   ADJUD
+  SCR4 [INFO] Book-only refs return null (by design; documented)                 ADJUD
   SW2 [LOW] corpusFirst cache.put is fire-and-forget (may die before commit)     DONE
-  SW3 [LOW] HTTP-cache staleness on network-only data files (subsumed by SW1)    OPEN
-  SW4 [INFO] CORE_CACHE eviction has no self-heal (persist() mitigates)          OPEN
-  APP3 [LOW] useReadingDwell visibility-resume reads stale dwellMs               OPEN
-  APP4 [INFO] Lazy-corpus subscription depends on index.html script order        OPEN
-  APP5 [LOW] vot-state full-serialize write amplification on every scroll-stop   OPEN
-  APP6 [INFO] 800-line canary forces two cohesion seams (documented)            OPEN
-  NTV2 [LOW] Aborted v3 export can orphan a partial file the abort can't delete  OPEN
-  NTV3 [LOW] GardenImageCache.clear() is dead code; Settings wipe unwired        OPEN
-  NTV4 [LOW] Recorder pause()/resume() report success with no active recording   OPEN
-  NTV5 [INFO] getZoomScale() transient during in-flight screenshot (benign)      OPEN
-  NTV6 [INFO] audioSystemService nullability unreachable (benign)                OPEN
-  BLD4 [LOW] esbuild pinned by caret; minifier change would silently re-emit     OPEN
-  BLD5 [INFO] CORPUS_VERSION correctness is transitive through "CI rebuilds"      OPEN
-  SEC2 [LOW] JSON.parse exception message surfaced to user (folded into SEC1)    OPEN
-  CORP4 [LOW] esprima 4.0.1 can't parse ?./?? -> false-positive if added to data OPEN
-  CORP5 [LOW] No num-sequence validation (gaps/dups/order)                       OPEN
-  CORP6 [INFO] audit-footnotes.js is strong but not wired into CI                OPEN
-  TEST3 [LOW] Real-time setTimeout(r,5) monotonic-ts assertions (flake)          OPEN
-  TEST4 [LOW] Device-only compressImage error branches unverified                OPEN
-  TEST5 [LOW] No-navigator.locks merge fallback untested                         OPEN
-  ERR3 [LOW] AppShell chrome renders outside the inner ErrorBoundary             OPEN
+  SW3 [LOW] HTTP-cache staleness on network-only data files (subsumed by SW1)    DONE
+  SW4 [INFO] CORE_CACHE eviction has no self-heal (persist() mitigates)          ADJUD
+  APP3 [LOW] useReadingDwell visibility-resume reads stale dwellMs               ADJUD
+  APP4 [INFO] Lazy-corpus subscription depends on index.html script order        ADJUD
+  APP5 [LOW] vot-state full-serialize write amplification on every scroll-stop   ADJUD
+  APP6 [INFO] 800-line canary forces two cohesion seams (documented)            ADJUD
+  NTV2 [LOW] Aborted v3 export can orphan a partial file the abort can't delete  DONE
+  NTV3 [LOW] GardenImageCache.clear() is dead code; Settings wipe unwired        DONE
+  NTV4 [LOW] Recorder pause()/resume() report success with no active recording   ADJUD
+  NTV5 [INFO] getZoomScale() transient during in-flight screenshot (benign)      ADJUD
+  NTV6 [INFO] audioSystemService nullability unreachable (benign)                ADJUD
+  BLD4 [LOW] esbuild pinned by caret; minifier change would silently re-emit     ADJUD
+  BLD5 [INFO] CORPUS_VERSION correctness is transitive through "CI rebuilds"      ADJUD
+  SEC2 [LOW] JSON.parse exception message surfaced to user (folded into SEC1)    DONE
+  CORP4 [LOW] esprima 4.0.1 can't parse ?./?? -> false-positive if added to data ADJUD
+  CORP5 [LOW] No num-sequence validation (gaps/dups/order)                       ADJUD
+  CORP6 [INFO] audit-footnotes.js is strong but not wired into CI                DONE
+  TEST3 [LOW] Real-time setTimeout(r,5) monotonic-ts assertions (flake)          DONE
+  TEST4 [LOW] Device-only compressImage error branches unverified                ADJUD
+  TEST5 [LOW] No-navigator.locks merge fallback untested                         DONE
+  ERR3 [LOW] AppShell chrome renders outside the inner ErrorBoundary             DONE
 
 --------------------------------------------------------------------------------
 SECTION 2 — THEMES (cross-agent convergences = highest signal)
@@ -349,6 +381,154 @@ SECTION 4 — WHAT'S GENUINELY GOOD (don't touch)
 --------------------------------------------------------------------------------
 PROGRESS LOG
 --------------------------------------------------------------------------------
+2026-06-07c  AUDIT FULLY CLOSED — the 3 items held in 2026-06-07b are now resolved
+            after the owner cleared them (no budget device; "as long as it's well-
+            optimized we're fine; not an intensive app"):
+            - ERR3 DONE (0b5c64e): instead of the originally-sketched <AppShellChrome>
+              extraction (which would have touched app.jsx, at 798/800), the cleaner
+              fix — AppShellOverlays + AppShellSheets each wrap their OWN return in
+              <ErrorBoundary fallback={null}>. ErrorBoundary gained an optional
+              `fallback` (omitted = the existing root panel; null = the crashed chrome
+              vanishes + still logs). A crashed sheet/overlay no longer nukes the app;
+              the screen + rest keep working. NO app.jsx change, no reorder. +3 tests;
+              smoke:ci green (12 screens, annotation round-trips, 0 console errors).
+            - NTV1 DONE (e8d6b50): restoreAudioModeIfActive() — restores
+              vm.previousAudioMode only when mode is still MODE_IN_COMMUNICATION —
+              called from onRenderProcessGone() + onDestroy() (teardown paths where no
+              live recording exists, so it can't disturb a capture; NOT onPause).
+              Kotlin compiles + :app:testDebugUnitTest green. Device-confirm optional.
+            - PERF1 ADJUDICATED (won't-do, owner call): cold-boot win is mainly for
+              slow devices the owner doesn't have; app isn't render-intensive; it's the
+              riskiest remaining change (cold-boot path) → net-negative for a marginal
+              gain. Plan retained in the SESSION HANDOFF if a budget audience appears.
+            Net: every fleet-audit finding is now DONE or ADJUDICATED-with-reason.
+            Optional owner-side: device confirms for NTV3 + NTV1; standing device walks.
+
+2026-06-07b  TAIL CLOSE-OUT (session 2) — the ~49 remaining items swept. Method:
+            7 per-cluster agents re-derived every open finding against CURRENT
+            source (gotcha #1), I verified + executed. 13 DONE (8 commits, pushed),
+            ~30 ADJUDICATED-with-reason, 3 held for you. All gates green (vitest +
+            lint + typecheck + gradle :app:testDebugUnitTest; PERF4 preview-proven).
+
+            DONE (commit):
+            - BLD1 (f8a046e): vitest gate — evals each shipped minified lazy corpus
+              bundle (a-bible/matthew/vot) + its concatenated source in two vm realms
+              and deep-compares every global, so a value-corrupting minify fails CI.
+            - BAK3+BAK5+SEC2 (8aa7b8e): verifyImportCounts reconciles the manifest's
+              `counts` block vs what landed (surfaced in the import summary); the web
+              FS-Access export sink gained abort() (no truncated .votbak on a failed
+              write); the 3 import error toasts stopped leaking raw JSON.parse text
+              (generic message + console.warn).
+            - ANN4+ANN5 (f4909fc): applyNoteIcons normalizes [data-hl-dom] containers
+              (heals splitText fragmentation now the A4 highlights-skip broke the
+              incidental heal); +RED-without-fix test; +2 elementsFromPoint multi-note
+              winner tests (the plural API was untested).
+            - TEST3+TEST5 (a58ca42): 5 monotonic-ts assertions moved off real
+              setTimeout(r,5) to a mocked Date.now (the prune test is now STRONGER);
+              +1 test for the no-navigator.locks merge fallback (blind write + a
+              once-per-store STOR5 trace) — every other cross-tab test rides the shim.
+            - CORP6+BLD2 (e5c51f5): audit-footnotes.js gained --check (exit 1 on any
+              dup/white footnote verse number) + a CI step (corpus clean: 0); the
+              deploy publish gate widened to lint+typecheck+vitest+footnotes (it runs
+              as a separate workflow from ci.yml, so it must re-prove the gates).
+            - NTV3 (d2d5765): "Clear All My Data" now wipes the native Garden image
+              disk cache (cacheDir/garden, ≤800 MB, survived the wipe before) via a
+              new clearGardenCache bridge method, plumbed end-to-end + gated by
+              BridgeContractTest + AppInterfaceTest + platform-bridge.test (34 keys).
+              Device-verify owed: confirm the dir is empty after Clear-All.
+            - PERF4 (e58eec5): content-visibility:auto + contain-intrinsic-size:auto
+              on .section-block + .letter-para — DOM-preserving off-screen layout/paint
+              skip. Preview-proven on Psalm 119 (176 verses): scroll-to-verse reaches
+              v176, gold sups/headings intact, 0 console errors. Device scroll-feel owed.
+            - SRCH4 (a119891): result snippets now highlight the matched SYNONYM
+              (search "shepherd" → a "pastor" verse marks "pastor"), via a pure
+              SearchScreen-only expandSnippetTerms over the exposed SYNONYM_MAP. Cross-
+              translation spelling variants stay unhighlighted (no map; rare).
+
+            ADJUDICATED — won't-do / already-handled / INFO (re-derived + proven):
+            - ALREADY-DONE/SUBSUMED: SW3 (bible-*.js now corpusFirst via SW1); NTV2
+              (finishV3Export(false) already deletes the partial SAF file via
+              DocumentsContract); TEST2 (skew documented in VENDORED-LIBS.md AND
+              exercised — smoke-ci boots the real 18.2.0 built bundle headless).
+            - NET-NEGATIVE / CRITICAL-PATH risk: PERF3 (React.memo on reading screens
+              never hits — 35+ fresh-identity callback props/render; redirected to the
+              now-done PERF4); STOR4 (the _saveMerged structuredClone is the merge
+              ANCESTOR — aliasing it reintroduces the STORE-1 clobber); APP5 (vot-state
+              write is already debounced + async off the paint path; per-field decomp
+              is explicitly rejected in state-store); SRCH5/SRCH6 (engine min-length +
+              dead-code on the search critical path — UI already gates, removal is
+              net-negative); BLD4 (package-lock + npm ci already pin esbuild exactly).
+            - FALSE-PREMISE / LATENT-ONLY / BY-DESIGN: JRNL1 (each media insert flushes
+              immediately — two can't share a render); JRNL2 (error-stage pendingSaveRef
+              is never consumed); JRNL3 (totalEntries is a cumulative counter by design,
+              clamped, milestones write-once); JRNL4 (the ts>=updated guard is already
+              documented 4×); SCR2/SCR3 (comma-list/cross-chapter mis-resolves are real
+              in parseRefStr but UNREACHABLE — every corpus ref is dict-keyed or a
+              display-only cross-ref); SCR4 (book-only null is by design); APP3 (dwell
+              reads dwellMs at call time, self-correcting); NAV5 (real but a tab-history
+              SCHEMA redesign — accepted UX rough-edge); CORP4 (0 real ?. in any scanned
+              data file); CORP5 (validateChain's prev/next pins ordering harder; num
+              gaps are legit); ANN3 (O(n²) only on the single-block letter path, n tiny).
+            - BENIGN INFO: BLD3 (CI git-diff is the dist/app.jsx backstop); BLD5; STOR3
+              (one comment at most); SW4 (CORE_CACHE self-heals; the "persist()" premise
+              is wrong but storage-health HAS a persist wrapper); APP4/APP6; NAV6
+              (unreachable); NTV4 (intentional forgiving no-op, Robolectric-pinned);
+              NTV5/NTV6 (defensive, unreachable); CORP3 (esprima is authoritative);
+              TEST4 (compressImage error branches need a real raster pipeline jsdom lacks).
+
+            HELD FOR YOU (open):
+            - PERF1 — focused build-pipeline session + device cold-boot (see above).
+            - NTV1 — device. EXACT SAFE PATCH: add a private MainActivity helper
+              `restoreAudioModeIfActive()` = `audioManager?.let { if (it.mode ==
+              AudioManager.MODE_IN_COMMUNICATION) try { it.mode = vm.previousAudioMode }
+              catch (_:Exception){} }` and call it at the top of onRenderProcessGone()
+              and in onDestroy(). Guarded on mode + only fires on teardown where the JS
+              endAudioSession() can't, so it can't break a live recording. (Deliberately
+              NOT onPause — a backgrounded recording is ambiguous; add after a device
+              test if wanted.) Then watch the emulator: routing returns to speaker after
+              a mid-record renderer-crash / app-finish.
+            - ERR3 — focused render-tree extraction (see SESSION HANDOFF). app.jsx is
+              798/800; the <AppShellChrome> wrapper that gives chrome its own
+              ErrorBoundary also frees canary room. Verify via smoke:ci + preview.
+
+2026-06-07  NAV4 landed (commit pending): useSwipeNav fired prev/next on any
+            horizontal drag (only an active selection suppressed it), so a drag
+            begun on a link / footnote-ref / annotation icon flipped the chapter
+            underneath. onTouchStart now ignores the gesture when e.target.closest
+            finds a tappable ancestor (a/button/input/.fn-ref/.inline-scrip-ref/the
+            verse-link/bookmark/note icons); plain text + highlights still swipe.
+            +2 hook tests; 8 swipe-nav tests green.
+2026-06-07  BAK4 landed (commit pending): the v3-aware web import capped a legacy
+            (v1/v2 JSON) whole-file .text() read at 300 MB while Android caps at 50
+            MB (MAX_IMPORT_SIZE) and the older web path at WEB_MAX_IMPORT_BYTES (50
+            MB). Lowered to 50 MB to match both (a 50-300 MB legacy JSON would OOM
+            on a budget device); v3 streaming stays uncapped. Lint+typecheck clean.
+2026-06-07  SRCH3 landed (commit pending, test-only): the engine stamps doc.volumeId
+            from VotSearchData.VOLUME_COLLECTIONS[].id; use-search routes via
+            COL_BY_SEARCH_ID (scripture-resolution) — two hand-kept registries.
+            Added a cross-registry assertion (every VOLUME_COLLECTIONS id resolves
+            in COL_BY_SEARCH_ID) so a future drift fails the gate instead of
+            dead-ending a collection's results on tap. 43 search-engine tests green.
+2026-06-07  SRCH2 landed (commit pending): executeSearch kept stop-words for any
+            <=4-word query, so a pure-grammar-glue query ("the", "of the") matched
+            ~every verse + built/sorted tens of thousands of hits (heaviest path)
+            for a useless result. Now short-circuits to empty BEFORE index work when
+            every term is a trimmed stop-word (and stop-word filtering is on); a
+            query with ANY content word is untouched. +2 tests; 108 search tests +
+            build + smoke:ci (critical-path bundle-a, 0 console errors) green.
+2026-06-07  APP2 landed (commit pending): use-scroll-memory Effect 3 (scroll restore
+            on nav) was a PASSIVE useEffect → ran after paint → the new screen
+            flashed at scroll 0 for a frame. Made it useLayoutEffect (runs before
+            paint). Safe + effective because __scrollEl is a ScreenLayout ref
+            CALLBACK (attached during commit, before this parent layout effect);
+            client-only, no SSR caveat. Sync write + rAF unchanged. 2092 tests pass.
+2026-06-07  NAV2 landed (commit pending): only LetterView + WtlbEntryView consume
+            the navHandoff 'pendingHighlight' slot (grep-verified), but the two set
+            sites (goToLetterFromMatthew, openInAppLetter) set it for EVERY dest
+            incl. a study chapter (no reader) — so it lingered until the next
+            goHome/back, and a later letter with a colliding id would pulse a stale
+            highlight. Gated the set on !dest.isStudy (study dest clears instead).
+            +2 tests; 15 tap-through tests green.
 2026-06-07  CORP2 landed (commit pending): new validateTranslationCompleteness(map,
             BIBLE_KJV) — presence-only — runs on each of the 7 alt-translations in
             the Format E section and ERRORs on a book/chapter the KJV reference has

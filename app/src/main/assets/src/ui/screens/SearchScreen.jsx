@@ -2,6 +2,32 @@
    SearchScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * SRCH4: build the snippet-highlight term list. SrchSnippet only marks the terms
+ * we hand it, so when synonym search is ON we expand each LITERAL query term
+ * through the SAME SYNONYM_MAP the engine matched on — otherwise a verse surfaced
+ * by a synonym (search "shepherd" → a "pastor" verse) shows the matched word
+ * unhighlighted. Phrases are exempt (the engine never synonym-expands a phrase).
+ * Cross-translation spelling variants (KJV "armour" vs NKJV "armor") have no such
+ * map and stay unhighlighted — rare + acceptable. Pure for testability.
+ * @param {{kind?:string, phrase?:string}|null} parsed
+ * @param {string[]} parsedTerms
+ * @param {Record<string,string[]>|null|undefined} synMap
+ * @param {boolean} synonymsOn
+ * @returns {string[]}
+ */
+export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn) {
+  if (!parsed || parsed.kind !== 'text') return [];
+  const base = [parsed.phrase].filter(Boolean).concat(parsedTerms || []);
+  if (!synonymsOn || !synMap) return base;
+  const out = new Set(base);
+  for (const t of (parsedTerms || [])) {
+    const grp = synMap[String(t).toLowerCase()];
+    if (Array.isArray(grp)) grp.forEach((g) => out.add(g));
+  }
+  return [...out];
+}
+
 export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand }) {
   const inputRef = React.useRef(null);
   const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });
@@ -73,9 +99,13 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         corpus: settings.searchCorpus || 'all',
         limit: 400
       }).then((r) => {
-        const terms = r.parsed && r.parsed.kind === 'text' ?
-        [r.parsed.phrase].filter(Boolean).concat(r.parsedTerms || []) :
-        [];
+        // SRCH4: include the matched synonyms (when synonym search is on) so the
+        // snippet highlights the word that actually surfaced the verse.
+        const terms = expandSnippetTerms(
+          r.parsed, r.parsedTerms || [],
+          /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
+          settings.searchSynonyms !== false,
+        );
         setState({ phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length });
       }).catch((err) => {
         setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0 });

@@ -99,4 +99,11 @@ interface BridgeHost {
      * PixelCopy + encode on the UI thread with a bounded timeout.
      */
     fun captureScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String
+
+    /**
+     * NTV3: delete the native Garden image disk cache (cacheDir/garden). Invoked off
+     * the UI thread (the @JavascriptInterface bridge call runs on a binder thread);
+     * GardenImageCache owns the directory + swallows its own I/O errors.
+     */
+    fun clearGardenCache()
 }

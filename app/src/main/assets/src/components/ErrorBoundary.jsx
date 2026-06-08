@@ -58,6 +58,14 @@ export class ErrorBoundary extends React.Component {
   }
   render() {
     if (!this.state.error) return this.props.children;
+    // ERR3: a consumer may opt into a custom fallback (commonly `null`). The
+    // AppShell chrome boundaries (AppShellOverlays / AppShellSheets) pass
+    // fallback={null} so a crashed sheet/overlay quietly vanishes + still logs
+    // (componentDidCatch above) instead of replacing the WHOLE app with the
+    // root "Something went wrong" panel. Omitting fallback keeps that panel —
+    // correct for the screen slot + the root boundary. `!== undefined` so an
+    // explicit null is honored.
+    if (this.props.fallback !== undefined) return this.props.fallback;
     var looping = this.state.crashCount >= 2;
     return (
       <div style={{ padding: "2rem", textAlign: "center", color: "#e0c97f", fontFamily: "Georgia, serif" }}>

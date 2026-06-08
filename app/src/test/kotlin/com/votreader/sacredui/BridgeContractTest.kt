@@ -55,6 +55,7 @@ class BridgeContractTest {
         "v3ImportReadChunk" to 1,
         "v3ImportClose" to 0,
         "getCrashLog" to 0,
+        "clearGardenCache" to 0,
         "haptic" to 1
     )
 

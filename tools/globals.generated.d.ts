@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 415 distinct identifiers.
+// Total: 419 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -31,6 +31,7 @@ declare const BIBLE_YLT: any;
 declare const BOOKS: any;
 declare const BOOKS_RESTORED: any;
 declare const BOOK_ALIASES: any;
+declare const BUNDLES: any;
 declare const BibleChapterView: any;
 declare const BibleStudyChapterView: any;
 declare const BibleStudyIndex: any;
@@ -57,7 +58,9 @@ declare const ChapterView: any;
 declare const ClearProgressRow: any;
 declare const Components: any;
 declare const ConfirmStrip: any;
+declare const DATA: any;
 declare const DEFAULT_HOME_ORDER: any;
+declare const DIST: any;
 declare const Data: any;
 declare const DiagnosticLog: any;
 declare const EXPAND_THRESHOLD: any;
@@ -75,6 +78,7 @@ declare const GARDEN_TIERS: any;
 declare const GARDEN_TOTAL: any;
 declare const GardenView: any;
 declare const GardenWarningFlagStore: any;
+declare const HERE: any;
 declare const HIDDEN_MANNA: any;
 declare const HIDDEN_MANNA_TITLES: any;
 declare const HL_COLORS: any;

@@ -156,12 +156,17 @@ export function useScrollMemory({
   }, [flushScrollToActiveTab]);
 
   // ── Effect 3: screen-change → update key + restore saved scroll ────────
-  // Applies the target scrollTop synchronously AND again inside a
-  // requestAnimationFrame: the sync write handles the common case; the rAF
-  // re-applies after the post-commit layout pass, in case the content swap
-  // (old entry → new entry) shifted the scroll offset first. Cleanup cancels
-  // a stale rAF so a rapid re-fire can't fight the next restore.
-  React.useEffect(() => {
+  // APP2: a LAYOUT effect (runs after commit, BEFORE paint) so the restored
+  // scrollTop is in place for the FIRST paint of the new screen — as a passive
+  // effect it applied AFTER paint, flashing the new content at scroll 0 for a
+  // frame. Safe + effective because __scrollEl is a ScreenLayout ref CALLBACK,
+  // attached during commit (child-first), so it is already the new container by
+  // the time this parent layout effect runs; client-only app, so no SSR caveat.
+  // Still applies the target synchronously AND again inside a requestAnimationFrame
+  // (the rAF re-applies after the post-commit layout pass, in case the content swap
+  // shifted the offset — async content / images). Cleanup cancels a stale rAF so a
+  // rapid re-fire can't fight the next restore.
+  React.useLayoutEffect(() => {
     const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId);
     scrollKeyRef.current = key;
     // surpriseAnchor is ALWAYS a verse anchor ({type:'verse'}) and is consumed

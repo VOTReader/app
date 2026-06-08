@@ -26,6 +26,13 @@ import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils
 
 const dataDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'src', 'main', 'assets', 'src', 'data');
 
+// CORP6: `--check` turns this read-only diagnostic into a CI gate — concise output,
+// exit 1 if any footnote renders with a duplicated or white verse number (the
+// dup / whiteBadKey / whiteFallback "hard problem" classes). validate-schemas'
+// validateFootnoteMarkers covers the no-marker case; the dup + bad-key cases are
+// this tool's unique signal. No-arg mode keeps the full human worklist.
+const CHECK = process.argv.includes('--check');
+
 const FILES = [
   { file: 'volume-one.js',      arrayVar: 'LETTERS_V1',      prefaceVar: 'LETTERS_V1_PREFACE' },
   { file: 'volume-two.js',      arrayVar: 'LETTERS',         prefaceVar: null },
@@ -118,11 +125,29 @@ for (const src of DICT_SOURCES) {
   dictCats[src.label] = c;
 }
 
+const problems = cats.dup.length + cats.whiteBadKey.length + cats.whiteFallback.length;
+const fixable = cats.goldHeuristic.length;
+let dictHard = 0;
+for (const label of Object.keys(dictCats)) {
+  const c = dictCats[label];
+  dictHard += c.dup + c.whiteBadKey + c.whiteFallback;
+}
+const hardTotal = problems + dictHard;
+
+// CORP6 gate: concise output + nonzero exit on any hard problem.
+if (CHECK) {
+  console.log(`audit-footnotes: ${total} Format A values + ${Object.keys(dictCats).length} dict sources — hard problems (dup + white): ${hardTotal}`);
+  if (hardTotal > 0) {
+    console.error('audit-footnotes: FAIL — ' + hardTotal + ' footnote value(s) render a duplicated or white verse number.');
+    console.error('Run `node tools/audit-footnotes.js` (no --check) for the full worklist, then fix the DATA (markers / keys).');
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
 console.log(`\nFORMAT A footnote nkjv values audited: ${total}\n`);
 const order = ['goldMarkers', 'goldHeuristic', 'single', 'compound', 'dup', 'whiteBadKey', 'whiteFallback'];
 for (const k of order) console.log(`  ${k.padEnd(15)} ${String(cats[k].length).padStart(4)}`);
-const problems = cats.dup.length + cats.whiteBadKey.length + cats.whiteFallback.length;
-const fixable = cats.goldHeuristic.length;
 console.log(`\n  → hard problems (dup + white): ${problems}`);
 console.log(`  → soft (gold but heuristic/marker-less): ${fixable}\n`);
 

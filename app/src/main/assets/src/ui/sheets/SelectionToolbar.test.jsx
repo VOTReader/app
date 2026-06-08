@@ -299,6 +299,54 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     expect(window.__openNote).toHaveBeenCalledWith('g3');
   });
 
+  // ANN5: the overlapping-note WINNER selection uses document.elementsFromPoint
+  // (plural) to gather every noted mark at the tap point — >1 distinct group opens
+  // the multi-note popover, otherwise the single note. jsdom has no layout, so
+  // elementsFromPoint must be stubbed (the existing tests only stub the SINGULAR
+  // elementFromPoint, leaving this branch unexercised).
+  it('routes overlapping note marks to __showMultiNote (elementsFromPoint winner)', () => {
+    const c = readingContainer(
+      'bible:test:1:2',
+      '<mark class="hl-mark hl-note" data-group-id="g1" data-kind="note">over</mark>'
+      + '<mark class="hl-mark hl-note" data-group-id="g2" data-kind="note">lap</mark> to God',
+    );
+    const marks = c.querySelectorAll('mark.hl-mark');
+    mount();
+    stubSelection(null);
+    /** @type {any} */ (globalThis).NoteStore.get = (g) => ((g === 'g1' || g === 'g2') ? { groupId: g } : null);
+    const origEFP = document.elementsFromPoint;
+    document.elementsFromPoint = () => [marks[0], marks[1]]; // both noted marks under the tap
+    try {
+      act(() => { fire(marks[0], 'contextmenu', { clientX: 10, clientY: 10 }); });
+    } finally {
+      document.elementsFromPoint = origEFP;
+    }
+    expect(window.__showMultiNote).toHaveBeenCalledTimes(1);
+    const [gids] = /** @type {any} */ (window.__showMultiNote).mock.calls[0];
+    expect([...gids].sort()).toEqual(['g1', 'g2']);
+    expect(window.__openNote).not.toHaveBeenCalled();
+  });
+
+  it('routes a single note when elementsFromPoint finds no other overlap', () => {
+    const c = readingContainer(
+      'bible:test:1:2',
+      '<mark class="hl-mark hl-note" data-group-id="g5" data-kind="note">solo</mark> to God',
+    );
+    const mark = c.querySelector('mark.hl-mark');
+    mount();
+    stubSelection(null);
+    /** @type {any} */ (globalThis).NoteStore.get = (g) => (g === 'g5' ? { groupId: 'g5' } : null);
+    const origEFP = document.elementsFromPoint;
+    document.elementsFromPoint = () => [mark]; // only this mark at the point
+    try {
+      act(() => { fire(mark, 'contextmenu', { clientX: 10, clientY: 10 }); });
+    } finally {
+      document.elementsFromPoint = origEFP;
+    }
+    expect(window.__openNote).toHaveBeenCalledWith('g5');
+    expect(window.__showMultiNote).not.toHaveBeenCalled();
+  });
+
   it('leaves the native menu intact outside any [data-hl-key] container', async () => {
     const outside = document.createElement('div');
     outside.textContent = 'app chrome, not reading text';

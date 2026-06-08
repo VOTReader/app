@@ -374,6 +374,18 @@ class AppInterface(
         return VOTReaderApp.releaseTree?.toJson() ?: "[]"
     }
 
+    /**
+     * NTV3: delete the native Garden image disk cache (cacheDir/garden, capped at
+     * 800 MB). Wired to the JS "Clear All My Data" flow so the native cache doesn't
+     * survive a full wipe (the JS side only clears IndexedDB + localStorage). Runs
+     * synchronously on the binder thread (NOT the UI thread) — GardenImageCache.clear()
+     * is plain file I/O and swallows its own errors.
+     */
+    @JavascriptInterface
+    fun clearGardenCache() {
+        host.clearGardenCache()
+    }
+
     @JavascriptInterface
     fun setImmersiveMode(immersive: Boolean) {
         host.postToUi {

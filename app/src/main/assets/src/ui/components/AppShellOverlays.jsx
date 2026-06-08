@@ -70,6 +70,9 @@ export function AppShellOverlays({
   });
 
   return (
+    // ERR3: a crash in any overlay is caught HERE (fallback={null} → it vanishes
+    // + logs) instead of escaping to the root boundary and taking down the app.
+    <ErrorBoundary fallback={null}>
     <>
       <StorageHealthBanner onNavigateSettings={() => setScreen('settings')} />
       <Safari7DayModal />
@@ -216,5 +219,6 @@ export function AppShellOverlays({
         );
       })()}
     </>
+    </ErrorBoundary>
   );
 }

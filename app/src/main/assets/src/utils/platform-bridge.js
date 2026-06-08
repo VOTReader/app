@@ -64,7 +64,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
  * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string) => void} saveToFile
- * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void> } | null>} openExportSink
+ * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
  * @property {() => Promise<Blob | null>} pickImportFile
  * @property {(suggestedName: string) => void} v3ExportOpen
  * @property {(manifestJson: string) => string} v3ExportBegin
@@ -77,6 +77,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(maxBytes: number) => string} v3ImportReadChunk
  * @property {() => void} v3ImportClose
  * @property {() => string} getCrashLog
+ * @property {() => void} clearGardenCache
  */
 
 /**
@@ -164,6 +165,9 @@ const androidImpl = {
   v3ImportClose: () => /** @type {any} */ (window).AndroidBridge.v3ImportClose(),
   // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
   getCrashLog: () => mergeCrashLog(/** @type {any} */ (window).AndroidBridge.getCrashLog()),
+  // NTV3: wipe the native Garden image disk cache (cacheDir/garden, up to 800 MB).
+  // Called from "Clear All My Data" so the native cache doesn't survive the wipe.
+  clearGardenCache: () => /** @type {any} */ (window).AndroidBridge.clearGardenCache(),
 };
 
 // ── Web impl: placeholders (W1.3 / W1.4 / W1.5 fill in actual behavior) ─
@@ -410,10 +414,11 @@ function webSaveToFile(suggestedName, content) {
 // chunked bridge (P3) and implement the SAME { write, close } / File contract.
 
 /**
- * Open a streaming WRITE sink for an export. Returns { write, close }, or null
- * if the user cancelled the destination picker.
+ * Open a streaming WRITE sink for an export. Returns { write, close, abort }, or
+ * null if the user cancelled the destination picker. abort() discards a partial
+ * write on failure (BAK5) so a mid-stream error can't leave a truncated backup.
  * @param {string} suggestedName
- * @returns {Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void> } | null>}
+ * @returns {Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>}
  */
 async function webOpenExportSink(suggestedName) {
   const picker = /** @type {any} */ (window).showSaveFilePicker;
@@ -432,6 +437,11 @@ async function webOpenExportSink(suggestedName) {
     return {
       write: (chunk) => writable.write(chunk),
       close: () => writable.close(),
+      // BAK5: createWritable() commits to the target file only on close()
+      // (temp-swap), so abort() drops the in-progress data and leaves the user's
+      // existing file intact — deterministic cleanup instead of relying on GC of
+      // an unclosed stream. The only backup must never leave a truncated .votbak.
+      abort: () => writable.abort(),
     };
   }
   // Fallback: accumulate chunks, download as a Blob on close. No streaming-to-disk
@@ -441,6 +451,9 @@ async function webOpenExportSink(suggestedName) {
   const chunks = [];
   return {
     write: (chunk) => { chunks.push(chunk.slice()); return Promise.resolve(); },
+    // BAK5: nothing is written to disk until close() triggers the download, so
+    // abort just drops the buffered chunks — no partial file can exist on this path.
+    abort: () => { chunks.length = 0; return Promise.resolve(); },
     close: () => {
       try {
         // Cast: TS lib types Uint8Array as Uint8Array<ArrayBufferLike>, which it
@@ -858,6 +871,9 @@ const webImpl = {
   getZoomScale: () => 1.0,
   // W7.4: the JS DiagnosticLog IS the web crash log (no native log to merge).
   getCrashLog: () => DiagnosticLog.toJSON(),
+  // NTV3: web has no app-managed Garden cache (Garden <img>s are browser
+  // HTTP-cached); "Clear All" deletes the IDB data, so this is a genuine no-op.
+  clearGardenCache: () => {},
 
   // Category 3 — real web impls
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)

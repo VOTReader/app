@@ -24,6 +24,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import 'fake-indexeddb/auto';
+import { COL_BY_SEARCH_ID } from './scripture-resolution.js';   // SRCH3 cross-registry check
 
 const assetsDir = 'app/src/main/assets';
 const read = (rel) => fs.readFileSync(path.join(assetsDir, rel), 'utf8');
@@ -375,5 +376,34 @@ describe('search engine — volumes corpus doc-building', () => {
     const st = VotSearch.getState();
     expect(st.volumes.ready).toBe(true);
     expect(st.volumes.docCount).toBeGreaterThan(0);
+  });
+});
+
+describe('search engine — SRCH2 (all-stop-word query short-circuits)', () => {
+  const stopWords = () => [...(globalThis.VotSearchData?.STOP_WORDS_TRIMMED || [])];
+
+  it('an all-stop-word query returns no results (skips the full-corpus scan)', async () => {
+    const stop = stopWords();
+    expect(stop.length).toBeGreaterThan(1);
+    const r = await VotSearch.search(stop.slice(0, 2).join(' '));   // e.g. "the of"
+    expect(((r && r.results) || []).length).toBe(0);
+  });
+
+  it('a stop-word + content word is unaffected (still finds the verse)', async () => {
+    const r = await VotSearch.search(stopWords()[0] + ' light');     // e.g. "the light"
+    expect(((r && r.results) || []).some((m) => /Genesis 1:3/.test((m.doc && m.doc.ref) || ''))).toBe(true);
+  });
+});
+
+describe('search engine — SRCH3 (volume-id registries stay in sync)', () => {
+  // The engine stamps doc.volumeId from VotSearchData.VOLUME_COLLECTIONS[].id; the
+  // result→letter router (use-search) looks that value up in COL_BY_SEARCH_ID
+  // (scripture-resolution). They're hand-kept in two files — if a future edit drifts
+  // one, a whole collection's results would silently dead-end on tap. This pins it.
+  it('every VOLUME_COLLECTIONS id resolves in COL_BY_SEARCH_ID', () => {
+    const searchIds = (globalThis.VotSearchData?.VOLUME_COLLECTIONS || []).map((c) => c.id);
+    expect(searchIds.length).toBeGreaterThan(0);
+    const unresolved = searchIds.filter((id) => !COL_BY_SEARCH_ID.has(id));
+    expect(unresolved).toEqual([]);
   });
 });

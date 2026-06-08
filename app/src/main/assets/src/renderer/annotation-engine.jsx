@@ -360,6 +360,15 @@ export function applyNoteIcons() {
   // remove nor splitText-insert into those — mutating React-owned DOM is the
   // latent NotFoundError. React verses carry data-hl-key but NOT data-hl-dom.
   document.querySelectorAll('[data-hl-dom] .hl-note-icon').forEach(el => el.remove());
+  // ANN4: heal the text-node fragmentation a prior icon insertion's splitText
+  // (findNoteIconInsertionPoint) leaves behind. applyDOMHighlights normalizes at
+  // the start of its pass, but its A4 signature-skip now short-circuits that pass
+  // when annotations are unchanged — so on a note-only re-pass (icons re-applied,
+  // highlights skipped) the splits would otherwise accumulate across toggles.
+  // Safe: [data-hl-dom] containers are imperatively managed (not React-owned
+  // children), so normalize() can't touch React's DOM — same scope as the
+  // applyDOMHighlights normalize. Runs before the insertion points are computed.
+  document.querySelectorAll('[data-hl-dom]').forEach(c => c.normalize());
   const lastByGroup = new Map();
   document.querySelectorAll('[data-hl-dom] mark.hl-note[data-group-id]').forEach(mark => {
     lastByGroup.set(mark.getAttribute('data-group-id'), mark);

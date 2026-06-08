@@ -15,7 +15,7 @@
    color/notebookIds/body each set() call.
 */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NoteStore } from './note-store.js';
 
 beforeEach(() => {
@@ -68,13 +68,16 @@ describe('NoteStore — CRUD surface', () => {
     expect(NoteStore.get('g_1').keys).toEqual(['letter:vol1:0', 'letter:vol1:1']);
   });
 
-  it('update patches an existing note in place + bumps updated', async () => {
+  it('update patches an existing note in place + bumps updated', () => {
     NoteStore.set('g_1', { body: 'A', color: 'green' });
     const t0 = NoteStore.get('g_1').updated;
 
-    // Small delay so `updated` ts is strictly newer.
-    await new Promise(r => setTimeout(r, 5));
+    // TEST3: deterministic clock advance (was a real setTimeout(r,5), which could
+    // flake if Date.now() didn't tick across 5 wall-clock ms). Restore BEFORE the
+    // assertions so a failure can't leak the mock into later tests.
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(t0 + 10);
     NoteStore.update('g_1', { body: 'B' });
+    nowSpy.mockRestore();
 
     const note = NoteStore.get('g_1');
     expect(note.body).toBe('B');
@@ -105,13 +108,16 @@ describe('NoteStore — CRUD surface', () => {
     expect(NoteStore.count()).toBe(1);
   });
 
-  it('list returns notes sorted newest first by updated', async () => {
-    NoteStore.set('g_old', { body: 'old' });
-    await new Promise(r => setTimeout(r, 5));
-    NoteStore.set('g_new', { body: 'new' });
-    await new Promise(r => setTimeout(r, 5));
-    // Touch g_old, making it the newest.
-    NoteStore.update('g_old', { body: 'old-updated' });
+  it('list returns notes sorted newest first by updated', () => {
+    // TEST3: deterministic monotonic clock (was two real setTimeout(r,5) waits).
+    let now = 1000;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    NoteStore.set('g_old', { body: 'old' });          // updated 1000
+    now = 2000;
+    NoteStore.set('g_new', { body: 'new' });          // updated 2000
+    now = 3000;
+    NoteStore.update('g_old', { body: 'old-updated' }); // updated 3000 → newest
+    nowSpy.mockRestore();
 
     const sorted = NoteStore.list();
     expect(sorted[0].groupId).toBe('g_old');   // most-recently-updated first
@@ -202,17 +208,22 @@ describe('NoteStore — pruneNotebook cascade (prune-one-too-many guard)', () =>
     expect(NoteStore.get('g_1').notebookIds).toEqual(['nb_b', 'nb_c']);
   });
 
-  it('bumps updated only on notes that ACTUALLY had the membership', async () => {
+  it('bumps updated only on notes that ACTUALLY had the membership', () => {
+    // TEST3: mock the clock so the prune stamp (2000) would DIFFER from the set
+    // stamp (1000) if pruneNotebook wrongly bumped g_without — a stronger check
+    // than the old setTimeout(r,5), which could read the same ms and pass falsely.
+    let now = 1000;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
     NoteStore.set('g_with', { body: 'A', notebookIds: ['nb_a'] });
     NoteStore.set('g_without', { body: 'B', notebookIds: [] });
 
-    const updated_without_before = NoteStore.get('g_without').updated;
-    await new Promise(r => setTimeout(r, 5));
-
+    const updated_without_before = NoteStore.get('g_without').updated; // 1000
+    now = 2000;
     NoteStore.pruneNotebook('nb_a');
+    nowSpy.mockRestore();
 
-    // g_with had the membership → updated bumped.
-    // g_without didn't → updated unchanged.
+    // g_with had the membership → updated bumped. g_without didn't → unchanged
+    // (still 1000, not the 2000 it would be if it had been bumped).
     expect(NoteStore.get('g_without').updated).toBe(updated_without_before);
     expect(NoteStore.get('g_with').notebookIds).toEqual([]);
   });

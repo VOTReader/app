@@ -526,6 +526,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       } catch (e) {
         hideToast(_TOAST_ID);
         console.warn('export write failed', e);
+        // BAK5: discard the partial write so no truncated .votbak is left behind.
+        try { await sink.abort?.(); } catch (_e) { /* best-effort cleanup */ }
         _showToast('Export failed while writing. Please try again.');
       }
     } catch (e) {
@@ -666,7 +668,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // Apply + WAIT for every write to durably land before reloading (U1
       // barrier). applyFn SKIPS any section that fails shape validation so a
       // corrupt section can't overwrite good data.
-      const { importFailures, writeFailures, skippedStores } = await applyFn(storesMap, flagMap);
+      const { importFailures, writeFailures, skippedStores, countMismatches } = await applyFn(storesMap, flagMap);
 
       hideToast(_TOAST_ID);
 
@@ -682,6 +684,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       if (importFailures > 0) problems.push(`${importFailures} error${importFailures > 1 ? 's' : ''}`);
       if (skippedStores.length > 0) {
         problems.push(`${skippedStores.length} section${skippedStores.length > 1 ? 's' : ''} skipped (invalid: ${skippedStores.join(', ')})`);
+      }
+      // BAK3: the manifest's `counts` block vs what actually landed. A clean import
+      // always reconciles; a mismatch means a truncated/edited backup or a partial
+      // media import — the user should know their only backup didn't fully restore.
+      if (countMismatches && countMismatches.length > 0) {
+        problems.push(`some records didn't restore (${countMismatches.join(', ')})`);
       }
       if (problems.length) {
         _showToast(`Import completed — ${problems.join('; ')} (check console). Reloading…`, 0);
@@ -733,9 +741,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           validateMediaRecord: validateMediaRecord,
         }));
       } catch (err) {
+        // SEC2: never surface the raw JSON.parse/exception text — V8 folds a
+        // fragment of the malformed input into err.message. Log it for diagnostics;
+        // show the same generic message the other corrupt-file paths use.
         console.warn('import failed', err);
         hideToast(_TOAST_ID);
-        _showToast('Import failed: ' + (err && err.message ? err.message : 'invalid file'));
+        _showToast('This backup file is corrupt or incomplete and could not be read.');
       }
     };
     // Android v3 streaming import via the native chunked bridge. Native sniffs
@@ -751,7 +762,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         PlatformBridge.v3ImportOpen();
       });
       if (ready === 'cancelled') return;                  // user dismissed the picker
-      if (ready !== 'ok') { _showToast('Import failed: ' + ready); return; }
+      // SEC2: log the raw native reason; show a generic, actionable message.
+      if (ready !== 'ok') { console.warn('v3 import open failed:', ready); _showToast('Import failed — could not open the file. Please try again.'); return; }
       // 2. Open + sniff (native reads the magic, then the manifest OR the whole
       //    legacy file). Close the native stream on every non-v3 / error exit.
       let begin;
@@ -842,18 +854,24 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         if (isContainerMagic(head)) {
           await _importV3Container(file);
         } else {
-          // Legacy JSON. Guard the whole-file text read against a pathological
-          // non-backup pick (v3 is the GB-scale path; legacy backups are small).
-          if (file.size > 300 * 1024 * 1024) {
-            _showToast('That file is too large to be a VOTReader backup.');
+          // Legacy JSON whole-file text read. BAK4: cap at 50 MB to match Android
+          // (StorageManager.MAX_IMPORT_SIZE) + the other web path
+          // (WEB_MAX_IMPORT_BYTES) — v3 is the GB-scale streaming path, a legacy
+          // v1/v2 backup is always well under this, so a larger pick is a
+          // pathological non-backup that a 300 MB .text() read would OOM on a
+          // budget device.
+          if (file.size > 50 * 1024 * 1024) {
+            _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
             return;
           }
           await _doImport(await file.text());
         }
       } catch (e) {
+        // SEC2: log for diagnostics; show a generic message, never the raw
+        // exception text (may embed a fragment of the malformed file).
         console.warn('import failed', e);
         hideToast(_TOAST_ID);
-        _showToast('Import failed: ' + (e && e.message ? e.message : 'invalid file'));
+        _showToast('This backup file is corrupt or incomplete and could not be read.');
       }
     })();
   };
@@ -886,6 +904,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
   const clearAllPersonalData = async () => {
     try {
+      // NTV3: wipe the native Garden image disk cache too (Android: cacheDir/garden,
+      // capped at 800 MB — it survived "Clear All" before because the JS wipe only
+      // touched IDB + localStorage). Best-effort + a no-op on web; never block the
+      // data wipe on it.
+      try { PlatformBridge.clearGardenCache(); } catch (_e) { /* best-effort native cache wipe */ }
       _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
       // W2.4 + W2.4-hotfix: Clear ALL user-data IDB databases. The
       // pre-hotfix version fired deleteDatabase() then reloaded

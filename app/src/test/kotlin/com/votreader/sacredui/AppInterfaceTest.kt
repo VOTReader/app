@@ -61,6 +61,15 @@ class AppInterfaceTest {
         assertEquals("error:permission", app.nativeRecordStart())
     }
 
+    // ─── NTV3: native Garden-cache wipe delegation ────────────────────
+
+    @Test
+    fun `clearGardenCache delegates to the host`() {
+        val (app, host, _) = newSubject()
+        app.clearGardenCache()
+        assertEquals(1, host.gardenCacheClearCount)
+    }
+
     @Test
     fun `nativeRecordPause delegates result mapping`() {
         val vm = mockk<MainViewModel>(relaxed = true)

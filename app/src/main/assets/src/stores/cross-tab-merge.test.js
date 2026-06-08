@@ -146,3 +146,42 @@ describe('STORE-1 protected (crossTabMerge) — committed data survives', () => 
     expect(b.list().map((e) => e.id).sort()).toEqual(['X', 'Y']);
   });
 });
+
+/* STOR5 — navigator.locks unavailable (a sub-floor host below chrome108): the
+   merge store must DEGRADE to the pre-STORE-1 blind blob write (data still
+   persists, last-writer-wins) and trace the degrade exactly ONCE per store via
+   DiagnosticLog. The shim (vitest.setup.js) makes every other test take the
+   merge path; this is the ONLY coverage of the fallback (TEST5). */
+describe('STOR5 — no navigator.locks: blind-write fallback + one-shot trace', () => {
+  let origLocks; let origDiag;
+  beforeEach(() => {
+    origLocks = navigator.locks;
+    /** @type {any} */ (navigator).locks = undefined; // Web Locks API absent
+    origDiag = /** @type {any} */ (globalThis).DiagnosticLog;
+    /** @type {any} */ (globalThis).DiagnosticLog = { warn: vi.fn(), error: vi.fn(), time: vi.fn() };
+  });
+  afterEach(() => {
+    /** @type {any} */ (navigator).locks = origLocks;
+    /** @type {any} */ (globalThis).DiagnosticLog = origDiag;
+  });
+
+  it('still persists the cache (blind write) and traces exactly once per store', async () => {
+    const s = makeJournalLikeStore('vot-test-nolocks', mergeListStore);
+    await s._hydrate();
+
+    s.add(entry('X'));
+    await s.whenSaved();
+    // The merge was skipped, but the data still durably landed (last-writer-wins).
+    expect(idsIn('vot-test-nolocks')).toEqual(['X']);
+    // STOR5: the degrade is traced once, to the 'store' channel...
+    const warn = /** @type {any} */ (globalThis).DiagnosticLog.warn;
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toBe('store');
+
+    // ...and NOT again on a second save of the same store (_warnedNoLocks guard).
+    s.add(entry('Y'));
+    await s.whenSaved();
+    expect(idsIn('vot-test-nolocks')).toEqual(['X', 'Y']);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+});

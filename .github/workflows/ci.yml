@@ -82,6 +82,14 @@ jobs:
         # gate; fails fast (cheap) before the heavier typecheck/test/build.
         run: npm run validate:data
 
+      - name: Audit footnote rendering (CORP6 — dup / white verse numbers)
+        # node tools/audit-footnotes.js --check: fails if any Format A footnote (or
+        # WTLB / Blessed / Matthew dict) value would render a DUPLICATED or WHITE
+        # verse number (the dup / bad-key / fallback classes). validate:data's
+        # validateFootnoteMarkers covers the no-marker case; this is the unique
+        # signal for the dup + label-suffixed-key cases. Runs with the data gates.
+        run: npm run check:footnotes
+
       - name: Test + run the data gate (check_balance.py — T6)
         # The front-line black-screen / white-verse gate: esprima JS parse,
         # non-ASCII verse-range dashes, smart-quote JSON delimiters, brace
