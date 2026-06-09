@@ -6,8 +6,12 @@
            raises the toolbar; a plain click (collapsed selection) does not.
      tap   a click or brief touch on an existing highlight/note mark or icon
            routes to the action chip / note sheet / multi-note popover.
-           Long-press context-menu behavior is intentionally absent — only
-           brief taps (< 300 ms) and mouse clicks are routed.
+           Long-press (contextmenu) NEVER routes a tap — only brief taps
+           (< 300 ms) and mouse clicks open chips/notes.
+     raise a long-press / right-click that produced a TEXT SELECTION still
+           raises the toolbar (the Android selection path, where the native
+           selection machinery swallows pointerup/touchend); a bare long-press
+           with nothing selected raises nothing.
 
    The handlers live inside a mount-time useEffect closure (attached to
    `document`), so they can only be exercised by rendering the component and
@@ -149,6 +153,48 @@ describe('SelectionToolbar — W4.5 mouse-drag selection', () => {
       'bible:test:1:1',
       expect.objectContaining({ kind: 'squiggle', color: 'green' }),
     );
+  });
+});
+
+describe('SelectionToolbar — long-press / right-click raises the toolbar (selection only)', () => {
+  it('raises the toolbar when a long-press / right-click produced a text selection', () => {
+    const c = readingContainer('bible:test:1:2', 'who bore witness to the word of God');
+    mount();
+    stubSelection(rangeOver(c, 0, 14)); // "who bore witne"
+    /** @type {any} */ let ev;
+    act(() => { ev = fire(c, 'contextmenu', { clientX: 20, clientY: 20 }); });
+    // Suppresses the native menu and shows ours.
+    expect(ev.defaultPrevented).toBe(true);
+    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+  });
+
+  it('a long-press on a highlight mark with NO selection does not open the chip', () => {
+    const c = readingContainer(
+      'bible:test:1:2',
+      '<mark class="hl-mark" data-group-id="g1" data-kind="highlight">witness</mark> to God',
+    );
+    const mark = c.querySelector('mark.hl-mark');
+    mount();
+    stubSelection(null); // a bare long-press leaves a collapsed selection
+    /** @type {any} */ let ev;
+    act(() => { ev = fire(mark, 'contextmenu', { clientX: 100, clientY: 200 }); });
+    // No chip, no note, native menu left intact (the dropped long-press behavior).
+    expect(window.__showAnnChip).not.toHaveBeenCalled();
+    expect(window.__openNote).not.toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
+  });
+
+  it('leaves the native menu intact for a selection outside any [data-hl-key] container', () => {
+    const outside = document.createElement('div');
+    outside.textContent = 'app chrome, not reading text';
+    document.body.appendChild(outside);
+    mount();
+    stubSelection(rangeOver(outside, 0, 3)); // a selection, but outside reading text
+    /** @type {any} */ let ev;
+    act(() => { ev = fire(outside, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    expect(ev.defaultPrevented).toBe(false);
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
   });
 });
 

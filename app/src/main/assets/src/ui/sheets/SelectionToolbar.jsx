@@ -274,6 +274,23 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       if (sel && !sel.isCollapsed) return;  // mid-selection -> leave it to the toolbar
       routeAnnotationTap(e.target, e.clientX || 0, e.clientY || 0);
     };
+
+    // Long-press (Android) / right-click (desktop). This is RAISE-ONLY: it
+    // NEVER routes an annotation tap (opening a chip/note on long-press was the
+    // behavior the user asked us to drop — our items are tap/click only). The
+    // one thing a long-press must still do is raise the selection toolbar when
+    // it produced a TEXT SELECTION: on Android the native selection machinery
+    // swallows the post-selection pointerup/touchend, so `contextmenu` is the
+    // only reliable signal that a fresh selection is ready to act on. A bare
+    // long-press with nothing selected (collapsed selection), or a selection
+    // outside reading text, is left alone — no toolbar, native menu intact.
+    const onContextMenu = (e) => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+      if (!findHlContainer(sel.getRangeAt(0).startContainer)) return;
+      e.preventDefault();
+      computeAndShow();
+    };
     // Android single-tap bridge (see onSingleTapUp in MainActivity.kt). Coords
     // are CSS pixels. elementFromPoint hit-tests the tap: an icon already fires
     // `click` natively (skip it); otherwise route the highlight/underline/note
@@ -294,6 +311,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     document.addEventListener('pointerup', onPointerUp);
     document.addEventListener('touchend', onPointerUp);
     document.addEventListener('click', onClick);
+    document.addEventListener('contextmenu', onContextMenu);
 
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange);
@@ -301,6 +319,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       document.removeEventListener('pointerup', onPointerUp);
       document.removeEventListener('touchend', onPointerUp);
       document.removeEventListener('click', onClick);
+      document.removeEventListener('contextmenu', onContextMenu);
       window.__nativeTapAnnotation = null;
     };
   }, [computeOffset, findHlContainer]);
