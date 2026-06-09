@@ -294,6 +294,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     // MARK to the chip — the case the WebView's selection layer swallows.
     window.__nativeTapAnnotation = (x, y) => {
       try {
+        if (window.__scrollLiftPending) return;  // finger just lifted from a scroll — not a tap
         const el = document.elementFromPoint(x, y);
         if (!el || !el.closest) return;
         if (el.closest('.hl-note-icon')) return;  // icon → its own click handler routes it

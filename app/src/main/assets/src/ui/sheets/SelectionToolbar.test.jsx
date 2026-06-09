@@ -243,6 +243,29 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     expect(window.__openNote).not.toHaveBeenCalled();
   });
 
+  // A native tap that arrives while __scrollLiftPending is set (finger just
+  // lifted off a scroll) must be silently ignored — the user was scrolling,
+  // not intentionally tapping the highlight.
+  it('native tap is suppressed when __scrollLiftPending is set', () => {
+    const c = readingContainer(
+      'bible:test:1:2',
+      '<mark class="hl-mark" data-group-id="g10" data-kind="highlight">word</mark>',
+    );
+    const mark = c.querySelector('mark.hl-mark');
+    mount();
+    stubSelection(null);
+    window.__scrollLiftPending = true;
+    const origEFP = document.elementFromPoint;
+    document.elementFromPoint = () => mark;
+    try {
+      act(() => { window.__nativeTapAnnotation(20, 20); });
+    } finally {
+      document.elementFromPoint = origEFP;
+      window.__scrollLiftPending = false;
+    }
+    expect(window.__showAnnChip).not.toHaveBeenCalled();
+  });
+
   // A native tap on plain (non-annotated) text opens nothing.
   it('native tap on plain text opens nothing', () => {
     const c = readingContainer('bible:test:1:2', 'plain unmarked verse text');

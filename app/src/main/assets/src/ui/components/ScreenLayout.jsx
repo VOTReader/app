@@ -95,12 +95,13 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
   React.useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    let startX = 0, startY = 0, didScroll = false;
+    let startX = 0, startY = 0, startScrollTop = 0, didScroll = false;
     let suppressFn = null, suppressTid = null;
 
     const cleanupSuppress = () => {
       if (suppressFn) { document.removeEventListener('click', suppressFn, true); suppressFn = null; }
       if (suppressTid !== null) { clearTimeout(suppressTid); suppressTid = null; }
+      window.__scrollLiftPending = false;
     };
 
     const INTERACTIVE_SEL = 'button, a, .fn-ref, .inline-scrip-ref, .letter-link-ref, '
@@ -110,6 +111,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
       if (!e.touches || !e.touches[0]) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
+      startScrollTop = el.scrollTop;
       didScroll = false;
       cleanupSuppress();
     };
@@ -120,9 +122,14 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
       if (dy > 8 && dy > dx) didScroll = true;
     };
     const onEndCapture = (e) => {
-      if (!didScroll) return;
+      // Use touchmove delta OR actual scrollTop change so small WebView scrolls
+      // (below the 8px touchmove threshold) are also caught.
+      const scrolled = didScroll || el.scrollTop !== startScrollTop;
+      if (!scrolled) { didScroll = false; return; }
       didScroll = false;
       cleanupSuppress();
+      // Signal __nativeTapAnnotation (highlight marks on Android) to skip this lift.
+      window.__scrollLiftPending = true;
       if (e.target && e.target.closest && e.target.closest(INTERACTIVE_SEL)) {
         e.stopPropagation();
       }
