@@ -145,7 +145,6 @@ function _buildLinkIcon(hlKey, count, isSource) {
     if (window.__openLinkSidebar) window.__openLinkSidebar(hlKey);
   };
   icon.addEventListener('click', openSidebar);
-  icon.addEventListener('touchend', openSidebar);
   return icon;
 }
 

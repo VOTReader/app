@@ -409,12 +409,6 @@ export function applyNoteIcons() {
       e.stopPropagation();
       _openIcon(e.clientX, e.clientY);
     });
-    icon.addEventListener('touchend', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      var t = e.changedTouches && e.changedTouches[0];
-      _openIcon(t ? t.clientX : 0, t ? t.clientY : 0);
-    });
     const ip = primary.ip;
     const ipUsable = ip.kind === 'beforeNode' && ip.node && ip.node.parentNode
       && container && container.contains(ip.node);

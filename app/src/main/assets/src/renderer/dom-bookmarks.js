@@ -142,7 +142,6 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
     }
   };
   icon.addEventListener('click', openIcon);
-  icon.addEventListener('touchend', openIcon);
   return icon;
 }
 

@@ -721,16 +721,32 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // hit-test the point and open the chip. Because nothing is consumed,
         // the existing selection / drag-to-create-highlight / scroll pipeline
         // is byte-for-byte untouched: this is purely additive.
+        var touchDownX = 0f
+        var touchDownY = 0f
         val tapDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
                 val density = resources.displayMetrics.density
+                // GestureDetector's scroll slop (~8 dp) is wider than the WebView's
+                // (~3 dp), so a small scroll can reach onSingleTapUp even though the
+                // page moved. Reject it if the finger drifted more than 4 dp vertically
+                // (and more vertically than horizontally, so horizontal swipes are fine).
+                val dyDp = Math.abs(e.y - touchDownY) / density
+                val dxDp = Math.abs(e.x - touchDownX) / density
+                if (dyDp > 4f && dyDp > dxDp) return false
                 MainActivityLogic.deviceToCssPx(e.x, e.y, density)?.let { (cx, cy) ->
                     bridge.callOptional(JsEvent.AnnotationTap, cx, cy)
                 }
                 return false  // never consume — the tap still flows to the WebView
             }
         })
-        wv.setOnTouchListener { _, ev -> tapDetector.onTouchEvent(ev); false }
+        wv.setOnTouchListener { _, ev ->
+            if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+                touchDownX = ev.x
+                touchDownY = ev.y
+            }
+            tapDetector.onTouchEvent(ev)
+            false
+        }
 
         return wv
     }
