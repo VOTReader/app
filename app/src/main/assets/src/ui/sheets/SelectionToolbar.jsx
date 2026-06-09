@@ -188,8 +188,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     // Shared tap/click routing for an EXISTING annotation: a note icon, a note
     // mark (-> open note / multi-note popover), or a highlight/underline mark
     // (-> the Remove/Color/Note action chip). Returns true if it handled the
-    // target. Used by the tap (pointerup), the click fallback (Android), and
-    // the long-press (contextmenu) paths so all three behave identically.
+    // target. Used by the brief-tap (pointerup) and click (onClick / Android
+    // native bridge) paths.
     const routeAnnotationTap = (rawTarget, x, y) => {
       const el = rawTarget && rawTarget.nodeType === 3 ? rawTarget.parentElement : rawTarget;
       if (!el || !el.closest) return false;
@@ -232,10 +232,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     };
 
     // Pointer/touch lifecycle: track drag state and commit on release
+    let pointerDownTime = 0;
     const onPointerDown = (e) => {
       if (toolbarRef.current && toolbarRef.current.contains(e.target)) return;
       tapTargetRef.current = e.target;
       tapPosRef.current = { x: e.clientX || 0, y: e.clientY || 0 };
+      pointerDownTime = performance.now();
       dragRef.current = true;
       setVisible(false);
     };
@@ -246,28 +248,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const isCollapsed = !sel || sel.isCollapsed;
       const tapTarget = tapTargetRef.current;
       const pos = (e && e.clientX) ? { x: e.clientX, y: e.clientY } : tapPosRef.current;
-      // Tap detection: collapsed selection + tap on a mark or note icon.
-      // Notes route to NoteSheet (read mode); highlights/underlines route
-      // to the action chip. Overlapping note marks at the tap point show
-      // the multi-note disambiguation popover.
-      if (isCollapsed && tapTarget && routeAnnotationTap(tapTarget, pos.x, pos.y)) return;
+      // Only route annotation taps from brief touches (< 300 ms). Longer holds
+      // are scrolls or long-presses; both should be ignored here. Also skip
+      // if ScreenLayout already flagged this lift as a scroll.
+      const isBriefTap = (performance.now() - pointerDownTime) < 300;
+      if (isCollapsed && isBriefTap && !window.__scrollLiftPending && tapTarget && routeAnnotationTap(tapTarget, pos.x, pos.y)) return;
       setTimeout(computeAndShow, 150);
-    };
-
-    // Android long-press / right-click: same routing as tap.
-    const onContextMenu = (e) => {
-      const hlContainer = e.target.closest('[data-hl-key]');
-      if (hlContainer) e.preventDefault();
-      if (routeAnnotationTap(e.target, e.clientX, e.clientY)) {
-        setVisible(false);
-        // A long-press creates a native text selection (the blue handles) right
-        // under the chip; collapse it so the OS handles don't intersect our
-        // "Remove / Color / Note" menu. The chip operates on the existing
-        // annotation (via hlKey/groupId), so it doesn't need the selection.
-        try { const s = window.getSelection(); if (s) s.removeAllRanges(); } catch (_e) { /* best-effort */ }
-        return;
-      }
-      setTimeout(computeAndShow, 80);
     };
 
     // Tap-to-open the action chip — the path differs by platform because a tap
@@ -307,7 +293,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('pointerup', onPointerUp);
     document.addEventListener('touchend', onPointerUp);
-    document.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('click', onClick);
 
     return () => {
@@ -315,7 +300,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('pointerup', onPointerUp);
       document.removeEventListener('touchend', onPointerUp);
-      document.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('click', onClick);
       window.__nativeTapAnnotation = null;
     };

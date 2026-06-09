@@ -1,15 +1,13 @@
-/* W4.4 + W4.5 — SelectionToolbar desktop contract.
-   ────────────────────────────────────────────────
-   Locks the unified pointer + contextmenu behavior the desktop polish
-   depends on (verified live in a desktop-width preview before this test
-   was written):
+/* W4.5 + annotation tap routing — SelectionToolbar contract.
+   ────────────────────────────────────────────────────────────
+   Locks the pointer-drag and tap-routing behaviors:
 
      W4.5  mouse-drag selection (pointerdown → selection → pointerup)
            raises the toolbar; a plain click (collapsed selection) does not.
-     W4.4  right-click inside reading text suppresses the native menu and
-           either raises the toolbar (plain selection) or routes an existing
-           mark/note-icon to its chip/note handler. Right-click OUTSIDE any
-           [data-hl-key] container leaves the native menu intact.
+     tap   a click or brief touch on an existing highlight/note mark or icon
+           routes to the action chip / note sheet / multi-note popover.
+           Long-press context-menu behavior is intentionally absent — only
+           brief taps (< 300 ms) and mouse clicks are routed.
 
    The handlers live inside a mount-time useEffect closure (attached to
    `document`), so they can only be exercised by rendering the component and
@@ -154,37 +152,7 @@ describe('SelectionToolbar — W4.5 mouse-drag selection', () => {
   });
 });
 
-describe('SelectionToolbar — W4.4 right-click context menu', () => {
-  it('suppresses the native menu and raises the toolbar on a text selection', async () => {
-    const c = readingContainer('bible:test:1:2', 'who bore witness to the word of God');
-    mount();
-    stubSelection(rangeOver(c, 0, 14)); // "who bore witne"
-    /** @type {any} */ let ev;
-    await act(async () => {
-      ev = fire(c, 'contextmenu', { clientX: 20, clientY: 20 });
-      await new Promise((r) => setTimeout(r, 150)); // past the 80ms computeAndShow
-    });
-    expect(ev.defaultPrevented).toBe(true);
-    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
-  });
-
-  it('routes a highlight mark to __showAnnChip (no toolbar)', () => {
-    const c = readingContainer(
-      'bible:test:1:2',
-      '<mark class="hl-mark" data-group-id="g1" data-kind="highlight">witness</mark> to God',
-    );
-    const mark = c.querySelector('mark.hl-mark');
-    mount();
-    stubSelection(null);
-    /** @type {any} */ let ev;
-    act(() => { ev = fire(mark, 'contextmenu', { clientX: 100, clientY: 200 }); });
-    expect(ev.defaultPrevented).toBe(true);
-    // chip opens at the default position (the point itself, no offset).
-    expect(window.__showAnnChip).toHaveBeenCalledWith(100, 200, 'bible:test:1:2', 'g1');
-    expect(window.__openNote).not.toHaveBeenCalled();
-    expect(document.querySelector('.sel-toolbar')).toBeNull();
-  });
-
+describe('SelectionToolbar — annotation tap and click routing', () => {
   // Desktop / non-text taps fire `click`; this opens the chip on a highlight.
   it('routes a click on a highlight mark to __showAnnChip', () => {
     const c = readingContainer(
@@ -291,7 +259,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     expect(window.__openNote).not.toHaveBeenCalled();
   });
 
-  it('routes a note mark to __openNote', () => {
+  it('routes a click on a note mark to __openNote', () => {
     const c = readingContainer(
       'bible:test:1:2',
       '<mark class="hl-mark hl-note" data-group-id="g2" data-kind="note">witness</mark> to God',
@@ -301,14 +269,12 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     stubSelection(null);
     // Note-ness is a NoteStore entry now (not data-kind) — make g2 a note.
     /** @type {any} */ (globalThis).NoteStore.get = (g) => (g === 'g2' ? { groupId: 'g2' } : null);
-    /** @type {any} */ let ev;
-    act(() => { ev = fire(mark, 'contextmenu', { clientX: 10, clientY: 10 }); });
-    expect(ev.defaultPrevented).toBe(true);
+    act(() => { fire(mark, 'click', { clientX: 10, clientY: 10 }); });
     expect(window.__openNote).toHaveBeenCalledWith('g2');
     expect(window.__showAnnChip).not.toHaveBeenCalled();
   });
 
-  it('routes a note icon to __openNote', () => {
+  it('routes a click on a note icon to __openNote', () => {
     const c = readingContainer(
       'bible:test:1:2',
       'witness<span class="hl-note-icon" data-group-id="g3"></span> to God',
@@ -316,9 +282,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     const icon = c.querySelector('.hl-note-icon');
     mount();
     stubSelection(null);
-    /** @type {any} */ let ev;
-    act(() => { ev = fire(icon, 'contextmenu', { clientX: 10, clientY: 10 }); });
-    expect(ev.defaultPrevented).toBe(true);
+    act(() => { fire(icon, 'click', { clientX: 10, clientY: 10 }); });
     expect(window.__openNote).toHaveBeenCalledWith('g3');
   });
 
@@ -340,7 +304,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     const origEFP = document.elementsFromPoint;
     document.elementsFromPoint = () => [marks[0], marks[1]]; // both noted marks under the tap
     try {
-      act(() => { fire(marks[0], 'contextmenu', { clientX: 10, clientY: 10 }); });
+      act(() => { fire(marks[0], 'click', { clientX: 10, clientY: 10 }); });
     } finally {
       document.elementsFromPoint = origEFP;
     }
@@ -362,7 +326,7 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     const origEFP = document.elementsFromPoint;
     document.elementsFromPoint = () => [mark]; // only this mark at the point
     try {
-      act(() => { fire(mark, 'contextmenu', { clientX: 10, clientY: 10 }); });
+      act(() => { fire(mark, 'click', { clientX: 10, clientY: 10 }); });
     } finally {
       document.elementsFromPoint = origEFP;
     }
@@ -370,20 +334,6 @@ describe('SelectionToolbar — W4.4 right-click context menu', () => {
     expect(window.__showMultiNote).not.toHaveBeenCalled();
   });
 
-  it('leaves the native menu intact outside any [data-hl-key] container', async () => {
-    const outside = document.createElement('div');
-    outside.textContent = 'app chrome, not reading text';
-    document.body.appendChild(outside);
-    mount();
-    stubSelection(null);
-    /** @type {any} */ let ev;
-    await act(async () => {
-      ev = fire(outside, 'contextmenu', { clientX: 5, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 120));
-    });
-    expect(ev.defaultPrevented).toBe(false);
-    expect(document.querySelector('.sel-toolbar')).toBeNull();
-  });
 });
 
 describe('SelectionToolbar — ANN2 remove-confirm discloses note deletion', () => {

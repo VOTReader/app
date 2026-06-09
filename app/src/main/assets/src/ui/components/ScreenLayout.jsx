@@ -95,7 +95,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
   React.useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    let startX = 0, startY = 0, startScrollTop = 0, didScroll = false;
+    let startX = 0, startY = 0, startScrollTop = 0, startTime = 0, didScroll = false;
     let suppressFn = null, suppressTid = null;
 
     const cleanupSuppress = () => {
@@ -112,6 +112,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       startScrollTop = el.scrollTop;
+      startTime = performance.now();
       didScroll = false;
       cleanupSuppress();
     };
@@ -122,10 +123,13 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
       if (dy > 8 && dy > dx) didScroll = true;
     };
     const onEndCapture = (e) => {
-      // Use touchmove delta OR actual scrollTop change so small WebView scrolls
-      // (below the 8px touchmove threshold) are also caught.
+      // Suppress scroll-lifts (finger moved) and long-holds (finger held > 300 ms).
+      // Either means the gesture was not a tap — clicking whatever you landed on
+      // would be accidental. Small WebView scrolls below the 8px touchmove delta
+      // are caught by the scrollTop change check.
       const scrolled = didScroll || el.scrollTop !== startScrollTop;
-      if (!scrolled) { didScroll = false; return; }
+      const tooLong = (performance.now() - startTime) > 300;
+      if (!scrolled && !tooLong) { didScroll = false; return; }
       didScroll = false;
       cleanupSuppress();
       // Signal __nativeTapAnnotation (highlight marks on Android) to skip this lift.
