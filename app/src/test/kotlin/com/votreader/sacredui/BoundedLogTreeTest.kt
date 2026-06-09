@@ -91,6 +91,18 @@ class BoundedLogTreeTest {
         assertNull(entry.tag)
     }
 
+    @Test
+    fun `entry sanitizes a sensitive tag (not just the message)`() {
+        // Defense-in-depth: every real call site uses a static tag, but the
+        // export advertises a sanitized tail. A dynamic content:// URI forced as
+        // the tag must be redacted exactly like it would be inside the message.
+        val tree = BoundedLogTree()
+        tree.record(Log.WARN, "content://com.example.provider/secret.json", "ok")
+        val entry = tree.getEntries().single()
+        assertEquals("[uri]", entry.tag)
+        assertEquals("ok", entry.message)
+    }
+
     // ─── capacity + ordering ──────────────────────────────────────────
 
     @Test

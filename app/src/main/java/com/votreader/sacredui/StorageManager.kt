@@ -272,7 +272,17 @@ class StorageManager(private val context: Context) {
                     try { dis.close() } catch (_: Exception) {}
                     return Result.Failure("bad_manifest_len")
                 }
-                val manifestBytes = ByteArray(manifestLen.toInt())
+                // Guard the allocation itself: OutOfMemoryError is an Error, not an
+                // Exception, so the function's outer try/catch would NOT catch it —
+                // a length under the cap but past this device's heap would crash.
+                // Fail it gracefully instead (the user's existing data is untouched;
+                // a corrupt backup just declines to import rather than killing the app).
+                val manifestBytes = try {
+                    ByteArray(manifestLen.toInt())
+                } catch (_: OutOfMemoryError) {
+                    try { dis.close() } catch (_: Exception) {}
+                    return Result.Failure("manifest_too_large")
+                }
                 dis.readFully(manifestBytes)
                 importIn = dis
                 importFrameRemaining = -1L
@@ -422,11 +432,24 @@ class StorageManager(private val context: Context) {
         val CONTAINER_MAGIC: ByteArray = "VOTBACK1".toByteArray(Charsets.US_ASCII)
 
         // Corruption guard on the v3 manifest-frame allocation: a manifest holds
-        // the structured stores (JSON, bounded to MBs even after years of text) +
-        // per-blob METADATA only, never the blob bytes. A length far past that is
-        // a corrupt/garbage header, not a real backup — refuse rather than attempt
-        // a multi-hundred-MB ByteArray alloc on a budget device.
-        const val MAX_V3_MANIFEST_SIZE = 256L * 1024 * 1024
+        // the structured stores (JSON, bounded to single-digit MBs even after
+        // years of text) + per-blob METADATA only, never the blob bytes. A length
+        // far past that is a corrupt/garbage header, not a real backup — refuse
+        // rather than attempt the alloc.
+        //
+        // The value must sit BELOW the device heap ceiling, not just be "large":
+        // the old 256 MB cap was higher than the default heap on many devices
+        // (64-256 MB, largeHeap off), so a garbage header declaring e.g. 250 MB
+        // PASSED this guard and then OOM-crashed on the ByteArray below — the
+        // guard undershot its own purpose. 128 MB is still ~10x any real manifest
+        // (a decades-prolific journaler is well under that) yet rejects an obvious
+        // garbage length before a single byte is allocated. The allocation itself
+        // is ALSO wrapped in an OutOfMemoryError catch (see beginV3Import) so an
+        // under-cap-but-still-too-big length on a small-heap device fails as a
+        // graceful Result.Failure instead of crashing — belt and suspenders, since
+        // the outer try/catch(Exception) does NOT catch OOM (an Error, not an
+        // Exception).
+        const val MAX_V3_MANIFEST_SIZE = 128L * 1024 * 1024
     }
 
     sealed interface Result<out T> {

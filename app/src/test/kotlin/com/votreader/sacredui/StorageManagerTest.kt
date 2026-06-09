@@ -438,6 +438,41 @@ class StorageManagerTest {
     }
 
     @Test
+    fun `beginV3Import rejects an over-cap manifest length before allocating`() {
+        // A corrupt/garbage header declaring a manifest larger than the cap must
+        // be refused at the length check — NOT allocated and then OOM-crashed.
+        // (The old 256 MB cap sat above the heap ceiling on many devices, so a
+        // 250 MB declaration passed the guard and crashed; the cap is now 128 MB
+        // and the alloc is additionally OOM-guarded.)
+        val overCap = StorageManager.MAX_V3_MANIFEST_SIZE + 1
+        val header = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            write(beLong(overCap))                 // declares an absurd manifest size
+            // no manifest bytes follow — the guard must trip before any read
+        }.toByteArray()
+        val uri = Uri.parse("content://test/overcap")
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(header)
+
+        val r = storage.beginV3Import(uri)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("bad_manifest_len", r.reason)
+    }
+
+    @Test
+    fun `beginV3Import rejects a negative manifest length`() {
+        val header = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            write(beLong(-1L))                     // 0xFFFF... reads back as negative
+        }.toByteArray()
+        val uri = Uri.parse("content://test/neglen")
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(header)
+
+        val r = storage.beginV3Import(uri)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("bad_manifest_len", r.reason)
+    }
+
+    @Test
     fun `v3 export rejects a short final frame on commit`() {
         val uri = Uri.parse("content://test/short")
         every { cr.openOutputStream(uri) } returns ByteArrayOutputStream()

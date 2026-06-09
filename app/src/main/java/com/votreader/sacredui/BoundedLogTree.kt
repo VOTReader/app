@@ -44,8 +44,8 @@ class BoundedLogTree(
      * One captured log line. Timestamp is wall-clock millis at log
      * time, the level uses [android.util.Log] constants (WARN=5,
      * ERROR=6, ASSERT=7), tag is whatever Timber inferred from the
-     * call site (nullable when forced via Timber.tag()), and message
-     * has already passed through [sanitize].
+     * call site (nullable when forced via Timber.tag()). Both tag and
+     * message have already passed through [sanitize].
      */
     data class LogEntry(
         val timestamp: Long,
@@ -64,8 +64,13 @@ class BoundedLogTree(
     // override has no effect on that path.
     public override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         if (priority < Log.WARN) return
-        val sanitized = sanitize(message)
-        val entry = LogEntry(clock(), priority, tag, sanitized)
+        // Sanitize BOTH fields. Every current call site uses a static literal tag
+        // ("GardenCache", "WebViewJS"), for which sanitize() is a no-op — but the
+        // export advertises a sanitized diagnostic tail, and a future
+        // Timber.tag(someUri) would otherwise leak straight past the message
+        // redaction. Sanitizing the tag too keeps the guarantee total, not
+        // message-only, at the cost of one no-op String pass per WARN+ line.
+        val entry = LogEntry(clock(), priority, tag?.let { sanitize(it) }, sanitize(message))
         synchronized(lock) {
             if (buffer.size >= capacity) buffer.removeFirst()
             buffer.addLast(entry)
