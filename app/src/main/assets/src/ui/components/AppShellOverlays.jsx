@@ -139,16 +139,16 @@ export function AppShellOverlays({
               thumbnails={tabThumbnails}
             />
           </ScreenLayout>
+          {tabActionIdx != null && (
+            <TabActionSheet
+              idx={tabActionIdx}
+              total={tabs.length}
+              onCloseOthers={() => {closeOtherTabs(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
+              onCloseToRight={() => {closeTabsToTheRight(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
+              onDismiss={() => setTabActionIdx(null)}
+            />
+          )}
         </div>
-      )}
-      {tabActionIdx != null && (
-        <TabActionSheet
-          idx={tabActionIdx}
-          total={tabs.length}
-          onCloseOthers={() => {closeOtherTabs(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
-          onCloseToRight={() => {closeTabsToTheRight(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
-          onDismiss={() => setTabActionIdx(null)}
-        />
       )}
 
       {disableTabsPromptOpen && (
