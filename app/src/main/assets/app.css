@@ -2247,6 +2247,7 @@
       transition:all 0.18s ease; z-index:3;
       backdrop-filter:blur(4px);
       -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
     }
     body.light .tab-card-close { background:rgba(247,242,232,0.6); color:var(--gold); }
     .tab-card-close:active { background:var(--gold-faint); color:var(--gold); }
@@ -2344,6 +2345,7 @@
       transition:all 0.18s ease; z-index:3;
       backdrop-filter:blur(4px);
       -webkit-tap-highlight-color:transparent;
+      touch-action:manipulation;
     }
     body.light .tab-card-menu { background:rgba(247,242,232,0.6); color:var(--gold); }
     .tab-card-menu:active { background:var(--gold-faint); color:var(--gold); }
