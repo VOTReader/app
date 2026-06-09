@@ -85,6 +85,33 @@ export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNot
     () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
   );
 
+  // Lazy-corpus readiness (bundle-a-bible / matthew / vot). A reading screen
+  // renders a "Loading…" placeholder — NOT its [data-hl-key] verse DOM — until
+  // its corpus loader resolves (see screen-routes.jsx _corpusView). On a DIRECT
+  // entry to a chapter (cold-boot saved-tab resume, History, a Library/search
+  // tap) that resolve lands AFTER the store-driven apply pass already ran over
+  // the empty placeholder, and NO store mutation follows to re-trigger it — so
+  // the marks/notes/icons stay unpainted until the user flips to an adjacent
+  // page (which changes screen/letterId and re-applies). Subscribing to each
+  // corpus version (same useSyncExternalStore contract as useLazyBundles) puts
+  // corpus readiness in the apply deps below, so the pass re-runs the instant
+  // the verses mount. The hub screens pre-load the corpus, which MASKS this on
+  // a fast device — but a slow device loses that race; this fixes it at the
+  // root. (The pendingScrollHlKey scroll in the same effect benefits too: a
+  // Library/link jump now scrolls to its mark once the corpus DOM exists.)
+  const bibleCorpusV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
+    () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
+  );
+  const matthewCorpusV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.subscribe(cb) : () => {}, []),
+    () => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.getVersion() : 0
+  );
+  const votCorpusV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
+    () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
+  );
+
   React.useEffect(() => {
     const t = setTimeout(() => {
       // Each annotation layer is isolated: this pipeline mutates the DOM
@@ -123,7 +150,7 @@ export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNot
     }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setNoteSheetTarget is a useState setter passed in as a param (identity-stable per React invariant; eslint can't trace it through the destructured hook-return at the call site).
-  }, [annV, noteV, linkV, bkmV, screen, letterId]);
+  }, [annV, noteV, linkV, bkmV, screen, letterId, bibleCorpusV, matthewCorpusV, votCorpusV]);
 
   // Toggle .is-active on every mark/icon belonging to the open note's group.
   // Default state: notes show only the trailing 📝 icon (no tint, no ribbon).

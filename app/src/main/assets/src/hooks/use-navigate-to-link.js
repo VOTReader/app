@@ -136,7 +136,14 @@ export function useNavigateToLink({
     // branches don't need BOOKS, so they still work.
     const _BOOKS = (typeof BOOKS !== 'undefined') ? BOOKS : null;
     let destSnapshot = null;
-    if (endpoint.type === 'bible' && endpoint.bookId && _BOOKS && _BOOKS[endpoint.bookId]) {
+    // The bible destSnapshot is pure nav metadata ({screen,bookId,chapterNum})
+    // for the back-pill — it does NOT need the corpus loaded. The old
+    // `_BOOKS[bookId]` guard here meant a direct bible jump made before
+    // __loadBibleCorpus resolved built a null snapshot (back-pill couldn't
+    // detect "moved on"); compute it from the endpoint alone instead. (matthew
+    // is a bible-typed endpoint routed to matthew-ch, so it's excluded here and
+    // handled by the next branch.)
+    if (endpoint.type === 'bible' && endpoint.bookId && endpoint.bookId !== 'matthew') {
       destSnapshot = { screen: 'bible-ch', bookId: endpoint.bookId, chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
     } else if (endpoint.type === 'study' || (endpoint.type === 'bible' && endpoint.bookId === 'matthew')) {
       destSnapshot = { screen: 'matthew-ch', bookId: 'matthew', chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
@@ -153,11 +160,30 @@ export function useNavigateToLink({
       sourceVolumeLabel: (meta && meta.sourceVolumeLabel) || null,
       destSnapshot: destSnapshot
     });
-    if (endpoint.type === 'bible' && endpoint.bookId && _BOOKS && _BOOKS[endpoint.bookId]) {
-      setBookId(endpoint.bookId);
-      setChapterNum(endpoint.chapter);
-      setScreen('bible-ch');
-      setSurpriseAnchor(endpoint.verse ? { type: 'verse', verses: [endpoint.verse] } : null);
+    if (endpoint.type === 'bible' && endpoint.bookId && endpoint.bookId !== 'matthew') {
+      // The bible corpus (BOOKS, in bundle-a-bible) may not be loaded yet on a
+      // direct entry — a Library/LinkSidebar tap straight after a cold boot,
+      // before any hub pre-loaded it. The OLD code gated this branch on
+      // `_BOOKS[bookId]`, so such a tap fell through EVERY branch and silently
+      // did NOTHING (the user's "links don't work until the target's loaded"
+      // report). Navigate immediately when the corpus is ready; otherwise kick
+      // the loader and navigate when it resolves — never drop the intent.
+      const goBible = () => {
+        setBookId(endpoint.bookId);
+        setChapterNum(endpoint.chapter);
+        setScreen('bible-ch');
+        setSurpriseAnchor(endpoint.verse ? { type: 'verse', verses: [endpoint.verse] } : null);
+      };
+      if (_BOOKS && _BOOKS[endpoint.bookId]) {
+        goBible();
+      } else if (typeof window.__loadBibleCorpus === 'function') {
+        window.__loadBibleCorpus().then(function () {
+          // Re-check post-load: a real endpoint resolves; a stale/bogus bookId
+          // no-ops with a trace rather than opening an empty chapter.
+          if (typeof BOOKS !== 'undefined' && BOOKS && BOOKS[endpoint.bookId]) goBible();
+          else console.warn('navigateToLink: bible book not found after corpus load', endpoint.bookId);
+        }).catch(function (e) { console.warn('navigateToLink: bible corpus load failed', e); });
+      }
     } else if (endpoint.type === 'study' || (endpoint.type === 'bible' && endpoint.bookId === 'matthew')) {
       setBookId('matthew');
       setChapterNum(endpoint.chapter);
