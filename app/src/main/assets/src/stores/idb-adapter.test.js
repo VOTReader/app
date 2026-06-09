@@ -70,10 +70,10 @@ describe('IDBAdapter — open + schema', () => {
       'vot-journal', 'vot-journal-notebooks', 'vot-journal-index',
       'vot-journal-stats', 'vot-bookmarks', 'vot-notebooks',
       'vot-history', 'vot-state', 'vot-annotations', 'vot-notes',
-      'vot-links', 'vot-home-order', 'vot-note-default', 'meta',
+      'vot-links', 'vot-home-order', 'vot-note-default', 'vot-library-order', 'meta',
     ]);
     expect(new Set(IDBAdapter.STORE_NAMES)).toEqual(expected);
-    expect(IDBAdapter.STORE_NAMES.length).toBe(19);
+    expect(IDBAdapter.STORE_NAMES.length).toBe(20);
   });
 
   it('DB_NAME is "votreader" — separate from vot-journal-media and vot-thumbs', () => {
@@ -82,8 +82,8 @@ describe('IDBAdapter — open + schema', () => {
     expect(IDBAdapter.DB_NAME).not.toBe('vot-thumbs');
   });
 
-  it('DB_VERSION is 3 (v3 added vot-note-default; v2 added vot-home-order)', () => {
-    expect(IDBAdapter.DB_VERSION).toBe(3);
+  it('DB_VERSION is 4 (v4 added vot-library-order; v3 added vot-note-default; v2 added vot-home-order)', () => {
+    expect(IDBAdapter.DB_VERSION).toBe(4);
   });
 
   it('reopening after _resetForTests creates a fresh promise', async () => {

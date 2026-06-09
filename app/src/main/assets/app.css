@@ -3557,6 +3557,27 @@
     }
     .library-tile.placeholder .library-tile-arrow { display: none; }
 
+    /* ── Library drag-to-reorder (mirrors Home + TabsOverview) ──── */
+    .library-tile.pressing {
+      border-color: var(--gold-dim);
+      box-shadow: 0 0 14px rgba(200,164,86,0.18), inset 0 0 0 1px rgba(200,164,86,0.15);
+    }
+    .library-tile.pressing::after {
+      content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: 0%;
+      background: linear-gradient(90deg, var(--gold-dim), var(--gold), var(--gold-bright));
+      border-radius: 0 0 0 2px;
+      animation: libPressFill 1s linear forwards;
+    }
+    @keyframes libPressFill { to { width: 100%; } }
+    .library-tile.dragging { opacity: 0 !important; pointer-events: none; }
+    .library-tile.drag-flying {
+      border-color: var(--gold); border-radius: 12px; cursor: grabbing;
+      box-shadow: 0 20px 44px rgba(0,0,0,0.65), 0 0 32px rgba(200,164,86,0.32), 0 0 0 1px var(--gold);
+    }
+    body.light .library-tile.drag-flying {
+      box-shadow: 0 20px 44px rgba(0,0,0,0.18), 0 0 28px rgba(122,92,16,0.28), 0 0 0 1px var(--gold);
+    }
+
     /* ══════════════════════════════════════════════════════════════
        NOTES INDEX SCREEN — list of every note with search, filter,
        sort. Each row leads with its source label and shows a body
