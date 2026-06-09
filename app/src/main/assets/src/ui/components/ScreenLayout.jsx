@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn }) {
+  const scrollRef = React.useRef(null);
   const ref = React.useCallback((el) => {
     // __scrollEl is a mutable `let` GLOBAL declared in index.html (line ~515),
     // read by use-scroll-memory + use-thumbnails. It is a lexical global, NOT a
@@ -12,6 +13,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
     // reassignment trips a false TS2588 — suppress just this line.
     // @ts-expect-error -- generated-globals const-vs-let mismatch (see above)
     __scrollEl = el;
+    scrollRef.current = el;
   }, []);
 
   const notchRef = React.useRef(null);
@@ -77,6 +79,53 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
       if (__scrollEl) { ro.observe(__scrollEl); update(); }
     }, 500);
     return () => { ro.disconnect(); clearInterval(poll); };
+  }, []);
+
+  // Suppress accidental taps that fire when a scrolling finger lifts on an
+  // interactive element (footnote marker, highlight, icon, etc.). When the
+  // finger moves >8 px vertically we know it was a scroll, not a tap — so we
+  // add a one-shot capture-phase click suppressor to eat the synthesised click
+  // Android WebView fires on touchend. The suppressor removes itself on first
+  // fire or after 300 ms (whichever is first) so it never blocks intentional
+  // taps that follow.
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let startY = 0, didScroll = false;
+    let suppressFn = null, suppressTid = null;
+
+    const cleanupSuppress = () => {
+      if (suppressFn) { document.removeEventListener('click', suppressFn, true); suppressFn = null; }
+      if (suppressTid !== null) { clearTimeout(suppressTid); suppressTid = null; }
+    };
+    const onStart = (e) => {
+      if (!e.touches || !e.touches[0]) return;
+      startY = e.touches[0].clientY;
+      didScroll = false;
+      cleanupSuppress();
+    };
+    const onMove = (e) => {
+      if (didScroll || !e.touches || !e.touches[0]) return;
+      if (Math.abs(e.touches[0].clientY - startY) > 8) didScroll = true;
+    };
+    const onEnd = () => {
+      if (!didScroll) return;
+      didScroll = false;
+      cleanupSuppress();
+      suppressFn = (ev) => { ev.stopPropagation(); ev.preventDefault(); cleanupSuppress(); };
+      document.addEventListener('click', suppressFn, true);
+      suppressTid = setTimeout(cleanupSuppress, 300);
+    };
+
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      cleanupSuppress();
+    };
   }, []);
 
   return (
