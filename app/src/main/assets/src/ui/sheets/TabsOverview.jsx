@@ -173,7 +173,14 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     clearTimeout(pressTimerRef.current);
     pressTimerRef.current = setTimeout(() => {
       // ~1.4s tap → ENTER DRAG MODE (280ms buffer + 1100ms hold — same as Home).
+      // Refs must be set synchronously here — setDragIdx/setPressingIdx are async
+      // React state updates that only reach the refs via useEffect after the next
+      // render. touchmove fires before that render on mobile, so without the direct
+      // ref writes the drag branch is never entered (all three drag bugs: no 2D
+      // movement, no sibling shifts, no auto-drop on lift).
       justDraggedRef.current = true;
+      pressingIdxRef.current = -1;
+      dragIdxRef.current = idx;
       setPressingIdx(-1);
       setDragIdx(idx);
       targetIdxRef.current = idx;
@@ -240,6 +247,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
         dragCloneRef.current = null;
         clearInlineTransforms();
         if (to !== from && to >= 0) onReorder && onReorder(from, to);
+        dragIdxRef.current = -1;  // sync ref immediately; setDragIdx's useEffect is async
         setDragIdx(-1);
         targetIdxRef.current = -1;
         setTimeout(() => {justDraggedRef.current = false;}, 120);
