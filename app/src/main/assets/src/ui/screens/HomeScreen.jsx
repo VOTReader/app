@@ -209,7 +209,13 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
       } else if (cardRefs.current[0]) {
         tileHeightRef.current = cardRefs.current[0].offsetHeight + 10;
       }
+      // Refs must be set synchronously — setDragIdx/setPressingIdx are async React
+      // state updates that only reach the refs via useEffect after the next render.
+      // touchmove fires before that render on mobile, so without direct ref writes
+      // the drag branch is never entered (same bug fixed in TabsOverview).
       justDraggedRef.current = true;
+      pressingIdxRef.current = -1;
+      dragIdxRef.current = idx;
       setPressingIdx(-1);
       setDragIdx(idx);
       targetIdxRef.current = idx;
@@ -275,6 +281,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           setOrder(newOrder);
           HomeOrderStore.set(newOrder);
         }
+        dragIdxRef.current = -1;  // sync ref immediately; setDragIdx's useEffect is async
         setDragIdx(-1);
         targetIdxRef.current = -1;
         setTimeout(() => {justDraggedRef.current = false;}, 120);
