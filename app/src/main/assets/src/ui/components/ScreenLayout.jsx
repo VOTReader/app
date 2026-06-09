@@ -83,47 +83,61 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
 
   // Suppress accidental taps that fire when a scrolling finger lifts on an
   // interactive element (footnote marker, highlight, icon, etc.). When the
-  // finger moves >8 px vertically we know it was a scroll, not a tap — so we
-  // add a one-shot capture-phase click suppressor to eat the synthesised click
-  // Android WebView fires on touchend. The suppressor removes itself on first
-  // fire or after 300 ms (whichever is first) so it never blocks intentional
-  // taps that follow.
+  // finger moves >8 px vertically (and more vertically than horizontally, so
+  // horizontal swipes aren't mistaken) we know it was a scroll, not a tap.
+  // The renderer attaches native `touchend` listeners directly on elements
+  // (dom-bookmarks, dom-links, annotation-engine) — those fire BEFORE any
+  // bubble-phase listener on this container. So we use capture-phase on all
+  // three events: capture fires top-down, reaching us BEFORE the element's
+  // own handlers. On a scroll-end over an interactive element we stopPropagation
+  // to block the native touchend handlers, then add a one-shot capture-phase
+  // click suppressor to eat the synthesised click Android WebView also fires.
   React.useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    let startY = 0, didScroll = false;
+    let startX = 0, startY = 0, didScroll = false;
     let suppressFn = null, suppressTid = null;
 
     const cleanupSuppress = () => {
       if (suppressFn) { document.removeEventListener('click', suppressFn, true); suppressFn = null; }
       if (suppressTid !== null) { clearTimeout(suppressTid); suppressTid = null; }
     };
+
+    const INTERACTIVE_SEL = 'button, a, .fn-ref, .inline-scrip-ref, .letter-link-ref, '
+      + '.tap-ref, .inline-bookmark-icon, .verse-link-icon, .inline-link-icon, .hl-note-icon';
+
     const onStart = (e) => {
       if (!e.touches || !e.touches[0]) return;
+      startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       didScroll = false;
       cleanupSuppress();
     };
     const onMove = (e) => {
       if (didScroll || !e.touches || !e.touches[0]) return;
-      if (Math.abs(e.touches[0].clientY - startY) > 8) didScroll = true;
+      const dy = Math.abs(e.touches[0].clientY - startY);
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      if (dy > 8 && dy > dx) didScroll = true;
     };
-    const onEnd = () => {
+    const onEndCapture = (e) => {
       if (!didScroll) return;
       didScroll = false;
       cleanupSuppress();
+      if (e.target && e.target.closest && e.target.closest(INTERACTIVE_SEL)) {
+        e.stopPropagation();
+      }
       suppressFn = (ev) => { ev.stopPropagation(); ev.preventDefault(); cleanupSuppress(); };
       document.addEventListener('click', suppressFn, true);
       suppressTid = setTimeout(cleanupSuppress, 300);
     };
 
-    el.addEventListener('touchstart', onStart, { passive: true });
-    el.addEventListener('touchmove', onMove, { passive: true });
-    el.addEventListener('touchend', onEnd, { passive: true });
+    el.addEventListener('touchstart', onStart, { capture: true, passive: true });
+    el.addEventListener('touchmove', onMove, { capture: true, passive: true });
+    el.addEventListener('touchend', onEndCapture, { capture: true });
     return () => {
-      el.removeEventListener('touchstart', onStart);
-      el.removeEventListener('touchmove', onMove);
-      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchstart', onStart, true);
+      el.removeEventListener('touchmove', onMove, true);
+      el.removeEventListener('touchend', onEndCapture, true);
       cleanupSuppress();
     };
   }, []);
