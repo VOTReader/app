@@ -122,12 +122,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         return;
       }
       const range = sel.getRangeAt(0);
-      // Strip .fn-ref bubbles and .hl-note-icon elements from the selection text
-      // so footnote numbers and note icons don't bleed into the link preview.
+      // Strip .fn-ref bubbles, .hl-note-icon elements, and .verse-num labels from
+      // the selection text so footnote numbers, note icons, and verse numbers
+      // don't bleed into copied/searched/bookmarked text. The verse number also
+      // lives OUTSIDE the [data-hl-key] container, so the annotation range itself
+      // can't cover it — a highlight/note/icon applies only to the scripture text,
+      // never the number, while the menu still raises on the scripture selection.
       const text = (() => {
         try {
           const frag = range.cloneContents();
-          frag.querySelectorAll('.fn-ref, .hl-note-icon').forEach(function(el) { el.remove(); });
+          frag.querySelectorAll('.fn-ref, .hl-note-icon, .verse-num').forEach(function(el) { el.remove(); });
           return frag.textContent.trim();
         } catch (_e) {
           return sel.toString().trim();

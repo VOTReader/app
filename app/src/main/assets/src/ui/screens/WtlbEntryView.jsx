@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useSwipeNav } from '../../hooks/use-swipe-nav.js';
+import { splitFormatBInline } from '../../utils/format-b-inline.js';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -116,8 +117,25 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
     return null;
   };
 
+  // Render a plain-text run, converting soft line breaks (\n) to <br/>. Because
+  // a _italic_/**bold** span can wrap a whole stanza, its breaks live INSIDE the
+  // <em>/<strong>; this fragmenting happens here in the leaf text segments so the
+  // breaks land wherever the run sits in the recursion.
+  const renderText = (str, keyBase) => {
+    if (str.indexOf('\n') < 0) return str;
+    const out = [];
+    str.split('\n').forEach((part, i) => {
+      if (i > 0) out.push(<br key={keyBase + 'br' + i} />);
+      if (part) out.push(<React.Fragment key={keyBase + 'tx' + i}>{part}</React.Fragment>);
+    });
+    return out;
+  };
+
+  // `line` is now the WHOLE paragraph text (with \n soft breaks), not one line —
+  // so _italic_/**bold** markers that close after a line break still pair (the
+  // splitter matches across \n). renderText turns the breaks back into <br/>.
   const renderLine = (line, consumeRef) => {
-    const parts = line.split(/(\*\*.*?\*\*|_.*?_|\{\{ref:[^}]+\}\}|\{\{nav:[^}]+\}\}|\[From [^\]]+\])/g);
+    const parts = splitFormatBInline(line);
     return parts.map((seg, si) => {
       if (!seg) return null;
       if (seg.startsWith('**') && seg.endsWith('**')) return <strong key={si}>{renderLine(seg.slice(2, -2), consumeRef)}</strong>;
@@ -181,7 +199,7 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
           </a>
         );
       }
-      return <React.Fragment key={si}>{seg}</React.Fragment>;
+      return <React.Fragment key={si}>{renderText(seg, 's' + si)}</React.Fragment>;
     });
   };
 
@@ -267,12 +285,7 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
                   data-hl-dom={true}
                 >
                   <StaticSubtree>
-                    {p.text.split('\n').map((line, li, arr) => (
-                      <React.Fragment key={li}>
-                        {renderLine(line, consumeRef)}
-                        {li < arr.length - 1 && <br />}
-                      </React.Fragment>
-                    ))}
+                    {renderLine(p.text, consumeRef)}
                   </StaticSubtree>
                 </p>
               );

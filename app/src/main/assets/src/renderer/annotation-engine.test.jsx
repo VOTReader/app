@@ -28,10 +28,18 @@ import {
 import { AnnotationStore } from '../stores/annotation-store.js';
 import { NoteStore } from '../stores/note-store.js';
 
-describe('snapRangeToWords (A2)', () => {
+describe('snapRangeToWords (A2 + sticky word/punctuation snap)', () => {
   it('walks start left out of the middle of a word', () => {
     // "hello world", start mid-"world" → snaps to the word boundary (index 6)
     expect(snapRangeToWords('hello world', 8, 11).start).toBe(6);
+  });
+  it('walks end RIGHT out of the middle of a word', () => {
+    // "hello world", end mid-"world" (index 8) → snaps right to the word end (11)
+    expect(snapRangeToWords('hello world', 0, 8).end).toBe(11);
+  });
+  it('expands BOTH ends of a mid-word selection to whole words', () => {
+    // "the quick brown" — start mid-"quick", end mid-"brown" → "quick brown"
+    expect(snapRangeToWords('the quick brown', 5, 12)).toEqual({ start: 4, end: 15 });
   });
   it('treats a STRAIGHT ASCII apostrophe as a word char (A2 fix)', () => {
     // "don't" with ASCII '. Start mid-word must walk left THROUGH the apostrophe
@@ -41,19 +49,38 @@ describe('snapRangeToWords (A2)', () => {
   it('treats the typographic apostrophe U+2019 as a word char too', () => {
     expect(snapRangeToWords('don’t stop', 4, 5).start).toBe(0);
   });
+  it('keeps a hyphenate ("self-control") whole', () => {
+    expect(snapRangeToWords('self-control now', 2, 9)).toEqual({ start: 0, end: 12 });
+  });
   it('leaves a start already at a boundary untouched', () => {
     expect(snapRangeToWords('hello world', 6, 11).start).toBe(6);
+  });
+  it('trims a trailing comma the drag overshot ("Love," → "Love")', () => {
+    // end lands after the comma (index 5); the comma is non-word, so it trims back.
+    expect(snapRangeToWords('Love, joy', 0, 5)).toEqual({ start: 0, end: 4 });
+  });
+  it('trims a trailing colon and period too ("ways..." / "Lord:")', () => {
+    expect(snapRangeToWords('His ways...', 0, 11)).toEqual({ start: 0, end: 8 });
+    expect(snapRangeToWords('the Lord:', 0, 9)).toEqual({ start: 0, end: 8 });
+  });
+  it('trims leading whitespace + punctuation so a mark begins on a word', () => {
+    expect(snapRangeToWords('  “word', 0, 7)).toEqual({ start: 3, end: 7 });
+  });
+  it('collapses an all-punctuation/whitespace selection to start===end (caller bails)', () => {
+    const r = snapRangeToWords('... , ;', 0, 7);
+    expect(r.start).toBe(r.end);
   });
   it('clamps out-of-range offsets', () => {
     expect(snapRangeToWords('abc', -5, 99)).toEqual({ start: 0, end: 3 });
   });
-  it('ANN-2: backs start off a lone trailing surrogate (no mid-emoji split)', () => {
-    // 'ab😀cd' — the emoji is a surrogate PAIR at indices 2-3. A start of 3 (the low
-    // surrogate) would splitText mid-glyph; it must back up to the codepoint boundary.
+  it('ANN-2: never leaves an endpoint mid-codepoint (emoji trims as a boundary)', () => {
+    // 'ab😀cd' — the emoji is a surrogate PAIR at indices 2-3, a non-word boundary.
+    // A start of 3 (the low surrogate) must never splitText mid-glyph; the trim
+    // now drops the whole emoji and lands on the next word "cd" (indices 4-6).
     const r = snapRangeToWords('ab😀cd', 3, 5);
-    expect(r.start).toBe(2);
+    expect(r).toEqual({ start: 4, end: 6 });
     const cc = 'ab😀cd'.charCodeAt(r.start);
-    expect(cc >= 0xDC00 && cc <= 0xDFFF).toBe(false); // no longer a trailing surrogate
+    expect(cc >= 0xDC00 && cc <= 0xDFFF).toBe(false); // not a lone trailing surrogate
   });
 });
 

@@ -28,25 +28,41 @@
      single-block prose React owns.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Snap an annotation's START back to a whole-word boundary — but leave the END
-   EXACTLY where the user released, BY DESIGN. A user can intentionally end a
-   selection mid-word (the note-icon slide-off in dom-links.js compensates so
-   the icon still lands on a boundary); snapping the end here would override that
-   intent. So this only walks `start` left while it sits inside a word. */
+/* Snap an annotation's range to whole WORDS — so a highlight/underline/note never
+   lands mid-word, and never swallows the trailing comma/colon/period the drag
+   overshot. Both endpoints are treated symmetrically:
+     1. EXPAND outward through any partial word (start walks left, end walks right)
+        so a selection that grabs half a word covers the whole word.
+     2. TRIM inward past leading/trailing whitespace + punctuation so the mark
+        begins and ends ON a word ("mostly just words highlight").
+   This makes mid-word / punctuation highlights effectively impossible — the owner
+   asked for "sticky/grippy" selection (2026-06). (Earlier this snapped only the
+   START and left the END exactly where released; the dom-links.js note-icon
+   slide-off that compensated for a mid-word end is now a near no-op, but stays as
+   defense for the adjacent-inline-element case.) An all-punctuation/whitespace
+   selection collapses to start===end; every caller already bails on that. */
 export function snapRangeToWords(text, start, end) {
   if (!text || typeof text !== 'string') return { start, end };
   start = Math.max(0, Math.min(start, text.length));
   end = Math.max(0, Math.min(end, text.length));
-  // A2: word chars include the typographic apostrophe (U+2019) AND the straight
-  // ASCII apostrophe — both appear in the corpus ("don't"/"don’t"); the prior
-  // class duplicated U+2019 and omitted ASCII ', so a straight-apostrophe word
-  // split mid-snap. Hyphen last = literal.
+  // A2: word chars include BOTH apostrophes (U+2019 + ASCII ') — both appear in
+  // the corpus ("don't"/"don’t") — plus the hyphen (last in the class = literal)
+  // so hyphenates ("self-control") stay whole. Everything else (space, comma,
+  // colon, period, emoji…) is a boundary the trim strips from the two ends.
   const isWord = (c) => !!c && /[\w’'-]/.test(c);
+  // START: walk left out of a partial word, then trim leading non-word chars so
+  // the mark begins on a letter (never a leading space or open-quote).
   while (start > 0 && isWord(text[start - 1]) && isWord(text[start])) start--;
+  while (start < end && !isWord(text[start])) start++;
+  // END: walk right out of a partial word, then trim trailing non-word chars —
+  // this drops the stray comma/colon/period/space a drag overshot.
+  while (end < text.length && isWord(text[end]) && isWord(text[end - 1])) end++;
+  while (end > start && !isWord(text[end - 1])) end--;
   // ANN-2: never leave `start` on a lone TRAILING surrogate (the low half of an
-  // emoji / astral codepoint) — a downstream splitText(start) would cleave the glyph.
-  // Back up to the codepoint boundary. (Corpus is ASCII; only a journal annotation
-  // could realistically reach this.)
+  // astral codepoint) — a downstream splitText(start) would cleave the glyph. The
+  // trim above lands `start` on a (BMP) word char in the common case; this guards
+  // the residual where start===end. The end is always left on a word char (the
+  // trim stops there), which is never a surrogate, so no symmetric end guard.
   const cc = text.charCodeAt(start);
   if (cc >= 0xDC00 && cc <= 0xDFFF && start > 0) start--;
   return { start, end };

@@ -31,10 +31,10 @@
    placement so it never interrupts content:
 
      1. Mid-word — slide forward to the end of the current word.
-        (Defensive: snapRangeToWords already aligns starts on word
-        boundaries, but the parallel-session change to snapRangeToWords
-        deliberately leaves END exactly where the user released — so
-        the user can intentionally end mid-word but the icon shouldn't.)
+        (Defensive: snapRangeToWords now snaps BOTH ends to word
+        boundaries — and trims trailing punctuation — so a fresh mark
+        won't end mid-word; this stays as belt-and-suspenders for any
+        range that bypassed the snap or predates it.)
      2. Closing punctuation — slide past `.,;:!?)...` and friends so
         the icon reads as belonging to the word, not splitting the
         punctuation off ("word."[icon] instead of "word"[icon]".").
