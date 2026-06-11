@@ -976,6 +976,14 @@
     /* PERF4: defer off-screen paragraph layout/paint on long letters (DOM-preserving —
        the imperative [data-hl-dom] annotation passes + scroll-to-highlight still work). */
     .letter-para { font-size:1.08rem; line-height:1.8; color:var(--cream); margin-bottom:1.8rem; content-visibility:auto; contain-intrinsic-size:auto 140px; }
+    /* Scroll-memory exact restore (use-scroll-memory.js Effect 3): while a saved
+       position is being applied, lift PERF4's content-visibility (here + the
+       Bible .section-block) so scrollTop lands against REAL block heights, not
+       the placeholder estimates — those let scroll anchoring drag the restored
+       position once real heights render in (~1-2 s later). One frame only; the
+       forced layout populates the `auto` remembered sizes, so re-engaging the
+       optimization changes no geometry. */
+    body.scroll-restoring .letter-para, body.scroll-restoring .section-block { content-visibility: visible; }
     .letter-intro { font-size:1.12rem; line-height:1.85; color:var(--cream); margin-bottom:1.8rem; }
     .study-heading { font-family:'Cinzel',serif; font-size:1.05rem; letter-spacing:0.16em; color:var(--gold); text-transform:uppercase; text-align:center; margin:2.6rem 0 1.1rem; line-height:1.4; }
     .study-heading-l3 { font-size:0.82rem; color:var(--gold-dim); letter-spacing:0.18em; margin:2rem 0 0.85rem; }

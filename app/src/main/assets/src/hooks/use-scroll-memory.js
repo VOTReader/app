@@ -5,15 +5,23 @@
 
    OWNS:
      - scrollKeyRef             (hook-internal; NOT returned)
+     - liveScrollRef            (hook-internal) — { key, y, pct } updated on
+                                 EVERY scroll event (ref write, no re-render).
+                                 The exact-position source for the nav-time
+                                 commit below; immune to the 120 ms debounce
+                                 race and to post-content-swap scrollTop
+                                 clamping (never re-reads the DOM at nav).
      - flushScrollToActiveTab   (React.useCallback, dep [updateActiveTab])
                                  Writes { y, pct } into the active tab's
                                  scrollPositions map for the current screen.
      - Debounced scroll-listener effect (attaches to __scrollEl with 300 ms
                                  re-poll; fires flushScrollToActiveTab after
-                                 120 ms idle).
+                                 120 ms idle; stamps liveScrollRef per event).
      - Visibility/pagehide effect (flushes before OS kill or tab-switch).
-     - Screen-change restore effect (updates scrollKeyRef; restores saved Y
-                                 or scrolls to top when no saved position).
+     - Screen-change restore effect (commits liveScrollRef for the key being
+                                 LEFT — in-tab nav only; updates scrollKeyRef;
+                                 restores saved Y or scrolls to top when no
+                                 saved position).
 
    DOES NOT OWN:
      - __scrollEl — window global set by the main scroll-container's ref
@@ -106,6 +114,17 @@ export function useScrollMemory({
   // ── Refs ───────────────────────────────────────────────────────────────
   const scrollKeyRef = React.useRef(getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId));
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
+  // Last REAL scroll position, stamped on every scroll event. The debounced
+  // flush only fires 120 ms after scrolling STOPS — navigating inside that
+  // window (tap "next letter" mid-momentum) used to lose the final position
+  // (the pending timeout fired after scrollKeyRef had moved to the new key).
+  // This stash is what the restore effect commits for the key being left.
+  const liveScrollRef = React.useRef(/** @type {{key: string, y: number, pct: number} | null} */ (null));
+  // Previous activeTabIdx — the nav-time commit is for IN-TAB nav only. Tab
+  // switches flush explicitly (goTabs fires flushScrollToActiveTab before the
+  // overview opens); committing here on a tab switch would write the OLD
+  // tab's position into the NEW tab via the rebound updateActiveTab.
+  const prevTabIdxRef = React.useRef(activeTabIdx);
 
   // ── Flush callback ─────────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [updateActiveTab].
@@ -128,6 +147,14 @@ export function useScrollMemory({
     let timeout;
     let currentEl = null;
     const onScroll = () => {
+      // Exact-position stash, every event (ref write — no re-render). Skipped
+      // while the tabs overview is open, mirroring the flush guard, so the
+      // overview's own scrolling can't masquerade as screen position.
+      if (currentEl && !tabsOverviewOpenRef.current) {
+        const y = currentEl.scrollTop;
+        const max = Math.max(currentEl.scrollHeight - currentEl.clientHeight, 1);
+        liveScrollRef.current = { key: scrollKeyRef.current, y, pct: Math.max(0, Math.min(1, y / max)) };
+      }
       clearTimeout(timeout);
       timeout = setTimeout(flushScrollToActiveTab, 120);
     };
@@ -141,6 +168,7 @@ export function useScrollMemory({
     attach();
     const poll = setInterval(attach, 300);
     return () => {clearInterval(poll);if (currentEl) currentEl.removeEventListener("scroll", onScroll);clearTimeout(timeout);};
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsOverviewOpenRef is a useRefMirror ref read via .current — call-time fresh, stable object identity (same contract as in flushScrollToActiveTab above). liveScrollRef/scrollKeyRef are plain useRefs. Deps stay [flushScrollToActiveTab] so the listener re-attaches only when the flush identity changes.
   }, [flushScrollToActiveTab]);
 
   // ── Effect 2: flush on page-hide / app-background ─────────────────────
@@ -168,6 +196,23 @@ export function useScrollMemory({
   // rapid re-fire can't fight the next restore.
   React.useLayoutEffect(() => {
     const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId);
+    // NAV-TIME EXACT CAPTURE: commit the live stash for the key being LEFT,
+    // before the new screen's restore runs. The debounced flush alone loses
+    // any scrolling done within 120 ms of the nav tap (its timeout fires
+    // after scrollKeyRef has moved on); the stash holds the position at the
+    // LAST scroll event — exactly where the user left. Guards:
+    //   - in-tab nav only (tab switches flush via goTabs; see prevTabIdxRef)
+    //   - stash key must MATCH the key being left (a stale stash from two
+    //     screens ago must not leak onto a screen the user never scrolled)
+    const prevKey = scrollKeyRef.current;
+    const sameTab = prevTabIdxRef.current === activeTabIdx;
+    prevTabIdxRef.current = activeTabIdx;
+    const live = liveScrollRef.current;
+    if (sameTab && prevKey !== key && live && live.key === prevKey) {
+      updateActiveTab((t) => ({
+        scrollPositions: { ...(t.scrollPositions || {}), [prevKey]: { y: live.y, pct: live.pct } }
+      }));
+    }
     scrollKeyRef.current = key;
     // surpriseAnchor is ALWAYS a verse anchor ({type:'verse'}) and is consumed
     // for scroll positioning ONLY by the bible-ch / matthew-ch screens (they
@@ -186,10 +231,42 @@ export function useScrollMemory({
     const savedY = saved == null ? null :
     typeof saved === 'number' ? saved : typeof saved.y === 'number' ? saved.y : null;
     const target = typeof savedY === 'number' && savedY > 0 ? savedY : 0;
+    // PERF4 × exact restore: .letter-para / .section-block are
+    // content-visibility:auto with PLACEHOLDER intrinsic heights (140px/500px)
+    // until first render. A saved y was measured against REAL layout (the user
+    // scrolled through it); restoring it against the estimated geometry lands
+    // on the wrong content, and as the browser lazily renders the skipped
+    // blocks (~1-2 s later) scroll anchoring drags scrollTop to follow the
+    // wrong content (preview-measured: left 400 → drifted to 478). While
+    // restoring a non-top position, body.scroll-restoring lifts the
+    // content-visibility (app.css) so layout is REAL when scrollTop lands; the
+    // forced full layout also populates `contain-intrinsic-size: auto`'s
+    // remembered sizes, so re-engaging the optimization one frame later
+    // changes no geometry — the position holds to the pixel. Top restores
+    // (target 0) skip the force — top is top in any geometry.
+    if (target > 0) {
+      document.body.classList.add('scroll-restoring');
+      if (__scrollEl) void __scrollEl.scrollHeight; // force the real-geometry layout now
+    }
     if (__scrollEl) __scrollEl.scrollTop = target;
-    const raf = requestAnimationFrame(() => { if (__scrollEl) __scrollEl.scrollTop = target; });
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration.
+    let raf2 = 0;
+    const raf = requestAnimationFrame(() => {
+      if (__scrollEl) __scrollEl.scrollTop = target;
+      // Release only after a PAINTED frame: `contain-intrinsic-size: auto`
+      // records the real block sizes during a frame's rendering update, so a
+      // same-frame (pre-paint) release re-engages content-visibility against
+      // the stale estimates and scroll anchoring drags the restored position
+      // (preview-measured: +614px on a revisited Psalm 119, whose section
+      // nodes React had just re-created). Frame 1 paints WITH the force
+      // (real sizes memoized); frame 2 releases — zero geometry change.
+      raf2 = requestAnimationFrame(() => { document.body.classList.remove('scroll-restoring'); });
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      if (raf2) cancelAnimationFrame(raf2);
+      document.body.classList.remove('scroll-restoring');
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration. updateActiveTab is useCallback([activeTabIdx]) — its identity only changes with activeTabIdx, which IS a dep, so the closure is never stale.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
 
   // ── Return ─────────────────────────────────────────────────────────────
