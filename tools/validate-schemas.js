@@ -25,6 +25,22 @@ import { resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils/scripture-parse.js';
 import { COLLECTIONS } from '../app/src/main/assets/src/data/scripture-resolution.js';
+import { splitFormatBInline } from '../app/src/main/assets/src/utils/format-b-inline.js';
+
+// Consume Format B inline markup the SAME way WtlbEntryView.renderLine does
+// (same splitter → no drift), returning the VISIBLE text. A leftover `_` or `**`
+// in that result means a marker that won't pair — it would render literally on
+// screen (the cross-newline-underscore class of bug). Recurses for nested
+// **bold**/_italic_; ref/nav/attribution markers become chips, so they drop out.
+function visibleFormatBText(text) {
+  return splitFormatBInline(text).map((seg) => {
+    if (!seg) return '';
+    if (seg.startsWith('**') && seg.endsWith('**')) return visibleFormatBText(seg.slice(2, -2));
+    if (seg.startsWith('_') && seg.endsWith('_')) return visibleFormatBText(seg.slice(1, -1));
+    if (/^\{\{(?:ref|nav):/.test(seg) || /^\[From /.test(seg)) return '';
+    return seg;
+  }).join('');
+}
 
 // ── CORP-2: cross-reference resolution ───────────────────────────
 // The in-app letter registry (built at index.html runtime) keys every letter by
@@ -551,6 +567,14 @@ function validateFormatBEntry(entry, prefix, errors, warnings, scriptures) {
       errors.push(`${pp}: missing "text" (string)`);
     } else {
       validateInlineRefs(para.text, pp, errors, warnings, refDict);
+      // Marker-balance guard: after consuming every _italic_/**bold** span the
+      // way the renderer does, no literal `_` or `**` may remain — an unpaired
+      // marker renders on screen (the underscore-"underline" bug). Catches a
+      // future edit that drops a closing marker before it can ship.
+      const visible = visibleFormatBText(para.text);
+      if (visible.includes('_') || visible.includes('**')) {
+        errors.push(`${pp}: unpaired emphasis marker — "${para.text.slice(0, 60).replace(/\n/g, '\\n')}…" would render a literal _ or ** (close the _italic_ / **bold** span)`);
+      }
     }
   }
 }

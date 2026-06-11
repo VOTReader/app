@@ -768,6 +768,34 @@ describe('validateFormatB', () => {
       expect(result.warnings).toEqual([]);
     });
   });
+
+  // Guard against the underscore-"underline" render bug: an _italic_ / **bold**
+  // span that never closes leaves a literal marker on screen. The renderer now
+  // pairs markers across soft line breaks, so this check is what stops a future
+  // edit from shipping an unpaired one.
+  describe('emphasis markers', () => {
+    const para = (text) => validEntry({ paragraphs: [{ align: 'center', text }] });
+    const markerErr = (e) => validateFormatB([e]).errors.filter((x) => /emphasis marker/.test(x));
+
+    it('accepts a balanced _italic_ / **bold** span', () => {
+      expect(markerErr(para('_For they shall_ see **God** here'))).toEqual([]);
+    });
+    it('accepts an italic span that wraps across a soft line break (the fixed case)', () => {
+      expect(markerErr(para('_Blessed are those\n\nWho keep My word._'))).toEqual([]);
+    });
+    it('accepts nested **bold** inside _italic_ across breaks', () => {
+      expect(markerErr(para('_**Title**\n\n**Subtitle**_'))).toEqual([]);
+    });
+    it('flags an unclosed _italic_ span', () => {
+      expect(markerErr(para('_Blessed are those\n\nwho keep My word'))).toHaveLength(1);
+    });
+    it('flags an unclosed **bold** span', () => {
+      expect(markerErr(para('A **bold start that never closes'))).toHaveLength(1);
+    });
+    it('flags an odd number of underscores (a stray marker)', () => {
+      expect(markerErr(para('one _two_ three _'))).toHaveLength(1);
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════
