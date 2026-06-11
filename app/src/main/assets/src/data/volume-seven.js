@@ -3482,6 +3482,7 @@ var LETTERS_V7 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding allowing comments of scoffers or debating with mockers)",
     "blocks": [
       {
         "type": "para",
@@ -4459,7 +4460,8 @@ var LETTERS_V7 = [
     "date": "11/9/08",
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy, For All Those Who Have Ears to Hear",
-    "forLine": "(Regarding a false prophetess, who claims she receives the Word of The Lord)",
+    "forLine": "",
+    "noteLine": "(Regarding a false prophetess, who claims she receives the Word of The Lord)",
     "blocks": [
       {
         "type": "para",
@@ -5751,6 +5753,7 @@ var LETTERS_V7 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy, For All Those Who Have Ears to Hear",
     "forLine": "",
+    "noteLine": "(Regarding believers in Messiah taking part in a Jewish fast during the month of Av)",
     "blocks": [
       {
         "type": "para",
@@ -7490,6 +7493,7 @@ var LETTERS_V7 = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy, For All Those Who Have Ears to Hear",
     "forLine": "",
+    "noteLine": "(Regarding the churches of men and their rejection of this Word)",
     "blocks": [
       {
         "type": "para",
@@ -7853,6 +7857,7 @@ var LETTERS_V7 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the churches of men)",
     "blocks": [
       {
         "type": "para",
@@ -12427,6 +12432,7 @@ var LETTERS_V7 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy, For All Those Who Have Ears to Hear",
     "forLine": "",
+    "noteLine": "(Regarding a large statue of Jesus which was struck by lightning and burned down)",
     "blocks": [
       {
         "type": "para",
@@ -14004,6 +14010,7 @@ var LETTERS_V7 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the churches of men)",
     "blocks": [
       {
         "type": "para",

@@ -201,7 +201,7 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
           <div className="meta-from">{letter.from}</div>
           <div className="meta-spoken">{letter.spoken}</div>
           <div className="meta-for">{letter.forLine}</div>
-          {letter.noteLine && <div className="meta-note">{letter.noteLine}</div>}
+          {letter.noteLine && <div className="meta-note">{Array.isArray(letter.noteLine) ? <Segments segments={letter.noteLine} {...fnProps} /> : letter.noteLine}</div>}
           {letter.metaAddendum && (
             <div className="meta-addendum">Addendum to{' '}
               {letter.metaAddendumLink && wrappedInAppLink ? (

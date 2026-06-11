@@ -576,6 +576,7 @@ var LETTERS_V5 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For a Brother in Christ, and For All Those Who Have Ears To Hear",
+    "noteLine": "(Regarding the judgment of those who are raised at the end of the thousand years)",
     "blocks": [
       {
         "type": "para",
@@ -1928,6 +1929,7 @@ var LETTERS_V5 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For Those in Men’s Fellowship, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the conflict which arises between those who keep the holidays of men and those who obey the Word of The Lord)",
     "blocks": [
       {
         "type": "para",
@@ -2236,6 +2238,7 @@ var LETTERS_V5 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the holidays of men)",
     "blocks": [
       {
         "type": "para",
@@ -2818,6 +2821,7 @@ var LETTERS_V5 = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding modern reports of people being raised from the dead and coming back from death)",
     "blocks": [
       {
         "type": "para",
@@ -3005,6 +3009,7 @@ var LETTERS_V5 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding those who say The Volumes of Truth are from the devil, who cite the Letters regarding Judas as proof)",
     "blocks": [
       {
         "type": "para",
@@ -3056,6 +3061,7 @@ var LETTERS_V5 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding modern false prophets)",
     "blocks": [
       {
         "type": "para",
@@ -3327,6 +3333,7 @@ var LETTERS_V5 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding a brother in Christ who fell away)",
     "blocks": [
       {
         "type": "para",

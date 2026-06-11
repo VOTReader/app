@@ -15,8 +15,8 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-970a66cd89';
-const CORPUS_VERSION = 'c9'; // c8→c9 (2026-06-06): SW1 — bible-studies.js + the bible-<code>.js alt-translations now enter the corpus cache (precache studies + cache-on-use translations) so Studies + alt-translations work OFFLINE; their bytes are now covered by tools/check-corpus-version.js. (c7→c8: CORP-2 holy-days dead-link clone. c6→c7: CORP-1 volume-seven. c5→c6: PF1 minified the lazy corpus bundles.)
+const CACHE_VERSION = 'v1.0.2-41884aae8f';
+const CORPUS_VERSION = 'c10'; // c9→c10 (2026-06-11): restored the parenthetical "(Regarding …)" occasion header line (noteLine) to ~40 Format A letters across Volumes 1/3/4/5/6/7 + Letters to the Flock + Letters from Timothy; fixed a forLine/noteLine scramble in volume-seven "Woe to Those Who Bear False Witness…"; added missing parens to volume-two "Do This in Remembrance of Me". (c8→c9: SW1 — bible-studies.js + bible-<code>.js alt-translations enter the corpus cache. c7→c8: CORP-2 holy-days dead-link clone. c6→c7: CORP-1 volume-seven. c5→c6: PF1 minified the lazy corpus bundles.)
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;

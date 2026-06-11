@@ -1370,6 +1370,7 @@ var LETTERS_V4 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the false doctrine of hell and eternal torment)",
     "blocks": [
       {
         "type": "para",
@@ -1945,6 +1946,7 @@ var LETTERS_V4 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding a video which showed children being “slain in the spirit” at a church assembly)",
     "blocks": [
       {
         "type": "para",
@@ -3197,6 +3199,7 @@ var LETTERS_V4 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the Feasts of The Lord)",
     "blocks": [
       {
         "type": "para",
@@ -4269,6 +4272,7 @@ var LETTERS_V4 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "",
     "forLine": "For a Sister and Brother in Christ, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the doctrine of hell and eternal torment, as taught in the churches of men)",
     "blocks": [
       {
         "type": "para",
@@ -4420,6 +4424,7 @@ var LETTERS_V4 = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding unbelieving family members)",
     "blocks": [
       {
         "type": "para",

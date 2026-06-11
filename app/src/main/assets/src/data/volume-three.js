@@ -235,6 +235,7 @@ var LETTERS_V3 = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding scoffing family members)",
     "blocks": [
       {
         "type": "para",
@@ -2798,6 +2799,7 @@ var LETTERS_V3 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the Feast of Unleavened Bread)",
     "blocks": [
       {
         "type": "para",
@@ -5827,6 +5829,7 @@ var LETTERS_V3 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the Holy Spirit)",
     "blocks": [
       {
         "type": "para",

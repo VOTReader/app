@@ -310,6 +310,7 @@ var LETTERS_V6 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding Easter)",
     "blocks": [
       {
         "type": "para",
@@ -415,6 +416,7 @@ var LETTERS_V6 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding self-appointed apostles, prophets and teachers)",
     "blocks": [
       {
         "type": "para",
@@ -2423,6 +2425,7 @@ var LETTERS_V6 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the United States)",
     "blocks": [
       {
         "type": "para",

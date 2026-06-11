@@ -124,6 +124,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For Timothy’s Sister, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding rebuking demons)",
     "blocks": [
       {
         "type": "para",
@@ -535,6 +536,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For Timothy and His Wife, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding their daughter who is seven)",
     "blocks": [
       {
         "type": "para",
@@ -2671,6 +2673,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy During an Online Fellowship",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding Thanksgiving)",
     "blocks": [
       {
         "type": "para",
@@ -2726,6 +2729,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the preparation of unleavened bread during The Feast of Unleavened Bread)",
     "blocks": [
       {
         "type": "para",
@@ -4004,6 +4008,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the Feast of Trumpets)",
     "blocks": [
       {
         "type": "para",
@@ -4176,6 +4181,8 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Trees of the Field",
+    "metaAddendumLink": { "collection": "Volume Five", "letterTitle": "Trees of the Field" },
     "blocks": [
       {
         "type": "para",
@@ -4295,6 +4302,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding those who persecute The Lord’s servants, because of The Volumes of Truth)",
     "blocks": [
       {
         "type": "para",
@@ -4346,6 +4354,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding requests to join online fellowship)",
     "blocks": [
       {
         "type": "para",
@@ -5103,6 +5112,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the gift of prophecy)",
     "blocks": [
       {
         "type": "para",
@@ -6391,6 +6401,7 @@ var LETTERS_FLOCK = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding Men’s Fellowship)",
     "blocks": [
       {
         "type": "para",
@@ -7212,6 +7223,7 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the false flat earth theory)",
     "blocks": [
       {
         "type": "para",

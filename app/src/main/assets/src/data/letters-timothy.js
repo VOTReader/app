@@ -1548,6 +1548,7 @@ var LETTERS_TIMOTHY = [
     "from": "",
     "spoken": "",
     "forLine": "",
+    "noteLine": "(Regarding The Day of Atonement)",
     "blocks": [
       {
         "type": "para",
@@ -2145,6 +2146,7 @@ var LETTERS_TIMOTHY = [
     "from": "",
     "spoken": "",
     "forLine": "",
+    "noteLine": "(Regarding the assertion that calling YAHUWAH or YAHUSHUA “God” and “Lord” is wrong)",
     "blocks": [
       {
         "type": "para",

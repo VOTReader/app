@@ -1636,6 +1636,11 @@ var LETTERS_V1 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "noteLine": [
+      { "t": "text", "v": "(Regarding the state of the dead" },
+      { "t": "fn", "v": "1" },
+      { "t": "text", "v": ")" }
+    ],
     "blocks": [
       {
         "type": "para",
@@ -3749,6 +3754,7 @@ var LETTERS_V1 = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For Timothy, and For All Those Who Have Ears to Hear",
+    "noteLine": "(Regarding the Indonesian tsunami)",
     "blocks": [
       {
         "type": "para",

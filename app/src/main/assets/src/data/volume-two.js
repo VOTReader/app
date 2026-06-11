@@ -412,7 +412,7 @@ var LETTERS = [
     from: "From YahuShua HaMashiach, Our Lord and Savior",
     spoken: "The Word of The Lord Spoken to Timothy",
     forLine: "For Timothy, and For All Those Who Have Ears to Hear",
-    noteLine: "Regarding Passover and the Feast of Unleavened Bread",
+    noteLine: "(Regarding Passover and the Feast of Unleavened Bread)",
     audioUrl: "https://thevolumesoftruth.bandcamp.com/track/do-this-in-remembrance-of-me",
     videoVoiceUrl: "https://www.youtube.com/watch?v=_k7yeHHdvYc&list=PLE8FlkxQPQkM99Siv2xPqHtuLS9gEQ6FA&index=7",
     bibleStudies: [
