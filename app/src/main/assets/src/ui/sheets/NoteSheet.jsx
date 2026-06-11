@@ -2,6 +2,8 @@
    NoteSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
 export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPicker }) {
   // Subscribe to NoteStore + AnnotationStore mutations. Each store's _bump
   // triggers a re-render of this component via useSyncExternalStore.
@@ -38,7 +40,7 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
     return null;
   }
   const color = note.color || 'yellow';
-  const anchor = note.fullText || segs.map(s => s.ann.text || '').join(' … ');
+  const anchor = normalizeExcerptDisplay(note.fullText || segs.map(s => s.ann.text || '').join(' … '));
   const truncatedAnchor = anchor.length > 220 ? anchor.slice(0, 220) + '…' : anchor;
 
   const save = () => {

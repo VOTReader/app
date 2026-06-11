@@ -2,6 +2,8 @@
    BookmarkCreateSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
 export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
@@ -140,7 +142,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
 
         <div className="bkm-create-body">
           {pending.sourceLabel && <div className="bkm-create-source">{pending.sourceLabel}</div>}
-          {pending.excerpt && <div className="bkm-create-excerpt">“{pending.excerpt}”</div>}
+          {pending.excerpt && <div className="bkm-create-excerpt">“{normalizeExcerptDisplay(pending.excerpt)}”</div>}
 
           <div className="bkm-create-field-label">Label</div>
           <input

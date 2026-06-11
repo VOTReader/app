@@ -2,6 +2,8 @@
    NoteRow — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
 export function NoteRow({ note, onTap }) {
   const sourceLabel = noteSourceLabel(note);
   const date = relativeDate(note.updated || note.created);
@@ -13,7 +15,7 @@ export function NoteRow({ note, onTap }) {
   })[note.color] || '#ffd700';
   const Exp = typeof JrnExpandable !== 'undefined' ? JrnExpandable : null;
   const bodyText = note.body || '';
-  const anchorText = (note.fullText || '').replace(/([,;:!?])([A-Z])/g, '$1 $2');
+  const anchorText = normalizeExcerptDisplay(note.fullText);
   return (
     <div
       className="note-row"

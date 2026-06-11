@@ -2,6 +2,8 @@
    AnnotationActionChip — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
 export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   const [mode, setMode] = React.useState('main'); // 'main' | 'confirm' | 'colors' | 'style'
   // Reset mode whenever a fresh chip opens (different group)
@@ -53,7 +55,9 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
     // is a NoteStore entry now, so no kind change). Record it as the next
     // note's default, then open the sheet to write the body.
     const segs = AnnotationStore.getByGroup(groupId);
-    const fullText = segs.map(s => s.ann.text || '').join(' … ');
+    // Write-time normalize (see SelectionToolbar) — old collapsed ann.text
+    // must not seed a fresh note's fullText.
+    const fullText = normalizeExcerptDisplay(segs.map(s => s.ann.text || '').join(' … '));
     const keys = [...new Set(segs.map(s => s.key))];
     NoteStore.set(groupId, { color: ann.color, fullText, keys, body: '' });
     if (typeof NoteDefaultStore !== 'undefined') {

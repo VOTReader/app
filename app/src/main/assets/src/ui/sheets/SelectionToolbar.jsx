@@ -2,6 +2,8 @@
    SelectionToolbar — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
 function hlDisplayText(container, tcText, start, end) {
   if (!container) return tcText.slice(start, end);
   var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -558,7 +560,10 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       setVisible(false);
       return;
     }
-    const fullText = segs.map(s => s.ann.text || '').join(' … ');
+    // Normalize at WRITE time too: ann.text captured before the TreeWalker
+    // poetry fix can carry collapsed line joins — don't bake them into a
+    // fresh note record.
+    const fullText = normalizeExcerptDisplay(segs.map(s => s.ann.text || '').join(' … '));
     const keys = [...new Set(segs.map(s => s.key))];
     const existingNote = NoteStore.get(groupId);
     NoteStore.set(groupId, {

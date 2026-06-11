@@ -2,6 +2,8 @@
    MultiNotePopover — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
 export function MultiNotePopover({ payload, onClose, onPick }) {
   if (!payload) return null;
   const { groupIds, x, y } = payload;
@@ -30,7 +32,7 @@ export function MultiNotePopover({ payload, onClose, onPick }) {
             >
               <span className="multinote-row-swatch" style={{ background: swatchBg }} />
               <span className="multinote-row-body">
-                <span className="multinote-row-preview">{n.body || (n.fullText ? "“" + n.fullText + "”" : 'Empty note')}</span>
+                <span className="multinote-row-preview">{n.body || (n.fullText ? "“" + normalizeExcerptDisplay(n.fullText) + "”" : 'Empty note')}</span>
                 <span className="multinote-row-meta">
                   {relativeDate(n.updated || n.created)}
                   {noteNbs.length > 0 && (' · ' + noteNbs.map(nb => nb.name).join(' · '))}

@@ -2,6 +2,8 @@
    HighlightsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
 /* Self-contained CSS injection (segregated from the main stylesheet,
    same pattern as journal-styles.js). All classes prefixed `hlx-`. */
 (function injectHighlightStyles() {
@@ -98,7 +100,7 @@ export function _collectMarks() {
   return Object.keys(groups).map(function(gid) {
     var g = groups[gid];
     g.segs.sort(function(x, y) { return (x.created - y.created) || (x.start - y.start); });
-    g.text = g.segs.map(function(s) { return s.text; }).join(' ').replace(/\s+/g, ' ').trim();
+    g.text = normalizeExcerptDisplay(g.segs.map(function(s) { return s.text; }).join(' ').replace(/\s+/g, ' ').trim());
     return g;
   });
 }

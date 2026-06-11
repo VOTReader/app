@@ -29,6 +29,8 @@
      [[journal:<id>]]                 — gold underlined journal-link
 ═══════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../utils/excerpt-display.js';
+
 export var JournalHelpers = (function() {
 
   function blockId() {
@@ -209,7 +211,9 @@ export var JournalHelpers = (function() {
       return {
         title: e.title || ctx.title || letterId,
         eyebrow: col.label,
-        body: excerpt,
+        // Display-only normalize — the STORED b.excerpt stays raw (it is
+        // also the tap-through DOM-match needle; see use-tap-through).
+        body: normalizeExcerptDisplay(excerpt),
         date: e.date || '',
         isExcerpt: true
       };
@@ -259,7 +263,7 @@ export var JournalHelpers = (function() {
     if (typeof NoteStore === 'undefined') return null;
     var n = NoteStore.get(noteGroupId);
     if (!n) return null;
-    var anchor = (n.fullText || '').substring(0, 100);
+    var anchor = normalizeExcerptDisplay(n.fullText).substring(0, 100);
     return {
       title: 'Note',
       eyebrow: 'My Note',

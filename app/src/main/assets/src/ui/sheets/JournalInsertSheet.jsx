@@ -2,6 +2,8 @@
    JournalInsertSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
 export function JournalInsertSheet(props) {
   var useState = React.useState;
 
@@ -357,7 +359,7 @@ export function JournalInsertSheet(props) {
     var filtered = filterByText(notes, function(n) {
       var src = '';
       try { src = noteLabel(n) || ''; } catch (_e) { /* helper may throw on malformed data; treat as missing */ }
-      return (n.body || '') + ' ' + (n.fullText || '') + ' ' + src;
+      return (n.body || '') + ' ' + normalizeExcerptDisplay(n.fullText) + ' ' + src;
     });
     return (
       <>
@@ -366,7 +368,7 @@ export function JournalInsertSheet(props) {
           {filtered.length === 0
             ? <div className="jrn-picker-empty">{notes.length === 0 ? 'No notes yet.' : 'No matches.'}</div>
             : filtered.slice(0, 200).map(function(n) {
-                var anchor = (n.fullText || '').substring(0, 80);
+                var anchor = normalizeExcerptDisplay(n.fullText).substring(0, 80);
                 var label = (n.body || '').substring(0, 60) || anchor || 'Note';
                 var src = '';
                 try { src = noteLabel(n); } catch (_e) { /* helper may throw on malformed data; treat as missing */ }

@@ -4,6 +4,17 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 ---
 
+## Collapsed-poetry excerpt display — one normalizer, every surface (2026-06-11, on main)
+
+Owner report (device screenshot): the INLINE note sheet still showed a stored poetry excerpt with the lines collapsed ("…loins,And become…be;Stand firm…waver;Draw very close…") — the same class fixed for the notebook list in `8469f3b`, where the display-normalize landed ONLY in `NoteRow` as an inline regex. Records captured before the TreeWalker capture fix persist in user data, so every render surface needs the transform.
+
+- **New `utils/excerpt-display.js` — `normalizeExcerptDisplay()`** (the proven NoteRow regex: insert a space after `,;:!?` followed by an uppercase letter; `.` deliberately excluded so "U.S." never splits). Pure helper, ESM-imported — inlined into both bundle-b (journal-helpers) and bundle-d (sheets/screens) graphs; no new window global.
+- **Wired at every surface that renders stored user-captured excerpt text**: `NoteSheet` (the reported inline sheet anchor), `NoteRow` (inline regex folded into the helper), `MultiNotePopover` preview, `HighlightsScreen` group text, `JournalInsertSheet` note-picker anchor/label + its search haystack (so a spaced query matches collapsed records), `journal-helpers.resolveNoteCard` + `resolveLetterCard` (journal note/letter-excerpt cards), `BookmarkCreateSheet` excerpt. Plus the two WRITE-time sites that bake annotation `ann.text` into a fresh note's `fullText` (`SelectionToolbar` note-create, `AnnotationActionChip` convert-to-note) so old collapsed segment text can't seed new records.
+- **Deliberately NOT normalized**: stored link/nav excerpts and `pendingHighlight` needles — `b.excerpt` doubles as the tap-through DOM-match needle (`highlightExcerptInDom` searches the letter DOM, whose poetry `textContent` IS collapsed); normalizing the stored value or the matcher input would break excerpt tap-through. Display-only at the card render (`resolveLetterCard` body), raw everywhere it anchors/matches. Corpus excerpts (`seeAlso`, study notes, verse blocks) are single-block sources — out of scope.
+- **Tests + gates**: `excerpt-display.test.js` (6 cases incl. the exact reported string + idempotence + abbreviation guard); **2170** vitest, lint 0/0, typecheck, build green.
+
+---
+
 ## Exact scroll-position memory — nav-time capture + content-visibility-aware restore (2026-06-10, on main)
 
 Owner report: "go to next letter then back, sometimes my position is lower or higher than I left it. It should be EXACTLY as I left it." Two independent bugs in `use-scroll-memory.js` produced the one symptom (letters hit hardest; same code serves Bible/Matthew/WTLB/studies):
