@@ -334,6 +334,13 @@ export function validateFormatA(letters, opts = {}) {
         }
       }
 
+      // noteLine may be a segments array — the parenthetical "occasion" header
+      // line ("(Regarding the state of the dead[1])") can carry an fn bubble, so
+      // its fn segments count as references too (else the footnote looks orphaned).
+      if (Array.isArray(letter.noteLine)) {
+        validateSegments(letter.noteLine, `${prefix} noteLine`, errors, fnRefsUsed);
+      }
+
       // orphan detection — footnotes not referenced by any fn segment
       for (const fnKey of fnKeys) {
         if (!fnRefsUsed.has(fnKey)) {
