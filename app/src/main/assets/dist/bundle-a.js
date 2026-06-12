@@ -1014,7 +1014,7 @@ var SCHEMA_VERSION = 14;                    // bumped 2026-06-04 (SRCH-1/SRCH-4)
 // service-worker.js CORPUS_VERSION; tools/check-corpus-version.js fails the build
 // if they diverge, so a corpus edit (which forces a CORPUS_VERSION bump) can't
 // silently leave the search index stale.
-var CORPUS_CONTENT_VERSION = 'c11';
+var CORPUS_CONTENT_VERSION = 'c12';
 var ALT_TRANSLATIONS = ['kjv', 'asv', 'web', 'bsb', 'hnv', 'lsv', 'ylt'];
 
 // ─── Archaic/modern pronoun normalization (bidirectional) ───

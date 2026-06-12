@@ -15,8 +15,8 @@
  *   activates → 'controllerchange' fires → page reloads on the new build.
  */
 
-const CACHE_VERSION = 'v1.0.2-0ec42f586f';
-const CORPUS_VERSION = 'c11'; // c10→c11 (2026-06-11): full faithfulness audit — restored the 14 blank Letters-from-Timothy headers (date/from/forLine, "Wisdom Given to Timothy"/"A Vision Given to Timothy" attributions, 2 addendums) and re-referenced The Shadow of The Almighty's attribution footnote; restored volume-seven "Recompense"'s missing opening "Dream of a Coming Storm" (sectionIntro) + its dropped spoken line. (c9→c10: restored the "(Regarding …)" occasion header line to ~40 letters. c8→c9: SW1 corpus-cache. c7→c8: CORP-2. c6→c7: CORP-1. c5→c6: PF1 minify.)
+const CACHE_VERSION = 'v1.0.2-569378304c';
+const CORPUS_VERSION = 'c12'; // c11→c12 (2026-06-12): WTLB/Blessed faithfulness audit — all 360 entries verified present + complete; included the one editorial clarification footnote ("The Letters" refers to The Volumes of Truth) on WTLB One "YAHUWAH Is One", the only footnote across the collection. (c10→c11: restored 14 blank Timothy headers + Recompense's lost dream. c9→c10: restored the "(Regarding …)" occasion header line to ~40 letters. c8→c9: SW1 corpus-cache. c7→c8: CORP-2. c6→c7: CORP-1. c5→c6: PF1 minify.)
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
