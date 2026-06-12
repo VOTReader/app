@@ -198,7 +198,7 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
       <div className="page-wrapper" onTouchStart={swipe.onTouchStart} onTouchEnd={swipe.onTouchEnd}>
         <div className="letter-meta">
           <div className="meta-date">{letter.date}</div>
-          <div className="meta-from">{letter.from}</div>
+          <div className="meta-from">{Array.isArray(letter.from) ? <Segments segments={letter.from} {...fnProps} /> : letter.from}</div>
           <div className="meta-spoken">{letter.spoken}</div>
           <div className="meta-for">{letter.forLine}</div>
           {letter.noteLine && <div className="meta-note">{Array.isArray(letter.noteLine) ? <Segments segments={letter.noteLine} {...fnProps} /> : letter.noteLine}</div>}

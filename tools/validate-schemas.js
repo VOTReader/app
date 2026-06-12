@@ -206,11 +206,20 @@ export function validateFormatA(letters, opts = {}) {
     if (letter.num !== undefined && typeof letter.num !== 'number') {
       errors.push(`${prefix}: "num" must be a number if present`);
     }
-    for (const optStr of ['date', 'from', 'spoken', 'forLine', 'audioUrl',
+    for (const optStr of ['date', 'audioUrl',
       'soundcloudUrl', 'videoVoiceUrl', 'videoMusicUrl',
       'metaAddendum', 'metaAddendumUrl', 'metaAddendumInternal']) {
       if (letter[optStr] !== undefined && typeof letter[optStr] !== 'string') {
         errors.push(`${prefix}: "${optStr}" must be a string if present`);
+      }
+    }
+    // from / spoken / forLine / noteLine may be a plain string OR a segments
+    // array — a header line can carry a footnote bubble (e.g. The Shadow of The
+    // Almighty's attribution "The Interpretation of the Vision Given to Timothy[1]",
+    // or Death and Awakening's "(Regarding the state of the dead[1])").
+    for (const optMeta of ['from', 'spoken', 'forLine', 'noteLine']) {
+      if (letter[optMeta] !== undefined && typeof letter[optMeta] !== 'string' && !Array.isArray(letter[optMeta])) {
+        errors.push(`${prefix}: "${optMeta}" must be a string or a segments array if present`);
       }
     }
 
@@ -334,11 +343,15 @@ export function validateFormatA(letters, opts = {}) {
         }
       }
 
-      // noteLine may be a segments array — the parenthetical "occasion" header
-      // line ("(Regarding the state of the dead[1])") can carry an fn bubble, so
-      // its fn segments count as references too (else the footnote looks orphaned).
-      if (Array.isArray(letter.noteLine)) {
-        validateSegments(letter.noteLine, `${prefix} noteLine`, errors, fnRefsUsed);
+      // Any header meta line (from / spoken / forLine / noteLine) may be a
+      // segments array carrying an fn bubble — e.g. noteLine "(Regarding the
+      // state of the dead[1])" or the Timothy attribution "The Interpretation of
+      // the Vision Given to Timothy[1]". Scan those for fn refs too, or the
+      // footnote looks orphaned.
+      for (const field of ['from', 'spoken', 'forLine', 'noteLine']) {
+        if (Array.isArray(letter[field])) {
+          validateSegments(letter[field], `${prefix} ${field}`, errors, fnRefsUsed);
+        }
       }
 
       // orphan detection — footnotes not referenced by any fn segment

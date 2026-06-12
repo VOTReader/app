@@ -152,8 +152,8 @@ var LETTERS_TIMOTHY = [
   {
     "id": "timothy-s-vision-of-yahushua-jesus-standing-upon-the-world",
     "title": "Timothy’s Vision of YahuShua (Jesus) Standing upon the World",
-    "date": "",
-    "from": "",
+    "date": "6/22/05",
+    "from": "Timothy’s Vision of YahuShua Standing upon the World",
     "spoken": "",
     "forLine": "",
     "blocks": [
@@ -214,10 +214,13 @@ var LETTERS_TIMOTHY = [
   {
     "id": "the-shadow-of-the-almighty",
     "title": "The Shadow of The Almighty",
-    "date": "",
-    "from": "",
+    "date": "6/22/05",
+    "from": [
+      { "t": "text", "v": "The Interpretation of the Vision Given to Timothy" },
+      { "t": "fn", "v": "1" }
+    ],
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -379,10 +382,12 @@ var LETTERS_TIMOTHY = [
   {
     "id": "stealing-from-the-power-of-the-cross",
     "title": "Stealing from the Power of the Cross",
-    "date": "",
-    "from": "",
+    "date": "7/10/05",
+    "from": "Wisdom Given to Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
+    "metaAddendum": "The True Baptism",
+    "metaAddendumUrl": "https://www.thevolumesoftruth.com/The_True_Baptism",
     "blocks": [
       {
         "type": "para",
@@ -530,10 +535,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "the-origin-of-life",
     "title": "The Origin of Life",
-    "date": "",
-    "from": "",
+    "date": "1/18/06",
+    "from": "An Exhortation from Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -735,10 +740,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "yahushua-hamashiach-is-king",
     "title": "YahuShua HaMashiach Is King",
-    "date": "",
-    "from": "",
+    "date": "2/6/06",
+    "from": "Wisdom Given to Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -899,10 +904,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "my-redeemer-lives",
     "title": "My Redeemer Lives",
-    "date": "",
-    "from": "",
+    "date": "4/11/06",
+    "from": "A Prayer of Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -1143,10 +1148,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "tithing",
     "title": "Tithing",
-    "date": "",
-    "from": "",
+    "date": "1/26/07",
+    "from": "Wisdom Given to Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For a Sister in Christ, and For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -1377,10 +1382,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "remember-the-sabbath-day-to-keep-it-holy",
     "title": "Remember The Sabbath Day, to Keep It Holy",
-    "date": "",
-    "from": "",
+    "date": "2/15/07",
+    "from": "Wisdom Given to Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -1544,10 +1549,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "atonement",
     "title": "Atonement",
-    "date": "",
-    "from": "",
+    "date": "2010",
+    "from": "Wisdom Given to Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
     "noteLine": "(Regarding The Day of Atonement)",
     "blocks": [
       {
@@ -1617,10 +1622,12 @@ var LETTERS_TIMOTHY = [
   {
     "id": "humble-yourselves-in-the-sight-of-the-king",
     "title": "Humble Yourselves in the Sight of The King",
-    "date": "",
-    "from": "",
+    "date": "7/5/10",
+    "from": "An Exhortation from Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
+    "metaAddendum": "The Alarm of War",
+    "metaAddendumLink": { "collection": "Volume Seven", "letterTitle": "The Alarm of War" },
     "blocks": [
       {
         "type": "para",
@@ -1683,10 +1690,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "fear-god-and-put-all-your-trust-in-the-holy-one",
     "title": "Fear God, and Put All Your Trust in The Holy One",
-    "date": "",
-    "from": "",
+    "date": "12/13/10",
+    "from": "An Exhortation from Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -1878,10 +1885,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "the-unending-fountain",
     "title": "The Unending Fountain",
-    "date": "",
-    "from": "",
+    "date": "6/5/11",
+    "from": "A Vision Given to Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Eyes to See and Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -2068,10 +2075,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "the-parable-of-the-great-landowner-and-his-beloved-sheep",
     "title": "The Parable of The Great Landowner and His Beloved Sheep",
-    "date": "",
-    "from": "",
+    "date": "7/23/11",
+    "from": "A Parable Given to Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -2142,10 +2149,10 @@ var LETTERS_TIMOTHY = [
   {
     "id": "one-lord-one-god-one-savior",
     "title": "One Lord, One God, One Savior",
-    "date": "",
-    "from": "",
+    "date": "2/25/14",
+    "from": "Wisdom Given to Timothy",
     "spoken": "",
-    "forLine": "",
+    "forLine": "For All Those Who Have Ears to Hear",
     "noteLine": "(Regarding the assertion that calling YAHUWAH or YAHUSHUA “God” and “Lord” is wrong)",
     "blocks": [
       {

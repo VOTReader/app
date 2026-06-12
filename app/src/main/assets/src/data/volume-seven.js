@@ -2331,8 +2331,23 @@ var LETTERS_V7 = [
     "title": "Recompense",
     "date": "11/28/07",
     "from": "From The Lord, Our God and Savior",
-    "spoken": "",
+    "spoken": "The Interpretation of the Dream Spoken to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
+    "sectionIntro": [
+      {
+        "type": "heading",
+        "text": "A Dream of a Coming Storm Given to a Brother in Christ (11/25/07)"
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "I saw a storm coming. The area where the storm was approaching from was just the open sky, but there was the sense that it was coming from out over the ocean. I could not tell which coast I was looking out from, but I knew I was looking from America. The storm clouds were approaching and getting darker and thicker. Then three tornadoes, or waterspouts, broke down out of the storm, all at once, and headed for the shore. After a small lapse of time, I saw myself climbing up some stairs in a house to my bed in an upper room. I laid down in this bed, and realized that my resting place had changed. The head of the bed had shifted from facing the west, and it was now facing the east."
+          }
+        ]
+      }
+    ],
     "blocks": [
       {
         "type": "para",
