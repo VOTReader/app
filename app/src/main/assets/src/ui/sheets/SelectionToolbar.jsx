@@ -27,7 +27,7 @@ function hlDisplayText(container, tcText, start, end) {
 export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
   const [pos, setPos] = React.useState({ x: 0, y: 0 });
-  const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, existingHl, multiVerse }
+  const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, copyText, existingHl, multiVerse }
   const [activeStyle, setActiveStyle] = React.useState('highlight'); // 'highlight' | 'underline'
   // Confirm-strip mode for the ✕ remove button. Resets whenever the
   // selection changes so a fresh selection always lands on the normal
@@ -126,10 +126,10 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const range = sel.getRangeAt(0);
       // Strip .fn-ref bubbles, .hl-note-icon elements, and .verse-num labels from
       // the selection text so footnote numbers, note icons, and verse numbers
-      // don't bleed into copied/searched/bookmarked text. The verse number also
-      // lives OUTSIDE the [data-hl-key] container, so the annotation range itself
-      // can't cover it — a highlight/note/icon applies only to the scripture text,
-      // never the number, while the menu still raises on the scripture selection.
+      // don't bleed into notes/search/bookmarks. The verse number also lives
+      // OUTSIDE the [data-hl-key] container, so the annotation range itself
+      // can't cover it — a highlight/note/icon applies only to the scripture
+      // text, never the number, while the menu still raises on the selection.
       const text = (() => {
         try {
           const frag = range.cloneContents();
@@ -140,6 +140,18 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         }
       })();
       if (!text) { setVisible(false); return; }
+      // Copy-specific text: keep verse-number spans so pasting preserves their
+      // inline position. Everything else (footnote bubbles, note icons) still
+      // stripped. Only the Copy action uses this; all other actions use `text`.
+      const selCopyText = (() => {
+        try {
+          const frag = range.cloneContents();
+          frag.querySelectorAll('.fn-ref, .hl-note-icon').forEach(function(el) { el.remove(); });
+          return frag.textContent.trim();
+        } catch (_e) {
+          return text;
+        }
+      })();
       const container = findHlContainer(range.startContainer);
       const endContainer = findHlContainer(range.endContainer);
       const isMultiVerse = !container || !endContainer || endContainer !== container;
@@ -148,14 +160,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         const allHlContainers = Array.from(document.querySelectorAll('[data-hl-key]'))
           .filter(function(c) { return range.intersectsNode(c); });
         if (allHlContainers.length === 0) { setVisible(false); return; }
-        setSelInfo({ hlKey: null, start: 0, end: 0, text, existingHl: null, multiVerse: true, multiContainers: allHlContainers });
+        setSelInfo({ hlKey: null, start: 0, end: 0, text, copyText: selCopyText, existingHl: null, multiVerse: true, multiContainers: allHlContainers });
       } else {
         const hlKey = container.dataset.hlKey;
         const start = computeOffset(container, range.startContainer, range.startOffset);
         const end = computeOffset(container, range.endContainer, range.endOffset);
         if (start >= end) { setVisible(false); return; }
         const existing = HighlightStore.get(hlKey).find(h => h.start <= start && h.end >= end);
-        setSelInfo({ hlKey, start, end, text, existingHl: existing || null, multiVerse: false });
+        setSelInfo({ hlKey, start, end, text, copyText: selCopyText, existingHl: existing || null, multiVerse: false });
       }
       const rect = range.getBoundingClientRect();
       const toolbarW = 320;
@@ -293,7 +305,11 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const onContextMenu = (e) => {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
-      if (!findHlContainer(sel.getRangeAt(0).startContainer)) return;
+      // Check both endpoints: a selection that starts/ends on a verse-number
+      // span (outside any [data-hl-key]) but reaches into reading text still
+      // has one endpoint in annotatable content — suppress the native menu.
+      const r = sel.getRangeAt(0);
+      if (!findHlContainer(r.startContainer) && !findHlContainer(r.endContainer)) return;
       e.preventDefault();
       computeAndShow();
     };
@@ -448,7 +464,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
   const copyText = React.useCallback(() => {
     if (!selInfo) return;
-    navigator.clipboard.writeText(selInfo.text).catch(() => {});
+    navigator.clipboard.writeText(selInfo.copyText || selInfo.text).catch(() => {});
     window.getSelection().removeAllRanges();
     setVisible(false);
   }, [selInfo]);

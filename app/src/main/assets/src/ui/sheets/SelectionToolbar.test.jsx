@@ -382,6 +382,67 @@ describe('SelectionToolbar — annotation tap and click routing', () => {
 
 });
 
+describe('SelectionToolbar — verse-number crossing (Android menu + copy)', () => {
+  // Helper: cross-element range from first text node in startEl[startOff] to
+  // first text node in endEl[endOff]. Mimics a selection that spans a .verse-num
+  // sibling into a [data-hl-key] reading container.
+  function crossRange(startEl, startOff, endEl, endOff) {
+    const sn = document.createTreeWalker(startEl, NodeFilter.SHOW_TEXT, null).nextNode();
+    const en = document.createTreeWalker(endEl, NodeFilter.SHOW_TEXT, null).nextNode();
+    const r = document.createRange();
+    r.setStart(sn, startOff);
+    r.setEnd(en, endOff);
+    r.getBoundingClientRect = () =>
+      /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+    return r;
+  }
+
+  it('suppresses the native menu when selection starts on a verse-num but ends in reading text', () => {
+    const numSpan = document.createElement('span');
+    numSpan.className = 'verse-num';
+    numSpan.textContent = '3';
+    document.body.appendChild(numSpan);
+    const c = readingContainer('bible:test:1:3', 'In the beginning God created');
+    mount();
+    stubSelection(crossRange(numSpan, 0, c, 5));
+    /** @type {any} */ let ev;
+    act(() => { ev = fire(numSpan, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    expect(ev.defaultPrevented).toBe(true);
+    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+  });
+
+  it('Copy button writes text WITH verse numbers; clean text (without verse-num) still used for the toolbar', () => {
+    const numSpan = document.createElement('span');
+    numSpan.className = 'verse-num';
+    numSpan.textContent = '5';
+    document.body.appendChild(numSpan);
+    const c = readingContainer('bible:test:1:5', 'God called the light Day');
+
+    const writtenTexts = /** @type {string[]} */ ([]);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (t) => { writtenTexts.push(t); return Promise.resolve(); } },
+      writable: true, configurable: true,
+    });
+
+    mount();
+    // Range from verse-num "5" into verse text (first 17 chars = "God called the li")
+    stubSelection(crossRange(numSpan, 0, c, 17));
+    act(() => { fire(numSpan, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+
+    const copyBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
+      .find((s) => s.textContent === 'Copy')?.closest('.sel-action-btn'));
+    expect(copyBtn).not.toBeNull();
+    act(() => { fire(copyBtn, 'click'); });
+
+    expect(writtenTexts.length).toBe(1);
+    // Copy text preserves the verse number "5"
+    expect(writtenTexts[0]).toMatch(/5/);
+    // Copy text also includes the reading content
+    expect(writtenTexts[0]).toMatch(/God called the li/);
+  });
+});
+
 describe('SelectionToolbar — ANN2 remove-confirm discloses note deletion', () => {
   // Raise the toolbar over an EXISTING highlight (so the ✕ shows), then press ✕.
   async function raiseAndPressClear({ noted }) {
