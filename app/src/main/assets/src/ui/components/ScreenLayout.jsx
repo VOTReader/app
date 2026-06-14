@@ -137,7 +137,21 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
       if (e.target && e.target.closest && e.target.closest(INTERACTIVE_SEL)) {
         e.stopPropagation();
       }
-      suppressFn = (ev) => { ev.stopPropagation(); ev.preventDefault(); cleanupSuppress(); };
+      // Only eat the ACCIDENTAL click on the reading content the finger lifted
+      // over — i.e. a click whose target is inside this scroll container. A
+      // deliberate tap on chrome OUTSIDE the scroll area (the Tabs button and
+      // every other .top-nav control, FABs, the selection toolbar) must pass
+      // through, even when it lands within 300 ms of a scroll. The suppressor
+      // is document-wide on purpose (it must out-race the renderer's own
+      // element-level touchend handlers, which run before any bubble listener),
+      // so without this target scope it silently swallowed the next tap on ANY
+      // nav button after a scroll — the "Tabs button lights up but does
+      // nothing" bug. We still clean up unconditionally so the one-shot window
+      // closes whether or not this particular click was suppressed.
+      suppressFn = (ev) => {
+        if (el.contains(ev.target)) { ev.stopPropagation(); ev.preventDefault(); }
+        cleanupSuppress();
+      };
       document.addEventListener('click', suppressFn, true);
       suppressTid = setTimeout(cleanupSuppress, 300);
     };
