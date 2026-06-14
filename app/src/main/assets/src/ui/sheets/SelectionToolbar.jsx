@@ -105,12 +105,21 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const el = toolbarRef.current;
     if (!el) return;
     const w = el.offsetWidth;
-    if (!w) return; // jsdom / not yet laid out — nothing to clamp against
+    const h = el.offsetHeight;
+    if (!w || !h) return; // jsdom / not yet laid out — nothing to clamp against
     const margin = 8;
     const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+    // The toolbar renders from (pos.y − h) to pos.y (translateY(-100%) shifts it
+    // up by its own height). Clamp pos.y so the toolbar top never enters the
+    // top-nav — otherwise the toolbar physically overlaps nav buttons (e.g. the
+    // Tabs button), whose taps land on the toolbar instead of the button.
+    const navEl = document.querySelector('.top-nav');
+    const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 60;
+    const minY = navBottom + h + margin;
     setPos((p) => {
       const x = Math.min(Math.max(margin, p.x), maxLeft);
-      return x === p.x ? p : { x: x, y: p.y };
+      const y = Math.max(p.y, minY);
+      return (x === p.x && y === p.y) ? p : { x, y };
     });
   }, [visible, selInfo]);
 
