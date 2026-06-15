@@ -198,6 +198,57 @@ describe('useScrollMemory — restore', () => {
     expect(el.scrollTop).toBe(1234);
   });
 
+  it('retries the restore until lazy content renders tall enough (cold-boot race)', () => {
+    // Cold boot: the saved position exists but the chapter content hasn't
+    // rendered yet (lazy corpus still loading), so the container is too short
+    // and `scrollTop = target` clamps to ~0. The effect must keep re-applying
+    // until the page is tall enough — otherwise the chapter reopens at the top.
+    tab.scrollPositions['letter-beta'] = { y: 1234, pct: 0.5 };
+    // Start SHORT (content not rendered): maxScroll = 700 - 600 = 100 < 1234.
+    Object.defineProperty(el, 'scrollHeight', { value: 700, configurable: true });
+    // jsdom doesn't clamp scrollTop to the scrollable range — emulate the
+    // browser clamp so the "clamped while short" assertion is meaningful.
+    let _top = 0;
+    Object.defineProperty(el, 'scrollTop', {
+      configurable: true,
+      get() { return _top; },
+      set(v) { _top = Math.min(v, Math.max(0, el.scrollHeight - el.clientHeight)); },
+    });
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    // Content not rendered → clamped short, force still held, retry pending.
+    expect(el.scrollTop).toBeLessThan(1234);
+    expect(document.body.classList.contains('scroll-restoring')).toBe(true);
+    act(() => { vi.advanceTimersByTime(100); }); // several frames, still short
+    expect(el.scrollTop).toBeLessThan(1234);
+    // Lazy corpus renders → the container becomes tall enough.
+    Object.defineProperty(el, 'scrollHeight', { value: 2000, configurable: true });
+    act(() => { vi.advanceTimersByTime(200); }); // a retry frame now lands it
+    expect(el.scrollTop).toBe(1234);             // EXACTLY the saved position
+    expect(document.body.classList.contains('scroll-restoring')).toBe(false); // force released
+  });
+
+  it('retries the restore until the scroll container mounts (cold-boot: __scrollEl null)', () => {
+    // The real cold-boot failure: the restore runs while the lazy-corpus loading
+    // view is up, so the chapter's scroll container (__scrollEl) hasn't mounted
+    // yet. The saved position IS known — the effect must keep retrying until the
+    // container appears, not give up (Hebrews reopened at the top otherwise).
+    tab.scrollPositions['letter-beta'] = { y: 1234, pct: 0.5 };
+    /** @type {any} */ (globalThis).__scrollEl = null; // container not mounted yet
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    // No container → can't restore yet, but the force is held and a retry pends.
+    expect(document.body.classList.contains('scroll-restoring')).toBe(true);
+    act(() => { vi.advanceTimersByTime(100); }); // frames pass, still no container
+    // The chapter mounts → its ScreenLayout ref sets __scrollEl (tall enough).
+    /** @type {any} */ (globalThis).__scrollEl = el;
+    act(() => { vi.advanceTimersByTime(100); });
+    expect(el.scrollTop).toBe(1234);            // retry lands it once the container appears
+    expect(document.body.classList.contains('scroll-restoring')).toBe(false); // released
+  });
+
   it('does not force real geometry for a to-top restore (no saved position)', () => {
     const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
     settleRestoreRaf();

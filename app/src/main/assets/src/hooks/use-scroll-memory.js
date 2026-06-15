@@ -82,6 +82,70 @@ function getScrollKey(scr, bid, cnum, lid, sid, scid) {
   return scr;
 }
 
+// Land a saved scrollTop on the current __scrollEl. Returns a cleanup fn.
+//
+// PERF4 × exact restore: .letter-para / .section-block are
+// content-visibility:auto with PLACEHOLDER intrinsic heights until first
+// render, so restoring against estimated geometry lands on the wrong content
+// (and scroll anchoring then drags it as blocks lazily render). While
+// restoring a non-top position, body.scroll-restoring lifts content-visibility
+// (app.css) so layout is REAL when scrollTop lands; the forced layout also
+// populates contain-intrinsic-size:auto's remembered sizes, so re-engaging the
+// optimization one frame later changes no geometry. Top restores (target 0)
+// skip the force — top is top in any geometry.
+//
+// COLD-BOOT RACE: on a fresh launch the restore runs BEFORE the chapter is
+// ready in two ways — (1) the scroll container itself isn't mounted yet
+// (`__scrollEl` is null while the lazy-corpus loading view shows), and (2) even
+// once mounted, the verses still have to render in, so the container is too
+// short and `scrollTop = target` CLAMPS. The effect runs once (its deps are the
+// nav keys, which don't change as the chapter streams in), so a single early
+// apply was lost (Hebrews reopened at the top on every cold boot). Re-apply
+// across animation frames until the container exists AND is tall enough to hold
+// `target`, or a bounded deadline passes. Content already present (in-tab nav)
+// satisfies the check on the FIRST apply and releases next frame — unchanged.
+function startRestore(target) {
+  if (target <= 0) {
+    if (__scrollEl) __scrollEl.scrollTop = 0;
+    return function () {};
+  }
+  document.body.classList.add('scroll-restoring');
+  var raf = 0, raf2 = 0, tries = 0;
+  var MAX_TRIES = 90; // ~1.5s @ 60fps — covers cold-boot corpus load + paint
+  var land = function () {
+    tries += 1;
+    if (__scrollEl) {
+      void __scrollEl.scrollHeight; // force real-geometry layout (cv lifted)
+      __scrollEl.scrollTop = target;
+    }
+    // "Ready" = the scroll container is mounted AND tall enough to hold target.
+    // On cold boot BOTH lag the restore: __scrollEl is null while the lazy-corpus
+    // loading view shows (the chapter — and its .screen-scroll ref — hasn't
+    // mounted), then once the chapter mounts its blocks still have to render in.
+    // Retry across frames until ready, or give up at the deadline (then still
+    // release, so the content-visibility lift can never leak).
+    var ready = __scrollEl && (__scrollEl.scrollHeight - __scrollEl.clientHeight) >= target - 2;
+    if (!ready && tries < MAX_TRIES) {
+      raf = requestAnimationFrame(land);
+      return;
+    }
+    // Re-apply after the post-commit layout pass (an async content swap can
+    // still shift the offset), then release one PAINTED frame later so
+    // contain-intrinsic-size:auto memoizes the real sizes before content-
+    // visibility re-engages. Frame 1 paints WITH the force; frame 2 releases.
+    raf = requestAnimationFrame(function () {
+      if (__scrollEl) __scrollEl.scrollTop = target;
+      raf2 = requestAnimationFrame(function () { document.body.classList.remove('scroll-restoring'); });
+    });
+  };
+  land();
+  return function () {
+    cancelAnimationFrame(raf);
+    if (raf2) cancelAnimationFrame(raf2);
+    document.body.classList.remove('scroll-restoring');
+  };
+}
+
 /**
  * Per-tab scroll-position persistence. Saves the active tab's scroll
  * percentage on scroll-stop / page-hide / pagehide; restores it on
@@ -231,41 +295,11 @@ export function useScrollMemory({
     const savedY = saved == null ? null :
     typeof saved === 'number' ? saved : typeof saved.y === 'number' ? saved.y : null;
     const target = typeof savedY === 'number' && savedY > 0 ? savedY : 0;
-    // PERF4 × exact restore: .letter-para / .section-block are
-    // content-visibility:auto with PLACEHOLDER intrinsic heights (140px/500px)
-    // until first render. A saved y was measured against REAL layout (the user
-    // scrolled through it); restoring it against the estimated geometry lands
-    // on the wrong content, and as the browser lazily renders the skipped
-    // blocks (~1-2 s later) scroll anchoring drags scrollTop to follow the
-    // wrong content (preview-measured: left 400 → drifted to 478). While
-    // restoring a non-top position, body.scroll-restoring lifts the
-    // content-visibility (app.css) so layout is REAL when scrollTop lands; the
-    // forced full layout also populates `contain-intrinsic-size: auto`'s
-    // remembered sizes, so re-engaging the optimization one frame later
-    // changes no geometry — the position holds to the pixel. Top restores
-    // (target 0) skip the force — top is top in any geometry.
-    if (target > 0) {
-      document.body.classList.add('scroll-restoring');
-      if (__scrollEl) void __scrollEl.scrollHeight; // force the real-geometry layout now
-    }
-    if (__scrollEl) __scrollEl.scrollTop = target;
-    let raf2 = 0;
-    const raf = requestAnimationFrame(() => {
-      if (__scrollEl) __scrollEl.scrollTop = target;
-      // Release only after a PAINTED frame: `contain-intrinsic-size: auto`
-      // records the real block sizes during a frame's rendering update, so a
-      // same-frame (pre-paint) release re-engages content-visibility against
-      // the stale estimates and scroll anchoring drags the restored position
-      // (preview-measured: +614px on a revisited Psalm 119, whose section
-      // nodes React had just re-created). Frame 1 paints WITH the force
-      // (real sizes memoized); frame 2 releases — zero geometry change.
-      raf2 = requestAnimationFrame(() => { document.body.classList.remove('scroll-restoring'); });
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      if (raf2) cancelAnimationFrame(raf2);
-      document.body.classList.remove('scroll-restoring');
-    };
+    // Land the saved position (or top). startRestore (module scope) handles the
+    // PERF4 content-visibility lift + the cold-boot content-render retry — see
+    // its definition. Returning it as this layout effect's cleanup cancels any
+    // pending frames if a rapid re-nav supersedes the restore.
+    return startRestore(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration. updateActiveTab is useCallback([activeTabIdx]) — its identity only changes with activeTabIdx, which IS a dep, so the closure is never stale.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
 

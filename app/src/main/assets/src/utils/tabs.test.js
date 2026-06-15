@@ -88,6 +88,27 @@ describe('describeTab', () => {
     /** @type {any} */ (globalThis).colLetterArr = () => [{ id: 'the-wide-path', title: 'The Wide Path' }];
     expect(describeTab({ screen: 'vot-letter', letterId: 'the-wide-path' })).toEqual({ title: 'The Wide Path', subtitle: 'Volume Two' });
   });
+  it('does NOT throw for a Matthew tab before the lazy corpus loads (regression: ReferenceError MATTHEW)', () => {
+    // MATTHEW / MATTHEW_PLAIN live in the lazy bundle-a-matthew. Describing a
+    // Matthew tab from a Bible screen (its corpus not yet loaded) must fall
+    // back gracefully, NOT throw a bare-identifier ReferenceError — the throw
+    // crashed AppShellOverlays' ErrorBoundary to null, which hid the whole Tabs
+    // overview AND stranded tabsOverviewOpen=true (silently killing scroll-
+    // memory recording, since it skips while the overview is "open").
+    delete (/** @type {any} */ (globalThis)).MATTHEW;
+    delete (/** @type {any} */ (globalThis)).MATTHEW_PLAIN;
+    expect(() => describeTab({ screen: 'matthew-ch', bookId: 'matthew', chapterNum: 5 })).not.toThrow();
+    expect(describeTab({ screen: 'matthew-ch', bookId: 'matthew', chapterNum: 5 })).toEqual({ title: 'Reading', subtitle: 'Scripture' });
+    expect(() => describeTab({ screen: 'bible-ch', bookId: 'matthew-plain', chapterNum: 1 })).not.toThrow();
+  });
+  it('resolves the Matthew title once the lazy corpus is present', () => {
+    /** @type {any} */ (globalThis).MATTHEW = { id: 'matthew', title: 'Matthew', chapters: [] };
+    /** @type {any} */ (globalThis).OT_BOOK_IDS = new Set();
+    expect(describeTab({ screen: 'matthew-ch', bookId: 'matthew', chapterNum: 5 }))
+      .toEqual({ title: 'Matthew · Ch. 5', subtitle: 'New Testament · Gospels' });
+    delete (/** @type {any} */ (globalThis)).MATTHEW;
+    delete (/** @type {any} */ (globalThis)).OT_BOOK_IDS;
+  });
   it('falls back to Home for an unknown screen', () => {
     expect(describeTab({ screen: 'totally-unknown' })).toEqual({ title: 'Home', subtitle: 'VOT Study Bible' });
   });

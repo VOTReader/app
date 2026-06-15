@@ -39,9 +39,21 @@
 export function describeTab(tab) {
   // Returns { title, subtitle } for the card. Falls back gracefully.
   const s = tab.screen || 'home';
-  // Q8: BOOKS is lazy-loaded; tolerate undefined (tab restored before
-  // bundle-a-bible.js finishes loading → returns null → 'Reading' label).
-  const resolveBook = (id) => id ? id === 'matthew' ? MATTHEW : id === 'matthew-plain' ? MATTHEW_PLAIN : (typeof BOOKS !== 'undefined' ? BOOKS[id] : null) : null;
+  // Q8: BOOKS *and* MATTHEW / MATTHEW_PLAIN are ALL lazy-loaded (bundle-a-bible
+  // / bundle-a-matthew). Describing a Matthew tab while its corpus hasn't loaded
+  // — e.g. the Tabs overview opened from a Bible screen, where only the bible
+  // corpus is present — must NOT throw a bare-identifier ReferenceError. It did:
+  // MATTHEW/MATTHEW_PLAIN were unguarded, so describeTab() threw "MATTHEW is not
+  // defined", which crashed the whole AppShellOverlays render into its
+  // ErrorBoundary fallback={null} — the overview (and every other overlay)
+  // silently vanished and never came back (the boundary has no reset). typeof-
+  // guard all three; a null book falls back to a generic 'Reading' label.
+  const resolveBook = (id) => {
+    if (!id) return null;
+    if (id === 'matthew') return (typeof MATTHEW !== 'undefined') ? MATTHEW : null;
+    if (id === 'matthew-plain') return (typeof MATTHEW_PLAIN !== 'undefined') ? MATTHEW_PLAIN : null;
+    return (typeof BOOKS !== 'undefined') ? BOOKS[id] : null;
+  };
   const book = resolveBook(tab.bookId);
 
   // Scripture flow
