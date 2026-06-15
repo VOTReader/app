@@ -95,3 +95,31 @@ describe('ScreenLayout scroll-lift click suppression', () => {
     expect(ev.defaultPrevented).toBe(false);
   });
 });
+
+describe('ScreenLayout scroll-target registration (trackScroll)', () => {
+  it('registers its container as the global __scrollEl by default (a real screen)', () => {
+    const { container } = render(<SL hideTabsBtn navChildren={null}>x</SL>);
+    expect(/** @type {any} */ (globalThis).__scrollEl).toBe(container.querySelector('.screen-scroll'));
+  });
+
+  it('does NOT hijack __scrollEl when trackScroll is false (an overlay)', () => {
+    // Simulate a real reading screen already being the scroll target.
+    const reading = document.createElement('div');
+    /** @type {any} */ (globalThis).__scrollEl = reading;
+    render(<SL hideTabsBtn trackScroll={false} navChildren={null}>x</SL>);
+    expect(/** @type {any} */ (globalThis).__scrollEl).toBe(reading); // overlay left it alone
+  });
+
+  it('does NOT null __scrollEl when a trackScroll=false overlay unmounts (the recording-death fix)', () => {
+    // The bug: the Tabs overview (its own ScreenLayout) nulled __scrollEl on
+    // close, killing scroll recording on the screen underneath until the next
+    // nav. With trackScroll={false}, opening AND closing it leave __scrollEl —
+    // the reading container — fully intact.
+    const reading = document.createElement('div');
+    /** @type {any} */ (globalThis).__scrollEl = reading;
+    const { unmount } = render(<SL hideTabsBtn trackScroll={false} navChildren={null}>x</SL>);
+    expect(/** @type {any} */ (globalThis).__scrollEl).toBe(reading);
+    unmount();
+    expect(/** @type {any} */ (globalThis).__scrollEl).toBe(reading); // still intact after close
+  });
+});

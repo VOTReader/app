@@ -119,7 +119,13 @@ export function AppShellOverlays({
 
       {settings.tabsEnabled && tabsOverviewOpen && (
         <div className="tabs-overview-layer">
-          <ScreenLayout navChildren={
+          {/* trackScroll={false}: this overlay renders OVER a live reading
+              screen, so it must not become the global scroll-memory target —
+              otherwise opening it hijacks __scrollEl and closing it nulls it,
+              killing scroll recording on the screen underneath until the next
+              nav. The overview's own scrolling is unaffected (it scrolls
+              natively; scroll-memory just doesn't track it). */}
+          <ScreenLayout trackScroll={false} navChildren={
             <>
               <button className="nav-home" onClick={() => setTabsOverviewOpen(false)}>{"← Back"}</button>
               <HomeBtn />

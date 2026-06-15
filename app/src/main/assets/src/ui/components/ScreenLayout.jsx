@@ -2,7 +2,7 @@
    ScreenLayout — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn }) {
+export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true }) {
   const scrollRef = React.useRef(null);
   const ref = React.useCallback((el) => {
     // __scrollEl is a mutable `let` GLOBAL declared in index.html (line ~515),
@@ -11,10 +11,20 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn 
     // would be a different binding the readers never see). The auto-generated
     // globals.d.ts declares every global `const`, so this legitimate
     // reassignment trips a false TS2588 — suppress just this line.
-    // @ts-expect-error -- generated-globals const-vs-let mismatch (see above)
-    __scrollEl = el;
+    //
+    // trackScroll gates this: ONLY the primary screen container (the one in the
+    // ROUTES slot) is the scroll-memory / thumbnail target. An OVERLAY that
+    // reuses ScreenLayout for its chrome while a real screen is still mounted
+    // underneath (the Tabs overview) passes trackScroll={false} — otherwise it
+    // hijacks __scrollEl on open and, worse, NULLS it on unmount (the screen
+    // underneath never re-registers its ref), silently killing scroll recording
+    // on that screen until the next navigation. Default true: every real screen.
+    if (trackScroll) {
+      // @ts-expect-error -- generated-globals const-vs-let mismatch (see above)
+      __scrollEl = el;
+    }
     scrollRef.current = el;
-  }, []);
+  }, [trackScroll]);
 
   const notchRef = React.useRef(null);
 
