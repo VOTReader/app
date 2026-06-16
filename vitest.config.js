@@ -60,12 +60,16 @@ export default defineConfig({
         // side-effect IIFE concatenated into bundle-a at ship time; importing it
         // in the test only runs the IIFE — production loading is unchanged.)
         'app/src/main/assets/search.js',
+        // The new MiniSearch engine (pure ES modules — Classic/MiniSearch
+        // coexistence). vendor/minisearch.js is excluded below (3rd-party).
+        'app/src/main/assets/src/search/**/*.{js,jsx}',
       ],
       // Exclude colocated test files + bundler entries from coverage measurement.
       exclude: [
         '**/*.test.{js,jsx}',
         '**/_entry-b.js',
         '**/_entry.js',
+        '**/search/vendor/**',
       ],
       // Coverage gate locked at the Q5.2 baseline (per [[lint-regression-gate]]).
       // Baseline is AGGREGATE across the full Q4 scope (37 files): 2 files

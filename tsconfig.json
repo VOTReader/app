@@ -21,11 +21,13 @@
     "app/src/main/assets/src/components/**/*",
     "app/src/main/assets/src/data/scripture-resolution.js",
     "app/src/main/assets/src/data/journal-helpers.js",
-    "app/src/main/assets/src/data/letter-linking.js"
+    "app/src/main/assets/src/data/letter-linking.js",
+    "app/src/main/assets/src/search/**/*"
   ],
   "exclude": [
     "app/src/main/assets/src/stores/_entry-b.js",
     "app/src/main/assets/src/renderer/_entry.js",
-    "app/src/main/assets/src/ui/_entry-d.js"
+    "app/src/main/assets/src/ui/_entry-d.js",
+    "app/src/main/assets/src/search/vendor/**"
   ]
 }

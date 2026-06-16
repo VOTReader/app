@@ -50,6 +50,7 @@ export default [
       'app/src/main/assets/search.js',
       'app/src/main/assets/search-data.js',
       'app/src/main/assets/src/data/**',
+      'app/src/main/assets/src/search/vendor/**',
       'node_modules/**',
       'tools/eslint-globals.generated.js',
     ],
