@@ -1906,6 +1906,7 @@
     .srch-card-badge.badge-letter { color:var(--gold-bright); }
     .srch-card-badge.badge-heading { color:var(--gold-dim); font-style:italic; }
     .srch-card-snippet { font-family:'EB Garamond',serif; font-size:0.93rem; line-height:1.5; color:var(--cream-muted); }
+    .srch-snippet-scroll { max-height:4.2rem; overflow:hidden; }
     .srch-card.card-direct { background:var(--gold-faint); }
     .srch-card.card-direct .srch-card-ref { color:var(--gold-bright); font-size:0.72rem; }
     .srch-card.card-direct .srch-card-snippet { color:var(--gold-dim); font-size:0.58rem; letter-spacing:0.14em; text-transform:uppercase; font-family:'Cinzel',serif; margin-top:0.2rem; }
