@@ -315,6 +315,22 @@ export default defineConfig({
         'app/src/main/assets/search.js': {
           statements: 65, branches: 55, functions: 61, lines: 70,
         },
+        // SEARCH (MiniSearch engine) — per-file floors on the three substantive
+        // logic modules (the pure helpers are ~100% and ride the aggregate they
+        // lift). Locked ~2-4pt below current with a buffer, since these are the
+        // files most likely to change; ratchet up as branches get covered, never
+        // down. Current: engine 83.5/73.8/88.9/90.9 · index-builder 79.3/61.7/
+        // 100/91.9 · ref-parser 80.2/64.8/100/85.6 (uncovered = rare ref-regex
+        // variants + the alt-translation path + defensive catches).
+        'app/src/main/assets/src/search/engine.js': {
+          statements: 80, branches: 70, functions: 85, lines: 88,
+        },
+        'app/src/main/assets/src/search/index-builder.js': {
+          statements: 76, branches: 58, functions: 95, lines: 88,
+        },
+        'app/src/main/assets/src/search/ref-parser.js': {
+          statements: 77, branches: 60, functions: 95, lines: 82,
+        },
       },
     },
   },
