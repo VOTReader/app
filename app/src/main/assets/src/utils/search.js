@@ -22,8 +22,7 @@ export function srchGroupKey(doc) {
   if (!doc) return 'other';
   const k = doc.kind;
   if (k === 'verse' || k === 'chapter-title' || k === 'heading') return doc.bookId === 'matthew' ? 'matthew' : 'bible';
-  if (k === 'study-note' || k === 'cross-ref') return 'matthew-study';
-  if (k === 'letter' || k === 'letter-title' || k === 'footnote') return doc.volumeId || 'letters';
+  if (k === 'letter' || k === 'letter-title') return doc.volumeId || 'letters';
   if (k === 'wtlb' || k === 'wtlb-title') return doc.volumeId || 'wtlb';
   if (k === 'blessed' || k === 'blessed-title') return 'blessed';
   if (k === 'holy-day' || k === 'holy-day-title') return 'holydays';

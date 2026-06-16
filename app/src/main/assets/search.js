@@ -38,7 +38,7 @@ var buildError = null;
 // ─── IndexedDB cache ───
 // Bump SCHEMA_VERSION when doc shape changes OR tokenizer config changes;
 // cache is invalidated automatically because the signature includes this.
-var SCHEMA_VERSION = 14;                    // bumped 2026-06-04 (SRCH-1/SRCH-4) — stop indexing the 'ref' field (it carried the collection LABEL on every volume doc, so a common query word + the 2.5x ref boost buried the actual verse); + NFD diacritic folding in kjvEncode. Forces cached indexes to rebuild without 'ref'. (Prior: 13 = U22 dropped section headings / inline topic breaks / chapter titles + the 'heading' field.)
+var SCHEMA_VERSION = 15;                    // bumped 2026-06-15: removed footnote/study-note/cross-ref doc kinds — only body text + titles are now indexed. (Prior: 14 = SRCH-1/SRCH-4 de-indexed 'ref' + NFD diacritics.)
 // SRCH1: corpus CONTENT version — distinct from SCHEMA_VERSION (doc shape /
 // tokenizer config). dataSignature is otherwise STRUCTURAL (array lengths +
 // verse/book counts), so a content-preserving edit — a reworded or typo-fixed
@@ -446,51 +446,6 @@ function buildDocs(options) {
           pushVerse('matthew', 'Matthew', mCh.num, mVerses[vi].n, mVerses[vi].text, mSec.heading || '');
         }
       }
-      // Matthew votNotes — folded as study-notes (includes Hidden Manna naturally)
-      var mNotes = mCh.votNotes || [];
-      for (var ni = 0; ni < mNotes.length; ni++) {
-        var n = mNotes[ni];
-        var noteText = [n.excerpt, n.letter, n.vol].filter(Boolean).join(' — ');
-        docs.push({
-          id: nextId(),
-          kind: 'study-note',
-          bookId: 'matthew',
-          chapterNum: mCh.num,
-          verseNum: 0,
-          letterId: '',
-          letterNum: 0,
-          volumeId: 'matthew-study',
-          translation: 'nkjv',
-          testament: 'nt',
-          genre: 'gospels',
-          title: n.letter || '',
-          heading: n.vol || '',
-          text: noteText,
-          ref: 'Matthew ' + (n.ref || '')
-        });
-      }
-      // Matthew cross-references (scriptures)
-      var mXrefs = mCh.scriptures || [];
-      for (var xi = 0; xi < mXrefs.length; xi++) {
-        var xr = mXrefs[xi];
-        docs.push({
-          id: nextId(),
-          kind: 'cross-ref',
-          bookId: 'matthew',
-          chapterNum: mCh.num,
-          verseNum: 0,
-          letterId: '',
-          letterNum: 0,
-          volumeId: 'matthew-study',
-          translation: 'nkjv',
-          testament: 'nt',
-          genre: 'gospels',
-          title: '',
-          heading: '',
-          text: xr.cite || '',
-          ref: 'Matthew ' + (xr.ref || '')
-        });
-      }
     }
   }
 
@@ -653,31 +608,6 @@ function buildDocs(options) {
           ref: volumeLabel + ' · Letter ' + (L.num || '?')
         });
       }
-      // Footnotes: embedded nkjv scripture lookups
-      if (L.nkjv) {
-        var nkKeys = Object.keys(L.nkjv);
-        for (var fk = 0; fk < nkKeys.length; fk++) {
-          var fref = nkKeys[fk];
-          var ftxt = L.nkjv[fref] || '';
-          docs.push({
-            id: nextId(),
-            kind: 'footnote',
-            bookId: '',
-            chapterNum: 0,
-            verseNum: 0,
-            letterId: L.id || '',
-            letterNum: L.num || 0,
-            volumeId: volumeId,
-            translation: 'nkjv',
-            testament: '',
-            genre: 'volume',
-            title: L.title || '',
-            heading: fref,
-            text: ftxt,
-            ref: fref + ' (' + volumeLabel + ' L' + (L.num || '?') + ')'
-          });
-        }
-      }
     }
   }
 
@@ -698,7 +628,7 @@ function buildDocs(options) {
       var body = '';
       for (var p = 0; p < paragraphs.length; p++) {
         var ptxt = paragraphs[p] && paragraphs[p].text ? paragraphs[p].text : '';
-        body += ' ' + ptxt;
+        body += ' ' + ptxt.replace(/\{\{[^}]+\}\}/g, ' ');
       }
       body = body.replace(/\s+/g, ' ').trim();
       // title doc
@@ -1569,10 +1499,8 @@ async function executeSearch(query, options) {
     }
   }
 
-  // Kind boost: favor focused, primary-content docs (actual verses, curated
-  // headings/titles) over long, diffuse docs (full letter bodies, study notes).
-  // A letter that incidentally contains 5 query tokens should NOT outrank a
-  // verse that contains the exact phrase.
+  // Kind boost: favor titles over body text — a letter incidentally containing
+  // 5 query tokens should not outrank a verse with the exact phrase.
   var KIND_BOOST = {
     'letter-title':   2.0,
     'wtlb-title':     2.0,
@@ -1581,14 +1509,11 @@ async function executeSearch(query, options) {
     'chapter-title':  1.6,
     'heading':        1.4,
     'verse':          1.0,
-    'footnote':       1.0,
     'letter':         0.8,
     'wtlb':           0.8,
     'blessed':        0.8,
     'holy-day':       0.8,
-    'bible-study':    0.7,
-    'study-note':     0.6,
-    'cross-ref':      0.5
+    'bible-study':    0.7
   };
   var rankedIds = Object.keys(scoreMap);
   for (var ki = 0; ki < rankedIds.length; ki++) {

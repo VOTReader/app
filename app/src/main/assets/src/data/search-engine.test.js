@@ -325,7 +325,7 @@ describe('search engine — volumes corpus doc-building', () => {
     const D = window.VotSearchData;
     // One real letter collection, seeded under its declared dataVar/prefaceVar
     // (read from the registry) — exercises collectLetters (preface concat),
-    // pushLetterCollection, letterText (segment blocks AND poetry lines), footnotes.
+    // pushLetterCollection, letterText (segment blocks AND poetry lines).
     const vc0 = D.VOLUME_COLLECTIONS[0];
     if (vc0.prefaceVar) {
       globalThis[vc0.prefaceVar] = { id: 'preface', num: 0, title: 'A Word of Warning',
@@ -337,15 +337,12 @@ describe('search engine — volumes corpus doc-building', () => {
         { segments: [{ v: 'Hear the word' }, { v: 'of the Lord' }] },
         { lines: [[{ v: 'a poetic line of judgment' }], [{ v: 'and another stanza' }]] },
       ],
-      nkjv: { 'Isaiah 1:1': 'The vision of Isaiah the son of Amoz.' },
     }];
-    // Matthew Study Bible — the isVolumes MATTHEW block (verse + study-note + cross-ref).
+    // Matthew Study Bible — the isVolumes MATTHEW block (verses only; votNotes and cross-refs are not indexed).
     globalThis.MATTHEW = {
       chapters: [{
         num: 1, title: 'The Genealogy',
         sections: [{ heading: 'Heading One', verses: [{ n: 1, text: 'The book of the genealogy of the Messiah.' }] }],
-        votNotes: [{ excerpt: 'a curated study note', letter: 'Some Letter', vol: 'Volume One', ref: '1:1' }],
-        scriptures: [{ cite: 'compare Luke 3', ref: '1:1' }],
       }],
     };
     // WTLB Part One — pushEntryCollection (paragraph entries → title + body docs).

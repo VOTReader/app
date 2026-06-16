@@ -21,15 +21,9 @@ describe('srchGroupKey', () => {
     expect(srchGroupKey({ kind: 'heading' })).toBe('bible');   // no bookId → not matthew
   });
 
-  it('study-note / cross-ref → "matthew-study"', () => {
-    expect(srchGroupKey({ kind: 'study-note' })).toBe('matthew-study');
-    expect(srchGroupKey({ kind: 'cross-ref' })).toBe('matthew-study');
-  });
-
   it('letter kinds use volumeId, falling back to "letters"', () => {
     expect(srchGroupKey({ kind: 'letter', volumeId: 'volume-three' })).toBe('volume-three');
     expect(srchGroupKey({ kind: 'letter-title', volumeId: 'rebuke' })).toBe('rebuke');
-    expect(srchGroupKey({ kind: 'footnote', volumeId: 'volume-one' })).toBe('volume-one');
     expect(srchGroupKey({ kind: 'letter' })).toBe('letters');          // no volumeId
   });
 
