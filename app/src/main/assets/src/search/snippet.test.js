@@ -11,12 +11,22 @@ describe('snippet', () => {
     expect(out).toBe('abcde…');
   });
 
-  it('centers on the first matched term with ellipses', () => {
+  it('centers on the matched term with ellipses', () => {
     const text = 'A'.repeat(100) + ' shepherd ' + 'B'.repeat(100);
     const out = snippet(text, ['shepherd'], 60);
     expect(out).toContain('shepherd');
     expect(out.startsWith('…')).toBe(true);
     expect(out.endsWith('…')).toBe(true);
+  });
+
+  it('centers on the densest cluster of query terms, not the first stray hit', () => {
+    const early = 'beloved beloved beloved beloved beloved. '; // "beloved" alone, early
+    const cluster = 'Now I call my beloved ones to come. ';     // call + beloved + ones together
+    const text = early + 'x'.repeat(40) + cluster + 'y'.repeat(60);
+    const out = snippet(text, ['call', 'beloved', 'ones'], 80);
+    // The window with all three terms (the cluster) wins over the lone early "beloved".
+    expect(out).toContain('call');
+    expect(out).toContain('ones');
   });
 
   it('is archaic-aware (a "you" query centers on "thou")', () => {

@@ -1899,6 +1899,7 @@
     .srch-card:active { background:var(--gold-faint); }
     .srch-card-top { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.3rem; }
     .srch-card-ref { font-family:'Cinzel',serif; font-size:0.65rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); }
+    .srch-card-loc { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); margin:-0.12rem 0 0.32rem; }
     .srch-card-badge { font-family:'Cinzel',serif; font-size:0.48rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); border:1px solid var(--gold-border); border-radius:3px; padding:0.08rem 0.35rem; }
     .srch-card-badge.badge-verse { color:var(--cream-muted); }
     .srch-card-badge.badge-note { color:var(--gold); border-color:var(--gold-dim); }

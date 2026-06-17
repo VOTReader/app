@@ -1622,19 +1622,37 @@ function snippet(text, terms, maxLen) {
   if (!terms || !terms.length) {
     return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
   }
-  // Expand archaic pronouns so a "you" query can center the snippet on "thee" in the verse.
+  // Expand archaic pronouns so a "you" query can center the snippet on "thee".
   var expanded = expandArchaicTerms(terms);
   var lower = text.toLowerCase();
-  var bestIdx = -1, bestLen = 0;
+  // Collect EVERY occurrence of every matchable term (capped for long bodies).
+  var occ = [];
   for (var i = 0; i < expanded.length; i++) {
     var t = expanded[i].toLowerCase();
-    if (!t) continue;
+    if (t.length < 2) continue;
     var idx = lower.indexOf(t);
-    if (idx >= 0 && (bestIdx < 0 || idx < bestIdx)) { bestIdx = idx; bestLen = t.length; }
+    while (idx >= 0 && occ.length < 400) {
+      occ.push({ idx: idx, len: t.length, term: t });
+      idx = lower.indexOf(t, idx + t.length);
+    }
   }
-  if (bestIdx < 0) return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
-  var half = Math.max(20, Math.floor((maxLen - bestLen) / 2));
-  var start = Math.max(0, bestIdx - half);
+  if (!occ.length) return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
+  occ.sort(function (a, b) { return a.idx - b.idx; });
+  // Pick the maxLen-wide window covering the MOST DISTINCT query terms — the
+  // passage where the query words actually cluster (the remembered phrase), not
+  // the first stray hit of one common word. Ties resolve to the earliest window.
+  var bestStart = occ[0].idx, bestCount = 0, bestSpan = occ[0].len;
+  for (var s = 0; s < occ.length; s++) {
+    var winStart = occ[s].idx;
+    var seen = Object.create(null), count = 0, spanEnd = winStart + occ[s].len;
+    for (var e = s; e < occ.length && (occ[e].idx + occ[e].len) <= winStart + maxLen; e++) {
+      if (!seen[occ[e].term]) { seen[occ[e].term] = true; count++; }
+      spanEnd = occ[e].idx + occ[e].len;
+    }
+    if (count > bestCount) { bestCount = count; bestStart = winStart; bestSpan = spanEnd - winStart; }
+  }
+  var pad = Math.max(0, Math.floor((maxLen - bestSpan) / 2));
+  var start = Math.max(0, bestStart - pad);
   var end = Math.min(text.length, start + maxLen);
   if (end - start < maxLen) start = Math.max(0, end - maxLen);
   var clip = text.slice(start, end);
