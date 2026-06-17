@@ -87,8 +87,7 @@ export function AppShellOverlays({
           position: 'fixed', inset: 0, zIndex: 9999,
           backgroundImage: 'url("splash.jpg")',
           backgroundColor: '#0a0e1a',
-          backgroundSize: 'contain', backgroundPosition: 'center center',
-          backgroundRepeat: 'no-repeat',
+          backgroundSize: 'cover', backgroundPosition: 'center 28%',
           display: 'flex', flexDirection: 'column'
         }}>
           {welcomeIsFirstBoot && !welcomeIsFirstBoot.current && (
