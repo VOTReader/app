@@ -25,7 +25,7 @@
 
 export function AppShellOverlays({
   // Welcome modal
-  showWelcome, isOnline,
+  showWelcome, isOnline, dismissWelcome, welcomeIsFirstBoot,
   // Tabs overview + TabActionSheet
   settings, updateSetting,
   tabsOverviewOpen, setTabsOverviewOpen,
@@ -47,6 +47,11 @@ export function AppShellOverlays({
   // overlays are always mounted (AppShellOverlays is always rendered)
   // so we can't conditionally call the hook; instead we toggle active
   // off when the modal is closed.
+  useModalRegistry({
+    id: 'welcome-modal',
+    dismiss: dismissWelcome,
+    active: !!(showWelcome && welcomeIsFirstBoot && !welcomeIsFirstBoot.current),
+  });
   useModalRegistry({
     id: 'tabs-overview',
     dismiss: () => setTabsOverviewOpen(false),
@@ -86,6 +91,23 @@ export function AppShellOverlays({
           backgroundRepeat: 'no-repeat',
           display: 'flex', flexDirection: 'column'
         }}>
+          {welcomeIsFirstBoot && !welcomeIsFirstBoot.current && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={dismissWelcome}
+                aria-label="Close"
+                style={{
+                  margin: 'calc(var(--inset-top, 0px) + 1rem) 1rem 0 0',
+                  background: 'rgba(0,0,0,0.55)', border: '1.5px solid rgba(255,255,255,0.35)',
+                  borderRadius: '50%', width: '2.4rem', height: '2.4rem',
+                  color: '#fff', fontSize: '1.2rem', lineHeight: 1,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                {"✕"}
+              </button>
+            </div>
+          )}
+
           {isOnline && (
             <a
               href="https://www.thevolumesoftruth.com"

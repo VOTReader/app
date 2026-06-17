@@ -290,7 +290,7 @@ function App() {
 
   /* AppShell-level leftover effects + small state (P7k — closes Phase 1).
      showWelcome / isOnline / dismissWelcome. */
-  const { showWelcome, setShowWelcome, isOnline, dismissWelcome } = useAppShellEffects({
+  const { showWelcome, setShowWelcome, isOnline, dismissWelcome, welcomeIsFirstBoot } = useAppShellEffects({
     setNavOrigin, setScreen,
   });
 
@@ -729,6 +729,7 @@ function App() {
           preserved. */}
       <AppShellOverlays
         showWelcome={showWelcome} isOnline={isOnline} dismissWelcome={dismissWelcome}
+        welcomeIsFirstBoot={welcomeIsFirstBoot}
         settings={settings} updateSetting={updateSetting}
         tabsOverviewOpen={tabsOverviewOpen} setTabsOverviewOpen={setTabsOverviewOpen}
         tabs={tabs} activeTabIdx={activeTabIdx} tabThumbnails={tabThumbnails} MAX_TABS={MAX_TABS}

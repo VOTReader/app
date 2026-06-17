@@ -57,7 +57,8 @@ import { WelcomedFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores
  *   showWelcome: boolean,
  *   setShowWelcome: (v: any) => void,
  *   isOnline: boolean,
- *   dismissWelcome: () => void
+ *   dismissWelcome: () => void,
+ *   welcomeIsFirstBoot: { current: boolean }
  * }}
  */
 export function useAppShellEffects({ setNavOrigin, setScreen }) {
@@ -65,6 +66,11 @@ export function useAppShellEffects({ setNavOrigin, setScreen }) {
   // HydrationGate has already resolved by the time this hook runs, so
   // the read is sync from the in-memory cache.
   const [showWelcome, setShowWelcome] = React.useState(() => !WelcomedFlagStore.is());
+
+  // True while the CURRENT showing is the first-boot auto-show (no X button,
+  // auto-dismiss). Flipped to false by dismissWelcome so any later manual
+  // re-opens via the info icon get the X button instead.
+  const welcomeIsFirstBoot = React.useRef(!WelcomedFlagStore.is());
 
   // Online status from navigator.onLine + the online/offline events (U21).
   // Was a no-cors fetch of thevolumesoftruth.com/favicon.ico — an EXTERNAL
@@ -89,6 +95,7 @@ export function useAppShellEffects({ setNavOrigin, setScreen }) {
   }, []);
 
   const dismissWelcome = () => {
+    welcomeIsFirstBoot.current = false;
     WelcomedFlagStore.set();
     setShowWelcome(false);
     // First-time users see the About intro right after the splash. After
@@ -107,5 +114,5 @@ export function useAppShellEffects({ setNavOrigin, setScreen }) {
     return () => clearTimeout(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { showWelcome, setShowWelcome, isOnline, dismissWelcome };
+  return { showWelcome, setShowWelcome, isOnline, dismissWelcome, welcomeIsFirstBoot };
 }
