@@ -2,12 +2,14 @@
    search/tokenize.js — shared tokenizer + archaic-pronoun folding
    ═══════════════════════════════════════════════════════════════════════
    `kjvEncode` is the ONE tokenizer used on BOTH sides of the engine — it is
-   MiniSearch's `tokenize` AND `processTerm` (so index-time and query-time
-   folding are identical), and it backs the contiguous-phrase check in
-   ranking.js. Folding rules (ported verbatim from the FlexSearch engine):
+   MiniSearch's `tokenize` (and processTerm is identity, since tokenize already
+   folds), so index-time and query-time tokens are identical, and it backs the
+   contiguous-phrase check in ranking.js. Folding rules (ported from the
+   FlexSearch engine):
      1. lowercase
-     2. strip diacritics (NFD → drop combining marks) — lets an accented query
-        ("resurrección") match its ASCII form; no-op on the ASCII corpus
+     2. strip diacritics (NFD → drop combining marks) — but ONLY when a non-ASCII
+        char is present, so the all-ASCII corpus skips the costly normalize at
+        index time while accented queries ("resurrección") still fold
      3. punctuation/symbols → space, then split on whitespace
      4. normalize archaic pronouns (thee/thou/ye→you, thy/thine→your) so KJV/ASV
         wording matches modern-translation wording and vice versa.
@@ -37,13 +39,13 @@ export const ARCHAIC_NORMALIZE = {
  */
 export function kjvEncode(str) {
   if (typeof str !== 'string' || !str) return [];
-  // NFD-decompose, strip combining marks (̀-ͯ), punctuation→space.
-  const tokens = str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9\s]+/g, ' ')
-    .split(/\s+/);
+  let s = str.toLowerCase();
+  // NFD-fold ONLY when a non-ASCII char is present (`[^ -~]` = anything outside
+  // printable ASCII). The English corpus is ASCII, so this skips normalize on
+  // ~every field at index time; accented queries still fold. ̀-ͯ are the
+  // combining diacritical marks dropped after decomposition.
+  if (/[^ -~]/.test(s)) s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const tokens = s.replace(/[^a-z0-9\s]+/g, ' ').split(/\s+/);
   const out = [];
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];

@@ -20,15 +20,18 @@ describe('search-config', () => {
     expect(opts.idField).toBe('id');
   });
 
-  it('processTerm folds diacritics + archaic pronouns, drops empties', () => {
-    expect(opts.processTerm('Thee')).toBe('you');
-    expect(opts.processTerm('Righteousness')).toBe('righteousness');
-    expect(opts.processTerm('résurrección')).toBe('resurreccion');
-    expect(opts.processTerm('!!!')).toBeNull();
+  it('processTerm is identity (tokenize already folded each token)', () => {
+    // MiniSearch always tokenizes (which folds) BEFORE processTerm, so processTerm
+    // must NOT re-fold — it just passes the already-folded token through.
+    expect(opts.processTerm('you')).toBe('you');
+    expect(opts.processTerm('righteousness')).toBe('righteousness');
+    expect(opts.processTerm('')).toBeNull();
   });
 
-  it('tokenize splits + folds a field value', () => {
+  it('tokenize splits + folds (diacritics + archaic) — the real folding step', () => {
     expect(opts.tokenize('Be still, and know')).toEqual(['be', 'still', 'and', 'know']);
+    expect(opts.tokenize('Thee')).toEqual(['you']);
+    expect(opts.tokenize('résurrección')).toEqual(['resurreccion']);
   });
 
   it('weights title above text', () => {

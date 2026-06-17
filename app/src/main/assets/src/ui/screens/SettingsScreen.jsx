@@ -1121,6 +1121,20 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={settings.searchEnabled !== false}
               onToggle={() => onToggle("searchEnabled")}
             />
+            <SelectField
+              eyebrow="Search"
+              title="Search Engine"
+              label="Search Engine"
+              desc="Classic is the original engine. MiniSearch (new) adds typo tolerance, cleaner relevance ranking, and recent searches. Both search the same content — try each and keep whichever you prefer."
+              value={settings.searchEngine || "classic"}
+              options={[
+                { id: "classic", label: "Classic", desc: "The original full-text search." },
+                { id: "minisearch", label: "MiniSearch (new)", desc: "Typo-tolerant, BM25 ranking, recent searches." },
+              ]}
+              onChange={(v) => onSetting("searchEngine", v)}
+              disabled={settings.searchEnabled === false}
+              disabledReason="Turn on Search to choose an engine."
+            />
             <SettingsRow
               label="Synonym Search"
               desc="On (default): also match scripture synonyms — searching 'mercy' finds 'compassion', 'shepherd' finds 'pastor', 'faith' finds 'belief' and 'trust'. Exact-word matches always rank first. Off: match only the words you type."

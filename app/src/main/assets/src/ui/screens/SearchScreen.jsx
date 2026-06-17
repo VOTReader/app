@@ -28,39 +28,47 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn) {
   return [...out];
 }
 
+// Classic/MiniSearch coexistence: resolve the active engine from settings. Both
+// engines expose the identical facade + result shape, so every call site stays
+// engine-agnostic. Falls back to Classic (always present in bundle-a) if the
+// lazy MiniSearch engine somehow isn't loaded.
+function pickEngine(name) {
+  return (name === 'minisearch' && window.VotSearchMini) ? window.VotSearchMini : window.VotSearch;
+}
+
 export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand }) {
   const inputRef = React.useRef(null);
   const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });
   const [buildInfo, setBuildInfo] = React.useState({ ready: false, building: false, progress: null });
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState([]);
+  const [recents, setRecents] = React.useState([]);
   const debounceRef = React.useRef(null);
+  const engineName = settings.searchEngine || 'classic';
 
-  // Build index on first mount
+  // Build the index on mount AND whenever the active engine changes (the toggle).
+  // Both engines read the lazy corpus globals (BOOKS / MATTHEW / VOT); building
+  // before they arrive yields an empty index, so load every corpus first, then
+  // build. Classic warm-opens hit its IDB cache; MiniSearch builds fresh in
+  // memory (no cache) behind the progress bar, then reuses it for the session.
   React.useEffect(() => {
-    if (!window.VotSearch) {
+    const E = pickEngine(engineName);
+    if (!E) {
       setBuildInfo({ ready: false, building: false, progress: null, error: 'Search engine failed to load. Check browser console.' });
       return;
     }
-    if (window.VotSearch.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return;}
+    if (E.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return;}
     setBuildInfo({ ready: false, building: true, progress: null });
-    // SR5: the index folds in BOTH the Bible (BOOKS) AND the Volumes (VOT +
-    // MATTHEW), all LAZY-loaded. Building before they arrive produces — and
-    // CACHES — a near-empty index that never self-repairs (init reads the bare
-    // corpus globals; an empty read yields an empty index that survives reloads
-    // until a manual reindex). Load every corpus first, then build. Warm opens
-    // cache-hit, so this pays the corpus download once and does NOT re-load the
-    // alt-translations (ensureIndex still pulls those only on a cache miss — U4).
     const loadBible = (typeof window.__loadBibleCorpus === 'function') ? window.__loadBibleCorpus().catch(() => {}) : Promise.resolve();
     const loadMatthew = (typeof window.__loadMatthewCorpus === 'function') ? window.__loadMatthewCorpus().catch(() => {}) : Promise.resolve();
     const loadVot = (typeof window.__loadVotCorpus === 'function') ? window.__loadVotCorpus().catch(() => {}) : Promise.resolve();
     Promise.all([loadBible, loadMatthew, loadVot])
-      .then(() => window.VotSearch.init({
+      .then(() => E.init({
         onProgress: (done, total) => setBuildInfo((b) => ({ ...b, progress: { done, total } }))
       }))
       .then(() => setBuildInfo({ ready: true, building: false, progress: null }))
       .catch((err) => setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }));
-  }, []);
+  }, [engineName]);
 
   // Focus input on mount
   React.useEffect(() => {
@@ -75,10 +83,12 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   React.useEffect(() => {
     const q = (query || '').trim();
     if (!q || q.length < 1 || q.length > 40) {setSuggestions([]);setShowSuggest(false);return;}
-    const s = window.VotSearch.suggest(q, { max: 8 });
+    const E = pickEngine(engineName);
+    if (!E) return;
+    const s = E.suggest(q, { max: 8 });
     setSuggestions(s);
     setShowSuggest(s.length > 0 && !buildInfo.building && !suggestDismissed);
-  }, [query, buildInfo.building, suggestDismissed]);
+  }, [query, buildInfo.building, suggestDismissed, engineName]);
 
   // Run search with debounce — one box, one index, everything included.
   React.useEffect(() => {
@@ -91,7 +101,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      window.VotSearch.search(q, {
+      pickEngine(engineName).search(q, {
         translation: settings.translation || 'nkjv',
         useStopWords: settings.searchUseStopWords !== false,
         synonyms: settings.searchSynonyms !== false,
@@ -112,7 +122,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       });
     }, 140);
     return () => {if (debounceRef.current) clearTimeout(debounceRef.current);};
-  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope]);
+  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope, engineName]);
 
   // Handle command-kind parsed results
   React.useEffect(() => {
@@ -183,12 +193,30 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (!q || q.length < 4 || q.length > 15) return null;
     if (/\s/.test(q)) return null; // multi-word: not a book attempt
     if (/[0-9:.,;-]/.test(q)) return null; // has digits/punctuation: already a ref attempt
-    const guess = window.VotSearch.fuzzyBookSuggest(q);
+    const guess = pickEngine(engineName).fuzzyBookSuggest(q);
     if (!guess) return null;
     const disp = window.VotSearchData.BOOK_DISPLAY[guess] || guess;
     if (disp.toLowerCase() === q.toLowerCase()) return null;
     return { original: q, suggestion: disp, rewrite: disp };
-  }, [state.parsed, state.results.length, query]);
+  }, [state.parsed, state.results.length, query, engineName]);
+
+  // Recent searches (gated by the existing history privacy toggle). Refresh
+  // whenever the box is empty (mount / clear / back-to-empty) so the list also
+  // reflects a "/clear history".
+  React.useEffect(() => {
+    if (!query && typeof window.getRecentSearches === 'function') setRecents(window.getRecentSearches());
+  }, [query]);
+
+  // Record a query as "recent" only on an explicit commit (Enter or tapping a
+  // result) — never per keystroke. Needs >=2 alphanumerics + history enabled.
+  const recordSearch = () => {
+    if (settings.historyEnabled === false) return;
+    const q = (query || '').trim();
+    if (q.replace(/[^a-z0-9]/gi, '').length < 2) return;
+    if (typeof window.addRecentSearch === 'function') setRecents(window.addRecentSearch(q));
+  };
+
+  const handleSelect = (entry) => { recordSearch(); onSelect(entry); };
 
   const clearQuery = () => {onQueryChange('');setShowSuggest(false);setSuggestDismissed(true);};
 
@@ -199,6 +227,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   };
 
   const handleKey = (e) => {
+    if (e.key === 'Enter') { recordSearch(); return; }
     if (e.key === 'Escape') {
       if (showSuggest) {setShowSuggest(false);setSuggestDismissed(true);} else
       if (query) {clearQuery();} else
@@ -306,6 +335,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               <h3>Search everything</h3>
               <p>Verses, letters, study notes, footnotes — across all 66 books and every Volume.</p>
             </div>
+            {settings.historyEnabled !== false && recents.length > 0 && (
+              <>
+                <div className="srch-section-label">Recent</div>
+                <div className="srch-quick-row">
+                  {recents.slice(0, 12).map((r) => (
+                    <button key={r} className="srch-quick-chip" onClick={() => onQueryChange(r)}>{r}</button>
+                  ))}
+                </div>
+              </>
+            )}
             <div className="srch-section-label">Quick picks</div>
             <div className="srch-quick-row">
               {SRCH_QUICK_PICKS.map((q) => (
@@ -331,7 +370,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         {directEntries.length > 0 && (
           <div className="srch-groups">
             {directEntries.map((d, i) => (
-              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={onSelect} isDirect={true} />
+              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} />
             ))}
           </div>
         )}
@@ -340,7 +379,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <div className="srch-top-results">
             <div className="srch-section-label">Best Matches</div>
             {topResults.map((entry, i) => (
-              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={onSelect} />
+              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} />
             ))}
           </div>
         )}
@@ -353,7 +392,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 gkey={g.key}
                 items={g.items}
                 terms={state.terms}
-                onSelect={onSelect}
+                onSelect={handleSelect}
                 defaultOpen={state.results.length <= 30 || i < 5}
               />
             ))}

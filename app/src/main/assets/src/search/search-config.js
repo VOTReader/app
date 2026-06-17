@@ -50,12 +50,12 @@ export function buildMiniSearchOptions() {
     idField: 'id',
     fields: MS_FIELDS,
     storeFields: MS_STORE_FIELDS,
+    // tokenize() already folds + normalizes every token (kjvEncode), so
+    // processTerm is identity — re-folding per token here (NFD on ~1M tokens) was
+    // the index-time hot spot. Index-side and query-side stay symmetric because
+    // both run through the SAME tokenize.
     /** @param {string} term */
-    processTerm: (term) => {
-      const t = kjvEncode(term);
-      if (!t.length) return null;
-      return t.length === 1 ? t[0] : t;
-    },
+    processTerm: (term) => term || null,
     /** @param {string} text */
     tokenize: (text) => kjvEncode(text),
     searchOptions: MS_SEARCH_DEFAULTS,

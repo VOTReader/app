@@ -103,6 +103,7 @@ export function useSettings({ savedSettings, theme }) {
       // AND a consumer in the search call.
       searchUseStopWords: true,
       searchCorpus: 'all', // 'all' | 'scriptures' | 'volumes'
+      searchEngine: 'classic', // 'classic' (FlexSearch) | 'minisearch' (new, typo-tolerant)
       haptic: true,
       keepScreenOn: true,
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,

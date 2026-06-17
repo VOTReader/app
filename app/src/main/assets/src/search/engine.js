@@ -28,6 +28,7 @@ import { expandQueryTerms } from './synonyms.js';
 import { kjvEncode } from './tokenize.js';
 import { snippet, highlightSpans } from './snippet.js';
 import { KIND_BOOST, coverageMultiplier, popcount, phraseTokenMatch, PHRASE_BOOST, SYNONYM_DEMOTION } from './ranking.js';
+import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 
 const FUZZY = 0.2;
 
@@ -35,7 +36,7 @@ const FUZZY = 0.2;
 /** @type {Promise<boolean>|null} */ let building = null;
 let ready = false;
 /** @type {Error|null} */ let buildError = null;
-/** @type {{docCount?:number, buildMs?:number, translation?:string}} */ let stats = {};
+/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string}} */ let stats = {};
 
 function now() {
   return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -55,8 +56,27 @@ function reshapeDoc(r) {
 async function build(options) {
   options = options || {};
   const code = options.translation || 'nkjv';
+  const sig = dataSignature(code);
+
+  // Warm cache: restore the serialized index (~0.3s) instead of rebuilding (~10s).
+  try {
+    const cachedJson = await loadCached(sig);
+    if (cachedJson) {
+      const tc = now();
+      msIndex = MiniSearch.loadJSON(cachedJson, buildMiniSearchOptions());
+      ready = true;
+      buildError = null;
+      stats = { docCount: msIndex.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code };
+      if (options.onProgress) options.onProgress(stats.docCount, stats.docCount);
+      return;
+    }
+  } catch { /* corrupt / blocked cache — fall through to a fresh build */ }
+
+  // Cold build: collect docs (fast, ~55ms) then index (the slow part, ~10s —
+  // chunked so the progress bar animates and the UI stays responsive).
   const t0 = now();
   const docs = buildDocs({ translation: code });
+  const t1 = now();
   const ms = new MiniSearch(buildMiniSearchOptions());
   const CHUNK = 2000;
   for (let i = 0; i < docs.length; i += CHUNK) {
@@ -65,10 +85,20 @@ async function build(options) {
     await new Promise((r) => setTimeout(r, 0));
   }
   if (options.onProgress) options.onProgress(docs.length, docs.length);
+  const t2 = now();
   msIndex = ms;
   ready = true;
   buildError = null;
-  stats = { docCount: docs.length, buildMs: Math.round(now() - t0), translation: code };
+  stats = {
+    docCount: docs.length,
+    buildMs: Math.round(t2 - t0),
+    collectMs: Math.round(t1 - t0), // buildDocs (tokenizer-bound)
+    insertMs: Math.round(t2 - t1), // MiniSearch addAll (index-bound)
+    cached: false,
+    translation: code,
+  };
+  // Persist for next session (fire-and-forget; ~0.5s serialize + IDB write).
+  saveCached(sig, JSON.stringify(ms)).catch(() => {});
 }
 
 function sameTranslation(opts) {
@@ -299,6 +329,7 @@ function rebuild(options) {
   const code = options.translation || stats.translation || 'nkjv';
   ready = false;
   msIndex = null;
+  clearCached().catch(() => {});
   return init({ translation: code });
 }
 

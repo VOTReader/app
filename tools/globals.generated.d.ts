@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 421 distinct identifiers.
+// Total: 425 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -235,6 +235,7 @@ declare const VolumeLetterIndex: any;
 declare const VolumesHome: any;
 declare const VotSearch: any;
 declare const VotSearchData: any;
+declare const VotSearchMini: any;
 declare const WEEKDAY_NAMES: any;
 declare const WTLB_ONE: any;
 declare const WTLB_SCRIPTURES: any;
@@ -284,6 +285,7 @@ declare const _translationLoaded: any;
 declare const _translationPromises: any;
 declare const _validateTabState: any;
 declare const _verseRangeLabel: any;
+declare const addRecentSearch: any;
 declare const applyActiveNoteState: any;
 declare const applyDOMBookmarks: any;
 declare const applyDOMHighlights: any;
@@ -301,6 +303,7 @@ declare const buildSourceEndpoint: any;
 declare const buildV3Manifest: any;
 declare const classifyV3ImportBegin: any;
 declare const clearLegacyLs: any;
+declare const clearRecentSearches: any;
 declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
 declare const colLetters: any;
@@ -324,6 +327,7 @@ declare const gardenUrl: any;
 declare const getEchoesForVerse: any;
 declare const getGardenTier: any;
 declare const getNotesForVerse: any;
+declare const getRecentSearches: any;
 declare const hasAnyPendingStores: any;
 declare const hideToast: any;
 declare const highlightExcerptInDom: any;

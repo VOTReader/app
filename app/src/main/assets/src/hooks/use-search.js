@@ -412,9 +412,19 @@ export function useSearch({
     if (action === 'settings') { goSettings(); return; }
     if (action === 'scriptures') { setScreen('scriptures-home'); return; }
     if (action === 'volumes') { setScreen('volumes-home'); return; }
+    if (action === 'clear-history') {
+      // Wires the long-dormant "/clear history" command to the recent-searches
+      // store (window-exposed by bundle-e). Guarded: bundle-e is loaded whenever
+      // this fires (the command is typed in SearchScreen, which lives there).
+      if (typeof window.clearRecentSearches === 'function') window.clearRecentSearches();
+      return;
+    }
     if (action === 'clear-query') { setSearchQuery(''); return; }
     if (action === 'rebuild-index') {
+      // Rebuild whichever engines are loaded (Classic always; MiniSearch once
+      // its lazy bundle has loaded).
       if (window.VotSearch) window.VotSearch.rebuild().catch(() => {});
+      if (window.VotSearchMini) window.VotSearchMini.rebuild().catch(() => {});
       return;
     }
     if (action === 'random') {

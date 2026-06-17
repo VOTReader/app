@@ -143,4 +143,11 @@ describe('VotSearchMini engine', () => {
     expect(VotSearchMini.fuzzyBookSuggest('jhon')).toBe('john');
     expect(VotSearchMini.snippet('The LORD is my shepherd', ['shepherd'])).toContain('shepherd');
   });
+
+  it('rebuild() drops and re-creates a working index', async () => {
+    await VotSearchMini.rebuild();
+    expect(VotSearchMini.getState().ready).toBe(true);
+    const { results } = await VotSearchMini.search('shepherd');
+    expect(results.length).toBeGreaterThan(0);
+  });
 });

@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 421 distinct identifiers.
+// Total: 425 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -234,6 +234,7 @@ export const projectGlobals = {
   VolumesHome: "readonly",
   VotSearch: "readonly",
   VotSearchData: "readonly",
+  VotSearchMini: "readonly",
   WEEKDAY_NAMES: "readonly",
   WTLB_ONE: "readonly",
   WTLB_SCRIPTURES: "readonly",
@@ -283,6 +284,7 @@ export const projectGlobals = {
   _translationPromises: "readonly",
   _validateTabState: "readonly",
   _verseRangeLabel: "readonly",
+  addRecentSearch: "readonly",
   applyActiveNoteState: "readonly",
   applyDOMBookmarks: "readonly",
   applyDOMHighlights: "readonly",
@@ -300,6 +302,7 @@ export const projectGlobals = {
   buildV3Manifest: "readonly",
   classifyV3ImportBegin: "readonly",
   clearLegacyLs: "readonly",
+  clearRecentSearches: "readonly",
   clearSuppressNextHistoryPush: "readonly",
   colLetterArr: "readonly",
   colLetters: "readonly",
@@ -323,6 +326,7 @@ export const projectGlobals = {
   getEchoesForVerse: "readonly",
   getGardenTier: "readonly",
   getNotesForVerse: "readonly",
+  getRecentSearches: "readonly",
   hasAnyPendingStores: "readonly",
   hideToast: "readonly",
   highlightExcerptInDom: "readonly",

@@ -19,9 +19,19 @@ import { SearchScreen } from './screens/SearchScreen.jsx';
 import {
   GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
 } from './screens/GardenView.jsx';
+// The MiniSearch engine (Classic/MiniSearch coexistence) ships in bundle-e
+// alongside SearchScreen — its sole trigger — so it never touches cold boot.
+// Both engines expose the identical facade + result shape; SearchScreen picks
+// the active one from settings.searchEngine. Recent-searches helpers are
+// window-exposed here so cross-bundle callers (use-search's /clear history) can
+// reach them without bundling a second copy.
+import { VotSearchMini } from '../search/engine.js';
+import { getRecentSearches, addRecentSearch, clearRecentSearches } from '../search/recent-searches.js';
 
 Object.assign(window, {
   SettingsScreen,
   SearchScreen,
   GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
+  VotSearchMini,
+  getRecentSearches, addRecentSearch, clearRecentSearches,
 });
