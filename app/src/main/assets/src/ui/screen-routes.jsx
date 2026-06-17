@@ -80,7 +80,6 @@ export function buildScreenRoutes({
   openInAppLetter, openLinkSidebar, navigateToLink,
   backHint, tapThroughBack, goToLetterFromMatthew,
   setNavOrigin, setNoteSheetTarget,
-  setShowWelcome,
   // ── Bible chapter boundary props (from useReadingChainNav) ──
   bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
   bcvPrevBoundaryTitle, bcvNextBoundaryTitle,
@@ -305,7 +304,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
-        onInfo={() => setShowWelcome(true)}
         onAbout={goAbout}
         history={readHistory}
         translation={settings.translation}

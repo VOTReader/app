@@ -22,8 +22,6 @@
        from 4 different subsystems (tabs, activeTabIdx, theme,
        lastReadChapters, lastReadLetterMap, activeReadKey, settings,
        readItems). It has no business inside a "settings" hook.
-     - showWelcome / isOnline / dismissWelcome / the online-check effect —
-       they stay in App() entirely and are not related to settings.
      - GARDEN_DEFAULT_TIER — a bare-name window global from bundle-d.js.
        Used as the gardenTier default inside the useState initializer.
        Accessed by bare name (no import, no param).

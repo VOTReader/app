@@ -278,8 +278,6 @@ function App() {
   // Per-tab focus-mode overrides. Each tab has independent state.
   const [titleFocusHidden, setTitleFocusHidden] = tabField('titleFocusHidden');
   const [headingsFocusHidden, setHeadingsFocusHidden] = tabField('headingsFocusHidden');
-  /* showWelcome / isOnline / dismissWelcome → src/hooks/use-app-shell-effects.js
-     (P7k, called below — needs setNavOrigin which is the next tabField). */
   // Tab-local search/nav breadcrumbs (each tab has its own search context).
   // searchQuery / searchOrigin / searchScope / searchContext tabFields →
   // owned by useSearch (P7c, called below).
@@ -288,11 +286,6 @@ function App() {
   const [fromSurprise, setFromSurprise] = tabField('fromSurprise');
   const [navOrigin, setNavOrigin] = tabField('navOrigin');
 
-  /* AppShell-level leftover effects + small state (P7k — closes Phase 1).
-     showWelcome / isOnline / dismissWelcome. */
-  const { showWelcome, setShowWelcome, isOnline, dismissWelcome, welcomeIsFirstBoot } = useAppShellEffects({
-    setNavOrigin, setScreen,
-  });
 
   // App-global: read history shared across all tabs.
   // State + mutators extracted to useHistory(); auto-track effect stays
@@ -700,7 +693,6 @@ function App() {
     openInAppLetter, openLinkSidebar, navigateToLink,
     backHint, tapThroughBack, goToLetterFromMatthew,
     setNavOrigin, setNoteSheetTarget,
-    setShowWelcome,
     bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
     bcvPrevBoundaryTitle, bcvNextBoundaryTitle,
     prophecyCardStatesRef, saveProphecyCardStates,
@@ -728,8 +720,6 @@ function App() {
           before, so z-index stacking and click-through behavior are
           preserved. */}
       <AppShellOverlays
-        showWelcome={showWelcome} isOnline={isOnline} dismissWelcome={dismissWelcome}
-        welcomeIsFirstBoot={welcomeIsFirstBoot}
         settings={settings} updateSetting={updateSetting}
         tabsOverviewOpen={tabsOverviewOpen} setTabsOverviewOpen={setTabsOverviewOpen}
         tabs={tabs} activeTabIdx={activeTabIdx} tabThumbnails={tabThumbnails} MAX_TABS={MAX_TABS}

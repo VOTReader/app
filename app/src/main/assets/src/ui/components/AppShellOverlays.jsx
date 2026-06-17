@@ -1,16 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════════════
    AppShellOverlays — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
-   The 4 modal/prompt overlays that sit ABOVE the ROUTES dispatch slot
+   The 3 modal/prompt overlays that sit ABOVE the ROUTES dispatch slot
    in App() — extracted from app.jsx (Phase 2 P9d):
 
-     1. Welcome modal           — splash on first launch + "open in
-                                  browser" hyperlink target
-     2. Tabs overview          — full-screen tab switcher (TabsOverview
+     1. Tabs overview          — full-screen tab switcher (TabsOverview
                                   + TabActionSheet long-press menu)
-     3. Disable-tabs prompt    — shown after the user closes their last
+     2. Disable-tabs prompt    — shown after the user closes their last
                                   tab a few times in a row
-     4. Garden warning         — pre-launch storage/bandwidth disclosure
+     3. Garden warning         — pre-launch storage/bandwidth disclosure
                                   + image-quality tier picker
 
    These are unrelated to the per-screen render path — they sit above
@@ -24,8 +22,6 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function AppShellOverlays({
-  // Welcome modal
-  showWelcome, isOnline, dismissWelcome, welcomeIsFirstBoot,
   // Tabs overview + TabActionSheet
   settings, updateSetting,
   tabsOverviewOpen, setTabsOverviewOpen,
@@ -47,11 +43,6 @@ export function AppShellOverlays({
   // overlays are always mounted (AppShellOverlays is always rendered)
   // so we can't conditionally call the hook; instead we toggle active
   // off when the modal is closed.
-  useModalRegistry({
-    id: 'welcome-modal',
-    dismiss: dismissWelcome,
-    active: !!(showWelcome && welcomeIsFirstBoot && !welcomeIsFirstBoot.current),
-  });
   useModalRegistry({
     id: 'tabs-overview',
     dismiss: () => setTabsOverviewOpen(false),
@@ -81,46 +72,6 @@ export function AppShellOverlays({
       <StorageHealthBanner onNavigateSettings={() => setScreen('settings')} />
       <Safari7DayModal />
       <IosPwaWelcomeCard onNavigateSettings={() => setScreen('settings')} />
-
-      {showWelcome && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          backgroundImage: 'url("splash.jpg")',
-          backgroundColor: '#0a0e1a',
-          backgroundSize: 'cover', backgroundPosition: 'center 28%',
-          display: 'flex', flexDirection: 'column'
-        }}>
-          {welcomeIsFirstBoot && !welcomeIsFirstBoot.current && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                onClick={dismissWelcome}
-                aria-label="Close"
-                style={{
-                  margin: 'calc(var(--inset-top, 0px) + 1rem) 1rem 0 0',
-                  background: 'rgba(0,0,0,0.55)', border: '1.5px solid rgba(255,255,255,0.35)',
-                  borderRadius: '50%', width: '2.4rem', height: '2.4rem',
-                  color: '#fff', fontSize: '1.2rem', lineHeight: 1,
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                {"✕"}
-              </button>
-            </div>
-          )}
-
-          {isOnline && (
-            <a
-              href="https://www.thevolumesoftruth.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                position: 'absolute', left: '50%', top: '37%', transform: 'translateX(-50%)',
-                width: '60%', maxWidth: '400px', height: '8%',
-                zIndex: 1, borderBottom: '1.5px solid #6cacf0'
-              }}
-            />
-          )}
-        </div>
-      )}
 
       {settings.tabsEnabled && tabsOverviewOpen && (
         <div className="tabs-overview-layer">

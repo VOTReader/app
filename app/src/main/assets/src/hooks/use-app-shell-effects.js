@@ -1,77 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   useAppShellEffects — leftover AppShell-level effects + small state (P7k)
+   useAppShellEffects — AppShell-level effects (P7k)
    ═══════════════════════════════════════════════════════════════════════
    Global-scope module. Bundled into dist/bundle-b.js.
 
-   Closes Phase 1 of the App() decomposition. Bundles two small
-   concerns that didn't fit anywhere else:
-
-     1. The first-run welcome modal state + dismissWelcome handler.
-        Reads/writes 'vot-welcomed' + 'vot-about-seen' localStorage
-        keys. The dismissal can optionally redirect to the About
-        screen on FIRST run (subsequent runs go straight to home).
-
-     2. The online-status ping check. Polls a known URL when the
-        welcome modal is showing (so the splash can render an
-        "offline" notice when relevant). The fetch uses 'no-cors'
-        so any 2xx OR opaque response counts as online.
-
-   (W7.3 removed the former window.__bumpHlTick bridge — the DOM
-   annotation layer now re-applies off store subscriptions in
-   useDomAnnotationSync, so no inline component pokes a global counter.)
-
    OWNS:
-     - showWelcome state + setShowWelcome
-     - isOnline state
-     - the online-check useEffect (deps on [showWelcome])
-     - dismissWelcome — writes 'vot-welcomed', clears state, optionally
-       routes to About on first run
+     - isOnline state (navigator.onLine + live events, zero egress U21)
 
    DOES NOT OWN:
-     - theme state — App-local useState; consumed widely in the render
-       tree and not bundled here (just state, no effect).
-     - The Welcome modal render — render tree.
-
-   PARAMS:
-     setNavOrigin     For dismissWelcome's About-redirect path. Snapshots
-                      home as the origin so back from About goes home.
-     setScreen        For dismissWelcome's About-redirect.
-
-   RETURNS: { showWelcome, setShowWelcome, isOnline, dismissWelcome }
-
-   STORAGE:
-     - 'vot-welcomed'   '1' once dismissed; absence triggers showWelcome
-                        on next boot.
-     - 'vot-about-seen' Read (not written) by dismissWelcome to decide
-                        whether to redirect to About on first dismissal.
+     - theme state — App-local useState.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { WelcomedFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
-
 /**
- * @param {{
- *   setNavOrigin: (v: any) => void,
- *   setScreen: (v: any) => void
- * }} args
- * @returns {{
- *   showWelcome: boolean,
- *   setShowWelcome: (v: any) => void,
- *   isOnline: boolean,
- *   dismissWelcome: () => void,
- *   welcomeIsFirstBoot: { current: boolean }
- * }}
+ * @returns {{ isOnline: boolean }}
  */
-export function useAppShellEffects({ setNavOrigin, setScreen }) {
-  // First-run welcome state. WelcomedFlagStore is IDB-backed (W2.3b);
-  // HydrationGate has already resolved by the time this hook runs, so
-  // the read is sync from the in-memory cache.
-  const [showWelcome, setShowWelcome] = React.useState(() => !WelcomedFlagStore.is());
-
-  // True while the CURRENT showing is the first-boot auto-show (no X button,
-  // auto-dismiss). Flipped to false by dismissWelcome so any later manual
-  // re-opens via the info icon get the X button instead.
-  const welcomeIsFirstBoot = React.useRef(!WelcomedFlagStore.is());
-
+export function useAppShellEffects() {
   // Online status from navigator.onLine + the online/offline events (U21).
   // Was a no-cors fetch of thevolumesoftruth.com/favicon.ico — an EXTERNAL
   // egress that contradicted the self-contained/offline policy
@@ -94,25 +36,5 @@ export function useAppShellEffects({ setNavOrigin, setScreen }) {
     };
   }, []);
 
-  const dismissWelcome = () => {
-    welcomeIsFirstBoot.current = false;
-    WelcomedFlagStore.set();
-    setShowWelcome(false);
-    // First-time users see the About intro right after the splash. After
-    // CONTINUE marks the about-seen flag, this path becomes a no-op and
-    // the splash just dismisses straight to home on subsequent uses.
-    if (!AboutSeenFlagStore.is()) {
-      setNavOrigin({ screen: 'home', bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null });
-      setScreen('about');
-    }
-  };
-
-  // Auto-dismiss after 3 seconds on first boot; unskippable (no X button).
-  React.useEffect(() => {
-    if (!showWelcome) return;
-    const id = setTimeout(dismissWelcome, 3000);
-    return () => clearTimeout(id);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return { showWelcome, setShowWelcome, isOnline, dismissWelcome, welcomeIsFirstBoot };
+  return { isOnline };
 }

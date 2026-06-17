@@ -2,7 +2,7 @@
    HomeScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onInfo, onAbout, history: _history, theme, onThemeChange, translation }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all
@@ -312,12 +312,6 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   return (
     <ScreenLayout navChildren={
       <>
-        <button className="nav-search-btn" onClick={onInfo} title="Welcome image" aria-label="Show welcome image" style={{ marginRight: '0.25rem', color: 'var(--gold)' }}>
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <rect x="10.5" y="2" width="3" height="20" rx="1" />
-            <rect x="4" y="8" width="16" height="3" rx="1" />
-          </svg>
-        </button>
         <button className="nav-search-btn" onClick={onAbout} title="About VOTReader" aria-label="About VOTReader" style={{ marginRight: 'auto', color: 'var(--gold)' }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="12" cy="12" r="9.5" />
