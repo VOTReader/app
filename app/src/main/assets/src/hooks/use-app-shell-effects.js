@@ -100,5 +100,12 @@ export function useAppShellEffects({ setNavOrigin, setScreen }) {
     }
   };
 
+  // Auto-dismiss after 3 seconds on first boot; unskippable (no X button).
+  React.useEffect(() => {
+    if (!showWelcome) return;
+    const id = setTimeout(dismissWelcome, 3000);
+    return () => clearTimeout(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return { showWelcome, setShowWelcome, isOnline, dismissWelcome };
 }
