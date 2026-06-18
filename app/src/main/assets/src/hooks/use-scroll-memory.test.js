@@ -266,3 +266,68 @@ describe('useScrollMemory — restore', () => {
     expect(document.body.classList.contains('scroll-restoring')).toBe(false);
   });
 });
+
+describe('useScrollMemory — content anchor (reflow-proof restore)', () => {
+  // jsdom has no layout engine, so getBoundingClientRect / elementFromPoint are
+  // stubbed. Rects are made SCROLL-AWARE (top shifts with el.scrollTop) so the
+  // content-coordinate math behaves like a real browser.
+  function stubContainerRect(top = 0) {
+    Object.defineProperty(el, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => /** @type {any} */ ({ top, left: 0, width: 400, height: 600, bottom: top + 600, right: 400 }),
+    });
+  }
+  function addAnchor(key, contentY) {
+    const a = document.createElement('div');
+    a.setAttribute('data-hl-key', key);
+    el.appendChild(a);
+    // Sits at content-Y `contentY`: its viewport top = contentY - scrollTop.
+    a.getBoundingClientRect = () => /** @type {any} */ ({ top: contentY - el.scrollTop, left: 0, width: 400, height: 40, bottom: contentY - el.scrollTop + 40, right: 400 });
+    return a;
+  }
+
+  it('restores to the content ANCHOR, not the drifted pixel y, when the element is present', () => {
+    stubContainerRect(0);
+    addAnchor('v', 500);
+    // Saved: a drifted pixel y (9999) but a precise anchor 10px into verse "v".
+    tab.scrollPositions['letter-beta'] = { y: 9999, pct: 1, anchorKey: 'v', anchorOff: 10 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(510); // anchorContentTop(500) + anchorOff(10) — ignores y=9999
+  });
+
+  it('adapts when the anchor has REFLOWED to a new position (the whole point)', () => {
+    stubContainerRect(0);
+    addAnchor('v', 800); // same verse now sits lower (e.g. larger font above it)
+    tab.scrollPositions['letter-beta'] = { y: 500, pct: 0.3, anchorKey: 'v', anchorOff: 10 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(810); // follows the verse to 800 (+10), NOT the stale 500
+  });
+
+  it('falls back to the saved pixel y when the anchor element is absent', () => {
+    tab.scrollPositions['letter-beta'] = { y: 1234, pct: 0.5, anchorKey: 'gone', anchorOff: 0 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(1234); // pixel fallback applied immediately
+    act(() => { vi.advanceTimersByTime(2000); }); // past the retry deadline
+    expect(document.body.classList.contains('scroll-restoring')).toBe(false); // force released
+  });
+
+  it('captures the topmost visible verse via binary search (skips notes/sticky chrome)', () => {
+    stubContainerRect(0); // container top 0, height 600
+    addAnchor('v1', 0);      // scrolled above the viewport
+    addAnchor('v2', 1000);   // the upcoming verse (a tall study note fills 40..1000)
+    addAnchor('v3', 2000);
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    // Viewport top at content-Y 970 — v1 is fully above; v2 starts 30px below.
+    act(() => { scrollTo(970); vi.advanceTimersByTime(150); }); // scroll → debounced flush
+    const saved = tab.scrollPositions['letter-alpha'];
+    expect(saved.anchorKey).toBe('v2');     // nearest verse, not the note at the exact top
+    expect(saved.anchorOff).toBe(-30);      // v2 starts 30px below the viewport top
+  });
+});

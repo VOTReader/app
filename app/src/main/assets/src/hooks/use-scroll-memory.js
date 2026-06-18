@@ -82,61 +82,121 @@ function getScrollKey(scr, bid, cnum, lid, sid, scid) {
   return scr;
 }
 
-// Land a saved scrollTop on the current __scrollEl. Returns a cleanup fn.
+// ── CONTENT-ANCHOR capture / restore ───────────────────────────────────────
+// Pixel offsets (and percentages) DRIFT when the page reflows: font-size (the
+// Text-Size setting) and font-family (Modern/Classic) changes, a different
+// translation, rotation, and content-visibility's ESTIMATED block heights all
+// move where a given pixel/percent lands — and the content above your spot
+// reflows by a different ratio than the content below it, so a proportion can't
+// track it either. Anchoring to the actual content element at the top of the
+// viewport — its data-hl-key, the SAME stable id the annotation engine uses —
+// makes restore invariant to all of that: we put the same verse/paragraph back
+// at the top, and any residual error is bounded by that ONE element instead of
+// the whole page above it. y/pct stay as the fallback (screens with no
+// data-hl-key, pre-anchor saved positions, or an element that no longer exists).
+
+// The topmost reading-content element at/under the viewport top → { anchorKey,
+// anchorOff }. anchorOff = px the viewport top sits below that element's top
+// (sub-element precision; negative if the element starts just below the top,
+// e.g. a study note occupies the very top). We BINARY-SEARCH the data-hl-key
+// elements (verses / paragraphs — document-ordered, so vertically monotonic)
+// for the first whose bottom is below the viewport top. elementFromPoint is NOT
+// used: on the Matthew Study Bible the exact top pixel is often a study note or
+// a sticky chapter-nav arrow (neither carries data-hl-key), so a point hit-test
+// finds no anchor — the search finds the nearest verse regardless. Empty key on
+// screens with no data-hl-key (Garden / Settings) → caller falls back to y/pct.
+function captureAnchor(el) {
+  if (!el) return { anchorKey: null, anchorOff: 0 };
+  var cRect = el.getBoundingClientRect();
+  if (!cRect.height) return { anchorKey: null, anchorOff: 0 };
+  var list = el.querySelectorAll('[data-hl-key]');
+  var n = list.length;
+  if (!n) return { anchorKey: null, anchorOff: 0 };
+  var top = cRect.top + 1;
+  var lo = 0, hi = n - 1, found = -1;
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1;
+    if (list[mid].getBoundingClientRect().bottom > top) { found = mid; hi = mid - 1; }
+    else { lo = mid + 1; }
+  }
+  if (found < 0) return { anchorKey: null, anchorOff: 0 }; // scrolled past the last one
+  var anchor = list[found];
+  return { anchorKey: anchor.getAttribute('data-hl-key'), anchorOff: Math.round(cRect.top - anchor.getBoundingClientRect().top) };
+}
+
+// Content-coordinate Y of an anchor element's top (distance from the top of the
+// scrollable content), or null if it isn't in the DOM yet. Invariant of the
+// current scrollTop because the rect-delta and scrollTop cancel.
+function anchorContentTop(el, anchorKey) {
+  if (!el || !anchorKey) return null;
+  var anchor = el.querySelector('[data-hl-key="' + String(anchorKey).replace(/"/g, '\\"') + '"]');
+  if (!anchor) return null;
+  return (anchor.getBoundingClientRect().top - el.getBoundingClientRect().top) + el.scrollTop;
+}
+
+// Land a saved position on the current __scrollEl. Returns a cleanup fn.
+// Accepts the full saved record { y, pct, anchorKey, anchorOff }, a legacy plain
+// number, or null. PREFERS the content anchor; falls back to the saved pixel y.
 //
-// PERF4 × exact restore: .letter-para / .section-block are
-// content-visibility:auto with PLACEHOLDER intrinsic heights until first
-// render, so restoring against estimated geometry lands on the wrong content
-// (and scroll anchoring then drags it as blocks lazily render). While
-// restoring a non-top position, body.scroll-restoring lifts content-visibility
-// (app.css) so layout is REAL when scrollTop lands; the forced layout also
-// populates contain-intrinsic-size:auto's remembered sizes, so re-engaging the
-// optimization one frame later changes no geometry. Top restores (target 0)
-// skip the force — top is top in any geometry.
+// PERF4 × exact restore: .letter-para / .section-block are content-visibility:
+// auto with PLACEHOLDER intrinsic heights until first render, so measuring
+// against estimated geometry lands on the wrong content. While restoring a
+// non-top position, body.scroll-restoring lifts content-visibility (app.css) so
+// layout is REAL when we read the anchor's position and set scrollTop; the
+// forced layout also memoizes contain-intrinsic-size, so re-engaging one frame
+// later changes no geometry.
 //
-// COLD-BOOT RACE: on a fresh launch the restore runs BEFORE the chapter is
-// ready in two ways — (1) the scroll container itself isn't mounted yet
-// (`__scrollEl` is null while the lazy-corpus loading view shows), and (2) even
-// once mounted, the verses still have to render in, so the container is too
-// short and `scrollTop = target` CLAMPS. The effect runs once (its deps are the
-// nav keys, which don't change as the chapter streams in), so a single early
-// apply was lost (Hebrews reopened at the top on every cold boot). Re-apply
-// across animation frames until the container exists AND is tall enough to hold
-// `target`, or a bounded deadline passes. Content already present (in-tab nav)
-// satisfies the check on the FIRST apply and releases next frame — unchanged.
-function startRestore(target) {
-  if (target <= 0) {
+// COLD-BOOT RACE: on a fresh launch the restore runs before the chapter is
+// ready in two ways — __scrollEl is null while the lazy-corpus loading view
+// shows, and even once mounted the verses (and the anchor element) still have to
+// render in. The effect runs once (deps are the nav keys), so we re-attempt
+// across animation frames until the anchor element appears (or, for the pixel
+// fallback, the container is tall enough), or a bounded deadline passes.
+function startRestore(saved) {
+  var legacyY = (saved == null) ? 0
+    : (typeof saved === 'number' ? saved : (typeof saved.y === 'number' ? saved.y : 0));
+  var anchorKey = (saved && typeof saved === 'object') ? (saved.anchorKey || null) : null;
+  var anchorOff = (saved && typeof saved === 'object' && typeof saved.anchorOff === 'number') ? saved.anchorOff : 0;
+
+  // Nothing meaningful to restore (top of page, no anchor) — top is top.
+  if (!anchorKey && legacyY <= 0) {
     if (__scrollEl) __scrollEl.scrollTop = 0;
     return function () {};
   }
   document.body.classList.add('scroll-restoring');
   var raf = 0, raf2 = 0, tries = 0;
   var MAX_TRIES = 90; // ~1.5s @ 60fps — covers cold-boot corpus load + paint
-  var land = function () {
-    tries += 1;
-    if (__scrollEl) {
-      void __scrollEl.scrollHeight; // force real-geometry layout (cv lifted)
-      __scrollEl.scrollTop = target;
-    }
-    // "Ready" = the scroll container is mounted AND tall enough to hold target.
-    // On cold boot BOTH lag the restore: __scrollEl is null while the lazy-corpus
-    // loading view shows (the chapter — and its .screen-scroll ref — hasn't
-    // mounted), then once the chapter mounts its blocks still have to render in.
-    // Retry across frames until ready, or give up at the deadline (then still
-    // release, so the content-visibility lift can never leak).
-    var ready = __scrollEl && (__scrollEl.scrollHeight - __scrollEl.clientHeight) >= target - 2;
-    if (!ready && tries < MAX_TRIES) {
-      raf = requestAnimationFrame(land);
-      return;
-    }
-    // Re-apply after the post-commit layout pass (an async content swap can
-    // still shift the offset), then release one PAINTED frame later so
-    // contain-intrinsic-size:auto memoizes the real sizes before content-
-    // visibility re-engages. Frame 1 paints WITH the force; frame 2 releases.
+
+  // Best target available THIS frame: the content anchor if its element is in
+  // the DOM (precise), else the saved pixel y.
+  function best() {
+    var aTop = anchorContentTop(__scrollEl, anchorKey);
+    if (aTop != null) return { y: Math.max(0, Math.round(aTop + anchorOff)), anchored: true };
+    return { y: legacyY, anchored: false };
+  }
+  function settle() {
     raf = requestAnimationFrame(function () {
-      if (__scrollEl) __scrollEl.scrollTop = target;
+      if (__scrollEl) __scrollEl.scrollTop = best().y; // re-apply post-commit layout pass
       raf2 = requestAnimationFrame(function () { document.body.classList.remove('scroll-restoring'); });
     });
+  }
+  var land = function () {
+    tries += 1;
+    var deadline = tries >= MAX_TRIES;
+    if (__scrollEl) {
+      void __scrollEl.scrollHeight; // force real-geometry layout (cv lifted)
+      var t = best();
+      __scrollEl.scrollTop = t.y;
+      // Ready when the anchor resolved (precise), OR — no anchor wanted/found —
+      // the container is tall enough for the pixel fallback. While an anchor IS
+      // wanted but its element hasn't rendered yet (cold boot), keep retrying.
+      var tallEnough = (__scrollEl.scrollHeight - __scrollEl.clientHeight) >= t.y - 2;
+      if (t.anchored || (!anchorKey && tallEnough) || deadline) { settle(); return; }
+    } else if (deadline) {
+      document.body.classList.remove('scroll-restoring');
+      return;
+    }
+    raf = requestAnimationFrame(land);
   };
   land();
   return function () {
@@ -183,7 +243,7 @@ export function useScrollMemory({
   // window (tap "next letter" mid-momentum) used to lose the final position
   // (the pending timeout fired after scrollKeyRef had moved to the new key).
   // This stash is what the restore effect commits for the key being left.
-  const liveScrollRef = React.useRef(/** @type {{key: string, y: number, pct: number} | null} */ (null));
+  const liveScrollRef = React.useRef(/** @type {{key: string, y: number, pct: number, anchorKey: string|null, anchorOff: number} | null} */ (null));
   // Previous activeTabIdx — the nav-time commit is for IN-TAB nav only. Tab
   // switches flush explicitly (goTabs fires flushScrollToActiveTab before the
   // overview opens); committing here on a tab switch would write the OLD
@@ -199,8 +259,9 @@ export function useScrollMemory({
     const { scrollTop, scrollHeight, clientHeight } = __scrollEl;
     const max = Math.max(scrollHeight - clientHeight, 1);
     const pct = Math.max(0, Math.min(1, scrollTop / max));
+    const a = captureAnchor(__scrollEl);
     updateActiveTab((t) => ({
-      scrollPositions: { ...(t.scrollPositions || {}), [key]: { y: scrollTop, pct } }
+      scrollPositions: { ...(t.scrollPositions || {}), [key]: { y: scrollTop, pct, anchorKey: a.anchorKey, anchorOff: a.anchorOff } }
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsOverviewOpenRef is a useRef ref read via .current — call-time fresh, stable object identity. Per HARD INVARIANT above, deps are intentionally [updateActiveTab] only.
   }, [updateActiveTab]);
@@ -217,7 +278,8 @@ export function useScrollMemory({
       if (currentEl && !tabsOverviewOpenRef.current) {
         const y = currentEl.scrollTop;
         const max = Math.max(currentEl.scrollHeight - currentEl.clientHeight, 1);
-        liveScrollRef.current = { key: scrollKeyRef.current, y, pct: Math.max(0, Math.min(1, y / max)) };
+        const a = captureAnchor(currentEl);
+        liveScrollRef.current = { key: scrollKeyRef.current, y, pct: Math.max(0, Math.min(1, y / max)), anchorKey: a.anchorKey, anchorOff: a.anchorOff };
       }
       clearTimeout(timeout);
       timeout = setTimeout(flushScrollToActiveTab, 120);
@@ -274,7 +336,7 @@ export function useScrollMemory({
     const live = liveScrollRef.current;
     if (sameTab && prevKey !== key && live && live.key === prevKey) {
       updateActiveTab((t) => ({
-        scrollPositions: { ...(t.scrollPositions || {}), [prevKey]: { y: live.y, pct: live.pct } }
+        scrollPositions: { ...(t.scrollPositions || {}), [prevKey]: { y: live.y, pct: live.pct, anchorKey: live.anchorKey, anchorOff: live.anchorOff } }
       }));
     }
     scrollKeyRef.current = key;
@@ -291,15 +353,13 @@ export function useScrollMemory({
     if (surpriseAnchor && (screen === 'bible-ch' || screen === 'matthew-ch')) return;
 
     const saved = activeTab && activeTab.scrollPositions && activeTab.scrollPositions[key];
-    // Support both new { y, pct } shape and legacy plain number for backcompat
-    const savedY = saved == null ? null :
-    typeof saved === 'number' ? saved : typeof saved.y === 'number' ? saved.y : null;
-    const target = typeof savedY === 'number' && savedY > 0 ? savedY : 0;
-    // Land the saved position (or top). startRestore (module scope) handles the
-    // PERF4 content-visibility lift + the cold-boot content-render retry — see
-    // its definition. Returning it as this layout effect's cleanup cancels any
-    // pending frames if a rapid re-nav supersedes the restore.
-    return startRestore(target);
+    // Hand the full saved record to startRestore — it prefers the content anchor
+    // (robust to reflow / font-size / content-visibility), falls back to the
+    // pixel y, and handles the legacy plain-number + null shapes. It also owns
+    // the PERF4 content-visibility lift and the cold-boot retry; returning it as
+    // this layout effect's cleanup cancels pending frames if a rapid re-nav
+    // supersedes the restore.
+    return startRestore(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration. updateActiveTab is useCallback([activeTabIdx]) — its identity only changes with activeTabIdx, which IS a dep, so the closure is never stale.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
 
