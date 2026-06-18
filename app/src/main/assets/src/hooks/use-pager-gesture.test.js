@@ -154,14 +154,15 @@ describe('createPagerGesture controller', () => {
     expect(pd).toHaveBeenCalled();
   });
 
-  it('NAV4: a drag begun on a tappable element never engages', () => {
+  it('engages + commits even when the drag begins on a tappable element (swipe from anywhere)', () => {
     const { io, calls } = makeIO();
     const g = createPagerGesture(io);
-    g.start(startEv(300, 100, { closest: () => ({}) })); // closest finds a tappable
+    g.start(startEv(300, 100, { closest: () => ({}) })); // a would-be tappable target is NOT guarded anymore
+    g.move(moveEv(250, 100, 0));
     g.move(moveEv(120, 100, 40));
     g.end();
-    expect(calls.peekChange).toEqual([]);
-    expect(calls.commits).toEqual([]);
+    expect(calls.peekChange[0].side).toBe('next');
+    expect(calls.commits).toEqual(['next']);
   });
 
   it('dead end (no target): rubber-bands, never commits even past threshold', () => {

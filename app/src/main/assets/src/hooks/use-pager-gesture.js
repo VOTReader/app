@@ -33,11 +33,6 @@ const SLOP = 8;
 // Settle animation: a decelerate curve ≈ Android FastOutSlowInInterpolator.
 const SETTLE_MS = 300;            // ≥ the CSS transition (280ms) + a small buffer
 const SETTLE_TRANSITION = 'transform 0.28s cubic-bezier(0.2, 0, 0, 1)';
-// A drag that BEGINS on any of these is interaction, not a page turn (NAV4 +
-// the broader interactive set ScreenLayout's suppressor recognizes).
-const INTERACTIVE_SEL = 'a, button, input, textarea, select, .fn-ref, '
-  + '.inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon, '
-  + '.letter-link-ref, .wtlb-cite, .tap-ref, .inline-link-icon';
 
 /**
  * Lock the gesture axis on the first significant move. Horizontal must clearly
@@ -166,8 +161,12 @@ export function createPagerGesture(io) {
       if (settling) return;
       if (!e.touches || e.touches.length !== 1) { s = null; return; }
       const t0 = e.touches[0];
-      const target = e.target;
-      if (target && target.closest && target.closest(INTERACTIVE_SEL)) { s = null; return; }
+      // No start-element guard: a swipe must work from ANYWHERE, including on
+      // scripture refs / study notes (which can fill most of the page) — the
+      // gesture is behaviorally identical to tapping a nav arrow. A tap on a
+      // ref still opens it: axis only locks on real horizontal travel, and a
+      // multi-px drag cancels the browser's synthetic click. The text-selection
+      // guard (in end()) still blocks a flip while selecting.
       s = { startX: t0.clientX, startY: t0.clientY, axis: null, dir: null, desc: null, dx: 0, samples: [], width: io.getWidth() };
     },
 

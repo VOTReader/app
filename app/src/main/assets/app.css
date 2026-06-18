@@ -385,13 +385,15 @@
       .pager-peek-scroll { height: 100%; overflow: hidden; }
       .pager-peek-boundary { height: 100%; display: flex; align-items: center; justify-content: center; padding: 2rem 1.5rem; }
       .pager-peek-boundary .bottom-nav-card { max-width: 360px; width: 100%; }
-      /* A peek is a transient glimpse pinned at the top — its content never
-         scrolls, so collapsing the off-screen remainder is free. Caps the layout
-         cost of mounting a long chapter's preview (e.g. Psalm 119, 176 verses)
-         when a swipe begins. */
-      .pager-peek .verses-block .verse,
+      /* The peek must render at REAL heights immediately so the page that slides
+         in matches the live screen pixel-for-pixel (no estimated-height settle as
+         the user releases). The live reading screens lift content-visibility
+         during scroll-restore (body.scroll-restoring), so the peek matches by
+         lifting it outright. Cost is bounded by the render cap in pager-preview
+         (only the top ~viewport is ever visible — the peek never scrolls). */
       .pager-peek .letter-para,
-      .pager-peek .letter-poetry { content-visibility: auto; contain-intrinsic-size: auto 2.5rem; }
+      .pager-peek .letter-poetry,
+      .pager-peek .section-block { content-visibility: visible; }
 
       .scroll-notch-marker {
         position: absolute; right: 0; width: 10px; height: 3px;

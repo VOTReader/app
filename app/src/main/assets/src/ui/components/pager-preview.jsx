@@ -26,6 +26,15 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
+import { StickyChapterNav } from './StickyChapterNav.jsx';
+
+// A peek is pinned at the top and never scrolls, so only the first ~viewport is
+// ever seen. Cap the rendered count so a long chapter/letter (Psalm 119 = 176
+// verses) doesn't pay full-render cost on swipe-start — the below-fold remainder
+// is invisible. Generous (several viewports) so an over-drag can't reveal the cut.
+const PEEK_VERSE_CAP = 60;
+const PEEK_BLOCK_CAP = 40;
+const _noop = () => {};
 
 // ── Format A (letters): inert {t,v} segment render ──────────────────────────
 // Mirrors LetterView's Segments output MINUS every annotation/interaction hook:
@@ -57,7 +66,7 @@ export function segmentsToPlainText(segments) {
 /** Inert render of a letter's blocks (Format A). */
 export function PreviewLetterBody({ blocks }) {
   if (!Array.isArray(blocks)) return null;
-  return blocks.map((block, bi) => {
+  return blocks.slice(0, PEEK_BLOCK_CAP).map((block, bi) => {
     if (block.type === 'intro') return <p key={bi} className="letter-intro">{previewSegments(block.segments)}</p>;
     if (block.type === 'para') return <p key={bi} className="letter-para">{previewSegments(block.segments)}</p>;
     if (block.type === 'heading') return <h2 key={bi} className={`study-heading study-heading-l${block.level || 2}`}>{block.text}</h2>;
@@ -119,7 +128,7 @@ export function stripFormatBMarkers(text) {
 /** Inert render of a WTLB/Blessed entry's paragraphs (Format B). */
 export function PreviewWtlbBody({ paragraphs }) {
   if (!Array.isArray(paragraphs)) return null;
-  return paragraphs.map((p, pi) => (
+  return paragraphs.slice(0, PEEK_BLOCK_CAP).map((p, pi) => (
     <p key={pi} style={{ textAlign: p.align }} className={p.align === 'center' ? 'letter-poetry' : 'letter-para'}>
       {previewFormatBLine(p.text || '')}
     </p>
@@ -133,7 +142,7 @@ export function PreviewVerses({ verses, poetry }) {
   if (!Array.isArray(verses)) return null;
   return (
     <div className={`verses-block${poetry ? ' is-poetry' : ''}`}>
-      {verses.map((v, vi) => (
+      {verses.slice(0, PEEK_VERSE_CAP).map((v, vi) => (
         <span key={vi} className="verse">
           <span className="verse-num">{v.n}</span>
           {v.text}{' '}
@@ -216,6 +225,11 @@ export function PagerPeek({ side, desc, peekRef }) {
   return (
     <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={peekRef}>
       <div className="pager-peek-scroll">
+        {/* Inert clone of the reading chrome so the settings-gated chapter-nav
+            arrows don't flash on the page being swiped to. Visibility/alignment
+            inherit the shared body.arrows-* class — same document, so it matches
+            the live screen automatically. */}
+        <StickyChapterNav onPrev={_noop} onNext={_noop} prevDisabled={false} nextDisabled={false} prevLabel="" nextLabel="" />
         <PreviewHero {...(desc.hero || {})} />
         <div className="page-wrapper">{body}</div>
       </div>
