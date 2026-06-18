@@ -1,0 +1,290 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   usePagerGesture — visible finger-follow page swipe (ViewPager2-style)
+   ═══════════════════════════════════════════════════════════════════════
+   Global-scope module. Bundled into dist/bundle-d.js (imported by ScreenLayout).
+
+   Replaces the invisible release-only `useSwipeNav`. The page (the
+   `.pager-track` wrapper) translates 1:1 with the finger in real time while an
+   INERT neighbor preview (PagerPeek, pager-preview.jsx) slides in from the
+   edge; on release past a distance/velocity threshold it settles and commits
+   via the SAME onNext/onPrev the screen already computes; below threshold it
+   springs back. Rubber-bands at true ends. Honors prefers-reduced-motion
+   (no animation → behaves like the old instant swap).
+
+   STRUCTURE: a PURE controller factory (`createPagerGesture`) holds all the
+   logic and is driven by injected I/O (element accessors + callbacks), so it
+   unit-tests with plain synthetic touch objects — no real TouchEvent/DOM
+   needed. `usePagerGesture` is the thin React wrapper that wires the
+   controller to the scroll container's touch listeners and owns the peek
+   mount state. The decision primitives (decideAxis / isCommit / rubberBand /
+   velocityFromSamples) are exported for direct testing.
+
+   COEXISTENCE: listeners are bubble-phase; ScreenLayout's capture-phase
+   tap-suppressor still sees touches first. They partition on axis — the
+   suppressor only acts on vertical lifts (dy>8 && dy>dx), the pager only
+   engages on horizontal intent (|dx|>|dy|*1.3) — so neither fights the other.
+   __scrollEl, scroll-memory, and the annotation engine are untouched: a child
+   transform changes no scrollTop/scrollHeight, and the peek carries no
+   data-hl-* so every annotation pass ignores it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// Begin a gesture only past this px slop; matches ScreenLayout's tap-suppressor.
+const SLOP = 8;
+// Settle animation: a decelerate curve ≈ Android FastOutSlowInInterpolator.
+const SETTLE_MS = 300;            // ≥ the CSS transition (280ms) + a small buffer
+const SETTLE_TRANSITION = 'transform 0.28s cubic-bezier(0.2, 0, 0, 1)';
+// A drag that BEGINS on any of these is interaction, not a page turn (NAV4 +
+// the broader interactive set ScreenLayout's suppressor recognizes).
+const INTERACTIVE_SEL = 'a, button, input, textarea, select, .fn-ref, '
+  + '.inline-scrip-ref, .verse-link-icon, .inline-bookmark-icon, .hl-note-icon, '
+  + '.letter-link-ref, .wtlb-cite, .tap-ref, .inline-link-icon';
+
+/**
+ * Lock the gesture axis on the first significant move. Horizontal must clearly
+ * dominate (×1.3) so vertical reading-scroll wins ties — reading-scroll is
+ * sacred. Returns 'x' (pager), 'y' (native scroll), or null (below slop).
+ * @param {number} dx @param {number} dy @param {number} [slop]
+ * @returns {'x'|'y'|null}
+ */
+export function decideAxis(dx, dy, slop = SLOP) {
+  if (Math.abs(dx) < slop && Math.abs(dy) < slop) return null;
+  return Math.abs(dx) > Math.abs(dy) * 1.3 ? 'x' : 'y';
+}
+
+/**
+ * Commit when the drag passes 35% of the viewport width, OR a fast flick
+ * (>0.5 px/ms) clears a small minimum (8% width).
+ * @param {number} dx @param {number} vx @param {number} width
+ * @returns {boolean}
+ */
+export function isCommit(dx, vx, width) {
+  const adx = Math.abs(dx);
+  if (width <= 0) return false;
+  if (adx > width * 0.35) return true;
+  if (Math.abs(vx) > 0.5 && adx > width * 0.08) return true;
+  return false;
+}
+
+/**
+ * Asymptotic resistance for a drag with no target (dead end) — the page can be
+ * tugged a little but never escapes, and always springs back.
+ * @param {number} dx @param {number} width @returns {number}
+ */
+export function rubberBand(dx, width) {
+  if (width <= 0) return 0;
+  const sign = dx < 0 ? -1 : 1;
+  const a = Math.abs(dx);
+  return sign * width * 0.18 * (1 - 1 / (a / (width * 0.55) + 1));
+}
+
+// Below this many ms of temporal separation there isn't enough signal to
+// trust a velocity — return 0 rather than dividing by a near-zero dt (which
+// would manufacture a huge "flick" from coalesced/degenerate timestamps and
+// commit a tiny drag that should spring back). ~half a frame; a real flick's
+// window is ~30ms (see the scan below), well clear of this.
+const MIN_VELOCITY_DT = 8;
+
+/**
+ * Fling velocity (px/ms) from recent {x,t} samples — the delta over the last
+ * ~30ms+ window. 0 when there isn't enough signal.
+ * @param {{x:number,t:number}[]} samples @returns {number}
+ */
+export function velocityFromSamples(samples) {
+  if (!samples || samples.length < 2) return 0;
+  const last = samples[samples.length - 1];
+  let ref = samples[0];
+  for (let i = samples.length - 2; i >= 0; i--) {
+    ref = samples[i];
+    if (last.t - samples[i].t >= 30) break;
+  }
+  const dt = last.t - ref.t;
+  if (dt < MIN_VELOCITY_DT) return 0;
+  return (last.x - ref.x) / dt;
+}
+
+/**
+ * Pure gesture controller. All logic; no React, no real DOM required.
+ * @param {{
+ *   getWidth: () => number,
+ *   getTrack: () => any,
+ *   getPeek: () => any,
+ *   peekFor: (side: 'prev'|'next') => any,
+ *   commit: (side: 'prev'|'next') => void,
+ *   onPeekChange: (side: 'prev'|'next'|null, desc: any) => void,
+ *   reducedMotion: () => boolean,
+ *   schedule: (fn: () => void, ms?: number) => any,
+ *   cancelScheduled?: (token: any) => void,
+ *   hasSelection?: () => boolean
+ * }} io
+ */
+export function createPagerGesture(io) {
+  let s = null;          // active gesture, or null
+  let settling = false;  // true while a settle animation is running
+  let settleToken = null; // pending settle timer (cancelled on dispose)
+
+  const setStyle = (el, transition, transform) => {
+    if (!el || !el.style) return;
+    el.style.transition = transition;
+    el.style.transform = transform;
+  };
+
+  function applyDrag(dx, dir, width) {
+    setStyle(io.getTrack(), 'none', `translateX(${dx}px)`);
+    const pk = io.getPeek();
+    if (pk) {
+      const base = dir === 'next' ? width : -width;
+      setStyle(pk, 'none', `translateX(${base + dx}px)`);
+    }
+  }
+
+  function finishSettle(committed, dir) {
+    settling = false;
+    settleToken = null;
+    if (committed) io.commit(dir);     // state swap → new content into the track
+    const tr = io.getTrack();
+    if (tr && tr.style) { tr.style.transition = 'none'; tr.style.transform = ''; tr.style.willChange = ''; }
+    const pk = io.getPeek();
+    if (pk && pk.style) { pk.style.transition = 'none'; pk.style.willChange = ''; }
+    // Clear the peek on the next frame so it covers the track during React's
+    // content swap — prevents a flash of the old page.
+    io.schedule(() => io.onPeekChange(null, null));
+  }
+
+  function beginSettle(committed, dir, width) {
+    const trackEnd = committed ? (dir === 'next' ? -width : width) : 0;
+    const peekEnd = committed ? 0 : (dir === 'next' ? width : -width);
+    if (io.reducedMotion()) { finishSettle(committed, dir); return; }
+    settling = true;
+    setStyle(io.getTrack(), SETTLE_TRANSITION, `translateX(${trackEnd}px)`);
+    const pk = io.getPeek();
+    if (pk) setStyle(pk, SETTLE_TRANSITION, `translateX(${peekEnd}px)`);
+    settleToken = io.schedule(() => finishSettle(committed, dir), SETTLE_MS);
+  }
+
+  return {
+    start(e) {
+      if (settling) return;
+      if (!e.touches || e.touches.length !== 1) { s = null; return; }
+      const t0 = e.touches[0];
+      const target = e.target;
+      if (target && target.closest && target.closest(INTERACTIVE_SEL)) { s = null; return; }
+      s = { startX: t0.clientX, startY: t0.clientY, axis: null, dir: null, desc: null, dx: 0, samples: [], width: io.getWidth() };
+    },
+
+    move(e) {
+      if (!s || settling) return;
+      const t = e.touches && e.touches[0];
+      if (!t) return;
+      const dx = t.clientX - s.startX;
+      const dy = t.clientY - s.startY;
+      if (s.axis === null) {
+        const ax = decideAxis(dx, dy);
+        if (ax === null) return;
+        if (ax === 'y') { s = null; return; }   // vertical → release to native scroll
+        s.axis = 'x';
+        s.dir = dx < 0 ? 'next' : 'prev';
+        s.desc = io.peekFor(s.dir) || null;      // null = dead end → rubber-band
+        io.onPeekChange(s.dir, s.desc);
+      }
+      if (e.cancelable !== false && typeof e.preventDefault === 'function') e.preventDefault();
+      s.dx = dx;
+      s.samples.push({ x: dx, t: e.timeStamp || 0 });
+      if (s.samples.length > 6) s.samples.shift();
+      applyDrag(s.desc ? dx : rubberBand(dx, s.width), s.dir, s.width);
+    },
+
+    end() {
+      if (!s) return;
+      const st = s;
+      s = null;
+      if (st.axis !== 'x') return;               // not a horizontal gesture
+      const hasSel = io.hasSelection ? io.hasSelection() : false;
+      const vx = velocityFromSamples(st.samples);
+      const committed = !hasSel && !!st.desc && isCommit(st.dx, vx, st.width);
+      beginSettle(committed, st.dir, st.width);
+    },
+
+    cancel() {
+      if (!s) return;
+      const st = s;
+      s = null;
+      if (st.axis === 'x') beginSettle(false, st.dir, st.width);
+    },
+
+    isSettling() { return settling; },
+
+    // Cancel a pending settle — called on ScreenLayout unmount so a settle
+    // that was mid-flight when the screen changed (e.g. a boundary commit that
+    // remounts a different screen type) can't fire its commit twice.
+    dispose() {
+      if (settleToken != null && io.cancelScheduled) io.cancelScheduled(settleToken);
+      settleToken = null;
+      settling = false;
+    },
+  };
+}
+
+/**
+ * React wrapper. Wires a `createPagerGesture` controller to the scroll
+ * container's touch events and owns the peek mount state.
+ *
+ * @param {{ current: any }} scrollRef  the `.screen-scroll` element ref
+ * @param {{
+ *   peek: (side: 'prev'|'next') => any,
+ *   onPrev: () => void,
+ *   onNext: () => void
+ * } | null | undefined} pager
+ * @returns {{ trackRef: {current:any}, peekRef: {current:any}, peek: {side:any, desc:any} }}
+ */
+export function usePagerGesture(scrollRef, pager) {
+  const trackRef = React.useRef(null);
+  const peekRef = React.useRef(null);
+  const pagerRef = React.useRef(pager);
+  pagerRef.current = pager;
+  const [peek, setPeek] = React.useState({ side: null, desc: null });
+
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !pagerRef.current) return undefined;
+    const mounted = { v: true };
+    const ctrl = createPagerGesture({
+      getWidth: () => el.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 0) || 0,
+      getTrack: () => trackRef.current,
+      getPeek: () => peekRef.current,
+      peekFor: (side) => { const p = pagerRef.current; return p && typeof p.peek === 'function' ? p.peek(side) : null; },
+      commit: (side) => {
+        const p = pagerRef.current;
+        if (!mounted.v || !p) return; // a settle that outlived this screen must not re-navigate
+        if (side === 'next') { if (p.onNext) p.onNext(); } else if (p.onPrev) p.onPrev();
+      },
+      onPeekChange: (side, desc) => { if (mounted.v) setPeek({ side, desc }); },
+      reducedMotion: () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      schedule: (fn, ms) => {
+        if (ms) return setTimeout(fn, ms);
+        return (typeof requestAnimationFrame === 'function') ? requestAnimationFrame(fn) : setTimeout(fn, 0);
+      },
+      cancelScheduled: (tok) => clearTimeout(tok),
+      hasSelection: () => typeof window !== 'undefined' && !!window.getSelection && !!String(window.getSelection()),
+    });
+    const onStart = (e) => ctrl.start(e);
+    const onMove = (e) => ctrl.move(e);
+    const onEnd = () => ctrl.end();
+    const onCancel = () => ctrl.cancel();
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    el.addEventListener('touchcancel', onCancel, { passive: true });
+    return () => {
+      mounted.v = false;
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onCancel);
+      ctrl.dispose();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- attach once per ScreenLayout instance; scrollRef.current is stable for the instance's life, and `pager` is read call-time-fresh via pagerRef. Re-running on pager identity churn would needlessly re-bind listeners every render.
+  }, []);
+
+  return { trackRef, peekRef, peek };
+}

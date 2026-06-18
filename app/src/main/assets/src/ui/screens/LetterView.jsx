@@ -2,9 +2,9 @@
    LetterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useSwipeNav } from '../../hooks/use-swipe-nav.js';
+import { resolveNeighborLetter } from '../components/pager-preview.jsx';
 
-export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -18,7 +18,24 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
 
   const goPrev = () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary();
   const goNext = () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary();
-  const swipe = useSwipeNav(goNext, goPrev);
+
+  // Visible finger-follow page swipe (ScreenLayout `pager`). A same-collection
+  // neighbor peeks full letter content (resolved from the in-memory corpus); a
+  // reading-chain boundary peeks a card. Same commit path as the nav arrows.
+  const _letterBg = studyMode ? 'study' : 'vol';
+  const _heroEyebrow = (n) => `${volumeLabel || 'Volume Two'}\xA0\xB7\xA0${studyMode ? (n === 0 ? 'Preface' : `Chapter ${n}`) : (n === 0 ? 'Preface' : `Letter ${n}`)}`;
+  const _letterPeek = (nb) => {
+    const full = resolveNeighborLetter(volKey, nb.id);
+    if (!full) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
+    return { kind: 'letter', blocks: full.blocks, hero: { eyebrow: _heroEyebrow(full.num), title: full.title, subtitle: full.subtitle, bgClass: _letterBg } };
+  };
+  const pager = {
+    onPrev: goPrev,
+    onNext: goNext,
+    peek: (side) => side === 'next'
+      ? (letter.nextLetter ? _letterPeek(letter.nextLetter) : nextBoundary ? { kind: 'boundary', eyebrow: nextBoundary.short ? `Next \xB7 ${nextBoundary.short}` : 'Next', title: nextBoundary.title } : null)
+      : (letter.prevLetter ? _letterPeek(letter.prevLetter) : prevBoundary ? { kind: 'boundary', eyebrow: prevBoundary.short ? `Previous \xB7 ${prevBoundary.short}` : 'Previous', title: prevBoundary.title } : null),
+  };
 
   useMarkAsRead(markAsReadEnabled, onMarkRead);
 
@@ -129,6 +146,7 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
   return (
     <ScreenLayout
       showProgress={showProgressBar}
+      pager={pager}
       navChildren={
         <>
           <button className="nav-volume nav-back-icon" onClick={onHome} title={`← ${volumeLabel || "Volume Two"}`} aria-label={`Back to ${volumeLabel || "Volume Two"}`}>‹</button>
@@ -195,7 +213,7 @@ export function LetterView({ letter, onHome, onNavigate, onStudyNavigate, prevBo
         </div>
       </header>
 
-      <div className="page-wrapper" onTouchStart={swipe.onTouchStart} onTouchEnd={swipe.onTouchEnd}>
+      <div className="page-wrapper">
         <div className="letter-meta">
           <div className="meta-date">{letter.date}</div>
           <div className="meta-from">{Array.isArray(letter.from) ? <Segments segments={letter.from} {...fnProps} /> : letter.from}</div>

@@ -109,6 +109,7 @@ export function buildScreenRoutes({
   const colReadNavProps = (volKey, clearSurprise) => {
     const rk = COL_BY_KEY.get(volKey).readKey;
     return {
+      volKey, // lets the reading view resolve neighbor content for the swipe peek
       onMarkRead: () => markRead(rk, letterId),
       onUnmark: () => unmarkRead(rk, letterId),
       isRead: (id) => isRead(rk, id),

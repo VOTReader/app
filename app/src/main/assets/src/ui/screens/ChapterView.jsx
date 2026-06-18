@@ -2,9 +2,6 @@
    ChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useSwipeNav } from '../../hooks/use-swipe-nav.js';
-
-
 export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
@@ -41,8 +38,23 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   const nextCh = book.chapters.find((c) => c.num === chapter.num + 1);
   const goPrevCh = () => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary();
   const goNextCh = () => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary();
-  const swipe = useSwipeNav(goNextCh, goPrevCh);
   const verses = chapter.verses || [];
+
+  // Visible finger-follow page swipe (ScreenLayout `pager`). Same-book chapters
+  // peek full verse content; a study boundary peeks a card.
+  const _chPeek = (ch) => ({
+    kind: 'verses', wrapClass: 'chapter-body',
+    hero: { eyebrow: `Matthew\xA0\xB7\xA0Chapter ${ch.num}`, title: `Chapter ${ch.num}`, subtitle: ch.title || undefined },
+    verses: ch.verses || [],
+  });
+  const _boundaryPeek = (b, dir) => b ? { kind: 'boundary', eyebrow: b.short ? `${dir} \xB7 ${b.short}` : (dir === 'Next' ? 'Next Book' : 'Previous Book'), title: b.title } : null;
+  const pager = {
+    onPrev: goPrevCh,
+    onNext: goNextCh,
+    peek: (side) => side === 'next'
+      ? (nextCh ? _chPeek(nextCh) : _boundaryPeek(nextBoundary, 'Next'))
+      : (prevCh ? _chPeek(prevCh) : _boundaryPeek(prevBoundary, 'Previous')),
+  };
 
   useMarkAsRead(markAsReadEnabled, onMarkRead);
   const hasLinks = chapter.links && chapter.links.length > 0;
@@ -50,6 +62,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   return (
     <ScreenLayout
       showProgress={showProgressBar}
+      pager={pager}
       navChildren={
         <>
           <button className="nav-home nav-back-icon" onClick={onIndex} title={`← ${book.title}`} aria-label={`Back to ${book.title}`}>‹</button>
@@ -131,7 +144,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       </header>
 
       <div className="page-wrapper">
-        <div className="chapter-body" onTouchStart={swipe.onTouchStart} onTouchEnd={swipe.onTouchEnd}>
+        <div className="chapter-body">
           {mode === "pdf" ? (
             /* ── PDF MODE: clean flowing verse text + study panels below ── */
             <>

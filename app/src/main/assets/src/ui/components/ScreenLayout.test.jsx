@@ -123,3 +123,25 @@ describe('ScreenLayout scroll-target registration (trackScroll)', () => {
     expect(/** @type {any} */ (globalThis).__scrollEl).toBe(reading); // still intact after close
   });
 });
+
+describe('ScreenLayout pager wiring', () => {
+  const pager = { peek: () => ({ kind: 'verses', verses: [] }), onPrev: () => {}, onNext: () => {} };
+
+  it('wraps children in .pager-track inside a .pager-viewport when a pager is passed', () => {
+    const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager}><span data-testid="c">body</span></SL>);
+    expect(container.querySelector('.pager-viewport')).toBeTruthy();
+    const track = container.querySelector('.screen-scroll .pager-track');
+    expect(track).toBeTruthy();
+    expect(track.querySelector('[data-testid="c"]')).toBeTruthy(); // children live in the track
+  });
+
+  it('still registers .screen-scroll as __scrollEl on the pager path', () => {
+    const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager}>x</SL>);
+    expect(/** @type {any} */ (globalThis).__scrollEl).toBe(container.querySelector('.screen-scroll'));
+  });
+
+  it('renders no peek at rest (peek mounts only mid-swipe)', () => {
+    const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager}>x</SL>);
+    expect(container.querySelector('.pager-peek')).toBeNull();
+  });
+});

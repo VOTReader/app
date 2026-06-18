@@ -2,7 +2,7 @@
    WtlbEntryView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useSwipeNav } from '../../hooks/use-swipe-nav.js';
+import { resolveNeighborLetter } from '../components/pager-preview.jsx';
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
 
 
@@ -13,7 +13,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   const [highlightedFn, setHighlightedFn] = React.useState(null);
@@ -105,7 +105,22 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
   const nextEntry = entry.nextEntry;
   const goPrev = () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary();
   const goNext = () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary();
-  const swipe = useSwipeNav(goNext, goPrev);
+
+  // Visible finger-follow page swipe (ScreenLayout `pager`). A same-collection
+  // entry peeks full content (resolved from the in-memory corpus); a boundary
+  // peeks a card. Same commit path as the nav arrows.
+  const _entryPeek = (nb) => {
+    const full = resolveNeighborLetter(volKey, nb.id);
+    if (!full) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
+    return { kind: 'wtlb', paragraphs: full.paragraphs, hero: { eyebrow: `${partLabel}\xA0\xB7\xA0${full.num}`, title: full.title, bgClass: 'vol' } };
+  };
+  const pager = {
+    onPrev: goPrev,
+    onNext: goNext,
+    peek: (side) => side === 'next'
+      ? (nextEntry ? _entryPeek(nextEntry) : nextBoundary ? { kind: 'boundary', eyebrow: nextBoundary.short ? `Next \xB7 ${nextBoundary.short}` : 'Next', title: nextBoundary.title } : null)
+      : (prevEntry ? _entryPeek(prevEntry) : prevBoundary ? { kind: 'boundary', eyebrow: prevBoundary.short ? `Previous \xB7 ${prevBoundary.short}` : 'Previous', title: prevBoundary.title } : null),
+  };
 
   const _attrCollectionLabel = (volStr) => {
     if (!volStr) return null;
@@ -206,6 +221,7 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
   return (
     <ScreenLayout
       showProgress={showProgressBar}
+      pager={pager}
       navChildren={
         <>
           <button className="nav-home nav-back-icon" onClick={onHome} title="← Index" aria-label="Back to Index">‹</button>
@@ -269,7 +285,7 @@ export function WtlbEntryView({ entry, partLabel, onHome, onNavigate, onSearch, 
         </div>
       </header>
 
-      <div className="page-wrapper" onTouchStart={swipe.onTouchStart} onTouchEnd={swipe.onTouchEnd}>
+      <div className="page-wrapper">
         <div className="content-layout">
           <main className="letter-body" ref={wtlbMainRef}>
             {entry.paragraphs.map((p, pi) => {

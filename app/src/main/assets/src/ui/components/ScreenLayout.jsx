@@ -2,8 +2,18 @@
    ScreenLayout — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true }) {
+import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
+import { PagerPeek } from './pager-preview.jsx';
+
+export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager }) {
   const scrollRef = React.useRef(null);
+  // Finger-follow page swipe. No-op when `pager` is absent (every non-reading
+  // screen): the hook's effect early-returns and peek.side stays null. When
+  // present, the `.pager-track` translates with the finger and PagerPeek slides
+  // in the inert neighbor. __scrollEl, scroll-memory, and the annotation engine
+  // are untouched — a child transform changes no scrollTop/scrollHeight, and the
+  // peek carries no data-hl-* so every annotation pass ignores it.
+  const { trackRef, peekRef, peek } = usePagerGesture(scrollRef, pager);
   const ref = React.useCallback((el) => {
     // __scrollEl is a mutable `let` GLOBAL declared in index.html (line ~515),
     // read by use-scroll-memory + use-thumbnails. It is a lexical global, NOT a
@@ -183,9 +193,18 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
         {navChildren}
         {hideTabsBtn ? null : <TabsNavBtn />}
       </nav>
-      <div className="screen-scroll" ref={ref}>
-        {children}
-      </div>
+      {pager ? (
+        <div className="pager-viewport">
+          <div className="screen-scroll" ref={ref}>
+            <div className="pager-track" ref={trackRef}>{children}</div>
+          </div>
+          <PagerPeek side={peek.side} desc={peek.desc} peekRef={peekRef} />
+        </div>
+      ) : (
+        <div className="screen-scroll" ref={ref}>
+          {children}
+        </div>
+      )}
       <div className="scroll-notch-marker" ref={notchRef} />
     </div>
   );

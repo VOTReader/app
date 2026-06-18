@@ -2,8 +2,6 @@
    BibleChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useSwipeNav } from '../../hooks/use-swipe-nav.js';
-
 export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack }) {
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // Restored-Name chrome lookup. When settings.restoredNames is on and
@@ -34,13 +32,32 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   const nextCh = book.chapters.find((c) => c.num === chapter.num + 1);
   const goPrevCh = () => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook();
   const goNextCh = () => nextCh ? onNavigate(nextCh.num) : onNextBook && onNextBook();
-  const swipe = useSwipeNav(goNextCh, goPrevCh);
+
+  // Visible finger-follow page swipe (ScreenLayout `pager`). Same neighbors the
+  // nav arrows + bottom-nav use: a same-book chapter peeks full verse content,
+  // a book boundary peeks a card.
+  const POETIC_BOOKS = new Set(['psalms', 'proverbs', 'songofsolomon', 'lamentations', 'ecclesiastes']);
+  const isPoetry = POETIC_BOOKS.has(book.id);
+  const _bibleBg = (typeof OT_BOOK_IDS !== 'undefined' && OT_BOOK_IDS.has(book.id)) ? 'ot' : '';
+  const _versesPeek = (ch) => ({
+    kind: 'verses', wrapClass: 'chapter-body', poetry: isPoetry,
+    hero: { eyebrow: `${book.title}\xA0\xB7\xA0Chapter ${ch.num}`, title: (ch.title || book.subtitle), bgClass: _bibleBg },
+    verses: ch.sections.flatMap((s) => s.verses),
+  });
+  const pager = {
+    onPrev: goPrevCh,
+    onNext: goNextCh,
+    peek: (side) => side === 'next'
+      ? (nextCh ? _versesPeek(nextCh) : nextBook ? { kind: 'boundary', eyebrow: 'Next Book', title: nextBoundaryTitle || `${nextBook.title} 1` } : null)
+      : (prevCh ? _versesPeek(prevCh) : prevBook ? { kind: 'boundary', eyebrow: 'Previous Book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}` } : null),
+  };
 
   useMarkAsRead(markAsReadEnabled, onMarkRead);
 
   return (
     <ScreenLayout
       showProgress={showProgressBar}
+      pager={pager}
       navChildren={
         <>
           <button className="nav-home nav-back-icon" onClick={onIndex} title={`← ${book.title}`} aria-label={`Back to ${book.title}`}>‹</button>
@@ -128,7 +145,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         );
       })()}
       <div className="page-wrapper">
-        <div className="chapter-body" onTouchStart={swipe.onTouchStart} onTouchEnd={swipe.onTouchEnd}>
+        <div className="chapter-body">
           {showSectionHeadings && headingsFocusHidden && chapter.sections.some((s) => s.heading || s.letter) && (
             <button
               className="hero-subtitle-restore headings-restore"
@@ -139,8 +156,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           )}
 
           {(() => {
-            const POETIC_BOOKS = new Set(['psalms', 'proverbs', 'songofsolomon', 'lamentations', 'ecclesiastes']);
-            const isPoetry = POETIC_BOOKS.has(book.id);
             const headingsVisible = showSectionHeadings && !headingsFocusHidden;
             const renderVerse = (v, vi) => {
               const vHlKey = bibleHlKey(book.id, chapter.num, v.n);
