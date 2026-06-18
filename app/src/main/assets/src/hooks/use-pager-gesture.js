@@ -99,13 +99,18 @@ export function velocityFromSamples(samples) {
 
 /**
  * Pure gesture controller. All logic; no React, no real DOM required.
+ *
+ * Both neighbor peeks are pre-mounted by ScreenLayout and parked off-screen
+ * at their CSS ±100% defaults. The controller drives whichever peek is active
+ * via getPeek(dir). No React state is mutated during the swipe — eliminating
+ * the main-thread stall + late-mount snap that caused visual artifacts.
+ *
  * @param {{
  *   getWidth: () => number,
  *   getTrack: () => any,
- *   getPeek: () => any,
+ *   getPeek: (dir: 'prev'|'next') => any,
  *   peekFor: (side: 'prev'|'next') => any,
  *   commit: (side: 'prev'|'next') => void,
- *   onPeekChange: (side: 'prev'|'next'|null, desc: any) => void,
  *   reducedMotion: () => boolean,
  *   schedule: (fn: () => void, ms?: number) => any,
  *   cancelScheduled?: (token: any) => void,
@@ -125,7 +130,7 @@ export function createPagerGesture(io) {
 
   function applyDrag(dx, dir, width) {
     setStyle(io.getTrack(), 'none', `translateX(${dx}px)`);
-    const pk = io.getPeek();
+    const pk = io.getPeek(dir);
     if (pk) {
       const base = dir === 'next' ? width : -width;
       setStyle(pk, 'none', `translateX(${base + dx}px)`);
@@ -135,14 +140,24 @@ export function createPagerGesture(io) {
   function finishSettle(committed, dir) {
     settling = false;
     settleToken = null;
-    if (committed) io.commit(dir);     // state swap → new content into the track
     const tr = io.getTrack();
-    if (tr && tr.style) { tr.style.transition = 'none'; tr.style.transform = ''; tr.style.willChange = ''; }
-    const pk = io.getPeek();
-    if (pk && pk.style) { pk.style.transition = 'none'; pk.style.willChange = ''; }
-    // Clear the peek on the next frame so it covers the track during React's
-    // content swap — prevents a flash of the old page.
-    io.schedule(() => io.onPeekChange(null, null));
+    const pk = io.getPeek(dir);
+    // Snap the track back to its rest position (transform: none).
+    if (tr && tr.style) { tr.style.transition = 'none'; tr.style.transform = ''; }
+    if (committed) {
+      // Peek is at translateX(0) and z-index:50 (CSS), covering the track while
+      // React renders the new screen. Queue the commit now — React 18's scheduler
+      // uses MessageChannel which fires before rAF in the browser task queue, so
+      // the new content will be in the DOM before the peek parks.
+      if (pk && pk.style) { pk.style.transition = 'none'; }
+      io.commit(dir);
+      // Park the peek on the next animation frame. By the time this fires, the
+      // MessageChannel flush has rendered the new content — the reveal is clean.
+      io.schedule(() => { if (pk && pk.style) pk.style.transform = ''; });
+    } else {
+      // Spring-back: park the peek immediately (it's already near ±100%).
+      if (pk && pk.style) { pk.style.transition = 'none'; pk.style.transform = ''; }
+    }
   }
 
   function beginSettle(committed, dir, width) {
@@ -151,7 +166,7 @@ export function createPagerGesture(io) {
     if (io.reducedMotion()) { finishSettle(committed, dir); return; }
     settling = true;
     setStyle(io.getTrack(), SETTLE_TRANSITION, `translateX(${trackEnd}px)`);
-    const pk = io.getPeek();
+    const pk = io.getPeek(dir);
     if (pk) setStyle(pk, SETTLE_TRANSITION, `translateX(${peekEnd}px)`);
     settleToken = io.schedule(() => finishSettle(committed, dir), SETTLE_MS);
   }
@@ -182,8 +197,9 @@ export function createPagerGesture(io) {
         if (ax === 'y') { s = null; return; }   // vertical → release to native scroll
         s.axis = 'x';
         s.dir = dx < 0 ? 'next' : 'prev';
-        s.desc = io.peekFor(s.dir) || null;      // null = dead end → rubber-band
-        io.onPeekChange(s.dir, s.desc);
+        s.desc = io.peekFor(s.dir) || null;      // null = dead end → rubber-band only
+        // No onPeekChange call — both peeks are pre-mounted and parked; the
+        // gesture drives the active peek's transform directly from here.
       }
       if (e.cancelable !== false && typeof e.preventDefault === 'function') e.preventDefault();
       s.dx = dx;
@@ -225,7 +241,9 @@ export function createPagerGesture(io) {
 
 /**
  * React wrapper. Wires a `createPagerGesture` controller to the scroll
- * container's touch events and owns the peek mount state.
+ * container's touch events. Both peeks are pre-mounted by ScreenLayout
+ * (parked at CSS ±100%); this hook hands their refs to the controller so it
+ * can drive them imperatively with no React state during the swipe.
  *
  * @param {{ current: any }} scrollRef  the `.screen-scroll` element ref
  * @param {{
@@ -233,14 +251,14 @@ export function createPagerGesture(io) {
  *   onPrev: () => void,
  *   onNext: () => void
  * } | null | undefined} pager
- * @returns {{ trackRef: {current:any}, peekRef: {current:any}, peek: {side:any, desc:any} }}
+ * @returns {{ trackRef: {current:any}, peekPrevRef: {current:any}, peekNextRef: {current:any} }}
  */
 export function usePagerGesture(scrollRef, pager) {
   const trackRef = React.useRef(null);
-  const peekRef = React.useRef(null);
+  const peekPrevRef = React.useRef(null);
+  const peekNextRef = React.useRef(null);
   const pagerRef = React.useRef(pager);
   pagerRef.current = pager;
-  const [peek, setPeek] = React.useState({ side: null, desc: null });
 
   React.useEffect(() => {
     const el = scrollRef.current;
@@ -249,14 +267,13 @@ export function usePagerGesture(scrollRef, pager) {
     const ctrl = createPagerGesture({
       getWidth: () => el.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 0) || 0,
       getTrack: () => trackRef.current,
-      getPeek: () => peekRef.current,
+      getPeek: (dir) => dir === 'prev' ? peekPrevRef.current : peekNextRef.current,
       peekFor: (side) => { const p = pagerRef.current; return p && typeof p.peek === 'function' ? p.peek(side) : null; },
       commit: (side) => {
         const p = pagerRef.current;
         if (!mounted.v || !p) return; // a settle that outlived this screen must not re-navigate
         if (side === 'next') { if (p.onNext) p.onNext(); } else if (p.onPrev) p.onPrev();
       },
-      onPeekChange: (side, desc) => { if (mounted.v) setPeek({ side, desc }); },
       reducedMotion: () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
         && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       schedule: (fn, ms) => {
@@ -285,5 +302,5 @@ export function usePagerGesture(scrollRef, pager) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- attach once per ScreenLayout instance; scrollRef.current is stable for the instance's life, and `pager` is read call-time-fresh via pagerRef. Re-running on pager identity churn would needlessly re-bind listeners every render.
   }, []);
 
-  return { trackRef, peekRef, peek };
+  return { trackRef, peekPrevRef, peekNextRef };
 }

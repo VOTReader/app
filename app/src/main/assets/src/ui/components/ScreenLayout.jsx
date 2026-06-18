@@ -8,12 +8,14 @@ import { PagerPeek } from './pager-preview.jsx';
 export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager }) {
   const scrollRef = React.useRef(null);
   // Finger-follow page swipe. No-op when `pager` is absent (every non-reading
-  // screen): the hook's effect early-returns and peek.side stays null. When
-  // present, the `.pager-track` translates with the finger and PagerPeek slides
-  // in the inert neighbor. __scrollEl, scroll-memory, and the annotation engine
-  // are untouched — a child transform changes no scrollTop/scrollHeight, and the
-  // peek carries no data-hl-* so every annotation pass ignores it.
-  const { trackRef, peekRef, peek } = usePagerGesture(scrollRef, pager);
+  // screen). When present, both neighbor peeks are pre-mounted and parked at
+  // their CSS ±100% defaults; usePagerGesture hands their refs to the controller
+  // which drives them imperatively — no React state fires during the swipe.
+  const { trackRef, peekPrevRef, peekNextRef } = usePagerGesture(scrollRef, pager);
+  // Compute neighbor peek descriptors at render time. Pre-mounted peeks update
+  // on each screen render (e.g. after navigation) with zero swipe-path cost.
+  const prevDesc = pager && typeof pager.peek === 'function' ? pager.peek('prev') : null;
+  const nextDesc = pager && typeof pager.peek === 'function' ? pager.peek('next') : null;
   const ref = React.useCallback((el) => {
     // __scrollEl is a mutable `let` GLOBAL declared in index.html (line ~515),
     // read by use-scroll-memory + use-thumbnails. It is a lexical global, NOT a
@@ -198,7 +200,8 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
           <div className="screen-scroll" ref={ref}>
             <div className="pager-track" ref={trackRef}>{children}</div>
           </div>
-          <PagerPeek side={peek.side} desc={peek.desc} peekRef={peekRef} />
+          {prevDesc && <PagerPeek side="prev" desc={prevDesc} peekRef={peekPrevRef} />}
+          {nextDesc && <PagerPeek side="next" desc={nextDesc} peekRef={peekNextRef} />}
         </div>
       ) : (
         <div className="screen-scroll" ref={ref}>

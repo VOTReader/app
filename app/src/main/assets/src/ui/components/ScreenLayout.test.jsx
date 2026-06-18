@@ -140,8 +140,11 @@ describe('ScreenLayout pager wiring', () => {
     expect(/** @type {any} */ (globalThis).__scrollEl).toBe(container.querySelector('.screen-scroll'));
   });
 
-  it('renders no peek at rest (peek mounts only mid-swipe)', () => {
+  it('pre-mounts both peeks at rest (parked off-screen at CSS ±100%)', () => {
     const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager}>x</SL>);
-    expect(container.querySelector('.pager-peek')).toBeNull();
+    // Both peeks are in the DOM immediately — no swipe needed — so the gesture
+    // controller can drive them with zero React state delay.
+    expect(container.querySelector('.pager-peek-prev')).toBeTruthy();
+    expect(container.querySelector('.pager-peek-next')).toBeTruthy();
   });
 });

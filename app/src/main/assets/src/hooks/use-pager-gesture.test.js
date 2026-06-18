@@ -78,71 +78,76 @@ describe('velocityFromSamples', () => {
 // ── Controller ──────────────────────────────────────────────────────────────
 function makeIO(overrides = {}) {
   const track = { style: {} };
-  const peek = { style: {} };
-  const calls = { peekChange: [], commits: [], scheduled: [] };
+  const prevPeek = { style: {} };
+  const nextPeek = { style: {} };
+  const calls = { commits: [] };
   const io = {
     getWidth: () => 400,
     getTrack: () => track,
-    getPeek: () => peek,
+    getPeek: (dir) => dir === 'prev' ? prevPeek : nextPeek,
     peekFor: () => ({ kind: 'verses', verses: [] }), // default: a target exists
     commit: (side) => calls.commits.push(side),
-    onPeekChange: (side, desc) => calls.peekChange.push({ side, desc }),
     reducedMotion: () => false,
     schedule: (fn) => { fn(); return 0; },           // synchronous for determinism
     hasSelection: () => false,
     ...overrides,
   };
-  return { io, track, peek, calls };
+  return { io, track, prevPeek, nextPeek, calls };
 }
 const startEv = (x, y, target) => ({ touches: [{ clientX: x, clientY: y }], target: target || { closest: () => null } });
 const moveEv = (x, y, t, pd) => ({ touches: [{ clientX: x, clientY: y }], timeStamp: t || 0, cancelable: true, preventDefault: pd || (() => {}) });
 
 describe('createPagerGesture controller', () => {
   it('commits NEXT on a clear leftward drag past threshold', () => {
-    const { io, calls } = makeIO();
+    const { io, calls, nextPeek } = makeIO();
     const g = createPagerGesture(io);
     g.start(startEv(300, 100));
-    g.move(moveEv(250, 100, 0));   // dx -50 → locks axis x, dir 'next', mounts peek
+    g.move(moveEv(250, 100, 0));   // dx -50 → locks axis x, dir 'next'
+    // Peek driven immediately (pre-mounted; no React state delay)
+    expect(nextPeek.style.transform).toMatch(/translateX/);
     g.move(moveEv(120, 100, 40));  // dx -180 (>140)
     g.end();
-    expect(calls.peekChange[0]).toEqual({ side: 'next', desc: { kind: 'verses', verses: [] } });
     expect(calls.commits).toEqual(['next']);
-    expect(calls.peekChange[calls.peekChange.length - 1]).toEqual({ side: null, desc: null }); // peek cleared
+    // After committed settle (synchronous schedule): peek inline style cleared → parks to CSS default
+    expect(nextPeek.style.transform).toBe('');
   });
 
   it('commits PREV on a clear rightward drag', () => {
-    const { io, calls } = makeIO();
+    const { io, calls, prevPeek } = makeIO();
     const g = createPagerGesture(io);
     g.start(startEv(100, 100));
     g.move(moveEv(160, 100, 0));
     g.move(moveEv(300, 100, 40)); // dx +200
     g.end();
-    expect(calls.peekChange[0].side).toBe('prev');
     expect(calls.commits).toEqual(['prev']);
+    expect(prevPeek.style.transform).toBe(''); // parked after settle
   });
 
   it('springs back below threshold (no commit)', () => {
-    const { io, calls } = makeIO();
+    const { io, calls, nextPeek } = makeIO();
     const g = createPagerGesture(io);
     g.start(startEv(300, 100));
     g.move(moveEv(270, 100, 0));  // dx -30, slow
     g.move(moveEv(265, 100, 200));
     g.end();
     expect(calls.commits).toEqual([]);
-    expect(calls.peekChange[calls.peekChange.length - 1]).toEqual({ side: null, desc: null });
+    // Spring-back: peek immediately parked (inline style cleared)
+    expect(nextPeek.style.transform).toBe('');
   });
 
   it('ignores a vertical drag — no peek, no commit, no preventDefault', () => {
-    const { io, calls } = makeIO();
+    const { io, calls, nextPeek, prevPeek } = makeIO();
     const g = createPagerGesture(io);
     const pd = vi.fn();
     g.start(startEv(300, 100));
     g.move(moveEv(305, 220, 0, pd)); // dx 5, dy 120 → axis 'y'
     g.move(moveEv(305, 320, 40, pd));
     g.end();
-    expect(calls.peekChange).toEqual([]);
     expect(calls.commits).toEqual([]);
     expect(pd).not.toHaveBeenCalled();
+    // No peek should have been driven
+    expect(nextPeek.style.transform).toBeUndefined();
+    expect(prevPeek.style.transform).toBeUndefined();
   });
 
   it('preventDefault fires once horizontal intent locks', () => {
@@ -155,26 +160,27 @@ describe('createPagerGesture controller', () => {
   });
 
   it('engages + commits even when the drag begins on a tappable element (swipe from anywhere)', () => {
-    const { io, calls } = makeIO();
+    const { io, calls, nextPeek } = makeIO();
     const g = createPagerGesture(io);
     g.start(startEv(300, 100, { closest: () => ({}) })); // a would-be tappable target is NOT guarded anymore
     g.move(moveEv(250, 100, 0));
     g.move(moveEv(120, 100, 40));
     g.end();
-    expect(calls.peekChange[0].side).toBe('next');
     expect(calls.commits).toEqual(['next']);
+    expect(nextPeek.style.transform).toBe(''); // parked after settle
   });
 
   it('dead end (no target): rubber-bands, never commits even past threshold', () => {
-    const { io, calls, track } = makeIO({ peekFor: () => null });
+    // In the real app, peekFor returns null → nextDesc is null → no peek mounted →
+    // getPeek returns null. Model that here so the controller finds no peek to drive.
+    const { io, calls, track } = makeIO({ peekFor: () => null, getPeek: () => null });
     const g = createPagerGesture(io);
     g.start(startEv(300, 100));
     g.move(moveEv(250, 100, 0));
     g.move(moveEv(80, 100, 40)); // far past threshold
-    expect(track.style.transform).toMatch(/translateX/); // dragged (resisted)
+    expect(track.style.transform).toMatch(/translateX/); // rubber-banded
     g.end();
     expect(calls.commits).toEqual([]);
-    expect(calls.peekChange[0]).toEqual({ side: 'next', desc: null });
   });
 
   it('selection guard blocks commit', () => {
@@ -248,15 +254,15 @@ describe('usePagerGesture (React wiring)', () => {
     const el = document.createElement('div');
     document.body.appendChild(el);
     const origRaf = globalThis.requestAnimationFrame;
-    globalThis.requestAnimationFrame = (fn) => { fn(0); return 0; }; // run the peek-clear sync
+    globalThis.requestAnimationFrame = (fn) => { fn(0); return 0; }; // run the peek-park sync
     vi.useFakeTimers();
     try {
       const onNext = vi.fn(), onPrev = vi.fn();
       const pager = { peek: () => ({ kind: 'verses', verses: [] }), onNext, onPrev };
       const { result } = renderHook(() => usePagerGesture({ current: el }, pager));
-      // The consumer (ScreenLayout) assigns these to the track + peek elements.
+      // ScreenLayout assigns these to the track + pre-mounted peek elements.
       result.current.trackRef.current = { style: {} };
-      result.current.peekRef.current = { style: {} };
+      result.current.peekNextRef.current = { style: {} };
       // jsdom clientWidth is 0 → getWidth falls back to window.innerWidth (1024);
       // 35% ≈ 358px, so a -700px drag commits on distance alone.
       fire(el, 'touchstart', 800, 100);
@@ -278,7 +284,9 @@ describe('usePagerGesture (React wiring)', () => {
     document.body.appendChild(el);
     const remove = vi.spyOn(el, 'removeEventListener');
     const { result, unmount } = renderHook(() => usePagerGesture({ current: el }, null));
-    expect(result.current.peek).toEqual({ side: null, desc: null });
+    // Hook returns two separate peek refs (no peek state)
+    expect(result.current.peekPrevRef).toBeDefined();
+    expect(result.current.peekNextRef).toBeDefined();
     unmount();
     // pager was null → effect returned early, so no listeners to remove.
     expect(remove).not.toHaveBeenCalled();

@@ -26,7 +26,6 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
-import { StickyChapterNav } from './StickyChapterNav.jsx';
 
 // A peek is pinned at the top and never scrolls, so only the first ~viewport is
 // ever seen. Cap the rendered count so a long chapter/letter (Psalm 119 = 176
@@ -34,7 +33,6 @@ import { StickyChapterNav } from './StickyChapterNav.jsx';
 // is invisible. Generous (several viewports) so an over-drag can't reveal the cut.
 const PEEK_VERSE_CAP = 60;
 const PEEK_BLOCK_CAP = 40;
-const _noop = () => {};
 
 // ── Format A (letters): inert {t,v} segment render ──────────────────────────
 // Mirrors LetterView's Segments output MINUS every annotation/interaction hook:
@@ -225,11 +223,6 @@ export function PagerPeek({ side, desc, peekRef }) {
   return (
     <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={peekRef}>
       <div className="pager-peek-scroll">
-        {/* Inert clone of the reading chrome so the settings-gated chapter-nav
-            arrows don't flash on the page being swiped to. Visibility/alignment
-            inherit the shared body.arrows-* class — same document, so it matches
-            the live screen automatically. */}
-        <StickyChapterNav onPrev={_noop} onNext={_noop} prevDisabled={false} nextDisabled={false} prevLabel="" nextLabel="" />
         <PreviewHero {...(desc.hero || {})} />
         <div className="page-wrapper">{body}</div>
       </div>

@@ -369,14 +369,19 @@
 
       /* ── Pager: visible finger-follow page swipe (ScreenLayout `pager` prop) ──
          Present only on reading screens. The live page lives in .pager-track
-         (transform set/cleared imperatively by usePagerGesture — none at rest,
-         so position:sticky + content-visibility behave normally). The inert
-         neighbor (.pager-peek) overlays the scroll VIEWPORT — below the nav,
-         fixed to the viewport, never scrolling with content — and slides in
-         from the edge during a drag. */
+         (transform set/cleared imperatively by usePagerGesture). Both neighbor
+         peeks (.pager-peek-prev / -next) are always mounted, parked off-screen
+         at ±100%; the gesture drives the active one into view. z-index:50 keeps
+         the peek ABOVE .chapter-nav-sticky (z-index:40) at all times — including
+         the 1-frame window after the track transform is cleared but before React
+         finishes rendering the new screen content. */
       .pager-viewport { position: relative; flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+      /* Pre-promote the track to its own GPU layer so the gesture finds a
+         composited layer ready to go — prevents text rasterization at a
+         different scale on the first move event. */
+      .pager-track { will-change: transform; }
       .pager-peek {
-        position: absolute; inset: 0; z-index: 4; overflow: hidden;
+        position: absolute; inset: 0; z-index: 50; overflow: hidden;
         pointer-events: none; background: var(--bg);
         transform: translateX(100%); will-change: transform;
       }
