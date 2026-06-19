@@ -222,6 +222,14 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     <ScreenLayout
       showProgress={showProgressBar}
       pager={pager}
+      stickyNav={<StickyChapterNav
+        onPrev={() => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary()}
+        onNext={() => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary()}
+        prevDisabled={!prevEntry && !prevBoundary}
+        nextDisabled={!nextEntry && !nextBoundary}
+        prevLabel="Previous entry"
+        nextLabel="Next entry"
+      />}
       navChildren={
         <>
           <button className="nav-home nav-back-icon" onClick={onHome} title="← Index" aria-label="Back to Index">‹</button>
@@ -254,15 +262,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         </>
       }
     >
-      <StickyChapterNav
-        onPrev={() => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary()}
-        onNext={() => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary()}
-        prevDisabled={!prevEntry && !prevBoundary}
-        nextDisabled={!nextEntry && !nextBoundary}
-        prevLabel="Previous entry"
-        nextLabel="Next entry"
-      />
-
       {backHint && (
         <div className="back-hint-row">
           <button className="back-hint-pill" onClick={onBack} aria-label="Back to source letter">

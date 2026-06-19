@@ -5,7 +5,7 @@
 import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
 
-export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager }) {
+export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav }) {
   const scrollRef = React.useRef(null);
   // Finger-follow page swipe. No-op when `pager` is absent (every non-reading
   // screen). When present, both neighbor peeks are pre-mounted and parked at
@@ -208,6 +208,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
           {children}
         </div>
       )}
+      {stickyNav}
       <div className="scroll-notch-marker" ref={notchRef} />
     </div>
   );

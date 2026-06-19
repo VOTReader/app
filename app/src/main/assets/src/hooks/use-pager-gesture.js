@@ -153,10 +153,16 @@ export function createPagerGesture(io) {
       io.commit(dir);
       // Park the peek on the next animation frame. By the time this fires, the
       // MessageChannel flush has rendered the new content — the reveal is clean.
-      io.schedule(() => { if (pk && pk.style) pk.style.transform = ''; });
+      // De-promote both layers in the same rAF so the live page is back on the
+      // main-thread paint path before it's uncovered: no stale GPU rasterization.
+      io.schedule(() => {
+        if (tr && tr.style) tr.style.willChange = '';
+        if (pk && pk.style) { pk.style.transform = ''; pk.style.willChange = ''; }
+      });
     } else {
-      // Spring-back: park the peek immediately (it's already near ±100%).
-      if (pk && pk.style) { pk.style.transition = 'none'; pk.style.transform = ''; }
+      // Spring-back: park the peek and de-promote both layers immediately.
+      if (pk && pk.style) { pk.style.transition = 'none'; pk.style.transform = ''; pk.style.willChange = ''; }
+      if (tr && tr.style) tr.style.willChange = '';
     }
   }
 
@@ -198,8 +204,14 @@ export function createPagerGesture(io) {
         s.axis = 'x';
         s.dir = dx < 0 ? 'next' : 'prev';
         s.desc = io.peekFor(s.dir) || null;      // null = dead end → rubber-band only
-        // No onPeekChange call — both peeks are pre-mounted and parked; the
-        // gesture drives the active peek's transform directly from here.
+        // Promote to compositing layer now we know it's horizontal — avoids text
+        // rasterization at a different scale on the first transformed frame.
+        // Cleared in finishSettle so the live page renders on the main thread at
+        // rest (no stale GPU layer visible when the peek uncovers the track).
+        const _trk = io.getTrack();
+        const _pk = io.getPeek(s.dir);
+        if (_trk && _trk.style) _trk.style.willChange = 'transform';
+        if (_pk && _pk.style) _pk.style.willChange = 'transform';
       }
       if (e.cancelable !== false && typeof e.preventDefault === 'function') e.preventDefault();
       s.dx = dx;

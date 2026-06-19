@@ -63,6 +63,14 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
     <ScreenLayout
       showProgress={showProgressBar}
       pager={pager}
+      stickyNav={<StickyChapterNav
+        onPrev={() => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary()}
+        onNext={() => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary()}
+        prevDisabled={!prevCh && !prevBoundary}
+        nextDisabled={!nextCh && !nextBoundary}
+        prevLabel="Previous chapter"
+        nextLabel="Next chapter"
+      />}
       navChildren={
         <>
           <button className="nav-home nav-back-icon" onClick={onIndex} title={`← ${book.title}`} aria-label={`Back to ${book.title}`}>‹</button>
@@ -95,14 +103,6 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         </>
       }
     >
-      <StickyChapterNav
-        onPrev={() => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary()}
-        onNext={() => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary()}
-        prevDisabled={!prevCh && !prevBoundary}
-        nextDisabled={!nextCh && !nextBoundary}
-        prevLabel="Previous chapter"
-        nextLabel="Next chapter"
-      />
       {backHint && (
         <div className="back-hint-row">
           <button className="back-hint-pill" onClick={onTapThroughBack} aria-label="Back to source">

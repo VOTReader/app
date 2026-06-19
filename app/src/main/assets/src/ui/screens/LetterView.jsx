@@ -147,6 +147,14 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     <ScreenLayout
       showProgress={showProgressBar}
       pager={pager}
+      stickyNav={<StickyChapterNav
+        onPrev={() => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary()}
+        onNext={() => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary()}
+        prevDisabled={!letter.prevLetter && !prevBoundary}
+        nextDisabled={!letter.nextLetter && !nextBoundary}
+        prevLabel="Previous letter"
+        nextLabel="Next letter"
+      />}
       navChildren={
         <>
           <button className="nav-volume nav-back-icon" onClick={onHome} title={`← ${volumeLabel || "Volume Two"}`} aria-label={`Back to ${volumeLabel || "Volume Two"}`}>‹</button>
@@ -181,15 +189,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         </>
       }
     >
-      <StickyChapterNav
-        onPrev={() => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary()}
-        onNext={() => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary()}
-        prevDisabled={!letter.prevLetter && !prevBoundary}
-        nextDisabled={!letter.nextLetter && !nextBoundary}
-        prevLabel="Previous letter"
-        nextLabel="Next letter"
-      />
-
       {backHint && (
         <div className="back-hint-row">
           <button className="back-hint-pill" onClick={onBack} aria-label="Back to source letter">

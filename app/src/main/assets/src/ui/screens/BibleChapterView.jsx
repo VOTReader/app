@@ -58,6 +58,14 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
     <ScreenLayout
       showProgress={showProgressBar}
       pager={pager}
+      stickyNav={<StickyChapterNav
+        onPrev={goPrevCh}
+        onNext={goNextCh}
+        prevDisabled={!prevCh && !prevBook}
+        nextDisabled={!nextCh && !nextBook}
+        prevLabel="Previous chapter"
+        nextLabel="Next chapter"
+      />}
       navChildren={
         <>
           <button className="nav-home nav-back-icon" onClick={onIndex} title={`← ${book.title}`} aria-label={`Back to ${book.title}`}>‹</button>
@@ -92,14 +100,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         </>
       }
     >
-      <StickyChapterNav
-        onPrev={goPrevCh}
-        onNext={goNextCh}
-        prevDisabled={!prevCh && !prevBook}
-        nextDisabled={!nextCh && !nextBook}
-        prevLabel="Previous chapter"
-        nextLabel="Next chapter"
-      />
       {backHint && (
         <div className="back-hint-row">
           <button className="back-hint-pill" onClick={onTapThroughBack} aria-label="Back to source">

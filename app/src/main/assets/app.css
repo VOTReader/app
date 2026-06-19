@@ -371,15 +371,11 @@
          Present only on reading screens. The live page lives in .pager-track
          (transform set/cleared imperatively by usePagerGesture). Both neighbor
          peeks (.pager-peek-prev / -next) are always mounted, parked off-screen
-         at ±100%; the gesture drives the active one into view. z-index:50 keeps
-         the peek ABOVE .chapter-nav-sticky (z-index:40) at all times — including
-         the 1-frame window after the track transform is cleared but before React
-         finishes rendering the new screen content. */
+         at ±100%; the gesture drives the active one into view. .chapter-nav-sticky
+         (z-index:55) sits ABOVE .pager-peek (z-index:50) so nav arrows are always
+         visible during and after a swipe; usePagerGesture promotes .pager-track to
+         a compositing layer only for the duration of an active horizontal gesture. */
       .pager-viewport { position: relative; flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-      /* Pre-promote the track to its own GPU layer so the gesture finds a
-         composited layer ready to go — prevents text rasterization at a
-         different scale on the first move event. */
-      .pager-track { will-change: transform; }
       .pager-peek {
         position: absolute; inset: 0; z-index: 50; overflow: hidden;
         pointer-events: none; background: var(--bg);
@@ -502,7 +498,7 @@
       .chapter-nav-sticky {
         position: fixed; left: 0; right: 0;
         top: calc(var(--inset-top, 0px) + 44px + 1.4rem + 1px);
-        z-index: 40;
+        z-index: 55;
         display: flex; justify-content: space-between; align-items: center;
         padding: 0.55rem 0.95rem;
         pointer-events: none;
