@@ -8,7 +8,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
-import { PagerPeek, resolveNeighborLetter } from './pager-preview.jsx';
+import { PagerPeek, resolveNeighborLetter, savedScrollFor, letterScrollKey } from './pager-preview.jsx';
 
 afterEach(cleanup);
 
@@ -58,5 +58,30 @@ describe('resolveNeighborLetter', () => {
     // COL_BY_KEY is undefined in the test env — the typeof guard must hold.
     expect(resolveNeighborLetter('two', 'some-id')).toBeNull();
     expect(resolveNeighborLetter(null, null)).toBeNull();
+  });
+});
+
+describe('savedScrollFor — neighbor saved-scroll lookup for the inert peek', () => {
+  it('returns the saved record for a key, null for a miss / bad input', () => {
+    const prev = window.__scrollPositions;
+    window.__scrollPositions = { 'letter-x': { y: 120, anchorKey: 'k' } };
+    expect(savedScrollFor('letter-x')).toEqual({ y: 120, anchorKey: 'k' });
+    expect(savedScrollFor('missing')).toBeNull();
+    expect(savedScrollFor(null)).toBeNull();
+    window.__scrollPositions = prev;
+  });
+  it('returns null when no positions are published yet', () => {
+    const prev = window.__scrollPositions;
+    delete window.__scrollPositions;
+    expect(savedScrollFor('anything')).toBeNull();
+    window.__scrollPositions = prev;
+  });
+});
+
+describe('letterScrollKey', () => {
+  it('returns null safely when corpus globals are unavailable', () => {
+    // COL_BY_KEY is undefined in the test env — the typeof guard must hold.
+    expect(letterScrollKey('two', 'some-id')).toBeNull();
+    expect(letterScrollKey(null, null)).toBeNull();
   });
 });

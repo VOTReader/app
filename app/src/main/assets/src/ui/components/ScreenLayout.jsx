@@ -5,7 +5,28 @@
 import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
 
-export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false }) {
+// Apply a saved scroll record ({ anchorKey, anchorOff, y } | legacy number) to a
+// given scroll container — used for the inert peek so it renders already at the
+// neighbor's saved offset (a swipe lands where the live screen restores to, no
+// top-then-jump). Prefers the content anchor (its data-hl-key element); falls
+// back to the saved pixel y. The peek's reading blocks are content-visibility:
+// visible, so heights are REAL and the anchor position is accurate immediately.
+function applySavedScrollToEl(el, saved) {
+  if (!el || !saved) return;
+  const anchorKey = (typeof saved === 'object') ? saved.anchorKey : null;
+  if (anchorKey) {
+    const a = el.querySelector('[data-hl-key="' + String(anchorKey).replace(/"/g, '\\"') + '"]');
+    if (a) {
+      const aTop = (a.getBoundingClientRect().top - el.getBoundingClientRect().top) + el.scrollTop;
+      el.scrollTop = Math.max(0, Math.round(aTop + (saved.anchorOff || 0)));
+      return;
+    }
+  }
+  const y = (typeof saved === 'number') ? saved : (typeof saved.y === 'number' ? saved.y : 0);
+  if (y > 0) el.scrollTop = y;
+}
+
+export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
@@ -53,6 +74,15 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
   }, [trackScroll, inert]);
 
   const notchRef = React.useRef(null);
+  // The inert peek's scroll container (only used when inert). A layout effect
+  // restores the neighbor's saved scroll onto it BEFORE paint, so the peek is
+  // already at the right offset while it slides in.
+  const inertScrollRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    if (!inert) return;
+    applySavedScrollToEl(inertScrollRef.current, restoreScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on the saved record's primitive fields (not its object identity, which is rebuilt each render) so this re-applies only when the target offset actually changes.
+  }, [inert, restoreScroll && restoreScroll.anchorKey, restoreScroll && restoreScroll.anchorOff, restoreScroll && restoreScroll.y]);
 
   React.useEffect(() => {
     if (inert || !showProgress) return;
@@ -213,7 +243,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
   // The `.pager-peek` parent (PagerPeek) is position:absolute with a fixed
   // height, so height:100% sizes this without a flex parent.
   if (inert) {
-    return <div className="screen-scroll" style={{ height: '100%' }}>{children}</div>;
+    return <div className="screen-scroll" style={{ height: '100%' }} ref={inertScrollRef}>{children}</div>;
   }
 
   return (

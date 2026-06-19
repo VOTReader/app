@@ -52,6 +52,28 @@ export function resolveNeighborLetter(volKey, neighborId) {
   return (pref && pref.id === neighborId) ? pref : null;
 }
 
+// ── Neighbor saved-scroll lookup (for the inert peek to render pre-scrolled) ──
+// So a swipe to a previously-read neighbor lands at the SAME offset the live
+// screen restores to on commit (behaviorally identical to the nav arrows) — no
+// top-then-jump. window.__scrollPositions is the active tab's saved map,
+// published by useScrollMemory (bundle-b). Returns the saved record or null.
+export function savedScrollFor(scrollKey) {
+  if (!scrollKey || typeof window === 'undefined' || !window.__scrollPositions) return null;
+  return window.__scrollPositions[scrollKey] || null;
+}
+
+// Scroll key for a Letter / WTLB / Blessed / Holy-Days neighbor — mirrors
+// useScrollMemory.getScrollKey's collection branch (prefix derived from the COL
+// kind), so the lookup hits the SAME key the live screen saved under. Bible /
+// Matthew chapters key as `${bookId}-${chapterNum}` (computed at the call site).
+export function letterScrollKey(volKey, neighborId) {
+  if (!volKey || !neighborId || typeof COL_BY_KEY === 'undefined') return null;
+  const col = COL_BY_KEY.get(volKey);
+  if (!col) return null;
+  const pfx = col.kind === 'holy-days' ? 'holyday' : col.kind === 'letter' ? 'letter' : col.kind;
+  return pfx + '-' + neighborId;
+}
+
 /* PagerPeek — the absolutely-positioned neighbor page that slides in during a
    swipe. ScreenLayout mounts ONE per side (the controller drives its transform
    via peekRef). `desc` is whatever the screen's pager.peek(side) returned:

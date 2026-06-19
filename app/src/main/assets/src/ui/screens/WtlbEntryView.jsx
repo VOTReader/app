@@ -2,7 +2,7 @@
    WtlbEntryView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { resolveNeighborLetter } from '../components/pager-preview.jsx';
+import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
 
 
@@ -13,7 +13,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, inert = false }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, inert = false, restoreScroll = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   const [highlightedFn, setHighlightedFn] = React.useState(null);
@@ -129,6 +129,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           showProgressBar={showProgressBar}
           markAsReadEnabled={false}
           inert={true}
+          restoreScroll={savedScrollFor(letterScrollKey(volKey, full.id))}
         />
       ),
     };
@@ -241,6 +242,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     <ScreenLayout
       showProgress={showProgressBar}
       inert={inert}
+      restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
       stickyNav={<StickyChapterNav
         onPrev={() => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary()}

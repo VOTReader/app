@@ -363,6 +363,16 @@ export function useScrollMemory({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration. updateActiveTab is useCallback([activeTabIdx]) — its identity only changes with activeTabIdx, which IS a dep, so the closure is never stale.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
 
+  // ── Effect 4: publish saved positions for the pager's inert neighbor peek ─
+  // The finger-follow swipe's neighbor peek (ScreenLayout `inert`) renders the
+  // neighbor already scrolled to ITS saved offset, so a swipe lands exactly where
+  // the live screen restores to on commit — no top-then-jump. Each reading screen
+  // reads this when it builds its peek (savedScrollFor in pager-preview.jsx).
+  // Cross-bundle (bundle-b → bundle-d) via window — the established bridge.
+  React.useEffect(() => {
+    window.__scrollPositions = (activeTab && activeTab.scrollPositions) || {};
+  }, [activeTab]);
+
   // ── Return ─────────────────────────────────────────────────────────────
   return { flushScrollToActiveTab };
 }

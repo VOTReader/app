@@ -394,12 +394,22 @@
       .pager-peek-scroll { height: 100%; overflow: hidden; }
       .pager-peek-boundary { height: 100%; display: flex; align-items: center; justify-content: center; padding: 2rem 1.5rem; }
       .pager-peek-boundary .bottom-nav-card { max-width: 360px; width: 100%; }
-      /* The peek must render at REAL heights immediately so the page that slides
-         in matches the live screen pixel-for-pixel (no estimated-height settle as
-         the user releases). The live reading screens lift content-visibility
-         during scroll-restore (body.scroll-restoring), so the peek matches by
-         lifting it outright. Cost is bounded by the render cap in pager-preview
-         (only the top ~viewport is ever visible — the peek never scrolls). */
+      /* Reading content renders at REAL heights on BOTH panes of the pager — the
+         live page (`.pager-track`) AND the inert peek (`.pager-peek`). The peek
+         needs it to paint while parked off-screen (content-visibility:auto would
+         skip an off-viewport element entirely → it'd pop in as it slides). The
+         LIVE page needs it so its scrollbar is accurate + STABLE from the first
+         paint: with content-visibility:auto (PERF4) the off-screen blocks report
+         ESTIMATED heights, so the live scrollbar thumb is approximate and snaps as
+         real heights resolve — and at swipe-commit you'd jump from the peek's
+         accurate scrollbar to the live's estimated one (a visible flash). Since
+         the pager already pre-renders both full neighbors, the PERF4 estimate buys
+         nothing on these 4 reading screens — so lift it here and the two panes
+         match exactly. (Non-pager reading screens — e.g. BibleStudyChapterView —
+         keep content-visibility:auto: they have no peek to match and no swipe.) */
+      .pager-track .letter-para,
+      .pager-track .letter-poetry,
+      .pager-track .section-block,
       .pager-peek .letter-para,
       .pager-peek .letter-poetry,
       .pager-peek .section-block { content-visibility: visible; }

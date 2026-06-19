@@ -2,9 +2,9 @@
    LetterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { resolveNeighborLetter } from '../components/pager-preview.jsx';
+import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -44,6 +44,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           showProgressBar={showProgressBar}
           markAsReadEnabled={false}
           inert={true}
+          restoreScroll={savedScrollFor(letterScrollKey(volKey, full.id))}
         />
       ),
     };
@@ -168,6 +169,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     <ScreenLayout
       showProgress={showProgressBar}
       inert={inert}
+      restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
       stickyNav={<StickyChapterNav
         onPrev={() => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary()}

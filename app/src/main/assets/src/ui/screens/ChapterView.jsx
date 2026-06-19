@@ -2,7 +2,9 @@
    ChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, inert = false }) {
+import { savedScrollFor } from '../components/pager-preview.jsx';
+
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
 
@@ -64,6 +66,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         showProgressBar={showProgressBar}
         markAsReadEnabled={false}
         inert={true}
+        restoreScroll={savedScrollFor(book.id + '-' + ch.num)}
       />
     ),
   });
@@ -84,6 +87,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
     <ScreenLayout
       showProgress={showProgressBar}
       inert={inert}
+      restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
       stickyNav={<StickyChapterNav
         onPrev={() => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary()}
