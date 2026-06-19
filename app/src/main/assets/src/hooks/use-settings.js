@@ -87,7 +87,7 @@ export function useSettings({ savedSettings, theme }) {
       migrated.showChapterTitle = false;
     }
     return {
-      showReadingDot: false, showSurpriseButton: false, markAsRead: false,
+      showReadingDot: false, showSurpriseButton: false, markAsRead: true,
       showProgressBar: true,
       // Search defaults — only the values that are actually wired to
       // VotSearch.search() at the call site. Previously this block also
@@ -105,14 +105,14 @@ export function useSettings({ savedSettings, theme }) {
       haptic: true,
       keepScreenOn: true,
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
-      showSettingsGear: false, translation: "nkjv", restoredNames: false,
+      showSettingsGear: true, translation: "nkjv", restoredNames: true,
       showChapterTitle: true, showSectionHeadings: true, showInlineEchoes: true,
-      tabsEnabled: false,
+      tabsEnabled: true,
       searchEnabled: true, historyEnabled: true,
-      historyInNav: false,
+      historyInNav: true,
       showBookmarkNav: true,
       showThemeBtn: true,
-      showScrollNotch: false,
+      showScrollNotch: true,
       arrowLayout: "split", // "split" | "right" | "left" | "nav" | "off"
       fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>
       ...savedS,
