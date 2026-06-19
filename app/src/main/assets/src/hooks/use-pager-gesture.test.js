@@ -85,7 +85,7 @@ function makeIO(overrides = {}) {
     getWidth: () => 400,
     getTrack: () => track,
     getPeek: (dir) => dir === 'prev' ? prevPeek : nextPeek,
-    peekFor: () => ({ kind: 'verses', verses: [] }), // default: a target exists
+    peekFor: () => ({ kind: 'screen' }), // default: a target exists (controller only checks truthiness)
     commit: (side) => calls.commits.push(side),
     reducedMotion: () => false,
     schedule: (fn) => { fn(); return 0; },           // synchronous for determinism
@@ -258,7 +258,7 @@ describe('usePagerGesture (React wiring)', () => {
     vi.useFakeTimers();
     try {
       const onNext = vi.fn(), onPrev = vi.fn();
-      const pager = { peek: () => ({ kind: 'verses', verses: [] }), onNext, onPrev };
+      const pager = { peek: () => ({ kind: 'screen' }), onNext, onPrev };
       const { result } = renderHook(() => usePagerGesture({ current: el }, pager));
       // ScreenLayout assigns these to the track + pre-mounted peek elements.
       result.current.trackRef.current = { style: {} };

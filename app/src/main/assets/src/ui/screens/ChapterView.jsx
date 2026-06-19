@@ -2,7 +2,7 @@
    ChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack }) {
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, inert = false }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
 
@@ -40,13 +40,32 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   const goNextCh = () => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary();
   const verses = chapter.verses || [];
 
-  // Visible finger-follow page swipe (ScreenLayout `pager`). Same-book chapters
-  // peek full verse content; a study boundary peeks a card.
+  // Visible finger-follow page swipe (ScreenLayout `pager`). The neighbor page
+  // that drags in is the REAL ChapterView rendered inert (ScreenLayout `inert` +
+  // PagerPeek kind:'screen'): identical component → identical verse layout,
+  // study notes, echoes, section headings, and inline highlight/link/bookmark
+  // icons, before and after the swipe commits (no more "study notes pop in after
+  // release"). A study boundary peeks a card. Render-affecting settings (mode,
+  // showStudy/Echoes, chapter-title visibility) are threaded so the clone
+  // matches exactly what the committed chapter will show.
   const _chPeek = (ch) => ({
-    kind: 'verses', wrapClass: 'chapter-body',
-    inlineVerses: mode !== 'pdf',
-    hero: { eyebrow: `Matthew\xA0\xB7\xA0Chapter ${ch.num}`, title: `Chapter ${ch.num}`, subtitle: ch.title || undefined },
-    verses: ch.verses || [],
+    kind: 'screen',
+    el: (
+      // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onIndex/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
+      <ChapterView
+        book={book}
+        chapter={ch}
+        mode={mode}
+        showStudy={showStudy}
+        showEchoes={showEchoes}
+        showChapterTitle={showChapterTitle}
+        titleFocusHidden={titleFocusHidden}
+        theme={theme}
+        showProgressBar={showProgressBar}
+        markAsReadEnabled={false}
+        inert={true}
+      />
+    ),
   });
   const _boundaryPeek = (b, dir) => b ? { kind: 'boundary', eyebrow: b.short ? `${dir} \xB7 ${b.short}` : (dir === 'Next' ? 'Next Book' : 'Previous Book'), title: b.title } : null;
   const pager = {
@@ -57,13 +76,15 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       : (prevCh ? _chPeek(prevCh) : _boundaryPeek(prevBoundary, 'Previous')),
   };
 
-  useMarkAsRead(markAsReadEnabled, onMarkRead);
+  // An inert clone (a swipe peek) must never claim __onReadingComplete.
+  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead);
   const hasLinks = chapter.links && chapter.links.length > 0;
 
   return (
     <ScreenLayout
       showProgress={showProgressBar}
-      pager={pager}
+      inert={inert}
+      pager={inert ? undefined : pager}
       stickyNav={<StickyChapterNav
         onPrev={() => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary()}
         onNext={() => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary()}
@@ -259,7 +280,9 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           </div>
         </div>
       </div>
-      <ScriptureSheet activeRef={activeScripRef} onClose={() => setActiveScripRef(null)} />
+      {/* position:fixed sheet — skipped in an inert peek (would mis-anchor in
+          the transformed `.pager-peek`; a clone is non-interactive anyway). */}
+      {!inert && <ScriptureSheet activeRef={activeScripRef} onClose={() => setActiveScripRef(null)} />}
     </ScreenLayout>
   );
 }

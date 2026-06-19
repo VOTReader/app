@@ -1,182 +1,46 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   pager-preview — INERT neighbor previews for the finger-follow page swipe
+   pager-preview — neighbor page shell for the finger-follow page swipe
    ═══════════════════════════════════════════════════════════════════════
-   Global-scope module. Bundled into dist/bundle-d.js (imported by
-   ScreenLayout). Renders the prev/next page that PEEKS in during a swipe.
+   Global-scope module. Bundled into dist/bundle-d.js (imported by ScreenLayout).
 
-   HARD INVARIANT — annotation-safety:
-     A peek is a throwaway, non-interactive glimpse of a neighbor page. It
-     must be INVISIBLE to every annotation pass. The imperative passes
-     (annotation-engine applyDOMHighlights/applyNoteIcons, dom-links,
-     dom-bookmarks) all scan `document.querySelectorAll('[data-hl-key]
-     [data-hl-dom]')` / `[data-hl-dom] …` document-wide. The React verse
-     annotations (HighlightableText/LinkIcon/BookmarkIcon) subscribe to the
-     annotation stores. So every renderer here:
-       • emits NO `data-hl-dom` and NO `data-hl-key`,
-       • renders NO `<mark>` / `.fn-ref` / `.wtlb-cite` / link/bookmark icons,
-       • uses NO store-subscribing component (no HighlightableText / Segments /
-         LinkIcon / BookmarkIcon) and NO React effects.
-     Emphasis (em/strong/caps) and plain text are kept for visual fidelity —
-     those carry no annotation hooks. Footnote bubbles + interactive refs are
-     flattened to inert text or dropped. The pager-preview.test.jsx suite pins
-     this invariant.
+   The neighbor page that PEEKS in during a swipe is the REAL screen component
+   rendered inert (see ScreenLayout `inert` + each reading screen's pager.peek):
+   identical UI, width, wrapping, hero, footnote bubbles, and inline
+   highlight/note/link/bookmark icons — all present BEFORE the user releases and
+   unchanged AFTER the swipe commits, with zero divergence, because the peek IS
+   the same component the nav arrows commit to.
 
-   DOES NOT OWN: the gesture/transform (use-pager-gesture.js) or the pager
-   DOM wiring (ScreenLayout.jsx). This file is pure + presentational.
+   This REPLACED an earlier approach — a parallel set of "inert preview"
+   renderers (PreviewLetterBody / PreviewWtlbBody / PreviewVerses /
+   PreviewInlineVerses) that re-implemented each screen's body MINUS its
+   annotation hooks. That spoof could never stay pixel-identical to the live
+   render (it dropped footnote bubbles + annotation icons, flattened sections,
+   and capped content, so width/wrapping/inline-icons drifted and study notes
+   "popped in" only after release). It was retired in favor of rendering the
+   real screen inert; see ScreenLayout's `inert` branch for how a clone claims
+   none of the app-wide singletons while still being painted by the same
+   document-wide annotation pass (which keys per-element by data-hl-key, so the
+   two panes stay isolated).
+
+   This file now owns only:
+     • PagerPeek            — the sliding `.pager-peek` shell that hosts either
+                              the real inert screen (kind:'screen') or a
+                              reading-chain boundary card (kind:'boundary').
+     • resolveNeighborLetter — resolve a Letter/WTLB neighbor {id} → its full
+                              corpus entry (the verse screens already hold full
+                              neighbor chapter objects, so only the VOT letter /
+                              WTLB screens need this).
+
+   DOES NOT OWN: the gesture/transform (use-pager-gesture.js) or the pager DOM
+   wiring (ScreenLayout.jsx).
    ═══════════════════════════════════════════════════════════════════════ */
-
-import { splitFormatBInline } from '../../utils/format-b-inline.js';
-
-// A peek is pinned at the top and never scrolls, so only the first ~viewport is
-// ever seen. Cap the rendered count so a long chapter/letter (Psalm 119 = 176
-// verses) doesn't pay full-render cost on swipe-start — the below-fold remainder
-// is invisible. Generous (several viewports) so an over-drag can't reveal the cut.
-const PEEK_VERSE_CAP = 60;
-const PEEK_BLOCK_CAP = 40;
-
-// ── Format A (letters): inert {t,v} segment render ──────────────────────────
-// Mirrors LetterView's Segments output MINUS every annotation/interaction hook:
-// emphasis kept, footnote bubbles dropped, stanza-break → <br>, letter-link
-// flattened to its plain text. No data-hl-*; nothing subscribes.
-function previewSegments(segments) {
-  if (!Array.isArray(segments)) return null;
-  return segments.map((s, i) => {
-    if (!s) return null;
-    const t = s.t, v = s.v || '';
-    if (t === 'fn') return null;                       // footnote bubble — drop
-    if (t === 'stanza-break') return <br key={i} />;
-    if (t === 'italic') return <em key={i}>{v}</em>;
-    if (t === 'bold-italic') return <strong key={i}><em>{v}</em></strong>;
-    if (t === 'caps') return <span key={i} className="caps">{v}</span>;
-    return <React.Fragment key={i}>{v}</React.Fragment>; // text + letter-link → plain
-  });
-}
-
-/** Flat plain-text of a {t,v} segment array (footnote/stanza dropped). */
-export function segmentsToPlainText(segments) {
-  if (!Array.isArray(segments)) return '';
-  return segments
-    .filter((s) => s && s.t !== 'fn' && s.t !== 'stanza-break')
-    .map((s) => s.v || '')
-    .join('');
-}
-
-/** Inert render of a letter's blocks (Format A). */
-export function PreviewLetterBody({ blocks }) {
-  if (!Array.isArray(blocks)) return null;
-  return blocks.slice(0, PEEK_BLOCK_CAP).map((block, bi) => {
-    if (block.type === 'intro') return <p key={bi} className="letter-intro">{previewSegments(block.segments)}</p>;
-    if (block.type === 'para') return <p key={bi} className="letter-para">{previewSegments(block.segments)}</p>;
-    if (block.type === 'heading') return <h2 key={bi} className={`study-heading study-heading-l${block.level || 2}`}>{block.text}</h2>;
-    if (block.type === 'poetry') {
-      const lines = block.lines
-        ? block.lines.map((line, li) => <div key={li} className="poetry-line">{previewSegments(line)}</div>)
-        : (block.segments || []).map((seg, li) => (
-            <div key={li} className="poetry-line">{previewSegments([{ ...seg, v: (seg.v || '').replace(/^\n/, '') }])}</div>
-          ));
-      return <div key={bi} className="letter-poetry">{lines}</div>;
-    }
-    if (block.type === 'closing') return <div key={bi} className="letter-closing">{block.text}</div>;
-    if (block.type === 'closing-fn') return <div key={bi} className="letter-closing-fn">{previewSegments(block.segments)}</div>;
-    return null; // prophecy-group / cover-image / study-image → skipped in a peek
-  });
-}
-
-// ── Format B (WTLB / Blessed): inert inline render ──────────────────────────
-// Mirrors WtlbEntryView.renderLine MINUS the interactive elements: emphasis
-// kept; {{ref:…}} → inert "(ref)" text; {{nav:…}} → inert "[bookId ch]" text;
-// attribution + plain text rendered literally with \n → <br>.
-function previewFormatBLine(text) {
-  const parts = splitFormatBInline(text);
-  return parts.map((seg, si) => {
-    if (!seg) return null;
-    if (seg.startsWith('**') && seg.endsWith('**')) return <strong key={si}>{previewFormatBLine(seg.slice(2, -2))}</strong>;
-    if (seg.startsWith('_') && seg.endsWith('_')) return <em key={si}>{previewFormatBLine(seg.slice(1, -1))}</em>;
-    const refMatch = seg.match(/^\{\{ref:(.+)\}\}$/);
-    if (refMatch) return <React.Fragment key={si}>{'(' + refMatch[1].trim() + ')'}</React.Fragment>;
-    const navMatch = seg.match(/^\{\{nav:([^:]+):(\d+)\}\}$/);
-    if (navMatch) return <React.Fragment key={si}>{'[' + navMatch[1] + ' ' + navMatch[2] + ']'}</React.Fragment>;
-    // attribution [From "…" ~ Volume N] + plain text: literal, soft breaks → <br>
-    const lines = String(seg).split('\n');
-    return (
-      <React.Fragment key={si}>
-        {lines.map((ln, li) => <React.Fragment key={li}>{li ? <br /> : null}{ln}</React.Fragment>)}
-      </React.Fragment>
-    );
-  });
-}
-
-/** Flat plain-text of a Format B paragraph (markers stripped, emphasis unwrapped). */
-export function stripFormatBMarkers(text) {
-  if (typeof text !== 'string') return '';
-  return splitFormatBInline(text)
-    .map((seg) => {
-      if (!seg) return '';
-      if (seg.startsWith('**') && seg.endsWith('**')) return stripFormatBMarkers(seg.slice(2, -2));
-      if (seg.startsWith('_') && seg.endsWith('_')) return stripFormatBMarkers(seg.slice(1, -1));
-      const refMatch = seg.match(/^\{\{ref:(.+)\}\}$/);
-      if (refMatch) return '(' + refMatch[1].trim() + ')';
-      const navMatch = seg.match(/^\{\{nav:([^:]+):(\d+)\}\}$/);
-      if (navMatch) return '[' + navMatch[1] + ' ' + navMatch[2] + ']';
-      return seg;
-    })
-    .join('');
-}
-
-/** Inert render of a WTLB/Blessed entry's paragraphs (Format B). */
-export function PreviewWtlbBody({ paragraphs }) {
-  if (!Array.isArray(paragraphs)) return null;
-  return paragraphs.slice(0, PEEK_BLOCK_CAP).map((p, pi) => (
-    <p key={pi} style={{ textAlign: p.align }} className={p.align === 'center' ? 'letter-poetry' : 'letter-para'}>
-      {previewFormatBLine(p.text || '')}
-    </p>
-  ));
-}
-
-// ── Format C (Bible / Matthew verses): inert verse list ─────────────────────
-// Plain verse spans — base NKJV/study text only (no translateVerse, no
-// HighlightableText/LinkIcon/BookmarkIcon). Matches the live `.verses-block`.
-export function PreviewVerses({ verses, poetry }) {
-  if (!Array.isArray(verses)) return null;
-  return (
-    <div className={`verses-block${poetry ? ' is-poetry' : ''}`}>
-      {verses.slice(0, PEEK_VERSE_CAP).map((v, vi) => (
-        <span key={vi} className="verse">
-          <span className="verse-num">{v.n}</span>
-          {v.text}{' '}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-// Matches the live ChapterView (VOT Matthew Study Bible) default (non-PDF)
-// inline mode: verse-row/verse-line blocks with an inline superscript verse
-// number and no left-gutter padding. Using this instead of PreviewVerses
-// (verses-block) eliminates the 1.8rem indent mismatch that made the peek
-// text appear narrower than the live content, causing the "briefly narrow"
-// layout snap at the moment the peek reveals the live screen.
-export function PreviewInlineVerses({ verses }) {
-  if (!Array.isArray(verses)) return null;
-  return (
-    <div className="verses-inline">
-      {verses.slice(0, PEEK_VERSE_CAP).map((v, vi) => (
-        <div key={vi} className="verse-row">
-          <div className="verse-line">
-            <span className="verse-num">{v.n}</span>
-            {v.text}{' '}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ── Neighbor resolution (Letter / WTLB) ─────────────────────────────────────
 // Bible/Matthew screens already hold full neighbor chapter objects; only the
-// VOT screens need to resolve {id} → full entry from the in-memory corpus.
-// COL_BY_KEY / colLetterArr / colPreface are cross-bundle globals
-// (scripture-resolution.js). Returns null if not found (caller falls back).
+// VOT letter / WTLB screens need to resolve {id} → full entry from the
+// in-memory corpus. COL_BY_KEY / colLetterArr / colPreface are cross-bundle
+// globals (scripture-resolution.js). Returns null if not found (caller falls
+// back to a boundary card).
 export function resolveNeighborLetter(volKey, neighborId) {
   if (!volKey || !neighborId || typeof COL_BY_KEY === 'undefined') return null;
   const col = COL_BY_KEY.get(volKey);
@@ -188,47 +52,32 @@ export function resolveNeighborLetter(volKey, neighborId) {
   return (pref && pref.id === neighborId) ? pref : null;
 }
 
-// ── Inert hero (dimmed) ─────────────────────────────────────────────────────
-// A lightweight clone of the reading hero so the peek reads as a real page
-// turn, not a bare paragraph. `bgClass` matches the host screen's hero-bg
-// modifier ('vol' | 'study' | 'ot' | '').
-function PreviewHero({ eyebrow, title, subtitle, bgClass }) {
-  if (!eyebrow && !title) return null;
-  return (
-    <header className="hero">
-      <div className={`hero-bg${bgClass ? ' ' + bgClass : ''}`} />
-      <div className="hero-content">
-        {eyebrow && <div className="hero-eyebrow">{eyebrow}</div>}
-        {title && <h1 className="hero-title">{title}</h1>}
-        {subtitle && <div className="hero-subtitle">{subtitle}</div>}
-        <div className="hero-ornament">
-          <div className="hero-ornament-line" />
-          <div className="hero-ornament-diamond" />
-          <div className="hero-ornament-line r" />
-        </div>
-      </div>
-    </header>
-  );
-}
-
 /* PagerPeek — the absolutely-positioned neighbor page that slides in during a
-   swipe. ScreenLayout mounts ONE of these (the active side) and the gesture
-   hook drives its transform. `desc` is whatever the screen's pager.peek(side)
-   returned (see ScreenLayout integration):
+   swipe. ScreenLayout mounts ONE per side (the controller drives its transform
+   via peekRef). `desc` is whatever the screen's pager.peek(side) returned:
 
-     { kind:'letter', hero, blocks }
-     { kind:'wtlb',   hero, paragraphs }
-     { kind:'verses', hero, verses, poetry, wrapClass }
-     { kind:'boundary', eyebrow, title }
-     null  → nothing to show (dead end); ScreenLayout does not mount a peek
+     { kind:'screen',   el }             → the REAL neighbor screen, rendered
+                                           inert (its own `.screen-scroll`)
+     { kind:'boundary', eyebrow, title } → a reading-chain boundary card
+                                           (e.g. "Previous Book · Genesis 50")
+     null                                → dead end; ScreenLayout mounts no peek
 
-   aria-hidden + pointer-events:none (in CSS): never interactive, never read. */
+   The HTML `inert` attribute (chrome108-native) + CSS pointer-events:none keep
+   the clone fully non-interactive and out of the focus / a11y tree. */
 export function PagerPeek({ side, desc, peekRef }) {
+  // Callback ref: forward the element to the gesture controller's ref AND set the
+  // HTML `inert` attribute imperatively. React 18 does NOT forward a JSX `inert`
+  // prop (it's only a recognized prop from React 19), so set it on the node —
+  // reliable in chrome108 (native) and in jsdom (setAttribute always reflects).
+  // Memoized on peekRef (a stable useRef object) so it doesn't churn per render.
+  const attach = React.useCallback((el) => {
+    if (peekRef) peekRef.current = el;
+    if (el) el.setAttribute('inert', '');
+  }, [peekRef]);
   if (!desc) return null;
-  let body = null;
   if (desc.kind === 'boundary') {
     return (
-      <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={peekRef}>
+      <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={attach}>
         <div className="pager-peek-boundary">
           <div className="bottom-nav-card">
             <div className="bottom-nav-label">{desc.eyebrow}</div>
@@ -238,21 +87,11 @@ export function PagerPeek({ side, desc, peekRef }) {
       </div>
     );
   }
-  if (desc.kind === 'letter') body = <div className="content-layout"><main className="letter-body">{<PreviewLetterBody blocks={desc.blocks} />}</main></div>;
-  else if (desc.kind === 'wtlb') body = <div className="content-layout"><main className="letter-body">{<PreviewWtlbBody paragraphs={desc.paragraphs} />}</main></div>;
-  else if (desc.kind === 'verses') {
-    const _vInner = desc.inlineVerses
-      ? <PreviewInlineVerses verses={desc.verses} />
-      : <PreviewVerses verses={desc.verses} poetry={desc.poetry} />;
-    body = <div className={desc.wrapClass || 'chapter-body'}>{_vInner}</div>;
-  }
-
+  // kind:'screen' — the real neighbor, rendered inert. desc.el already produces
+  // its own `.screen-scroll` (via inert ScreenLayout); we only supply the shell.
   return (
-    <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={peekRef}>
-      <div className="pager-peek-scroll">
-        <PreviewHero {...(desc.hero || {})} />
-        <div className="page-wrapper">{body}</div>
-      </div>
+    <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={attach}>
+      {desc.el}
     </div>
   );
 }

@@ -13,7 +13,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, inert = false }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   const [highlightedFn, setHighlightedFn] = React.useState(null);
@@ -87,7 +87,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     openSheetForRef(ref);
   };
 
-  useMarkAsRead(markAsReadEnabled, onMarkRead);
+  // An inert clone (a swipe peek) must never claim __onReadingComplete.
+  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead);
 
   React.useEffect(() => { setScriptureRef(null); setScriptureText(null); setHighlightedFn(null); }, [entry.id]);
 
@@ -106,13 +107,31 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   const goPrev = () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary();
   const goNext = () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary();
 
-  // Visible finger-follow page swipe (ScreenLayout `pager`). A same-collection
-  // entry peeks full content (resolved from the in-memory corpus); a boundary
-  // peeks a card. Same commit path as the nav arrows.
+  // Visible finger-follow page swipe (ScreenLayout `pager`). The neighbor page
+  // that drags in is the REAL WtlbEntryView rendered inert (ScreenLayout `inert`
+  // + PagerPeek kind:'screen') — identical component → identical UI, width,
+  // wrapping, inline scripture cites, and annotation icons before and after the
+  // swipe commits. A boundary (no in-collection neighbor) still peeks a card.
   const _entryPeek = (nb) => {
     const full = resolveNeighborLetter(volKey, nb.id);
     if (!full) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
-    return { kind: 'wtlb', paragraphs: full.paragraphs, hero: { eyebrow: `${partLabel}\xA0\xB7\xA0${full.num}`, title: full.title, bgClass: 'vol' } };
+    return {
+      kind: 'screen',
+      el: (
+        // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onHome/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
+        <WtlbEntryView
+          entry={full}
+          volKey={volKey}
+          partLabel={partLabel}
+          scripturesDict={scripturesDict}
+          footnotesMode={footnotesMode}
+          theme={theme}
+          showProgressBar={showProgressBar}
+          markAsReadEnabled={false}
+          inert={true}
+        />
+      ),
+    };
   };
   const pager = {
     onPrev: goPrev,
@@ -221,7 +240,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   return (
     <ScreenLayout
       showProgress={showProgressBar}
-      pager={pager}
+      inert={inert}
+      pager={inert ? undefined : pager}
       stickyNav={<StickyChapterNav
         onPrev={() => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary()}
         onNext={() => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary()}
@@ -373,6 +393,9 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         </div>
       </div>
 
+      {/* Interactive chrome (position:fixed bottom sheet) is skipped in an inert
+          peek — it would mis-anchor inside the transformed `.pager-peek`. */}
+      {!inert && (
       <>
         <div className={`fn-sheet-backdrop${scriptureRef ? " open" : ""}`} onClick={() => setScriptureRef(null)} />
         <div className={`fn-sheet${scriptureRef ? " open" : ""}`}>
@@ -390,6 +413,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           )}
         </div>
       </>
+      )}
     </ScreenLayout>
   );
 }

@@ -376,6 +376,14 @@
          visible during and after a swipe; usePagerGesture promotes .pager-track to
          a compositing layer only for the duration of an active horizontal gesture. */
       .pager-viewport { position: relative; flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+      /* Reserve the scrollbar gutter ALWAYS on reading screens (live + peek)
+         so content width — and therefore text wrapping — is byte-identical
+         whether or not the page overflows. Without this, a short non-scrolling
+         page (no scrollbar) is ~10px wider than its longer scrolling neighbor
+         (scrollbar present), shifting wrapping at the moment the peek reveals or
+         a swipe commits. Applies to both `.pager-viewport > .screen-scroll`
+         (live) and `.pager-peek .screen-scroll` (the inert clone). */
+      .pager-viewport .screen-scroll { scrollbar-gutter: stable; }
       .pager-peek {
         position: absolute; inset: 0; z-index: 50; overflow: hidden;
         pointer-events: none; background: var(--bg);

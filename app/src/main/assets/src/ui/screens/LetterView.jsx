@@ -4,7 +4,7 @@
 
 import { resolveNeighborLetter } from '../components/pager-preview.jsx';
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -19,15 +19,34 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   const goPrev = () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary();
   const goNext = () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary();
 
-  // Visible finger-follow page swipe (ScreenLayout `pager`). A same-collection
-  // neighbor peeks full letter content (resolved from the in-memory corpus); a
-  // reading-chain boundary peeks a card. Same commit path as the nav arrows.
-  const _letterBg = studyMode ? 'study' : 'vol';
-  const _heroEyebrow = (n) => `${volumeLabel || 'Volume Two'}\xA0\xB7\xA0${studyMode ? (n === 0 ? 'Preface' : `Chapter ${n}`) : (n === 0 ? 'Preface' : `Letter ${n}`)}`;
+  // Visible finger-follow page swipe (ScreenLayout `pager`). The neighbor page
+  // that drags in is the REAL LetterView rendered inert (ScreenLayout `inert` +
+  // PagerPeek kind:'screen') — the identical component the nav arrows commit to,
+  // so its UI, width, wrapping, hero, footnote bubbles, and inline annotation
+  // icons are pixel-identical before and after release (the document-wide
+  // annotation paint keys per-element by data-hl-key, so it paints the clone in
+  // isolation, already done before the user lets go). A same-volume neighbor
+  // resolves to its full corpus entry; a reading-chain boundary (no in-volume
+  // neighbor) still peeks the lightweight card. Same commit path as the arrows.
   const _letterPeek = (nb) => {
     const full = resolveNeighborLetter(volKey, nb.id);
     if (!full) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
-    return { kind: 'letter', blocks: full.blocks, hero: { eyebrow: _heroEyebrow(full.num), title: full.title, subtitle: full.subtitle, bgClass: _letterBg } };
+    return {
+      kind: 'screen',
+      el: (
+        // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onHome/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
+        <LetterView
+          letter={full}
+          volKey={volKey}
+          volumeLabel={volumeLabel}
+          studyMode={studyMode}
+          theme={theme}
+          showProgressBar={showProgressBar}
+          markAsReadEnabled={false}
+          inert={true}
+        />
+      ),
+    };
   };
   const pager = {
     onPrev: goPrev,
@@ -37,7 +56,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       : (letter.prevLetter ? _letterPeek(letter.prevLetter) : prevBoundary ? { kind: 'boundary', eyebrow: prevBoundary.short ? `Previous \xB7 ${prevBoundary.short}` : 'Previous', title: prevBoundary.title } : null),
   };
 
-  useMarkAsRead(markAsReadEnabled, onMarkRead);
+  // An inert clone (a swipe peek) must never claim the single __onReadingComplete
+  // hook or it would mark a merely-peeked letter as read.
+  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead);
 
   React.useEffect(() => {
     setHighlightedFn(null);
@@ -146,7 +167,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   return (
     <ScreenLayout
       showProgress={showProgressBar}
-      pager={pager}
+      inert={inert}
+      pager={inert ? undefined : pager}
       stickyNav={<StickyChapterNav
         onPrev={() => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary()}
         onNext={() => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary()}
@@ -469,6 +491,11 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         </div>
       </div>
 
+      {/* Interactive chrome (bottom sheets + the prophecy expand FAB) is
+          position:fixed; inside an inert peek's transformed `.pager-peek`
+          ancestor that would mis-anchor or float visibly. A clone is
+          non-interactive anyway, so skip it entirely. */}
+      {!inert && (<>
       <FootnoteSheet
         num={sheetFn}
         fn={sheetFn ? letter.footnotes[sheetFn] : null}
@@ -516,6 +543,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           }}
         />
       )}
+      </>)}
     </ScreenLayout>
   );
 }

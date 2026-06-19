@@ -125,7 +125,7 @@ describe('ScreenLayout scroll-target registration (trackScroll)', () => {
 });
 
 describe('ScreenLayout pager wiring', () => {
-  const pager = { peek: () => ({ kind: 'verses', verses: [] }), onPrev: () => {}, onNext: () => {} };
+  const pager = { peek: () => ({ kind: 'screen', el: <span className="screen-scroll">peek</span> }), onPrev: () => {}, onNext: () => {} };
 
   it('wraps children in .pager-track inside a .pager-viewport when a pager is passed', () => {
     const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager}><span data-testid="c">body</span></SL>);

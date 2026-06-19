@@ -2,7 +2,7 @@
    BibleChapterView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false }) {
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // Restored-Name chrome lookup. When settings.restoredNames is on and
   // books-restored.js has an entry for this chapter, swap the chrome.
@@ -38,11 +38,31 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   // a book boundary peeks a card.
   const POETIC_BOOKS = new Set(['psalms', 'proverbs', 'songofsolomon', 'lamentations', 'ecclesiastes']);
   const isPoetry = POETIC_BOOKS.has(book.id);
-  const _bibleBg = (typeof OT_BOOK_IDS !== 'undefined' && OT_BOOK_IDS.has(book.id)) ? 'ot' : '';
+  // The neighbor page that drags in is the REAL BibleChapterView rendered inert
+  // (ScreenLayout `inert` + PagerPeek kind:'screen'): identical component →
+  // identical section headings, translation/restored-name chrome, poetry layout,
+  // and inline highlight/link/bookmark icons before and after the swipe commits
+  // (no more "section headings pop in after release"). Render-affecting settings
+  // are threaded so the clone matches exactly what the committed chapter shows.
   const _versesPeek = (ch) => ({
-    kind: 'verses', wrapClass: 'chapter-body', poetry: isPoetry,
-    hero: { eyebrow: `${book.title}\xA0\xB7\xA0Chapter ${ch.num}`, title: (ch.title || book.subtitle), bgClass: _bibleBg },
-    verses: ch.sections.flatMap((s) => s.verses),
+    kind: 'screen',
+    el: (
+      // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onIndex/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
+      <BibleChapterView
+        book={book}
+        chapter={ch}
+        translation={translation}
+        restoredNames={restoredNames}
+        showChapterTitle={showChapterTitle}
+        showSectionHeadings={showSectionHeadings}
+        titleFocusHidden={titleFocusHidden}
+        headingsFocusHidden={headingsFocusHidden}
+        theme={theme}
+        showProgressBar={showProgressBar}
+        markAsReadEnabled={false}
+        inert={true}
+      />
+    ),
   });
   const pager = {
     onPrev: goPrevCh,
@@ -52,12 +72,14 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
       : (prevCh ? _versesPeek(prevCh) : prevBook ? { kind: 'boundary', eyebrow: 'Previous Book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}` } : null),
   };
 
-  useMarkAsRead(markAsReadEnabled, onMarkRead);
+  // An inert clone (a swipe peek) must never claim __onReadingComplete.
+  useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead);
 
   return (
     <ScreenLayout
       showProgress={showProgressBar}
-      pager={pager}
+      inert={inert}
+      pager={inert ? undefined : pager}
       stickyNav={<StickyChapterNav
         onPrev={goPrevCh}
         onNext={goNextCh}

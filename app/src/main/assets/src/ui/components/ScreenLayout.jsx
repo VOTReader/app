@@ -5,17 +5,31 @@
 import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
 
-export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav }) {
+export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false }) {
   const scrollRef = React.useRef(null);
+  // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
+  // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
+  // swipe drags the REAL next/prev page (identical UI, width, wrapping, inline
+  // annotation icons) instead of a separate spoof. An inert clone must claim
+  // NONE of the app-wide singletons the live screen owns — the global scroll
+  // element, the swipe gesture, the reading-progress / scroll-notch effects, the
+  // tap-suppressor — or it would fight the live screen for them. Every such path
+  // below is gated on !inert; the live screen keeps sole ownership. Visual
+  // rendering (incl. the document-wide annotation paint, which keys per-element
+  // by data-hl-key so it isolates the two panes) is NOT suppressed — that's what
+  // makes the peek arrive already painted, before release.
+  const activePager = inert ? null : pager;
   // Finger-follow page swipe. No-op when `pager` is absent (every non-reading
-  // screen). When present, both neighbor peeks are pre-mounted and parked at
-  // their CSS ±100% defaults; usePagerGesture hands their refs to the controller
-  // which drives them imperatively — no React state fires during the swipe.
-  const { trackRef, peekPrevRef, peekNextRef } = usePagerGesture(scrollRef, pager);
+  // screen) or when inert (a clone never nests its own gesture/peeks). When
+  // present, both neighbor peeks are pre-mounted and parked at their CSS ±100%
+  // defaults; usePagerGesture hands their refs to the controller which drives
+  // them imperatively — no React state fires during the swipe.
+  const { trackRef, peekPrevRef, peekNextRef } = usePagerGesture(scrollRef, activePager);
   // Compute neighbor peek descriptors at render time. Pre-mounted peeks update
   // on each screen render (e.g. after navigation) with zero swipe-path cost.
-  const prevDesc = pager && typeof pager.peek === 'function' ? pager.peek('prev') : null;
-  const nextDesc = pager && typeof pager.peek === 'function' ? pager.peek('next') : null;
+  // Never computed when inert — a clone must not build grand-neighbor peeks.
+  const prevDesc = activePager && typeof activePager.peek === 'function' ? activePager.peek('prev') : null;
+  const nextDesc = activePager && typeof activePager.peek === 'function' ? activePager.peek('next') : null;
   const ref = React.useCallback((el) => {
     // __scrollEl is a mutable `let` GLOBAL declared in index.html (line ~515),
     // read by use-scroll-memory + use-thumbnails. It is a lexical global, NOT a
@@ -31,17 +45,17 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
     // hijacks __scrollEl on open and, worse, NULLS it on unmount (the screen
     // underneath never re-registers its ref), silently killing scroll recording
     // on that screen until the next navigation. Default true: every real screen.
-    if (trackScroll) {
+    if (trackScroll && !inert) {
       // @ts-expect-error -- generated-globals const-vs-let mismatch (see above)
       __scrollEl = el;
     }
     scrollRef.current = el;
-  }, [trackScroll]);
+  }, [trackScroll, inert]);
 
   const notchRef = React.useRef(null);
 
   React.useEffect(() => {
-    if (!showProgress) return;
+    if (inert || !showProgress) return;
     const onScroll = () => {
       if (!__scrollEl) return;
       const { scrollTop, scrollHeight, clientHeight } = __scrollEl;
@@ -72,9 +86,10 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
       clearInterval(poll);
       if (el) el.removeEventListener("scroll", onScroll);
     };
-  }, [showProgress]);
+  }, [showProgress, inert]);
 
   React.useEffect(() => {
+    if (inert) return;
     const marker = notchRef.current;
     if (!marker) return;
     const update = () => {
@@ -101,7 +116,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
       if (__scrollEl) { ro.observe(__scrollEl); update(); }
     }, 500);
     return () => { ro.disconnect(); clearInterval(poll); };
-  }, []);
+  }, [inert]);
 
   // Suppress accidental taps that fire when a scrolling finger lifts on an
   // interactive element (footnote marker, highlight, icon, etc.). When the
@@ -115,6 +130,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
   // to block the native touchend handlers, then add a one-shot capture-phase
   // click suppressor to eat the synthesised click Android WebView also fires.
   React.useEffect(() => {
+    if (inert) return;
     const el = scrollRef.current;
     if (!el) return;
     let startX = 0, startY = 0, startScrollTop = 0, startTime = 0, didScroll = false;
@@ -187,7 +203,18 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
       el.removeEventListener('touchend', onEndCapture, true);
       cleanupSuppress();
     };
-  }, []);
+  }, [inert]);
+
+  // Inert clone (a pager peek): render ONLY the scrollable content, in a
+  // container whose box model is byte-identical to the live `.screen-scroll`
+  // (same overflow/scrollbar-gutter → same content width → same text wrapping).
+  // No top-nav (the live nav stays fixed and identical), no sticky nav, no
+  // pager-viewport (a clone never nests its own peeks), no scroll-notch marker.
+  // The `.pager-peek` parent (PagerPeek) is position:absolute with a fixed
+  // height, so height:100% sizes this without a flex parent.
+  if (inert) {
+    return <div className="screen-scroll" style={{ height: '100%' }}>{children}</div>;
+  }
 
   return (
     <div className="screen-layout">
