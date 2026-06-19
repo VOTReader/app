@@ -150,6 +150,28 @@ export function PreviewVerses({ verses, poetry }) {
   );
 }
 
+// Matches the live ChapterView (VOT Matthew Study Bible) default (non-PDF)
+// inline mode: verse-row/verse-line blocks with an inline superscript verse
+// number and no left-gutter padding. Using this instead of PreviewVerses
+// (verses-block) eliminates the 1.8rem indent mismatch that made the peek
+// text appear narrower than the live content, causing the "briefly narrow"
+// layout snap at the moment the peek reveals the live screen.
+export function PreviewInlineVerses({ verses }) {
+  if (!Array.isArray(verses)) return null;
+  return (
+    <div className="verses-inline">
+      {verses.slice(0, PEEK_VERSE_CAP).map((v, vi) => (
+        <div key={vi} className="verse-row">
+          <div className="verse-line">
+            <span className="verse-num">{v.n}</span>
+            {v.text}{' '}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Neighbor resolution (Letter / WTLB) ─────────────────────────────────────
 // Bible/Matthew screens already hold full neighbor chapter objects; only the
 // VOT screens need to resolve {id} → full entry from the in-memory corpus.
@@ -218,7 +240,12 @@ export function PagerPeek({ side, desc, peekRef }) {
   }
   if (desc.kind === 'letter') body = <div className="content-layout"><main className="letter-body">{<PreviewLetterBody blocks={desc.blocks} />}</main></div>;
   else if (desc.kind === 'wtlb') body = <div className="content-layout"><main className="letter-body">{<PreviewWtlbBody paragraphs={desc.paragraphs} />}</main></div>;
-  else if (desc.kind === 'verses') body = <div className={desc.wrapClass || 'chapter-body'}>{<PreviewVerses verses={desc.verses} poetry={desc.poetry} />}</div>;
+  else if (desc.kind === 'verses') {
+    const _vInner = desc.inlineVerses
+      ? <PreviewInlineVerses verses={desc.verses} />
+      : <PreviewVerses verses={desc.verses} poetry={desc.poetry} />;
+    body = <div className={desc.wrapClass || 'chapter-body'}>{_vInner}</div>;
+  }
 
   return (
     <div className={`pager-peek pager-peek-${side}`} aria-hidden="true" ref={peekRef}>

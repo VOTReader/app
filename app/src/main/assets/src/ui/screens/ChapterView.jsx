@@ -44,6 +44,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
   // peek full verse content; a study boundary peeks a card.
   const _chPeek = (ch) => ({
     kind: 'verses', wrapClass: 'chapter-body',
+    inlineVerses: mode !== 'pdf',
     hero: { eyebrow: `Matthew\xA0\xB7\xA0Chapter ${ch.num}`, title: `Chapter ${ch.num}`, subtitle: ch.title || undefined },
     verses: ch.verses || [],
   });

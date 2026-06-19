@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import {
-  PreviewLetterBody, PreviewWtlbBody, PreviewVerses, PagerPeek,
+  PreviewLetterBody, PreviewWtlbBody, PreviewVerses, PreviewInlineVerses, PagerPeek,
   segmentsToPlainText, stripFormatBMarkers, resolveNeighborLetter,
 } from './pager-preview.jsx';
 
@@ -87,6 +87,21 @@ describe('PreviewVerses (Format C) is inert', () => {
   });
 });
 
+describe('PreviewInlineVerses (inline mode) is inert', () => {
+  const verses = [{ n: 1, text: 'In the beginning God created.' }, { n: 2, text: 'The earth was without form.' }];
+  it('renders verse-row/verse-line structure with no annotation hooks', () => {
+    const { container } = render(<PreviewInlineVerses verses={verses} />);
+    assertInert(container);
+    expect(container.querySelector('.verses-inline')).toBeTruthy();
+    expect(container.querySelectorAll('.verse-row').length).toBe(2);
+    expect(container.querySelector('.verse-num').textContent).toBe('1');
+    expect(container.textContent).toContain('In the beginning God created.');
+  });
+  it('handles null without throwing', () => {
+    expect(() => render(<PreviewInlineVerses verses={null} />)).not.toThrow();
+  });
+});
+
 describe('PagerPeek wrapper', () => {
   it('renders a letter peek, inert + aria-hidden', () => {
     const { container } = render(
@@ -98,13 +113,24 @@ describe('PagerPeek wrapper', () => {
     expect(container.querySelector('.hero-title').textContent).toBe('The Narrow Gate');
     expect(container.textContent).toContain('body text here');
   });
-  it('renders a verses peek with the chapter-body wrapper', () => {
+  it('renders a verses peek (verses-block, no inlineVerses flag) with the chapter-body wrapper', () => {
     const { container } = render(
       <PagerPeek side="prev" desc={{ kind: 'verses', hero: { eyebrow: 'Genesis', title: 'Chapter 2' }, verses: [{ n: 1, text: 'Thus the heavens.' }], wrapClass: 'chapter-body' }} />
     );
     assertInert(container);
     expect(container.querySelector('.chapter-body')).toBeTruthy();
+    expect(container.querySelector('.verses-block')).toBeTruthy();
     expect(container.querySelector('.pager-peek-prev')).toBeTruthy();
+  });
+  it('renders an inline-verses peek (inlineVerses: true) with verse-row structure matching live inline mode', () => {
+    const { container } = render(
+      <PagerPeek side="next" desc={{ kind: 'verses', inlineVerses: true, hero: { eyebrow: 'Matthew · Chapter 3', title: 'Chapter 3' }, verses: [{ n: 1, text: 'Thus said the Lord.' }], wrapClass: 'chapter-body' }} />
+    );
+    assertInert(container);
+    expect(container.querySelector('.chapter-body')).toBeTruthy();
+    expect(container.querySelector('.verses-inline')).toBeTruthy();
+    expect(container.querySelectorAll('.verse-row').length).toBe(1);
+    expect(container.querySelector('.verses-block')).toBeNull();
   });
   it('renders a boundary card peek (no full content)', () => {
     const { container } = render(
