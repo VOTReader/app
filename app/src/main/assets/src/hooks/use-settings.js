@@ -105,7 +105,7 @@ export function useSettings({ savedSettings, theme }) {
       haptic: true,
       keepScreenOn: true,
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
-      showSettingsGear: true, translation: "nkjv", restoredNames: true,
+      showSettingsGear: true, translation: "nkjv", restoredNames: true, fontStyle: "classic",
       showChapterTitle: true, showSectionHeadings: true, showInlineEchoes: true,
       tabsEnabled: true,
       searchEnabled: true, historyEnabled: true,
