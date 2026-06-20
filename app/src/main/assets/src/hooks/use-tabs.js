@@ -71,6 +71,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
 export const DEFAULT_TAB = {
   screen: 'home',
@@ -119,7 +120,7 @@ export function useTabs({ saved }) {
     // Migration: seed tab 0 from legacy single-screen state
     return [{
       ...DEFAULT_TAB,
-      screen: saved.screen || 'home',
+      screen: saved.screen || (!AboutSeenFlagStore.is() ? 'about' : 'home'),
       bookId: saved.bookId || null,
       chapterNum: saved.chapterNum != null ? saved.chapterNum : null,
       letterId: saved.letterId || null,
