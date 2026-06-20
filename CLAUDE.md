@@ -52,6 +52,7 @@ What every agent needs in 30 seconds. For landed work history, see **HISTORY.md*
 - **CORPUS_VERSION** needs a manual bump on any `books.js` / `matthew.js` / VOT-corpus edit, or web PWAs keep stale cache (`tools/check-corpus-version.js` enforces). ([[corpus-version-bump]])
 - **adb** at `C:/Users/corbi/AppData/Local/Android/Sdk/platform-tools/`; test device `51071FDAP000C8`; emulator AVD `vot_api28` (API 28 / WebView 69 = the Android 8/9 floor). **gh** at `C:\Program Files\GitHub CLI\gh.exe` (authed as VOTReader).
 - **Preview clean-slate** (load fresh bundles past the SW cache): `(async()=>{for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();for(const k of await caches.keys())await caches.delete(k);location.reload();})()`
+- **`VOTReader/VOTReader-studio` is a redirect-only repo** (2026-06-19), NOT the code. After the code repo was renamed `VOTReader-studio`→`app`, the old Pages URL `votreader.github.io/VOTReader-studio/` 404'd (GitHub carries renamed *repo* URLs but not project *Pages* URLs). This repo reclaims the old name and serves `index.html`+`404.html`, both JS/meta-redirecting every path → `votreader.github.io/app/`. Side effect: reclaiming the name consumed the rename-alias, so `github.com/VOTReader/VOTReader-studio` now shows this redirect repo instead of 301'ing to the code at `/app`. Local clone: `D:\_votreader-studio-redirect` (disposable). The live code + Pages deploy is `VOTReader/app` only.
 
 ## Closed phases — full detail in HISTORY.md
 
