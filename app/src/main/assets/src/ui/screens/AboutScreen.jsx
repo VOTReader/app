@@ -56,7 +56,7 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
               <>
                 <h1 className="about-heading">What You Can Do</h1>
                 <div className="about-body about-features">
-                  <p><strong>Complete library.</strong> All 7 Volumes, Letters to the Flock, Letters from Timothy, WTLB Parts One and Two, The Blessed, Holy Days, the <em>Return to the Garden</em> visual journey, and every Bible and letter study.</p>
+                  <p><strong>Complete library.</strong> All 7 Volumes, A Testament Against The World: The Lord’s Rebuke, Letters to the Flock, Letters from Timothy, WTLB Parts One and Two, The Blessed, Holy Days, the <em>Return to the Garden</em> visual journey, and every Bible and letter study.</p>
                   <p><strong>Eight Bible translations.</strong> Read the whole Bible in NKJV, KJV, WEB, BSB, and four more — switch versions whenever you like.</p>
                   <p><strong>Matthew Study Bible.</strong> The full Gospel in PDF and Inline reading modes, with tappable footnotes and letter references.</p>
                   <p><strong>Mark up anything.</strong> Highlight, underline, or bookmark any passage, and attach your own notes, links, and references — anywhere in the app, including your journal entries.</p>
