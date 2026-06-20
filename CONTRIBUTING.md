@@ -1,4 +1,4 @@
-# Contributing to VOTReader-studio
+# Contributing to VOTReader/app
 
 > Last updated: 2026-05-10. See **PLAN.txt** for the live improvement plan
 > and **CLAUDE.md** for stable project knowledge.

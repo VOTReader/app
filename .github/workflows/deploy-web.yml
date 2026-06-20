@@ -23,7 +23,7 @@ name: Deploy Web (PWA → GitHub Pages)
 #
 # All in-app asset paths are relative (dist/bundle-a.js, fonts/..., etc.),
 # and the SW + manifest use ./ scope, so serving from the
-# /VOTReader-studio/ subpath works with no base-path rewriting. The app
+# /app/ subpath works with no base-path rewriting. The app
 # never changes the URL path (history.pushState({}, '', '') only adds
 # back-button entries), so no SPA 404 fallback is needed.
 #
