@@ -56,12 +56,12 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
               <>
                 <h1 className="about-heading">What You Can Do</h1>
                 <div className="about-body about-features">
-                  <p><strong>Complete library.</strong> All 7 Volumes, Letters to the Flock, Letters from Timothy, WTLB, The Blessed, Holy Days, and the Bible in multiple translations.</p>
-                  <p><strong>Matthew Study Bible.</strong> The full Gospel with inline study notes, a dedicated study mode, and linked Bible study chapters.</p>
-                  <p><strong>Highlights and notes.</strong> Mark any passage in your choice of colors, underline it, or write a personal note. Annotations appear everywhere that passage is referenced.</p>
-                  <p><strong>Personal journal.</strong> Write entries with photos and voice memos. Stored privately on this device.</p>
-                  <p><strong>Full-text search.</strong> Search across all letters, scriptures, and the Bible — with synonym expansion to surface related passages.</p>
-                  <p><strong>Fully offline.</strong> Works without an internet connection after the first load. Your data never leaves this device.</p>
+                  <p><strong>Complete library.</strong> All 7 Volumes, Letters to the Flock, Letters from Timothy, WTLB Parts One and Two, The Blessed, Holy Days, the <em>Return to the Garden</em> visual journey, and every Bible and letter study.</p>
+                  <p><strong>Matthew Study Bible.</strong> The full Gospel in PDF and Inline reading modes, with tappable footnotes and letter references.</p>
+                  <p><strong>Mark up anything.</strong> Highlight, underline, or bookmark any passage, and attach your own notes, links, and references — anywhere in the app, including your journal entries.</p>
+                  <p><strong>Personal journal.</strong> Write entries, add photos and voice memos, and link out to any Bible chapter or letter. Stored privately on this device.</p>
+                  <p><strong>Full-text search.</strong> Search every letter, scripture, and Bible verse at once, with synonym expansion that surfaces related passages.</p>
+                  <p><strong>Fully offline.</strong> Works with no internet connection after the first load. Your data never leaves this device.</p>
                 </div>
               </>
             )}
