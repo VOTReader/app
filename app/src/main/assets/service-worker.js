@@ -8,14 +8,13 @@
  *     NOT cleared on version bump (corpus data rarely changes).
  *     Only cleared when CORPUS_VERSION changes.
  *
- * Update lifecycle (no skipWaiting on install — user controls timing):
- *   New SW installs in background → goes to "waiting".
- *   Page detects the waiting worker → shows "update available" toast.
- *   User taps → page posts SKIP_WAITING → this SW skipWaiting()s → it
- *   activates → 'controllerchange' fires → page reloads on the new build.
+ * Update lifecycle (fully automatic):
+ *   New SW calls self.skipWaiting() on install → takes over immediately.
+ *   'controllerchange' fires in sw-register.js → page reloads onto the
+ *   new build. Background tabs defer their reload until they become visible.
  */
 
-const CACHE_VERSION = 'v1.0.2-986d6ccd38';
+const CACHE_VERSION = 'v1.0.2-58779c603c';
 const CORPUS_VERSION = 'c12'; // c11→c12 (2026-06-12): WTLB/Blessed faithfulness audit — all 360 entries verified present + complete; included the one editorial clarification footnote ("The Letters" refers to The Volumes of Truth) on WTLB One "YAHUWAH Is One", the only footnote across the collection. (c10→c11: restored 14 blank Timothy headers + Recompense's lost dream. c9→c10: restored the "(Regarding …)" occasion header line to ~40 letters. c8→c9: SW1 corpus-cache. c7→c8: CORP-2. c6→c7: CORP-1. c5→c6: PF1 minify.)
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -113,6 +112,9 @@ const CORPUS_PRECACHE = [
 // ── Install: pre-cache critical shell + full corpus ─────────────
 
 self.addEventListener('install', (event) => {
+  // Take over immediately — don't wait for the old SW's tabs to close.
+  // controllerchange fires in sw-register.js, which reloads the page.
+  self.skipWaiting();
   event.waitUntil((async () => {
     const core = await caches.open(CORE_CACHE);
     // Critical shell — all-or-nothing; a miss here SHOULD fail install.
