@@ -1042,7 +1042,12 @@
 
     /* ── STUDY INLINE IMAGE (figures, charts, diagrams) ── */
     .study-image-block { margin:1.5rem -1.5rem; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-    .study-image-block img { display:block; max-width:none; height:auto; border-radius:4px; }
+    /* Default: scale the image to fit the reading column (title/banner images
+       like the Part-One section title are ~1227px wide and otherwise overflow).
+       Genuinely-wide diagrams (the chronology chart) opt back into natural width
+       + horizontal scroll, where the extra width is needed to stay legible. */
+    .study-image-block img { display:block; max-width:100%; height:auto; border-radius:4px; }
+    .study-image-block img[src*="chart"] { max-width:none; }
     .study-image-caption { padding:0.5rem 1.5rem 0; font-size:0.78rem; color:var(--cream-dim); font-style:italic; }
 
     .section-intro-quote { padding:1.5rem 1.5rem 0; text-align:center; }
