@@ -113,7 +113,7 @@ export function useSettings({ savedSettings, theme }) {
       showBookmarkNav: true,
       showThemeBtn: true,
       showScrollNotch: true,
-      arrowLayout: "split", // "split" | "right" | "left" | "nav" | "off"
+      arrowLayout: "off", // "split" | "right" | "left" | "nav" | "off"
       fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>
       ...savedS,
       ...migrated // migration wins over stale saved values
