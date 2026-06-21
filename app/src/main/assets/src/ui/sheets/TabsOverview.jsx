@@ -312,7 +312,13 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
       </div>
       <div className="tabs-overview-grid">
         {tabs.map((t, i) => {
-          const { title, subtitle } = describeTab(t);
+          // Prefer the live describeTab label; but if its corpus isn't loaded
+          // this session (resolved:false → a generic "Reading"/"Entry"
+          // fallback), use the label remembered on the tab from when it was
+          // last viewed (useTabTitleMemo) so a tab never forgets what it was.
+          const _d = describeTab(t);
+          const title = _d.resolved ? _d.title : (t.title || _d.title);
+          const subtitle = _d.resolved ? _d.subtitle : (t.subtitle || _d.subtitle);
           const scrollKey = scrollKeyForTab(t);
           const saved = t.scrollPositions && t.scrollPositions[scrollKey];
           const pctLive = saved == null ? 0 :

@@ -27,8 +27,12 @@ export function useDocumentTitle({ activeTab }) {
   let title = APP_NAME;
   try {
     const d = describeTab(activeTab || { screen: 'home' });
+    // Prefer the live label; if its corpus isn't loaded yet (resolved:false),
+    // fall back to the label remembered on the tab (useTabTitleMemo) so the
+    // window title doesn't flash a generic "Reading" on a cold boot.
+    const label = (d && !d.resolved && activeTab && activeTab.title) ? activeTab.title : (d && d.title);
     // describeTab's Home/default label → just the app name; otherwise prefix it.
-    if (d && d.title && d.title !== 'Home') title = `${d.title} — ${APP_NAME}`;
+    if (label && label !== 'Home') title = `${label} — ${APP_NAME}`;
   } catch (_e) { /* describeTab reads lazy corpus globals; fall back to app name */ }
 
   // Effect keyed on the resolved string, so it only writes when the title

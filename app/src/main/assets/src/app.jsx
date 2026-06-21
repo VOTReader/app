@@ -141,6 +141,10 @@ function App() {
   useKeyboardInset();
   // Keep the tab/window title in sync with the active screen (W4.6).
   useDocumentTitle({ activeTab });
+  // Remember the active tab's resolved card label so the Tabs overview never
+  // reverts a viewed tab to a generic "Reading"/"Entry" when its lazy corpus
+  // isn't loaded this session.
+  useTabTitleMemo({ activeTab, updateActiveTab });
   // Desktop keyboard shortcuts (web only): / + Ctrl+F search, arrows = chapter nav (W4.2).
   useDesktopKeyboard();
   /* __bookmarkCreate, inboundJournalPayload, __openJournalInbound,

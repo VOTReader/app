@@ -86,7 +86,13 @@ export const DEFAULT_TAB = {
   searchQuery: '', searchOrigin: null, searchScope: null, searchContext: null,
   navOrigin: null,
   gardenPage: 1,
-  scrollPositions: {} // per-screen scroll memory: { [screenName]: px }
+  scrollPositions: {}, // per-screen scroll memory: { [screenName]: px }
+  // Last-resolved card label, captured by useTabTitleMemo whenever this tab is
+  // active and its (lazy) corpus is loaded. The Tabs overview falls back to
+  // these when describeTab can't resolve a live title (corpus not loaded this
+  // session) — so a tab never reverts to a generic "Reading"/"Entry" label
+  // once it's been viewed. Persisted with the tab, so it survives app restart.
+  title: null, subtitle: null
 };
 
 /**

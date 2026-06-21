@@ -33,8 +33,15 @@
  * Tabs Overview cards. Falls back gracefully — every branch ends with a
  * defined return, and the final default lands on Home.
  *
+ * `resolved` is true when the title came from actual corpus data (book /
+ * letter / study found) OR from a corpus-independent screen (search, settings,
+ * home, …); it is false ONLY when a content lookup fell back to a generic label
+ * because the relevant lazy corpus hasn't loaded yet. Callers use it to decide
+ * whether to trust the live label or prefer a previously-stored one
+ * (see useTabTitleMemo + the Tabs overview).
+ *
  * @param {TabState} tab
- * @returns {{ title: string, subtitle: string }}
+ * @returns {{ title: string, subtitle: string, resolved: boolean }}
  */
 export function describeTab(tab) {
   // Returns { title, subtitle } for the card. Falls back gracefully.
@@ -63,45 +70,45 @@ export function describeTab(tab) {
     const subtitle = book ?
     book.id === 'matthew' || book.id === 'matthew-plain' ? 'New Testament · Gospels' : ot ? 'Old Testament' : 'New Testament' :
     'Scripture';
-    return { title, subtitle };
+    return { title, subtitle, resolved: !!book };
   }
   if (s === 'bible-idx' || s === 'matthew-idx') {
     const title = book ? book.title : 'Book';
-    return { title, subtitle: book && OT_BOOK_IDS && OT_BOOK_IDS.has(book.id) ? 'Old Testament' : 'New Testament' };
+    return { title, subtitle: book && OT_BOOK_IDS && OT_BOOK_IDS.has(book.id) ? 'Old Testament' : 'New Testament', resolved: !!book };
   }
-  if (s === 'scriptures-home') return { title: 'Scriptures', subtitle: 'The Scriptures of Truth' };
-  if (s === 'scripture-genre') return { title: tab.genreId || 'Scriptures', subtitle: 'Browse by genre' };
+  if (s === 'scriptures-home') return { title: 'Scriptures', subtitle: 'The Scriptures of Truth', resolved: true };
+  if (s === 'scripture-genre') return { title: tab.genreId || 'Scriptures', subtitle: 'Browse by genre', resolved: true };
 
   // Volumes & letter collections (via COLLECTIONS registry)
   const _ltrCol = COL_BY_LETTER_SC.get(s);
   if (_ltrCol) {
     const l = colLetterArr(_ltrCol).find(e => e.id === tab.letterId);
-    return { title: l?.title || (_ltrCol.kind === 'letter' ? 'Letter' : 'Entry'), subtitle: _ltrCol.label };
+    return { title: l?.title || (_ltrCol.kind === 'letter' ? 'Letter' : 'Entry'), subtitle: _ltrCol.label, resolved: !!l };
   }
   const _idxCol = COL_BY_INDEX_SC.get(s);
-  if (_idxCol) return { title: _idxCol.label, subtitle: _idxCol.kind === 'letter' ? 'Letter index' : 'Entry index' };
-  if (s === 'volumes-home') return { title: 'Volumes', subtitle: 'The Volumes of Truth' };
+  if (_idxCol) return { title: _idxCol.label, subtitle: _idxCol.kind === 'letter' ? 'Letter index' : 'Entry index', resolved: true };
+  if (s === 'volumes-home') return { title: 'Volumes', subtitle: 'The Volumes of Truth', resolved: true };
 
   // Studies
-  if (s === 'studies-home') return { title: 'Studies', subtitle: 'Letter Studies · Matthew Study Bible' };
+  if (s === 'studies-home') return { title: 'Studies', subtitle: 'Letter Studies · Matthew Study Bible', resolved: true };
   if (s === 'bible-study-index') {
     const _study = _studies().find(st => st.slug === tab.studyId);
-    return { title: _study?.title || 'Study', subtitle: 'Bible Letter Study' };
+    return { title: _study?.title || 'Study', subtitle: 'Bible Letter Study', resolved: !!_study };
   }
   if (s === 'bible-study-chapter') {
     const _study = _studies().find(st => st.slug === tab.studyId);
     const _ch = _study && _study.chapters && _study.chapters.find(c => c.id === tab.studyChapterId);
-    return { title: _ch?.title || 'Study Chapter', subtitle: _study?.title || 'Bible Letter Study' };
+    return { title: _ch?.title || 'Study Chapter', subtitle: _study?.title || 'Bible Letter Study', resolved: !!_ch };
   }
 
   // Meta
-  if (s === 'garden-view') return { title: `The Garden · Page ${tab.gardenPage ?? 1}`, subtitle: 'A Return to The Garden' };
-  if (s === 'search') return { title: tab.searchQuery ? `"${tab.searchQuery}"` : 'Search', subtitle: 'Full-text search' };
-  if (s === 'history') return { title: 'History', subtitle: 'Recently visited' };
-  if (s === 'settings') return { title: 'Settings', subtitle: 'App configuration' };
+  if (s === 'garden-view') return { title: `The Garden · Page ${tab.gardenPage ?? 1}`, subtitle: 'A Return to The Garden', resolved: true };
+  if (s === 'search') return { title: tab.searchQuery ? `"${tab.searchQuery}"` : 'Search', subtitle: 'Full-text search', resolved: true };
+  if (s === 'history') return { title: 'History', subtitle: 'Recently visited', resolved: true };
+  if (s === 'settings') return { title: 'Settings', subtitle: 'App configuration', resolved: true };
 
   // Default → Home
-  return { title: 'Home', subtitle: 'VOT Study Bible' };
+  return { title: 'Home', subtitle: 'VOT Study Bible', resolved: true };
 }
 
 /**
