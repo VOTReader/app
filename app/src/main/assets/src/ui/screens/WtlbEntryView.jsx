@@ -395,9 +395,12 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         </div>
       </div>
 
-      {/* Interactive chrome (position:fixed bottom sheet) is skipped in an inert
-          peek — it would mis-anchor inside the transformed `.pager-peek`. */}
-      {!inert && (
+      {/* position:fixed bottom sheet. Skipped in an inert peek (a clone is
+          non-interactive and a duplicate sheet in <body> would be wrong); for the
+          LIVE pane it's portaled to <body> so the page-swipe transform on
+          `.pager-track` can't become its containing block and drop it off-screen
+          (see ScriptureSheet for the full rationale). */}
+      {!inert && ReactDOM.createPortal(
       <>
         <div className={`fn-sheet-backdrop${scriptureRef ? " open" : ""}`} onClick={() => setScriptureRef(null)} />
         <div className={`fn-sheet${scriptureRef ? " open" : ""}`}>
@@ -414,7 +417,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
             </>
           )}
         </div>
-      </>
+      </>,
+      document.body
       )}
     </ScreenLayout>
   );

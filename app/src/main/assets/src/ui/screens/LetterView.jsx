@@ -508,6 +508,10 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         onInAppLink={(link) => { setSheetFn(null); wrappedInAppLink && wrappedInAppLink(link); }}
       />
 
+      {/* position:fixed sheet — portal to <body> so a page-swipe transform on
+          `.pager-track` can't become its containing block and drop it off-screen
+          (see ScriptureSheet for the full rationale). */}
+      {ReactDOM.createPortal(
       <>
         <div className={`fn-sheet-backdrop${scripRef ? " open" : ""}`} onClick={() => setScripRef(null)} />
         <div className={`fn-sheet${scripRef ? " open" : ""}`}>
@@ -527,7 +531,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             </>
           )}
         </div>
-      </>
+      </>,
+      document.body
+      )}
 
       {hasProphecyGroups && (
         <ProphecyExpandToggle

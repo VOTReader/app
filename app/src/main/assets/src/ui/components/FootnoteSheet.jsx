@@ -21,7 +21,11 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   const nextKey = curIdx >= 0 && curIdx < orderedKeys.length - 1 ? orderedKeys[curIdx + 1] : null;
   const total = orderedKeys.length;
   const showNav = total > 1 && onNavigate && curIdx !== -1;
-  return (
+  // position:fixed sheet — portal to <body> so it anchors to the viewport, not to
+  // the reading screen's `.pager-track` (whose transient page-swipe transform
+  // would otherwise become its containing block and drop it off-screen — see
+  // ScriptureSheet for the full rationale).
+  return ReactDOM.createPortal(
     <>
       <div className={`fn-sheet-backdrop${isOpen ? " open" : ""}`} onClick={onClose} />
       <div className={`fn-sheet${isOpen ? " open" : ""}`}>
@@ -100,6 +104,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
           </>
         )}
       </div>
-    </>
+    </>,
+    document.body
   );
 }

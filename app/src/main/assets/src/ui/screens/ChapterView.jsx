@@ -284,8 +284,10 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           </div>
         </div>
       </div>
-      {/* position:fixed sheet — skipped in an inert peek (would mis-anchor in
-          the transformed `.pager-peek`; a clone is non-interactive anyway). */}
+      {/* position:fixed sheet, skipped in an inert peek (a clone is
+          non-interactive; a duplicate sheet in <body> would be wrong). The live
+          sheet portals to <body> itself (ScriptureSheet) so the page-swipe
+          transform on `.pager-track` can't drop it off-screen. */}
       {!inert && <ScriptureSheet activeRef={activeScripRef} onClose={() => setActiveScripRef(null)} />}
     </ScreenLayout>
   );

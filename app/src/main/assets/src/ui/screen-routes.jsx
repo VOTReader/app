@@ -637,6 +637,15 @@ export function buildScreenRoutes({
     'matthew-ch': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
       if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
+      // The Matthew study cards cross-reference VOT letters; resolveVotLetter only
+      // resolves once the VOT corpus has loaded and __finishVotInit has rebuilt
+      // VOT_LETTER_REGISTRY. On a cold-boot restore STRAIGHT into Matthew, nothing
+      // else pulls the VOT corpus, so every letter card renders as an un-tappable
+      // gold box with no chevron. Kick the load in the BACKGROUND — idempotent and
+      // async-notify-only (same render-phase contract as _corpusView's loadFn), so
+      // it never blocks the verses; useLazyBundles re-renders App when the corpus
+      // arrives, upgrading the cards to tappable.
+      if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
       return (
         <MatthewChapterView
           chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}
