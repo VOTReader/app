@@ -35,6 +35,7 @@ function baseProps(overrides) {
     screen: 'home', bookId: null, genreId: null,
     fromSearch: false, fromStudies: false, fromMatthewCh: null, studyId: null, fromWtlb: null, fromSurprise: false,
     tabsOverviewOpen: false, journalEntryId: null, fromLetterRef: { current: [] },
+    tapThroughBack: vi.fn(), backHint: null,
     setScreen: vi.fn(), setBookId: vi.fn(), setChapterNum: vi.fn(), setLetterId: vi.fn(),
     setStudyId: vi.fn(), setStudyChapterId: vi.fn(),
     setFromLetterStack: vi.fn(), setFromSearch: vi.fn(), setFromStudies: vi.fn(),
@@ -151,6 +152,58 @@ describe('useAndroidBack — UX3 index-screen origin + safe fallthrough', () => 
     const res = window.handleAndroidBack();
     expect(res).toBe('true');
     expect(props.goHome).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useAndroidBack — "Back to …" pill parity on chapter tap-throughs', () => {
+  // Library/deep-link tap-throughs land on bible-ch / matthew-ch (NOT in
+  // LETTER_SCREEN_SET) and show the cross-screen back-pill. Hardware-back must
+  // match the pill: call tapThroughBack (the pill's own handler), not the
+  // chapter-index route.
+  const pillStack = [{ sourceScreen: 'notes-index', sourceLetterTitle: 'My Notes' }];
+
+  it('bible-ch with the pill showing pops the tap-through stack (not bible-idx)', () => {
+    const props = baseProps({
+      screen: 'bible-ch', bookId: 'genesis',
+      fromLetterRef: { current: pillStack }, backHint: { title: 'My Notes', volumeLabel: null },
+    });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.tapThroughBack).toHaveBeenCalledTimes(1);
+    expect(props.setScreen).not.toHaveBeenCalledWith('bible-idx');
+    expect(props.goScripturesHome).not.toHaveBeenCalled();
+  });
+
+  it('matthew-ch with the pill showing pops the tap-through stack (not matthew-idx)', () => {
+    const props = baseProps({
+      screen: 'matthew-ch',
+      fromLetterRef: { current: pillStack }, backHint: { title: 'My Notes', volumeLabel: null },
+    });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.tapThroughBack).toHaveBeenCalledTimes(1);
+    expect(props.setScreen).not.toHaveBeenCalledWith('matthew-idx');
+  });
+
+  it('bible-ch with NO pill still backs to the book index (regression guard)', () => {
+    const props = baseProps({ screen: 'bible-ch', bookId: 'genesis', backHint: null });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.tapThroughBack).not.toHaveBeenCalled();
+    expect(props.setScreen).toHaveBeenCalledWith('bible-idx');
+  });
+
+  it('the pill wins over a stale fromSearch on bible-ch (pill is the user intent)', () => {
+    const props = baseProps({
+      screen: 'bible-ch', fromSearch: true,
+      fromLetterRef: { current: pillStack }, backHint: { title: 'My Notes', volumeLabel: null },
+    });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.tapThroughBack).toHaveBeenCalledTimes(1);
+    expect(props.setScreen).not.toHaveBeenCalledWith('search');
   });
 });
 

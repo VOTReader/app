@@ -14,6 +14,11 @@
    │  2. the Tabs Overview overlay             → close it                  │
    │  3. a LETTER_SCREEN_SET screen with a     → pop the tap-through stack, │
    │     non-empty fromLetter stack              restore the source        │
+   │  3b. bible-ch / matthew-ch while the       → pop the tap-through stack │
+   │     "Back to …" pill is showing (backHint)  (tapThroughBack), so      │
+   │     — these are NOT in LETTER_SCREEN_SET     hardware-back matches the │
+   │                                             pill on Library/deep-link  │
+   │                                             tap-throughs into chapters │
    │  4. settings / history / about            → goNavOrigin (about also   │
    │                                             marks vot-about-seen)     │
    │  5. notes/links/bookmarks/highlights-index → library                  │
@@ -94,6 +99,13 @@
      journalEntryId                   — App()-local useState; mirrored (the
                                         journalEntryIdRef fix — see above).
      fromLetterRef                    — useFromLetterStack (already a ref).
+     tapThroughBack, backHint         — useFromLetterStack. backHint is the
+                                        live pill state (non-null ⇒ pill shown);
+                                        tapThroughBack is the pill's own pop
+                                        handler. Both mirrored so step 3b reads
+                                        them call-time fresh. Hardware-back on
+                                        bible-ch/matthew-ch defers to the SAME
+                                        handler the pill tap uses.
      setScreen, setBookId, setChapterNum, setLetterId, setStudyId,
        setStudyChapterId, setFromSearch, setFromStudies, setFromWtlb,
        setFromMatthewCh               — useTabs via tabField setters.
@@ -141,7 +153,7 @@ import { modalRegistry } from './use-modal-registry.js';
  */
 export function useAndroidBack({
   screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb, fromSurprise,
-  tabsOverviewOpen, journalEntryId, fromLetterRef,
+  tabsOverviewOpen, journalEntryId, fromLetterRef, tapThroughBack, backHint,
   setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
   setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh, setFromSurprise,
   setTabsOverviewOpen, setSurpriseAnchor,
@@ -165,6 +177,13 @@ export function useAndroidBack({
   const fromSurpriseRef = useRefMirror(fromSurprise);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
   const journalEntryIdRef = useRefMirror(journalEntryId);
+  // The cross-screen "Back to …" pill state + its handler, mirrored so the
+  // mount-only handler reads the CURRENT pill at back-press time. backHint is
+  // non-null exactly when the pill is showing; tapThroughBack pops the
+  // tap-through stack and restores the source — the SAME action the pill's tap
+  // runs (both come from useFromLetterStack).
+  const backHintRef = useRefMirror(backHint);
+  const tapThroughBackRef = useRefMirror(tapThroughBack);
 
   // All letter-style screens that can be a tap-through destination. When
   // the user entered via an in-app footnote link, Android back pops the
@@ -209,6 +228,19 @@ export function useAndroidBack({
         if (fl.sourceStudyId !== undefined) setStudyId(fl.sourceStudyId);
         if (fl.sourceStudyChapterId !== undefined) setStudyChapterId(fl.sourceStudyChapterId);
         setScreen(fl.sourceScreen);
+        return "true";
+      }
+      // Library / deep-link tap-throughs that land on a Bible or Matthew
+      // chapter render the SAME "Back to …" pill (backHint) as letter
+      // tap-throughs — but bible-ch / matthew-ch are NOT in LETTER_SCREEN_SET,
+      // so the step above skips them and hardware-back would fall through to the
+      // chapter-index routing below while the pill points back to the Library
+      // origin. When the pill is showing, hardware-back must MATCH it: pop the
+      // tap-through stack and restore the source — exactly what tapping the pill
+      // does (tapThroughBack). Must precede the fromSurprise/fromSearch chapter
+      // routing below so a visible pill wins.
+      if ((s === "bible-ch" || s === "matthew-ch") && backHintRef.current) {
+        tapThroughBackRef.current();
         return "true";
       }
       if (s === "settings") {goNavOrigin();return "true";} else
@@ -267,7 +299,7 @@ export function useAndroidBack({
       goHome();return "true";
     };
     return () => {delete window.handleAndroidBack;};
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/fromSurpriseRef/tabsOverviewOpenRef/journalEntryIdRef + fromLetterRef from useFromLetterStack — all 12 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell/getStudyById same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/fromSurpriseRef/tabsOverviewOpenRef/journalEntryIdRef/backHintRef/tapThroughBackRef + fromLetterRef from useFromLetterStack — all 14 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell/getStudyById same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
   }, []);
 
   /* ═══════════════════════════════════════════════════════════════════════

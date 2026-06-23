@@ -625,7 +625,7 @@ function App() {
      after every nav helper it threads (goStudiesHome is the last one). */
   useAndroidBack({
     screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb, fromSurprise,
-    tabsOverviewOpen, journalEntryId, fromLetterRef,
+    tabsOverviewOpen, journalEntryId, fromLetterRef, tapThroughBack, backHint,
     setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
     setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh, setFromSurprise,
     setTabsOverviewOpen, setSurpriseAnchor,
