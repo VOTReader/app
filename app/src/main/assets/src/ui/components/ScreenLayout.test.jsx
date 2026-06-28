@@ -96,6 +96,58 @@ describe('ScreenLayout scroll-lift click suppression', () => {
   });
 });
 
+describe('ScreenLayout touchend propagation vs the pager (horizontal-swipe settle)', () => {
+  // The capture-phase suppressor lives on .screen-scroll; the pager's end()
+  // listens in the BUBBLE phase on the SAME element. If the suppressor
+  // stopPropagation's the touchend, the pager never settles → the page freezes
+  // mid-swipe ("holds part-way", worst on Matthew where dense study-note buttons
+  // make almost every swipe start on an interactive target). A horizontal swipe
+  // must therefore pass its touchend through; a vertical scroll-lift must still
+  // be suppressed. Drive performance.now() so the >300ms "tooLong" branch (the
+  // one that bit) is exercised deterministically.
+  function withClock(fn) {
+    const real = performance.now;
+    let t = 1000;
+    /** @type {any} */ (performance).now = () => t;
+    try { return fn((next) => { t = next; }); }
+    finally { /** @type {any} */ (performance).now = real; }
+  }
+
+  it('does NOT stop a horizontal swipe touchend on an interactive target (the "holds part-way" fix)', () => {
+    const { container } = mount();
+    const scrollEl = container.querySelector('.screen-scroll');
+    const contentBtn = container.querySelector('[data-testid="content-btn"]'); // a <button> ∈ INTERACTIVE_SEL
+    let pagerEndReached = false;
+    scrollEl.addEventListener('touchend', () => { pagerEndReached = true; }); // models the pager's bubble end()
+    withClock((setT) => {
+      act(() => {
+        fireTouch(contentBtn, 'touchstart', 200, 300);
+        fireTouch(contentBtn, 'touchmove', 100, 296); // dx 100 ≫ dy 4 → horizontal lock
+        setT(1400);                                    // 400ms later → tooLong branch
+        fireTouch(contentBtn, 'touchend', 100, 296);
+      });
+    });
+    expect(pagerEndReached).toBe(true); // touchend reached .screen-scroll → pager can settle
+  });
+
+  it('still stops a vertical scroll-lift touchend on an interactive target (suppression intact)', () => {
+    const { container } = mount();
+    const scrollEl = container.querySelector('.screen-scroll');
+    const contentBtn = container.querySelector('[data-testid="content-btn"]');
+    let bubbleReached = false;
+    scrollEl.addEventListener('touchend', () => { bubbleReached = true; });
+    withClock((setT) => {
+      act(() => {
+        fireTouch(contentBtn, 'touchstart', 100, 300);
+        fireTouch(contentBtn, 'touchmove', 100, 278); // dy 22 > dx → vertical scroll lock
+        setT(1400);
+        fireTouch(contentBtn, 'touchend', 100, 278);
+      });
+    });
+    expect(bubbleReached).toBe(false); // suppressor stopPropagation'd it (intended)
+  });
+});
+
 describe('ScreenLayout scroll-target registration (trackScroll)', () => {
   it('registers its container as the global __scrollEl by default (a real screen)', () => {
     const { container } = render(<SL hideTabsBtn navChildren={null}>x</SL>);

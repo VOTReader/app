@@ -163,7 +163,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
     if (inert) return;
     const el = scrollRef.current;
     if (!el) return;
-    let startX = 0, startY = 0, startScrollTop = 0, startTime = 0, didScroll = false;
+    let startX = 0, startY = 0, startScrollTop = 0, startTime = 0, didScroll = false, didSwipeX = false;
     let suppressFn = null, suppressTid = null;
 
     const cleanupSuppress = () => {
@@ -182,13 +182,21 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
       startScrollTop = el.scrollTop;
       startTime = performance.now();
       didScroll = false;
+      didSwipeX = false;
       cleanupSuppress();
     };
     const onMove = (e) => {
-      if (didScroll || !e.touches || !e.touches[0]) return;
+      if (didScroll || didSwipeX || !e.touches || !e.touches[0]) return;
       const dy = Math.abs(e.touches[0].clientY - startY);
       const dx = Math.abs(e.touches[0].clientX - startX);
+      // Lock the first axis intent (mirrors the pager's decideAxis: horizontal
+      // must dominate ×1.3). A horizontal lock means the pager owns this gesture,
+      // so onEndCapture must NOT stopPropagation the touchend — that would kill
+      // the pager's same-element bubble end() and freeze the page mid-swipe with
+      // no snap (the Matthew "holds part-way" bug, where dense study-note buttons
+      // make almost every swipe start on an interactive target).
       if (dy > 8 && dy > dx) didScroll = true;
+      else if (dx > 8 && dx > dy * 1.3) didSwipeX = true;
     };
     const onEndCapture = (e) => {
       // Suppress scroll-lifts (finger moved) and long-holds (finger held > 300 ms).
@@ -197,12 +205,21 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
       // are caught by the scrollTop change check.
       const scrolled = didScroll || el.scrollTop !== startScrollTop;
       const tooLong = (performance.now() - startTime) > 300;
-      if (!scrolled && !tooLong) { didScroll = false; return; }
+      if (!scrolled && !tooLong) { didScroll = false; didSwipeX = false; return; }
+      const wasSwipeX = didSwipeX;   // a horizontal pager swipe owns this lift
       didScroll = false;
+      didSwipeX = false;
       cleanupSuppress();
       // Signal __nativeTapAnnotation (highlight marks on Android) to skip this lift.
       window.__scrollLiftPending = true;
-      if (e.target && e.target.closest && e.target.closest(INTERACTIVE_SEL)) {
+      // Block the renderer's own touchend handler on the interactive target the
+      // finger lifted over (an accidental ref/note open after a non-tap lift) —
+      // but NEVER for a horizontal pager swipe: this is a capture-phase listener
+      // on .screen-scroll, so stopPropagation here also cancels the pager's
+      // same-element bubble end(), freezing the page mid-swipe. The pager cancels
+      // its own accidental tap (preventDefault on the horizontal touchmove), and
+      // the document-level click suppressor below still eats any synthesised click.
+      if (!wasSwipeX && e.target && e.target.closest && e.target.closest(INTERACTIVE_SEL)) {
         e.stopPropagation();
       }
       // Only eat the ACCIDENTAL click on the reading content the finger lifted
