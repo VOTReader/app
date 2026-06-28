@@ -183,6 +183,25 @@ describe('createPagerGesture controller', () => {
     expect(calls.commits).toEqual([]);
   });
 
+  it('flips to the opposite neighbor when the finger reverses past the start', () => {
+    // Part-swipe toward NEXT, then drag back past the origin into PREV territory.
+    // The next peek must park (no longer in flight) and the prev peek take over —
+    // otherwise the track slides into empty space with the wrong peek frozen
+    // off-screen (the "cuts off the screen" glitch on a part-swipe-then-reverse).
+    const { io, calls, prevPeek, nextPeek, track } = makeIO();
+    const g = createPagerGesture(io);
+    g.start(startEv(200, 100));
+    g.move(moveEv(160, 100, 0));    // dx -40 → axis x, dir 'next'
+    expect(nextPeek.style.transform).toMatch(/translateX/);
+    g.move(moveEv(360, 100, 40));   // dx +160 → reversed past origin into 'prev'
+    // Next peek parked back to CSS default; prev peek now driven into view.
+    expect(nextPeek.style.transform).toBe('');
+    expect(prevPeek.style.transform).toMatch(/translateX/);
+    expect(track.style.transform).toBe('translateX(160px)');
+    g.end();                        // +160 > 35% of 400 (=140) → commits prev
+    expect(calls.commits).toEqual(['prev']);
+  });
+
   it('selection guard blocks commit', () => {
     const { io, calls } = makeIO({ hasSelection: () => true });
     const g = createPagerGesture(io);

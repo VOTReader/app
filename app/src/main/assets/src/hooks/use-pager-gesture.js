@@ -128,6 +128,32 @@ export function createPagerGesture(io) {
     el.style.transform = transform;
   };
 
+  // Park a peek back at its CSS rest position (off-screen at ±100%) and
+  // de-promote it. Used when the finger reverses across the origin so the
+  // no-longer-active peek can't stay stuck half-on-screen.
+  function parkPeek(dir) {
+    const pk = io.getPeek(dir);
+    if (pk && pk.style) { pk.style.transition = 'none'; pk.style.transform = ''; pk.style.willChange = ''; }
+  }
+
+  // Resolve the active direction + its target descriptor and promote the track +
+  // the active peek to a compositing layer. Called at axis-lock AND whenever the
+  // finger reverses past the start point mid-drag: the page must follow into the
+  // OPPOSITE neighbor (ViewPager2 behavior) instead of sliding into empty space
+  // with the wrong peek frozen off-screen — that stale state is what "cut off
+  // the screen" on a part-swipe-then-reverse. The previously-active peek (if any)
+  // is parked first so only one neighbor is ever in flight.
+  function setDir(st, dir) {
+    if (st.dir === dir) return;
+    if (st.dir) parkPeek(st.dir);
+    st.dir = dir;
+    st.desc = io.peekFor(dir) || null;     // null = dead end → rubber-band only
+    const trk = io.getTrack();
+    const pk = io.getPeek(dir);
+    if (trk && trk.style) trk.style.willChange = 'transform';
+    if (pk && pk.style) pk.style.willChange = 'transform';
+  }
+
   function applyDrag(dx, dir, width) {
     setStyle(io.getTrack(), 'none', `translateX(${dx}px)`);
     const pk = io.getPeek(dir);
@@ -202,16 +228,14 @@ export function createPagerGesture(io) {
         if (ax === null) return;
         if (ax === 'y') { s = null; return; }   // vertical → release to native scroll
         s.axis = 'x';
-        s.dir = dx < 0 ? 'next' : 'prev';
-        s.desc = io.peekFor(s.dir) || null;      // null = dead end → rubber-band only
-        // Promote to compositing layer now we know it's horizontal — avoids text
-        // rasterization at a different scale on the first transformed frame.
-        // Cleared in finishSettle so the live page renders on the main thread at
-        // rest (no stale GPU layer visible when the peek uncovers the track).
-        const _trk = io.getTrack();
-        const _pk = io.getPeek(s.dir);
-        if (_trk && _trk.style) _trk.style.willChange = 'transform';
-        if (_pk && _pk.style) _pk.style.willChange = 'transform';
+        // Lock direction + promote the track/peek to a compositing layer (cleared
+        // in finishSettle so the live page renders on the main thread at rest).
+        setDir(s, dx < 0 ? 'next' : 'prev');
+      } else if (dx !== 0) {
+        // Axis already locked: re-resolve direction so a finger that reverses
+        // past the start point flips to the opposite neighbor instead of
+        // dragging the wrong (frozen) peek into empty space.
+        setDir(s, dx < 0 ? 'next' : 'prev');
       }
       if (e.cancelable !== false && typeof e.preventDefault === 'function') e.preventDefault();
       s.dx = dx;
