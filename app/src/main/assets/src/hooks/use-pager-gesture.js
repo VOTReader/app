@@ -136,6 +136,19 @@ export function createPagerGesture(io) {
     if (pk && pk.style) { pk.style.transition = 'none'; pk.style.transform = ''; pk.style.willChange = ''; }
   }
 
+  // Park BOTH peeks back to their CSS rest position. Called at the start of every
+  // gesture so a new swipe begins from a known-clean baseline even if a prior
+  // gesture left a peek mid-transform — most importantly the just-committed peek,
+  // which sits at translateX(0) covering the screen between finishSettle (which
+  // clears `settling`) and its deferred rAF de-promote. In that window a new
+  // gesture is allowed to start and would drive the OTHER peek while this one
+  // still covers the view → two panes on screen at once (the "split screen").
+  // Clearing both here closes that window regardless of rAF timing.
+  function parkAllPeeks() {
+    parkPeek('prev');
+    parkPeek('next');
+  }
+
   // Resolve the active direction + its target descriptor and promote the track +
   // the active peek to a compositing layer. Called at axis-lock AND whenever the
   // finger reverses past the start point mid-drag: the page must follow into the
@@ -207,6 +220,10 @@ export function createPagerGesture(io) {
     start(e) {
       if (settling) return;
       if (!e.touches || e.touches.length !== 1) { s = null; return; }
+      // Start clean: clear any leftover peek transform from a prior gesture (e.g.
+      // a committed peek still covering the screen before its rAF de-promote) so
+      // this swipe can never coexist with a stale neighbor pane.
+      parkAllPeeks();
       const t0 = e.touches[0];
       // No start-element guard: a swipe must work from ANYWHERE, including on
       // scripture refs / study notes (which can fill most of the page) — the

@@ -145,9 +145,11 @@ describe('createPagerGesture controller', () => {
     g.end();
     expect(calls.commits).toEqual([]);
     expect(pd).not.toHaveBeenCalled();
-    // No peek should have been driven
-    expect(nextPeek.style.transform).toBeUndefined();
-    expect(prevPeek.style.transform).toBeUndefined();
+    // No peek driven into view: both are at their parked baseline ('' → CSS
+    // ±100% off-screen). start() parks both for a clean baseline, so a vertical
+    // drag leaves them parked rather than literally untouched — same visual.
+    expect(nextPeek.style.transform).toBe('');
+    expect(prevPeek.style.transform).toBe('');
   });
 
   it('preventDefault fires once horizontal intent locks', () => {
@@ -200,6 +202,35 @@ describe('createPagerGesture controller', () => {
     expect(track.style.transform).toBe('translateX(160px)');
     g.end();                        // +160 > 35% of 400 (=140) → commits prev
     expect(calls.commits).toEqual(['prev']);
+  });
+
+  it('parks a leftover committed-cover peek when the next gesture starts (no split screen)', () => {
+    // Models the real cross-gesture window: after a commit, finishSettle clears
+    // `settling` and the committed peek sits at translateX(0) (covering) until a
+    // DEFERRED rAF parks it. A fast second swipe starting in that window must not
+    // drive the opposite peek while this one still covers the view (two panes =
+    // the "split screen"). Defer the no-ms rAF here so the cover persists.
+    let raf = null;
+    const { io, calls, nextPeek, prevPeek } = makeIO({
+      schedule: (fn, ms) => { if (ms) { fn(); return 0; } raf = fn; return 1; },
+    });
+    const g = createPagerGesture(io);
+    // Gesture 1: commit NEXT. Settle timer (ms) runs finishSettle synchronously →
+    // commit fires, but the rAF that clears nextPeek is deferred (stored in raf).
+    g.start(startEv(300, 100));
+    g.move(moveEv(250, 100, 0));
+    g.move(moveEv(120, 100, 40));
+    g.end();
+    expect(calls.commits).toEqual(['next']);
+    expect(g.isSettling()).toBe(false);
+    expect(nextPeek.style.transform).toBe('translateX(0px)'); // still covering (rAF pending)
+    // Gesture 2 (opposite) starts INSIDE the window → must park the cover first.
+    g.start(startEv(100, 100));
+    expect(nextPeek.style.transform).toBe(''); // parked by parkAllPeeks → no split
+    g.move(moveEv(160, 100, 60));              // dx +60 → prev peek drives in
+    expect(prevPeek.style.transform).toMatch(/translateX/);
+    expect(nextPeek.style.transform).toBe(''); // and the cover stays parked
+    expect(typeof raf).toBe('function');       // the deferred rAF was real (window existed)
   });
 
   it('selection guard blocks commit', () => {
