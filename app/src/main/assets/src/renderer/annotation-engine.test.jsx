@@ -24,6 +24,8 @@ import {
   applyNoteIcons,
   annDomSig,
   snapRangeToWords,
+  blockBoundaryOffsets,
+  snapSelectionRange,
 } from './annotation-engine.jsx';
 import { AnnotationStore } from '../stores/annotation-store.js';
 import { NoteStore } from '../stores/note-store.js';
@@ -81,6 +83,85 @@ describe('snapRangeToWords (A2 + sticky word/punctuation snap)', () => {
     expect(r).toEqual({ start: 4, end: 6 });
     const cc = 'ab😀cd'.charCodeAt(r.start);
     expect(cc >= 0xDC00 && cc <= 0xDFFF).toBe(false); // not a lone trailing surrogate
+  });
+
+  // Line-break seams: on the imperative DOM path a poetry block flattens two
+  // on-screen lines into one textContent run with NO separating character
+  // ("…captiveThat…"). The `boundaries` set marks those seams so the
+  // expand-outward step can't swallow the next line's first word — the
+  // owner-reported "highlight jumps tracks".
+  it('does NOT expand the END across a hard line boundary ("captive" | "That")', () => {
+    const text = 'Take your every thought captiveThat you may be fully set apart';
+    const boundaries = new Set([31]);                 // break sits before "That"
+    expect(snapRangeToWords(text, 0, 31, boundaries).end).toBe(31);
+    // Proof the guard is load-bearing: without it the end leaks through "That".
+    expect(snapRangeToWords(text, 0, 31).end).toBe(35);
+  });
+  it('does NOT expand the START backward across a hard line boundary ("from" | "This")', () => {
+    const text = 'fromThis world in word';                // "from" | "This world…"
+    const boundaries = new Set([4]);                        // break before "This"
+    expect(snapRangeToWords(text, 4, 22, boundaries).start).toBe(4);
+    expect(snapRangeToWords(text, 4, 22).start).toBe(0);    // pre-fix leaks into "from"
+  });
+  it('still snaps a partial word that does NOT cross a boundary', () => {
+    const boundaries = new Set([100]);                      // far away — no effect
+    expect(snapRangeToWords('the quick brown', 5, 12, boundaries)).toEqual({ start: 4, end: 15 });
+  });
+  it('preserves a selection deliberately dragged PAST the boundary (only auto-expand stops)', () => {
+    // End starts mid-"That" (already across the seam) → expansion within line 2
+    // to the word end is still allowed; the boundary only blocks crossing INTO it.
+    const text = 'captiveThat you';
+    const boundaries = new Set([7]);
+    expect(snapRangeToWords(text, 0, 9, boundaries).end).toBe(11);
+  });
+});
+
+describe('blockBoundaryOffsets + snapSelectionRange (poetry / <br> line-break seams)', () => {
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  it('finds a seam between each poetry-line block div (LetterView shape)', () => {
+    document.body.innerHTML =
+      '<div data-hl-key="k" data-hl-dom>' +
+        '<div class="poetry-line">Beloved, stand apart from</div>' +
+        '<div class="poetry-line">This world in word and by deed;</div>' +
+        '<div class="poetry-line">Take your every thought captive</div>' +
+        '<div class="poetry-line">That you may be fully set apart...</div>' +
+      '</div>';
+    const b = blockBoundaryOffsets(document.querySelector('[data-hl-key="k"]'));
+    expect(b.has(25)).toBe(true);   // before "This"
+    expect(b.has(56)).toBe(true);   // before "Take"
+    expect(b.has(87)).toBe(true);   // before "That"
+  });
+
+  it('finds a seam at each <br> soft break (WtlbEntryView shape)', () => {
+    document.body.innerHTML =
+      '<div data-hl-key="k" data-hl-dom>' +
+        'Take your every thought captive<br><br>That you may be fully set apart...' +
+      '</div>';
+    const b = blockBoundaryOffsets(document.querySelector('[data-hl-key="k"]'));
+    expect(b.has(31)).toBe(true);   // break before "That"
+  });
+
+  it('returns an EMPTY set for a plain inline paragraph (paragraphs must not change)', () => {
+    document.body.innerHTML = '<p data-hl-key="k" data-hl-dom>Hello <em>brave</em> world</p>';
+    expect(blockBoundaryOffsets(document.querySelector('[data-hl-key="k"]')).size).toBe(0);
+  });
+
+  it('snapSelectionRange stops the highlight at the line break (regression: "Set Apart")', () => {
+    document.body.innerHTML =
+      '<div data-hl-key="k" data-hl-dom>' +
+        'Take your every thought captive<br><br>That you may be fully set apart...' +
+      '</div>';
+    const c = document.querySelector('[data-hl-key="k"]');
+    const text = c.textContent;                       // "…captiveThat…"
+    const snapped = snapSelectionRange(c, text, 0, 31);
+    expect(snapped.end).toBe(31);
+    expect(text.slice(snapped.start, snapped.end)).toBe('Take your every thought captive');
+    expect(snapRangeToWords(text, 0, 31).end).toBe(35); // the unguarded snap still leaks
+  });
+
+  it('snapSelectionRange degrades to the plain snap when the container is null', () => {
+    expect(snapSelectionRange(null, 'hello world', 0, 8).end).toBe(11);
   });
 });
 

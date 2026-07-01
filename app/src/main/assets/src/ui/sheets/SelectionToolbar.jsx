@@ -393,7 +393,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           ? computeOffset(container, range.startContainer, range.startOffset) : 0;
         var rawEnd = range && container.contains(range.endContainer)
           ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
-        var snap = snapRangeToWords(containerText, rawStart, rawEnd);
+        var snap = snapSelectionRange(container, containerText, rawStart, rawEnd);
         if (snap.start >= snap.end) return;
         AnnotationStore.add(hlKey, {
           id: hlId(), groupId: groupId, kind: kind,
@@ -409,7 +409,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // boundaries first so the visual mark never lands mid-word.
       const container = document.querySelector('[data-hl-key="' + selInfo.hlKey.replace(/"/g, '\\"') + '"]');
       const containerText = container ? container.textContent : selInfo.text;
-      const snap = snapRangeToWords(containerText, selInfo.start, selInfo.end);
+      const snap = snapSelectionRange(container, containerText, selInfo.start, selInfo.end);
       const existing = AnnotationStore.get(selInfo.hlKey);
       const groupsToRemove = new Set();
       existing.forEach(h => {
@@ -537,7 +537,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             ? computeOffset(container, range.startContainer, range.startOffset) : 0;
           var rawEnd = range && container.contains(range.endContainer)
             ? computeOffset(container, range.endContainer, range.endOffset) : containerLen;
-          var snap = snapRangeToWords(containerText, rawStart, rawEnd);
+          var snap = snapSelectionRange(container, containerText, rawStart, rawEnd);
           if (snap.start >= snap.end) return;
           AnnotationStore.add(hlKey, {
             id: hlId(), groupId: groupId, kind: def.style,
@@ -553,7 +553,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // at the default (allowing stacking with existing notes on the range).
       const container = document.querySelector('[data-hl-key="' + selInfo.hlKey.replace(/"/g, '\\"') + '"]');
       const containerText = container ? container.textContent : selInfo.text;
-      const snap = snapRangeToWords(containerText, selInfo.start, selInfo.end);
+      const snap = snapSelectionRange(container, containerText, selInfo.start, selInfo.end);
       // Empty / whitespace-only / collapsed selection — bail before we create
       // a zero-width annotation (would render as nothing but persist forever).
       if (snap.start >= snap.end) {
@@ -638,8 +638,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     // multi-container bookmarks use the first-container start as a proxy).
     var container = document.querySelector('[data-hl-key="' + hlKey.replace(/"/g, '\\"') + '"]');
     var containerText = container ? container.textContent : (selInfo.text || '');
-    var snap = (typeof snapRangeToWords === 'function')
-      ? snapRangeToWords(containerText, selInfo.start || 0, selInfo.end || 0)
+    var snap = (typeof snapSelectionRange === 'function')
+      ? snapSelectionRange(container, containerText, selInfo.start || 0, selInfo.end || 0)
       : { start: selInfo.start || 0, end: selInfo.end || 0 };
 
     // Derive label from the highlighted text. Two-strategy approach so the

@@ -85,6 +85,9 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).BookmarkStore = { add: vi.fn() };
   /** @type {any} */ (globalThis).ConfirmStrip = vi.fn(() => null);   // ANN2: capture the question/onConfirm props
   /** @type {any} */ (globalThis).snapRangeToWords = (_t, s, e) => ({ start: s, end: e });
+  // Identity stub (mirrors snapRangeToWords above) — the line-break-seam logic is
+  // covered in annotation-engine.test.jsx; here we assert raw offsets pass through.
+  /** @type {any} */ (globalThis).snapSelectionRange = (_c, _t, s, e) => ({ start: s, end: e });
   /** @type {any} */ (globalThis).hlId = () => 'hl_test';
   window.__showAnnChip = vi.fn();
   window.__openNote = vi.fn();
@@ -102,6 +105,7 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).BookmarkStore;
   delete /** @type {any} */ (globalThis).ConfirmStrip;
   delete /** @type {any} */ (globalThis).snapRangeToWords;
+  delete /** @type {any} */ (globalThis).snapSelectionRange;
   delete /** @type {any} */ (globalThis).hlId;
 });
 

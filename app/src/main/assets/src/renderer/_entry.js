@@ -20,6 +20,8 @@ import { applyDOMLinks } from './dom-links.js';
 import { applyDOMBookmarks } from './dom-bookmarks.js';
 import {
   snapRangeToWords,
+  blockBoundaryOffsets,
+  snapSelectionRange,
   HighlightableText,
   findNoteIconInsertionPoint,
   applyNoteIcons,
@@ -36,6 +38,8 @@ Object.assign(window, {
   applyDOMLinks,
   applyDOMBookmarks,
   snapRangeToWords,
+  blockBoundaryOffsets,
+  snapSelectionRange,
   HighlightableText,
   findNoteIconInsertionPoint,
   applyNoteIcons,

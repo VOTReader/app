@@ -40,8 +40,21 @@
    START and left the END exactly where released; the dom-links.js note-icon
    slide-off that compensated for a mid-word end is now a near no-op, but stays as
    defense for the adjacent-inline-element case.) An all-punctuation/whitespace
-   selection collapses to start===end; every caller already bails on that. */
-export function snapRangeToWords(text, start, end) {
+   selection collapses to start===end; every caller already bails on that.
+
+   `boundaries` (optional) is a Set of offsets that are HARD visual-line breaks —
+   positions where the flattened container text stitches two separately-rendered
+   lines together with NO separating character. On the imperative DOM path a
+   poetry block is one [data-hl-key] container whose child <div class=poetry-line>
+   lines (LetterView) or <br> soft breaks (WTLB) leave textContent as
+   "…captiveThat…" — the two words are adjacent in the STRING but on different
+   LINES on screen. Without this, the expand-outward step reads that seam as a
+   partial word and swallows the next line's first word (the owner-reported
+   "highlight jumps tracks"). A boundary at offset i means "there is a line break
+   immediately before text[i]", so expansion must not cross it. It only stops the
+   AUTOMATIC widening — a selection the user deliberately dragged across the break
+   is untouched. See blockBoundaryOffsets/snapSelectionRange for the DOM side. */
+export function snapRangeToWords(text, start, end, boundaries) {
   if (!text || typeof text !== 'string') return { start, end };
   start = Math.max(0, Math.min(start, text.length));
   end = Math.max(0, Math.min(end, text.length));
@@ -50,13 +63,14 @@ export function snapRangeToWords(text, start, end) {
   // so hyphenates ("self-control") stay whole. Everything else (space, comma,
   // colon, period, emoji…) is a boundary the trim strips from the two ends.
   const isWord = (c) => !!c && /[\w’'-]/.test(c);
-  // START: walk left out of a partial word, then trim leading non-word chars so
-  // the mark begins on a letter (never a leading space or open-quote).
-  while (start > 0 && isWord(text[start - 1]) && isWord(text[start])) start--;
+  const atBoundary = (i) => !!boundaries && boundaries.has(i);
+  // START: walk left out of a partial word (but never across a line break), then
+  // trim leading non-word chars so the mark begins on a letter.
+  while (start > 0 && !atBoundary(start) && isWord(text[start - 1]) && isWord(text[start])) start--;
   while (start < end && !isWord(text[start])) start++;
-  // END: walk right out of a partial word, then trim trailing non-word chars —
-  // this drops the stray comma/colon/period/space a drag overshot.
-  while (end < text.length && isWord(text[end]) && isWord(text[end - 1])) end++;
+  // END: walk right out of a partial word (but never across a line break), then
+  // trim trailing non-word chars — dropping the stray comma/space a drag overshot.
+  while (end < text.length && !atBoundary(end) && isWord(text[end]) && isWord(text[end - 1])) end++;
   while (end > start && !isWord(text[end - 1])) end--;
   // ANN-2: never leave `start` on a lone TRAILING surrogate (the low half of an
   // astral codepoint) — a downstream splitText(start) would cleave the glyph. The
@@ -66,6 +80,62 @@ export function snapRangeToWords(text, start, end) {
   const cc = text.charCodeAt(start);
   if (cc >= 0xDC00 && cc <= 0xDFFF && start > 0) start--;
   return { start, end };
+}
+
+/* The offsets in a [data-hl-key] container's flattened textContent where a HARD
+   visual-line break sits — the seams snapRangeToWords must not expand across.
+   Two seam sources, both of which put NO character in textContent between the
+   lines they separate (so the raw string reads two on-screen lines as one run):
+     • a block-level child element boundary — LetterView poetry renders each line
+       as its own <div class="poetry-line">; textContent joins them directly.
+     • a <br> — WtlbEntryView turns each "\n" soft break into a <br> and drops the
+       newline character, so the two lines abut in textContent.
+   Walks children in document order, accumulating the running text offset, and
+   records the offset at every such seam. Inline elements (em/strong/mark/span/
+   fn-ref/note-icon…) are recursed WITHOUT a boundary — snapping across an inline
+   italic/footnote split is correct and must be preserved. A plain paragraph
+   (letter-para) has no block children and no <br>, so this returns an empty set
+   and snapRangeToWords behaves exactly as before. */
+export function blockBoundaryOffsets(container) {
+  const set = new Set();
+  if (!container || container.nodeType !== 1) return set;
+  const isBlock = (el) => {
+    const t = el.tagName;
+    return t === 'DIV' || t === 'P' || t === 'LI' || t === 'BLOCKQUOTE' ||
+      t === 'H1' || t === 'H2' || t === 'H3' || t === 'H4' || t === 'H5' || t === 'H6';
+  };
+  let off = 0;
+  const walk = (node) => {
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      if (child.nodeType === 3) {            // text node
+        off += child.nodeValue.length;
+      } else if (child.nodeType === 1) {     // element
+        if (child.tagName === 'BR') {
+          set.add(off);                      // line break at the running offset
+        } else if (isBlock(child)) {
+          if (off > 0) set.add(off);         // break before this block's text starts
+          walk(child);
+          set.add(off);                      // break after this block's text ends
+        } else {
+          walk(child);                       // inline — recurse, no seam
+        }
+      }
+    }
+  };
+  walk(container);
+  return set;
+}
+
+/* Snap a selection range to whole words like snapRangeToWords, but STOPPING at
+   the container's on-screen line breaks so a poetry line or a WTLB soft-break line
+   can't drag the highlight onto the next line (the "jumps tracks" bug). `text`
+   is the container's flattened textContent (the same coordinate space computeOffset
+   and applyDOMHighlights use); a null container (unmounted DOM) degrades to the
+   plain string snap. This is the single entry point every SelectionToolbar snap
+   call site uses so none can regress the seam handling independently. */
+export function snapSelectionRange(container, text, start, end) {
+  const boundaries = container ? blockBoundaryOffsets(container) : null;
+  return snapRangeToWords(text, start, end, boundaries);
 }
 
 /* An annotation's effective VISIBILITY — does it paint anything? A blank
