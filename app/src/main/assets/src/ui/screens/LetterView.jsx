@@ -493,10 +493,10 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         </div>
       </div>
 
-      {/* Interactive chrome (bottom sheets + the prophecy expand FAB) is
-          position:fixed; inside an inert peek's transformed `.pager-peek`
-          ancestor that would mis-anchor or float visibly. A clone is
-          non-interactive anyway, so skip it entirely. */}
+      {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals
+          to <body>, so an inert peek rendering it would put a DUPLICATE,
+          visible copy on the live viewport. A clone is non-interactive
+          anyway, so skip it entirely. */}
       {!inert && (<>
       <FootnoteSheet
         num={sheetFn}

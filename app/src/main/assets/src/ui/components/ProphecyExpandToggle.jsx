@@ -3,7 +3,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ProphecyExpandToggle({ allExpanded, onToggle }) {
-  return (
+  // position:fixed FAB (.mode-toggle-wrap) — portal to <body> so it anchors to
+  // the viewport, NOT to the reading screen's `.pager-track`. During a
+  // page-swipe settle the track carries a transient transform /
+  // will-change:transform (use-pager-gesture); a transformed ancestor becomes
+  // the containing block for fixed descendants, so the FAB's bottom/right
+  // would resolve against the tall scrolled track and float off-position
+  // (same trap as ScriptureSheet / FootnoteSheet).
+  return ReactDOM.createPortal(
     <div className="mode-toggle-wrap">
       <div className="mode-toggle">
         <button
@@ -21,6 +28,7 @@ export function ProphecyExpandToggle({ allExpanded, onToggle }) {
           {allExpanded ? "Collapse" : "Expand"}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
