@@ -77,6 +77,20 @@ describe('VotSearchMini engine', () => {
     expect(refs(results)).toContain('Psalms 23:1');
   });
 
+  it('carries the fuzzy-corrected doc-side terms on each result (snippet highlight)', async () => {
+    const { results } = await VotSearchMini.search('shephard');
+    const hit = results.find((r) => r.doc.ref === 'Psalms 23:1');
+    // The engine hands the UI the word the fuzzy search ACTUALLY matched in
+    // the doc, so SrchCard can merge it into the highlight list.
+    expect(hit.terms).toContain('shepherd');
+    // Round-trip through the highlighter: the typed term alone marks nothing
+    // (the v1.1 gap), typed + corrected marks the corrected word.
+    const typedOnly = VotSearchMini.highlightSpans(hit.doc.text, ['shephard']);
+    expect(typedOnly.some((s) => s.hit)).toBe(false);
+    const merged = VotSearchMini.highlightSpans(hit.doc.text, ['shephard'].concat(hit.terms));
+    expect(merged.some((s) => s.hit && /shepherd/i.test(s.text))).toBe(true);
+  });
+
   it('expands synonyms only when enabled (mercy → compassion)', async () => {
     const on = await VotSearchMini.search('mercy', { synonyms: true });
     expect(on.results.some((r) => r.doc.kind === 'letter')).toBe(true);

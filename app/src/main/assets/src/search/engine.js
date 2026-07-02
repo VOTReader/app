@@ -16,7 +16,9 @@
      4. re-rank: KIND_BOOST · coverage multiplier · phrase-proximity boost ·
         synonym-only demotion
      5. filter (corpus / scope / quoted-phrase / +must / -mustNot) + dedup + cap
-     6. emit { score, doc } — doc carries the routing/display contract fields
+     6. emit { score, doc, terms } — doc carries the routing/display contract
+        fields; terms carries the doc-side matched words (fuzzy/prefix-
+        corrected) for snippet highlighting. Classic results have no terms.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import MiniSearch from './vendor/minisearch.js';
@@ -130,7 +132,7 @@ async function ensureReady(options) {
  * Execute a search.
  * @param {string} query
  * @param {{translation?:string, useStopWords?:boolean, synonyms?:boolean, scope?:{bookId?:string,volumeId?:string}|null, corpus?:string, limit?:number}} [options]
- * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object}>, parsedTerms?:string[], textQuery?:Object|null}>}
+ * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[]}>, parsedTerms?:string[], textQuery?:Object|null}>}
  */
 async function search(query, options) {
   options = options || {};
@@ -173,6 +175,7 @@ async function search(query, options) {
   const scoreMap = Object.create(null);
   const termMask = Object.create(null);
   const literalHit = Object.create(null);
+  const matchedTerms = Object.create(null);
   const docLookup = Object.create(null);
   for (let u = 0; u < units.length; u++) {
     const unit = units[u];
@@ -191,7 +194,22 @@ async function search(query, options) {
       const id = hit.id;
       scoreMap[id] = (scoreMap[id] || 0) + hit.score;
       if (!docLookup[id]) docLookup[id] = hit;
-      if (unit.literal) literalHit[id] = true;
+      if (unit.literal) {
+        literalHit[id] = true;
+        // hit.terms is the DOC-side vocabulary that matched (MiniSearch derives
+        // it from the match map), so for a fuzzy/prefix hit it's the corrected
+        // word — query "sheperd" carries "shepherd" here. The snippet
+        // highlighter only knows the literal typed terms, so these ride along
+        // on the result for the UI to merge in (v1.1 gap: corrected words
+        // rendered unmarked). Literal units only: synonym units match exactly,
+        // and SRCH4's expandSnippetTerms already covers those.
+        if (hit.terms) {
+          const mt = matchedTerms[id] || (matchedTerms[id] = []);
+          for (let t = 0; t < hit.terms.length && mt.length < 12; t++) {
+            if (mt.indexOf(hit.terms[t]) < 0) mt.push(hit.terms[t]);
+          }
+        }
+      }
       if (unit.origin < 31) termMask[id] = (termMask[id] || 0) | (1 << unit.origin);
     }
   }
@@ -264,7 +282,7 @@ async function search(query, options) {
     const dedupKey = doc.kind + '|' + (doc.ref || '') + '|' + (doc.text || '').slice(0, 60);
     if (seen[dedupKey]) continue;
     seen[dedupKey] = true;
-    out.push({ score: scoreMap[id], doc: reshapeDoc(doc) });
+    out.push({ score: scoreMap[id], doc: reshapeDoc(doc), terms: matchedTerms[id] || [] });
   }
 
   return { parsed, results: out, parsedTerms: filtered, textQuery: p };

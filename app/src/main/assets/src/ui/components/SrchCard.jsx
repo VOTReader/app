@@ -27,6 +27,14 @@ export function SrchCard({ entry, terms, onSelect, isDirect }) {
   (doc.kind === 'chapter-title' || doc.kind === 'letter-title' || doc.kind === 'wtlb-title' || doc.kind === 'blessed-title' || doc.kind === 'holy-day-title') ?
   (doc.title || doc.text) :
   doc.text;
+  // Merge the engine's per-result matched terms (MiniSearch only — the
+  // doc-side words a fuzzy/prefix search actually hit, e.g. typed "sheperd"
+  // matched "shepherd") into the query-level term list, so a typo-corrected
+  // match still gets its <mark> in the snippet. Classic results carry no
+  // entry.terms and pass through unchanged.
+  const hlTerms = (entry.terms && entry.terms.length)
+    ? (terms || []).concat(entry.terms.filter((t) => (terms || []).indexOf(t) < 0))
+    : terms;
   return (
     <button className="srch-card" onClick={() => onSelect(entry)}>
       <div className="srch-card-top">
@@ -37,7 +45,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect }) {
       </div>
       {locLine && <div className="srch-card-loc">{locLine}</div>}
       <div className="srch-card-snippet">
-        <SrchSnippet text={body || ''} terms={terms} />
+        <SrchSnippet text={body || ''} terms={hlTerms} />
       </div>
     </button>
   );

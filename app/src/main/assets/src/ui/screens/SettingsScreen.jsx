@@ -920,13 +920,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // Fix: await the critical deletions (votreader = 19 stores of
       // user data; vot-journal-media = audio + images) before
       // reload. Each delete has a 3s timeout fallback so a stuck
-      // onblocked never hangs the UI; vot-thumbs + vot-search-cache
-      // are caches and get a 1s timeout each.
+      // onblocked never hangs the UI; vot-thumbs + the two search-index
+      // caches (Classic + MiniSearch) are regenerable caches and get a
+      // 1s timeout each.
       await Promise.all([
         _deleteIdbDatabase('votreader', true),
         _deleteIdbDatabase('vot-journal-media', true),
         _deleteIdbDatabase('vot-thumbs', false),
         _deleteIdbDatabase('vot-search-cache', false),
+        _deleteIdbDatabase('vot-minisearch-cache', false),
       ]);
       alert('All personal data cleared. The app will now reload.');
       window.location.reload();

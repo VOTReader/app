@@ -23,6 +23,7 @@
    and NOT in the export):
      - Garden images        (re-fetchable from GitHub Releases)
      - vot-search-cache     (rebuildable FlexSearch index)
+     - vot-minisearch-cache (rebuildable MiniSearch index)
      - vot-thumbs           (tab-card screenshots, re-captured)
      - the SW corpus cache  (the scripture/volume bundles)
 
