@@ -4,7 +4,7 @@
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -29,7 +29,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   // resolves to its full corpus entry; a reading-chain boundary (no in-volume
   // neighbor) still peeks the lightweight card. Same commit path as the arrows.
   const _letterPeek = (nb) => {
-    const full = resolveNeighborLetter(volKey, nb.id);
+    // A host screen not backed by a VOT collection supplies its own resolver
+    // (BibleStudyChapterView renders LetterView over a letter-shaped study-
+    // chapter shim): resolvePeek(nb) → { letter, scrollKey } | null. The
+    // default resolver only knows the COL_BY_KEY collections, so without the
+    // override a same-study neighbor degraded to a generic boundary card.
+    const custom = resolvePeek ? resolvePeek(nb) : null;
+    const full = custom ? custom.letter : resolveNeighborLetter(volKey, nb.id);
     if (!full) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
     return {
       kind: 'screen',
@@ -44,7 +50,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           showProgressBar={showProgressBar}
           markAsReadEnabled={false}
           inert={true}
-          restoreScroll={savedScrollFor(letterScrollKey(volKey, full.id))}
+          restoreScroll={savedScrollFor(custom ? custom.scrollKey : letterScrollKey(volKey, full.id))}
         />
       ),
     };

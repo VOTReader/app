@@ -49,7 +49,8 @@ export function BibleStudyChapterView({
   const prevEntry = !prevCh ? prevChainEntry(studyId) : null;
   const nextEntry = !nextCh ? nextChainEntry(studyId) : null;
 
-  // Build the letter-shaped object expected by LetterView.
+  // Build the letter-shaped object expected by LetterView — for the CURRENT
+  // chapter, and (via resolvePeek below) for a swipe-peeked neighbor.
   // Resource fields (audio/video/relatedTopics/etc.) fall back from
   // chapter → study, so the study can declare them once and every
   // chapter inherits. Chapter-level values override when present.
@@ -58,28 +59,48 @@ export function BibleStudyChapterView({
     if (Array.isArray(chVal)) return chVal.length ? chVal : studyVal || empty;
     return chVal;
   };
-  const letterShim = {
-    id: ch.id,
-    title: ch.title,
-    subtitle: ch.subtitle || null,
-    num: ch.num,
-    date: null, from: null, spoken: null, forLine: null,
-    preamble: ch.part ? `Part ${ch.part}` : null,
-    blocks: ch.blocks || [],
-    sectionIntro: ch.sectionIntro || null,
-    footnotes: ch.footnotes || {},
-    nkjv: ch.nkjv || {},
-    prevLetter: prevCh ? { id: prevCh.id, title: prevCh.title } : null,
-    nextLetter: nextCh ? { id: nextCh.id, title: nextCh.title } : null,
-    relatedTopics: pick(ch.relatedTopics, study.relatedTopics, []),
-    bibleStudies: pick(ch.bibleStudies, study.bibleStudies, []),
-    videos: pick(ch.videos, study.videos, []),
-    audioUrl: pick(ch.audioUrl, study.audioUrl, null),
-    soundcloudUrl: pick(ch.soundcloudUrl, study.soundcloudUrl, null),
-    videoVoiceUrl: pick(ch.videoVoiceUrl, study.videoVoiceUrl, null),
-    videoVoiceLabel: pick(ch.videoVoiceLabel, study.videoVoiceLabel, null),
-    videoMusicUrl: pick(ch.videoMusicUrl, study.videoMusicUrl, null),
-    addendum: pick(ch.addendum, study.addendum, null),
+  // `c` is the chapter object, `chIdx` its index in study.chapters (-1 for a
+  // preface chapter living outside the array — same neighbor arithmetic as
+  // before: prev null, next chapters[0]).
+  const shimFor = (c, chIdx) => {
+    const pc = chIdx > 0 ? study.chapters[chIdx - 1] : null;
+    const nc = chIdx < study.chapters.length - 1 ? study.chapters[chIdx + 1] : null;
+    return {
+      id: c.id,
+      title: c.title,
+      subtitle: c.subtitle || null,
+      num: c.num,
+      date: null, from: null, spoken: null, forLine: null,
+      preamble: c.part ? `Part ${c.part}` : null,
+      blocks: c.blocks || [],
+      sectionIntro: c.sectionIntro || null,
+      footnotes: c.footnotes || {},
+      nkjv: c.nkjv || {},
+      prevLetter: pc ? { id: pc.id, title: pc.title } : null,
+      nextLetter: nc ? { id: nc.id, title: nc.title } : null,
+      relatedTopics: pick(c.relatedTopics, study.relatedTopics, []),
+      bibleStudies: pick(c.bibleStudies, study.bibleStudies, []),
+      videos: pick(c.videos, study.videos, []),
+      audioUrl: pick(c.audioUrl, study.audioUrl, null),
+      soundcloudUrl: pick(c.soundcloudUrl, study.soundcloudUrl, null),
+      videoVoiceUrl: pick(c.videoVoiceUrl, study.videoVoiceUrl, null),
+      videoVoiceLabel: pick(c.videoVoiceLabel, study.videoVoiceLabel, null),
+      videoMusicUrl: pick(c.videoMusicUrl, study.videoMusicUrl, null),
+      addendum: pick(c.addendum, study.addendum, null),
+    };
+  };
+  const letterShim = shimFor(ch, idx);
+
+  // Swipe-peek resolver for LetterView's pager: a same-study neighbor renders
+  // as the REAL study-chapter page (the neighbor's shim through the same
+  // inert-LetterView path the VOT letters use) instead of the generic
+  // "Continue" boundary card the default VOT-collection resolver degraded to.
+  // The scroll key mirrors useScrollMemory's 'study-<studyId>-<chapterId>'
+  // branch, so the peek opens at the neighbor's saved reading position.
+  const resolvePeek = (nb) => {
+    const i = study.chapters.findIndex((c) => c.id === nb.id);
+    if (i < 0) return null;
+    return { letter: shimFor(study.chapters[i], i), scrollKey: 'study-' + studyId + '-' + nb.id };
   };
 
   // onStudyNavigate: internal jump to another study. Saves current
@@ -120,6 +141,7 @@ export function BibleStudyChapterView({
       onNextBoundary={nextEntry ? goToChainEntryFirst(nextEntry.slug) : null}
       prophecyCardStatesRef={prophecyCardStatesRef}
       saveProphecyCardStates={saveProphecyCardStates}
+      resolvePeek={resolvePeek}
     />
   );
 }

@@ -404,9 +404,10 @@
          real heights resolve — and at swipe-commit you'd jump from the peek's
          accurate scrollbar to the live's estimated one (a visible flash). Since
          the pager already pre-renders both full neighbors, the PERF4 estimate buys
-         nothing on these 4 reading screens — so lift it here and the two panes
-         match exactly. (Non-pager reading screens — e.g. BibleStudyChapterView —
-         keep content-visibility:auto: they have no peek to match and no swipe.) */
+         nothing on the pager reading screens — so lift it here and the two panes
+         match exactly. (BibleStudyChapterView renders through LetterView inside
+         `.pager-track`, so these selectors cover it too; PERF4 stays active only
+         on reading content outside any pager.) */
       .pager-track .letter-para,
       .pager-track .letter-poetry,
       .pager-track .section-block,
