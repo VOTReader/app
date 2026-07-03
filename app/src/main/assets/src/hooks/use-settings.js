@@ -106,6 +106,11 @@ export function useSettings({ savedSettings, theme }) {
       //  persisted 'searchEngine' key in old vot-state blobs is simply unread.)
       haptic: true,
       keepScreenOn: true,
+      // Backup-freshness reminder (useBackupReminder). The companion stamps —
+      // lastExportAt (set on export success) + lastBackupRemindedAt (set when
+      // the reminder shows) — deliberately have NO defaults: absent means
+      // "never", which the decision fn treats as stale.
+      backupReminder: true,
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
       showSettingsGear: true, translation: "nkjv", restoredNames: true, fontStyle: "classic",
       showChapterTitle: true, showSectionHeadings: true, showInlineEchoes: true,
