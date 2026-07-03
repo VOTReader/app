@@ -196,11 +196,11 @@ describe('useNav — goHome (multi-state reset)', () => {
   });
 });
 
-// ── navOrigin-pattern helpers (8 of them, all identical shape) ─────────
+// ── navOrigin-pattern helpers (10 of them, all identical shape) ────────
 
 describe('useNav — navOrigin-pattern helpers', () => {
   // Each name → expected destination screen. The capture-then-switch
-  // contract is identical across all 8; tested in one parameterized loop
+  // contract is identical across all 10; tested in one parameterized loop
   // so a regression in `_captureOrigin` shows up in every row, not just
   // the first.
   const cases = [
@@ -208,6 +208,7 @@ describe('useNav — navOrigin-pattern helpers', () => {
     ['goHistory',         'history'],
     ['goAbout',           'about'],
     ['goLibrary',         'library'],
+    ['goProgress',        'my-progress'],
     ['goJournalHub',      'journal-home'],
     ['goNotesIndex',      'notes-index'],
     ['goLinksIndex',      'links-index'],

@@ -338,6 +338,10 @@
     await step('Library → Highlights', async function () { return lib(/My Marks|Highlights/, /Highlight|Underline/); });
     await step('Library → Links', async function () { return lib(/My Links/, /Link/); });
     await step('Library → Journal', async function () { return lib(/My Journal/, /Journal/); });
+    await step('Library → Progress', async function () {
+      await lib(/My Progress/);
+      return /Most Annotated/i.test(document.body.textContent || '');
+    });
     await step('Settings', async function () {
       clickByText(/App Configuration|^Settings/); await sleep(360);
       return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || '');

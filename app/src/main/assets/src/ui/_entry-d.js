@@ -57,6 +57,11 @@ import {
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
 } from '../utils/nav-index.js';
 import { _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav } from '../utils/note-source.js';
+import {
+  READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
+  countReadFor, groupBooks, tallyGroup,
+  annotationSourceForKey, mostAnnotatedSources,
+} from '../utils/progress-stats.js';
 import { bookCategory } from '../utils/book-category.js';
 import {
   firstVerseOfRef, parseRefRanges, lastVerseOfFirstRange, echoVersesForRef,
@@ -131,6 +136,7 @@ import { WtlbEntryView } from './screens/WtlbEntryView.jsx';
 import { BibleChapterView } from './screens/BibleChapterView.jsx';
 import { ChapterView } from './screens/ChapterView.jsx';
 import { LibraryScreen } from './screens/LibraryScreen.jsx';
+import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import { VolumesHome } from './screens/VolumesHome.jsx';
 import { StudiesHome } from './screens/StudiesHome.jsx';
@@ -191,6 +197,9 @@ Object.assign(window, {
   describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab,
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
   _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav,
+  READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
+  countReadFor, groupBooks, tallyGroup,
+  annotationSourceForKey, mostAnnotatedSources,
   bookCategory,
   firstVerseOfRef, parseRefRanges, lastVerseOfFirstRange, echoVersesForRef,
   getNotesForVerse, getEchoesForVerse, parseRefRange, splitIntoVerses,
@@ -225,7 +234,7 @@ Object.assign(window, {
   buildScreenRoutes,
   // Screens
   LetterView, WtlbEntryView, BibleChapterView, ChapterView,
-  LibraryScreen, NotesIndexScreen,
+  LibraryScreen, MyProgressScreen, NotesIndexScreen,
   VolumesHome, StudiesHome, HistoryScreen, AboutScreen,
   HomeScreen,
   BibleStudyIndex, BibleStudyChapterView, MatthewChapterView, ChapterIndex,

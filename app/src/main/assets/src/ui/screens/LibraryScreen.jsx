@@ -2,7 +2,7 @@
    LibraryScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
    Drag-to-reorder: same imperative DOM / long-press architecture as
-   HomeScreen (1D reference) and TabsOverview (2D grid). The 5 tiles are
+   HomeScreen (1D reference) and TabsOverview (2D grid). The 6 tiles are
    in a 2-column grid, so sibling shifts use full 2D FLIP (naturalRectsRef
    holds real viewport coords; diagonal cross-row moves work for free).
 
@@ -14,7 +14,7 @@
    React re-renders so the useEffect-only path leaves the refs stale.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, readCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to all 5 stores so tile counts re-render on any mutation.
   React.useSyncExternalStore(
     React.useCallback((cb) => NoteStore.subscribe(cb), []),
@@ -108,6 +108,19 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
         <svg viewBox="0 0 24 24">
           <path d="M9 11l-4 4 4 4 11-11-4-4-7 7" />
           <line x1="13" y1="7" x2="17" y2="11" />
+        </svg>
+      ),
+    },
+    progress: {
+      id: 'progress', eyebrow: 'My Progress', title: 'Progress',
+      detail: !readCount ? 'Nothing read yet' : (readCount + ' read'),
+      onClick: onOpenProgress,
+      icon: (
+        <svg viewBox="0 0 24 24">
+          <line x1="6" y1="20" x2="6" y2="14" />
+          <line x1="12" y1="20" x2="12" y2="9" />
+          <line x1="18" y1="20" x2="18" y2="4" />
+          <path d="M3 20h18" />
         </svg>
       ),
     },

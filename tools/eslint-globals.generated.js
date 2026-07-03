@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 426 distinct identifiers.
+// Total: 435 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -163,6 +163,7 @@ export const projectGlobals = {
   MatthewChapterView: "readonly",
   ModeToggle: "readonly",
   MultiNotePopover: "readonly",
+  MyProgressScreen: "readonly",
   NavButtons: "readonly",
   NoteDefaultStore: "readonly",
   NoteRow: "readonly",
@@ -179,6 +180,7 @@ export const projectGlobals = {
   ProphecyGroup: "readonly",
   READING_CHAIN: "readonly",
   READING_SCREENS: "readonly",
+  READ_VERSION_ID: "readonly",
   React: "readonly",
   ReactDOM: "readonly",
   RecentNavStore: "readonly",
@@ -283,6 +285,7 @@ export const projectGlobals = {
   _validateTabState: "readonly",
   _verseRangeLabel: "readonly",
   addRecentSearch: "readonly",
+  annotationSourceForKey: "readonly",
   applyActiveNoteState: "readonly",
   applyDOMBookmarks: "readonly",
   applyDOMHighlights: "readonly",
@@ -296,6 +299,7 @@ export const projectGlobals = {
   bookCategory: "readonly",
   buildExportPayload: "readonly",
   buildNavIndex: "readonly",
+  buildProgressGroups: "readonly",
   buildScreenRoutes: "readonly",
   buildSourceEndpoint: "readonly",
   buildV3Manifest: "readonly",
@@ -306,6 +310,7 @@ export const projectGlobals = {
   colLetterArr: "readonly",
   colLetters: "readonly",
   colPreface: "readonly",
+  countReadFor: "readonly",
   data: "readonly",
   describeTab: "readonly",
   echoVersesForRef: "readonly",
@@ -326,6 +331,7 @@ export const projectGlobals = {
   getGardenTier: "readonly",
   getNotesForVerse: "readonly",
   getRecentSearches: "readonly",
+  groupBooks: "readonly",
   hasAnyPendingStores: "readonly",
   hideToast: "readonly",
   highlightExcerptInDom: "readonly",
@@ -355,6 +361,7 @@ export const projectGlobals = {
   lookupVersesFromBooks: "readonly",
   measureUserData: "readonly",
   modalRegistry: "readonly",
+  mostAnnotatedSources: "readonly",
   navHandoff: "readonly",
   navItemPreview: "readonly",
   navItemToEndpoint: "readonly",
@@ -367,6 +374,7 @@ export const projectGlobals = {
   parseRefStr: "readonly",
   parseScriptureRef: "readonly",
   persistLink: "readonly",
+  progressCorporaReady: "readonly",
   readContainer: "readonly",
   relativeDate: "readonly",
   renderCommentaryCite: "readonly",
@@ -389,6 +397,7 @@ export const projectGlobals = {
   suppressNextHistoryPush: "readonly",
   tabContentKey: "readonly",
   tabHasProgressBar: "readonly",
+  tallyGroup: "readonly",
   timeAgo: "readonly",
   translateVerse: "readonly",
   translationLabel: "readonly",

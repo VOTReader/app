@@ -1,10 +1,15 @@
 /* ══════════════════════════════════════════════════════════════════════
    LibraryOrderStore — library-screen tile-order persistence
    ══════════════════════════════════════════════════════════════════════
-   Mirrors HomeOrderStore. Stores the display order of the 5 library
-   tiles in IDB under key 'vot-library-order'. DB_VERSION bumped 3→4
+   Mirrors HomeOrderStore. Stores the display order of the library tiles
+   in IDB under key 'vot-library-order'. DB_VERSION bumped 3→4
    (idb-adapter.js) to create the object store on existing installs via
    the onupgradeneeded additive guard.
+
+   Unlike HomeOrderStore's strict exact-length check, get() here is
+   growth-tolerant: a saved order from before a new default tile shipped
+   keeps the user's custom arrangement, with the new tile appended at
+   the end. Foreign ids still reject the whole save (schema safety).
 
    API:
      LibraryOrderStore.get()              → string[]  (saved or DEFAULT)
@@ -16,23 +21,26 @@ import { CachedStore, extendStore } from './cached-store.js';
 
 /** Canonical default library-tile order. */
 export const DEFAULT_LIBRARY_ORDER = Object.freeze([
-  'notes', 'links', 'journal', 'bookmarks', 'highlights',
+  'notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress',
 ]);
 
 export const LibraryOrderStore = extendStore(
   CachedStore('vot-library-order', /** @type {string[]} */ ([]), { idb: true }),
   {
     /**
-     * Saved order if it passes the schema check (exact length match +
-     * every default id present); otherwise DEFAULT_LIBRARY_ORDER.
+     * Saved order when every saved id is a known tile id (deduped, with
+     * any default ids the save predates appended at the end); otherwise
+     * DEFAULT_LIBRARY_ORDER.
      * @returns {string[]}
      */
     get() {
       const saved = this._load();
-      if (Array.isArray(saved) &&
-          saved.length === DEFAULT_LIBRARY_ORDER.length &&
-          DEFAULT_LIBRARY_ORDER.every((id) => saved.includes(id))) {
-        return /** @type {string[]} */ (saved);
+      if (Array.isArray(saved) && saved.length > 0 &&
+          saved.every((id) => DEFAULT_LIBRARY_ORDER.includes(id))) {
+        const seen = new Set();
+        const clean = saved.filter((id) => !seen.has(id) && seen.add(id));
+        const missing = DEFAULT_LIBRARY_ORDER.filter((id) => !seen.has(id));
+        return /** @type {string[]} */ (clean.concat(missing));
       }
       return /** @type {string[]} */ (DEFAULT_LIBRARY_ORDER);
     },

@@ -424,7 +424,7 @@ function App() {
   const [journalEntryId, setJournalEntryId] = useState(null);
   const {
     goHome, goScripturesHome, goScriptureGenre, goVolumesHome,
-    goSettings, goHistory, goAbout, goLibrary,
+    goSettings, goHistory, goAbout, goLibrary, goProgress,
     goJournalHub, goJournalViewer, goJournalEditor,
     goNotesIndex, goLinksIndex, goBookmarksIndex, goHighlightsIndex,
     goColIdx, goMatthewIdx, goStudiesHome, goBibleIdx, goToGardenFirst,
@@ -679,6 +679,7 @@ function App() {
     goVolumesHome, goScripturesHome, goScriptureGenre, goBibleIdx, goMatthewIdx,
     goStudiesHome,
     goNotesIndex, goLinksIndex, goBookmarksIndex, goJournalHub, goHighlightsIndex,
+    goProgress,
     goJournalViewer, goJournalEditor,
     goSearchOrigin, goColIdx,
     handleSelect, handleSurprise, handleScriptureSelect, handleVolumeSelect,
@@ -707,7 +708,7 @@ function App() {
           intentionally renders nothing (null is a valid no-op React child). */}
       {null}
 
-      {settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && (
+      {settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "my-progress", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && (
         <button className="reading-dot-global" onClick={goToLastRead} title="Resume reading">
           <span className="rdg-inner" />
         </button>

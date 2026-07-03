@@ -3731,6 +3731,113 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
+       MY PROGRESS SCREEN — read-only dashboard unifying mark-as-read
+       progress, journal streak, library counts, and most-annotated
+       sources. The header reuses the .library-* idiom and the cards
+       reuse .settings-section-label / .settings-card; only the
+       dashboard-specific pieces (hero stat cells, progress bars,
+       source rows) are defined here.
+       ════════════════════════════════════════════════════════════ */
+    .prg-screen {
+      max-width: 640px; margin: 0 auto;
+      padding: 1.5rem 1.2rem 4rem;
+      width: 100%;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .prg-hero {
+      display: flex; gap: 0.85rem;
+      width: 100%; max-width: 520px;
+      margin-bottom: 1.8rem;
+    }
+    .prg-stat {
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+      padding: 1.05rem 0.4rem 0.95rem;
+      background: var(--bg2);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      text-align: center;
+    }
+    .prg-stat-num {
+      font-family: 'Cinzel', serif; font-size: 1.6rem; line-height: 1.1;
+      color: var(--gold);
+    }
+    .prg-stat-label {
+      font-family: 'Cinzel', serif; font-size: 0.56rem;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--gold-dim);
+      margin-top: 0.1rem;
+    }
+    .prg-stat-sub {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.78rem; color: var(--cream-muted); line-height: 1.25;
+    }
+    .prg-section { margin-left: auto; margin-right: auto; }
+    /* Every card child row shares the same divider discipline as
+       .progress-row: bottom rule, none on the last. */
+    .prg-row, .prg-note, .prg-history-row, .prg-src-row {
+      border-bottom: 1px solid var(--gold-border);
+    }
+    .settings-card > .prg-row:last-child,
+    .settings-card > .prg-note:last-child,
+    .settings-card > .prg-history-row:last-child,
+    .settings-card > .prg-src-row:last-child { border-bottom: none; }
+    .prg-row {
+      display: flex; flex-direction: column; gap: 0.5rem;
+      padding: 0.85rem 1.2rem 0.95rem;
+    }
+    .prg-row-head { display: flex; align-items: baseline; gap: 0.75rem; }
+    .prg-row-label {
+      font-family: 'Cinzel', serif; font-size: 0.78rem;
+      letter-spacing: 0.06em; color: var(--cream); flex: 1;
+    }
+    .prg-row-tally {
+      font-family: 'Cinzel', serif; font-size: 0.65rem;
+      letter-spacing: 0.1em; color: var(--gold-dim); white-space: nowrap;
+    }
+    .prg-bar {
+      height: 4px; border-radius: 2px;
+      background: var(--gold-faint);
+      overflow: hidden;
+    }
+    .prg-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+      border-radius: 2px;
+    }
+    .prg-history-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.7rem 1.2rem;
+      background: var(--bg);
+    }
+    .prg-history-label {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.85rem; color: var(--cream-muted); flex: 1;
+    }
+    .prg-note {
+      padding: 0.9rem 1.2rem;
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.9rem; color: var(--cream-muted); line-height: 1.45;
+    }
+    .prg-src-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.75rem 1.2rem;
+    }
+    .prg-src-main {
+      flex: 1; display: flex; flex-direction: column; gap: 0.1rem;
+      min-width: 0;
+    }
+    .prg-src-title {
+      font-family: 'Cinzel', serif; font-size: 0.8rem;
+      letter-spacing: 0.05em; color: var(--cream);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .prg-src-col {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.78rem; color: var(--cream-muted);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
        NOTES INDEX SCREEN — list of every note with search, filter,
        sort. Each row leads with its source label and shows a body
        preview, anchored quote, and any notebook chips.
