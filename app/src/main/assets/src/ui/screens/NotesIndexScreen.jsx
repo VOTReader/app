@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { composeNotesExport, notesExportFilename, shareNotesExport } from '../../utils/notes-export.js';
 
 /**
  * Case-insensitive full-text filter for the Notes index — matches a note's
@@ -154,6 +155,18 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
     setDrilledNbId(null);
   };
 
+  // "Share as text" — compose the visible list as a markdown document and
+  // hand it to the platform share/save path (notes-export.js owns the
+  // format; noteSourceLabel resolves each note's source the same way the
+  // rows render it, degrading to the raw slug when a title can't resolve).
+  const exportNotes = (title, list) => {
+    shareNotesExport({
+      title,
+      filename: notesExportFilename(title),
+      text: composeNotesExport({ title, notes: list, resolveLabel: noteSourceLabel }),
+    });
+  };
+
   // ── Hierarchical back: a drilled-in notebook is its own navigation level ──
   // Unwind it to the Notebooks list before Back leaves the screen, so no level
   // is skipped. popDrill is the single source of that transition — used by the
@@ -216,9 +229,14 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                     <button className="nb-drilled-action" onClick={commitRename} title="Save name">Save</button>
                     <button className="nb-drilled-action" onClick={() => setRenaming(false)} title="Cancel rename">Cancel</button>
                   </>
-                : drilledNb && <>
-                    <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>
-                    <button className="nb-drilled-action danger" onClick={() => setConfirmDeleteNb(true)} title="Delete notebook">Delete</button>
+                : <>
+                    {drilledNotes.length > 0 && (
+                      <button className="nb-drilled-action" onClick={() => exportNotes(drilledTitle, drilledNotes)} title="Share notebook as text">Share</button>
+                    )}
+                    {drilledNb && <>
+                      <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>
+                      <button className="nb-drilled-action danger" onClick={() => setConfirmDeleteNb(true)} title="Delete notebook">Delete</button>
+                    </>}
                   </>
               }
             </div>
@@ -341,6 +359,11 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
             />
             {allNotes.length > 0 && (
               <div className="notes-index-controls">
+                <button
+                  className="notes-index-sort-btn"
+                  onClick={() => exportNotes('My Notes', allNotesSorted)}
+                  title="Share all notes as text"
+                >Share as Text</button>
                 <button
                   className="notes-index-sort-btn"
                   onClick={() => setAllNotesSort(s => s === 'newest' ? 'oldest' : 'newest')}
