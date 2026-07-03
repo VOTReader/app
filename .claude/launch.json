@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["tools/preview-server.py", "8090", "D:\\VOTReader-studio\\app\\src\\main\\assets"],
       "port": 8090
+    },
+    {
+      "name": "app-alt",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/preview-server.py", "8093", "D:\\VOTReader-studio\\app\\src\\main\\assets"],
+      "port": 8093
     }
   ]
 }
