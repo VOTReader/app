@@ -2,6 +2,29 @@
    NotesIndexScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+
+/**
+ * Case-insensitive full-text filter for the Notes index — matches a note's
+ * body, its anchor excerpt (fullText, display-normalized so queries match
+ * what NoteRow actually renders, including legacy collapsed-line records),
+ * and its source label ("Genesis 1:1-3", a letter title, "Journal · …").
+ * A blank query returns the list unchanged.
+ *
+ * @param {any[]} notes
+ * @param {string} query
+ * @returns {any[]}
+ */
+export function filterNotesByQuery(notes, query) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return notes;
+  return notes.filter(note =>
+    (note.body || '').toLowerCase().includes(q) ||
+    normalizeExcerptDisplay(note.fullText).toLowerCase().includes(q) ||
+    noteSourceLabel(note).toLowerCase().includes(q)
+  );
+}
+
 export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to NoteStore + NotebookStore mutations so the index re-renders
   // on any add/remove/rename/membership change.
@@ -33,6 +56,10 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const [confirmDeleteNb, setConfirmDeleteNb] = React.useState(false);
   const [allNotesSort, setAllNotesSort] = React.useState('newest'); // 'newest' | 'oldest'
   const [drilledSort, setDrilledSort] = React.useState('newest');
+  // One shared query filters the All Notes tab AND any drilled notebook —
+  // the box is visible in both views, so the carried-over filter is never
+  // hidden state. The Notebooks card grid has no box (cards aren't notes).
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   // Build the back-pill source label from the user's current location.
   // — Drilled into a user notebook: that notebook's name
@@ -93,6 +120,9 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   }, [allNotes, drilledNbId, drilledSort]);
 
   const allNotesSorted = React.useMemo(() => sortList(allNotes, allNotesSort), [allNotes, allNotesSort]);
+
+  const drilledNotesShown = React.useMemo(() => filterNotesByQuery(drilledNotes, searchQuery), [drilledNotes, searchQuery]);
+  const allNotesShown = React.useMemo(() => filterNotesByQuery(allNotesSorted, searchQuery), [allNotesSorted, searchQuery]);
 
   const createNotebook = () => {
     const trimmed = newNbName.trim();
@@ -200,6 +230,13 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                 onConfirm={deleteCurrent}
               />
             )}
+            <input
+              className="notes-index-search"
+              type="search"
+              placeholder="Search notes…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
             {drilledNotes.length > 0 && (
               <div className="notes-index-controls">
                 <button
@@ -221,11 +258,18 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                     </div>
                   </div>
                 )
-              : (
-                  <div className="notes-index-list">
-                    {drilledNotes.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} hideNotebookId={drilledNbId} />)}
-                  </div>
-                )
+              : drilledNotesShown.length === 0
+                ? (
+                    <div className="notes-empty">
+                      <div className="notes-empty-title">No Matches</div>
+                      <div className="notes-empty-hint">Try a different search term.</div>
+                    </div>
+                  )
+                : (
+                    <div className="notes-index-list">
+                      {drilledNotesShown.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} hideNotebookId={drilledNbId} />)}
+                    </div>
+                  )
             }
           </>
         )}
@@ -288,6 +332,13 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
         {/* ── ALL NOTES TAB ── */}
         {!drilledNbId && tab === 'all-notes' && (
           <>
+            <input
+              className="notes-index-search"
+              type="search"
+              placeholder="Search notes…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
             {allNotes.length > 0 && (
               <div className="notes-index-controls">
                 <button
@@ -304,11 +355,18 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                     <div className="notes-empty-hint">Long-press text in any chapter, tap Note in the toolbar, and your notes will appear here.</div>
                   </div>
                 )
-              : (
-                  <div className="notes-index-list">
-                    {allNotesSorted.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} />)}
-                  </div>
-                )
+              : allNotesShown.length === 0
+                ? (
+                    <div className="notes-empty">
+                      <div className="notes-empty-title">No Matches</div>
+                      <div className="notes-empty-hint">Try a different search term.</div>
+                    </div>
+                  )
+                : (
+                    <div className="notes-index-list">
+                      {allNotesShown.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} />)}
+                    </div>
+                  )
             }
           </>
         )}
