@@ -10,6 +10,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { AnnotationActionChip } from './AnnotationActionChip.jsx';
+import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
+
+// The chip's confirm mode renders the REAL ConfirmStrip (a bare global at
+// runtime) so the confirm-gate test below is non-vacuous.
+/** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
 
 afterEach(() => {
   cleanup();
@@ -92,5 +97,28 @@ describe('AnnotationActionChip style switcher', () => {
     fireEvent.click(screen.getByTitle('Back'));
     expect(screen.getByTitle('Style')).toBeTruthy(); // main row again
     expect(window.AnnotationStore.convertGroup).not.toHaveBeenCalled();
+  });
+
+  // Destructive-action placement: Remove is LAST on the main row (after
+  // Color/Style/Note) so a tap aimed at the common actions can't land on it.
+  it('renders Remove as the LAST main-row button, on a highlight and on a note', () => {
+    setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' });
+    const { container, unmount } = render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    let labels = [...container.querySelectorAll('.ann-chip-btn')].map(b => b.textContent);
+    expect(labels).toEqual(['Color', 'Style', 'Note', 'Remove']);
+    unmount();
+    setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' }, { isNote: true });
+    const r2 = render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    labels = [...r2.container.querySelectorAll('.ann-chip-btn')].map(b => b.textContent);
+    expect(labels).toEqual(['Color', 'Style', 'Remove']); // no Note button on an existing note
+  });
+
+  it('Remove still confirm-gates: tapping it swaps to the ConfirmStrip, not an instant delete', () => {
+    setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' });
+    render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    fireEvent.click(screen.getByTitle('Remove'));
+    expect(window.AnnotationStore.removeGroup).not.toHaveBeenCalled();
+    expect(screen.getByText('Cancel')).toBeTruthy();
+    expect(screen.getByText('Yes, remove')).toBeTruthy();
   });
 });

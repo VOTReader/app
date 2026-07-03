@@ -1695,6 +1695,11 @@
     .settings-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; overflow:hidden; }
     .settings-row { display:flex; flex-direction:column; align-items:stretch; gap:0; padding:0; margin:0; background:none; border:none; border-radius:0; border-bottom:1px solid rgba(232,192,80,0.13); }
     .settings-card > .settings-row:last-child { border-bottom:none; }
+    /* Danger zone (Clear All Personal Data) — visibly set apart from the
+       routine Export/Import rows above it: breathing room + a red-tinted
+       rule so the destructive row can't be mistaken for one of them. */
+    .settings-row.danger-zone { margin-top:0.9rem; border-top:1px solid rgba(199,92,74,0.4); }
+    .settings-row.danger-zone .settings-row-head { padding-top:0.85rem; padding-bottom:0.85rem; }
     .settings-row-head { display:flex; align-items:center; gap:0.5rem; padding:0.62rem 0.95rem; min-height:46px; }
     .settings-row-grow { flex:1 1 auto; min-width:0.5rem; }
     .settings-row-text { flex:1; min-width:0; }
@@ -2405,9 +2410,11 @@
     body.light .tab-card.drag-flying {
       box-shadow:0 20px 44px rgba(0,0,0,0.18), 0 0 28px rgba(122,92,16,0.28), 0 0 0 1px var(--gold);
     }
-    /* "Tab actions" (⋮) button — sibling of the × close, offset to its left */
+    /* "Tab actions" (⋮) button — opposite corner from the instant-close ×:
+       side-by-side top-right they sat 3px apart, so a tap aimed at the menu
+       could close the tab. */
     .tab-card-menu {
-      position:absolute; top:0.35rem; right:2.45rem;
+      position:absolute; top:0.35rem; left:0.35rem;
       width:1.9rem; height:1.9rem; border-radius:50%;
       background:rgba(0,0,0,0.55); border:0; cursor:pointer;
       font-size:1.15rem; line-height:1; color:var(--gold);
@@ -2665,7 +2672,9 @@
     .ann-chip-btn + .ann-chip-btn { border-left: 1px solid rgba(224,201,127,0.12); }
     .ann-chip-btn:active { background: rgba(224,201,127,0.10); color: var(--gold); }
     .ann-chip-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-    .ann-chip-btn.danger { color: var(--danger); }
+    /* Destructive Remove sits LAST in the chip, behind a real gutter + a
+       stronger divider, so a tap aimed at Color/Style/Note can't reach it. */
+    .ann-chip-btn.danger { color: var(--danger); margin-left: 6px; border-left: 1px solid var(--gold-border); }
     .ann-chip-btn.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
     /* Confirm strip — replaces the chip in place. */
     .ann-chip-confirm {
@@ -2833,11 +2842,14 @@
     .sel-color-btn.sel-color-squiggle[data-color="brown"]  { border-color: var(--hl-brown); }
     .sel-color-btn.sel-color-squiggle[data-color="gray"]   { border-color: var(--hl-gray); }
     /* Clear/remove circle (X) at end of color row */
+    /* Gap before the destructive ✕ so it reads as its own action, not the
+       next swatch in the color row (it was flush against the last color). */
     .sel-color-clear {
       background: transparent; color: var(--cream-dim);
       border: 2px solid var(--gold-border);
       display: flex; align-items: center; justify-content: center;
       font-size: 0.875rem; font-weight: 600;
+      margin-left: 10px;
     }
     .sel-color-clear:active { background: rgba(244,143,177,0.2); border-color: var(--accent-pink) !important; color: var(--accent-pink); }
     /* Blank ("no color") swatch — outline circle + diagonal slash (the
@@ -2863,8 +2875,10 @@
       mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
     }
     /* Action button row: 5 buttons, equal-width grid */
+    /* 3-across so the 6 actions form two balanced rows (5-across left a lone
+       orphan button wrapping onto its own row) and each target gets wider. */
     .sel-toolbar-actions {
-      display: grid; grid-template-columns: repeat(5, 1fr);
+      display: grid; grid-template-columns: repeat(3, 1fr);
       gap: 2px; padding-top: 4px;
       border-top: 1px solid var(--gold-border);
     }
@@ -3450,6 +3464,22 @@
       font-size: 0.95rem; color: var(--cream-muted);
       padding: 14px 2px; text-align: center;
     }
+    /* Empty-note primary action — a real tappable affordance instead of a
+       "Tap ⋯ → Edit" instruction. Dashed outline reads as "fill me in". */
+    .note-sheet-empty-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; margin: 10px 0 4px; padding: 12px;
+      background: transparent;
+      border: 1px dashed var(--gold-border); border-radius: 8px;
+      color: var(--gold-dim); cursor: pointer;
+      font-family: 'Cinzel', serif; font-size: 0.66rem;
+      letter-spacing: 0.10em; text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+    }
+    .note-sheet-empty-btn svg { width: 15px; height: 15px; }
+    .note-sheet-empty-btn:active { color: var(--gold); border-color: var(--gold); background: var(--gold-faint); }
+    @media (hover: hover) { .note-sheet-empty-btn:hover { color: var(--gold); border-color: var(--gold); } }
     .note-sheet-textarea {
       width: 100%; min-height: 120px; padding: 10px 14px;
       background: var(--bg); border: 1px solid var(--gold-border);
@@ -3511,7 +3541,9 @@
     }
     .note-sheet-menu-item + .note-sheet-menu-item { border-top: 1px solid rgba(224,201,127,0.10); }
     .note-sheet-menu-item:active { background: rgba(224,201,127,0.08); color: var(--gold); }
-    .note-sheet-menu-item.danger { color: var(--danger); }
+    /* Destructive Delete gets a visible gap + stronger rule above it so it
+       reads as its own zone below the routine menu items. */
+    .note-sheet-menu-item.danger { color: var(--danger); margin-top: 6px; border-top: 1px solid rgba(224,201,127,0.25); }
     .note-sheet-menu-item.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
     .note-sheet-menu-item.disabled { color: var(--cream-muted); opacity: 0.5; cursor: not-allowed; }
     .note-sheet-menu-item.disabled:active { background: none; color: var(--cream-muted); }
@@ -3799,7 +3831,9 @@
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
     .nb-drilled-action:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
-    .nb-drilled-action.danger { color: var(--danger); border-color: rgba(239,154,154,0.35); }
+    /* Extra gap before the destructive Delete so a tap aimed at Rename
+       can't land on it (flex gap 0.55rem + this margin ≈ 16px clear). */
+    .nb-drilled-action.danger { color: var(--danger); border-color: rgba(239,154,154,0.35); margin-left: 0.45rem; }
     .nb-drilled-action.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
     /* Inline rename input in drilled header */
     .nb-drilled-rename {
@@ -4298,6 +4332,11 @@
     .link-action-btn:active { background: var(--gold-faint); color: var(--gold); }
     @media (hover: hover) { .link-action-btn:hover { background: var(--gold-faint); color: var(--gold); } }
     .link-action-btn svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--gold-dim); }
+    /* Destructive Delete row in the action sheets sits behind a gap + rule
+       so it reads as its own zone below Open/Edit/Share. (Doubled class for
+       specificity — the base .link-action-btn { border:none } is declared
+       later in this file and would otherwise clobber the border-top.) */
+    .link-action-btn.link-action-btn-danger { margin-top: 6px; border-top: 1px solid rgba(224,201,127,0.18); }
     .link-action-btn-danger { color: var(--danger); }
     .link-action-btn-danger svg { color: var(--danger); }
     .link-action-btn-danger:active { background: rgba(244,143,177,0.12); color: var(--accent-pink); }

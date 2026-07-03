@@ -4,10 +4,17 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
-export function NoteRow({ note, onTap }) {
+/**
+ * @param {{ note: any, onTap: any, hideNotebookId?: any }} props
+ */
+export function NoteRow({ note, onTap, hideNotebookId }) {
   const sourceLabel = noteSourceLabel(note);
   const date = relativeDate(note.updated || note.created);
-  const noteNbs = (note.notebookIds || []).map(id => NotebookStore.get(id)).filter(Boolean);
+  // Inside a drilled notebook every row belongs to that notebook, so its chip
+  // is pure noise — the host passes hideNotebookId to suppress just that one.
+  const noteNbs = (note.notebookIds || [])
+    .filter(id => id !== hideNotebookId)
+    .map(id => NotebookStore.get(id)).filter(Boolean);
   const swatchBg = ({
     yellow: '#ffd700', green: '#76ff03', pink: '#ff4081', red: '#f44336',
     orange: '#ff9100', blue: '#2196f3', purple: '#ba68c8', teal: '#00bcd4',

@@ -178,6 +178,15 @@ export function buildScreenRoutes({
     return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>{loadingLabel}</div>;
   };
   const _wrapVot = (jsx) => _votReady ? jsx : _corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…');
+  // Personal-library screens (notes/bookmarks/links/highlights/journal) resolve
+  // VOT letter titles + nav endpoints via findEntryContext, which only works
+  // once the VOT corpus registry is built. On a cold-boot restore straight into
+  // one of them nothing else pulls the corpus, so rows show raw ids
+  // ("the-last-trump") and letter tap-throughs dead-end. Kick the load in the
+  // BACKGROUND — same render-phase contract as 'matthew-ch' below (idempotent
+  // + async-notify-only); useLazyBundles re-renders App when it lands and the
+  // labels upgrade in place.
+  const _kickVot = (jsx) => { if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus(); return jsx; };
 
   return {
     // ── Volume index screens (13) ──
@@ -350,7 +359,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'library': () => (
+    'library': () => _kickVot(
       <LibraryScreen
         onBack={goHome}
         onOpenNotes={goNotesIndex}
@@ -365,7 +374,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'highlights-index': () => typeof HighlightsScreen !== 'undefined' && (
+    'highlights-index': () => typeof HighlightsScreen !== 'undefined' && _kickVot(
       <HighlightsScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -382,7 +391,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'journal-home': () => typeof JournalHubScreen !== 'undefined' && (
+    'journal-home': () => typeof JournalHubScreen !== 'undefined' && _kickVot(
       <JournalHubScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -396,7 +405,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'journal-viewer': () => typeof JournalViewerScreen !== 'undefined' && (
+    'journal-viewer': () => typeof JournalViewerScreen !== 'undefined' && _kickVot(
       <JournalViewerScreen
         onSettings={goSettings}
         entryId={journalEntryId}
@@ -425,7 +434,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'journal-editor': () => typeof JournalEditorScreen !== 'undefined' && (
+    'journal-editor': () => typeof JournalEditorScreen !== 'undefined' && _kickVot(
       <JournalEditorScreen
         onSettings={goSettings}
         entryId={journalEntryId}
@@ -437,7 +446,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'notes-index': () => (
+    'notes-index': () => _kickVot(
       <NotesIndexScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -455,7 +464,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'links-index': () => (
+    'links-index': () => _kickVot(
       <LinksScreen
         onSettings={goSettings}
         onBack={goNavOrigin}
@@ -478,7 +487,7 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    'bookmarks-index': () => (
+    'bookmarks-index': () => _kickVot(
       <BookmarksScreen
         onSettings={goSettings}
         onBack={goNavOrigin}

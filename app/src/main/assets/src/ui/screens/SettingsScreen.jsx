@@ -73,10 +73,10 @@ function DataInfoRow({ label, value = null, children = null }) {
 }
 
 /* DataActionRow — label + ⓘ-revealed description + action button. */
-function DataActionRow({ label, desc = null, children = null }) {
+function DataActionRow({ label, desc = null, children = null, className = '' }) {
   const [showDesc, setShowDesc] = React.useState(false);
   return (
-    <div className="settings-row">
+    <div className={'settings-row' + (className ? ' ' + className : '')}>
       <div className="settings-row-head">
         <span className="settings-row-label">{label}</span>
         {desc && (
@@ -1224,6 +1224,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               </DataActionRow>
             )}
             <DataActionRow
+              className="danger-zone"
               label="Clear All Personal Data"
               desc="Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup."
             >

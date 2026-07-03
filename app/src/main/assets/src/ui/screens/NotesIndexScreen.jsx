@@ -223,7 +223,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                 )
               : (
                   <div className="notes-index-list">
-                    {drilledNotes.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} />)}
+                    {drilledNotes.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} hideNotebookId={drilledNbId} />)}
                   </div>
                 )
             }

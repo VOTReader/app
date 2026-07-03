@@ -4,6 +4,9 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
+/**
+ * @param {{ groupId: any, startInEditMode: any, onClose: any, onOpenNotebookPicker?: any }} props
+ */
 export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPicker }) {
   // Subscribe to NoteStore + AnnotationStore mutations. Each store's _bump
   // triggers a re-render of this component via useSyncExternalStore.
@@ -231,7 +234,15 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
             {mode === 'read' ? (
               note.body
                 ? <div className="note-sheet-body">{note.body}</div>
-                : <div className="note-sheet-empty">Empty note. Tap ⋯ → Edit to add text.</div>
+                : (
+                  <button className="note-sheet-empty-btn" onClick={() => setMode('edit')}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" />
+                    </svg>
+                    Add note text
+                  </button>
+                )
             ) : (
               <textarea
                 ref={textareaRef}

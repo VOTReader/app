@@ -81,17 +81,9 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
       >
         {mode === 'main' && (
           <>
-            <button
-              className="ann-chip-btn danger"
-              onClick={() => setMode('confirm')}
-              title="Remove"
-            >
-              <svg viewBox="0 0 24 24">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-              <span>Remove</span>
-            </button>
+            {/* Destructive action LAST + separated (see .ann-chip-btn.danger
+                margin/border in app.css) so a tap aimed at the common actions
+                (Color/Style/Note) can't land on Remove. */}
             <button
               className="ann-chip-btn"
               onClick={() => setMode('colors')}
@@ -133,6 +125,17 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
                 <span>Note</span>
               </button>
             )}
+            <button
+              className="ann-chip-btn danger"
+              onClick={() => setMode('confirm')}
+              title="Remove"
+            >
+              <svg viewBox="0 0 24 24">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              <span>Remove</span>
+            </button>
           </>
         )}
         {mode === 'confirm' && (

@@ -229,7 +229,9 @@
   R('.jrn-aud-waveform .bar { width: 2px; background: var(--gold-dim); border-radius: 1px; flex-shrink: 0; transition: background 0.1s; }');
   R('.jrn-aud-waveform .bar.is-played { background: var(--gold); }');
   R('.jrn-aud-meta { font-family: var(--font-cinzel); font-size: 0.5625rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); display: flex; justify-content: space-between; gap: 8px; }');
-  R('.jrn-aud-delete { background: none; border: none; color: var(--gold-dim); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.12s, color 0.12s; }');
+  R('.jrn-aud-delete { position: relative; background: none; border: none; color: var(--gold-dim); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.12s, color 0.12s; }');
+  // 44px effective tap target (WL4 pattern) without growing the 32px visual.
+  R('.jrn-aud-delete::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }');
   R('.jrn-aud-delete svg { width: 16px; height: 16px; }');
   R('.jrn-aud-delete:hover { background: rgba(199, 92, 74, 0.15); color: #c75c4a; }');
   // When the user taps × on an audio block, the standardized ConfirmStrip
@@ -271,7 +273,9 @@
   R('.jrn-pin-btn:hover { color: var(--gold); }');
   R('.jrn-pin-btn.is-pinned { color: var(--gold); }');
   R('.jrn-pin-btn.is-pinned svg { filter: drop-shadow(0 0 4px var(--gold-glow)); }');
-  R('.jrn-del-btn { color: var(--gold-dim); transition: color 0.15s; }');
+  // Gap before the destructive trash button so it can't be fat-fingered
+  // from the adjacent pin (both are 44px nav targets, previously flush).
+  R('.jrn-del-btn { color: var(--gold-dim); transition: color 0.15s; margin-left: 0.5rem; }');
   R('.jrn-del-btn:hover { color: #c75c4a; }');
 
   // Insert sheet
@@ -337,6 +341,9 @@
   R('.jrn-block-del-btn:hover { opacity: 1; color: #c75c4a; background: rgba(199, 92, 74, 0.12); border-color: rgba(199, 92, 74, 0.45); }');
   R('.jrn-block-del-btn:active { transform: scale(0.92); }');
   R('.jrn-block-del-btn svg { width: 14px; height: 14px; }');
+  // 44px effective tap target (WL4 pattern): the visual stays a subtle 26px
+  // circle but the hit area meets the touch-target floor.
+  R('.jrn-block-del-btn::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; }');
   // The standardized ConfirmStrip (.ann-chip-confirm base) is rendered
   // with className="jrn-block-confirm" so it flips to the TOP of the
   // block (order:-1) as a warm-red banner and pushes the block's own
