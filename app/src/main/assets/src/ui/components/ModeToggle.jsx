@@ -3,9 +3,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
+  // The pill floats over scripture with no context — without this caption a
+  // first-time reader can't tell what "PDF / Inline / Off" applies to
+  // (tooltips don't exist on touch).
+  const caption = <div className="mode-toggle-label">Study Notes</div>;
   if (!showStudy) {
     return (
       <div className="mode-toggle-wrap">
+        {caption}
         <div className="mode-toggle">
           <button
             className="mode-btn active"
@@ -16,7 +21,7 @@ export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
               <circle cx="12" cy="12" r="9" />
               <path d="M9 12l2 2 4-4" />
             </svg>
-            {"On"}
+            {"Show"}
           </button>
         </div>
       </div>
@@ -26,6 +31,7 @@ export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
   const isPdf = mode === "pdf";
   return (
     <div className="mode-toggle-wrap">
+      {caption}
       <div className="mode-toggle">
         <button
           className="mode-btn active"

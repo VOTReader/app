@@ -79,6 +79,17 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   var previewPlaying = _previewPlaying[0];
   var setPreviewPlaying = _previewPlaying[1];
 
+  // Discard is destructive (an in-progress take or a finished recording is
+  // gone for good) yet it was reachable INSTANTLY from the backdrop, the
+  // header ×, and the preview's × next to Save. requestDiscard() gates it
+  // behind a ConfirmStrip whenever real audio is at risk; the confirm resets
+  // on any stage change so it can't linger across transitions.
+  var _confirmingDiscard = useState(false);
+  var confirmingDiscard = _confirmingDiscard[0];
+  var setConfirmingDiscard = _confirmingDiscard[1];
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setConfirmingDiscard is a useState setter (identity-stable); only the stage transition should re-fire this reset.
+  useEffect(function() { setConfirmingDiscard(false); }, [stage]);
+
   // Refs the component owns for UI display + IDB save. The bridge owns the
   // recorder + MediaStream + AudioContext + AnalyserNode; nothing about
   // platform branching lives in this file.
@@ -319,6 +330,15 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     onClose && onClose();
   }
 
+  // Confirm-gate the discard whenever real audio would be lost: a take in
+  // progress (any recorded seconds) or a finished recording under review.
+  // The requesting/error stages hold nothing, so they still close instantly.
+  function requestDiscard() {
+    var atRisk = stage === 'preview' || ((stage === 'recording' || stage === 'paused') && seconds > 0);
+    if (atRisk) { setConfirmingDiscard(true); return; }
+    discard();
+  }
+
   function persistRecording() {
     var blob = previewBlobRef.current;
     if (!blob || !blob.size) {
@@ -468,8 +488,17 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           <div className={"jrn-rec-status" + (isPaused ? ' is-paused' : '')}>{isPaused ? 'Paused' : 'Recording'}</div>
           <div className="jrn-rec-time">{fmtTime(seconds)}</div>
           {renderRecordingWave(waveLive)}
+          {confirmingDiscard ? (
+            <ConfirmStrip
+              className="jrn-rec-discard-confirm"
+              question="Discard this recording?"
+              yesLabel="Yes, discard"
+              onCancel={function() { setConfirmingDiscard(false); }}
+              onConfirm={discard}
+            />
+          ) : (
           <div className="jrn-rec-actions">
-            <button className="jrn-rec-cancel" onClick={discard} aria-label="Cancel">Cancel</button>
+            <button className="jrn-rec-cancel" onClick={requestDiscard} aria-label="Cancel">Cancel</button>
             {isPaused ? (
               <button className="jrn-rec-pause-btn" onClick={resumeRecording} aria-label="Resume" title="Resume">
                 <svg viewBox="0 0 24 24" fill="currentColor">
@@ -489,6 +518,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
               </svg>
             </button>
           </div>
+          )}
         </div>
       );
     }
@@ -510,14 +540,24 @@ export function JournalRecordingSheet({ onSave, onClose }) {
             </svg>
           </button>
         </div>
-        <div className="jrn-rec-actions">
-          <button className="jrn-rec-discard-btn" onClick={discard} aria-label="Discard" title="Discard">×</button>
+        {confirmingDiscard ? (
+          <ConfirmStrip
+            className="jrn-rec-discard-confirm"
+            question="Discard this recording?"
+            yesLabel="Yes, discard"
+            onCancel={function() { setConfirmingDiscard(false); }}
+            onConfirm={discard}
+          />
+        ) : (
+        <div className="jrn-rec-actions jrn-rec-review-actions">
+          <button className="jrn-rec-discard-btn" onClick={requestDiscard} aria-label="Discard" title="Discard">×</button>
           <button className="jrn-rec-confirm-btn" onClick={save} aria-label="Save" title="Save">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </button>
         </div>
+        )}
         {previewUrlRef.current && (
           <audio
             ref={previewAudioRef}
@@ -534,12 +574,12 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   }
 
   return (
-    <div className="note-sheet-overlay" onClick={function(e) { if (e.target === e.currentTarget) discard(); }}>
+    <div className="note-sheet-overlay" onClick={function(e) { if (e.target === e.currentTarget) requestDiscard(); }}>
       <div className="note-sheet jrn-rec-sheet" onClick={function(e) { e.stopPropagation(); }}>
         <div className="note-sheet-header">
           <span className="note-sheet-title" style={{ flex: 1 }}>{stage === 'preview' ? 'Review Recording' : 'Voice Recording'}</span>
           {stage !== 'preview' && (
-            <button className="note-sheet-menu-btn" onClick={discard} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
+            <button className="note-sheet-menu-btn" onClick={requestDiscard} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
           )}
         </div>
         {renderContent()}

@@ -85,7 +85,10 @@ export function LinkRow({ lnk, onNavigateSource, onNavigateTarget, onLongPress }
         {srcCat && <span className="link-row-side-cat">{srcCat}</span>}
         {srcPreview && <span className="link-row-side-preview">{srcPreview}</span>}
       </button>
-      {/* Chain icon + date */}
+      {/* Chain icon + date + a VISIBLE options affordance. The action sheet
+          (Open source/target, Delete) was long-press-only — invisible, and
+          inconsistent with BookmarkRow's ⋯ button. Same handler, now
+          discoverable. */}
       <div className="link-row-mid">
         <svg
           className="link-row-chain"
@@ -97,6 +100,18 @@ export function LinkRow({ lnk, onNavigateSource, onNavigateTarget, onLongPress }
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
         {date && <span className="link-row-date">{date}</span>}
+        <button
+          className="link-row-more"
+          onClick={function(e) { e.stopPropagation(); if (onLongPress) onLongPress(lnk, e); }}
+          title="Link options"
+          aria-label="Link options"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="5" r="1" />
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="12" cy="19" r="1" />
+          </svg>
+        </button>
       </div>
       {/* Target side — tappable */}
       <button

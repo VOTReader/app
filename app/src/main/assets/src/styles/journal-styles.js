@@ -390,6 +390,13 @@
   R('.jrn-rec-waveform.is-scrubbable { cursor: pointer; padding: 0 6px; }');
   R('.jrn-rec-error { font-family: var(--font-garamond); font-style: italic; color: #d05a4a; font-size: 0.875rem; padding: 14px 24px; }');
   R('.jrn-rec-actions { display: flex; justify-content: center; gap: 14px; margin-top: 24px; align-items: center; }');
+  // Review row holds ONLY the destructive × and the Save ✓ — give the pair a
+  // wider gutter than the generic action row so a Save tap can't graze Discard.
+  R('.jrn-rec-review-actions { gap: 34px; }');
+  // Discard confirm — warm-red banner in place of the action row (same
+  // ConfirmStrip skin the block-delete confirm uses).
+  R('.jrn-rec-discard-confirm { margin-top: 24px; padding: 10px 12px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }');
+  R('.jrn-rec-discard-confirm .ann-chip-confirm-q { color: #c75c4a; }');
   // Pill-style legacy buttons (cancel + close + error close)
   R('.jrn-rec-cancel { background: none; padding: 10px 24px; border-radius: 999px; font-family: var(--font-cinzel); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; border: 1px solid var(--gold-dim); color: var(--gold-dim); }');
   R('.jrn-rec-cancel:hover { color: var(--gold); border-color: var(--gold); }');

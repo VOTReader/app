@@ -979,7 +979,18 @@
       /* ── PDF/INLINE TOGGLE ── */
       .mode-toggle-wrap {
         position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+        display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
       }
+      /* Caption above the pill — names what the modes apply to. */
+      .mode-toggle-label {
+        font-family: 'Cinzel', serif; font-size: 0.5rem;
+        letter-spacing: 0.18em; text-transform: uppercase;
+        color: var(--gold-dim);
+        padding: 2px 8px; border-radius: 8px;
+        background: rgba(0,0,0,0.72); backdrop-filter: blur(8px);
+        margin-right: 6px;
+      }
+      body.light .mode-toggle-label { background: rgba(247,242,232,0.8); }
       .mode-toggle {
         display: flex; align-items: center; gap: 0; border-radius: 40px;
         border: 1px solid var(--gold-border);
@@ -1334,6 +1345,11 @@
     .related-card-title { font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
     .related-link { display:block; color:var(--cream-dim); text-decoration:none; font-size:0.95rem; line-height:1.5; padding:0.3rem 0; border-bottom:1px solid transparent; transition:all var(--transition); }
     @media (hover: hover) { .related-link:hover { color:var(--gold-bright); border-bottom-color:var(--gold-dim); } }
+    /* External-link affordance: every target="_blank" anchor (audio/video
+       links, related topics, About, footnote URLs, playlist buttons) leaves
+       the app for the browser — a quiet trailing ↗ says so before the tap.
+       In-app links never carry target, so they stay unmarked. */
+    a[target="_blank"]::after { content:" \2197"; font-size:0.8em; opacity:0.65; }
     /* ── HOME SCREEN ── */
     .home-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 1.5rem; }
     /* SacredUI hero — pull the brand mark up toward the top of the viewport
@@ -4264,7 +4280,20 @@
       gap: 0.6rem;
       padding: 6px 1rem;
       background: rgba(232,192,80,0.04);
+      position: relative;
     }
+    /* Visible ⋯ options button (mirrors .bkm-row-more) — pinned to the mid
+       strip's right edge with a 44px hit area; opens the same action sheet
+       long-press does. */
+    .link-row-more {
+      position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: var(--cream-muted); padding: 10px;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.12s;
+    }
+    .link-row-more:active, .link-row-more:hover { color: var(--gold); }
+    .link-row-more svg { width: 16px; height: 16px; display: block; }
     .link-row-chain {
       width: 14px; height: 14px;
       stroke: var(--gold-dim); flex-shrink: 0;
