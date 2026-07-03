@@ -327,7 +327,36 @@
     });
     await step('Search', async function () {
       clickByText(/^Search$|Search/); await sleep(300);
-      return !!document.querySelector('input[type="search"],.search-screen,[class*="search"]');
+      var input = document.querySelector('input.search-input');
+      if (!input) return false;
+      // Type a known query through React's controlled-input path: the native
+      // value setter + an input event. A plain `.value =` assignment is
+      // swallowed by React's internal value tracking and onChange never fires.
+      function typeQuery(v) {
+        var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setter.call(input, v);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      typeQuery('shepherd');
+      // Poll for REAL results — ≥1 result card AND ≥1 highlighted <mark> in a
+      // snippet — guarding the whole MiniSearch engine+UI path (index build,
+      // query, ranking, snippet highlight), not just the screen shell.
+      // Generous deadline: a cold index build takes ~10 s headless (a warm
+      // vot-minisearch-cache restore is ~0.4 s). Fail fast once the engine
+      // settles on zero results or an error.
+      var passed = false;
+      var deadline = now() + 60000;
+      while (now() < deadline) {
+        if (document.querySelectorAll('.srch-card').length >= 1 &&
+            document.querySelectorAll('mark.search-highlight').length >= 1) { passed = true; break; }
+        if (isCrashed()) break;
+        if (document.querySelector('.search-no-results,.srch-error')) break;
+        await sleep(400);
+      }
+      // Leave the box empty so the query doesn't linger in app state for the
+      // rest of the walk (or in a live session the harness was pasted into).
+      typeQuery('');
+      return passed;
     });
     await step('Library hub', async function () {
       clickByText(/Personal Study|Library/); await sleep(320);

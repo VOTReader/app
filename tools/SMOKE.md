@@ -28,7 +28,9 @@ nearly all of that in seconds, deterministically.
 ## Options
 
 - `votSmoke()` — full run (globals + data wiring + screen walk +
-  annotation round-trip). ~15–25 s.
+  annotation round-trip). ~15–25 s warm; the Search step waits for a
+  cold MiniSearch index build (~10 s headless) when the
+  `vot-minisearch-cache` IDB is empty, e.g. every CI run.
 - `votSmoke({ walk:false })` — globals + data + console only. ~1 s.
   Fast inner-loop check while editing.
 - `votSmoke({ mutating:false })` — skips the annotation round-trip
@@ -55,7 +57,10 @@ nearly all of that in seconds, deterministically.
 - `screens[]` — per screen: `crashed:true` = ErrorBoundary tripped
   (real regression); `reached:false` (not crashed) = the harness
   couldn't find the entry button (usually a label change, not a bug —
-  eyeball it).
+  eyeball it). The **Search** step goes further than render: it types
+  `shepherd` and asserts ≥1 result card AND ≥1 highlighted `<mark>`
+  (polling up to 60 s for the cold index build), so `reached:false`
+  there means the MiniSearch engine+UI path returned no usable results.
 - `annotation.ok` — marks render and next→prev doesn't crash (guards
   the class of bug fixed in `2db70f5`). It snapshots and **always
   restores** `vot-annotations`/`vot-notes` in-session, so it never
