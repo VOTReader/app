@@ -251,6 +251,7 @@ export function useAndroidBack({
       // not a hardcoded Library. (goNavOrigin restores the captured origin, or
       // goHome() when none — matching settings/history/about above.)
       if (s === "notes-index") {goNavOrigin();return "true";} else
+      if (s === "my-progress") {goNavOrigin();return "true";} else
       if (s === "links-index") {goNavOrigin();return "true";} else
       if (s === "bookmarks-index") {goNavOrigin();return "true";} else
       if (s === "highlights-index") {goNavOrigin();return "true";} else

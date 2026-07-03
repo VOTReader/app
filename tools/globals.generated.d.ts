@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 427 distinct identifiers.
+// Total: 436 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -164,6 +164,7 @@ declare const MONTH_NAMES: any;
 declare const MatthewChapterView: any;
 declare const ModeToggle: any;
 declare const MultiNotePopover: any;
+declare const MyProgressScreen: any;
 declare const NavButtons: any;
 declare const NoteDefaultStore: any;
 declare const NoteRow: any;
@@ -180,6 +181,7 @@ declare const ProphecyExpandToggle: any;
 declare const ProphecyGroup: any;
 declare const READING_CHAIN: any;
 declare const READING_SCREENS: any;
+declare const READ_VERSION_ID: any;
 declare const React: any;
 declare const ReactDOM: any;
 declare const RecentNavStore: any;
@@ -284,6 +286,7 @@ declare const _translationPromises: any;
 declare const _validateTabState: any;
 declare const _verseRangeLabel: any;
 declare const addRecentSearch: any;
+declare const annotationSourceForKey: any;
 declare const applyActiveNoteState: any;
 declare const applyDOMBookmarks: any;
 declare const applyDOMHighlights: any;
@@ -297,6 +300,7 @@ declare const blockBoundaryOffsets: any;
 declare const bookCategory: any;
 declare const buildExportPayload: any;
 declare const buildNavIndex: any;
+declare const buildProgressGroups: any;
 declare const buildScreenRoutes: any;
 declare const buildSourceEndpoint: any;
 declare const buildV3Manifest: any;
@@ -307,6 +311,7 @@ declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
 declare const colLetters: any;
 declare const colPreface: any;
+declare const countReadFor: any;
 declare const data: any;
 declare const describeTab: any;
 declare const echoVersesForRef: any;
@@ -327,6 +332,7 @@ declare const getEchoesForVerse: any;
 declare const getGardenTier: any;
 declare const getNotesForVerse: any;
 declare const getRecentSearches: any;
+declare const groupBooks: any;
 declare const hasAnyPendingStores: any;
 declare const hideToast: any;
 declare const highlightExcerptInDom: any;
@@ -356,6 +362,7 @@ declare const loadTranslation: any;
 declare const lookupVersesFromBooks: any;
 declare const measureUserData: any;
 declare const modalRegistry: any;
+declare const mostAnnotatedSources: any;
 declare const navHandoff: any;
 declare const navItemPreview: any;
 declare const navItemToEndpoint: any;
@@ -368,6 +375,7 @@ declare const parseRefRanges: any;
 declare const parseRefStr: any;
 declare const parseScriptureRef: any;
 declare const persistLink: any;
+declare const progressCorporaReady: any;
 declare const readContainer: any;
 declare const relativeDate: any;
 declare const renderCommentaryCite: any;
@@ -390,6 +398,7 @@ declare const studyShortTitle: any;
 declare const suppressNextHistoryPush: any;
 declare const tabContentKey: any;
 declare const tabHasProgressBar: any;
+declare const tallyGroup: any;
 declare const timeAgo: any;
 declare const translateVerse: any;
 declare const translationLabel: any;

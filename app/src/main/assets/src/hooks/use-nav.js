@@ -8,9 +8,10 @@
    side menu, the library tiles, and the bottom-nav buttons all call.
    They share two patterns this hook canonicalises:
 
-     A) The "navOrigin capture" pattern (8 helpers). goSettings,
-        goHistory, goAbout, goLibrary, goJournalHub, goNotesIndex,
-        goLinksIndex, goBookmarksIndex, goHighlightsIndex all do:
+     A) The "navOrigin capture" pattern (10 helpers). goSettings,
+        goHistory, goAbout, goLibrary, goProgress, goJournalHub,
+        goNotesIndex, goLinksIndex, goBookmarksIndex,
+        goHighlightsIndex all do:
 
           setNavOrigin({ screen, bookId, chapterNum, letterId,
                          studyId, studyChapterId });
@@ -35,6 +36,7 @@
      - goHistory           _captureOrigin + setScreen
      - goAbout             _captureOrigin + setScreen
      - goLibrary           _captureOrigin + setScreen
+     - goProgress          _captureOrigin + setScreen
      - goJournalHub        _captureOrigin + setScreen
      - goJournalViewer     setJournalEntryId + setScreen (no-op if no eid)
      - goJournalEditor     setJournalEntryId + setScreen (no-op if no eid)
@@ -130,6 +132,7 @@
  *   goHistory: () => void,
  *   goAbout: () => void,
  *   goLibrary: () => void,
+ *   goProgress: () => void,
  *   goJournalHub: () => void,
  *   goJournalViewer: (eid: string | null) => void,
  *   goJournalEditor: (eid: string | null) => void,
@@ -173,13 +176,14 @@ export function useNav({
   const goScriptureGenre = (gid) => { setGenreId(gid); setScreen('scripture-genre'); };
   const goVolumesHome = () => { setScreen('volumes-home'); };
 
-  // ── navOrigin-pattern helpers (8 of them) ────────────────────────────
+  // ── navOrigin-pattern helpers (10 of them) ───────────────────────────
   // Each captures the current reading position into navOrigin (so Back
   // restores it) and switches to its destination screen.
   const goSettings        = () => { _captureOrigin(); setScreen('settings'); };
   const goHistory         = () => { _captureOrigin(); setScreen('history'); };
   const goAbout           = () => { _captureOrigin(); setScreen('about'); };
   const goLibrary         = () => { _captureOrigin(); setScreen('library'); };
+  const goProgress        = () => { _captureOrigin(); setScreen('my-progress'); };
   const goJournalHub      = () => { _captureOrigin(); setScreen('journal-home'); };
   const goNotesIndex      = () => { _captureOrigin(); setScreen('notes-index'); };
   const goLinksIndex      = () => { _captureOrigin(); setScreen('links-index'); };
@@ -207,7 +211,7 @@ export function useNav({
 
   return {
     goHome, goScripturesHome, goScriptureGenre, goVolumesHome,
-    goSettings, goHistory, goAbout, goLibrary,
+    goSettings, goHistory, goAbout, goLibrary, goProgress,
     goJournalHub, goJournalViewer, goJournalEditor,
     goNotesIndex, goLinksIndex, goBookmarksIndex, goHighlightsIndex,
     goColIdx, goMatthewIdx, goStudiesHome, goBibleIdx, goToGardenFirst,

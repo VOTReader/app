@@ -62,6 +62,7 @@ export function buildScreenRoutes({
   goVolumesHome, goScripturesHome, goScriptureGenre, goBibleIdx, goMatthewIdx,
   goStudiesHome,
   goNotesIndex, goLinksIndex, goBookmarksIndex, goJournalHub, goHighlightsIndex,
+  goProgress,
   goJournalViewer, goJournalEditor,
   goSearchOrigin, goColIdx,
   // ── Selection / handlers ──
@@ -367,9 +368,24 @@ export function buildScreenRoutes({
         onOpenBookmarks={goBookmarksIndex}
         onOpenJournal={goJournalHub}
         onOpenHighlights={goHighlightsIndex}
+        onOpenProgress={goProgress}
+        readCount={Object.keys(readItems).length}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
+        historyEnabled={settings.historyEnabled !== false}
+        theme={theme} onThemeChange={setTheme}
+      />
+    ),
+    'my-progress': () => typeof MyProgressScreen !== 'undefined' && _kickVot(
+      <MyProgressScreen
+        onBack={goNavOrigin}
+        onSearch={goSearch}
+        onHistory={goHistory}
+        onSettings={goSettings}
+        settings={settings}
+        readItems={readItems}
+        historyCount={readHistory.length}
         historyEnabled={settings.historyEnabled !== false}
         theme={theme} onThemeChange={setTheme}
       />
