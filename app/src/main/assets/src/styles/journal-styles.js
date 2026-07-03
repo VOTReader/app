@@ -135,7 +135,7 @@
 
   // Editor screen — single body surface, title-only header, no inline + icons
   R('.jrn-editor { display: flex; flex-direction: column; flex: 1; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }');
-  R('.jrn-editor-meta { padding: 18px 22px 4px; }');
+  R('.jrn-editor-meta { padding: 18px 22px 4px 44px; }');
   R('.jrn-editor-title { width: 100%; background: none; border: none; color: var(--gold); font-family: var(--font-cinzel); font-size: 1.375rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; outline: none; padding: 0; }');
   R('body.light .jrn-editor-title { color: #8b6f30; }');
   R('.jrn-editor-title::placeholder { color: var(--gold-dim); opacity: 0.6; font-style: italic; text-transform: none; letter-spacing: 0.02em; font-weight: 400; }');
@@ -344,6 +344,21 @@
   // 44px effective tap target (WL4 pattern): the visual stays a subtle 26px
   // circle but the hit area meets the touch-target floor.
   R('.jrn-block-del-btn::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; }');
+  // Drag-to-reorder grip — lives in a left gutter (the editor's .jrn-blocks
+  // gets padding-left:44px below), the opposite corner from the delete x —
+  // the same grab-left / destroy-right separation the tab cards use.
+  // touch-action:none = grabbing it never scrolls; the drag starts instantly.
+  R('.jrn-editor .jrn-blocks { padding-left: 44px; }');
+  R('.jrn-block-drag-btn { position: absolute; top: 6px; left: -38px; width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--gold-dim); cursor: grab; display: flex; align-items: center; justify-content: center; padding: 0; opacity: 0.45; transition: opacity 0.12s, color 0.12s; z-index: 2; touch-action: none; }');
+  R('.jrn-block-drag-btn:hover { opacity: 1; color: var(--gold); }');
+  R('.jrn-block-drag-btn:active { cursor: grabbing; }');
+  R('.jrn-block-drag-btn svg { width: 15px; height: 15px; pointer-events: none; }');
+  R('.jrn-block-drag-btn::after { content: ""; position: absolute; inset: -8px; border-radius: 50%; }');
+  // Dragged original stays as a dimmed ghost holding its slot; the flying
+  // clone follows the finger as a framed card (mirrors the tab-card drag).
+  R('.jrn-block.dragging { opacity: 0.25; }');
+  R('.jrn-block.drag-flying { position: fixed; z-index: 9999; pointer-events: none; margin: 0; box-sizing: border-box; background: var(--bg2); border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 18px 40px rgba(0,0,0,0.6), 0 0 26px rgba(200,164,86,0.28); overflow: hidden; }');
+  R('body.light .jrn-block.drag-flying { background: white; box-shadow: 0 18px 40px rgba(0,0,0,0.16), 0 0 22px rgba(122,92,16,0.22); }');
   // The standardized ConfirmStrip (.ann-chip-confirm base) is rendered
   // with className="jrn-block-confirm" so it flips to the TOP of the
   // block (order:-1) as a warm-red banner and pushes the block's own

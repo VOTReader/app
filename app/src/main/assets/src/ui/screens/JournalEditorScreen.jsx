@@ -101,6 +101,45 @@ export function JournalEditorScreen(props) {
   // sized for the play-button row.
   const [confirmDelIdx, setConfirmDelIdx] = useState(null);
 
+  // ─── Block drag-to-reorder (grip handle) ────────────────────
+  // Imperative-DOM drag like TabsOverview/HomeScreen, but with NO
+  // long-press phase: the grip is an explicit affordance (touch-action:
+  // none), so the grab starts the instant it's touched. State machine
+  // carries the same hardening as the tab drag: the drop-commit parks in
+  // finishBlockDragRef (a new grab flushes it), moves/lifts are matched
+  // to the pointer that owns the drag, and the commit body is
+  // try/finally so the refs can never stay poisoned.
+  var _dragIdx = useState(-1);
+  var dragIdx = _dragIdx[0]; var setDragIdx = _dragIdx[1];
+  var blockRefs = useRef([]);
+  var dragIdxRef = useRef(-1);
+  var dragTargetRef = useRef(-1);
+  var dragCloneRef = useRef(null);
+  var dragRectsRef = useRef([]);        // CONTAINER-coordinate rects (viewport + scrollTop) at grab
+  var dragScrollerRef = useRef(null);
+  var dragTouchIdRef = useRef(null);    // pointer that owns the drag ('mouse' for pointer)
+  var finishBlockDragRef = useRef(null);
+  var dragCommitTimerRef = useRef(null);
+  var dragCleanupRef = useRef(null);
+  var dragFingerOffYRef = useRef(0);
+  var dragLastYRef = useRef(0);
+  var dragAutoDirRef = useRef(0);       // -1 scroll up / 0 / 1 scroll down (edge autoscroll)
+  var dragScrollRafRef = useRef(0);
+
+  // Tear down listeners, the rAF autoscroll loop, and the flying clone if
+  // the editor unmounts mid-drag; flush a parked commit so the reorder is
+  // not lost (finish() updates blocksRef synchronously, and commitSave()
+  // persists it even though the store-flush cleanup ran on the old array).
+  useEffect(function() {
+    return function() {
+      if (dragCleanupRef.current) dragCleanupRef.current();
+      if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
+      if (finishBlockDragRef.current) { finishBlockDragRef.current(); commitSave(); }
+      if (dragCloneRef.current && dragCloneRef.current.parentNode)
+        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
+    };
+  }, []);
+
   // Tap anywhere outside the ConfirmStrip fully cancels it. Capture phase
   // so the gesture is seen even if a child stops propagation; taps inside
   // .jrn-block-confirm (the strip itself) are ignored here. The opening
@@ -271,6 +310,240 @@ export function JournalEditorScreen(props) {
     scheduleSave();
   }
 
+  // ─── Block drag-to-reorder mechanics ────────────────────────
+  var setBlockRef = function(i) { return function(el) { blockRefs.current[i] = el; }; };
+
+  // Multi-touch discipline (same contract as TabsOverview): only the
+  // pointer that grabbed the grip moves the block or ends the drag.
+  function _dragPoint(e) {
+    if (e.touches) {
+      for (var i = 0; i < e.touches.length; i++)
+        if (e.touches[i].identifier === dragTouchIdRef.current) return e.touches[i];
+      return null;
+    }
+    return dragTouchIdRef.current === 'mouse' ? e : null;
+  }
+  function _dragEnded(e) {
+    if (!e.changedTouches) return dragTouchIdRef.current === 'mouse';
+    for (var i = 0; i < e.changedTouches.length; i++)
+      if (e.changedTouches[i].identifier === dragTouchIdRef.current) return true;
+    for (var j = 0; j < e.touches.length; j++)
+      if (e.touches[j].identifier === dragTouchIdRef.current) return false;
+    return true; // ours vanished without a changedTouches entry (some touchcancels)
+  }
+
+  // The dragged block's full slot delta (height + inter-block spacing) —
+  // what its neighbors must shift by. Blocks have VARIABLE heights, so
+  // this is measured from adjacent captured rects, not assumed uniform.
+  function _dragSlotDelta() {
+    var rects = dragRectsRef.current;
+    var from = dragIdxRef.current;
+    var r0 = rects[from];
+    if (!r0) return 0;
+    if (rects[from + 1]) return rects[from + 1].top - r0.top;
+    if (rects[from - 1]) return r0.bottom - rects[from - 1].bottom;
+    return r0.h;
+  }
+
+  // FLIP the siblings between the drag origin and the current target out
+  // of the way. Exact for variable heights: removing block `from` shifts
+  // everything after it up by its slot delta; re-inserting after/before
+  // `to` cancels that shift for blocks outside the affected span.
+  function _applyBlockShifts(to) {
+    var from = dragIdxRef.current;
+    var D = _dragSlotDelta();
+    blockRefs.current.forEach(function(n, i) {
+      if (!n || i === from) return;
+      var shift = 0;
+      if (from < to && i > from && i <= to) shift = -D;
+      else if (from > to && i >= to && i < from) shift = D;
+      n.style.transition = 'transform 0.18s cubic-bezier(0.2,0.8,0.3,1)';
+      n.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+    });
+  }
+
+  // Insertion index = how many OTHER blocks' centers sit above the dragged
+  // block's center (container coordinates, so mid-drag autoscroll doesn't
+  // invalidate the comparison). Handles variable heights cleanly.
+  function _updateDragTarget(clientY) {
+    var rects = dragRectsRef.current;
+    var from = dragIdxRef.current;
+    if (from < 0) return;
+    var scroller = dragScrollerRef.current;
+    var st = scroller ? scroller.scrollTop : 0;
+    var r0 = rects[from];
+    var cy = (clientY - dragFingerOffYRef.current) + (r0 ? r0.h / 2 : 0) + st;
+    var idx = 0;
+    for (var i = 0; i < rects.length; i++) {
+      if (i === from || !rects[i]) continue;
+      if (rects[i].cy < cy) idx++;
+    }
+    idx = Math.max(0, Math.min(rects.length - 1, idx));
+    if (idx !== dragTargetRef.current) {
+      dragTargetRef.current = idx;
+      _applyBlockShifts(idx);
+    }
+  }
+
+  // Edge autoscroll: a long entry must keep scrolling while the finger
+  // parks near the top/bottom edge. 16ms timeout loop (~rAF cadence on a
+  // visible page, but unlike rAF it still fires in hidden/headless test
+  // hosts); speed scales with how deep into the edge zone the finger
+  // sits; re-derives the target each step because the content moves
+  // under a stationary finger.
+  function _updateAutoScroll(clientY) {
+    var vh = window.innerHeight || 800;
+    var EDGE = 110;
+    var dir = clientY < EDGE ? -1 : (clientY > vh - EDGE ? 1 : 0);
+    dragAutoDirRef.current = dir;
+    if (dir !== 0 && !dragScrollRafRef.current) {
+      var step = function() {
+        dragScrollRafRef.current = 0;
+        if (dragIdxRef.current < 0 || dragAutoDirRef.current === 0) return;
+        var scroller = dragScrollerRef.current;
+        if (!scroller) return;
+        var y = dragLastYRef.current;
+        var d = dragAutoDirRef.current;
+        var depth = d < 0 ? (EDGE - y) : (y - (vh - EDGE));
+        scroller.scrollTop += d * (4 + Math.min(18, depth * 0.25));
+        _updateDragTarget(y);
+        dragScrollRafRef.current = setTimeout(step, 16);
+      };
+      dragScrollRafRef.current = setTimeout(step, 16);
+    }
+  }
+
+  function startBlockDrag(idx, clientY, pointerId) {
+    // A just-dropped drag parks its commit while the snap animation plays;
+    // flush it so this grab is never silently swallowed.
+    if (finishBlockDragRef.current) finishBlockDragRef.current();
+    if (dragIdxRef.current >= 0) return;
+    var container = blocksContainerRef.current;
+    var el = blockRefs.current[idx];
+    if (!container || !el) return;
+    var scroller = container.closest('.screen-scroll') || document.documentElement;
+    dragScrollerRef.current = scroller;
+    // Open confirm strips target blocks BY INDEX — close them before the
+    // indices move (and before their banner height skews the rect capture).
+    setConfirmDelIdx(null);
+    setConfirmAudioDelete(null);
+    dragTouchIdRef.current = pointerId != null ? pointerId : 'mouse';
+    var st = scroller.scrollTop;
+    dragRectsRef.current = blockRefs.current.map(function(n) {
+      if (!n) return null;
+      var r = n.getBoundingClientRect();
+      return { top: r.top + st, bottom: r.bottom + st, cy: r.top + st + r.height / 2, h: r.height };
+    });
+    var rect = el.getBoundingClientRect();
+    dragFingerOffYRef.current = clientY - rect.top;
+    dragLastYRef.current = clientY;
+    dragIdxRef.current = idx;
+    dragTargetRef.current = idx;
+    setDragIdx(idx);
+
+    // Flying clone — framed card that follows the finger. React renders a
+    // textarea's text via the value PROPERTY, which cloneNode does not
+    // copy, so mirror form-field values onto the clone by hand.
+    var clone = el.cloneNode(true);
+    var srcFields = el.querySelectorAll('textarea, input');
+    var dstFields = clone.querySelectorAll('textarea, input');
+    for (var i = 0; i < srcFields.length; i++) {
+      if (dstFields[i]) dstFields[i].value = srcFields[i].value;
+    }
+    clone.className = 'jrn-block drag-flying';
+    clone.style.cssText = [
+      'position:fixed',
+      'top:' + rect.top + 'px',
+      'left:' + rect.left + 'px',
+      'width:' + rect.width + 'px',
+      'height:' + rect.height + 'px',
+      'z-index:9999',
+      'pointer-events:none',
+    ].join(';');
+    document.body.appendChild(clone);
+    dragCloneRef.current = clone;
+
+    var onMove = function(e) {
+      var p = _dragPoint(e);
+      if (!p) return;
+      if (e.cancelable) { try { e.preventDefault(); } catch (_er) { /* passive — ignore */ } }
+      dragLastYRef.current = p.clientY;
+      var c = dragCloneRef.current;
+      if (c) c.style.top = (p.clientY - dragFingerOffYRef.current) + 'px';
+      _updateAutoScroll(p.clientY);
+      _updateDragTarget(p.clientY);
+    };
+    var onEnd = function(e) {
+      if (!_dragEnded(e)) return;
+      if (dragCleanupRef.current) dragCleanupRef.current();
+      endBlockDrag();
+    };
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+    document.addEventListener('touchcancel', onEnd);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onEnd);
+    dragCleanupRef.current = function() {
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+      document.removeEventListener('touchcancel', onEnd);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+      dragCleanupRef.current = null;
+    };
+    if (navigator.vibrate) { try { navigator.vibrate(35); } catch (_e) { /* unsupported — ignore */ } }
+  }
+
+  function endBlockDrag() {
+    dragTouchIdRef.current = null;
+    dragAutoDirRef.current = 0;
+    if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
+    if (dragIdxRef.current < 0) return;
+    var from = dragIdxRef.current;
+    var to = dragTargetRef.current >= 0 ? dragTargetRef.current : from;
+    var clone = dragCloneRef.current;
+    var rects = dragRectsRef.current;
+    var r0 = rects[from];
+    // Snap the clone to the slot it will occupy, then commit + clean up.
+    if (clone && r0) {
+      var st = dragScrollerRef.current ? dragScrollerRef.current.scrollTop : 0;
+      var snapTop = to === from ? r0.top
+        : (to > from ? (rects[to] ? rects[to].bottom - r0.h : r0.top)
+                     : (rects[to] ? rects[to].top : r0.top));
+      clone.style.transition = 'top 0.2s cubic-bezier(0.2,0.8,0.3,1)';
+      clone.style.top = (snapTop - st) + 'px';
+    }
+    var finish = function() {
+      if (finishBlockDragRef.current !== finish) return;
+      finishBlockDragRef.current = null;
+      clearTimeout(dragCommitTimerRef.current);
+      try {
+        if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+        dragCloneRef.current = null;
+        blockRefs.current.forEach(function(n) {
+          if (n) { n.style.transform = ''; n.style.transition = ''; }
+        });
+        if (to !== from) {
+          var moved = JournalHelpers.moveBlock(blocksRef.current, from, to);
+          if (moved !== blocksRef.current) {
+            // Write the ref synchronously too: a pagehide/unmount flush in
+            // the same tick must persist the NEW order, not wait a render.
+            blocksRef.current = moved;
+            setBlocks(moved);
+            activeTextareaRef.current = null; // caret index is stale after a move
+            scheduleSave();
+          }
+        }
+      } finally {
+        dragIdxRef.current = -1;
+        setDragIdx(-1);
+        dragTargetRef.current = -1;
+      }
+    };
+    finishBlockDragRef.current = finish;
+    dragCommitTimerRef.current = setTimeout(finish, 220);
+  }
+
   // ─── Cursor-aware insertion ─────────────────────────────────
   // The "single body surface" UX: when the user picks a media/card from
   // the FAB +, we split the focused paragraph at the cursor, drop the
@@ -438,12 +711,38 @@ export function JournalEditorScreen(props) {
     );
   }
 
+  // ─── Shared drag affordance ─────────────────────────────────
+  // A grip in the left gutter of every block (only when there are at
+  // least two — a lone block has nowhere to go). Opposite corner from
+  // the delete x, mirroring the tab cards' grab-left / destroy-right
+  // separation. Grabbing it starts the drag immediately (no long-press).
+  function blockDragUI(idx) {
+    if (blocks.length < 2) return null;
+    return (
+      <button
+        className="jrn-block-drag-btn"
+        onTouchStart={function(e) { e.stopPropagation(); if (e.touches && e.touches[0]) startBlockDrag(idx, e.touches[0].clientY, e.touches[0].identifier); }}
+        onMouseDown={function(e) { e.stopPropagation(); if (e.button === 0) startBlockDrag(idx, e.clientY); }}
+        onClick={function(e) { e.stopPropagation(); e.preventDefault(); }}
+        title="Drag to reorder"
+        aria-label="Drag to reorder"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <circle cx="9" cy="6" r="1.7" /><circle cx="15" cy="6" r="1.7" />
+          <circle cx="9" cy="12" r="1.7" /><circle cx="15" cy="12" r="1.7" />
+          <circle cx="9" cy="18" r="1.7" /><circle cx="15" cy="18" r="1.7" />
+        </svg>
+      </button>
+    );
+  }
+
   // ─── Block render — editable variants ───────────────────────
   function renderEditableBlock(b, idx) {
     var common = {
       key: b.id,
-      className: 'jrn-block jrn-block-edit',
-      'data-block-id': b.id
+      className: 'jrn-block jrn-block-edit' + (idx === dragIdx ? ' dragging' : ''),
+      'data-block-id': b.id,
+      ref: setBlockRef(idx)
     };
     if (b.type === 'p' || b.type === 'h2') {
       return (
@@ -462,6 +761,7 @@ export function JournalEditorScreen(props) {
             ref={function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
           />
           {blockDeleteUI(idx)}
+          {blockDragUI(idx)}
         </div>
       );
     }
@@ -491,6 +791,7 @@ export function JournalEditorScreen(props) {
             />
           </div>
           {blockDeleteUI(idx)}
+          {blockDragUI(idx)}
         </div>
       );
     }
@@ -499,6 +800,7 @@ export function JournalEditorScreen(props) {
         <div {...common}>
           <div className="jrn-divider">❖  ❖  ❖</div>
           {blockDeleteUI(idx)}
+          {blockDragUI(idx)}
         </div>
       );
     }
@@ -519,6 +821,7 @@ export function JournalEditorScreen(props) {
             />
           </div>
           {blockDeleteUI(idx)}
+          {blockDragUI(idx)}
         </div>
       );
     }
@@ -535,6 +838,7 @@ export function JournalEditorScreen(props) {
             onConfirmDelete={function() { setConfirmAudioDelete(null); deleteBlock(idx); }}
             confirming={confirming}
           />
+          {blockDragUI(idx)}
         </div>
       );
     }
@@ -567,6 +871,10 @@ export function JournalEditorScreen(props) {
     setBlocks(function(arr) { return arr.concat([{ id: newId, type: 'p', text: '' }]); });
     scheduleSave();
   }
+
+  // Drop stale refs when the block count shrinks (delete) so a future
+  // drag's rect capture never reads a dead node. Ref callbacks repopulate.
+  blockRefs.current.length = blocks.length;
 
   // ─── Nav (back left; saved indicator + right cluster) ───────
   // Standard app-wide Library nav. Editor specifics preserved: "Done"

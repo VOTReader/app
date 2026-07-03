@@ -45,6 +45,19 @@ export var JournalHelpers = (function() {
     return [ newBlock('p', { text: '' }) ];
   }
 
+  /* Move the block at `from` to index `to` (drag-to-reorder). Returns a
+     NEW array; the original is untouched. Out-of-range or no-op moves
+     return the input array unchanged so callers can identity-check. */
+  function moveBlock(blocks, from, to) {
+    if (!Array.isArray(blocks)) return blocks;
+    if (from === to) return blocks;
+    if (from < 0 || to < 0 || from >= blocks.length || to >= blocks.length) return blocks;
+    var next = blocks.slice();
+    var moved = next.splice(from, 1)[0];
+    next.splice(to, 0, moved);
+    return next;
+  }
+
   /* Walk every block + every inline mark, return a deduped list of
      external resource keys (refKeys for JournalIndexStore). */
   function collectRefs(entry) {
@@ -474,6 +487,7 @@ export var JournalHelpers = (function() {
     blockId: blockId,
     newBlock: newBlock,
     defaultBlocks: defaultBlocks,
+    moveBlock: moveBlock,
     collectRefs: collectRefs,
     previewText: previewText,
     attachmentSummary: attachmentSummary,
