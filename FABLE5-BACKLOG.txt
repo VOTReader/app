@@ -230,4 +230,11 @@ SUGGESTED SEQUENCE FOR ~5 DAYS
 
 DONE LOG
   (add one-liners here as items land)
+  2026-07-03  [1] Notes full-text search — filterNotesByQuery over body+excerpt+source, Bookmarks-parity input on All Notes + drilled notebooks (+9 tests).
+  2026-07-03  [5] smoke.js Search step types "shepherd", asserts >=1 result card + >=1 <mark> (RED-proven fail-fast).
+  2026-07-03  [2] Share-as-text export — utils/notes-export.js composer (markdown, grouped by source) via navigator.share / PlatformBridge.saveToFile; notebook header + All Notes (+19 tests).
+  2026-07-03  [4] Backup freshness reminder — lastExportAt stamped in the shared export success tail; boot toast >30d + >50KB with Settings deep link, 7d cooldown, settings.backupReminder toggle (+18 tests).
+  2026-07-03  [3] My Progress dashboard — hero read/streak/entries, per-collection bars (mark-as-read table extracted to utils/progress-stats.js, shared with Settings), library counts, most-annotated top-5 (Hidden Manna filtered); Library tile via growth-tolerant LibraryOrderStore (+32 tests).
+  2026-07-03  [6] Journal block drag-to-reorder — left-gutter grip per block (instant grab, touch-action:none), variable-height FLIP, edge autoscroll, JournalHelpers.moveBlock commit; hardened lifecycle shared with the tabs-drag fix (+7 tests).
+  2026-07-03  (unplanned, owner-reported) tab/home/library drag lock-up fixed — see CLAUDE.md 2026-07-03 entry (swallowed grab in the 240ms snap window, any-finger early commit, poisonable refs).
 ═══════════════════════════════════════════════════════════════════════════
