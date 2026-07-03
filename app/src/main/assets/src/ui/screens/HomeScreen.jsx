@@ -55,6 +55,9 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   const dragCloneRef = React.useRef(null);
   const fingerOffsetYRef = React.useRef(0);
   const naturalCardTopsRef = React.useRef([]);
+  const touchIdRef = React.useRef(null);        // identifier of the pointer that owns the press ('mouse' for pointer)
+  const finishDragRef = React.useRef(null);     // pending drop-commit; flushed early if a new press arrives
+  const commitTimerRef = React.useRef(null);
 
   React.useEffect(() => {dragIdxRef.current = dragIdx;}, [dragIdx]);
   React.useEffect(() => {pressingIdxRef.current = pressingIdx;}, [pressingIdx]);
@@ -123,8 +126,33 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     });
   };
 
-  const startPress = (idx, clientY) => {
+  // Multi-touch discipline: the press belongs to ONE pointer. Moves from other
+  // fingers are ignored, and only that pointer lifting (or a touchcancel that
+  // swallowed it) ends the press — a stray second finger can no longer commit
+  // the drag early at whatever slot the tile happened to be passing over.
+  const trackedPoint = (e) => {
+    if (e.touches) {
+      for (let i = 0; i < e.touches.length; i++)
+        if (e.touches[i].identifier === touchIdRef.current) return e.touches[i];
+      return null;
+    }
+    return touchIdRef.current === 'mouse' ? e : null;
+  };
+  const trackedEnded = (e) => {
+    if (!e.changedTouches) return touchIdRef.current === 'mouse';
+    for (let i = 0; i < e.changedTouches.length; i++)
+      if (e.changedTouches[i].identifier === touchIdRef.current) return true;
+    for (let i = 0; i < e.touches.length; i++)
+      if (e.touches[i].identifier === touchIdRef.current) return false;
+    return true; // ours vanished without a changedTouches entry (some touchcancels)
+  };
+
+  const startPress = (idx, clientY, pointerId) => {
+    // A just-dropped drag parks its commit in finishDragRef while the snap
+    // animation plays; flush it so this grab is never silently swallowed.
+    if (finishDragRef.current) finishDragRef.current();
     if (pressingIdxRef.current >= 0 || dragIdxRef.current >= 0) return;
+    touchIdRef.current = pointerId != null ? pointerId : 'mouse';
     pressStartYRef.current = clientY;
     pressStartTsRef.current = Date.now();
     // Track the intent in a ref immediately (for drift detection), but
@@ -140,7 +168,9 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
 
     // Attach document listeners SYNCHRONOUSLY. No useEffect gap, no missed moves.
     const onMove = (e) => {
-      const y = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+      const p = trackedPoint(e);
+      if (!p) return;
+      const y = p.clientY;
       if (dragIdxRef.current >= 0 && e.cancelable) {
         try {e.preventDefault();} catch (_err) { /* DOM access — element may not exist or API unsupported */ }
       }
@@ -181,7 +211,8 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
       }
     };
 
-    const onEnd = () => {
+    const onEnd = (e) => {
+      if (!trackedEnded(e)) return;
       if (activeCleanupRef.current) activeCleanupRef.current();
       endPress();
     };
@@ -257,6 +288,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     const wasDragging = dragIdxRef.current >= 0;
     setPressingIdx(-1);
     pressingIdxRef.current = -1;
+    touchIdRef.current = null;
 
     if (wasDragging) {
       const from = dragIdxRef.current;
@@ -269,23 +301,33 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
         clone.style.top = snapTop + "px";
         clone.style.transform = "scale(1)";
       }
-      setTimeout(() => {
-        // Snap complete — remove clone, wipe sibling transforms, commit new order.
-        if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
-        dragCloneRef.current = null;
-        clearInlineTransforms();
-        if (to !== from && to >= 0) {
-          const newOrder = [...orderRef.current];
-          const [moved] = newOrder.splice(from, 1);
-          newOrder.splice(to, 0, moved);
-          setOrder(newOrder);
-          HomeOrderStore.set(newOrder);
+      // The commit runs at most once: normally the timer fires it after the snap
+      // animation; a new press flushes it early via finishDragRef. The finally
+      // guarantees the drag refs reset even if the order write throws.
+      const finish = () => {
+        if (finishDragRef.current !== finish) return;
+        finishDragRef.current = null;
+        clearTimeout(commitTimerRef.current);
+        try {
+          if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+          dragCloneRef.current = null;
+          clearInlineTransforms();
+          if (to !== from && to >= 0) {
+            const newOrder = [...orderRef.current];
+            const [moved] = newOrder.splice(from, 1);
+            newOrder.splice(to, 0, moved);
+            setOrder(newOrder);
+            HomeOrderStore.set(newOrder);
+          }
+        } finally {
+          dragIdxRef.current = -1;  // sync ref immediately; setDragIdx's useEffect is async
+          setDragIdx(-1);
+          targetIdxRef.current = -1;
+          setTimeout(() => {justDraggedRef.current = false;}, 120);
         }
-        dragIdxRef.current = -1;  // sync ref immediately; setDragIdx's useEffect is async
-        setDragIdx(-1);
-        targetIdxRef.current = -1;
-        setTimeout(() => {justDraggedRef.current = false;}, 120);
-      }, 240);
+      };
+      finishDragRef.current = finish;
+      commitTimerRef.current = setTimeout(finish, 240);
     } else if (wasPressing) {
       if (Date.now() - pressStartTsRef.current > 400) {
         justDraggedRef.current = true;
@@ -344,7 +386,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
               ref={setCardRef(i)}
               className={`home-nav-item${i === pressingIdx ? " pressing" : ""}${i === dragIdx ? " dragging" : ""}`}
               onTouchStart={(e) => {
-                if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientY);
+                if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientY, e.touches[0].identifier);
               }}
               onMouseDown={(e) => {
                 if (e.button === 0) startPress(i, e.clientY);

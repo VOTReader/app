@@ -134,6 +134,9 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
   const fingerOffsetXRef  = React.useRef(0);
   const fingerOffsetYRef  = React.useRef(0);
   const naturalRectsRef   = React.useRef([]); // [{left,top,cx,cy,w,h}] per card at drag-start
+  const touchIdRef        = React.useRef(null); // identifier of the pointer that owns the press ('mouse' for pointer)
+  const finishDragRef     = React.useRef(null); // pending drop-commit; flushed early if a new press arrives
+  const commitTimerRef    = React.useRef(null);
 
   React.useEffect(() => { dragIdxRef.current     = dragIdx;   }, [dragIdx]);
   React.useEffect(() => { pressingIdxRef.current = pressingIdx; }, [pressingIdx]);
@@ -187,8 +190,33 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     return Math.max(0, Math.min(orderRef.current.length - 1, best));
   };
 
-  const startPress = (idx, clientX, clientY) => {
+  // Multi-touch discipline: the press belongs to ONE pointer. Moves from other
+  // fingers are ignored, and only that pointer lifting (or a touchcancel that
+  // swallowed it) ends the press — a stray second finger can no longer commit
+  // the drag early at whatever slot the tile happened to be passing over.
+  const trackedPoint = (e) => {
+    if (e.touches) {
+      for (let i = 0; i < e.touches.length; i++)
+        if (e.touches[i].identifier === touchIdRef.current) return e.touches[i];
+      return null;
+    }
+    return touchIdRef.current === 'mouse' ? e : null;
+  };
+  const trackedEnded = (e) => {
+    if (!e.changedTouches) return touchIdRef.current === 'mouse';
+    for (let i = 0; i < e.changedTouches.length; i++)
+      if (e.changedTouches[i].identifier === touchIdRef.current) return true;
+    for (let i = 0; i < e.touches.length; i++)
+      if (e.touches[i].identifier === touchIdRef.current) return false;
+    return true; // ours vanished without a changedTouches entry (some touchcancels)
+  };
+
+  const startPress = (idx, clientX, clientY, pointerId) => {
+    // A just-dropped drag parks its commit in finishDragRef while the snap
+    // animation plays; flush it so this grab is never silently swallowed.
+    if (finishDragRef.current) finishDragRef.current();
     if (pressingIdxRef.current >= 0 || dragIdxRef.current >= 0) return;
+    touchIdRef.current = pointerId != null ? pointerId : 'mouse';
     pressStartXRef.current  = clientX;
     pressStartYRef.current  = clientY;
     pressStartTsRef.current = Date.now();
@@ -200,8 +228,9 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     }, 280);
 
     const onMove = (e) => {
-      const x = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
-      const y = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+      const p = trackedPoint(e);
+      if (!p) return;
+      const x = p.clientX, y = p.clientY;
       if (dragIdxRef.current >= 0 && e.cancelable) {
         try { e.preventDefault(); } catch (_err) { /* passive — ignore */ }
       }
@@ -234,7 +263,11 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
         }
       }
     };
-    const onEnd = () => { if (activeCleanupRef.current) activeCleanupRef.current(); endPress(); };
+    const onEnd = (e) => {
+      if (!trackedEnded(e)) return;
+      if (activeCleanupRef.current) activeCleanupRef.current();
+      endPress();
+    };
 
     document.addEventListener('touchmove',   onMove, { passive: false });
     document.addEventListener('touchend',    onEnd);
@@ -303,6 +336,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     const wasDragging = dragIdxRef.current >= 0;
     setPressingIdx(-1);
     pressingIdxRef.current = -1;
+    touchIdRef.current = null;
 
     if (wasDragging) {
       const from  = dragIdxRef.current;
@@ -317,22 +351,33 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
         clone.style.top       = (snap ? snap.top  : 0) + 'px';
         clone.style.transform = 'scale(1)';
       }
-      setTimeout(() => {
-        if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
-        dragCloneRef.current = null;
-        clearInlineTransforms();
-        if (to !== from && to >= 0) {
-          const newOrder = [...orderRef.current];
-          const [moved]  = newOrder.splice(from, 1);
-          newOrder.splice(to, 0, moved);
-          setOrder(newOrder);
-          LibraryOrderStore.set(newOrder);
+      // The commit runs at most once: normally the timer fires it after the snap
+      // animation; a new press flushes it early via finishDragRef. The finally
+      // guarantees the drag refs reset even if the order write throws.
+      const finish = () => {
+        if (finishDragRef.current !== finish) return;
+        finishDragRef.current = null;
+        clearTimeout(commitTimerRef.current);
+        try {
+          if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+          dragCloneRef.current = null;
+          clearInlineTransforms();
+          if (to !== from && to >= 0) {
+            const newOrder = [...orderRef.current];
+            const [moved]  = newOrder.splice(from, 1);
+            newOrder.splice(to, 0, moved);
+            setOrder(newOrder);
+            LibraryOrderStore.set(newOrder);
+          }
+        } finally {
+          dragIdxRef.current   = -1;   // sync immediately; setDragIdx's useEffect is async
+          setDragIdx(-1);
+          targetIdxRef.current = -1;
+          setTimeout(() => { justDraggedRef.current = false; }, 120);
         }
-        dragIdxRef.current   = -1;   // sync immediately; setDragIdx's useEffect is async
-        setDragIdx(-1);
-        targetIdxRef.current = -1;
-        setTimeout(() => { justDraggedRef.current = false; }, 120);
-      }, 240);
+      };
+      finishDragRef.current = finish;
+      commitTimerRef.current = setTimeout(finish, 240);
     } else if (wasPressing) {
       if (Date.now() - pressStartTsRef.current > 400) {
         justDraggedRef.current = true;
@@ -365,7 +410,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
                 if (justDraggedRef.current) { e.preventDefault(); e.stopPropagation(); return; }
                 tile.onClick();
               }}
-              onTouchStart={(e) => { if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientX, e.touches[0].clientY); }}
+              onTouchStart={(e) => { if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientX, e.touches[0].clientY, e.touches[0].identifier); }}
               onMouseDown={(e) => { if (e.button === 0) startPress(i, e.clientX, e.clientY); }}
             >
               <span className="library-tile-icon">{tile.icon}</span>

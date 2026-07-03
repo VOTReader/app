@@ -47,6 +47,9 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
   const fingerOffsetYRef = React.useRef(0);
   const naturalRectsRef = React.useRef([]);     // [{left,top,cx,cy,w,h}] per real card, captured at drag start
   const tabsLenRef = React.useRef(total);
+  const touchIdRef = React.useRef(null);        // identifier of the pointer that owns the press ('mouse' for pointer)
+  const finishDragRef = React.useRef(null);     // pending drop-commit; flushed early if a new press arrives
+  const commitTimerRef = React.useRef(null);
 
   React.useEffect(() => {dragIdxRef.current = dragIdx;}, [dragIdx]);
   React.useEffect(() => {pressingIdxRef.current = pressingIdx;}, [pressingIdx]);
@@ -104,8 +107,35 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     return Math.max(0, Math.min(tabsLenRef.current - 1, best));
   };
 
-  const startPress = (idx, clientX, clientY) => {
+  // Multi-touch discipline: the press belongs to ONE pointer. Moves from other
+  // fingers are ignored, and only that pointer lifting (or a touchcancel that
+  // swallowed it) ends the press — a stray second finger can no longer commit
+  // the drag early at whatever slot the card happened to be passing over.
+  const trackedPoint = (e) => {
+    if (e.touches) {
+      for (let i = 0; i < e.touches.length; i++)
+        if (e.touches[i].identifier === touchIdRef.current) return e.touches[i];
+      return null;
+    }
+    return touchIdRef.current === 'mouse' ? e : null;
+  };
+  const trackedEnded = (e) => {
+    if (!e.changedTouches) return touchIdRef.current === 'mouse';
+    for (let i = 0; i < e.changedTouches.length; i++)
+      if (e.changedTouches[i].identifier === touchIdRef.current) return true;
+    for (let i = 0; i < e.touches.length; i++)
+      if (e.touches[i].identifier === touchIdRef.current) return false;
+    return true; // ours vanished without a changedTouches entry (some touchcancels)
+  };
+
+  const startPress = (idx, clientX, clientY, pointerId) => {
+    // A just-dropped drag parks its commit in finishDragRef while the snap
+    // animation plays; flush it so this grab is never silently swallowed
+    // (pre-fix, a re-grab inside that window left the press untracked — the
+    // finger just scrolled the grid and nothing could be dropped).
+    if (finishDragRef.current) finishDragRef.current();
     if (pressingIdxRef.current >= 0 || dragIdxRef.current >= 0) return;
+    touchIdRef.current = pointerId != null ? pointerId : 'mouse';
     pressStartXRef.current = clientX; pressStartYRef.current = clientY;
     pressStartTsRef.current = Date.now();
     // Track intent immediately (drift detection); delay the visible "pressing"
@@ -118,8 +148,9 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
 
     // Attach document listeners SYNCHRONOUSLY — no useEffect gap, no missed moves.
     const onMove = (e) => {
-      const x = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
-      const y = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+      const p = trackedPoint(e);
+      if (!p) return;
+      const x = p.clientX, y = p.clientY;
       if (dragIdxRef.current >= 0 && e.cancelable) {
         try {e.preventDefault();} catch (_err) { /* passive/unsupported — ignore */ }
       }
@@ -154,7 +185,11 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
         }
       }
     };
-    const onEnd = () => { if (activeCleanupRef.current) activeCleanupRef.current(); endPress(); };
+    const onEnd = (e) => {
+      if (!trackedEnded(e)) return;
+      if (activeCleanupRef.current) activeCleanupRef.current();
+      endPress();
+    };
 
     document.addEventListener("touchmove", onMove, { passive: false });
     document.addEventListener("touchend", onEnd);
@@ -226,6 +261,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     const wasDragging = dragIdxRef.current >= 0;
     setPressingIdx(-1);
     pressingIdxRef.current = -1;
+    touchIdRef.current = null;
 
     if (wasDragging) {
       const from = dragIdxRef.current;
@@ -241,17 +277,28 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
         clone.style.top = (snap ? snap.top : 0) + "px";
         clone.style.transform = "scale(1)";
       }
-      setTimeout(() => {
-        // Snap done — remove clone, wipe sibling transforms, commit the new order.
-        if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
-        dragCloneRef.current = null;
-        clearInlineTransforms();
-        if (to !== from && to >= 0) onReorder && onReorder(from, to);
-        dragIdxRef.current = -1;  // sync ref immediately; setDragIdx's useEffect is async
-        setDragIdx(-1);
-        targetIdxRef.current = -1;
-        setTimeout(() => {justDraggedRef.current = false;}, 120);
-      }, 240);
+      // The commit runs at most once: normally the timer fires it after the snap
+      // animation; a new press flushes it early via finishDragRef. The finally
+      // guarantees the drag refs reset even if onReorder throws — pre-fix, an
+      // exception here left dragIdxRef poisoned and every future grab refused.
+      const finish = () => {
+        if (finishDragRef.current !== finish) return;
+        finishDragRef.current = null;
+        clearTimeout(commitTimerRef.current);
+        try {
+          if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+          dragCloneRef.current = null;
+          clearInlineTransforms();
+          if (to !== from && to >= 0) onReorder && onReorder(from, to);
+        } finally {
+          dragIdxRef.current = -1;  // sync ref immediately; setDragIdx's useEffect is async
+          setDragIdx(-1);
+          targetIdxRef.current = -1;
+          setTimeout(() => {justDraggedRef.current = false;}, 120);
+        }
+      };
+      finishDragRef.current = finish;
+      commitTimerRef.current = setTimeout(finish, 240);
     } else if (wasPressing) {
       if (Date.now() - pressStartTsRef.current > 400) {
         justDraggedRef.current = true;
@@ -331,7 +378,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
               ref={setCardRef(i)}
               className={`tab-card${isActive ? ' active' : ''}${thumb ? ' has-thumb' : ''}${i === pressingIdx ? ' pressing' : ''}${i === dragIdx ? ' dragging' : ''}`}
               onClick={(e) => { if (justDraggedRef.current) { e.preventDefault(); e.stopPropagation(); return; } onSelect(i); }}
-              onTouchStart={(e) => { if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientX, e.touches[0].clientY); }}
+              onTouchStart={(e) => { if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientX, e.touches[0].clientY, e.touches[0].identifier); }}
               onMouseDown={(e) => { if (e.button === 0) startPress(i, e.clientX, e.clientY); }}
             >
               <button
