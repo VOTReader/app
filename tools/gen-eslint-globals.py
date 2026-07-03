@@ -56,8 +56,8 @@ OUT_DTS = ROOT / 'tools/globals.generated.d.ts'
 
 VENDOR_GLOBALS = [
     'React', 'ReactDOM',
-    'FlexSearch', 'html2canvas',
-    'VotSearch', 'VotSearchData',
+    'html2canvas',
+    'VotSearchData',
 ]
 
 

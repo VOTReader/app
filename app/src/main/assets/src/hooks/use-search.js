@@ -79,7 +79,7 @@
                                            bridge (intentional design).
 
    DOES NOT OWN:
-     - The search engine itself (window.VotSearch) — that's bundle-a's
+     - The search engine itself (window.VotSearchMini) — that's bundle-e's
        responsibility. handleSearchCommand's 'rebuild-index' action
        calls into it, but the engine is external.
      - The SearchScreen component — render tree, stays in ui/screens/.
@@ -154,9 +154,9 @@
                                 srchResolveLetterId.
      colLetterArr, colPreface   Used by srchResolveLetterId for
                                 letterNum → letterId resolution.
-     window.VotSearch           For handleSearchCommand's 'rebuild-index'
+     window.VotSearchMini       For handleSearchCommand's 'rebuild-index'
                                 action (delegates to the search engine
-                                in bundle-a).
+                                in bundle-e).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
@@ -313,7 +313,7 @@ export function useSearch({
 
   // ── handleSearchSelect — the 80-line result-routing dispatcher ──────────
   // Two top-level branches:
-  //   (a) entry.__direct: a directly-parsed reference (from VotSearch's
+  //   (a) entry.__direct: a directly-parsed reference (the engine's
   //       __direct entries). Sub-dispatched by r.kind: ref-bible /
   //       named-passage / ref-letter / ref-book.
   //   (b) Orama doc hits: entry.doc carries kind: verse / chapter-title /
@@ -421,9 +421,8 @@ export function useSearch({
     }
     if (action === 'clear-query') { setSearchQuery(''); return; }
     if (action === 'rebuild-index') {
-      // Rebuild whichever engines are loaded (Classic always; MiniSearch once
-      // its lazy bundle has loaded).
-      if (window.VotSearch) window.VotSearch.rebuild().catch(() => {});
+      // Guarded: the engine lives in bundle-e, loaded whenever this fires
+      // (the command is typed in SearchScreen, which lives there too).
       if (window.VotSearchMini) window.VotSearchMini.rebuild().catch(() => {});
       return;
     }

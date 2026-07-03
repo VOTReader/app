@@ -28,12 +28,12 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn) {
   return [...out];
 }
 
-// Classic/MiniSearch coexistence: resolve the active engine from settings. Both
-// engines expose the identical facade + result shape, so every call site stays
-// engine-agnostic. Falls back to Classic (always present in bundle-a) if the
-// lazy MiniSearch engine somehow isn't loaded.
-function pickEngine(name) {
-  return (name === 'minisearch' && window.VotSearchMini) ? window.VotSearchMini : window.VotSearch;
+// MiniSearch is THE engine (the owner A/B'd it against the retired FlexSearch
+// Classic and kept it — typo tolerance, BM25 ranking, recent searches, warm IDB
+// cache). It ships in bundle-e alongside this screen, so it's always loaded by
+// the time this renders; pickEngine still guards for a hypothetical load failure.
+function pickEngine() {
+  return window.VotSearchMini;
 }
 
 export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand }) {
@@ -44,15 +44,14 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const [suggestions, setSuggestions] = React.useState([]);
   const [recents, setRecents] = React.useState([]);
   const debounceRef = React.useRef(null);
-  const engineName = settings.searchEngine || 'classic';
 
-  // Build the index on mount AND whenever the active engine changes (the toggle).
-  // Both engines read the lazy corpus globals (BOOKS / MATTHEW / VOT); building
-  // before they arrive yields an empty index, so load every corpus first, then
-  // build. Classic warm-opens hit its IDB cache; MiniSearch builds fresh in
-  // memory (no cache) behind the progress bar, then reuses it for the session.
+  // Build the index on mount. The engine reads the lazy corpus globals
+  // (BOOKS / MATTHEW / VOT); building before they arrive yields an empty
+  // index, so load every corpus first, then build. A warm boot restores the
+  // serialized index from the vot-minisearch-cache IDB (~0.3s) instead of
+  // rebuilding (~10s) behind the progress bar.
   React.useEffect(() => {
-    const E = pickEngine(engineName);
+    const E = pickEngine();
     if (!E) {
       setBuildInfo({ ready: false, building: false, progress: null, error: 'Search engine failed to load. Check browser console.' });
       return;
@@ -68,7 +67,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       }))
       .then(() => setBuildInfo({ ready: true, building: false, progress: null }))
       .catch((err) => setBuildInfo({ ready: false, building: false, progress: null, error: err?.message || String(err) }));
-  }, [engineName]);
+  }, []);
 
   // Focus input on mount
   React.useEffect(() => {
@@ -83,12 +82,12 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   React.useEffect(() => {
     const q = (query || '').trim();
     if (!q || q.length < 1 || q.length > 40) {setSuggestions([]);setShowSuggest(false);return;}
-    const E = pickEngine(engineName);
+    const E = pickEngine();
     if (!E) return;
     const s = E.suggest(q, { max: 8 });
     setSuggestions(s);
     setShowSuggest(s.length > 0 && !buildInfo.building && !suggestDismissed);
-  }, [query, buildInfo.building, suggestDismissed, engineName]);
+  }, [query, buildInfo.building, suggestDismissed]);
 
   // Run search with debounce — one box, one index, everything included.
   React.useEffect(() => {
@@ -101,7 +100,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      pickEngine(engineName).search(q, {
+      pickEngine().search(q, {
         translation: settings.translation || 'nkjv',
         useStopWords: settings.searchUseStopWords !== false,
         synonyms: settings.searchSynonyms !== false,
@@ -122,7 +121,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       });
     }, 140);
     return () => {if (debounceRef.current) clearTimeout(debounceRef.current);};
-  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope, engineName]);
+  }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope]);
 
   // Handle command-kind parsed results
   React.useEffect(() => {
@@ -193,12 +192,12 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (!q || q.length < 4 || q.length > 15) return null;
     if (/\s/.test(q)) return null; // multi-word: not a book attempt
     if (/[0-9:.,;-]/.test(q)) return null; // has digits/punctuation: already a ref attempt
-    const guess = pickEngine(engineName).fuzzyBookSuggest(q);
+    const guess = pickEngine().fuzzyBookSuggest(q);
     if (!guess) return null;
     const disp = window.VotSearchData.BOOK_DISPLAY[guess] || guess;
     if (disp.toLowerCase() === q.toLowerCase()) return null;
     return { original: q, suggestion: disp, rewrite: disp };
-  }, [state.parsed, state.results.length, query, engineName]);
+  }, [state.parsed, state.results.length, query]);
 
   // Recent searches (gated by the existing history privacy toggle). Refresh
   // whenever the box is empty (mount / clear / back-to-empty) so the list also

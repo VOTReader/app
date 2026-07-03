@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
-import { dataSignature, loadCached, saveCached, clearCached, MS_INDEX_VERSION } from './cache.js';
+import { dataSignature, loadCached, saveCached, clearCached, MS_INDEX_VERSION, CORPUS_CONTENT_VERSION } from './cache.js';
 
 describe('cache signature', () => {
   beforeEach(() => { for (const k of ['BOOKS', 'MATTHEW', 'LETTERS_V1', 'WTLB_ONE']) delete globalThis[k]; });
@@ -9,6 +9,15 @@ describe('cache signature', () => {
     const sig = dataSignature('nkjv');
     expect(sig).toContain('v:' + MS_INDEX_VERSION);
     expect(sig).toContain('tr:nkjv');
+  });
+
+  it('folds in CORPUS_CONTENT_VERSION so a content-only corpus edit busts the cache (SRCH1)', () => {
+    // The gate (tools/check-corpus-version.js) keeps this constant equal to the
+    // SW's CORPUS_VERSION; the signature carrying it is what makes a corpus
+    // content edit rebuild the index. A structural-only signature would miss
+    // a reworded verse of the same length.
+    expect(dataSignature('nkjv')).toContain('cv:' + CORPUS_CONTENT_VERSION);
+    expect(CORPUS_CONTENT_VERSION).toMatch(/^c\d+$/);
   });
 
   it('busts when the corpus structure changes (a collection grows)', () => {

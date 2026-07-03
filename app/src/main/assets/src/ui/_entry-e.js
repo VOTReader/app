@@ -19,10 +19,9 @@ import { SearchScreen } from './screens/SearchScreen.jsx';
 import {
   GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
 } from './screens/GardenView.jsx';
-// The MiniSearch engine (Classic/MiniSearch coexistence) ships in bundle-e
-// alongside SearchScreen — its sole trigger — so it never touches cold boot.
-// Both engines expose the identical facade + result shape; SearchScreen picks
-// the active one from settings.searchEngine. Recent-searches helpers are
+// The MiniSearch engine — THE app's search engine (Classic/FlexSearch retired
+// 2026-07-02 after the owner's A/B) — ships in bundle-e alongside SearchScreen,
+// its sole trigger, so it never touches cold boot. Recent-searches helpers are
 // window-exposed here so cross-bundle callers (use-search's /clear history) can
 // reach them without bundling a second copy.
 import { VotSearchMini } from '../search/engine.js';

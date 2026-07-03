@@ -242,20 +242,15 @@ function App() {
     loadTranslation(code).then(() => setTranslationTick((v) => v + 1));
   }, [settings.translation]);
 
-  // One-time reclaim of stale search-index cache generations at boot. The
-  // vot-search-cache DB accumulated a fresh ~21 MB serialized index per
-  // dataSignature() change (corpus edit / schema bump / translation switch)
-  // and never evicted the superseded copies — hundreds of MB of dead index
-  // on long-lived installs. purgeStaleCache() is a CHEAP standalone IDB
-  // key-deletion (it does NOT build or load an index), so it runs here at
-  // boot rather than being gated behind VotSearch.init() (which only fires
-  // when the user opens Search — they might not for days). Keeps only the
-  // current-signature entries; idempotent; fire-and-forget.
+  // One-time reclaim of the RETIRED Classic engine's index cache at boot.
+  // The FlexSearch engine is gone (MiniSearch is the only engine now), so
+  // its vot-search-cache DB — which could hold tens of MB of serialized
+  // index on installs that used Classic search — is pure orphaned storage.
+  // deleteDatabase is idempotent (a no-op success when the DB doesn't
+  // exist), so every boot may fire it; fire-and-forget. MiniSearch's own
+  // vot-minisearch-cache is version-gated internally and stays.
   useEffect(() => {
-    if (window.VotSearch && typeof window.VotSearch.purgeStaleCache === 'function') {
-      window.VotSearch.purgeStaleCache(settings.translation || 'nkjv').catch(() => {});
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time boot reclaim; deliberately runs once on mount, not per translation change (saveToCache self-evicts thereafter).
+    try { indexedDB.deleteDatabase('vot-search-cache'); } catch (_e) { /* best-effort reclaim */ }
   }, []);
 
   // ERR1: shared by the boot effect AND the StudiesHome "Try again" button.

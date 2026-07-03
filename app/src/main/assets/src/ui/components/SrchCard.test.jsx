@@ -5,7 +5,7 @@
    The query-level term list only holds the literal typed words, so before
    this merge a typo-corrected result rendered its snippet with NO <mark>.
    SrchCard must union entry.terms into the highlight list, and must pass
-   Classic results (no entry.terms) through unchanged. */
+   results WITHOUT entry.terms (direct-ref parses) through unchanged. */
 
 import { it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
@@ -17,7 +17,7 @@ beforeEach(() => {
   // SrchCard / SrchSnippet read these as free-var globals (window-attached in prod).
   /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { verse: { label: 'Verse', cls: '' } };
   /** @type {any} */ (globalThis).SrchSnippet = SrchSnippet;
-  /** @type {any} */ (globalThis).VotSearch = { snippet, highlightSpans };
+  /** @type {any} */ (globalThis).VotSearchMini = { snippet, highlightSpans };
 });
 afterEach(() => { cleanup(); });
 
@@ -37,7 +37,7 @@ it('marks the fuzzy-corrected word carried on entry.terms (typed term alone matc
   expect(marks(container).some((t) => /shepherd/i.test(t))).toBe(true);
 });
 
-it('still marks plain query-level terms (no entry.terms — the Classic engine shape)', () => {
+it('still marks plain query-level terms (no entry.terms on the result)', () => {
   const { container } = render(
     <SrchCard entry={entry(null)} terms={['shepherd']} onSelect={() => {}} isDirect={false} />,
   );

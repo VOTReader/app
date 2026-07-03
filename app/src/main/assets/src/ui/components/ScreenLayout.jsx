@@ -4,6 +4,7 @@
 
 import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
+import { AnnotationHint } from './AnnotationHint.jsx';
 
 // Apply a saved scroll record ({ anchorKey, anchorOff, y } | legacy number) to a
 // given scroll container — used for the inert peek so it renders already at the
@@ -283,6 +284,12 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
         </div>
       )}
       {stickyNav}
+      {/* First-run annotation tip — reading screens only (`pager` is passed
+          exclusively by the 4 reading screens). Sits OUTSIDE .pager-track as
+          a stickyNav sibling so swipe-settle transforms can't displace it;
+          renders null unless the user has zero annotations (see the
+          component header). */}
+      {pager ? <AnnotationHint /> : null}
       <div className="scroll-notch-marker" ref={notchRef} />
     </div>
   );

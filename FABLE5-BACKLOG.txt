@@ -1,0 +1,233 @@
+═══════════════════════════════════════════════════════════════════════════
+FABLE5-BACKLOG.txt — what to have Fable 5 build before access ends
+═══════════════════════════════════════════════════════════════════════════
+Written 2026-07-02 by a Fable 5 session with full context of the codebase
+(it had just walked every screen, retired Classic search, and shipped the
+annotation hint). Owner has ~5 days of Fable 5 access. This file is the
+menu: each item is scoped so ONE session can land it end-to-end.
+
+HOW TO RUN A SESSION (the protocol that has worked)
+  1. Session reads CLAUDE.md first (always), then this file.
+  2. Pick ONE item (or one Tier-1 + one small Tier-2). Resist bundling.
+  3. VERIFY CURRENT STATE before building — plans and counts in docs drift;
+     read the code ([[verify-current-state-not-plan]]).
+  4. Implement → preview-verify on the real corpus (import the owner's
+     .votbak via adb if real data helps — proven workflow, see the
+     2026-07-02 CLAUDE.md entries) → full gates (vitest + coverage +
+     typecheck + lint --max-warnings 0 + smoke:ci) → CLAUDE.md handoff
+     entry → commit → push → gradle assembleDebug + adb install -r if the
+     owner's phone is connected.
+  5. Mark the item DONE here with a one-liner.
+
+HARD CONSTRAINTS (owner policies — never violate)
+  • NO AI features, NO API keys, NO LLM anything. NO auth/login. NO new
+    network egress (the app is self-contained + offline; only existing
+    egress: Garden images from GitHub, external links opened OUT).
+  • Do NOT touch the welcome splash (UX6 — owner veto).
+  • Hidden Manna stays out of every public index/search/home tile.
+  • Data faithfulness: never author content that isn't on the live site;
+    corpus edits need CORPUS_VERSION bump + check_balance.py.
+  • ≤800-line app.jsx canary; 428-global lint gate (regenerate via
+    npm run lint when window-globals change); pre-commit rebuilds bundles
+    from the working tree — one logical change per commit.
+
+ALREADY REJECTED / ADJUDICATED — do NOT re-litigate
+  • PF3 IntersectionObserver windowing (dropped: risks the load-bearing
+    scroll-restore/annotation layer; content-visibility landed instead).
+  • PERF1 cold-boot restructuring (won't-do: risk > gain, no budget users).
+  • D3 global strictNullChecks; D4 NavContext; D8 wholesale sheet-hook
+    dissolve; PF2 minify bundle-a (react UMD reads top-level `this`).
+  • UX6 welcome splash changes.
+
+───────────────────────────────────────────────────────────────────────────
+TIER 1 — HIGHEST LEVERAGE (do these first)
+───────────────────────────────────────────────────────────────────────────
+
+[1] MY NOTES FULL-TEXT SEARCH  (gap found in the 2026-07-02 screen walk)
+    Bookmarks, Links, and Highlights index screens all have a search box;
+    the Notes index (the richest store: bodies + anchor excerpts) has NONE.
+    Add the same `.notes-index-search` input filtering All Notes + drilled
+    notebook views over note.body + fullText + source label.
+    Acceptance: typing "covenant" filters both tabs live; empty state for
+    no matches; tests for the filter fn; visual parity with Bookmarks.
+    Effort: S.  Files: NotesIndexScreen.jsx (+ small CSS reuse).
+
+[2] EXPORT NOTES / NOTEBOOK AS TEXT (shareable study notes, zero egress)
+    A "Share as text" action on a notebook (drilled header ⋯ or button)
+    and on All Notes: compose a plain-text/markdown document (note anchors
+    as quotes + bodies + source labels + dates), hand it to the existing
+    share/save path (navigator.share / SAF text write — the journal
+    recording save + export flows show the pattern). NO new formats in
+    backup — this is a human-readable artifact, not a backup.
+    Acceptance: a 3-note notebook exports a readable .md/.txt; verified on
+    web preview; Android path compiles + emulator-verified if possible.
+    Effort: M.  Files: NotesIndexScreen, a small utils/notes-export.js.
+
+[3] "MY PROGRESS" DASHBOARD (all data already exists, pure UI)
+    One screen unifying: Mark-as-Read percentages (per collection — the
+    Settings rows already compute them), journal streak (JournalStats),
+    counts of notes/highlights/bookmarks, most-annotated books/letters
+    (AnnotationStore keys → group by book/letter, resolve titles the way
+    noteSourceLabel does). Entry point: Library card or Home tile.
+    Acceptance: renders offline from stores; zero new persistence;
+    respects historyEnabled=false (hide history-derived rows).
+    Effort: M.  Files: new screen + route + Library/Home entry.
+
+[4] BACKUP FRESHNESS REMINDER (the only-backup story needs this)
+    The app's ONLY backup is manual Export. Track lastExportAt (StateStore
+    write in the export success path — both platforms), and at boot show
+    the existing toast pattern if >30 days AND user data is non-trivial
+    (>50 KB): "It's been a while since your last backup — Export from
+    Settings." One-tap deep link to Settings; a settings toggle to disable
+    the reminder. NO scheduling APIs, NO notifications — boot-check only.
+    Acceptance: toast fires on a stale-stamped profile, not on fresh
+    export; toggle silences; tests around the threshold fn.
+    Effort: S-M.  Files: SettingsScreen export paths, use-app-shell-
+    effects (or App boot effect), use-settings default.
+
+[5] SMOKE SEARCH RESULT ASSERTION (deferred v1.1 item, now MiniSearch-only)
+    tools/smoke.js "Search" step still only asserts the screen renders.
+    Make it type a known query (e.g. "shepherd") and assert ≥1 result card
+    + ≥1 <mark> — guarding the whole engine+UI path in CI forever.
+    Watch: cold index build in headless CI (~10s budget; the corpus is
+    already loaded by earlier smoke steps, and the golden suite proves the
+    engine, so assert with a generous timeout).
+    Acceptance: smoke:ci green locally + in CI with the new assertion.
+    Effort: S.  Files: tools/smoke.js (+ SMOKE.md note).
+
+───────────────────────────────────────────────────────────────────────────
+TIER 2 — UX / DESIGN CONTINUATIONS (the 2026-07-02 pass's natural sequels)
+───────────────────────────────────────────────────────────────────────────
+
+[6] JOURNAL BLOCK REORDER (drag handles)
+    Blocks can be added/deleted but not reordered — a long entry with a
+    misplaced quote must be rebuilt. The app already has TWO proven
+    imperative drag implementations (HomeScreen 1D, TabsOverview 2D FLIP);
+    reuse that exact pattern (long-press handle → FLIP siblings → commit
+    via a JournalStore blocks splice). RED-first tests on the reorder fn.
+    Effort: M-L (gesture code is subtle — copy the TabsOverview idioms).
+
+[7] TAB NAMES + PIN
+    Tabs remember titles now (useTabTitleMemo); let the ⋮ TabActionSheet
+    add "Rename tab…" (persisted custom title overrides the memo) and
+    "Pin" (pinned tabs sort first + skip Close-others/Clear-all).
+    Effort: M.  Files: TabActionSheet, use-tab-actions, tabs.js, tests.
+
+[8] SEARCH RESULT FILTER CHIPS
+    Results are grouped by collection with counts already; add tappable
+    chips (All · Scriptures · Volumes · WTLB · Studies) ABOVE the results
+    that filter the rendered set (the scope engine option already exists —
+    this is UI over r.results). Plus a sort toggle (relevance | book
+    order) for verse results.
+    Effort: S-M.  Files: SearchScreen, SrchGroup, CSS.
+
+[9] "SEARCH IN THIS BOOK/LETTER" ENTRY POINT
+    From a Bible book index or letter: a search affordance that opens
+    SearchScreen pre-scoped (the engine's `scope` option + searchScope
+    plumbing already exist — use-search supports it). Discoverability win.
+    Effort: S-M.
+
+[10] AMOLED TRUE-BLACK THEME VARIANT
+    A third theme value ("Dark · True Black") that only overrides the
+    surface CSS vars (--bg/--bg2/--bg3 → #000-#0a0a0a family). Pure CSS
+    vars + the theme cycle button/setting. Verify both annotation colors
+    and gold contrast (the WCAG audit method is in CLAUDE.md).
+    Effort: S-M.  Watch: theme persistence + boot pre-mount application.
+
+[11] NOTEBOOK COLOR TAGS
+    Notebooks are uniform cards; a small color dot (picker in the drilled
+    header, reuse HL_COLORS swatch UI) carried on the notebook record and
+    shown on cards + note-row chips. Migration-safe: absent color = gold.
+    Effort: S-M.  Files: notebook-store (field), NotesIndexScreen, NoteRow.
+
+[12] HOLY DAYS YEAR VIEW (curated data only — no authoring)
+    The 16 Holy Days entries as a simple vertical year timeline (their
+    existing order/labels), each row tapping through to the entry. Zero
+    new content; purely a navigation view over HOLY_DAYS.
+    Effort: S-M.
+
+───────────────────────────────────────────────────────────────────────────
+TIER 3 — ENGINEERING HARDENING
+───────────────────────────────────────────────────────────────────────────
+
+[13] MODAL FOCUS TRAPS (the code half of "deep a11y")
+    Sheets/dialogs don't trap Tab focus (desktop PWA + TalkBack nav). One
+    small useFocusTrap hook applied to NoteSheet, the pickers, the wipe
+    dialog, TabActionSheet, ConfirmStrip-bearing dialogs. Escape handling
+    already exists via modalRegistry — wire the trap into the same mounts.
+    The TalkBack DEVICE walk stays owner-side, but this unblocks it.
+    Effort: M.  Tests: jsdom Tab-cycle tests per sheet.
+
+[14] APP.JSX TARGETED TYPING (CQ5's honest core)
+    checkJs on app.jsx was adjudicated too noisy wholesale; the tractable
+    version: JSDoc-type the ~15 useState slots + the deps object passed to
+    buildScreenRoutes (one @typedef in screen-routes consumed by app.jsx).
+    Acceptance: tsc clean, zero `any` regressions in the route contract,
+    canary still ≤800.
+    Effort: M.
+
+[15] BACKUP VERIFY ACTION (read-only .votbak inspector)
+    Settings → Your Data → "Verify a backup file": pick a .votbak, run
+    readContainer + validateImportEnvelope + count records/media WITHOUT
+    applying, report "Backup from <date>: N notes, N journal entries,
+    N media (X MB) — looks intact." Catches a corrupt only-backup BEFORE
+    the owner needs it. Reuses the entire import read path minus apply.
+    Effort: S-M.  Files: SettingsScreen (+ the same flow on Android needs
+    the native begin/read/close bridge calls — web-only first is fine).
+
+[16] JOURNAL EDITOR SESSION UNDO (scoped, not a full undo stack)
+    After a destructive block action (delete confirmed / voice memo
+    removed), offer the same 6s Undo toast the tab-close uses (snapshot
+    the removed block + index; restore splices it back). NOT a keystroke
+    undo — block-level only, matching the app's recoverability pattern.
+    Effort: M.  Files: JournalEditorScreen + use-tab-actions' toast idiom.
+
+[17] STICKY-NAV/CHROME AUDIT AT 200% BROWSER ZOOM (desktop PWA)
+    The 1.5× font-scale walk passed (2026-07-02), but desktop browser zoom
+    stacks ON TOP of font scale. One session: 200% zoom walk of the 8 core
+    screens, fix any fixed-height chrome clipping.
+    Effort: S.
+
+───────────────────────────────────────────────────────────────────────────
+TIER 4 — DOCS / META (cheap, compounding)
+───────────────────────────────────────────────────────────────────────────
+
+[18] ARCHITECTURE.md REFRESH
+    It predates: the real-inert pager peek, MiniSearch-only search, the
+    v3 backup container, the modal registry's full reach, bundle-e. One
+    session of read-verify-rewrite makes every FUTURE session (any model)
+    cheaper. Delete stale sections aggressively ([[doc-pruning]]).
+    Effort: M.
+
+[19] GOLDEN SEARCH SUITE EXPANSION
+    src/search/golden.test.js pins quality queries. Add the owner's real
+    vocabulary: 10-15 queries he actually uses (ask him for his last
+    searches), pin expected top-3s. Cheap insurance against ranking
+    regressions now that MiniSearch is the only engine.
+    Effort: S.
+
+[20] DEVICE-WALK DAY (owner + any model together)
+    tools/n1-smoke-walk.md items + the newly shipped confirm flows:
+    recording discard confirm, tab bulk-close confirms, annotation hint
+    (fresh profile), backup reminder once [4] lands, NTV1/NTV3 confirms.
+    Consolidate results back into the checklist.
+    Effort: owner time, not model time — schedule it while Fable can fix
+    what the walk finds SAME-DAY.
+
+───────────────────────────────────────────────────────────────────────────
+SUGGESTED SEQUENCE FOR ~5 DAYS
+───────────────────────────────────────────────────────────────────────────
+  Day 1:  [1] notes search + [5] smoke assertion  (small, sharp) — then
+          [4] backup reminder.
+  Day 2:  [3] progress dashboard  (the owner-visible crown piece).
+  Day 3:  [6] journal block reorder  (the hardest gesture work — do it
+          while Fable is available, it's exactly the kind of subtle
+          imperative-DOM task weaker models fumble).
+  Day 4:  [2] notes export + [15] backup verify  (data-safety day).
+  Day 5:  [13] focus traps + [18] ARCHITECTURE refresh + [20] device-walk
+          day with same-day fixes.
+  Slot [7]/[8]/[10] into any day that finishes early.
+
+DONE LOG
+  (add one-liners here as items land)
+═══════════════════════════════════════════════════════════════════════════

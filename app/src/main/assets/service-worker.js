@@ -14,7 +14,7 @@
  *   new build. Background tabs defer their reload until they become visible.
  */
 
-const CACHE_VERSION = 'v1.0.2-d32c763d4c';
+const CACHE_VERSION = 'v1.0.2-748a01ae88';
 const CORPUS_VERSION = 'c12'; // c11→c12 (2026-06-12): WTLB/Blessed faithfulness audit — all 360 entries verified present + complete; included the one editorial clarification footnote ("The Letters" refers to The Volumes of Truth) on WTLB One "YAHUWAH Is One", the only footnote across the collection. (c10→c11: restored 14 blank Timothy headers + Recompense's lost dream. c9→c10: restored the "(Regarding …)" occasion header line to ~40 letters. c8→c9: SW1 corpus-cache. c7→c8: CORP-2. c6→c7: CORP-1. c5→c6: PF1 minify.)
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -37,7 +37,7 @@ const CORE_ASSETS = [
   // bundle-e must not abort the whole SW install — the route degrades to the
   // _corpusView "Try again" affordance instead.
   './dist/bundle-e.js',
-  // U18: react.min.js / react-dom.min.js / flexsearch.min.js / search.js /
+  // U18: react.min.js / react-dom.min.js /
   // search-data.js are NOT listed — they are CONCATENATED into bundle-a.js
   // (build.py) and never loaded standalone, so precaching them was pure
   // double-caching + extra install-failure surface (addAll is all-or-nothing).

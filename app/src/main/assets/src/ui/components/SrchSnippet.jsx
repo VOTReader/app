@@ -19,8 +19,8 @@ export function SrchSnippet({ text, terms, maxLen = 180 }) {
   }, []);
 
   if (!text) return null;
-  const snippet = window.VotSearch.snippet(text, terms || [], maxLen);
-  const spans = window.VotSearch.highlightSpans(snippet, terms || []);
+  const snippet = window.VotSearchMini.snippet(text, terms || [], maxLen);
+  const spans = window.VotSearchMini.highlightSpans(snippet, terms || []);
   return (
     <div ref={ref} className="srch-snippet-scroll">
       {spans.map((s, i) =>

@@ -47,7 +47,6 @@ export default [
     ignores: [
       'app/src/main/assets/dist/**',
       'app/src/main/assets/*.min.js',
-      'app/src/main/assets/search.js',
       'app/src/main/assets/search-data.js',
       'app/src/main/assets/src/data/**',
       'app/src/main/assets/src/search/vendor/**',

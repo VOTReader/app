@@ -52,16 +52,10 @@ export default defineConfig({
         'app/src/main/assets/src/renderer/**/*.{js,jsx}',
         'app/src/main/assets/src/data/scripture-resolution.js',
         // SRCH-COV: the FlexSearch engine wrapper (the app's lowest-rated
-        // subsystem per the blind audit) is now in the measured scope. It was
-        // OUT only because the tests loaded it via eval(), and v8 instruments
-        // imported modules, NOT eval'd source — so it read as untestable when it
-        // simply wasn't being measured. search-engine.test.js now `import`s it,
-        // making it visible + gated by the per-file floor below. (It is a classic
-        // side-effect IIFE concatenated into bundle-a at ship time; importing it
-        // in the test only runs the IIFE — production loading is unchanged.)
-        'app/src/main/assets/search.js',
-        // The new MiniSearch engine (pure ES modules — Classic/MiniSearch
-        // coexistence). vendor/minisearch.js is excluded below (3rd-party).
+        // The MiniSearch engine (pure ES modules). The Classic FlexSearch
+        // engine (assets/search.js) was RETIRED 2026-07-02 — its include entry
+        // + per-file floor left with it. vendor/minisearch.js is excluded
+        // below (3rd-party).
         'app/src/main/assets/src/search/**/*.{js,jsx}',
       ],
       // Exclude colocated test files + bundler entries from coverage measurement.
@@ -262,19 +256,10 @@ export default defineConfig({
       // branches 49→51 (1.21), functions 63→64 (1.48); lines HELD at 64 (a 65
       // floor leaves only 0.07). Re-ratchet after U8 re-measures.
       //
-      // SRCH-COV SCOPE EXPANSION (2015 tests) — assets/search.js joined the
-      // measured `include`. Unlike U15 (which ROSE), adding a ~1830-line file at
-      // 67%/72% is mildly DILUTIVE, so the aggregate floors are HELD, not raised
-      // (the live aggregate sits well above them — statements 71.9, branches 61.3,
-      // functions 74.2, lines 76.1 — because many recent batches added tests
-      // without ratcheting). search.js gets its own per-file floor below so its
-      // coverage is gated directly (a search refactor that dips it now fails CI),
-      // which is the real protection; the aggregate margin is incidental. +52
-      // search tests (public-API helpers — levenshtein/fuzzyBookSuggest/parse-
-      // refs/snippet/highlightSpans/suggest/getState/getStats — plus a volumes-
-      // engine fixture covering the second doc-builder) lifted search.js from
-      // ~44/35/45/49 to 66.72/56.25/62.72/71.92. The remaining uncovered slice is
-      // the IDB cache layer + alt-translation loading (jsdom-hostile paths).
+      // (SRCH-COV historical note: the retired Classic engine assets/search.js
+      // sat in the measured include at 67/56/63/72 per-file — REMOVING a
+      // below-aggregate file is mildly ACCRETIVE, so the aggregate floors are
+      // safely held as-is.)
       thresholds: {
         statements: 60,
         branches: 51,
@@ -306,14 +291,6 @@ export default defineConfig({
         },
         'app/src/main/assets/src/renderer/dom-bookmarks.js': {
           statements: 96, branches: 88, functions: 100, lines: 98,
-        },
-        // SRCH-COV: search.js is the app's lowest-rated subsystem AND the file
-        // most likely to see future change, so — unlike the inert overlays above
-        // — its per-file floor keeps a ~1-2pt buffer rather than locking tight.
-        // Current 66.72/56.25/62.72/71.92; ratchet up as the cache/translation
-        // paths get covered, never down.
-        'app/src/main/assets/search.js': {
-          statements: 65, branches: 55, functions: 61, lines: 70,
         },
         // SEARCH (MiniSearch engine) — per-file floors on the substantive logic
         // modules (the pure helpers are ~100% and ride the aggregate they lift).

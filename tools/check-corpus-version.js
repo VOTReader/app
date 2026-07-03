@@ -59,22 +59,24 @@ const cvMatch = sw.match(/const CORPUS_VERSION = '([^']+)'/);
 if (!cvMatch) fail('Could not find CORPUS_VERSION in service-worker.js.');
 const corpusVersion = cvMatch[1];
 
-// SRCH1: the search-index cache signature (assets/search.js CORPUS_CONTENT_VERSION)
-// folds in the corpus content version so a content-only corpus edit (a reworded
-// verse of the same length) busts the stale search index — dataSignature is
-// otherwise purely structural. Keep it equal to CORPUS_VERSION and fail closed if
-// they diverge, so the corpus-edit → CORPUS_VERSION bump also rebuilds the index.
-const searchPath = resolve(root, 'app/src/main/assets/search.js');
-const ccvMatch = readFileSync(searchPath, 'utf-8').match(/var CORPUS_CONTENT_VERSION = '([^']+)'/);
-if (!ccvMatch) fail('Could not find CORPUS_CONTENT_VERSION in app/src/main/assets/search.js.');
+// SRCH1: the MiniSearch cache signature (src/search/cache.js
+// CORPUS_CONTENT_VERSION) folds in the corpus content version so a content-only
+// corpus edit (a reworded verse of the same length) busts the stale search
+// index — dataSignature is otherwise purely structural. Keep it equal to
+// CORPUS_VERSION and fail closed if they diverge, so the corpus-edit →
+// CORPUS_VERSION bump also rebuilds the index. (Moved from the retired Classic
+// engine's assets/search.js on 2026-07-02.)
+const searchCachePath = resolve(root, 'app/src/main/assets/src/search/cache.js');
+const ccvMatch = readFileSync(searchCachePath, 'utf-8').match(/export const CORPUS_CONTENT_VERSION = '([^']+)'/);
+if (!ccvMatch) fail('Could not find CORPUS_CONTENT_VERSION in app/src/main/assets/src/search/cache.js.');
 if (ccvMatch[1] !== corpusVersion) {
   fail(
     'SEARCH-CACHE VERSION OUT OF SYNC (SRCH1).\n' +
-    `    app/src/main/assets/search.js  CORPUS_CONTENT_VERSION = '${ccvMatch[1]}'\n` +
-    `    app/src/main/assets/service-worker.js  CORPUS_VERSION       = '${corpusVersion}'\n` +
+    `    app/src/main/assets/src/search/cache.js  CORPUS_CONTENT_VERSION = '${ccvMatch[1]}'\n` +
+    `    app/src/main/assets/service-worker.js    CORPUS_VERSION         = '${corpusVersion}'\n` +
     '    The search-index cache signature folds in CORPUS_CONTENT_VERSION so a corpus\n' +
     '    content edit busts the stale index — keep the two equal. Set\n' +
-    `    CORPUS_CONTENT_VERSION = '${corpusVersion}' in search.js, then rebuild.`
+    `    CORPUS_CONTENT_VERSION = '${corpusVersion}' in src/search/cache.js, then rebuild.`
   );
 }
 

@@ -101,7 +101,9 @@ export function useSettings({ savedSettings, theme }) {
       // AND a consumer in the search call.
       searchUseStopWords: true,
       searchCorpus: 'all', // 'all' | 'scriptures' | 'volumes'
-      searchEngine: 'classic', // 'classic' (FlexSearch) | 'minisearch' (new, typo-tolerant)
+      // (searchEngine removed 2026-07-02 — the Classic/FlexSearch engine is
+      //  RETIRED after the owner's A/B; MiniSearch is the only engine. A stale
+      //  persisted 'searchEngine' key in old vot-state blobs is simply unread.)
       haptic: true,
       keepScreenOn: true,
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,

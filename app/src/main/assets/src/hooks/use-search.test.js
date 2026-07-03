@@ -61,7 +61,7 @@ import { navHandoff } from '../utils/nav-handoff.js';
 // ── Global stubs ────────────────────────────────────────────────────────
 let _prevBOOKS, _prevCOL_BY_LETTER_SC, _prevCOL_BY_SEARCH_ID;
 let _prevColLetterArr, _prevColPreface;
-let _prevVotSearch;
+let _prevVotSearchMini;
 
 beforeEach(() => {
   _prevBOOKS = window.BOOKS;
@@ -69,7 +69,7 @@ beforeEach(() => {
   _prevCOL_BY_SEARCH_ID = window.COL_BY_SEARCH_ID;
   _prevColLetterArr = window.colLetterArr;
   _prevColPreface = window.colPreface;
-  _prevVotSearch = window.VotSearch;
+  _prevVotSearchMini = window.VotSearchMini;
   // goSearch takes the navHandoff 'pendingSearchQuery' slot; navHandoff is
   // globalized by _entry-b in production — mirror that here.
   window.navHandoff = navHandoff;
@@ -109,7 +109,7 @@ afterEach(() => {
   window.COL_BY_SEARCH_ID = _prevCOL_BY_SEARCH_ID;
   window.colLetterArr = _prevColLetterArr;
   window.colPreface = _prevColPreface;
-  window.VotSearch = _prevVotSearch;
+  window.VotSearchMini = _prevVotSearchMini;
   navHandoff._resetForTests();
   // Cleanup the window bridge in case a test left it behind.
   delete window.__goSearch;
@@ -560,17 +560,17 @@ describe('useSearch — handleSearchCommand', () => {
     expect(setSearchQuery).toHaveBeenCalledWith('');
   });
 
-  it("'rebuild-index' → calls window.VotSearch.rebuild() and swallows errors", () => {
-    window.VotSearch = { rebuild: vi.fn(() => Promise.reject(new Error('boom'))) };
+  it("'rebuild-index' → calls window.VotSearchMini.rebuild() and swallows errors", () => {
+    window.VotSearchMini = { rebuild: vi.fn(() => Promise.reject(new Error('boom'))) };
     const { result } = setup();
     act(() => { result.current.handleSearchCommand('rebuild-index'); });
-    expect(window.VotSearch.rebuild).toHaveBeenCalledTimes(1);
+    expect(window.VotSearchMini.rebuild).toHaveBeenCalledTimes(1);
     // The .catch(() => {}) swallows the rejection — no test for that is
     // possible synchronously; the key is that it doesn't throw here.
   });
 
-  it("'rebuild-index' is a no-op when window.VotSearch is absent", () => {
-    delete window.VotSearch;
+  it("'rebuild-index' is a no-op when window.VotSearchMini is absent (bundle-e not loaded)", () => {
+    delete window.VotSearchMini;
     const { result } = setup();
     // Should not throw.
     act(() => { result.current.handleSearchCommand('rebuild-index'); });

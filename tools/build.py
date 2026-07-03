@@ -2,15 +2,15 @@
 
 After G.2.1/G.2.2/G.2.3, Clusters B, C, and D are bundled by esbuild as
 ES-module → IIFE bundles. This script emits the classic-script bundle-a.js
-(vendor + small data + search engine) plus the three lazy corpus bundles.
-bundle-a stays UNMINIFIED — its vendored UMD libs (react/react-dom/flexsearch)
+(vendor + small data + search index data) plus the three lazy corpus bundles.
+bundle-a stays UNMINIFIED — its vendored UMD libs (react/react-dom)
 read top-level `this`, which esbuild's minify would break (PF2). The corpus
 bundles are pure `var X = {...}` data with no top-level `this`, so they ARE
 minified here (PF1 — esbuild --minify --target=chrome108 after the concat,
 ~3.3 MB saved; globals-preserving + chrome108-safe + data-identical, verified).
 
 CLUSTER OWNERSHIP:
-  A — vendor + small data + search engine (raw)            (Python concat — this script)
+  A — vendor + small data + search index data (raw)        (Python concat — this script)
   A-bible/matthew/vot — lazy corpus, MINIFIED (PF1)        (Python concat + esbuild --minify)
   B — stores + components + hooks + journal + scripture    (esbuild → bundle-b.js)
   C — renderer (annotation engine + DOM bridges)           (esbuild → bundle-c.js)
@@ -49,7 +49,7 @@ DIST  = os.path.join(ROOT, 'dist')
 # esbuild JS API, which resolves the platform binary internally → cross-platform.
 MINIFY_JS = os.path.join(_HERE, 'minify-bundle.mjs')
 
-# Cluster A — vendor + small data + search engine (CRITICAL PATH).
+# Cluster A — vendor + small data + search index data (CRITICAL PATH).
 # All corpus content is lazy-loaded:
 #   - books.js (6.9 MB NKJV) → bundle-a-bible.js (Q8.1)
 #   - matthew.js (618 KB Study Bible) → bundle-a-matthew.js (Q8.2)
@@ -68,16 +68,21 @@ A = [
     'react.min.js', 'react-dom.min.js',
     'src/data/books-restored.js',
     'src/data/matthew-plain.js', 'src/data/matthew-nkjv.js',
-    'flexsearch.min.js', 'search-data.js', 'search.js',
+    # search-data.js = the SHARED window.VotSearchData index source (books/
+    # display names/synonyms) consumed by the MiniSearch engine (bundle-e) +
+    # SearchScreen. The Classic engine (search.js) + its flexsearch.min.js
+    # vendor were RETIRED 2026-07-02 (owner A/B kept MiniSearch) — ~97 KB off
+    # the cold-boot critical path.
+    'search-data.js',
 ]
 
 # PF2 — the pure-corpus-DATA members of bundle-a (`var X = {…}`, no top-level
 # `this`, no cross-file bare-name dep beyond their one global). These are
 # minified per-file BEFORE the concat (the PF1 pattern, proven globals-preserving
 # + value-identical), stripping ~150 KB of indentation off the cold-boot parse a
-# budget WebView pays on EVERY launch. The vendored UMD libs (react/react-dom/
-# flexsearch read top-level `this`) stay RAW, and the search ENGINE (search.js) +
-# its index data (search-data.js, multi-global) stay raw too — minify them only
+# budget WebView pays on EVERY launch. The vendored UMD libs (react/react-dom
+# read top-level `this`) stay RAW, and the search index data (search-data.js,
+# multi-global) stays raw too — minify it only
 # with the same deep-equal rigor if the marginal win is ever wanted. bundle-a is
 # NOT in the corpus-version gate (that hashes only the lazy a-bible/matthew/vot
 # bundles), so this needs no CORPUS_VERSION bump; the SW content-hash auto-busts.

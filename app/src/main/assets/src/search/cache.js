@@ -11,10 +11,14 @@
 
    Invalidation: a structural signature (corpus array lengths + book/chapter
    counts) busts the cache on any add/remove. MS_INDEX_VERSION busts it on a
-   doc-shape / search-config change. A content-only edit that preserves every
-   length is NOT auto-detected — bump MS_INDEX_VERSION (or run "/rebuild index")
-   in that case. (The Classic engine carries the same caveat via its
-   CORPUS_CONTENT_VERSION.)
+   doc-shape / search-config change. CORPUS_CONTENT_VERSION (below) busts it
+   on a content-only corpus edit (a reworded verse of the same length is
+   structurally invisible): the pre-commit/CI corpus gate
+   (tools/check-corpus-version.js, SRCH1) fails closed unless it equals the
+   service worker's CORPUS_VERSION, so the corpus-edit → CORPUS_VERSION bump
+   also rebuilds the search index. (This invariant lived in the retired
+   Classic engine's assets/search.js; it moved here 2026-07-02 with the
+   Classic retirement.)
 
    NOTE (verify gotcha): to test a fresh build in preview you must wipe this DB
    too — indexedDB.deleteDatabase('vot-minisearch-cache') — or it warm-restores.
@@ -26,6 +30,10 @@ const KEY = 'index';
 
 /** Bump on any index-builder doc-shape OR search-config change (busts all caches). */
 export const MS_INDEX_VERSION = 'm1';
+
+/** MUST equal service-worker.js CORPUS_VERSION — gate-enforced (SRCH1, see
+ *  header). Busts the cached index on content-only corpus edits. */
+export const CORPUS_CONTENT_VERSION = 'c12';
 
 function ln(v) { return (v && typeof v.length === 'number') ? v.length : 0; }
 function kc(v) { return (v && typeof v === 'object') ? Object.keys(v).length : 0; }
@@ -52,6 +60,7 @@ export function dataSignature(translation) {
   const MATTHEW = g('MATTHEW');
   return [
     'v:' + MS_INDEX_VERSION,
+    'cv:' + CORPUS_CONTENT_VERSION,
     'tr:' + (translation || 'nkjv'),
     'bk:' + kc(g('BOOKS')) + '.' + bookChapterCount(),
     'mt:' + (MATTHEW && MATTHEW.chapters ? MATTHEW.chapters.length : 0),
