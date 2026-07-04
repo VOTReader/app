@@ -58,6 +58,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   const touchIdRef = React.useRef(null);        // identifier of the pointer that owns the press ('mouse' for pointer)
   const finishDragRef = React.useRef(null);     // pending drop-commit; flushed early if a new press arrives
   const commitTimerRef = React.useRef(null);
+  const lastDragEvtRef = React.useRef(0);       // last time the active drag saw one of its own events (zombie detector)
 
   React.useEffect(() => {dragIdxRef.current = dragIdx;}, [dragIdx]);
   React.useEffect(() => {pressingIdxRef.current = pressingIdx;}, [pressingIdx]);
@@ -151,6 +152,20 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     // A just-dropped drag parks its commit in finishDragRef while the snap
     // animation plays; flush it so this grab is never silently swallowed.
     if (finishDragRef.current) finishDragRef.current();
+    // Zombie self-heal: a LIVE drag sees its own events continuously. If a
+    // drag is "active" but has seen nothing for seconds, its end event was
+    // lost — abort it, uncommitted, and let this fresh grab proceed.
+    if (dragIdxRef.current >= 0 && Date.now() - lastDragEvtRef.current > 2500) {
+      if (activeCleanupRef.current) activeCleanupRef.current();
+      if (dragCloneRef.current && dragCloneRef.current.parentNode)
+        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
+      dragCloneRef.current = null;
+      clearInlineTransforms();
+      dragIdxRef.current = -1;
+      setDragIdx(-1);
+      targetIdxRef.current = -1;
+      justDraggedRef.current = false;
+    }
     if (pressingIdxRef.current >= 0 || dragIdxRef.current >= 0) return;
     touchIdRef.current = pointerId != null ? pointerId : 'mouse';
     pressStartYRef.current = clientY;
@@ -170,6 +185,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     const onMove = (e) => {
       const p = trackedPoint(e);
       if (!p) return;
+      lastDragEvtRef.current = Date.now();
       const y = p.clientY;
       if (dragIdxRef.current >= 0 && e.cancelable) {
         try {e.preventDefault();} catch (_err) { /* DOM access — element may not exist or API unsupported */ }
@@ -217,17 +233,20 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
       endPress();
     };
 
-    document.addEventListener("touchmove", onMove, { passive: false });
-    document.addEventListener("touchend", onEnd);
-    document.addEventListener("touchcancel", onEnd);
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onEnd);
+    // CAPTURE phase — document-capture runs before ScreenLayout's
+    // tap-suppressor can stopPropagation a long-hold lift (see the
+    // TabsOverview comment; same lock-up class on this screen).
+    document.addEventListener("touchmove", onMove, { passive: false, capture: true });
+    document.addEventListener("touchend", onEnd, true);
+    document.addEventListener("touchcancel", onEnd, true);
+    document.addEventListener("mousemove", onMove, true);
+    document.addEventListener("mouseup", onEnd, true);
     activeCleanupRef.current = () => {
-      document.removeEventListener("touchmove", onMove);
-      document.removeEventListener("touchend", onEnd);
-      document.removeEventListener("touchcancel", onEnd);
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onEnd);
+      document.removeEventListener("touchmove", onMove, { capture: true });
+      document.removeEventListener("touchend", onEnd, true);
+      document.removeEventListener("touchcancel", onEnd, true);
+      document.removeEventListener("mousemove", onMove, true);
+      document.removeEventListener("mouseup", onEnd, true);
       activeCleanupRef.current = null;
     };
 
@@ -247,6 +266,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
       justDraggedRef.current = true;
       pressingIdxRef.current = -1;
       dragIdxRef.current = idx;
+      lastDragEvtRef.current = Date.now();
       setPressingIdx(-1);
       setDragIdx(idx);
       targetIdxRef.current = idx;

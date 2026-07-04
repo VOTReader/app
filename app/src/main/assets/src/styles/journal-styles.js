@@ -349,7 +349,7 @@
   // the same grab-left / destroy-right separation the tab cards use.
   // touch-action:none = grabbing it never scrolls; the drag starts instantly.
   R('.jrn-editor .jrn-blocks { padding-left: 44px; }');
-  R('.jrn-block-drag-btn { position: absolute; top: 6px; left: -38px; width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--gold-dim); cursor: grab; display: flex; align-items: center; justify-content: center; padding: 0; opacity: 0.45; transition: opacity 0.12s, color 0.12s; z-index: 2; touch-action: none; }');
+  R('.jrn-block-drag-btn { position: absolute; top: 6px; left: -38px; width: 26px; height: 26px; border-radius: 50%; background: transparent; border: 1px solid transparent; color: var(--gold-dim); cursor: grab; display: flex; align-items: center; justify-content: center; padding: 0; opacity: 0.45; transition: opacity 0.12s, color 0.12s; z-index: 2; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }');
   R('.jrn-block-drag-btn:hover { opacity: 1; color: var(--gold); }');
   R('.jrn-block-drag-btn:active { cursor: grabbing; }');
   R('.jrn-block-drag-btn svg { width: 15px; height: 15px; pointer-events: none; }');

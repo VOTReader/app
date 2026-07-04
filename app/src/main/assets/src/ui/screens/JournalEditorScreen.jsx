@@ -125,6 +125,7 @@ export function JournalEditorScreen(props) {
   var dragLastYRef = useRef(0);
   var dragAutoDirRef = useRef(0);       // -1 scroll up / 0 / 1 scroll down (edge autoscroll)
   var dragScrollRafRef = useRef(0);
+  var lastDragEvtRef = useRef(0);       // last time the active drag saw one of its own events (zombie detector)
 
   // Tear down listeners, the rAF autoscroll loop, and the flying clone if
   // the editor unmounts mid-drag; flush a parked commit so the reorder is
@@ -417,6 +418,20 @@ export function JournalEditorScreen(props) {
     // A just-dropped drag parks its commit while the snap animation plays;
     // flush it so this grab is never silently swallowed.
     if (finishBlockDragRef.current) finishBlockDragRef.current();
+    // Zombie self-heal: a LIVE drag sees its own events continuously. If a
+    // drag is "active" but has seen nothing for seconds, its end event was
+    // lost — abort it, uncommitted, and let this fresh grab proceed.
+    if (dragIdxRef.current >= 0 && Date.now() - lastDragEvtRef.current > 2500) {
+      if (dragCleanupRef.current) dragCleanupRef.current();
+      if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
+      if (dragCloneRef.current && dragCloneRef.current.parentNode)
+        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
+      dragCloneRef.current = null;
+      blockRefs.current.forEach(function(n) { if (n) { n.style.transform = ''; n.style.transition = ''; } });
+      dragIdxRef.current = -1;
+      setDragIdx(-1);
+      dragTargetRef.current = -1;
+    }
     if (dragIdxRef.current >= 0) return;
     var container = blocksContainerRef.current;
     var el = blockRefs.current[idx];
@@ -439,6 +454,7 @@ export function JournalEditorScreen(props) {
     dragLastYRef.current = clientY;
     dragIdxRef.current = idx;
     dragTargetRef.current = idx;
+    lastDragEvtRef.current = Date.now();
     setDragIdx(idx);
 
     // Flying clone — framed card that follows the finger. React renders a
@@ -466,6 +482,7 @@ export function JournalEditorScreen(props) {
     var onMove = function(e) {
       var p = _dragPoint(e);
       if (!p) return;
+      lastDragEvtRef.current = Date.now();
       if (e.cancelable) { try { e.preventDefault(); } catch (_er) { /* passive — ignore */ } }
       dragLastYRef.current = p.clientY;
       var c = dragCloneRef.current;
@@ -478,17 +495,20 @@ export function JournalEditorScreen(props) {
       if (dragCleanupRef.current) dragCleanupRef.current();
       endBlockDrag();
     };
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onEnd);
-    document.addEventListener('touchcancel', onEnd);
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onEnd);
+    // CAPTURE phase — document-capture runs before ScreenLayout's
+    // tap-suppressor can stopPropagation a long-hold lift over the grip
+    // (a button = interactive target; see the TabsOverview comment).
+    document.addEventListener('touchmove', onMove, { passive: false, capture: true });
+    document.addEventListener('touchend', onEnd, true);
+    document.addEventListener('touchcancel', onEnd, true);
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('mouseup', onEnd, true);
     dragCleanupRef.current = function() {
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onEnd);
-      document.removeEventListener('touchcancel', onEnd);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchmove', onMove, { capture: true });
+      document.removeEventListener('touchend', onEnd, true);
+      document.removeEventListener('touchcancel', onEnd, true);
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('mouseup', onEnd, true);
       dragCleanupRef.current = null;
     };
     if (navigator.vibrate) { try { navigator.vibrate(35); } catch (_e) { /* unsupported — ignore */ } }

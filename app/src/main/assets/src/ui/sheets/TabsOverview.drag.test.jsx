@@ -145,6 +145,59 @@ describe('TabsOverview drag lifecycle', () => {
   });
 });
 
+describe('TabsOverview device event-delivery hardening', () => {
+  // Android WebView's native text-selection machinery, when it claims a
+  // long-press, delivers the release touchend NON-BUBBLING (the documented
+  // tap->chip bug, MainActivity.kt) - and ScreenLayout's tap-suppressor can
+  // stopPropagation a >300ms lift. Both starve document-BUBBLE listeners.
+  // The drag listeners are registered in the CAPTURE phase, which no
+  // intermediate consumer can block; these tests deliver events the hostile
+  // way (non-bubbling, targeted at the card) and expect the drag to survive.
+  const touch = (id, x, y) => ({ identifier: id, clientX: x, clientY: y });
+  const rawTouchEvent = (type, target, id, x, y, bubbles) => {
+    const e = new Event(type, { bubbles, cancelable: true });
+    Object.defineProperty(e, 'touches', { value: type === 'touchend' ? [] : [touch(id, x, y)], configurable: true });
+    Object.defineProperty(e, 'changedTouches', { value: [touch(id, x, y)], configurable: true });
+    target.dispatchEvent(e);
+  };
+
+  it('a NON-BUBBLING touchend (WebView selection machinery) still ends and commits the drag', () => {
+    const { props, cards } = renderOverview();
+    const c0 = center(0);
+    fireEvent.touchStart(cards[0], { touches: [touch(1, c0.x, c0.y)], changedTouches: [touch(1, c0.x, c0.y)] });
+    act(() => { vi.advanceTimersByTime(1400); });
+    expect(cards[0].className).toContain('dragging');
+    const c1 = center(1);
+    rawTouchEvent('touchmove', cards[0], 1, c1.x, c1.y, false);   // non-bubbling move too
+    rawTouchEvent('touchend', cards[0], 1, c1.x, c1.y, false);    // the zombie-maker pre-fix
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(document.querySelector('.tab-card.drag-flying')).toBeNull();
+    expect(props.onReorder).toHaveBeenCalledWith(0, 1);
+  });
+
+  it('a zombied drag (end event fully lost) self-heals on the next grab instead of refusing forever', () => {
+    const { props, cards } = renderOverview();
+    const c0 = center(0);
+    fireEvent.touchStart(cards[0], { touches: [touch(1, c0.x, c0.y)], changedTouches: [touch(1, c0.x, c0.y)] });
+    act(() => { vi.advanceTimersByTime(1400); });
+    expect(document.querySelector('.tab-card.drag-flying')).toBeTruthy();
+    // the end event NEVER arrives (worst case); 3s later the user grabs again
+    act(() => { vi.advanceTimersByTime(3000); });
+    const c2 = center(2);
+    fireEvent.touchStart(cards[2], { touches: [touch(4, c2.x, c2.y)], changedTouches: [touch(4, c2.x, c2.y)] });
+    // the stale drag was aborted (uncommitted) and the new press is live
+    expect(document.querySelector('.tab-card.drag-flying')).toBeNull();
+    expect(props.onReorder).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(1400); });
+    expect(cards[2].className).toContain('dragging');
+    const c3 = center(3);
+    fireEvent.touchMove(document, { touches: [touch(4, c3.x, c3.y)], changedTouches: [touch(4, c3.x, c3.y)] });
+    fireEvent.touchEnd(document, { touches: [], changedTouches: [touch(4, c3.x, c3.y)] });
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(props.onReorder).toHaveBeenCalledWith(2, 3);
+  });
+});
+
 describe('TabsOverview multi-touch identity', () => {
   const touch = (id, x, y) => ({ identifier: id, clientX: x, clientY: y });
 

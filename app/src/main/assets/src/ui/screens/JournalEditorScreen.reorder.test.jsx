@@ -158,6 +158,31 @@ describe('journal block drag-to-reorder', () => {
     expect(storedTexts(entry.id)).toEqual(['b', 'a', 'c']);
   });
 
+  it('a NON-BUBBLING touchend (WebView selection machinery) still ends and commits the drag', () => {
+    // Android WebView's native selection machinery delivers a claimed
+    // gesture's touchend non-bubbling — document-BUBBLE listeners starve
+    // (the tabs lock-up class). The drag listens in CAPTURE, which no
+    // intermediate consumer can block.
+    const entry = renderEditor(['a', 'b', 'c']);
+    stubRects();
+    const grips = document.querySelectorAll('.jrn-block-drag-btn');
+    const touch = (id, y) => ({ identifier: id, clientX: 20, clientY: y });
+    fireEvent.touchStart(grips[0], { touches: [touch(1, TOP(0) + 10)], changedTouches: [touch(1, TOP(0) + 10)] });
+    expect(document.querySelector('.jrn-block.drag-flying')).toBeTruthy();
+    const raw = (type, y, touches) => {
+      const e = new Event(type, { bubbles: false, cancelable: true });
+      Object.defineProperty(e, 'touches', { value: touches, configurable: true });
+      Object.defineProperty(e, 'changedTouches', { value: [touch(1, y)], configurable: true });
+      grips[0].dispatchEvent(e);
+    };
+    raw('touchmove', 270, [touch(1, 270)]);
+    raw('touchend', 270, []);
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(document.querySelector('.jrn-block.drag-flying')).toBeNull();
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(storedTexts(entry.id)).toEqual(['b', 'a', 'c']);
+  });
+
   it('unmounting mid-snap-window still persists the reorder (flush + commitSave)', () => {
     const entry = renderEditor(['a', 'b', 'c']);
     stubRects();

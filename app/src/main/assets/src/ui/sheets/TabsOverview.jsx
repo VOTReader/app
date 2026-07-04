@@ -50,6 +50,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
   const touchIdRef = React.useRef(null);        // identifier of the pointer that owns the press ('mouse' for pointer)
   const finishDragRef = React.useRef(null);     // pending drop-commit; flushed early if a new press arrives
   const commitTimerRef = React.useRef(null);
+  const lastDragEvtRef = React.useRef(0);       // last time the active drag saw one of its own events (zombie detector)
 
   React.useEffect(() => {dragIdxRef.current = dragIdx;}, [dragIdx]);
   React.useEffect(() => {pressingIdxRef.current = pressingIdx;}, [pressingIdx]);
@@ -134,6 +135,22 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     // (pre-fix, a re-grab inside that window left the press untracked — the
     // finger just scrolled the grid and nothing could be dropped).
     if (finishDragRef.current) finishDragRef.current();
+    // Zombie self-heal: a LIVE drag sees its own events continuously (the
+    // clone follows the finger). If a drag is "active" but has seen nothing
+    // for seconds, its end event was lost (e.g. eaten by an event consumer
+    // between the card and document) — abort it, uncommitted, and let this
+    // fresh grab proceed instead of refusing until an app restart.
+    if (dragIdxRef.current >= 0 && Date.now() - lastDragEvtRef.current > 2500) {
+      if (activeCleanupRef.current) activeCleanupRef.current();
+      if (dragCloneRef.current && dragCloneRef.current.parentNode)
+        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
+      dragCloneRef.current = null;
+      clearInlineTransforms();
+      dragIdxRef.current = -1;
+      setDragIdx(-1);
+      targetIdxRef.current = -1;
+      justDraggedRef.current = false;
+    }
     if (pressingIdxRef.current >= 0 || dragIdxRef.current >= 0) return;
     touchIdRef.current = pointerId != null ? pointerId : 'mouse';
     pressStartXRef.current = clientX; pressStartYRef.current = clientY;
@@ -150,6 +167,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     const onMove = (e) => {
       const p = trackedPoint(e);
       if (!p) return;
+      lastDragEvtRef.current = Date.now();
       const x = p.clientX, y = p.clientY;
       if (dragIdxRef.current >= 0 && e.cancelable) {
         try {e.preventDefault();} catch (_err) { /* passive/unsupported — ignore */ }
@@ -191,17 +209,25 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
       endPress();
     };
 
-    document.addEventListener("touchmove", onMove, { passive: false });
-    document.addEventListener("touchend", onEnd);
-    document.addEventListener("touchcancel", onEnd);
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onEnd);
+    // CAPTURE phase: document-capture is the FIRST node in propagation, so no
+    // intermediate handler can starve these. Bubble registration was the tabs
+    // lock-up's root cause — ScreenLayout's tap-suppressor stopPropagation()s
+    // the touchend of any >300ms hold lifting over an interactive target (in
+    // capture, on .screen-scroll), so a long-press drag's RELEASE never
+    // reached a document-bubble listener unless the motion was horizontal
+    // enough to set its wasSwipeX escape (why sideways drags worked and
+    // vertical reorders froze mid-air).
+    document.addEventListener("touchmove", onMove, { passive: false, capture: true });
+    document.addEventListener("touchend", onEnd, true);
+    document.addEventListener("touchcancel", onEnd, true);
+    document.addEventListener("mousemove", onMove, true);
+    document.addEventListener("mouseup", onEnd, true);
     activeCleanupRef.current = () => {
-      document.removeEventListener("touchmove", onMove);
-      document.removeEventListener("touchend", onEnd);
-      document.removeEventListener("touchcancel", onEnd);
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onEnd);
+      document.removeEventListener("touchmove", onMove, { capture: true });
+      document.removeEventListener("touchend", onEnd, true);
+      document.removeEventListener("touchcancel", onEnd, true);
+      document.removeEventListener("mousemove", onMove, true);
+      document.removeEventListener("mouseup", onEnd, true);
       activeCleanupRef.current = null;
     };
 
@@ -216,6 +242,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
       justDraggedRef.current = true;
       pressingIdxRef.current = -1;
       dragIdxRef.current = idx;
+      lastDragEvtRef.current = Date.now();
       setPressingIdx(-1);
       setDragIdx(idx);
       targetIdxRef.current = idx;
