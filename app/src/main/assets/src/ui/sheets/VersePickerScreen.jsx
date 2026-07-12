@@ -187,23 +187,26 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
   const titleText = (item.title || target.label.replace(/\s\d+$/, '')) + ' ' + target.chapter;
   const hasSelection = !!selInfo;
   const previewText = selInfo ? (selInfo.text || '') : '';
+  // Step-context breadcrumb — tells the user WHERE they are in the flow and,
+  // in link mode, WHAT they are linking from. (Journal-insert mode has no
+  // source passage.)
+  const contextLine = returnTargetInsteadOfLink
+    ? 'Choose scripture to insert'
+    : (sourceLabel ? 'Linking from ' + sourceLabel : 'Choose scripture to link');
+  // Footer primary — a scripture link always targets a specific verse/passage,
+  // so it stays disabled until the user selects one (removes the old silent
+  // dead-end where an empty header ✓ just cancelled).
+  const primaryLabel = hasSelection
+    ? (returnTargetInsteadOfLink ? 'Insert this selection' : 'Link this selection')
+    : 'Select a verse to continue';
 
   return (
     <div className="picker-screen">
       <div className="picker-header">
         <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
         <span className="picker-title">Select Text</span>
-        <button
-          className="picker-confirm"
-          onClick={confirmLink}
-          aria-label="Confirm"
-          title={hasSelection ? "Use this excerpt" : "Use the whole chapter"}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
       </div>
+      <div className="picker-breadcrumb">{contextLine}</div>
       <div
         className="picker-body picker-body-letter"
         onTouchEnd={captureSelection}
@@ -215,7 +218,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
           className={"picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")}
         >{hasSelection
           ? previewText
-          : "Highlight any portion to link. Or tap a verse number to grab the whole verse."
+          : "Highlight any portion, or tap a verse number to grab the whole verse."
         }</div>
         <div ref={bodyRef} className="picker-verses">
           {verses.map(v => (
@@ -232,6 +235,14 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
             </p>
           ))}
         </div>
+      </div>
+      <div className="picker-footer">
+        <button
+          type="button"
+          className={"picker-footer-btn" + (hasSelection ? "" : " is-disabled")}
+          onClick={hasSelection ? confirmLink : undefined}
+          disabled={!hasSelection}
+        >{primaryLabel}</button>
       </div>
     </div>
   );

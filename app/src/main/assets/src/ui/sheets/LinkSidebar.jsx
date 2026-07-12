@@ -31,11 +31,14 @@ export function LinkSidebar({ hlKey, onClose, onNavigate }) {
     <>
       <div className="link-sidebar-overlay" onClick={onClose} />
       <div className="link-sidebar">
+        {/* Close on the RIGHT, matching every other sheet in the app. */}
         <div className="link-sidebar-header">
-          <button className="link-sidebar-close" onClick={onClose} title="Close">×</button>
           <span className="link-sidebar-title">Links</span>
+          <button className="link-sidebar-close" onClick={onClose} aria-label="Close links" title="Close">×</button>
         </div>
-        <div className="link-sidebar-date">{countStr}</div>
+        {/* Count only when there are links — the empty body message below
+            already says "No links yet", so a "No links" line here was redundant. */}
+        {links.length > 0 && <div className="link-sidebar-date link-sidebar-count">{countStr}</div>}
         <div className="link-sidebar-body">
           {links.length === 0 && <div className="link-sidebar-empty">No links yet</div>}
           {links.map(lnk => <LinkCard key={lnk.id} lnk={lnk} hlKey={hlKey} isBlockScope={isBlockScope} onNavigate={onNavigate} />)}

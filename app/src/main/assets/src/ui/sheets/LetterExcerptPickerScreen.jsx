@@ -136,23 +136,27 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
   const subtitleText = item.collection || (target.type === 'blessed' ? 'The Blessed' :
                        target.type === 'holy-days' ? 'Holy Days' : '');
   const hasSelection = !!selInfo;
+  // Noun for the "whole X" affordance — this picker covers letters, WTLB /
+  // Blessed / Holy-Days entries, and non-Matthew study chapters.
+  const entryNoun = target.type === 'study-letter' ? 'chapter'
+    : target.type === 'letter' ? 'letter' : 'entry';
+  const contextLine = returnTargetInsteadOfLink
+    ? 'Choose text to insert'
+    : (sourceLabel ? 'Linking from ' + sourceLabel : 'Choose text to link');
+  // Footer primary — a selection links the excerpt; no selection links the
+  // whole letter/entry (an explicit, honest label instead of the old hidden
+  // "tap ✓ with nothing selected" behaviour).
+  const primaryLabel = hasSelection
+    ? (returnTargetInsteadOfLink ? 'Insert this excerpt' : 'Link this excerpt')
+    : (returnTargetInsteadOfLink ? 'Insert the whole ' + entryNoun : 'Link the whole ' + entryNoun);
 
   return (
     <div className="picker-screen">
       <div className="picker-header">
         <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
-        <span className="picker-title">Select Text to Link</span>
-        <button
-          className="picker-confirm"
-          onClick={confirmLink}
-          aria-label="Confirm"
-          title={hasSelection ? "Link this excerpt" : "Link the whole letter"}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
+        <span className="picker-title">Select Text</span>
       </div>
+      <div className="picker-breadcrumb">{contextLine}</div>
       <div
         className="picker-body picker-body-letter"
         ref={bodyRef}
@@ -162,7 +166,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
         <div className="picker-letter-title">{titleText}</div>
         {subtitleText && <div className="picker-letter-subtitle">{subtitleText}</div>}
         {hasSelection && <div className="picker-selection-hint">{'"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + '…' : selInfo.text) + '"'}</div>}
-        {!hasSelection && <div className="picker-selection-hint picker-selection-hint-empty">Long-press and drag to select an excerpt, then tap ✓. Tap ✓ without selecting to link the whole letter.</div>}
+        {!hasSelection && <div className="picker-selection-hint picker-selection-hint-empty">Long-press and drag to select an excerpt — or use the button below to link the whole {entryNoun}.</div>}
         {blocks.map(b => (
           <p
             key={b.key}
@@ -170,6 +174,13 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
             className="picker-letter-block"
           >{b.text}</p>
         ))}
+      </div>
+      <div className="picker-footer">
+        <button
+          type="button"
+          className="picker-footer-btn"
+          onClick={confirmLink}
+        >{primaryLabel}</button>
       </div>
     </div>
   );
