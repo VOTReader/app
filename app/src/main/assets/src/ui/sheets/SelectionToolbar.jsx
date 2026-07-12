@@ -24,6 +24,57 @@ function hlDisplayText(container, tcText, start, end) {
   return parts.join('') || tcText.slice(start, end);
 }
 
+/** Nearest scrollable ancestor of `node` — the reading screen's .screen-scroll
+    in practice, but derived structurally so picker screens and future layouts
+    work too. Returns null when nothing above the node actually scrolls.
+    @param {Node|null} node */
+function findScrollParent(node) {
+  let el = node && node.nodeType === 3 ? /** @type {Text} */ (node).parentElement : /** @type {Element|null} */ (node);
+  while (el && el !== document.body && el !== document.documentElement) {
+    if (el.scrollHeight > el.clientHeight + 1) {
+      const oy = getComputedStyle(el).overflowY;
+      if (oy === 'auto' || oy === 'scroll') return el;
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/** Decide where the toolbar goes relative to the current selection. The
+    returned `y` is the toolbar's BOTTOM edge (the element renders with
+    translateY(-100%), hanging upward from pos.y); `scrollUp` is how many px
+    the reading container should scroll up (scrollTop -= scrollUp) BEFORE the
+    toolbar shows, sliding the selection down to make room.
+
+    Placement policy (the Android near-top fix):
+      1. Prefer ABOVE the selection with a two-line gap, so the selected text
+         and its native drag handles stay visible and grabbable.
+      2. No room under the top-nav? Auto-scroll the container up exactly the
+         deficit — the selection slides down and the toolbar still sits two
+         lines above it.
+      3. Container can't scroll that far (selection at the very top of the
+         document — nothing above to reveal)? Sit fully BELOW the selection
+         with the same two-line gap instead. Never on top of it.
+      4. Viewport-spanning selection (nothing fits anywhere): clamp under the
+         nav as before — the selection's end handle in the lower half of the
+         screen stays reachable.
+    @param {{ selTop: number, selBottom: number, toolbarH: number,
+              navBottom: number, viewportH: number, lineH: number,
+              maxScrollUp: number }} a
+    @returns {{ y: number, scrollUp: number }} */
+export function computeToolbarPlacement({ selTop, selBottom, toolbarH, navBottom, viewportH, lineH, maxScrollUp }) {
+  const margin = 8;
+  const gap = Math.min(Math.max(2 * lineH, 40), 120); // "two lines", sane-bounded
+  const minY = navBottom + margin + toolbarH; // lowest y whose toolbar TOP still clears the nav
+  const above = selTop - gap;
+  if (above >= minY) return { y: above, scrollUp: 0 };
+  const deficit = minY - above;
+  if (deficit <= maxScrollUp) return { y: minY, scrollUp: deficit };
+  const below = selBottom + gap + toolbarH;
+  if (below <= viewportH - margin) return { y: below, scrollUp: 0 };
+  return { y: minY, scrollUp: 0 };
+}
+
 export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
   const [visible, setVisible] = React.useState(false);
   const [pos, setPos] = React.useState({ x: 0, y: 0 });
@@ -93,35 +144,65 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     return () => { window.__hideSelectionToolbar = null; };
   }, []);
 
-  // Keep the toolbar fully on-screen. computeAndShow positions x from an
-  // ESTIMATE, but the real width depends on content (style buttons, the
-  // scrolling color row, the action grid) and the CSS max-width. Measure the
-  // rendered width and clamp x so no part runs off either edge — the bug was a
-  // selection near the right margin pushing the toolbar partly off-screen,
-  // leaving the far buttons untappable. Runs in a layout effect so the
-  // correction lands before paint (no visible jump).
+  // Authoritative placement pass. computeAndShow seeds pos from an ESTIMATE
+  // (the toolbar hasn't rendered yet, so its real size is unknown); this
+  // layout effect re-derives the final placement BEFORE PAINT once the
+  // rendered width/height are measurable:
+  //   x — clamp so no part runs off either edge (the old bug was a selection
+  //       near the right margin leaving the far buttons untappable);
+  //   y — computeToolbarPlacement (see its docstring): above-with-gap,
+  //       else auto-scroll the reading container up to make room, else flip
+  //       fully below. Replaces the old blind Math.max(p.y, navBottom+h)
+  //       clamp, which shoved a near-top toolbar DOWN ONTO the selection —
+  //       covering the text and the native drag handles (owner-reported on
+  //       Android). The scroll (scrollTop -= scrollUp) is synchronous here,
+  //       so content and toolbar land together in one frame.
   React.useLayoutEffect(() => {
     if (!visible) return;
     const el = toolbarRef.current;
     if (!el) return;
     const w = el.offsetWidth;
     const h = el.offsetHeight;
-    if (!w || !h) return; // jsdom / not yet laid out — nothing to clamp against
+    if (!w || !h) return; // jsdom / not yet laid out — nothing to place against
     const margin = 8;
     const maxLeft = Math.max(margin, window.innerWidth - w - margin);
-    // The toolbar renders from (pos.y − h) to pos.y (translateY(-100%) shifts it
-    // up by its own height). Clamp pos.y so the toolbar top never enters the
-    // top-nav — otherwise the toolbar physically overlaps nav buttons (e.g. the
-    // Tabs button), whose taps land on the toolbar instead of the button.
     const navEl = document.querySelector('.top-nav');
     const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 60;
-    const minY = navBottom + h + margin;
+    let placed = null;
+    try {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (rect && (rect.width > 0 || rect.height > 0)) {
+          const container = findHlContainer(range.startContainer);
+          let lineH = 28;
+          if (container) {
+            const lh = parseFloat(getComputedStyle(container).lineHeight);
+            if (lh > 0 && isFinite(lh)) lineH = lh;
+          }
+          const scroller = findScrollParent(container || range.startContainer);
+          placed = computeToolbarPlacement({
+            selTop: rect.top,
+            selBottom: rect.bottom,
+            toolbarH: h,
+            navBottom,
+            viewportH: window.innerHeight,
+            lineH,
+            maxScrollUp: scroller ? scroller.scrollTop : 0,
+          });
+          if (placed.scrollUp > 0 && scroller) scroller.scrollTop -= placed.scrollUp;
+        }
+      }
+    } catch (_e) { /* selection gone mid-frame — fall through to the plain clamp */ }
     setPos((p) => {
       const x = Math.min(Math.max(margin, p.x), maxLeft);
-      const y = Math.max(p.y, minY);
+      // No live rect (selection cleared between commit and effect): keep the
+      // old defensive clamp so the toolbar at least never overlaps the nav.
+      const y = placed ? placed.y : Math.max(p.y, navBottom + h + margin);
       return (x === p.x && y === p.y) ? p : { x, y };
     });
-  }, [visible, selInfo]);
+  }, [visible, selInfo, findHlContainer]);
 
   React.useEffect(() => {
     // Compute and show the toolbar from the current selection
@@ -182,8 +263,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       const toolbarW = 320;
       let x = rect.left + rect.width / 2 - toolbarW / 2;
       x = Math.max(8, Math.min(x, window.innerWidth - toolbarW - 8));
-      let y = rect.top - 10;
-      if (y < 80) y = rect.bottom + 10;
+      // Estimate only — the placement layout effect derives the real position
+      // (incl. the near-top scroll-assist / below-flip) before paint, once the
+      // toolbar's true height is measurable. The old `y = rect.bottom + 10`
+      // near-top flip was wrong: with translateY(-100%) that put the toolbar's
+      // BOTTOM just under the selection, i.e. its body on top of the text.
+      const y = rect.top - 10;
       setPos({ x, y });
       setVisible(true);
     };

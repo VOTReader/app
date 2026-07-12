@@ -21,7 +21,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
-import { SelectionToolbar } from './SelectionToolbar.jsx';
+import { SelectionToolbar, computeToolbarPlacement } from './SelectionToolbar.jsx';
 
 let _origGetSelection;
 
@@ -444,6 +444,113 @@ describe('SelectionToolbar — verse-number crossing (Android menu + copy)', () 
     expect(writtenTexts[0]).toMatch(/5/);
     // Copy text also includes the reading content
     expect(writtenTexts[0]).toMatch(/God called the li/);
+  });
+});
+
+describe('computeToolbarPlacement — near-top placement policy', () => {
+  // toolbarH 150, navBottom 60 → minY = 60+8+150 = 218; lineH 28 → gap 56.
+  const base = { toolbarH: 150, navBottom: 60, viewportH: 800, lineH: 28 };
+
+  it('fits above: sits a two-line gap above the selection, no scroll', () => {
+    expect(computeToolbarPlacement({ ...base, selTop: 400, selBottom: 420, maxScrollUp: 500 }))
+      .toEqual({ y: 344, scrollUp: 0 }); // 400 − 56
+  });
+
+  it('near the top with scroll room: scrolls up exactly the deficit and pins under the nav', () => {
+    // above = 100−56 = 44 < 218 → deficit 174. After scrollTop −= 174 the
+    // selection sits at 274, and y=218 is exactly two lines (56px) above it.
+    expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 120, maxScrollUp: 500 }))
+      .toEqual({ y: 218, scrollUp: 174 });
+  });
+
+  it('at the very top of the document (not enough scroll room): flips fully below, never a partial scroll', () => {
+    // deficit 174 > maxScrollUp 40 → below = 120 + 56 + 150 = 326 (toolbar TOP
+    // lands at 326−150 = 176, a two-line gap under selBottom 120). scrollUp
+    // must be 0 — a partial scroll can't make room above, so it would just
+    // jump the content for nothing.
+    expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 120, maxScrollUp: 40 }))
+      .toEqual({ y: 326, scrollUp: 0 });
+  });
+
+  it('viewport-spanning selection (nothing fits): clamps under the nav so the end handle stays reachable', () => {
+    // below = 700+56+150 = 906 > 792 → last resort.
+    expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 700, maxScrollUp: 0 }))
+      .toEqual({ y: 218, scrollUp: 0 });
+  });
+
+  it('the gap tracks the text line height (2 lines) and is sane-bounded', () => {
+    // Largest text size: lineH 48 → gap 96.
+    expect(computeToolbarPlacement({ ...base, lineH: 48, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(404);
+    // Absurd computed lineHeight clamps at 120.
+    expect(computeToolbarPlacement({ ...base, lineH: 500, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(380);
+  });
+});
+
+describe('SelectionToolbar — near-top selection never sits under the toolbar (layout effect)', () => {
+  /* jsdom has no layout engine: the placement layout effect bails on
+     offsetWidth/offsetHeight 0. Stub the prototype getters so ONLY the
+     .sel-toolbar element reports a real size (320×150) — every other element
+     keeps jsdom's 0, matching production geometry closely enough to drive the
+     placement math. No .top-nav in the test DOM → navBottom falls back to 60,
+     so minY = 218; the rangeOver rect is top 100 / bottom 116 and jsdom's
+     lineHeight is unparseable → lineH falls back to 28 → gap 56. */
+  let restoreSize;
+  beforeEach(() => {
+    const ow = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+    const oh = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      get() { return this.classList && this.classList.contains('sel-toolbar') ? 320 : 0; },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get() { return this.classList && this.classList.contains('sel-toolbar') ? 150 : 0; },
+    });
+    restoreSize = () => {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', ow);
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', oh);
+    };
+  });
+  afterEach(() => { restoreSize(); });
+
+  /** Scrollable reading container (stands in for .screen-scroll) with a
+      controllable scrollTop, holding a [data-hl-key] paragraph. */
+  function scrollerWithContainer(scrollTop) {
+    const s = document.createElement('div');
+    s.style.overflowY = 'auto';
+    Object.defineProperty(s, 'scrollHeight', { configurable: true, get: () => 2000 });
+    Object.defineProperty(s, 'clientHeight', { configurable: true, get: () => 700 });
+    let st = scrollTop;
+    Object.defineProperty(s, 'scrollTop', { configurable: true, get: () => st, set: (v) => { st = v; } });
+    document.body.appendChild(s);
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'bible:test:1:1');
+    p.textContent = 'The Revelation of Jesus Christ';
+    s.appendChild(p);
+    return { scroller: s, container: p };
+  }
+
+  it('with scroll room: auto-scrolls the container up by the deficit and sits two lines above (RED pre-fix: no scroll, toolbar shoved onto the selection)', () => {
+    const { scroller, container } = scrollerWithContainer(500);
+    mount();
+    stubSelection(rangeOver(container, 0, 14)); // rect top 100 → deficit 174
+    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
+    const tb = /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
+    expect(tb).not.toBeNull();
+    expect(scroller.scrollTop).toBe(326);   // 500 − 174
+    expect(tb.style.top).toBe('218px');     // bottom edge = two lines above the slid-down selection
+  });
+
+  it('at the top of the document (scrollTop 0): places the toolbar fully BELOW the selection (RED pre-fix: clamped on top of it)', () => {
+    const { scroller, container } = scrollerWithContainer(0);
+    mount();
+    stubSelection(rangeOver(container, 0, 14));
+    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
+    const tb = /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
+    expect(tb).not.toBeNull();
+    expect(scroller.scrollTop).toBe(0);     // nothing to reveal — no pointless jump
+    // y 322 → toolbar TOP at 322−150 = 172, a two-line gap under selBottom 116.
+    expect(tb.style.top).toBe('322px');
   });
 });
 
