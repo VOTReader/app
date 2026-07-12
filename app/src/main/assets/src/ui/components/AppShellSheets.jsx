@@ -80,16 +80,10 @@ export function AppShellSheets({
     dismiss: () => setLinkRefineRequest(null),
     active: !!(linkRefineRequest && linkRefineRequest.kind === 'excerpt' && linkPickerSource),
   });
-  useModalRegistry({
-    id: 'note-sheet',
-    dismiss: closeNoteSheet,
-    active: !!noteSheetTarget,
-  });
-  useModalRegistry({
-    id: 'notebook-picker-sheet',
-    dismiss: () => setNotebookPickerTarget(null),
-    active: !!notebookPickerTarget,
-  });
+  // (NoteSheet + NotebookPickerSheet register THEMSELVES with the modal
+  // registry — their dismissal is stateful (unsaved-edit discard confirms),
+  // so Escape/Android-back must route through the component's own
+  // requestClose, not a bare state-null here. 2026-07-12.)
   useModalRegistry({
     id: 'multi-note-popover',
     dismiss: () => setMultiNotePayload(null),
@@ -200,6 +194,7 @@ export function AppShellSheets({
           key={noteSheetTarget.groupId + ':' + (noteSheetTarget.startInEditMode ? 'edit' : 'read')}
           groupId={noteSheetTarget.groupId}
           startInEditMode={noteSheetTarget.startInEditMode}
+          freshGroup={!!noteSheetTarget.freshGroup}
           onClose={closeNoteSheet}
           onOpenNotebookPicker={(gid) => setNotebookPickerTarget(gid)}
         />

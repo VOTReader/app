@@ -123,7 +123,7 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
     if (ids.length === 1) {
       // Single bookmark at this position — open the full create/edit
       // sheet so the user gets the same UI as creation: editable label
-      // + thought + Delete. Consistent UX whether they're making a new
+      // + Delete. Consistent UX whether they're making a new
       // bookmark or revisiting an existing one.
       // atSource:true tells the sheet to suppress the "Open Source"
       // button — the user tapped the icon AT the source, so navigation

@@ -5,9 +5,9 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
 /**
- * @param {{ groupId: any, startInEditMode: any, onClose: any, onOpenNotebookPicker?: any }} props
+ * @param {{ groupId: any, startInEditMode: any, freshGroup?: any, onClose: any, onOpenNotebookPicker?: any }} props
  */
-export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPicker }) {
+export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpenNotebookPicker }) {
   // Subscribe to NoteStore + AnnotationStore mutations. Each store's _bump
   // triggers a re-render of this component via useSyncExternalStore.
   // The imperative DOM highlight layer re-applies off the same store
@@ -27,6 +27,11 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [showColors, setShowColors] = React.useState(false);
+  // Discard-gate for an edit-mode dismissal with unsaved text. Holds the
+  // dismissal INTENT so confirming lands where the user was headed:
+  //   'cancel' — the footer Cancel button (existing note → back to read mode)
+  //   'close'  — backdrop / Escape / Android back (sheet closes entirely)
+  const [confirmingDiscard, setConfirmingDiscard] = React.useState(/** @type {null | 'cancel' | 'close'} */ (null));
   const textareaRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -38,6 +43,13 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
     }
   }, [mode]);
 
+  // The sheet owns its OWN modal-registry entry (moved out of AppShellSheets
+  // 2026-07-12): Escape / Android back must route through requestClose so an
+  // edit-mode dismissal gets the same honest cancel/discard semantics as the
+  // backdrop — a bare setNoteSheetTarget(null) used to strand a fresh
+  // never-saved note group ("Save" looked cosmetic; owner-reported).
+  useModalRegistry({ id: 'note-sheet', dismiss: () => requestClose() });
+
   if (!note || !segs.length) {
     // Note record went missing — close
     return null;
@@ -46,25 +58,51 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
   const anchor = normalizeExcerptDisplay(note.fullText || segs.map(s => s.ann.text || '').join(' … '));
   const truncatedAnchor = anchor.length > 220 ? anchor.slice(0, 220) + '…' : anchor;
 
+  // A "fresh" note = opened straight into edit mode with no saved body yet.
+  // Discarding one removes the NoteStore record; if this flow also CREATED
+  // the annotation group (freshGroup), the group goes too. When note-ness
+  // was attached to a PRE-EXISTING mark, that mark survives the discard.
+  const freshUnsaved = !!startInEditMode && !note.body;
+  const dirty = body.trim() !== (note.body || '').trim();
+
   const save = () => {
     NoteStore.update(groupId, { body });
     onClose();
   };
 
-  const cancelEdit = () => {
+  /** @param {'cancel' | 'close'} intent */
+  function performDiscard(intent) {
+    setConfirmingDiscard(null);
     setBody(note.body || '');
-    if (startInEditMode && !note.body) {
-      // Fresh new note, never saved → discard it entirely. (Pre-decouple this
-      // converted it back to a highlight to "preserve the selection", but the
-      // note default can now be a BLANK highlight, which would leave an
-      // invisible, un-removable orphan mark — so remove the whole group.)
-      AnnotationStore.removeGroup(groupId);
+    if (freshUnsaved) {
+      if (freshGroup) AnnotationStore.removeGroup(groupId);
       NoteStore.remove(groupId);
       onClose();
       return;
     }
+    if (intent === 'close') { onClose(); return; }
     setMode('read');
-  };
+  }
+
+  /** @param {'cancel' | 'close'} intent */
+  function requestCancel(intent) {
+    if (dirty) { setConfirmingDiscard(intent); return; }
+    performDiscard(intent);
+  }
+
+  // Single dismissal entry point — backdrop, Escape, Android back all land
+  // here. Steps back through transient panels first, then applies the
+  // edit-mode cancel semantics, and only then closes.
+  function requestClose() {
+    // Record vanished (render bailed to null before the consts above
+    // initialized) — just close; nothing left to cancel or discard.
+    if (!note || !segs.length) { onClose(); return; }
+    if (confirmingDiscard) { setConfirmingDiscard(null); return; }
+    if (menuOpen) { setMenuOpen(false); setConfirmDelete(false); setShowColors(false); return; }
+    if (showColors) { setShowColors(false); return; }
+    if (mode === 'edit') { requestCancel('close'); return; }
+    onClose();
+  }
 
   // The note's current visual style (legacy 'note' kind → 'highlight').
   const _segKind = segs[0] && segs[0].ann ? segs[0].ann.kind : 'highlight';
@@ -105,11 +143,6 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
     setMenuOpen(false);
   };
 
-  const closeOverlay = () => {
-    if (menuOpen) { setMenuOpen(false); setConfirmDelete(false); setShowColors(false); return; }
-    onClose();
-  };
-
   // Blank notes are allowed — the body can be empty. (Pre-Q3.3f-dead a
   // `const canSave = true` lived here; the Save button never reads it.)
   // Tapping the header color dot opens the color picker — works in either
@@ -121,7 +154,7 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
   };
 
   return (
-    <div className="note-sheet-overlay" onClick={closeOverlay}>
+    <div className="note-sheet-overlay" onClick={requestClose}>
       <div className="note-sheet" onClick={e => e.stopPropagation()}>
         {/* Header: color dot (tappable) · "Note" · ⋯ menu (read mode only) */}
         <div className="note-sheet-header">
@@ -274,12 +307,24 @@ export function NoteSheet({ groupId, startInEditMode, onClose, onOpenNotebookPic
               </button>
             )}
             {/* Read mode: no Edit footer — use ⋯ → Edit. Edit mode: Cancel + Save.
-                Save is always enabled — blank notes are valid. */}
+                Save is always enabled — blank notes are valid. A dismissal
+                with unsaved text swaps the footer for a discard ConfirmStrip
+                (typed words are never silently dropped). */}
             {mode === 'edit' && (
-              <div className="note-sheet-footer">
-                <button className="note-sheet-secondary" onClick={cancelEdit}>Cancel</button>
-                <button className="note-sheet-save" onClick={save}>Save</button>
-              </div>
+              confirmingDiscard ? (
+                <ConfirmStrip
+                  className="note-sheet-discard-confirm"
+                  question={freshUnsaved ? 'Discard this note?' : 'Discard changes?'}
+                  yesLabel="Yes, discard"
+                  onCancel={() => setConfirmingDiscard(null)}
+                  onConfirm={() => performDiscard(confirmingDiscard)}
+                />
+              ) : (
+                <div className="note-sheet-footer">
+                  <button className="note-sheet-secondary" onClick={() => requestCancel('cancel')}>Cancel</button>
+                  <button className="note-sheet-save" onClick={save}>Save</button>
+                </div>
+              )
             )}
             {/* ⋯ menu panel (read mode only). Color sub-panel was hoisted above
                 so the menu only carries the action items + delete confirm. */}

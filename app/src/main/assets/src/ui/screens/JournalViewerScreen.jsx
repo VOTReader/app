@@ -459,16 +459,11 @@ export function JournalViewerScreen(props) {
   );
   var entry = entryId ? JournalStore.get(entryId) : null;
 
-  var _confirmStep = useState(0);
-  var confirmStep = _confirmStep[0]; var setConfirmStep = _confirmStep[1];
-  var _typedDelete = useState('');
-  var typedDelete = _typedDelete[0]; var setTypedDelete = _typedDelete[1];
-
-  function startDelete() { setConfirmStep(1); setTypedDelete(''); }
-  function nextDeleteStep() {
-    if (confirmStep < 3) setConfirmStep(confirmStep + 1);
-  }
-  function cancelDelete() { setConfirmStep(0); setTypedDelete(''); }
+  // Entry-options ⋯ sheet (pin/delete live there — the top nav only carries
+  // ONE extra icon; pin + delete as separate nav icons overflowed the bar on
+  // narrow Android screens).
+  var _menuOpen = useState(false);
+  var menuOpen = _menuOpen[0]; var setMenuOpen = _menuOpen[1];
 
   if (typeof window !== 'undefined' && !window.__journalBackStack) window.__journalBackStack = [];
   var _jstack = (typeof window !== 'undefined' && window.__journalBackStack) || [];
@@ -566,81 +561,25 @@ export function JournalViewerScreen(props) {
     onBack && onBack();
   }
 
+  // ONE ⋯ nav icon opens the same entry-options sheet the hub cards use
+  // (Edit / Pin / Delete-with-triple-confirm) — JournalCardMenu, with the
+  // redundant "Open Entry" item hidden since we're already inside the entry.
   var navExtras = (
-    <>
-      <button
-        className={'nav-search-btn jrn-pin-btn' + (entry.pinned ? ' is-pinned' : '')}
-        onClick={togglePin}
-        title={entry.pinned ? 'Unpin entry' : 'Pin entry'}
-        aria-label={entry.pinned ? 'Unpin entry' : 'Pin entry'}
-        aria-pressed={!!entry.pinned}
-      >
-        {jrnPinIcon(!!entry.pinned)}
-      </button>
-      <button
-        className="nav-search-btn jrn-del-btn"
-        onClick={startDelete}
-        title="Delete entry"
-        aria-label="Delete entry"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="3 6 5 6 21 6" />
-          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-          <path d="M10 11v6M14 11v6" />
-        </svg>
-      </button>
-    </>
+    <button
+      className="nav-search-btn jrn-entry-menu-btn"
+      onClick={function() { setMenuOpen(true); }}
+      title="Entry options"
+      aria-label="Entry options"
+      aria-haspopup="menu"
+      aria-expanded={menuOpen}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="12" cy="5" r="1.6" />
+        <circle cx="12" cy="12" r="1.6" />
+        <circle cx="12" cy="19" r="1.6" />
+      </svg>
+    </button>
   );
-
-  function renderDeleteBanner() {
-    if (confirmStep === 0) return null;
-    var stepLabel = confirmStep === 1 ? 'Step 1 of 3'
-      : confirmStep === 2 ? 'Step 2 of 3'
-      : 'Step 3 of 3';
-    var question = confirmStep === 1 ? 'Delete this entry?'
-      : confirmStep === 2 ? 'Are you sure? This cannot be undone.'
-      : 'Type DELETE to permanently remove this entry.';
-    return (
-      <div className={'jrn-tripledel jrn-tripledel-step' + confirmStep}>
-        <div className="jrn-tripledel-step-label">{stepLabel}</div>
-        <div className="jrn-tripledel-question">{question}</div>
-        {(function () {
-          var summary = (typeof JournalStore !== 'undefined' && JournalStore.associatedDataSummary)
-            ? JournalStore.associatedDataSummary(entryId) : null;
-          return summary && (
-            <div className="jrn-tripledel-cascade">
-              {'This will also permanently delete ' + summary + ' you placed inside this entry.'}
-            </div>
-          );
-        })()}
-        {confirmStep === 3 && (
-          <input
-            type="text"
-            className="jrn-tripledel-input"
-            placeholder="Type DELETE"
-            value={typedDelete}
-            autoFocus
-            onChange={function(e) { setTypedDelete(e.target.value); }}
-          />
-        )}
-        <div className="jrn-tripledel-actions">
-          <button className="jrn-tripledel-cancel" onClick={cancelDelete}>Cancel</button>
-          {confirmStep < 3 && (
-            <button className="jrn-tripledel-next" onClick={nextDeleteStep}>
-              {confirmStep === 1 ? 'Continue' : 'I am sure'}
-            </button>
-          )}
-          {confirmStep === 3 && (
-            <button
-              className="jrn-tripledel-final"
-              onClick={doDelete}
-              disabled={typedDelete.trim().toUpperCase() !== 'DELETE'}
-            >Delete forever</button>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   var displayTitle = JournalHelpers.entryDisplayTitle(entry);
 
@@ -663,7 +602,6 @@ export function JournalViewerScreen(props) {
             {entry.pinned && ' · Pinned'}
           </div>
         </div>
-        {renderDeleteBanner()}
         <div className="jrn-viewer-blocks">
           {(entry.blocks || []).map(function(b, i) {
             return (
@@ -689,6 +627,16 @@ export function JournalViewerScreen(props) {
           <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" />
         </svg>
       </button>
+      {menuOpen && (
+        <JournalCardMenu
+          entry={entry}
+          hideOpen
+          onClose={function() { setMenuOpen(false); }}
+          onEdit={function() { onEdit && onEdit(); }}
+          onTogglePin={togglePin}
+          onDelete={doDelete}
+        />
+      )}
     </ScreenLayout>
   );
 }

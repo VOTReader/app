@@ -589,6 +589,10 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const sel = window.getSelection();
     const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
     let groupId;
+    // True when THIS flow creates the annotation group (vs attaching note-ness
+    // to an existing mark). The NoteSheet needs it so discarding a never-saved
+    // note removes exactly what this flow created — never a pre-existing mark.
+    let createdGroup = false;
     if (selInfo.multiVerse) {
       const containers = selInfo.multiContainers ||
         (range ? Array.from(document.querySelectorAll('[data-hl-key]')).filter(c => range.intersectsNode(c)) : []);
@@ -614,6 +618,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         groupId = attachTarget;
       } else {
         groupId = hlId();
+        createdGroup = true;
         containers.forEach(function(container) {
           var hlKey = container.dataset.hlKey;
           var containerText = container.textContent;
@@ -654,6 +659,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       } else {
         const id = hlId();
         groupId = id;
+        createdGroup = true;
         AnnotationStore.add(selInfo.hlKey, {
           id: id, groupId: id, kind: def.style,
           start: snap.start, end: snap.end,
@@ -683,7 +689,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     });
     window.getSelection().removeAllRanges();
     setVisible(false);
-    onNoteRequest && onNoteRequest(groupId, /*startInEditMode=*/true);
+    onNoteRequest && onNoteRequest(groupId, /*startInEditMode=*/true, /*freshGroup=*/createdGroup);
   }, [selInfo, onNoteRequest, computeOffset]);
 
   const handleShare = React.useCallback(() => {
@@ -788,8 +794,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
     // Open the pre-commit BookmarkCreateSheet — replaces the previous
     // silent BookmarkStore.add. The sheet lets the user refine the
-    // auto-derived label and add an optional thought BEFORE persisting,
-    // then commits on its own (App-level onConfirm wires the store write).
+    // auto-derived label BEFORE persisting, then commits on its own
+    // (App-level onConfirm wires the store write).
     if (typeof window.__bookmarkCreate === 'function') {
       window.__bookmarkCreate({
         hlKey: storedKey,

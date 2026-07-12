@@ -3544,6 +3544,9 @@
     .note-sheet-footer {
       display: flex; gap: 10px; margin-top: 12px;
     }
+    /* Discard ConfirmStrip swaps in for the footer when a dismissal
+       arrives with unsaved note text (honest-Save, 2026-07-12). */
+    .note-sheet-discard-confirm { margin-top: 12px; width: 100%; }
     .note-sheet-save {
       flex: 1;
       padding: 11px; border-radius: 8px; cursor: pointer;
@@ -4281,8 +4284,54 @@
       border-radius: 4px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       flex-shrink: 0;
+      /* Destructive-control separation: a faint divider + gap keep the
+         delete × from reading as part of the toggle row, and a WL4 ::after
+         overlay gives the small glyph a 44px effective hit area. */
+      position: relative;
+      margin-left: 10px; padding-left: 14px;
+      border-left: 1px solid var(--border);
+      border-radius: 0 4px 4px 0;
+    }
+    .nb-picker-row-delete::after {
+      content: ""; position: absolute;
+      top: 50%; left: 50%;
+      width: 44px; height: 44px;
+      transform: translate(-50%, -50%);
     }
     .nb-picker-row-delete:active { color: var(--accent-pink); background: rgba(244,143,177,0.12); }
+
+    /* ── Notebook picker footer — the transactional Save/Cancel pair
+       (2026-07-12): membership toggles buffer locally; Save commits,
+       Cancel/×/backdrop discard (ConfirmStrip-gated when dirty). ── */
+    .nb-picker-footer {
+      display: flex; gap: 12px;
+      margin-top: 16px; padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .nb-picker-cancel {
+      flex: 1; padding: 12px 0; border-radius: 8px;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--cream-dim);
+      font-family: 'Cinzel', serif; font-size: 0.62rem;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .nb-picker-cancel:active { background: var(--gold-faint); color: var(--gold); }
+    .nb-picker-save {
+      flex: 1.4; padding: 12px 0; border-radius: 8px;
+      background: var(--gold); border: 1px solid var(--gold);
+      color: var(--bg);
+      font-family: 'Cinzel', serif; font-size: 0.62rem;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .nb-picker-save:active { background: var(--gold-bright); }
+    .nb-picker-save:disabled {
+      background: transparent; color: var(--cream-muted);
+      border-color: var(--gold-border);
+      opacity: 0.55; cursor: not-allowed;
+    }
+    .nb-picker-discard-confirm { margin-top: 16px; width: 100%; }
 
     /* ── NoteSheet inline notebook chips (in read mode header area) ── */
     .note-sheet-nb-chips {

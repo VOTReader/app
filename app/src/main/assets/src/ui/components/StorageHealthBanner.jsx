@@ -5,18 +5,20 @@
    useSyncExternalStore so only this component re-renders on tier
    changes — no full-app re-render.
 
-   Renders the appropriate banner for scenarios 2, 6, 7, 8 from the
+   Renders the appropriate banner for scenarios 6, 7, 8 from the
    W2.7 design. Scenario 5 (caution-level, Settings-only) is handled
    inline in SettingsScreen. Scenarios 3 + 4 (Safari modal + iOS PWA
-   welcome card) are separate components in W2.7e.
+   welcome card) are separate components in W2.7e. Scenario 2 (the
+   "not protected from browser cleanup" nag) was REMOVED 2026-07-12
+   (owner call) — only banners about ACTUAL data danger remain.
 
    Priority (highest first):
      READONLY with writeFailedThisSession → scenario 7 (write-failed)
      CRITICAL with privateModeLikely      → scenario 8 (private mode)
      CRITICAL                             → scenario 7 (critical quota)
      WARNING                              → scenario 6 (running low)
-     CAUTION with not-persisted risk      → scenario 2 (not persisted)
-     HEALTHY / dismissed                  → null (nothing)
+     storesDegraded                       → storage-slow (E5)
+     HEALTHY                              → null (nothing)
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -29,11 +31,8 @@ export function useStorageHealth() {
 
 export function StorageHealthBanner({ onNavigateSettings }) {
   const report = useStorageHealth();
-  const [persistResult, setPersistResult] = React.useState(
-    /** @type {'idle' | 'granted' | 'denied'} */ ('idle')
-  );
 
-  const scenario = _pickScenario(report, persistResult);
+  const scenario = _pickScenario(report);
   if (!scenario) return null;
 
   return (
@@ -64,10 +63,9 @@ export function StorageHealthBanner({ onNavigateSettings }) {
 
   /**
    * @param {import('../../utils/storage-health.js').StorageHealthReport} r
-   * @param {'idle' | 'granted' | 'denied'} persist
    */
-  function _pickScenario(r, persist) {
-    const { tier, risks, remaining, privateModeLikely, writeFailedThisSession, storesDegraded } = r;
+  function _pickScenario(r) {
+    const { tier, remaining, privateModeLikely, writeFailedThisSession, storesDegraded } = r;
 
     if (tier === StorageHealth.TIER.READONLY && writeFailedThisSession) {
       return {
@@ -113,33 +111,14 @@ export function StorageHealthBanner({ onNavigateSettings }) {
       };
     }
 
-    if (risks.includes(StorageHealth.RISK.NOT_PERSISTED) && !StorageHealth.isDismissed('not-persisted')) {
-      if (persist === 'granted') {
-        return {
-          id: 'not-persisted',
-          style: 'gold',
-          text: "Data protected ✓",
-          dismissable: true,
-          buttons: [],
-        };
-      }
-      if (persist === 'denied') {
-        return {
-          id: 'not-persisted',
-          style: 'gold',
-          text: "Browser denied protection. Export regularly to keep your data safe.",
-          dismissable: true,
-          buttons: [{ label: 'Export now', primary: false, onClick: _goExport }],
-        };
-      }
-      return {
-        id: 'not-persisted',
-        style: 'gold',
-        text: "Your data isn't protected from browser cleanup yet.",
-        dismissable: true,
-        buttons: [{ label: 'Protect my data', primary: true, onClick: _handlePersist }],
-      };
-    }
+    // (The former scenario-2 "not protected from browser cleanup" nag was
+    // REMOVED 2026-07-12, owner call: it warned about hypothetical eviction,
+    // not a real emergency. Persistence is still requested silently where
+    // that's free (see _ensurePersistence in storage-health.js), and the
+    // Settings → Storage row keeps the manual "Protect now" lever for the
+    // one engine that prompts (Firefox). The banners that remain above all
+    // signal ACTUAL data danger — write failure, full storage, private
+    // mode — and stay.)
 
     // E5: lowest priority — a store is stuck in the degraded hydration tier
     // (serving empty defaults). Placed last so it never masks a real quota /
@@ -155,11 +134,6 @@ export function StorageHealthBanner({ onNavigateSettings }) {
     }
 
     return null;
-  }
-
-  async function _handlePersist() {
-    var granted = await StorageHealth.requestPersistence();
-    setPersistResult(granted ? 'granted' : 'denied');
   }
 
   function _goExport() {

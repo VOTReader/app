@@ -57,11 +57,11 @@
   R('.jrn-card:hover { background: var(--bg3); border-color: var(--gold-border); }');
   R('body.light .jrn-card:hover { background: #f3ecdc; }');
   R('.jrn-card:active { transform: scale(0.99); }');
-  // Pin marker (bookmark-ribbon icon, top-right). Lives outside any tap
-  // target so it is purely decorative — the user pins/unpins from the viewer.
-  // Pin marker sits just LEFT of the ⋯ menu button so they never overlap.
-  R('.jrn-card-pin-marker { position: absolute; top: 12px; right: 44px; width: 13px; height: 16px; color: var(--gold); pointer-events: none; }');
-  R('.jrn-card-pin-marker svg { width: 100%; height: 100%; filter: drop-shadow(0 0 4px var(--gold-glow)); }');
+  // Pinned indicator — an INLINE glyph inside the date span, flowing with the
+  // text so it can never draw over the timestamp at any width or font-scale
+  // (the old absolute top-right marker sat exactly on the date on narrow
+  // Android screens). Purely decorative — pin/unpin lives in the ⋯ menus.
+  R('.jrn-card-pin-inline { display: inline-block; width: 0.75rem; height: 0.75rem; vertical-align: -0.09rem; margin-right: 0.375rem; color: var(--gold); filter: drop-shadow(0 0 4px var(--gold-glow)); }');
   // Per-card ⋯ (3-dot) options button — top-right corner.
   R('.jrn-card { padding-right: 42px; }');
   R('.jrn-card-menu-btn { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; background: transparent; border: none; color: var(--gold-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: background 0.12s, color 0.12s; z-index: 2; }');

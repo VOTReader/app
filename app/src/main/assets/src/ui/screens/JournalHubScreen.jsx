@@ -19,6 +19,9 @@ export function JournalCardMenu(props) {
         <div className="link-action-handle" />
         {step === 0 && (
           <>
+            {/* "Open Entry" is meaningless when the menu is launched from
+                INSIDE the entry (JournalViewerScreen sets hideOpen). */}
+            {!props.hideOpen && (
             <button className="link-action-btn" onClick={function() { close(); props.onOpen(); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
@@ -26,6 +29,7 @@ export function JournalCardMenu(props) {
               </svg>
               <span>Open Entry</span>
             </button>
+            )}
             <button className="link-action-btn" onClick={function() { close(); props.onEdit(); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9" />
@@ -154,14 +158,6 @@ export function JournalHubScreen(props) {
         }}
       >
         <span className={'jrn-card-mood ' + moodClass} />
-        {entry.pinned && (
-          <div className="jrn-card-pin-marker" title="Pinned">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" />
-              <path d="M8 12 L3 19" />
-            </svg>
-          </div>
-        )}
         <button
           className="jrn-card-menu-btn"
           onClick={function(e) { e.stopPropagation(); setMenuEntry(entry); }}
@@ -177,6 +173,12 @@ export function JournalHubScreen(props) {
         <div className="jrn-card-row">
           <h3 className={'jrn-card-title' + (title ? '' : ' untitled')}>{title || 'Untitled'}</h3>
           <span className="jrn-card-date">
+            {entry.pinned && (
+              <svg className="jrn-card-pin-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-label="Pinned" role="img">
+                <path d="M9 4.5 L19.5 15 M15 3.5 a1.5 1.5 0 0 1 0 2.1 L13 7.5 l1.8 4.6 -2 2 -8.4 -8.4 2-2 4.6 1.8 1.9-1.9 a1.5 1.5 0 0 1 2.1 0z" />
+                <path d="M8 12 L3 19" />
+              </svg>
+            )}
             {JournalHelpers.shortDate(entry.updated || entry.created)}
             <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(entry.updated || entry.created)}</span>
           </span>

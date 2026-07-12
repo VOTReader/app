@@ -127,43 +127,32 @@ describe('StorageHealthBanner — E5 storage-slow (degraded)', () => {
   });
 });
 
-/* ─── Banner: scenario 2 (not-persisted) ───────────────────────── */
+/* ─── Banner: scenario 2 (not-persisted) — REMOVED 2026-07-12 ──────
+   Owner call: the "not protected from browser cleanup" nag warned about
+   hypothetical eviction, not a real emergency. The banner must never
+   render for this risk anymore; silent persistence upgrade + the
+   Settings storage row cover it. */
 
-describe('StorageHealthBanner — scenario 2 (not persisted)', () => {
-  it('shows gold banner with "Protect my data" button', () => {
+describe('StorageHealthBanner — not-persisted nag is gone', () => {
+  it('renders NOTHING for CAUTION + NOT_PERSISTED risk', () => {
     const { container } = renderBanner({
       tier: StorageHealth.TIER.CAUTION,
       risks: [StorageHealth.RISK.NOT_PERSISTED],
       persisted: false,
     });
+    expect(container.querySelector('.sh-banner')).toBeNull();
+  });
+
+  it('real emergencies still render when the risk list also carries NOT_PERSISTED', () => {
+    const { container } = renderBanner({
+      tier: StorageHealth.TIER.CRITICAL,
+      risks: [StorageHealth.RISK.NOT_PERSISTED, StorageHealth.RISK.CRITICAL_QUOTA],
+      remaining: 5e6,
+    });
     const banner = container.querySelector('.sh-banner');
     expect(banner).not.toBeNull();
-    expect(banner.className).toContain('sh-banner-gold');
-    expect(banner.textContent).toContain('protected from browser cleanup');
-    expect(container.querySelector('.sh-banner-btn-primary').textContent).toBe('Protect my data');
-  });
-
-  it('has dismiss button', () => {
-    const { container } = renderBanner({
-      tier: StorageHealth.TIER.CAUTION,
-      risks: [StorageHealth.RISK.NOT_PERSISTED],
-    });
-    expect(container.querySelector('.sh-banner-dismiss')).not.toBeNull();
-  });
-
-  it('disappears after dismissal via StorageHealth.dismissScenario', () => {
-    const report = mkReport({
-      tier: StorageHealth.TIER.CAUTION,
-      risks: [StorageHealth.RISK.NOT_PERSISTED],
-    });
-    StorageHealth.getReport = () => report;
-    const { container } = render(
-      <StorageHealthBanner onNavigateSettings={vi.fn()} />
-    );
-    expect(container.querySelector('.sh-banner')).not.toBeNull();
-
-    StorageHealth.dismissScenario('not-persisted');
-    expect(StorageHealth.isDismissed('not-persisted')).toBe(true);
+    expect(banner.textContent).toContain('almost full');
+    expect(banner.textContent).not.toContain('browser cleanup');
   });
 });
 

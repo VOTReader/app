@@ -64,7 +64,9 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
       NoteDefaultStore.set(kind === 'note' ? 'highlight' : kind, ann.color);
     }
     onClose();
-    if (onNoteRequest) onNoteRequest(groupId, /*startInEditMode=*/true);
+    // freshGroup=false — the mark existed BEFORE the note; discarding the
+    // never-saved note must remove only the NoteStore record, not the mark.
+    if (onNoteRequest) onNoteRequest(groupId, /*startInEditMode=*/true, /*freshGroup=*/false);
   };
 
   return (

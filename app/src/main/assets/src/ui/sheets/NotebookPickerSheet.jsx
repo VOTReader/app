@@ -1,5 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════════════
    NotebookPickerSheet — Cluster D (esbuild bundle-d.js)
+   ═══════════════════════════════════════════════════════════════════════
+   TRANSACTIONAL since 2026-07-12 (owner call): membership toggles are
+   buffered locally and committed only by the footer Save button. The ×,
+   backdrop, Escape and Android back all discard — with a ConfirmStrip
+   gate when there are unsaved changes — so closing the sheet mid-way
+   never silently persists half a decision. (Before this, every row tap
+   wrote straight to NoteStore and Save-less closing kept the changes.)
+
+   Still IMMEDIATE (deliberately): creating a notebook (explicit "Create"
+   button — the container is real and reusable even if this note's
+   membership is discarded) and deleting a notebook (its own ConfirmStrip;
+   store-side cleanup moves notes to Uncategorized).
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function NotebookPickerSheet({ groupId, onClose }) {
@@ -17,37 +29,82 @@ export function NotebookPickerSheet({ groupId, onClose }) {
   const notebooks = NotebookStore.list();
   const [newName, setNewName] = React.useState('');
   const [confirmDeleteNb, setConfirmDeleteNb] = React.useState(null); // notebook id or null
+  const [confirmingDiscard, setConfirmingDiscard] = React.useState(false);
+  // The BUFFERED membership set — seeded from the store at open, committed
+  // by Save. Lazy initializer so it reads the store exactly once per mount
+  // (the sheet is conditionally rendered, so each open is a fresh mount).
+  const [selected, setSelected] = React.useState(
+    () => new Set((NoteStore.get(groupId) || {}).notebookIds || [])
+  );
   const inputRef = React.useRef(null);
 
+  // Own modal-registry entry (moved out of AppShellSheets 2026-07-12):
+  // Escape / Android back must route through requestClose so the unsaved-
+  // changes discard gate applies to every dismissal path, not just the ×.
+  useModalRegistry({ id: 'notebook-picker-sheet', dismiss: () => requestClose() });
+
   if (!note) return null;
-  const memberIds = new Set(note.notebookIds || []);
+
+  // Unsaved-change detection: symmetric difference between the buffer and
+  // the store. Deleted notebooks are pruned from both sides by deleteNb /
+  // the store's own cleanup, so a stale id never fakes dirtiness.
+  const storedIds = new Set(note.notebookIds || []);
+  const dirty = selected.size !== storedIds.size
+    || [...selected].some((id) => !storedIds.has(id));
 
   const createNotebook = () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
     const nb = NotebookStore.add(trimmed);
     if (nb) {
-      // Auto-add the note to the freshly-created notebook
-      NoteStore.toggleNotebook(groupId, nb.id);
+      // Pre-select the fresh notebook in the BUFFER — committed on Save.
+      setSelected((prev) => { const next = new Set(prev); next.add(nb.id); return next; });
       setNewName('');
     }
   };
 
   const toggle = (nbId) => {
-    NoteStore.toggleNotebook(groupId, nbId);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(nbId)) next.delete(nbId); else next.add(nbId);
+      return next;
+    });
   };
 
   const deleteNb = (nbId) => {
     NotebookStore.remove(nbId);
+    setSelected((prev) => { const next = new Set(prev); next.delete(nbId); return next; });
     setConfirmDeleteNb(null);
   };
 
+  const commit = () => {
+    // Apply the buffer as a diff through the store's existing toggle API.
+    // Only ids of notebooks that still exist are added (a notebook deleted
+    // while the sheet was open must not resurrect as a dangling id).
+    const valid = new Set(NotebookStore.list().map((nb) => nb.id));
+    const current = new Set(note.notebookIds || []);
+    selected.forEach((id) => {
+      if (!current.has(id) && valid.has(id)) NoteStore.toggleNotebook(groupId, id);
+    });
+    current.forEach((id) => {
+      if (!selected.has(id)) NoteStore.toggleNotebook(groupId, id);
+    });
+    onClose();
+  };
+
+  // Single dismissal entry point — ×, backdrop, Escape, Android back.
+  function requestClose() {
+    if (confirmingDiscard) { setConfirmingDiscard(false); return; }
+    if (dirty) { setConfirmingDiscard(true); return; }
+    onClose();
+  }
+
   return (
-    <div className="nb-picker-overlay" onClick={onClose}>
+    <div className="nb-picker-overlay" onClick={requestClose}>
       <div className="nb-picker" onClick={e => e.stopPropagation()}>
         <div className="nb-picker-header">
-          <span className="nb-picker-title">{memberIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"}</span>
-          <button className="nb-picker-close" onClick={onClose} aria-label="Close">×</button>
+          <span className="nb-picker-title">{storedIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"}</span>
+          <button className="nb-picker-close" onClick={requestClose} aria-label="Close">×</button>
         </div>
         <div className="nb-picker-new">
           <input
@@ -80,7 +137,7 @@ export function NotebookPickerSheet({ groupId, onClose }) {
                     />
                   );
                 }
-                const checked = memberIds.has(nb.id);
+                const checked = selected.has(nb.id);
                 return (
                   <div
                     key={nb.id}
@@ -107,6 +164,28 @@ export function NotebookPickerSheet({ groupId, onClose }) {
               })}
             </div>
         }
+        {/* Footer — the HONEST Save: nothing above commits until this button.
+            Swaps to a discard ConfirmStrip when a dismissal arrives with
+            unsaved changes. Save is disabled when there's nothing to save. */}
+        {confirmingDiscard ? (
+          <ConfirmStrip
+            className="nb-picker-discard-confirm"
+            question="Discard changes?"
+            yesLabel="Yes, discard"
+            onCancel={() => setConfirmingDiscard(false)}
+            onConfirm={onClose}
+          />
+        ) : (
+          <div className="nb-picker-footer">
+            <button className="nb-picker-cancel" onClick={requestClose}>Cancel</button>
+            <button
+              className="nb-picker-save"
+              onClick={commit}
+              disabled={!dirty}
+              title={dirty ? 'Save notebook changes' : 'No changes to save'}
+            >Save</button>
+          </div>
+        )}
       </div>
     </div>
   );

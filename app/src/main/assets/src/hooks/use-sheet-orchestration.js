@@ -106,7 +106,7 @@ export function useSheetOrchestration({
   // hook (see use-link-picker-orchestration.js); spread into the return below
   // so App()'s destructure is unchanged.
   const linkPicker = useLinkPickerOrchestration();
-  const [noteSheetTarget, setNoteSheetTarget] = React.useState(null);  // { groupId, startInEditMode } or null
+  const [noteSheetTarget, setNoteSheetTarget] = React.useState(null);  // { groupId, startInEditMode, freshGroup } or null
   const [notebookPickerTarget, setNotebookPickerTarget] = React.useState(null); // groupId or null
   const [multiNotePayload, setMultiNotePayload] = React.useState(null); // { groupIds, x, y } or null
   const [bookmarkPopoverPayload, setBookmarkPopoverPayload] = React.useState(null); // { bkmIds, x, y, hlKey } or null
@@ -114,8 +114,13 @@ export function useSheetOrchestration({
   const [inboundJournalPayload, setInboundJournalPayload] = React.useState(null);
 
   // ── Opener / closer useCallbacks ───────────────────────────────────────
-  const openNoteSheet = React.useCallback((groupId, startInEditMode) => {
-    setNoteSheetTarget({ groupId, startInEditMode: !!startInEditMode });
+  // freshGroup: true ONLY when the caller CREATED the annotation group for
+  // this note (SelectionToolbar's create branches). Discarding a never-saved
+  // note then removes the whole group; when note-ness was attached to a
+  // PRE-EXISTING mark (chip "Note", toolbar attach), discard removes only
+  // the NoteStore record and the user's original highlight survives.
+  const openNoteSheet = React.useCallback((groupId, startInEditMode, freshGroup) => {
+    setNoteSheetTarget({ groupId, startInEditMode: !!startInEditMode, freshGroup: !!freshGroup });
     setAnnChip(null);
   }, []);
   const closeNoteSheet = React.useCallback(() => setNoteSheetTarget(null), []);

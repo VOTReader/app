@@ -64,7 +64,7 @@ describe('window bridges', () => {
     act(() => window.__showAnnChip(10, 20, 'k', 'g1'));
     expect(result.current.annChip).toEqual({ x: 10, y: 20, hlKey: 'k', groupId: 'g1' });
     act(() => result.current.openNoteSheet('g1', true));
-    expect(result.current.noteSheetTarget).toEqual({ groupId: 'g1', startInEditMode: true });
+    expect(result.current.noteSheetTarget).toEqual({ groupId: 'g1', startInEditMode: true, freshGroup: false });
     expect(result.current.annChip).toBeNull(); // chip cleared on note open
   });
 

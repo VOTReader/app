@@ -177,34 +177,14 @@ export function BookmarkRow({ bkm, onNavigate, onLongPress, editingId, onEditSta
 }
 
 /* ── BookmarkRowActionSheet ──────────────────────────────────── */
-export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onEditThought, onDelete }) {
+export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onDelete }) {
   var useState = React.useState;
 
   var _state = useState(false);
   var confirming = _state[0];
   var setConfirming = _state[1];
 
-  var _te = useState(false); var editingThought = _te[0]; var setEditingThought = _te[1];
-  var _tt = useState(''); var thoughtText = _tt[0]; var setThoughtText = _tt[1];
-
   if (!bkm) return null;
-  var hasThought = !!(bkm.thought && bkm.thought.trim());
-
-  function startEditThought() {
-    setThoughtText(bkm.thought || '');
-    setEditingThought(true);
-    setConfirming(false);
-  }
-  function saveThought() {
-    BookmarkStore.update(bkm.id, { thought: thoughtText });
-    if (typeof onEditThought === 'function') onEditThought();
-    setEditingThought(false);
-    onClose();
-  }
-  function cancelEditThought() {
-    setEditingThought(false);
-    setThoughtText('');
-  }
 
   var doDelete = function() {
     BookmarkStore.remove(bkm.id);
@@ -216,7 +196,7 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, 
     <div className="link-action-overlay" onClick={onClose}>
       <div className="link-action-sheet" onClick={function(e) { e.stopPropagation(); }}>
         <div className="link-action-handle" />
-        {!confirming && !editingThought && (
+        {!confirming && (
           <>
             <button className="link-action-btn" onClick={function() { onNavigate(bkm); onClose(); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -233,12 +213,6 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, 
               </svg>
               <span>Edit Label</span>
             </button>
-            <button className="link-action-btn" onClick={startEditThought}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-              </svg>
-              <span>{hasThought ? 'Edit Thought' : 'Add Thought'}</span>
-            </button>
             <button className="link-action-btn link-action-btn-danger" onClick={function() { setConfirming(true); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6" />
@@ -249,25 +223,6 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, 
               <span>Delete Bookmark</span>
             </button>
           </>
-        )}
-        {editingThought && !confirming && (
-          <div className="bkm-action-thought-edit">
-            <div className="bkm-action-thought-prompt">Why did you bookmark this?</div>
-            <textarea
-              className="bkm-popover-thought-textarea"
-              autoFocus
-              value={thoughtText}
-              placeholder="A few words for your future self…"
-              onChange={function(e) { setThoughtText(e.target.value); }}
-              onKeyDown={function(e) {
-                if (e.key === 'Escape') { e.preventDefault(); cancelEditThought(); }
-              }}
-            />
-            <div className="bkm-action-thought-actions">
-              <button className="link-action-btn" onClick={cancelEditThought}><span>Cancel</span></button>
-              <button className="link-action-btn" onClick={saveThought} style={{ color: 'var(--gold)' }}><span>Save</span></button>
-            </div>
-          </div>
         )}
         {confirming && (
           <ConfirmStrip
@@ -286,10 +241,6 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, 
 export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDone }) {
   var useState = React.useState;
   var _ci = useState(null); var confirmingId = _ci[0]; var setConfirmingId = _ci[1];
-  var _ei = useState(null); var editingId = _ei[0]; var setEditingId = _ei[1];
-  var _et = useState(''); var editText = _et[0]; var setEditText = _et[1];
-  var _tick = useState(0); var setTick = _tick[1]; // value unread; setter forces re-render
-  function bump() { setTick(function(t) { return t + 1; }); }
 
   if (!bkmIds || !bkmIds.length) return null;
   var bookmarks = bkmIds.map(function(id) { return BookmarkStore.get(id); }).filter(Boolean);
@@ -300,20 +251,6 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
     onDeleteDone && onDeleteDone();
     if (bookmarks.length <= 1) onClose();
     else setConfirmingId(null);
-  }
-  function startEditThought(bkm) {
-    setEditingId(bkm.id);
-    setEditText(bkm.thought || '');
-    setConfirmingId(null);
-  }
-  function saveThought(bkm) {
-    BookmarkStore.update(bkm.id, { thought: editText });
-    setEditingId(null);
-    bump();
-  }
-  function cancelEditThought() {
-    setEditingId(null);
-    setEditText('');
   }
 
   var popX = Math.max(8, Math.min(x - 80, window.innerWidth - 320));
@@ -329,44 +266,24 @@ export function BookmarkPopover({ bkmIds, x, y, onClose, onNavigate, onDeleteDon
       >
         {bookmarks.map(function(bkm) {
           var isConfirming = confirmingId === bkm.id;
-          var isEditing = editingId === bkm.id;
           var dateStr = (typeof relativeDate === 'function') ? relativeDate(bkm.created) : '';
           var hasThought = !!(bkm.thought && bkm.thought.trim().length);
 
           return (
             <div key={bkm.id} className="bkm-popover-item">
-              {!isConfirming && !isEditing && (
+              {!isConfirming && (
                 <>
                   <div className="bkm-popover-label">{bkm.label || '(no label)'}</div>
                   {dateStr && <div className="bkm-popover-date">{dateStr}</div>}
+                  {/* Legacy records may still carry a saved thought — keep
+                      DISPLAYING user data; only the add/edit affordance was
+                      removed (owner call, 2026-07-12). */}
                   {hasThought && <div className="bkm-popover-thought">{bkm.thought}</div>}
                   <div className="bkm-popover-actions">
                     <button className="bkm-popover-btn" onClick={function() { onNavigate(bkm); onClose(); }}>Open</button>
-                    <button className="bkm-popover-btn" onClick={function() { startEditThought(bkm); }}>
-                      {hasThought ? 'Edit Thought' : 'Add Thought'}
-                    </button>
                     <button className="bkm-popover-btn bkm-popover-btn-danger" onClick={function() { setConfirmingId(bkm.id); }}>Delete</button>
                   </div>
                 </>
-              )}
-              {isEditing && (
-                <div className="bkm-popover-thought-edit">
-                  <div className="bkm-popover-label">{bkm.label || '(no label)'}</div>
-                  <textarea
-                    className="bkm-popover-thought-textarea"
-                    autoFocus
-                    value={editText}
-                    placeholder="Why did you bookmark this?"
-                    onChange={function(e) { setEditText(e.target.value); }}
-                    onKeyDown={function(e) {
-                      if (e.key === 'Escape') { e.preventDefault(); cancelEditThought(); }
-                    }}
-                  />
-                  <div className="bkm-popover-actions">
-                    <button className="bkm-popover-btn" onClick={cancelEditThought}>Cancel</button>
-                    <button className="bkm-popover-btn bkm-popover-btn-primary" onClick={function() { saveThought(bkm); }}>Save</button>
-                  </div>
-                </div>
               )}
               {isConfirming && (
                 <ConfirmStrip
@@ -554,7 +471,6 @@ export function BookmarksScreen(props) {
             onClose={function() { setActionTarget(null); }}
             onNavigate={function(bkm) { navigateToBookmark(bkm); setActionTarget(null); }}
             onEditLabel={function(id) { setEditingId(id); setActionTarget(null); }}
-            onEditThought={function() {}}
             onDelete={onDeleteDone}
           />
         )}

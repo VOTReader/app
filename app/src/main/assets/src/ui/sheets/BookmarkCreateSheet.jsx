@@ -4,6 +4,9 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
+/**
+ * @param {{ pending: any, onConfirm: any, onCancel: any, onDelete?: any, onOpen?: any }} props
+ */
 export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, onOpen }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
@@ -16,20 +19,23 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
     isEditMode ? (pending.currentLabel || '') : ((pending && pending.defaultLabel) || '')
   );
   var label = _label[0]; var setLabel = _label[1];
-  var _thought = useState(isEditMode ? (pending.currentThought || '') : '');
-  var thought = _thought[0]; var setThought = _thought[1];
 
   // Inline delete-confirm state (tap-confirm strip, never instant)
   var _confirmDel = useState(false);
   var confirmingDelete = _confirmDel[0]; var setConfirmingDelete = _confirmDel[1];
 
-  // Track the values the sheet opened with so we can gate the Save button
+  // Track the label the sheet opened with so we can gate the Save button
   // on an actual change. In EDIT mode this prevents accidental no-op writes
   // (the user opens, glances, taps ✓ out of habit → silent no-op + 'updated'
   // timestamp bump). In CREATE mode we still want Save tappable on first
-  // glance, so this ref just records the auto-derived defaults; the canSave
+  // glance, so this ref just records the auto-derived default; the canSave
   // rule below treats CREATE differently (any non-empty label is fine).
-  var initialRef = useRef({ label: '', thought: '' });
+  // Seeded with the SAME value the label state starts from — the re-sync
+  // effect below only fires after the first paint, and an unseeded ref left
+  // EDIT-mode Save enabled (comparing against '') until then.
+  var initialRef = useRef({
+    label: isEditMode ? (pending.currentLabel || '') : ((pending && pending.defaultLabel) || '')
+  });
 
   // Re-sync local state if a different `pending` arrives. The two-key
   // dependency captures both mode (editId) and instance (hlKey), so
@@ -42,18 +48,10 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
     if (!pending) return;
     if (pending.editId) {
       setLabel(pending.currentLabel || '');
-      setThought(pending.currentThought || '');
-      initialRef.current = {
-        label: pending.currentLabel || '',
-        thought: pending.currentThought || ''
-      };
+      initialRef.current = { label: pending.currentLabel || '' };
     } else {
       setLabel(pending.defaultLabel || '');
-      setThought('');
-      initialRef.current = {
-        label: pending.defaultLabel || '',
-        thought: ''
-      };
+      initialRef.current = { label: pending.defaultLabel || '' };
     }
     setConfirmingDelete(false);
     // Focus the label input on mount so users can immediately refine it
@@ -64,18 +62,17 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
         labelRef.current.select();
       }
     }, 60);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent is re-sync ONLY when pending switches identity (editId/hlKey are the mode + instance keys). pending itself reads other fields at fire-time but tracking it would re-fire on every parent re-render. setLabel/setThought/setConfirmingDelete are tuple-unpacked useState setters (identity-stable).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent is re-sync ONLY when pending switches identity (editId/hlKey are the mode + instance keys). pending itself reads other fields at fire-time but tracking it would re-fire on every parent re-render. setLabel/setConfirmingDelete are tuple-unpacked useState setters (identity-stable).
   }, [pendingEditId, pendingHlKey]);
 
   // canSave drives both the visual disabled state and the keyboard-shortcut
-  // guard. EDIT-mode: only if at least one field differs from what we
-  // opened with (whitespace-tolerant). CREATE-mode: a non-empty label is
-  // enough — the auto-derived default satisfies this on first render so
-  // the fast "highlight → ✓" path stays one tap.
+  // guard. EDIT-mode: only if the label differs from what we opened with
+  // (whitespace-tolerant). CREATE-mode: a non-empty label is enough — the
+  // auto-derived default satisfies this on first render so the fast
+  // "highlight → ✓" path stays one tap.
   var canSave;
   if (isEditMode) {
-    canSave = label.trim() !== initialRef.current.label.trim()
-           || thought.trim() !== initialRef.current.thought.trim();
+    canSave = label.trim() !== initialRef.current.label.trim();
   } else {
     canSave = label.trim().length > 0;
   }
@@ -93,12 +90,14 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
 
   function commit() {
     var trimmedLabel = label.trim() || pending.defaultLabel || pending.currentLabel || 'Bookmark';
-    var trimmedThought = thought.trim();
+    // The "thought" free-text feature was removed (owner call, 2026-07-12);
+    // an existing thought on a legacy record passes through untouched so an
+    // edit never destroys old data.
     onConfirm({
       editId: pending.editId || null,
       hlKey: pending.hlKey,
       label: trimmedLabel,
-      thought: trimmedThought
+      thought: isEditMode ? (pending.currentThought || '') : ''
     });
   }
 
@@ -157,22 +156,6 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
             }}
             placeholder="A short name for this bookmark…"
             maxLength={200}
-          />
-
-          <div className="bkm-create-field-label">
-            A Thought
-            <span className="bkm-create-field-hint"> (optional — why did you save this?)</span>
-          </div>
-          <textarea
-            className="bkm-create-thought-input"
-            value={thought}
-            onChange={function(e) { setThought(e.target.value); }}
-            onKeyDown={function(e) {
-              if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-              else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (canSave) commit(); }
-            }}
-            placeholder="A few words for your future self…"
-            rows={4}
           />
 
           {/* Edit-mode actions: Open Source + Delete (tap-confirm). Only
