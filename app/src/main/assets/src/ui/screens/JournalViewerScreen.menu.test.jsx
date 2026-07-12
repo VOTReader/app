@@ -116,6 +116,58 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
   });
 });
 
+describe('JournalViewerScreen — inline {{ref:}} links actually navigate (dead-UI sweep 2026-07-12)', () => {
+  // Pre-fix these tappable gold links called window.__openScriptureSheet — a
+  // bridge NO screen installs — so the tap was a silent no-op.
+  const REF_ENTRY = {
+    ...ENTRY,
+    blocks: [{ id: 'b1', type: 'p', text: 'See {{ref:Psalms 23:1}} this morning.' }],
+  };
+
+  afterEach(() => {
+    delete window.parseRefStr;
+    delete window.findBook;
+    delete window.__loadBibleCorpus;
+    vi.useRealTimers();
+  });
+
+  it('tapping the ref navigates to the verse endpoint when the corpus is resolvable', () => {
+    setupGlobals({ entries: [REF_ENTRY] });
+    window.parseRefStr = (s) => (s === 'Psalms 23:1' ? { rawBook: 'Psalms', chapter: 23, verse: 1, verseEnd: null, tag: null } : null);
+    window.findBook = () => 'psalms';
+    const onNavigateToLink = vi.fn();
+    const { container } = render(
+      <JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} onNavigateToLink={onNavigateToLink} />
+    );
+    fireEvent.click(container.querySelector('.jrn-inline-ref'));
+    expect(onNavigateToLink).toHaveBeenCalledWith(
+      { type: 'bible', bookId: 'psalms', chapter: 23, verse: 1 },
+      expect.anything()
+    );
+  });
+
+  it('when the Bible corpus is not loaded, the tap fires the loader and navigates once it resolves', () => {
+    vi.useFakeTimers();
+    setupGlobals({ entries: [REF_ENTRY] });
+    window.parseRefStr = () => ({ rawBook: 'Psalms', chapter: 23, verse: 1, verseEnd: null, tag: null });
+    let loaded = false;
+    window.findBook = () => (loaded ? 'psalms' : null);
+    window.__loadBibleCorpus = vi.fn(() => { loaded = true; });
+    const onNavigateToLink = vi.fn();
+    const { container } = render(
+      <JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} onNavigateToLink={onNavigateToLink} />
+    );
+    fireEvent.click(container.querySelector('.jrn-inline-ref'));
+    expect(window.__loadBibleCorpus).toHaveBeenCalled();
+    expect(onNavigateToLink).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(300); // one retry tick after the "load" lands
+    expect(onNavigateToLink).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'bible', bookId: 'psalms', chapter: 23 }),
+      expect.anything()
+    );
+  });
+});
+
 describe('JournalHubScreen — inline pin indicator (no timestamp overlap)', () => {
   it('a pinned card renders the pin INSIDE the date span; the old absolute marker is gone', () => {
     setupGlobals();

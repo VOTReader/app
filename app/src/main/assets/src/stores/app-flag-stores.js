@@ -76,10 +76,10 @@ function buildFlagStore(key) {
   );
 }
 
-/** First-run welcome modal — read by AppShellOverlays via use-app-shell-effects. */
+/** First-run welcome modal — read by use-tabs + screen-routes. */
 export const WelcomedFlagStore = buildFlagStore('vot-welcomed');
 
-/** About screen seen — read by use-app-shell-effects, use-android-back, screen-routes. */
+/** About screen seen — read by use-android-back, screen-routes, SettingsScreen. */
 export const AboutSeenFlagStore = buildFlagStore('vot-about-seen');
 
 /** Garden warning acknowledged — read by app.jsx + AppShellOverlays. */

@@ -537,8 +537,31 @@ export function JournalViewerScreen(props) {
       if (onOpenNotebook) onOpenNotebook(nbId);
     },
     onScriptureRef: function(ref) {
-      if (typeof window.__openScriptureSheet === 'function') {
-        window.__openScriptureSheet(ref);
+      // {{ref:Book C:V}} in journal text used to call window.__openScriptureSheet,
+      // a bridge NO screen ever installs — the gold link rendered tappable but
+      // the tap did nothing (dead-UI sweep, 2026-07-12). Journals have no
+      // per-entry scriptures dict to feed a sheet, so navigate to the verse
+      // instead (same endpoint shape the viewer's verse-blocks use). findBook
+      // needs the lazy Bible corpus, which this route doesn't preload — fire
+      // the loader and retry briefly when it isn't resolvable yet.
+      var tryNav = function() {
+        var p = (typeof parseRefStr === 'function') ? parseRefStr(ref) : null;
+        if (!p || !p.chapter) return true; // unparseable — nothing sane to open
+        var bookKey = (typeof findBook === 'function') ? findBook(p.rawBook) : null;
+        if (!bookKey) return false;        // corpus not loaded yet — retry
+        var endpoint = { type: 'bible', bookId: bookKey, chapter: p.chapter };
+        if (p.verse != null) endpoint.verse = p.verse;
+        if (p.verseEnd != null) endpoint.verseEnd = p.verseEnd;
+        if (onNavigateToLink) onNavigateToLink(endpoint, sourceMeta);
+        return true;
+      };
+      if (tryNav()) return;
+      if (typeof window.__loadBibleCorpus === 'function') {
+        window.__loadBibleCorpus();
+        var tries = 0;
+        var timer = setInterval(function() {
+          if (tryNav() || ++tries >= 40) clearInterval(timer);
+        }, 250);
       }
     },
     onInlineLink: function(kind, data) {

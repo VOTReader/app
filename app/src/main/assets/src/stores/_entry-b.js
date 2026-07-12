@@ -101,7 +101,6 @@ import { useTapThrough } from '../hooks/use-tap-through.js';
 import { useReadingPositionNav } from '../hooks/use-reading-position-nav.js';
 import { useReadingChainNav } from '../hooks/use-reading-chain-nav.js';
 import { useSurprise } from '../hooks/use-surprise.js';
-import { useAppShellEffects } from '../hooks/use-app-shell-effects.js';
 import { useBackupReminder } from '../hooks/use-backup-reminder.js';
 import { useDomAnnotationSync } from '../hooks/use-dom-annotation-sync.js';
 import { useKeyboardInset } from '../hooks/use-keyboard-inset.js';
@@ -205,7 +204,6 @@ Object.assign(window, {
   useReadingPositionNav,
   useReadingChainNav,
   useSurprise,
-  useAppShellEffects,
   useBackupReminder,
   useDomAnnotationSync,
   useKeyboardInset,
