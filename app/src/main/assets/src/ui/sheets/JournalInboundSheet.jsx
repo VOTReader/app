@@ -30,7 +30,14 @@ export function JournalInboundSheet({ refKey, resourceLabel, onClose, onOpenEntr
                     key={e.id}
                     className="jrn-inbound-item"
                     role="button"
+                    tabIndex={0}
                     onClick={() => { onOpenEntry && onOpenEntry(e); }}
+                    onKeyDown={(ev) => {
+                      if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault();
+                        onOpenEntry && onOpenEntry(e);
+                      }
+                    }}
                   >
                     <div className="jrn-inbound-title">{title}</div>
                     <div className="jrn-inbound-date">{JournalHelpers.longDate(e.updated || e.created)}</div>

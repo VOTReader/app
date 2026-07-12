@@ -4919,3 +4919,119 @@
     .link-card-show-more { padding: 8px 4px; }
     .link-card-remove { margin-left: auto; padding: 8px 4px; }
 
+    /* ── SHEETS-UX pass 2026-07-12 ──────────────────────────────────
+       Missable-sheet redesign: LinkPicker source context + success/undo,
+       the verse/excerpt picker footer action bar + breadcrumb, the
+       MultiNotePopover viewport clamp, and LinkSidebar chrome polish.
+       All new rules; each dark rule has a body.light counterpart. */
+
+    /* LinkPicker — "what am I linking from" context strip */
+    .navpick-context {
+      margin: 0 18px 12px; padding: 10px 14px;
+      background: var(--gold-faint);
+      border-left: 2px solid var(--gold-dim);
+      border-radius: 0 8px 8px 0;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    body.light .navpick-context { background: rgba(180,150,90,0.10); }
+    .navpick-context-label {
+      font-family: 'Cinzel', serif; font-size: 0.6rem;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--gold-dim);
+    }
+    .navpick-context-source {
+      font-family: 'EB Garamond', serif; font-size: 0.98rem;
+      color: var(--cream);
+    }
+    body.light .navpick-context-source { color: var(--input-text); }
+    .navpick-context-excerpt {
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.88rem; color: var(--cream-muted); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    /* LinkPicker — success confirmation + separated Undo (replaces the
+       old red-×-beside-green-✓ header pair). */
+    .navpick-success {
+      display: flex; align-items: center; gap: 10px;
+      margin: 0 18px 12px; padding: 9px 10px 9px 14px;
+      background: rgba(76,175,80,0.14);
+      border-left: 2px solid #4caf50;
+      border-radius: 0 8px 8px 0;
+      animation: navpickFlashIn 0.18s ease-out;
+    }
+    body.light .navpick-success { background: rgba(76,175,80,0.12); }
+    .navpick-success-check { width: 18px; height: 18px; color: #4caf50; flex-shrink: 0; }
+    .navpick-success-text {
+      flex: 1; min-width: 0;
+      font-family: 'EB Garamond', serif; font-size: 0.95rem;
+      color: var(--cream);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    body.light .navpick-success-text { color: var(--input-text); }
+    .navpick-undo {
+      position: relative; flex-shrink: 0;
+      background: none; border: 1px solid var(--gold-border);
+      border-radius: 999px; padding: 8px 18px;
+      font-family: 'Cinzel', serif; font-size: 0.62rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--cream-dim); cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.12s, border-color 0.12s;
+    }
+    /* WL4 — extend the pill's touch target to ~44px without bloating it. */
+    .navpick-undo::after { content: ''; position: absolute; inset: -6px -4px; }
+    .navpick-undo:active { color: var(--accent-pink); border-color: var(--accent-pink); }
+
+    /* Picker screens — step breadcrumb + footer action bar */
+    .picker-breadcrumb {
+      flex-shrink: 0;
+      padding: 9px 22px 11px;
+      font-family: 'EB Garamond', serif; font-style: italic;
+      font-size: 0.9rem; color: var(--cream-muted);
+      border-bottom: 1px solid rgba(110,98,76,0.10);
+    }
+    .picker-footer {
+      flex-shrink: 0;
+      padding: 12px 18px calc(var(--inset-bottom, 0px) + 14px);
+      border-top: 1px solid rgba(110,98,76,0.18);
+      background: var(--bg);
+    }
+    body.light .picker-footer { background: var(--bg); }
+    .picker-footer-btn {
+      width: 100%; min-height: 52px;
+      border: 1px solid var(--gold-border);
+      border-radius: 12px;
+      background: var(--gold-faint);
+      color: var(--gold);
+      font-family: 'Cinzel', serif; font-size: 0.86rem;
+      letter-spacing: 0.05em;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.14s, border-color 0.14s, color 0.14s;
+    }
+    .picker-footer-btn:active { background: rgba(212,183,114,0.22); border-color: var(--gold); }
+    .picker-footer-btn:disabled,
+    .picker-footer-btn.is-disabled {
+      opacity: 0.55; cursor: default;
+      color: var(--cream-muted);
+      background: transparent;
+      border-color: rgba(110,98,76,0.30);
+    }
+
+    /* MultiNotePopover — slim scrollbar for the clamped/scrolling case */
+    .multinote-popover::-webkit-scrollbar { width: 6px; }
+    .multinote-popover::-webkit-scrollbar-thumb { background: var(--gold-border); border-radius: 3px; }
+    .multinote-popover::-webkit-scrollbar-track { background: transparent; }
+
+    /* LinkSidebar — title takes the row so the close button sits at the right
+       (consistent with every other sheet); the count row swaps the misleading
+       calendar glyph for a link/chain glyph. */
+    .link-sidebar-header .link-sidebar-title { flex: 1; }
+    .link-sidebar-date.link-sidebar-count::before {
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a99e84' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/><path d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/></svg>");
+    }
+    body.light .link-sidebar-date.link-sidebar-count::before {
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23736850' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/><path d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/></svg>");
+    }
+
+    
