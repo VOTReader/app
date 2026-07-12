@@ -20,18 +20,16 @@ import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
   R.push('.hlx-search:focus { border-color: var(--gold); }');
   R.push('.hlx-sort-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }');
   R.push('.hlx-sort-label { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); }');
-  R.push('.hlx-sort-btn { background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; }');
-  R.push('.hlx-sort-btn.active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold); }');
-  R.push('.hlx-sort-btn:hover { color: var(--gold); }');
   // Filter rows (Type chips + Color dots), each with a leading label.
   R.push('.hlx-filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 4px; }');
-  R.push('.hlx-type-chip { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
+  // 7px vertical padding lifts the pill to a ≥24px AA touch height (5px read 21px).
+  R.push('.hlx-type-chip { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 7px 12px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
   R.push('.hlx-type-chip.active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold); }');
   R.push('.hlx-type-chip:hover { color: var(--gold); }');
   // Granular color-filter dots (mirror the highlight/underline picker).
   // Explicit box-sizing + appearance reset + flex:0 0 auto so the
   // <button> never collapses to a sliver inside the flex row.
-  R.push('.hlx-color-all { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 11px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
+  R.push('.hlx-color-all { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 7px 12px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
   R.push('.hlx-color-all.active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold); }');
   R.push('.hlx-color-dot { appearance: none; -webkit-appearance: none; box-sizing: border-box; width: 24px; height: 24px; min-width: 24px; flex: 0 0 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.15); cursor: pointer; padding: 0; margin: 0; line-height: 0; font-size: 0; transition: transform 0.1s, border-color 0.12s; }');
   R.push('.hlx-color-dot:hover { transform: scale(1.12); }');

@@ -4859,4 +4859,14 @@
     }
     body.light .hl-note-icon-badge::after { box-shadow: 0 0 0 1.5px var(--bg3); }
 
-    
+    /* ── LIB-UX pass 2026-07-12 ── */
+
+    /* LinkCard action row (rendered in the reading-screen link sidebar): the
+       destructive "Remove link" sat 10px from the routine "Show more", both
+       9px-tall caps-links — a mis-tap hazard called out in the owner's UX
+       directive. Push Remove to the far right so a clear gap separates the two,
+       and pad both to a ≥24px AA tap height. Remove stays confirm-gated. */
+    .link-card-actions { margin-top: 2px; }
+    .link-card-show-more { padding: 8px 4px; }
+    .link-card-remove { margin-left: auto; padding: 8px 4px; }
+
