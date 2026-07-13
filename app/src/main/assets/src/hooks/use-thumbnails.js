@@ -141,8 +141,14 @@ export function useThumbnails({
   //     then classifyThumbTheme probes the JPEG's average luminance and
   //     upgrades the row to its real theme slot (so even never-revisited
   //     tabs participate in theme matching — the owner's Library card).
+  // The load also SCRUBS degenerate variants: before the capture-side floor
+  // existed, a zero-sized-canvas capture stored "data:," and painted that tab
+  // blank forever (background tabs never recapture). Any variant under the
+  // floor is dropped; an entry left empty is deleted → placeholder until the
+  // next good capture.
   React.useEffect(() => {
     let cancelled = false;
+    const ok = (u) => typeof u === 'string' && u.length >= 1000;
     idbReadAll().then((thumbs) => {
       if (cancelled) return;
       const norm = {};
@@ -150,20 +156,32 @@ export function useThumbnails({
       const probes = [];
       for (const k of Object.keys(thumbs || {})) {
         const v = thumbs[k];
+        let entry = null;
+        let rewrite = false;
         if (typeof v === 'string') {
-          norm[k] = { unknown: v };
-          probes.push([k, v]);
+          if (ok(v)) entry = { unknown: v };
         } else if (v && typeof v.url === 'string') {
           // interim { url, theme } rows
-          if (v.theme === 'dark' || v.theme === 'light') {
-            norm[k] = { [v.theme]: v.url };
-            idbPut(k, norm[k]);
-          } else {
-            norm[k] = { unknown: v.url };
-            probes.push([k, v.url]);
+          rewrite = true;
+          if (ok(v.url)) {
+            entry = (v.theme === 'dark' || v.theme === 'light')
+              ? { [v.theme]: v.url }
+              : { unknown: v.url };
           }
+        } else if (v && typeof v === 'object') {
+          entry = {};
+          for (const f of ['dark', 'light', 'unknown']) {
+            if (ok(v[f])) entry[f] = v[f];
+            else if (v[f] != null) rewrite = true; // blank variant scrubbed
+          }
+          if (Object.keys(entry).length === 0) entry = null;
+        }
+        if (entry) {
+          norm[k] = entry;
+          if (entry.unknown) probes.push([k, entry.unknown]);
+          if (rewrite) idbPut(k, entry);
         } else {
-          norm[k] = v || {};
+          idbDelete(k); // blank/empty row — placeholder until recaptured
         }
       }
       thumbnailsRef.current = norm;
@@ -247,8 +265,10 @@ export function useThumbnails({
 
     // Merge one theme's pixels into the tab's variant entry ({ dark?, light?,
     // unknown? }). Any real capture supersedes a legacy `unknown` snapshot.
+    // The length floor rejects degenerate captures ("data:," from a zero-sized
+    // canvas) — storing one painted a permanently blank tab card.
     const mergeVariant = (variantTheme, dataUrl) => {
-      if (!dataUrl) return;
+      if (!dataUrl || dataUrl.length < 1000) return;
       const cur = thumbnailsRef.current[key];
       const base = (cur && typeof cur === 'object') ? cur : {};
       const entry = { ...base, [variantTheme]: dataUrl };

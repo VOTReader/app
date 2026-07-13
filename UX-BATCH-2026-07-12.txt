@@ -212,6 +212,19 @@ transitional fallback; classifyThumbTheme (luminance probe) upgrades
 legacy `unknown` rows so old cards participate too; garden = one capture
 fills both slots. Live-proven: app stayed dark → row {dark 82KB, light
 72KB}, luma 2 vs 239; overview served each theme's variant unfiltered.
+(A2, owner re-test) TABS-SCREEN HOME BUTTON DEAD + PC BLANK THUMBNAILS —
+(1) the overview's HomeBtn called __goHome, which changes the screen UNDER
+the overlay (looked like a no-op on both platforms). HomeBtn gained a
+`beforeGo` prop; the overview passes its own dismiss. (2) html2canvas
+occasionally yields a ZERO-SIZED canvas (boot races); its toDataURL is
+"data:," — truthy, so it was STORED and painted that tab card permanently
+blank (background tabs never recapture → the owner's PC wall of blank
+squares). Fixed at three layers: webTakeScreenshot rejects tiny canvases +
+sub-1000-char encodes ('' = failure, next capture retries); mergeVariant
+floors incoming URLs; the load-on-mount SCRUBS stored degenerate variants
+(drops the field, deletes emptied rows → placeholder until the next good
+capture heals it). Live-proven: seeded {dark:'data:,',light:'data:,'} row
+deleted at boot; overview Home tap closes the overlay + lands Home.
 (B) EXCERPT-PICKER "can't save until I scroll" — the picker only captured
 selection on mouseup/touchend over the body, but Android's long-press
 selection delivers its touchend NON-BUBBLING (same WebView behavior as the

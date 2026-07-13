@@ -596,6 +596,13 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
     });
     const w = canvas.width;
     const h = canvas.height;
+    // html2canvas occasionally yields a ZERO/near-zero-sized canvas (seen at
+    // boot races); its toDataURL is the empty "data:," — which is TRUTHY, so
+    // it used to get stored and rendered as a permanently blank tab card
+    // (background tabs never recapture, so the blank stuck). Treat it as the
+    // failure it is: '' → the caller skips the store and the next
+    // nav/scroll-stop capture retries.
+    if (w < 16 || h < 16) return '';
     const scale = Math.min(maxDim / w, maxDim / h, 1);
     let out = canvas;
     if (scale < 1) {
@@ -610,7 +617,8 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
       }
       out = c2;
     }
-    return out.toDataURL('image/jpeg', Math.max(0, Math.min(100, jpegQuality)) / 100);
+    const url = out.toDataURL('image/jpeg', Math.max(0, Math.min(100, jpegQuality)) / 100);
+    return url.length > 1000 ? url : ''; // "data:," / degenerate encodes → failure
   } catch (_e) {
     return '';
   }

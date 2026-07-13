@@ -8,15 +8,27 @@
    rendering a DOM clone with the opposite theme class forced
    (PlatformBridge.takeThemedScreenshot). Entries become variant maps
    { dark?, light?, unknown? }; a theme switch is then an instant lookup.
-   Legacy shapes migrate in place (bare string / {url,theme}). */
+   Legacy shapes migrate in place (bare string / {url,theme}).
+
+   Second owner report (PC): blank tab cards. A zero-sized-canvas capture
+   returns "data:," — truthy, so it used to be STORED and painted the card
+   blank forever (background tabs never recapture). mergeVariant now rejects
+   degenerate URLs (length floor) and the load scrubs any stored ones. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
+// Realistic-length data URLs — mergeVariant + the load scrub floor at 1000
+// chars (a real viewport JPEG is tens of KB; "data:," is 5).
+const U = (tag) => 'data:image/jpeg;base64,' + tag + 'x'.repeat(1200);
+const PRIMARY = U('primary');
+const THEMED = U('themed');
+const PRIMARY_LIGHT = U('primary-light');
+
 vi.mock('../utils/platform-bridge.js', () => ({
   PlatformBridge: {
-    takeScreenshot: vi.fn(async () => 'data:primary'),
-    takeThemedScreenshot: vi.fn(async () => 'data:themed'),
+    takeScreenshot: vi.fn(async () => 'data:image/jpeg;base64,MOCK'),
+    takeThemedScreenshot: vi.fn(async () => 'data:image/jpeg;base64,MOCK'),
   },
 }));
 import { PlatformBridge } from '../utils/platform-bridge.js';
@@ -33,8 +45,10 @@ beforeEach(() => {
   g.idbDelete = vi.fn();
   g.tabContentKey = (t) => 'key-' + (t.id || 'a');
   g.__scrollEl = null;
-  takeScreenshot.mockClear();
-  takeThemedScreenshot.mockClear();
+  takeScreenshot.mockReset();
+  takeScreenshot.mockResolvedValue(PRIMARY);
+  takeThemedScreenshot.mockReset();
+  takeThemedScreenshot.mockResolvedValue(THEMED);
 });
 
 afterEach(() => {
@@ -54,47 +68,75 @@ const advance = async (ms) => { await act(async () => { vi.advanceTimersByTime(m
 
 describe('useThumbnails — dual-theme variants', () => {
   it('migrates every legacy row shape to the variant map on load', async () => {
+    const LEGACY = U('legacy');
+    const INTERIM = U('interim');
+    const INTERIM_NULL = U('interim-null');
+    const V3 = U('v3');
     g.idbReadAll = vi.fn(async () => ({
-      k1: 'data:legacy-string',
-      k2: { url: 'data:interim', theme: 'light' },
-      k3: { url: 'data:interim-null', theme: null },
-      k4: { dark: 'data:already-v3' },
+      k1: LEGACY,
+      k2: { url: INTERIM, theme: 'light' },
+      k3: { url: INTERIM_NULL, theme: null },
+      k4: { dark: V3 },
     }));
     const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
     await flush();
     expect(result.current.tabThumbnails).toEqual({
-      k1: { unknown: 'data:legacy-string' },          // awaiting the luminance probe
-      k2: { light: 'data:interim' },                  // interim rows upgrade instantly
-      k3: { unknown: 'data:interim-null' },
-      k4: { dark: 'data:already-v3' },                // v3 passes through untouched
+      k1: { unknown: LEGACY },            // awaiting the luminance probe
+      k2: { light: INTERIM },             // interim rows upgrade instantly
+      k3: { unknown: INTERIM_NULL },
+      k4: { dark: V3 },                   // v3 passes through untouched
     });
     // The instant interim upgrade is written back so the migration is one-time.
-    expect(g.idbPut).toHaveBeenCalledWith('k2', { light: 'data:interim' });
+    expect(g.idbPut).toHaveBeenCalledWith('k2', { light: INTERIM });
+  });
+
+  it('SCRUBS degenerate blank variants on load ("data:," rows painted blank cards)', async () => {
+    const GOOD = U('good');
+    g.idbReadAll = vi.fn(async () => ({
+      k1: { dark: 'data:,', light: GOOD },  // blank dark variant — dropped
+      k2: { dark: 'data:,' },               // nothing left — row deleted
+      k3: 'data:,',                         // blank legacy string — deleted
+    }));
+    const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await flush();
+    expect(result.current.tabThumbnails).toEqual({ k1: { light: GOOD } });
+    expect(g.idbPut).toHaveBeenCalledWith('k1', { light: GOOD });
+    expect(g.idbDelete).toHaveBeenCalledWith('k2');
+    expect(g.idbDelete).toHaveBeenCalledWith('k3');
   });
 
   it('captures the CURRENT theme, then renders the OTHER theme from a clone ~900ms later', async () => {
     const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps({ theme: 'light' }) });
     await advance(350); // after-nav primary capture
     expect(takeScreenshot).toHaveBeenCalledTimes(1);
-    expect(result.current.tabThumbnails['key-a']).toEqual({ light: 'data:primary' });
+    expect(result.current.tabThumbnails['key-a']).toEqual({ light: PRIMARY });
     await advance(900); // deferred other-theme render
     expect(takeThemedScreenshot).toHaveBeenCalledWith('dark', 1440, 90);
-    expect(result.current.tabThumbnails['key-a']).toEqual({ light: 'data:primary', dark: 'data:themed' });
-    expect(g.idbPut).toHaveBeenLastCalledWith('key-a', { light: 'data:primary', dark: 'data:themed' });
+    expect(result.current.tabThumbnails['key-a']).toEqual({ light: PRIMARY, dark: THEMED });
+    expect(g.idbPut).toHaveBeenLastCalledWith('key-a', { light: PRIMARY, dark: THEMED });
+  });
+
+  it('a degenerate capture ("data:,") is REJECTED — nothing stored, card keeps its placeholder', async () => {
+    takeScreenshot.mockResolvedValue('data:,');
+    const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350);
+    expect(takeScreenshot).toHaveBeenCalled();
+    expect(result.current.tabThumbnails['key-a']).toBeUndefined();
+    expect(g.idbPut).not.toHaveBeenCalled();
   });
 
   it('a theme flip recaptures TRUE pixels into the same entry (replacing the rendered approximation)', async () => {
     const { result, rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps({ theme: 'dark' }) });
     await advance(350);
     await advance(900);
-    expect(result.current.tabThumbnails['key-a']).toEqual({ dark: 'data:primary', light: 'data:themed' });
+    expect(result.current.tabThumbnails['key-a']).toEqual({ dark: PRIMARY, light: THEMED });
     // Flip the theme → the active tab re-photographs; the light slot upgrades
     // from the html2canvas render to genuine pixels.
-    takeScreenshot.mockResolvedValueOnce('data:primary-light');
+    takeScreenshot.mockResolvedValueOnce(PRIMARY_LIGHT);
     rerender(hookProps({ theme: 'light' }));
     await advance(350);
-    expect(result.current.tabThumbnails['key-a'].light).toBe('data:primary-light');
-    expect(result.current.tabThumbnails['key-a'].dark).toBe('data:primary');
+    expect(result.current.tabThumbnails['key-a'].light).toBe(PRIMARY_LIGHT);
+    expect(result.current.tabThumbnails['key-a'].dark).toBe(PRIMARY);
   });
 
   it('garden tabs fill BOTH slots from one capture and never run the themed render', async () => {
@@ -103,7 +145,7 @@ describe('useThumbnails — dual-theme variants', () => {
       initialProps: hookProps({ tabs: [garden], activeTab: garden }),
     });
     await advance(350);
-    expect(g.idbPut).toHaveBeenLastCalledWith('key-a', { dark: 'data:primary', light: 'data:primary' });
+    expect(g.idbPut).toHaveBeenLastCalledWith('key-a', { dark: PRIMARY, light: PRIMARY });
     await advance(1500);
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
   });

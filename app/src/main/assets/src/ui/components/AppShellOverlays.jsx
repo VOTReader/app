@@ -84,7 +84,9 @@ export function AppShellOverlays({
           <ScreenLayout trackScroll={false} navChildren={
             <>
               <button className="nav-home" onClick={() => setTabsOverviewOpen(false)}>{"← Back"}</button>
-              <HomeBtn />
+              {/* __goHome changes the screen UNDER this overlay — close the
+                  overlay too or the tap looks like a dead button. */}
+              <HomeBtn beforeGo={() => setTabsOverviewOpen(false)} />
             </>
           }>
             <TabsOverview

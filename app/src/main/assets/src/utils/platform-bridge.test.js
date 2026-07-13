@@ -756,17 +756,23 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     delete (/** @type {any} */ (globalThis)).html2canvas;
   });
 
+  // Realistic-length stub URLs — the degenerate-capture guard floors real
+  // results at >1000 chars ("data:," from a zero-sized canvas painted
+  // permanently blank tab cards before it existed).
+  const FULLSIZE_URL = 'data:image/jpeg;base64,FULLSIZE' + 'x'.repeat(1200);
+  const DOWNSCALED_URL = 'data:image/jpeg;base64,DOWNSCALED' + 'x'.repeat(1200);
+
   it('returns html2canvas data URL when canvas dims fit within maxDim', async () => {
     const stubCanvas = {
       width: 800,
       height: 600,
-      toDataURL: vi.fn(() => 'data:image/jpeg;base64,FULLSIZE'),
+      toDataURL: vi.fn(() => FULLSIZE_URL),
     };
     /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
     bridge = await importBridge();
 
     const result = await bridge.takeScreenshot(0, 1024, 80);
-    expect(result).toBe('data:image/jpeg;base64,FULLSIZE');
+    expect(result).toBe(FULLSIZE_URL);
     // jpegQuality 80 (int 0-100) converts to 0.8 for canvas.toDataURL
     expect(stubCanvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.8);
     expect(/** @type {any} */ (globalThis).html2canvas).toHaveBeenCalledTimes(1);
@@ -776,7 +782,7 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     const stubCanvas = {
       width: 4000,
       height: 3000,
-      toDataURL: vi.fn(() => 'data:image/jpeg;base64,FULL'),
+      toDataURL: vi.fn(() => FULLSIZE_URL),
     };
     /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
     bridge = await importBridge();
@@ -789,7 +795,7 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
         imageSmoothingEnabled: false,
         drawImage: vi.fn(),
       })),
-      toDataURL: vi.fn(() => 'data:image/jpeg;base64,DOWNSCALED'),
+      toDataURL: vi.fn(() => DOWNSCALED_URL),
     };
     const realCreate = document.createElement.bind(document);
     const spy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
@@ -798,13 +804,21 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     });
 
     const result = await bridge.takeScreenshot(0, 1024, 90);
-    expect(result).toBe('data:image/jpeg;base64,DOWNSCALED');
+    expect(result).toBe(DOWNSCALED_URL);
     // 4000x3000 scaled by min(1024/4000, 1024/3000, 1) = 0.256 → 1024 x 768
     expect(downscaleCanvas.width).toBe(1024);
     expect(downscaleCanvas.height).toBe(768);
     expect(downscaleCanvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.9);
 
     spy.mockRestore();
+  });
+
+  it('rejects a zero-sized canvas (the "data:," poison) with an empty string', async () => {
+    const stubCanvas = { width: 0, height: 0, toDataURL: vi.fn(() => 'data:,') };
+    /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
+    bridge = await importBridge();
+    expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
+    expect(stubCanvas.toDataURL).not.toHaveBeenCalled();
   });
 
   it('returns empty string when html2canvas throws', async () => {

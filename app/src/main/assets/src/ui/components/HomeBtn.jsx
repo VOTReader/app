@@ -2,11 +2,17 @@
    HomeBtn — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function HomeBtn() {
+/**
+ * @param {{ beforeGo?: (() => void) | null }} props
+ *   beforeGo — runs before the home navigation. Overlay hosts (the Tabs
+ *   overview) pass their own dismiss here: __goHome only changes the screen
+ *   UNDERNEATH an overlay, so without closing it the tap looked like a no-op.
+ */
+export function HomeBtn({ beforeGo = null } = {}) {
   return (
     <button
       className="nav-search-btn"
-      onClick={() => window.__goHome && window.__goHome()}
+      onClick={() => { if (beforeGo) beforeGo(); window.__goHome && window.__goHome(); }}
       title="Home"
       aria-label="Home"
     >
