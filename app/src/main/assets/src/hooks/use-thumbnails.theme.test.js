@@ -150,6 +150,22 @@ describe('useThumbnails — dual-theme variants', () => {
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
   });
 
+  it('sets --card-ar from the APP COLUMN width (.screen-layout), not the raw window', async () => {
+    const col = document.createElement('div');
+    col.className = 'screen-layout';
+    col.getBoundingClientRect = () => /** @type {any} */ ({ width: 760 });
+    document.body.appendChild(col);
+    try {
+      renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+      await flush();
+      expect(document.documentElement.style.getPropertyValue('--card-ar'))
+        .toBe('760 / ' + (window.innerHeight || 1));
+    } finally {
+      col.remove();
+      document.documentElement.style.removeProperty('--card-ar');
+    }
+  });
+
   it('a superseding capture drops the stale other-theme render (seq guard)', async () => {
     const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps({ theme: 'dark' }) });
     await advance(350); // primary #1 lands, other-theme timer armed

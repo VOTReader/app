@@ -817,6 +817,24 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     spy.mockRestore();
   });
 
+  it('captures the app COLUMN (.screen-layout) when present — not the whole window', async () => {
+    const stubCanvas = { width: 760, height: 900, toDataURL: vi.fn(() => FULLSIZE_URL) };
+    const h2c = /** @type {any} */ (vi.fn(async () => stubCanvas));
+    /** @type {any} */ (globalThis).html2canvas = h2c;
+    const col = document.createElement('div');
+    col.className = 'screen-layout';
+    document.body.appendChild(col);
+    try {
+      bridge = await importBridge();
+      await bridge.takeScreenshot(0, 1024, 80);
+      // A wide desktop window is empty flanks around the centered column —
+      // capturing the column makes every card a mini of the app viewport.
+      expect(h2c.mock.calls[0][0]).toBe(col);
+    } finally {
+      col.remove();
+    }
+  });
+
   it('rejects a UNIFORM capture (blank render — e.g. canvas-blocked PCs) with an empty string', async () => {
     const stubCanvas = { width: 800, height: 600, toDataURL: vi.fn(() => FULLSIZE_URL) };
     /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);

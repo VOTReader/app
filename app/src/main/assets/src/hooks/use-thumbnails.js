@@ -62,6 +62,23 @@ import { useRefMirror } from './use-ref-mirror.js';
 import { PlatformBridge } from '../utils/platform-bridge.js';
 
 /**
+ * Publish the tab-card aspect ratio (--card-ar) from the APP COLUMN
+ * (.screen-layout — what the screenshots capture; max-width 760px centered
+ * on desktop, full-width on phones). Falls back to the window when no
+ * column is mounted (corpus-loading placeholder, garden). Called from the
+ * mount/resize effect AND at capture time — at boot the first measurement
+ * can land while a lazy corpus still shows the placeholder (no column yet),
+ * so the capture path re-measures once real screens exist.
+ */
+function updateCardAr() {
+  const layout = document.querySelector('.screen-layout');
+  const colW = layout ? layout.getBoundingClientRect().width : 0;
+  const w = colW || window.innerWidth || 1;
+  const h = window.innerHeight || 1;
+  document.documentElement.style.setProperty('--card-ar', Math.round(w) + ' / ' + h);
+}
+
+/**
  * Classify which theme a legacy (pre-metadata) thumbnail was captured under
  * by its average luminance: the dark theme's background (#07070e, luma ~8)
  * and the light theme's (#f7f2e8, luma ~242) dominate any capture, so a
@@ -247,6 +264,10 @@ export function useThumbnails({
     const tab = tabsRef.current[activeTabIdxRef.current];
     if (!tab) return;
     const key = tabContentKey(tab);
+    // Re-measure the card aspect now that a real screen is up — the mount
+    // effect can fire while a lazy-corpus placeholder (no .screen-layout)
+    // still covers the route.
+    updateCardAr();
 
     // Measure nav height (in CSS px) so the native side can crop it. Web
     // ignores topCropDp (chrome hidden via the capturing-thumb body class
@@ -366,16 +387,18 @@ export function useThumbnails({
   }, [captureActiveTabThumbnail, tabsEnabled]);
 
   // ── Aspect-ratio CSS var effect ────────────────────────────────────────
-  // Keep tab-card aspect ratio in sync with the viewport so
-  // thumbnails fill their cards without crop or distortion.
+  // Keep tab-card aspect ratio in sync with the APP COLUMN (.screen-layout —
+  // what the screenshots now capture), not the raw window: on a wide desktop
+  // window the column is a centered 760px strip, so window-aspect cards drew
+  // landscape boxes around portrait captures. Column aspect ⇒ every card is
+  // a mini of the app viewport on every platform. On phones the column
+  // equals the window, so mobile card geometry is unchanged. (updateCardAr
+  // also runs at capture time — see the callback above — covering the boot
+  // race where this effect fires while a lazy corpus placeholder is up.)
   React.useEffect(() => {
-    const update = () => {
-      const w = window.innerWidth || 1, h = window.innerHeight || 1;
-      document.documentElement.style.setProperty('--card-ar', w + ' / ' + h);
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    updateCardAr();
+    window.addEventListener('resize', updateCardAr);
+    return () => window.removeEventListener('resize', updateCardAr);
   }, []);
 
   // ── Capture-after-nav effect ───────────────────────────────────────────

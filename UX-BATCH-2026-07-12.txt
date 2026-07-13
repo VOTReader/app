@@ -239,6 +239,17 @@ contrast; also catches canvas-blocker white-outs at the store level);
 "[thumb] …" + DiagnosticLog('thumb'). If the owner's PC still shows
 placeholders after this build: F12 → Console → send the [thumb] lines —
 they name the exact cause.
+(A4, owner re-test: PC thumbnails NOW WORK but "don't fill or fit the
+tabs") — root cause: the capture was the whole window; on a wide PC the
+app is a centered 760px .screen-layout column with empty flanks, so cards
+showed a thin strip floating in blackness. Fixed: web captures now target
+.screen-layout (the app's true viewport; #root/body fallbacks keep the
+extension hardening), and --card-ar derives from the COLUMN width (via
+shared updateCardAr(), re-run at capture time — the mount effect can fire
+while a lazy-corpus placeholder has no column yet). Phones: column ==
+window → Android/mobile byte-identical (owner constraint). Live-proven at
+1280×720: capture 760×720, --card-ar '760 / 720', card 231×219, img fills
+card edge-to-edge.
 (B) EXCERPT-PICKER "can't save until I scroll" — the picker only captured
 selection on mouseup/touchend over the body, but Android's long-press
 selection delivers its touchend NON-BUBBLING (same WebView behavior as the

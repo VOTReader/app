@@ -574,13 +574,18 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
     : (typeof document !== 'undefined') && document.body.classList.contains('light');
   const bg = isLight ? '#f7f2e8' : '#07070e';
   try {
-    // Capture the app's #root, not document.body: browser extensions inject
-    // their own nodes as direct body children (password managers, blockers…)
-    // and an exotic injected node can make html2canvas throw on EVERY capture
-    // — a PC-only "no thumbnails ever" failure the app can't see otherwise.
-    // #root also excludes body-portaled sheets, so a card never shows a
-    // half-open bottom sheet. (Falls back to body if the mount ever renames.)
-    const target = document.getElementById('root') || document.body;
+    // Capture the app COLUMN (.screen-layout — max-width 760px centered on
+    // desktop, full-width on phones), NOT the whole window: a wide PC window
+    // is mostly empty flanks around the column, and capturing them made the
+    // tab cards look like a thin strip floating in blackness (owner-reported).
+    // The column IS the app's "device viewport", so cards now look like a
+    // mini device on every platform; on phones the column equals the window,
+    // so Android/mobile output is byte-identical. Falling back to #root (not
+    // document.body) keeps extension-injected body nodes and body-portaled
+    // sheets out of the render — an exotic injected node can make html2canvas
+    // throw on EVERY capture (a PC-only "no thumbnails ever" failure).
+    const target = document.querySelector('.screen-layout')
+      || document.getElementById('root') || document.body;
     const canvas = await h2c(target, {
       backgroundColor: bg,
       onclone: (/** @type {Document} */ clonedDoc) => {
