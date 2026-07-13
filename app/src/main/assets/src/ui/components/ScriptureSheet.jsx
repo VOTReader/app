@@ -2,7 +2,7 @@
    ScriptureSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ScriptureSheet({ activeRef, onClose }) {
+export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
   const isOpen = activeRef !== null;
   const verseText = activeRef ? MATTHEW_NKJV[activeRef.cite] : null;
   // position:fixed sheet — portal to <body> so it anchors to the viewport, NOT to
@@ -26,6 +26,9 @@ export function ScriptureSheet({ activeRef, onClose }) {
               </div>
             ) : (
               <div className="sc-sheet-verse" style={{ color: 'var(--cream-dim)', fontStyle: 'italic' }}>Verse text not available in app data</div>
+            )}
+            {typeof GoToRefButton !== 'undefined' && onGoToRef && (
+              <GoToRefButton refStr={activeRef.cite} onGo={onGoToRef} />
             )}
           </>
         )}

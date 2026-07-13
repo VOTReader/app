@@ -73,3 +73,27 @@ it('removes the portaled sheet from <body> on unmount (no leak)', () => {
   unmount();
   expect(document.body.querySelector('.fn-sheet')).toBeNull();
 });
+
+/* "Go to Scripture" — the study cite sheet gets the jump-to-verse action when
+   the host wires onGoToRef; the CITE (full "Book C:V") threads through, and
+   the action is absent when the host has no navigation to offer. */
+it('renders the Go-to-Scripture action with the cite when onGoToRef is wired', () => {
+  /** @type {any} */ (globalThis).GoToRefButton = ({ refStr, onGo }) => (
+    <button data-testid="goto" onClick={() => onGo({ type: 'bible', bookId: 'john', chapter: 3, verse: 16 })}>{refStr}</button>
+  );
+  const onGoToRef = vi.fn();
+  render(<Sheet activeRef={{ ref: '3:16', cite: 'John 3:16' }} onClose={() => {}} onGoToRef={onGoToRef} />);
+  const btn = document.querySelector('[data-testid="goto"]');
+  expect(btn).not.toBeNull();
+  expect(btn.textContent).toBe('John 3:16');
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  expect(onGoToRef).toHaveBeenCalledWith({ type: 'bible', bookId: 'john', chapter: 3, verse: 16 });
+  delete (/** @type {any} */ (globalThis)).GoToRefButton;
+});
+
+it('omits the Go-to-Scripture action when no onGoToRef handler is provided', () => {
+  /** @type {any} */ (globalThis).GoToRefButton = () => <button data-testid="goto" />;
+  render(<Sheet activeRef={{ ref: '3:16', cite: 'John 3:16' }} onClose={() => {}} />);
+  expect(document.querySelector('[data-testid="goto"]')).toBeNull();
+  delete (/** @type {any} */ (globalThis)).GoToRefButton;
+});

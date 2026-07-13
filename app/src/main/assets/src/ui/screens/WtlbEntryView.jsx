@@ -13,9 +13,17 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, inert = false, restoreScroll = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, inert = false, restoreScroll = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
+  // "Go to Scripture" on the inline ref sheet — close the sheet, then route
+  // the resolved {type:'bible'} endpoint through navigateToLink (verse flash
+  // highlight + "Back to …" pill + Android back via the from-letter stack).
+  const goToScriptureRef = onNavigateToLink ? (endpoint) => {
+    setScriptureRef(null);
+    setScriptureText(null);
+    onNavigateToLink(endpoint, { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null });
+  } : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const wtlbMainRef = React.useRef(null);
   React.useEffect(() => {
@@ -413,6 +421,9 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
                 <div className="sc-sheet-verse"><ScriptureVerseText text={scriptureText} cite={scriptureRef} /></div>
               ) : (
                 <div className="sc-sheet-verse" style={{ color: 'var(--cream-dim)', fontStyle: 'italic' }}>Verse text not available in app data</div>
+              )}
+              {typeof GoToRefButton !== 'undefined' && goToScriptureRef && (
+                <GoToRefButton refStr={scriptureRef} onGo={goToScriptureRef} />
               )}
             </>
           )}

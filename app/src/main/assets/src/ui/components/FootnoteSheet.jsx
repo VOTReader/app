@@ -2,7 +2,7 @@
    FootnoteSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate }) {
+export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate, onGoToRef }) {
   const isOpen = num !== null;
   // SC5: fall back to the global BOOKS corpus when this letter's own nkjv dict
   // doesn't carry the ref — the inline ref sheet (LetterView) already does this;
@@ -71,6 +71,9 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
                   <div className="fn-sheet-verse-missing">
                     Verse text isn’t available for this reference. The footnote points to <strong>{fn.ref}</strong>, but no matching entry was found in this letter’s scripture dictionary.
                   </div>
+                )}
+                {typeof GoToRefButton !== 'undefined' && onGoToRef && (
+                  <GoToRefButton refStr={fn.ref} onGo={onGoToRef} />
                 )}
                 {fn.seeAlso && (
                   <div className="fn-sheet-see-also">

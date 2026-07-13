@@ -1,0 +1,179 @@
+═══════════════════════════════════════════════════════════════════════════
+UX-BATCH-2026-07-12 — owner-directed UX batch (9 items → 5 sessions)
+═══════════════════════════════════════════════════════════════════════════
+Owner directive (2026-07-12): a batch of UX requests. "Suggestions are
+flexible — improve/redesign where you know better. Pay special attention to
+UX/UI; everything intuitive, natural, self-explanatory; ⓘ info buttons where
+useful. Act like a professional, expert designer."
+
+This file is the canonical tracker. Mark items DONE with a dated one-liner.
+Each session: recon-verify current code (docs drift) → implement → RED-first
+tests where fixing behavior → gates (vitest, lint --max-warnings 0, typecheck,
+smoke:ci) → preview-verify at 375px → commit+push → update CLAUDE.md handoff.
+
+───────────────────────────────────────────────────────────────────────────
+SESSION 1 — Scripture references: "Go to verse" + back pill  [THIS SESSION] ✅ DONE
+───────────────────────────────────────────────────────────────────────────
+Owner: "Tap footnote scripture references… or any other way a scripture is
+referenced… add some kind of button to go to where the actual scripture is
+in the app, with the proper scripture highlighted with the behavior we
+already have built, also make android back feature aware and add back to
+pill at top."
+
+RECON FINDINGS (all verified in source 2026-07-12):
+- The scripture-reference SHEET surfaces (each shows a ref + verse text):
+    1. FootnoteSheet.jsx        — Format A numbered footnotes (LetterView +
+                                  BibleStudyChapterView via LetterView shim)
+    2. ScriptureSheet.jsx       — Matthew study cite sheets (MATTHEW_NKJV)
+    3. LetterView.jsx inline    — inline scripture-ref sheet (SC5)
+    4. WtlbEntryView.jsx inline — Format B {{ref:}} / (Book C:V) cite sheet
+  (Journal viewer {{ref:}} links already NAVIGATE directly — 3f271ce.)
+- Verse-highlight nav behavior EXISTS: navigateToLink (use-navigate-to-link.js)
+  routes {type:'bible',bookId,chapter,verse} → bible-ch/matthew-ch and sets
+  surpriseAnchor {type:'verse',verses:[…]} → BibleChapterView flash-highlights
+  4s + scrolls (same for Matthew).
+- Back pill EXISTS: useFromLetterStack backHint → "Back to <title>" pill on
+  destination; navigateToLink pushes the source entry (with destSnapshot
+  pruning). Android back consults fromLetterStack (use-android-back).
+- parseRefStr/findBook handle ref→book/chapter/verse(+verseEnd); the journal
+  viewer's __loadBibleCorpus-retry pattern handles the lazy corpus.
+
+PLAN:
+- Shared pure helper (scripture-resolution.js): resolve a ref string →
+  {endpoint:{type:'bible',bookId,chapter,verse,verseEnd}} or null.
+- Extend navigateToLink: verses array spans verse..verseEnd (range refs
+  highlight the whole range, not just the first verse).
+- Add a clearly-labeled "Open in <Book C:V> →"-style gold action button to
+  all 4 sheets (shared CSS class); hidden when the ref can't resolve to an
+  in-app book. Tap → close sheet → navigateToLink with meta
+  {sourceLetterTitle, sourceVolumeLabel} so the pill reads "Back to <letter>".
+- Corpus-lazy safe: kick __loadBibleCorpus and navigate on resolve (never
+  drop the tap) — navigateToLink already does this for bible endpoints.
+- Android back: free via fromLetterStack (verify).
+DONE 2026-07-12: new shared GoToRefButton (ui/components, globalized) on all
+4 sheets — reuses the .fn-sheet-link-btn family ("Go to Scripture" eyebrow +
+ref title + chevron). COMPOUND Matthew study cites ("Psalm 118:14; Isaiah
+12:2") render one button PER passage. verseAnchorFor in use-navigate-to-link
+makes range refs flash the WHOLE span (capped 176). Mount effect pre-warms
+__loadBibleCorpus; unresolvable taps retry 40×250ms (journal {{ref:}}
+pattern). NOTE: findBook("Matthew")='matthew-plain' → refs open the PLAIN
+Bible Matthew (consistent w/ journal nav); study endpoints (bookId
+'matthew') still route matthew-ch. Preview-proven: letter fn → Proverbs
+16:17 flash+pill+1-press android back; Matthew 27:15-26 range → 12 verses
+flashed; WTLB {{ref:}} → flash+pill-tap return; study compound cite →
+Isaiah 12:2 + "Back to Study Bible · Matthew 1". Gates: 2529 vitest/140
+files (+21), lint 438 globals, typecheck, smoke:ci PASS, 0 console errors.
+
+───────────────────────────────────────────────────────────────────────────
+SESSION 2 — Link picker overhaul (items 3 + 6 + 7)
+───────────────────────────────────────────────────────────────────────────
+Owner items:
+  (3) "Network of links — link picker has optional second tab/screen showing
+      targets and sources of recent links."
+  (6) "Add search function to link picker."
+  (7) "Full top-down menu (regular menu navigation) as a toggleable way to
+      get to your desired target in link picker, instead of just recent
+      targets or search."
+
+RECON: LinkPicker.jsx ALREADY has search (searchNavIndex over the nav index,
+30 results) + a Recent list (RecentNavStore). So item 6 is interpreted as:
+search must exist at EVERY step of the flow — notably the refinement pickers
+(VersePickerScreen: long chapters; LetterExcerptPickerScreen: long letters)
+have no filter/search today. ⚠ FLAGGED to owner in session summary.
+
+PLAN:
+- Segmented mode control in the picker: [Search] [Browse] [Recent Links].
+  - Browse: full hierarchical drill-down mirroring app nav (Volumes → letters;
+    WTLB parts → entries; Bible → books → chapters; Studies → chapters;
+    Blessed/Holy Days), reusing the nav-index data. Breadcrumb + back per level.
+  - Recent Links: the link NETWORK — recently created links as source ⇄ target
+    rows (from LinkStore, newest first); tapping an endpoint picks it as the
+    new target (and can jump-preview). This doubles as "recent links" browse.
+  - Search: existing behavior (default mode).
+- Add lightweight filter/search inside VersePicker + LetterExcerptPicker.
+- Keep the create/refine/success-strip flow byte-identical otherwise.
+
+───────────────────────────────────────────────────────────────────────────
+SESSION 3 — Journal editor: insert-below + menu/nav redesign (items 8 + 9)
+───────────────────────────────────────────────────────────────────────────
+Owner items:
+  (8) "Redesign in-journal entry menu and navigation to look better and be
+      more intuitive and plain; decide between ⋯ > edit or bottom-right pen
+      icon to edit; all items draggable with live rearrange around the
+      dragged item."
+  (9) "Inserting an item should never split other items — always insert
+      beneath the current one."
+
+RECON: The viewer TODAY has BOTH a pen FAB (jrn-fab is-edit) and a ⋯ menu
+(JournalCardMenu hideOpen) — the "decide" is real: pick ONE primary edit
+affordance. Drag-to-reorder with live FLIP rearrange LANDED 2026-07-03
+(b048e07) for ALL block types in the editor — verify it matches the owner's
+bar on-device; polish if not. insertAtCursor (JournalEditorScreen.jsx:572)
+DOES split a text block at the caret (head/tail slices) — that's item 9's
+target.
+
+PLAN:
+- (9) insertAtCursor → insert AFTER the current block (whole-block
+  granularity; caret position no longer splits text). Keep the "no caret
+  context" fallback (insert before trailing blank p). Update reorder tests.
+- (8) Decision: KEEP the pen FAB as the one edit affordance (Google-Keep
+  idiom, discoverable, thumb-reachable); ⋯ menu keeps Pin/Delete(+share
+  later) and DROPS Edit (redundant). Sweep viewer+editor chrome for
+  plainness: labels under ambiguous icons, spacing, hierarchy.
+- Re-verify drag UX in preview (grips, live rearrange, autoscroll).
+
+───────────────────────────────────────────────────────────────────────────
+SESSION 4 — Text size slider, text-only scaling (item 2)
+───────────────────────────────────────────────────────────────────────────
+Owner: "Adjustable font size slider — shrink OR expand. Must NOT expand
+icons; icon scaling would be a separate feature. Wrap icons if they'd spill?"
+
+RECON: WL1 today = Settings SelectField with 4 steps (1.0/1.15/1.3/1.5) →
+`html{font-size:calc(100% * var(--font-scale))}` → EVERYTHING rem/em-based
+scales, including nav chrome + glyph icons. index.html boot script applies
+the persisted value pre-mount (no FOUC) — keep that contract.
+
+PLAN:
+- Slider (range ~0.8–1.6, step 0.05) with a live preview line + reset-to-
+  standard; replaces the 4-step selector. Persist same settings.fontScale key
+  (numeric string; old values remain valid).
+- TEXT-ONLY scaling: keep the root multiplier (it's what makes every reading
+  surface scale, incl. injected journal/highlights CSS) but PIN app chrome:
+  top-nav, sticky nav, toolbars, sheets' control rows, FABs, badges, icon
+  buttons get px-locked font-size/dimensions (audit pass; the svg icons are
+  already width/height px — the GLYPH icons (✕ ⋯ ‹ ›) + button labels are the
+  scaling leak). Acceptance: at 0.8 and 1.6, chrome is pixel-identical;
+  reading text, journal text, note bodies, search snippets scale.
+- ANSWER to owner's wrap question (also said in session summary): icons
+  should NOT wrap — with icons pinned they can't spill from text scaling;
+  if a future icon-size feature lands, cap it / collapse overflow into ⋯
+  rather than wrapping (wrapped toolbars destroy muscle memory).
+
+───────────────────────────────────────────────────────────────────────────
+SESSION 5 — Polish batch: selection restriction + spacing audit (items 4 + 5)
+───────────────────────────────────────────────────────────────────────────
+Owner items:
+  (4) "Can't highlight anything (tabs number) besides text." → interpreted:
+      UI chrome (e.g. the tabs-count button in the top nav) is long-press
+      SELECTABLE today; only reading/user text should be selectable.
+  (5) "Proper button spacing — ⓘ info icon right next to delete button on
+      'delete my data' in Settings; sweep all screens. Search's expand
+      chevrons (volume/album groups) are tiny and not apparent."
+
+PLAN:
+- (4) user-select:none on app chrome (nav bars, buttons, badges, sheet
+  chrome), explicit user-select:text opt-in on reading containers, journal
+  text, note bodies, inputs/textareas. Careful: SelectionToolbar's long-press
+  flow must keep working (reading containers stay selectable); Android
+  WebView needs -webkit- prefixes; the tap→chip native bridge unaffected.
+- (5) Settings danger zone: separate the ⓘ from "Clear All My Data" (own
+  row/gap). SrchGroup header chevron: larger (≥24px), higher-contrast, with
+  a real rotation affordance. Then a measured sweep of icon-button hit areas
+  + destructive-adjacent gaps (the 2026-07-02 passes fixed many; re-walk
+  with fresh eyes on Settings + Search + Library headers).
+
+───────────────────────────────────────────────────────────────────────────
+STATUS LOG
+───────────────────────────────────────────────────────────────────────────
+2026-07-12  File created; recon of all 9 items done (surfaces verified in
+            source). Session 1 executed this session — see top.

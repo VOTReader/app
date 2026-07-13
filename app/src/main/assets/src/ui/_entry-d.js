@@ -91,6 +91,7 @@ import { ProphecyCard } from './components/ProphecyCard.jsx';
 import { ProphecyGroup } from './components/ProphecyGroup.jsx';
 import { VerseWithNumbers, _fnTextRedundantWithLink } from './components/VerseWithNumbers.jsx';
 import { InAppLinkButton } from './components/InAppLinkButton.jsx';
+import { GoToRefButton } from './components/GoToRefButton.jsx';
 import { FootnoteSheet } from './components/FootnoteSheet.jsx';
 import { ScriptureVerseText } from './components/ScriptureVerseText.jsx';
 import { ScriptureSheet } from './components/ScriptureSheet.jsx';
@@ -218,7 +219,7 @@ Object.assign(window, {
   // Components
   Segments, ProphecyCard, ProphecyGroup,
   VerseWithNumbers, _fnTextRedundantWithLink,
-  InAppLinkButton, FootnoteSheet, ScriptureVerseText, ScriptureSheet,
+  InAppLinkButton, GoToRefButton, FootnoteSheet, ScriptureVerseText, ScriptureSheet,
   EXPAND_THRESHOLD, MIN_HIDDEN_WORDS, ExpandableVerse,
   ThemeBtn, ScreenLayout,
   ModeToggle, renderCommentaryCite,

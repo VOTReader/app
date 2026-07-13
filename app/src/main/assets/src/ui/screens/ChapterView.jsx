@@ -4,9 +4,19 @@
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null }) {
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, markAsReadEnabled, showProgressBar, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null }) {
   const [activeScripRef, setActiveScripRef] = React.useState(null);
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
+  // "Go to Scripture" on the study-note scripture sheet — close the sheet,
+  // then route the resolved {type:'bible'} endpoint through navigateToLink
+  // (verse flash highlight + "Back to …" pill + Android back).
+  const goToScriptureRef = onNavigateToLink ? (endpoint) => {
+    setActiveScripRef(null);
+    onNavigateToLink(endpoint, {
+      sourceLetterTitle: (book && book.title ? book.title : 'Matthew') + ' ' + chapter.num,
+      sourceVolumeLabel: 'Study Bible',
+    });
+  } : null;
 
   React.useEffect(() => {
     if (!activeScripRef) return;
@@ -288,7 +298,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           non-interactive; a duplicate sheet in <body> would be wrong). The live
           sheet portals to <body> itself (ScriptureSheet) so the page-swipe
           transform on `.pager-track` can't drop it off-screen. */}
-      {!inert && <ScriptureSheet activeRef={activeScripRef} onClose={() => setActiveScripRef(null)} />}
+      {!inert && <ScriptureSheet activeRef={activeScripRef} onClose={() => setActiveScripRef(null)} onGoToRef={goToScriptureRef} />}
     </ScreenLayout>
   );
 }

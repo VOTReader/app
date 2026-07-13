@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useNavigateToLink } from './use-navigate-to-link.js';
+import { useNavigateToLink, verseAnchorFor } from './use-navigate-to-link.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 
 function makeParams(over) {
@@ -100,5 +100,31 @@ describe('useNavigateToLink — bible nav corpus-await', () => {
     act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'matthew', chapter: 5 }); });
     expect(p.setScreen).toHaveBeenCalledWith('matthew-ch');
     expect(p.setBookId).toHaveBeenCalledWith('matthew');
+  });
+
+  it('a range endpoint (verseEnd) flash-highlights the WHOLE span', () => {
+    window.BOOKS = { john: { title: 'John' } };
+    const p = makeParams();
+    const { result } = renderHook(() => useNavigateToLink(p));
+    act(() => { result.current.navigateToLink({ type: 'bible', bookId: 'john', chapter: 3, verse: 16, verseEnd: 18 }); });
+    expect(p.setSurpriseAnchor).toHaveBeenCalledWith({ type: 'verse', verses: [16, 17, 18] });
+  });
+});
+
+describe('verseAnchorFor — range → highlight-span math', () => {
+  it('single verse → single-entry span; no verse → null', () => {
+    expect(verseAnchorFor({ verse: 3 })).toEqual({ type: 'verse', verses: [3] });
+    expect(verseAnchorFor({ verse: null })).toBeNull();
+    expect(verseAnchorFor({})).toBeNull();
+  });
+  it('ignores a verseEnd at-or-before the start (malformed range)', () => {
+    expect(verseAnchorFor({ verse: 9, verseEnd: 9 })).toEqual({ type: 'verse', verses: [9] });
+    expect(verseAnchorFor({ verse: 9, verseEnd: 4 })).toEqual({ type: 'verse', verses: [9] });
+  });
+  it('caps an absurd span at 176 verses (Psalm 119 bound)', () => {
+    const anchor = verseAnchorFor({ verse: 1, verseEnd: 10000 });
+    expect(anchor.verses.length).toBe(176);
+    expect(anchor.verses[0]).toBe(1);
+    expect(anchor.verses[175]).toBe(176);
   });
 });

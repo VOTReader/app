@@ -7,7 +7,7 @@
    portals it to <body>. FootnoteSheet already had a graceful missing-verse
    message; this guards the portal relocation. */
 
-import { it, expect, beforeEach, afterEach } from 'vitest';
+import { it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { FootnoteSheet } from './FootnoteSheet.jsx';
@@ -17,7 +17,10 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).ScriptureVerseText = ({ text }) => <span>{text}</span>;
   /** @type {any} */ (globalThis).lookupVersesFromBooks = () => null;
 });
-afterEach(() => { cleanup(); });
+afterEach(() => {
+  cleanup();
+  delete (/** @type {any} */ (globalThis)).GoToRefButton;
+});
 
 const Sheet = /** @type {any} */ (FootnoteSheet);
 const fn = { type: 'scripture', ref: 'Isaiah 13:11' };
@@ -37,4 +40,26 @@ it('shows the missing-verse message instead of a blank sheet', () => {
   render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
   expect(document.body.textContent).toContain('Isaiah 13:11');
   expect(document.body.textContent.toLowerCase()).toContain("isn’t available".toLowerCase());
+});
+
+/* "Go to Scripture" — a scripture footnote gets the jump-to-verse action when
+   the host wires onGoToRef; the sheet passes the ref through and the action
+   is absent when the host has no navigation to offer. */
+it('renders the Go-to-Scripture action for a scripture footnote when onGoToRef is wired', () => {
+  /** @type {any} */ (globalThis).GoToRefButton = ({ refStr, onGo }) => (
+    <button data-testid="goto" onClick={() => onGo({ type: 'bible', bookId: 'isaiah', chapter: 13, verse: 11 })}>{refStr}</button>
+  );
+  const onGoToRef = vi.fn();
+  render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} onGoToRef={onGoToRef} />);
+  const btn = document.querySelector('[data-testid="goto"]');
+  expect(btn).not.toBeNull();
+  expect(btn.textContent).toBe('Isaiah 13:11'); // the fn's own ref threads through
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  expect(onGoToRef).toHaveBeenCalledWith({ type: 'bible', bookId: 'isaiah', chapter: 13, verse: 11 });
+});
+
+it('omits the Go-to-Scripture action when no onGoToRef handler is provided', () => {
+  /** @type {any} */ (globalThis).GoToRefButton = () => <button data-testid="goto" />;
+  render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
+  expect(document.querySelector('[data-testid="goto"]')).toBeNull();
 });

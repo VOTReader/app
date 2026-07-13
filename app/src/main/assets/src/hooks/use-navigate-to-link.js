@@ -69,6 +69,28 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
+ * Build the surpriseAnchor for a bible/matthew endpoint's verse target.
+ * A ref with a range ("John 3:16-18" → verse 16, verseEnd 18) highlights
+ * EVERY verse in the span, not just the first — the destination chapter
+ * views flash all of `verses` and scroll to verses[0]. Span capped at 176
+ * (the longest chapter, Psalm 119) so a malformed range can't build an
+ * absurd array.
+ *
+ * @param {{ verse?: number|null, verseEnd?: number|null }} endpoint
+ * @returns {{ type: 'verse', verses: number[] } | null}
+ */
+export function verseAnchorFor(endpoint) {
+  if (!endpoint || endpoint.verse == null) return null;
+  const start = endpoint.verse;
+  const end = (typeof endpoint.verseEnd === 'number' && endpoint.verseEnd > start)
+    ? Math.min(endpoint.verseEnd, start + 175)
+    : start;
+  const verses = [];
+  for (let v = start; v <= end; v++) verses.push(v);
+  return { type: 'verse', verses };
+}
+
+/**
  * Cross-screen navigation handler. Returns a stable `navigateToLink`
  * function (identity-fresh closure refreshed every render via ref) that
  * routes a LinkPicker-resolved endpoint to the right screen and pushes
@@ -172,7 +194,7 @@ export function useNavigateToLink({
         setBookId(endpoint.bookId);
         setChapterNum(endpoint.chapter);
         setScreen('bible-ch');
-        setSurpriseAnchor(endpoint.verse ? { type: 'verse', verses: [endpoint.verse] } : null);
+        setSurpriseAnchor(verseAnchorFor(endpoint));
       };
       if (_BOOKS && _BOOKS[endpoint.bookId]) {
         goBible();
@@ -188,7 +210,7 @@ export function useNavigateToLink({
       setBookId('matthew');
       setChapterNum(endpoint.chapter);
       setScreen('matthew-ch');
-      setSurpriseAnchor(endpoint.verse ? { type: 'verse', verses: [endpoint.verse] } : null);
+      setSurpriseAnchor(verseAnchorFor(endpoint));
     } else if (endpoint.type === 'study-letter' && endpoint.studyId && endpoint.studyChapterId) {
       setBookId(null); setChapterNum(null); setLetterId(null);
       setStudyId(endpoint.studyId);

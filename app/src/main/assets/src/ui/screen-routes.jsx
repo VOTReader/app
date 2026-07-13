@@ -140,6 +140,7 @@ export function buildScreenRoutes({
     onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
     theme, onThemeChange: setTheme, surpriseAnchor,
     onInAppLink: openInAppLetter, backHint,
+    onNavigateToLink: navigateToLink,
     onLinkOpen: openLinkSidebar,
     onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
     markAsReadEnabled: settings.markAsRead, showProgressBar: settings.showProgressBar,
@@ -687,6 +688,7 @@ export function buildScreenRoutes({
           theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
           backHint={backHint} tapThroughBack={tapThroughBack}
           openLinkSidebar={openLinkSidebar}
+          onNavigateToLink={navigateToLink}
         />
       );
     },

@@ -4,7 +4,7 @@
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -123,6 +123,16 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   const handleScripClick = (ref) => {
     setScripRef(ref);
   };
+  // "Go to Scripture" on the footnote / inline-ref sheets: close the sheet
+  // and route the resolved {type:'bible'} endpoint through navigateToLink,
+  // which owns the verse flash-highlight + the "Back to …" pill + Android
+  // back (from-letter stack). The meta names THIS letter so the pill reads
+  // "Back to <letter title>".
+  const goToScriptureRef = onNavigateToLink ? (endpoint) => {
+    setSheetFn(null);
+    setScripRef(null);
+    onNavigateToLink(endpoint, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel || null });
+  } : null;
   React.useEffect(() => {
     var closer = sheetFn !== null ? () => setSheetFn(null) : scripRef !== null ? () => setScripRef(null) : null;
     if (!closer) return;
@@ -512,6 +522,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         onNavigate={(newKey) => setSheetFn(newKey)}
         onClose={() => setSheetFn(null)}
         onInAppLink={(link) => { setSheetFn(null); wrappedInAppLink && wrappedInAppLink(link); }}
+        onGoToRef={goToScriptureRef}
       />
 
       {/* position:fixed sheet — portal to <body> so a page-swipe transform on
@@ -534,6 +545,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   ? <div className="sc-sheet-verse"><ScriptureVerseText text={text} cite={scripRef} /></div>
                   : <div className="sc-sheet-verse" style={{ color: 'var(--cream-dim)', fontStyle: 'italic' }}>Verse text not available in app data</div>;
               })()}
+              {typeof GoToRefButton !== 'undefined' && goToScriptureRef && (
+                <GoToRefButton refStr={scripRef} onGo={goToScriptureRef} />
+              )}
             </>
           )}
         </div>
