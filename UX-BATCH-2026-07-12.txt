@@ -63,6 +63,16 @@ Bible Matthew (consistent w/ journal nav); study endpoints (bookId
 flashed; WTLB {{ref:}} → flash+pill-tap return; study compound cite →
 Isaiah 12:2 + "Back to Study Bible · Matthew 1". Gates: 2529 vitest/140
 files (+21), lint 438 globals, typecheck, smoke:ci PASS, 0 console errors.
+FOLLOW-UP (owner: "don't see the flash"): .verse-surprise had NO CSS rule
+ANYWHERE — the flash was always invisible (Surprise button included); the
+scroll masked it. Fixed in app.css: gold wash + 5px spread + 4px radius on
+.verse-surprise (light-theme variant), base transition on .verse/.verse-row
+fades the flash in AND the 4s clear out; under prefers-reduced-motion the
+global 0.01ms override degrades to a static 4s highlight (transition-based
+deliberately — a keyframes+forwards approach would compute to TRANSPARENT
+under that override). Preview: computed rgba(200,164,86,0.22)+spread proven
+(hidden preview tab freezes transitions — verify computed style with
+transition:none, not by eye).
 
 ───────────────────────────────────────────────────────────────────────────
 SESSION 2 — Link picker overhaul (items 3 + 6 + 7)
