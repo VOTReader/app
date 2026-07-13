@@ -136,9 +136,9 @@ function TranslationInfoDesc() {
       </ul>
       <p>
         <strong>Please note:</strong> the Restored Name editions were prepared
-        with AI assistance (Claude, 2026). Every change was rule-generated and
-        machine-checked against the Greek, but errors are possible — where a
-        rendering matters, compare the base NKJV or KJV.
+        with AI assistance (Claude Fable 5, 2026). Every change was
+        rule-generated and machine-checked against the Greek, but errors are
+        possible — where a rendering matters, compare the base NKJV or KJV.
       </p>
     </>
   );
