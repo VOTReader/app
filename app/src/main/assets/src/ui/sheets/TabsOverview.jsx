@@ -403,17 +403,33 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
           const pctLive = saved == null ? 0 :
             typeof saved === 'object' && typeof saved.pct === 'number' ? saved.pct : 0;
           const isActive = i === activeTabIdx;
-          // Thumbnail entries are { url, theme } ({@link useThumbnails});
-          // legacy bare-string rows still render (theme unknown → as-is).
-          // A card whose screenshot was captured under the OTHER theme gets
-          // .thumb-theme-flip (an invert+hue-rotate that reads as the current
-          // theme) so a theme switch never shows a mixed dark/light wall —
-          // the next visit to that tab recaptures true pixels. Garden tabs
-          // are exempt: photographs invert badly and are theme-neutral.
+          // Thumbnail entries are DUAL-THEME variant maps ({ dark?, light?,
+          // unknown? } — {@link useThumbnails}): prefer the variant matching
+          // the CURRENT theme (true pixels, instant on a theme switch). When
+          // only the other theme exists yet, render it through
+          // .thumb-theme-flip (invert+hue-rotate) as a transitional
+          // approximation; `unknown` legacy rows (awaiting the luminance
+          // probe) render as-is. Garden tabs never flip (photographs).
           const thumbEntry = thumbnails ? thumbnails[tabContentKey(t)] : null;
-          const thumb = thumbEntry ? (typeof thumbEntry === 'string' ? thumbEntry : thumbEntry.url) : null;
-          const thumbFlip = !!(thumbEntry && typeof thumbEntry === 'object' && thumbEntry.theme &&
-            thumbEntry.theme !== currentTheme && t.screen !== 'garden-view');
+          let thumb = null;
+          let thumbFlip = false;
+          if (typeof thumbEntry === 'string') {
+            thumb = thumbEntry; // pre-migration transient — render as-is
+          } else if (thumbEntry) {
+            const other = currentTheme === 'light' ? thumbEntry.dark : thumbEntry.light;
+            if (thumbEntry[currentTheme]) {
+              thumb = thumbEntry[currentTheme];
+            } else if (thumbEntry.unknown) {
+              thumb = thumbEntry.unknown;
+            } else if (other) {
+              thumb = other;
+              thumbFlip = t.screen !== 'garden-view';
+            } else if (thumbEntry.url) {
+              // interim { url, theme } rows not yet migrated by the hook
+              thumb = thumbEntry.url;
+              thumbFlip = !!(thumbEntry.theme && thumbEntry.theme !== currentTheme && t.screen !== 'garden-view');
+            }
+          }
           return (
             <div
               key={i}

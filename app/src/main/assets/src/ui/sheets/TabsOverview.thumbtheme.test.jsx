@@ -1,10 +1,11 @@
-/* TabsOverview — thumbnail theme-normalization at render.
+/* TabsOverview — dual-theme thumbnail variant pick.
    ─────────────────────────────────────────────────────────────────
-   A tab card whose screenshot was captured under the OTHER theme renders
-   its <img> with .thumb-theme-flip (an invert+hue-rotate filter that reads
-   as the current theme), so a theme switch never shows a mixed wall of
-   dark+light cards. Matching captures, legacy bare-string entries (theme
-   unknown), and Garden tabs (photographs) render unfiltered. */
+   Entries are variant maps { dark?, light?, unknown? } (useThumbnails).
+   The card prefers the variant matching the CURRENT theme (true pixels,
+   no filter); when only the other theme exists it renders through
+   .thumb-theme-flip as a transitional approximation; `unknown` legacy rows
+   (awaiting the luminance probe) and bare strings render as-is; Garden
+   tabs never flip (photographs invert badly). */
 
 import { it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
@@ -35,39 +36,52 @@ afterEach(() => {
   document.body.classList.remove('light');
 });
 
-it('a thumbnail captured under the CURRENT theme renders unfiltered', () => {
-  renderWith([mkTab()], { k0: { url: 'data:dark-shot', theme: 'dark' } });
+it('prefers the CURRENT theme variant — true pixels, no filter', () => {
+  renderWith([mkTab()], { k0: { dark: 'data:dark-shot', light: 'data:light-shot' } }); // current = dark
   const img = thumbImg();
   expect(img.getAttribute('src')).toBe('data:dark-shot');
   expect(img.className).not.toContain('thumb-theme-flip');
 });
 
-it('a thumbnail captured under the OTHER theme gets the theme-flip filter', () => {
-  renderWith([mkTab()], { k0: { url: 'data:light-shot', theme: 'light' } }); // current = dark
-  expect(thumbImg().className).toContain('thumb-theme-flip');
-});
-
-it('in LIGHT theme a dark capture flips (and a light one does not)', () => {
+it('in LIGHT theme the same entry serves the light variant unfiltered', () => {
   document.body.classList.add('light');
-  renderWith([mkTab(), mkTab({ __i: 1 })], {
-    k0: { url: 'data:dark-shot', theme: 'dark' },
-    k1: { url: 'data:light-shot', theme: 'light' },
-  });
-  const imgs = Array.from(document.querySelectorAll('.tab-card-thumb'));
-  expect(imgs[0].className).toContain('thumb-theme-flip');
-  expect(imgs[1].className).not.toContain('thumb-theme-flip');
+  renderWith([mkTab()], { k0: { dark: 'data:dark-shot', light: 'data:light-shot' } });
+  const img = thumbImg();
+  expect(img.getAttribute('src')).toBe('data:light-shot');
+  expect(img.className).not.toContain('thumb-theme-flip');
 });
 
-it('legacy bare-string thumbnails render as-is (theme unknown → no flip)', () => {
-  renderWith([mkTab()], { k0: 'data:legacy-shot' });
+it('falls back to the OTHER variant through the flip filter when the match is missing', () => {
+  renderWith([mkTab()], { k0: { light: 'data:light-shot' } }); // current = dark, no dark variant yet
+  const img = thumbImg();
+  expect(img.getAttribute('src')).toBe('data:light-shot');
+  expect(img.className).toContain('thumb-theme-flip');
+});
+
+it('unknown legacy rows (probe pending) render as-is, never filtered', () => {
+  renderWith([mkTab()], { k0: { unknown: 'data:legacy-shot' } });
   const img = thumbImg();
   expect(img.getAttribute('src')).toBe('data:legacy-shot');
   expect(img.className).not.toContain('thumb-theme-flip');
 });
 
-it('garden tabs are exempt from the flip (photographs invert badly)', () => {
-  renderWith([mkTab({ screen: 'garden-view' })], { k0: { url: 'data:garden-shot', theme: 'light' } }); // mismatch
+it('bare-string entries (pre-migration transient) render as-is', () => {
+  renderWith([mkTab()], { k0: 'data:string-shot' });
+  const img = thumbImg();
+  expect(img.getAttribute('src')).toBe('data:string-shot');
+  expect(img.className).not.toContain('thumb-theme-flip');
+});
+
+it('garden tabs never flip even on a mismatched-only entry', () => {
+  renderWith([mkTab({ screen: 'garden-view' })], { k0: { light: 'data:garden-shot' } }); // current = dark
   const img = thumbImg();
   expect(img.getAttribute('src')).toBe('data:garden-shot');
   expect(img.className).not.toContain('thumb-theme-flip');
+});
+
+it('interim {url, theme} rows still render (compat branch) with the mismatch filter', () => {
+  renderWith([mkTab()], { k0: { url: 'data:interim-shot', theme: 'light' } }); // current = dark
+  const img = thumbImg();
+  expect(img.getAttribute('src')).toBe('data:interim-shot');
+  expect(img.className).toContain('thumb-theme-flip');
 });

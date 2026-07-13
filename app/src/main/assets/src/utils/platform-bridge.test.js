@@ -35,6 +35,7 @@ const METHODS = [
   'resetZoom',
   'getZoomScale',
   'takeScreenshot',
+  'takeThemedScreenshot',
   'openFilePicker',
   'saveToFile',
   'openExportSink',
@@ -130,7 +131,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     delete (/** @type {any} */ (globalThis.window).AndroidBridge);
   });
 
-  it('exposes exactly the 34 expected keys', () => {
+  it('exposes exactly the 35 expected keys', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);
@@ -227,7 +228,7 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
     warnSpy.mockRestore();
   });
 
-  it('exposes the same 23 keys as Android impl (uniform shape)', () => {
+  it('exposes the same 35 keys as Android impl (uniform shape)', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);

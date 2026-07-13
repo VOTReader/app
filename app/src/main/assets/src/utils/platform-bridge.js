@@ -62,6 +62,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => void} nativeRecordStop
  * @property {() => void} nativeRecordCancel
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
+ * @property {(theme: string, maxDim: number, jpegQuality: number) => Promise<string>} takeThemedScreenshot
  * @property {() => void} openFilePicker
  * @property {(suggestedName: string, content: string) => void} saveToFile
  * @property {(suggestedName: string) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
@@ -136,6 +137,11 @@ const androidImpl = {
   // Promise.resolve to give consumers a uniform Promise<string> shape on
   // both platforms. Web returns html2canvas's genuine async Promise.
   takeScreenshot: async (top, max, q) => /** @type {any} */ (window).AndroidBridge.takeScreenshot(top, max, q),
+  // Themed (other-theme) screenshot is html2canvas on BOTH platforms: native
+  // PixelCopy can only shoot the pixels on screen — a hypothetical-theme
+  // capture must render from a DOM clone, and html2canvas runs fine inside
+  // the WebView (it's the same JS bundle; lazy-loaded on first use).
+  takeThemedScreenshot: (theme, max, q) => webTakeScreenshot(0, max, q, theme),
   openFilePicker: () => /** @type {any} */ (window).AndroidBridge.openFilePicker(),
   saveToFile: (name, content) => /** @type {any} */ (window).AndroidBridge.saveToFile(name, content),
   // openExportSink/pickImportFile are the WEB v3 file primitives (FS Access API
@@ -551,16 +557,30 @@ function _ensureHtml2canvas() {
  * @param {number} maxDim      - max width/height in CSS px; downscale if exceeded
  * @param {number} jpegQuality - 0-100 integer (matches Android contract);
  *                                converted to 0.0-1.0 for canvas.toDataURL
+ * @param {string} [forceTheme] - 'dark' | 'light': render the capture under
+ *                                this theme regardless of the live one.
+ *                                html2canvas renders from a CLONED document,
+ *                                so toggling the clone's body class re-resolves
+ *                                every CSS var to the forced theme without the
+ *                                user ever seeing a flash (dual-theme tab
+ *                                thumbnails ride on this).
  * @returns {Promise<string>}
  */
-async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality) {
+async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
   const h2c = await _ensureHtml2canvas();
   if (typeof h2c !== 'function') return '';
-  const isLight = (typeof document !== 'undefined') && document.body.classList.contains('light');
+  const isLight = forceTheme
+    ? forceTheme === 'light'
+    : (typeof document !== 'undefined') && document.body.classList.contains('light');
   const bg = isLight ? '#f7f2e8' : '#07070e';
   try {
     const canvas = await h2c(document.body, {
       backgroundColor: bg,
+      onclone: (/** @type {Document} */ clonedDoc) => {
+        if (forceTheme && clonedDoc && clonedDoc.body) {
+          clonedDoc.body.classList.toggle('light', forceTheme === 'light');
+        }
+      },
       // PERF-1: capture at scale 1, NOT devicePixelRatio×2. The result is downscaled to
       // maxDim:1440 below regardless, so a DPR×2 capture of the WHOLE scrolled body (a
       // long chapter is many thousands of px tall) just allocated a ~4× larger transient
@@ -877,6 +897,7 @@ const webImpl = {
 
   // Category 3 — real web impls
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)
+  takeThemedScreenshot: (theme, max, q) => webTakeScreenshot(0, max, q, theme), // dual-theme thumbnails
   setKeepScreenOn: webSetKeepScreenOn,       // Tier B.1 (WakeLock + de-dup)
   openFilePicker: webOpenFilePicker,         // Tier B.2 (DOM input + FileReader → __onImportFile)
   saveToFile: webSaveToFile,                 // Tier B.2 (Blob + URL.createObjectURL + anchor → __onExportComplete)

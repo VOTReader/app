@@ -4,7 +4,12 @@
    Global-scope module. Bundled into dist/bundle-b.js.
 
    OWNS:
-     - tabThumbnails state (content-keyed JPEG data-URL map)
+     - tabThumbnails state (content-keyed DUAL-THEME variant maps:
+       { dark?: jpegDataUrl, light?: jpegDataUrl, unknown?: jpegDataUrl } —
+       the current theme is photographed as before; the OTHER theme is
+       rendered ~900ms later from an html2canvas clone with the opposite
+       theme class forced, so the Tabs overview always has the right-theme
+       card and a theme switch never mixes dark+light walls)
      - setTabThumbnails   (returned so App's closeAllTabs can clear it)
      - IDB load-on-mount  (idbReadAll — reads IndexedDB on first render)
      - GC effect          (debounced, removes stale keys no longer tied
@@ -57,6 +62,43 @@ import { useRefMirror } from './use-ref-mirror.js';
 import { PlatformBridge } from '../utils/platform-bridge.js';
 
 /**
+ * Classify which theme a legacy (pre-metadata) thumbnail was captured under
+ * by its average luminance: the dark theme's background (#07070e, luma ~8)
+ * and the light theme's (#f7f2e8, luma ~242) dominate any capture, so a
+ * mid-scale threshold is unambiguous. Resolves 'dark' | 'light', or null
+ * when the image can't be decoded/drawn (jsdom, corrupt row) — callers
+ * leave the row as `unknown` and render it as-is.
+ *
+ * @param {string} dataUrl
+ * @returns {Promise<'dark'|'light'|null>}
+ */
+export function classifyThumbTheme(dataUrl) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas');
+          c.width = 8; c.height = 8;
+          const ctx = c.getContext('2d');
+          if (!ctx) { resolve(null); return; }
+          ctx.drawImage(img, 0, 0, 8, 8);
+          const d = ctx.getImageData(0, 0, 8, 8).data;
+          let luma = 0;
+          for (let i = 0; i < d.length; i += 4) {
+            luma += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          }
+          luma /= (d.length / 4);
+          resolve(luma >= 128 ? 'light' : 'dark');
+        } catch (_e) { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    } catch (_e) { resolve(null); }
+  });
+}
+
+/**
  * Per-tab thumbnail capture + IDB persistence + scroll-stop refresh.
  * Owns the tabThumbnails state, the captureActiveTabThumbnail callback,
  * the IDB load-on-mount effect, and the scroll-listener attach effect.
@@ -70,7 +112,7 @@ import { PlatformBridge } from '../utils/platform-bridge.js';
  *   theme: string
  * }} args
  * @returns {{
- *   tabThumbnails: Record<string, { url: string, theme: string | null }>,
+ *   tabThumbnails: Record<string, { dark?: string, light?: string, unknown?: string }>,
  *   setTabThumbnails: (val: any) => void,
  *   captureActiveTabThumbnail: () => void
  * }}
@@ -85,22 +127,60 @@ export function useThumbnails({
 }) {
   // ── State ──────────────────────────────────────────────────────────────
   const [tabThumbnails, setTabThumbnails] = React.useState({});
+  // Call-time mirror of tabThumbnails — mergeVariant and the probe upgrades
+  // read it to build entries without stale-closure state.
+  const thumbnailsRef = React.useRef({});
 
   // ── Load previously-saved thumbnails on mount ──────────────────────────
-  // Entries are { url, theme } — theme is the theme the screenshot was
-  // captured under, so the Tabs overview can theme-normalize a mismatched
-  // card at render time. Legacy rows (bare data-URL strings from before the
-  // theme field existed) normalize to theme:null = "unknown, render as-is".
+  // Entries are DUAL-THEME variant maps: { dark?: url, light?: url,
+  // unknown?: url }. The overview picks the variant matching the current
+  // theme, so a theme switch never shows a mixed dark/light wall and never
+  // needs a recapture. Older shapes migrate in place:
+  //   - { url, theme }  (the one-day interim format) → { [theme]: url }
+  //   - bare string / theme:null (pre-metadata rows)  → { unknown: url },
+  //     then classifyThumbTheme probes the JPEG's average luminance and
+  //     upgrades the row to its real theme slot (so even never-revisited
+  //     tabs participate in theme matching — the owner's Library card).
   React.useEffect(() => {
     let cancelled = false;
     idbReadAll().then((thumbs) => {
       if (cancelled) return;
       const norm = {};
+      /** @type {Array<[string, string]>} */
+      const probes = [];
       for (const k of Object.keys(thumbs || {})) {
         const v = thumbs[k];
-        norm[k] = (typeof v === 'string') ? { url: v, theme: null } : v;
+        if (typeof v === 'string') {
+          norm[k] = { unknown: v };
+          probes.push([k, v]);
+        } else if (v && typeof v.url === 'string') {
+          // interim { url, theme } rows
+          if (v.theme === 'dark' || v.theme === 'light') {
+            norm[k] = { [v.theme]: v.url };
+            idbPut(k, norm[k]);
+          } else {
+            norm[k] = { unknown: v.url };
+            probes.push([k, v.url]);
+          }
+        } else {
+          norm[k] = v || {};
+        }
       }
+      thumbnailsRef.current = norm;
       setTabThumbnails(norm);
+      // Luminance-probe the unknowns in the background; each resolution
+      // upgrades its row (state + IDB) unless a real capture got there first.
+      probes.forEach(([k, url]) => {
+        classifyThumbTheme(url).then((cls) => {
+          if (cancelled || !cls) return;
+          const cur = thumbnailsRef.current[k];
+          if (!cur || cur.unknown !== url) return; // superseded by a real capture
+          const entry = { [cls]: url };
+          thumbnailsRef.current[k] = entry;
+          setTabThumbnails((prev) => ({ ...prev, [k]: entry }));
+          idbPut(k, entry);
+        });
+      });
     });
     return () => { cancelled = true; };
   }, []);
@@ -128,11 +208,15 @@ export function useThumbnails({
   const activeTabIdxRef = useRefMirror(activeTabIdx);
   const tabsRef = useRefMirror(tabs);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
-  // Theme rides a ref so applyThumb reads it call-time fresh without
+  // Theme rides a ref so the capture reads it call-time fresh without
   // breaking the captureActiveTabThumbnail [tabsEnabled] identity invariant.
   const themeRef = useRefMirror(theme);
   const captureInFlightRef = React.useRef(false);
-  const thumbnailsRef = React.useRef({});
+  // Capture sequence + the pending other-theme capture timer. Each primary
+  // capture bumps the sequence; the deferred themed capture aborts if a newer
+  // primary superseded it (fresh scroll position or content).
+  const captureSeqRef = React.useRef(0);
+  const variantTimerRef = React.useRef(/** @type {any} */ (null));
 
   // ── Capture callback ───────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
@@ -152,15 +236,57 @@ export function useThumbnails({
     const navEl = document.querySelector('.top-nav');
     const navHeightDp = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0;
 
-    const applyThumb = (dataUrl) => {
+    const curTheme = themeRef.current === 'light' ? 'light' : 'dark';
+    const otherTheme = curTheme === 'light' ? 'dark' : 'light';
+    // Garden pages are photographs — theme-neutral content where a themed
+    // re-render buys nothing (and html2canvas re-rasterizing large images is
+    // the priciest case). One capture fills BOTH variant slots.
+    const isGarden = tab.screen === 'garden-view';
+    const seq = ++captureSeqRef.current;
+    if (variantTimerRef.current) { clearTimeout(variantTimerRef.current); variantTimerRef.current = null; }
+
+    // Merge one theme's pixels into the tab's variant entry ({ dark?, light?,
+    // unknown? }). Any real capture supersedes a legacy `unknown` snapshot.
+    const mergeVariant = (variantTheme, dataUrl) => {
       if (!dataUrl) return;
-      // Record the theme the pixels were captured under — the overview
-      // theme-normalizes mismatched cards so a theme switch never shows a
-      // mixed wall of dark+light thumbnails.
-      const entry = { url: dataUrl, theme: themeRef.current === 'light' ? 'light' : 'dark' };
+      const cur = thumbnailsRef.current[key];
+      const base = (cur && typeof cur === 'object') ? cur : {};
+      const entry = { ...base, [variantTheme]: dataUrl };
+      delete entry.unknown;
+      delete entry.url; delete entry.theme; // scrub interim-format fields
       thumbnailsRef.current[key] = entry;
       setTabThumbnails((prev) => ({ ...prev, [key]: entry }));
       idbPut(key, entry); // write-through to IndexedDB — survives app restart
+    };
+
+    const applyThumb = (dataUrl) => {
+      if (!dataUrl) return;
+      mergeVariant(curTheme, dataUrl);
+      if (isGarden) mergeVariant(otherTheme, dataUrl);
+    };
+
+    // The OTHER theme can't be photographed (native capture only shoots the
+    // on-screen pixels) but it CAN be rendered: html2canvas draws from a DOM
+    // clone whose theme class we force (PlatformBridge.takeThemedScreenshot),
+    // so both variants exist without the user ever seeing a theme flash.
+    // Deferred ~900ms so it never contends with the visible nav/scroll settle,
+    // and dropped if a newer capture supersedes it meanwhile.
+    const scheduleOtherTheme = () => {
+      if (isGarden) return;
+      variantTimerRef.current = setTimeout(async () => {
+        variantTimerRef.current = null;
+        if (captureSeqRef.current !== seq) return;        // superseded
+        if (tabsOverviewOpenRef.current) return;          // overview covers the page
+        document.body.classList.add('capturing-thumb');   // clone inherits it
+        try {
+          const dataUrl = await PlatformBridge.takeThemedScreenshot(otherTheme, 1440, 90);
+          if (captureSeqRef.current === seq) mergeVariant(otherTheme, dataUrl);
+        } catch (_e) {
+          // best-effort — the overview falls back to the flip filter
+        } finally {
+          document.body.classList.remove('capturing-thumb');
+        }
+      }, 900);
     };
 
     // Hide floating UI chrome (sticky arrows, reading dot) for the duration
@@ -174,6 +300,7 @@ export function useThumbnails({
     try {
       const dataUrl = await PlatformBridge.takeScreenshot(navHeightDp, 1440, 90);
       applyThumb(dataUrl);
+      if (dataUrl) scheduleOtherTheme();
     } catch (_e) {
       // Best-effort capture — failures are silent (thumbnails are visual
       // sugar; missing one isn't an error worth surfacing to the user).
@@ -183,6 +310,11 @@ export function useThumbnails({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTabIdxRef/tabsOverviewOpenRef/tabsRef are useRef refs read via .current inside the callback — call-time fresh, never stale. The ref objects themselves are stable; inclusion would add noise without changing behavior.
   }, [tabsEnabled]);
+
+  // ── Pending other-theme capture — clear on unmount ─────────────────────
+  React.useEffect(() => () => {
+    if (variantTimerRef.current) clearTimeout(variantTimerRef.current);
+  }, []);
 
   // ── Scroll-stop capture effect ─────────────────────────────────────────
   // Keep tab thumbnails fresh: capture on scroll-stop (300ms idle).
