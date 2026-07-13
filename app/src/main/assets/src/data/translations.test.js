@@ -42,3 +42,57 @@ describe('translateVerse (PERF-3)', () => {
     expect(a).toBe('For God so loued the world');
   });
 });
+
+/* Sparse Restored-Name overlays: rkjv carries only changed verses and chains
+   to its registry base (kjv) for the rest; rnkjv needs no chain — a miss falls
+   through to verse.text, which IS the NKJV base. */
+describe('translateVerse — sparse overlay base chain', () => {
+  beforeEach(() => {
+    globalThis.TRANSLATION_OPTIONS = [
+      { id: 'nkjv', label: 'NKJV', desc: 'x' },
+      { id: 'rnkjv', label: 'NKJV-R', desc: 'x' },
+      { id: 'kjv', label: 'KJV', desc: 'x' },
+      { id: 'rkjv', label: 'KJV-R', desc: 'x', base: 'kjv' },
+    ];
+    globalThis.BIBLE_RKJV = { john: { 3: [{ n: 16, text: 'restored kjv 16' }] } };
+    globalThis.BIBLE_RNKJV = { john: { 3: [{ n: 16, text: 'restored nkjv 16' }] } };
+  });
+  afterEach(() => {
+    delete globalThis.TRANSLATION_OPTIONS;
+    delete globalThis.BIBLE_RKJV;
+    delete globalThis.BIBLE_RNKJV;
+  });
+
+  it('rkjv: overlay verse wins', () => {
+    expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'rkjv')).toBe('restored kjv 16');
+  });
+  it('rkjv: overlay miss falls back to the base translation (kjv), not NKJV', () => {
+    expect(translateVerse('john', 3, { n: 17, text: 'nkjv17' }, 'rkjv')).toBe('For God sent not his Son');
+    // whole book absent from the overlay (OT) → base translation text
+    expect(translateVerse('genesis', 1, { n: 1, text: 'nkjvG' }, 'rkjv')).toBe('In the beginning God created');
+  });
+  it('rkjv: miss in overlay AND base → verse.text', () => {
+    expect(translateVerse('mark', 1, { n: 1, text: 'nkjvM' }, 'rkjv')).toBe('nkjvM');
+  });
+  it('rkjv: base not yet loaded → verse.text (NKJV) until the kjv script lands', () => {
+    const savedKjv = globalThis.BIBLE_KJV;
+    delete globalThis.BIBLE_KJV;
+    try {
+      expect(translateVerse('john', 3, { n: 17, text: 'nkjv17' }, 'rkjv')).toBe('nkjv17');
+      expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'rkjv')).toBe('restored kjv 16');
+    } finally {
+      globalThis.BIBLE_KJV = savedKjv;
+    }
+  });
+  it('rnkjv (no base): overlay verse wins, miss falls through to verse.text', () => {
+    expect(translateVerse('john', 3, { n: 16, text: 'nkjv16' }, 'rnkjv')).toBe('restored nkjv 16');
+    expect(translateVerse('john', 3, { n: 17, text: 'nkjv17' }, 'rnkjv')).toBe('nkjv17');
+    expect(translateVerse('genesis', 1, { n: 1, text: 'nkjvG' }, 'rnkjv')).toBe('nkjvG');
+  });
+  it('chain lookups alternating overlay/base per verse stay consistent (LRU cache)', () => {
+    for (let i = 0; i < 3; i++) {
+      expect(translateVerse('john', 3, { n: 16, text: 'x' }, 'rkjv')).toBe('restored kjv 16');
+      expect(translateVerse('john', 3, { n: 17, text: 'x' }, 'rkjv')).toBe('For God sent not his Son');
+    }
+  });
+});

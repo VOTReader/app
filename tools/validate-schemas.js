@@ -940,8 +940,11 @@ const VALID_STUDY_BLOCK_TYPES = new Set(['heading', 'para', 'poetry']);
  * @param {string} prefix
  * @param {string[]} errors
  * @param {string[]} warnings
+ * @param {boolean} [sparse] - sparse overlay (bible-rnkjv/rkjv): verse gaps
+ *   are the DESIGN (only changed verses are present), so the gap warning is
+ *   suppressed; ascending order stays an error.
  */
-function validateVerseArray(verses, prefix, errors, warnings) {
+function validateVerseArray(verses, prefix, errors, warnings, sparse) {
   let lastN = null;
   for (let vi = 0; vi < verses.length; vi++) {
     const v = verses[vi];
@@ -960,7 +963,7 @@ function validateVerseArray(verses, prefix, errors, warnings) {
     if (lastN !== null) {
       if (v.n <= lastN) {
         errors.push(`${prefix}: verse numbering not ascending — n=${v.n} follows n=${lastN}`);
-      } else if (v.n > lastN + 1) {
+      } else if (v.n > lastN + 1 && !sparse) {
         warnings.push(`${prefix}: verse gap — n jumps from ${lastN} to ${v.n}`);
       }
     }
@@ -969,10 +972,11 @@ function validateVerseArray(verses, prefix, errors, warnings) {
 }
 
 /**
- * Format E — translation verse map (bible-asv/bsb/hnv/kjv/lsv/web/ylt).
+ * Format E — translation verse map (bible-asv/bsb/hnv/kjv/lsv/web/ylt, and
+ * the sparse Restored-Name overlays bible-rnkjv/rkjv).
  * Shape: { bookId: { "<chapNum>": [ { n: number, text: string } ] } }
  * @param {object} map
- * @param {{ strict?: boolean, fileName?: string }} [opts]
+ * @param {{ strict?: boolean, fileName?: string, sparse?: boolean }} [opts]
  * @returns {{ errors: string[], warnings: string[] }}
  */
 export function validateTranslationMap(map, opts = {}) {
@@ -1003,10 +1007,44 @@ export function validateTranslationMap(map, opts = {}) {
         errors.push(`${cp}: chapter value is not an array of verses`);
         continue;
       }
-      validateVerseArray(verses, cp, errors, warnings);
+      validateVerseArray(verses, cp, errors, warnings, opts.sparse);
     }
   }
 
+  return { errors, warnings };
+}
+
+/**
+ * Sparse-overlay subset check (bible-rnkjv/rkjv): a sparse overlay may only
+ * carry verses that EXIST in the complete reference translation — an unknown
+ * book id, chapter, or verse number means the generator mis-keyed something
+ * and that verse would silently never render. Inverse of
+ * validateTranslationCompleteness, which sparse files intentionally skip.
+ * @param {object} map - sparse overlay
+ * @param {object} ref - complete reference map (BIBLE_KJV)
+ * @param {{ fileName?: string }} [opts]
+ * @returns {{ errors: string[], warnings: string[] }}
+ */
+export function validateOverlaySubset(map, ref, opts = {}) {
+  const errors = [];
+  const warnings = [];
+  const fileName = opts.fileName || '(unknown)';
+  if (!map || typeof map !== 'object' || !ref || typeof ref !== 'object') return { errors, warnings };
+  for (const [bookId, book] of Object.entries(map)) {
+    const rBook = ref[bookId];
+    if (!rBook) { errors.push(`${fileName}: book "${bookId}" not in the reference translation`); continue; }
+    for (const [chapKey, verses] of Object.entries(book)) {
+      const rVerses = rBook[chapKey];
+      if (!Array.isArray(rVerses)) { errors.push(`${fileName}: ${bookId} ${chapKey} not in the reference translation`); continue; }
+      if (!Array.isArray(verses)) continue; // shape error already reported by validateTranslationMap
+      const rNs = new Set(rVerses.map((v) => v && v.n));
+      for (const v of verses) {
+        if (v && typeof v.n === 'number' && !rNs.has(v.n)) {
+          errors.push(`${fileName}: ${bookId} ${chapKey}:${v.n} not in the reference translation`);
+        }
+      }
+    }
+  }
   return { errors, warnings };
 }
 
@@ -1453,7 +1491,7 @@ const FORMAT_D_FILES = [
 // verse maps share one shape (table below); matthew.js (MATTHEW Study Bible)
 // and matthew-nkjv.js (ref->text dict) are single objects handled inline in
 // the CLI Format E section.
-/** @type {Array<{file: string, varName: string}>} */
+/** @type {Array<{file: string, varName: string, sparse?: boolean}>} */
 const FORMAT_E_TRANSLATIONS = [
   { file: 'bible-asv.js', varName: 'BIBLE_ASV' },
   { file: 'bible-bsb.js', varName: 'BIBLE_BSB' },
@@ -1462,6 +1500,10 @@ const FORMAT_E_TRANSLATIONS = [
   { file: 'bible-lsv.js', varName: 'BIBLE_LSV' },
   { file: 'bible-web.js', varName: 'BIBLE_WEB' },
   { file: 'bible-ylt.js', varName: 'BIBLE_YLT' },
+  // Restored-Name NT overlays (tools/gen-restored-nt.mjs) — sparse: only
+  // changed verses; completeness is skipped, subset-vs-reference is enforced.
+  { file: 'bible-rnkjv.js', varName: 'BIBLE_RNKJV', sparse: true },
+  { file: 'bible-rkjv.js', varName: 'BIBLE_RKJV', sparse: true },
 ];
 
 /**
@@ -1626,14 +1668,20 @@ function runCli() {
     try { map = loadVar(resolve(dataDir, entry.file), entry.varName); }
     catch (e) { loadErr(label, e.message); continue; }
     if (!map || typeof map !== 'object' || Array.isArray(map)) { loadErr(label, `variable "${entry.varName}" is not an object`); continue; }
-    const result = validateTranslationMap(map, { strict, fileName: label });
+    const result = validateTranslationMap(map, { strict, fileName: label, sparse: entry.sparse });
     // CORP2: also require every KJV book/chapter to be present (kjv-vs-kjv is
-    // trivially complete, so skip it). Merged into `result` so it counts + prints
-    // on the same line.
-    if (xlatRef && entry.varName !== 'BIBLE_KJV') {
+    // trivially complete, so skip it; sparse overlays are incomplete BY DESIGN
+    // and get the inverse subset check instead). Merged into `result` so it
+    // counts + prints on the same line.
+    if (xlatRef && entry.varName !== 'BIBLE_KJV' && !entry.sparse) {
       const comp = validateTranslationCompleteness(map, xlatRef, { fileName: label });
       result.errors.push(...comp.errors);
       result.warnings.push(...comp.warnings);
+    }
+    if (xlatRef && entry.sparse) {
+      const sub = validateOverlaySubset(map, xlatRef, { fileName: label });
+      result.errors.push(...sub.errors);
+      result.warnings.push(...sub.warnings);
     }
     const nBooks = Object.keys(map).length;
     add(result, nBooks);

@@ -21,9 +21,10 @@ export function loadTranslation(code) {
   // an imported backup, and is concatenated into a <script> src below. Allow
   // only a bare lowercase token so a crafted value can never shape the URL
   // (path traversal, a second origin via "//host", a query/fragment). Every
-  // real id (TRANSLATION_OPTIONS in index.html: web/bsb/hnv/kjv/asv/lsv/ylt) is
-  // 2–4 lowercase letters; an unknown-but-safe code just 404s → NKJV fallback.
-  // Defense-in-depth over script-src 'self' + the same-origin string wrap.
+  // real id (TRANSLATION_OPTIONS in index.html: web/bsb/hnv/kjv/asv/lsv/ylt/
+  // rnkjv/rkjv) is 2–5 lowercase letters; an unknown-but-safe code just 404s
+  // → NKJV fallback. Defense-in-depth over script-src 'self' + the
+  // same-origin string wrap.
   if (!/^[a-z]{2,8}$/.test(code)) return Promise.resolve();
   // SCR1: only codes with a shipped bible-<code>.js bundle are loadable. Corpus
   // nkjv keys carry tags for translations with NO bundle (CJB/GNT/ESV/NLT/NAS/CEB);
@@ -33,6 +34,28 @@ export function loadTranslation(code) {
   // (index.html) is the single source of truth for shipped translations; guarded
   // so jsdom tests that never ran index.html behave exactly as before.
   if (typeof TRANSLATION_OPTIONS !== 'undefined' && !TRANSLATION_OPTIONS.some((o) => o.id === code)) return Promise.resolve();
+  // A SPARSE overlay (registry `base`, e.g. rkjv over kjv) carries only its
+  // changed verses; the base translation must be loaded alongside so
+  // translateVerse can resolve the rest. rnkjv needs no `base` — its fallback
+  // is verse.text (the NKJV base corpus) like every other translation.
+  const base = _baseOf(code);
+  if (base) return Promise.all([_loadTranslationScript(code), loadTranslation(base)]).then(() => {});
+  return _loadTranslationScript(code);
+}
+
+/**
+ * The registry `base` translation a sparse overlay falls back to, or null.
+ * @param {string} code
+ * @returns {string|null}
+ */
+function _baseOf(code) {
+  if (typeof TRANSLATION_OPTIONS === 'undefined') return null;
+  const opt = TRANSLATION_OPTIONS.find((o) => o.id === code);
+  return (opt && opt.base) || null;
+}
+
+/** @param {string} code */
+function _loadTranslationScript(code) {
   const globalName = 'BIBLE_' + code.toUpperCase();
   if (window[globalName]) {_translationLoaded[code] = true;return Promise.resolve();}
   if (_translationPromises[code]) return _translationPromises[code];
@@ -77,31 +100,51 @@ export function loadBibleStudies() {
   return _bibleStudiesPromise;
 }
 
-// PERF-3: a SINGLE-entry verse-index cache so translateVerse is O(1) per verse, not O(N)
+// PERF-3: a tiny verse-index cache so translateVerse is O(1) per verse, not O(N)
 // — a full chapter render was O(N²) (each of N verses linear-scanned the N-verse alt
-// array). The reader shows ONE chapter at a time, so a single { n -> text } map keyed by
-// translation:bookId:chNum is enough: it's built once when a chapter is first rendered,
-// hit by every other verse + every re-render, and rebuilt on chapter/translation change —
-// so it can't grow unbounded (alt-translation globals load whole, so no partial staleness).
-let _xlateKey = null;
-let _xlateIdx = null;
+// array). The reader shows ONE chapter at a time, so a handful of { n -> text } maps
+// keyed by translation:bookId:chNum is enough. It was a SINGLE entry until the sparse
+// Restored-Name overlays: a chain lookup (rkjv miss → kjv) alternates TWO keys per
+// verse, which would rebuild the index on every call — the small LRU keeps both hot.
+// Bounded, so it can't grow unbounded (alt-translation globals load whole, so no
+// partial staleness — a cached index never goes stale because the data never mutates
+// after its script loads, and _verseIndex is only reached once the global exists).
+const _xlateCache = new Map();
+const _xlateCacheMax = 8;
 function _verseIndex(data, translation, bookId, chNum) {
   const key = translation + ':' + bookId + ':' + chNum;
-  if (key === _xlateKey) return _xlateIdx;
+  const hit = _xlateCache.get(key);
+  if (hit) {
+    _xlateCache.delete(key); _xlateCache.set(key, hit); // refresh recency
+    return hit;
+  }
   const verses = data[bookId] && data[bookId][chNum];
   const idx = Object.create(null);
   if (verses) { for (let i = 0; i < verses.length; i++) idx[verses[i].n] = verses[i].text; }
-  _xlateKey = key;
-  _xlateIdx = idx;
+  _xlateCache.set(key, idx);
+  if (_xlateCache.size > _xlateCacheMax) _xlateCache.delete(_xlateCache.keys().next().value);
   return idx;
 }
 
 export function translateVerse(bookId, chNum, verse, translation) {
   if (!translation || translation === 'nkjv') return verse.text;
   const data = window['BIBLE_' + translation.toUpperCase()];
-  if (!data) return verse.text; // not yet loaded → NKJV fallback
-  const t = _verseIndex(data, translation, bookId, chNum)[verse.n];
-  return (t !== undefined) ? t : verse.text;
+  if (data) {
+    const t = _verseIndex(data, translation, bookId, chNum)[verse.n];
+    if (t !== undefined) return t;
+  }
+  // Sparse overlay miss (or overlay not yet loaded) → consult the registry
+  // base translation (rkjv → kjv). nkjv-based overlays need no hop: falling
+  // through to verse.text IS the NKJV base.
+  const base = _baseOf(translation);
+  if (base && base !== 'nkjv') {
+    const bd = window['BIBLE_' + base.toUpperCase()];
+    if (bd) {
+      const t = _verseIndex(bd, base, bookId, chNum)[verse.n];
+      if (t !== undefined) return t;
+    }
+  }
+  return verse.text; // not loaded / verse absent → NKJV fallback
 }
 
 // ── Translation display labels ──────────────────────────────────────────

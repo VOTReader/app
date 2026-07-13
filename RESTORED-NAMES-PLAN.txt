@@ -1,0 +1,174 @@
+================================================================================
+RESTORED-NAMES-PLAN.txt — the Restored-Name New Testament (NKJV-R / KJV-R)
+Canonical tracker for the Name-restoration translations. 2026-07-12.
+================================================================================
+
+WHAT SHIPPED
+------------
+Two new Bible translations, selectable at Settings → Bible Translation:
+
+  NKJV-R  (id rnkjv)  — NKJV with His Name restored across the New Testament
+  KJV-R   (id rkjv)   — KJV  with His Name restored across the New Testament
+
+"Jesus" → YahuShua · "Christ" → HaMashiach / Mashiach (grammar-dependent, below)
+New Testament ONLY (1,212 NKJV verses + 1,217 KJV verses changed). The Old
+Testament renders the base translation untouched. For personal use.
+
+DOCTRINE BASIS (why these forms)
+--------------------------------
+The Volumes of Truth — "Death and Deliverance": "I command all who have ears to
+hear, to call upon His name as it is, was, and has always been, and not as they
+presume it to be… YAHUSHUA HAMASHIACH, both Lord and Savior of men." And
+"Proclaim The Name of The Lord": "Speak My name as it is, and also in the
+tongue of the hearer." (Also read: answersonlygodcangive.com/The_Name_of_The_Lord
+and /Regarding_Sacred_Names.)
+  - YahuShua = "YAH Is Salvation" (Zech 6:11 — the Hebrew of "Joshua" is
+    Yahushua יהושע; Ps 118:14).
+  - Ha = the definite article; Mashiach = "Anointed" (Messiah). HaMashiach =
+    "The Messiah".
+  - The commanded full Name is always "YahuShua HaMashiach" — the VOT corpus
+    writes it 121x and NEVER in reversed order.
+
+LANGUAGE ANALYSIS (how the ruleset was derived)
+-----------------------------------------------
+Every occurrence in both bases was cross-joined against the Textus Receptus
+Greek (the base text behind the KJV and NKJV NT; Stephanus 1550/1894, public
+domain, via getbible.net). Key findings that shaped the rules:
+
+  - Greek Χριστός TRANSLATES Hebrew מָשִׁיחַ (mashiach, "anointed") — it is not
+    a name transliteration. Restoring it yields Mashiach; with the Hebrew
+    article, HaMashiach.
+  - English "the Christ" is ALWAYS articular Greek (ho Christos) — 48/48 NKJV,
+    18/18 KJV. Bare English "Christ" splits ~50/50 articular/anarthrous in the
+    Greek, but Greek drops articles after prepositions as pure syntax — Hebrew
+    puts the article on a definite title regardless (Delitzsch's Hebrew NT
+    renders standalone Christos as HaMashiach in both cases). So ALL standalone
+    Christ → HaMashiach, and the Greek article is NOT the splitting criterion.
+  - Hebrew grammar forbids the article on a suffixed/construct noun: "His
+    Christ" (Ps 2:2 meshichō, quoted Acts 4:26; Rev 11:15, 12:10) and "the
+    Lord's Christ" (Luke 2:26, construct) → bare "Mashiach". Likewise the
+    predicate in Acts 2:36 ("made Him… Lord and Mashiach") and "who is called
+    Mashiach" after a naming verb (Matt 1:16, 27:17, 27:22).
+  - Exactly ONE vocative exists (Matt 26:68 Χριστέ) → HaMashiach (Hebrew
+    vocatives take the article; so Delitzsch).
+  - The KJV itself reverses the TR's "Christ Jesus" to "Jesus Christ" in 11
+    verses — pair order was never treated as inspired, which supports
+    normalizing pairs to the commanded Name order.
+  - Six verses print the Name in CAPITALS and my case-sensitive scan initially
+    missed them — the naming verses (Matt 1:21, 1:25; Luke 1:31, 2:21 — where
+    "you shall call His name YAHUSHUA, for He will save His people" only makes
+    sense in Hebrew) and the cross inscriptions (Matt 27:37; John 19:19) →
+    YAHUSHUA.
+
+THE RULESET (tools/gen-restored-nt.mjs — regenerate there, never hand-edit)
+---------------------------------------------------------------------------
+  JESUS (caps)              → YAHUSHUA                    (6 verses ×2)
+  Jesus Christ['s]          → YahuShua HaMashiach['s]     (184+1 / 196+2)
+  Christ Jesus              → YahuShua HaMashiach         (69 / 58) [see CALLS]
+  false christs/Christs     → false messiahs/Messiahs     (Matt 24:24, Mk 13:22)
+  His/my/thy/your Christ    → … Mashiach                  (Acts 4:26, Rev 11:15, 12:10)
+  the Lord's Christ         → the Lord's Mashiach         (Luke 2:26)
+  is/was called Christ      → … called Mashiach           (Matt 1:16, 27:17, 27:22)
+  the Christ                → HaMashiach ("the" absorbed — Ha IS the) (55 / 18)
+  Christ's                  → HaMashiach's                (14 / 14)
+  Christ (standalone)       → HaMashiach                  (236 / 273)
+  Jesus' (possessive)       → YahuShua's                  (9 / 10)
+  Jesus                     → YahuShua                    (710 / 708)
+
+PER-VERSE EXCEPTIONS (hand-adjudicated)
+---------------------------------------
+  Col 4:11    UNCHANGED — "Jesus who is called Justus", Paul's coworker. The
+              Matthew Study Bible's own precedent governs all non-Lord bearers:
+              "the names of other people were not corrected. Only The Messiah's
+              name was restored."
+  Acts 13:6   UNCHANGED — Bar-Jesus the sorcerer (protected token).
+  Acts 11:26, 26:28, 1 Pet 4:16 — "Christian(s)" KEPT (VOT corpus uses it 53x).
+  1 John 2:18/2:22/4:3, 2 John 7 — "antichrist(s)" KEPT (VOT uses it 16x).
+  Acts 7:45 + Heb 4:8 (KJV only) — "Jesus" → "Joshua": the referent is Joshua
+              son of Nun (Greek Iēsous covers both names); NKJV already reads
+              Joshua, and a leftover "Jesus" would read as the Lord's retired
+              name.
+  John 1:41 + 4:25 — John's glosses translate Aramaic "Messias" into Greek for
+              his readers ("which is translated, the Christ"). Restored:
+              "We have found the Mashiach" (which is translated, the Anointed) —
+              rendering the gloss by MEANING avoids "Mashiach…, that is,
+              Mashiach" circularity.
+  Acts 2:36   "both Lord and Mashiach" — anarthrous Hebrew predicate (Delitzsch).
+
+JUDGMENT CALLS AN OWNER MIGHT FLIP (each is a 1-line generator change + rerun)
+------------------------------------------------------------------------------
+  1. PAIR ORDER: "Christ Jesus" is normalized to "YahuShua HaMashiach" (the
+     commanded order; VOT never reverses it; the naive alternative "HaMashiach
+     YahuShua" was rejected as awkward — your call going in). The
+     order-preserving alternative "Mashiach YahuShua" (bare, per the anarthrous
+     Greek) is one constant away: PAIR_ORDER='preserve' in gen-restored-nt.mjs.
+  2. TITLE STYLE: standalone titular Christ → "HaMashiach". The Matthew Study
+     Bible instead uses English "The Messiah" in verse text (its own earlier
+     convention). If you ever want NKJV-R/KJV-R to match the Study Bible's
+     style, swap the three standalone rules' output to "the Messiah"/"Messiah"
+     and rerun.
+  3. Matt 26:68 vocative KJV reads "thou HaMashiach" (Delitzsch has the
+     article; English "thou" + Ha reads slightly oddly — flag if unwanted).
+
+ARCHITECTURE
+------------
+  - SPARSE OVERLAYS: bible-rnkjv.js / bible-rkjv.js carry ONLY changed verses
+    (~180 KB each, vs 4.7 MB for a full copy). translateVerse falls through:
+    rnkjv → verse.text (the NKJV base corpus); rkjv → BIBLE_KJV (registry
+    `base:'kjv'`, a new field on TRANSLATION_OPTIONS) → verse.text.
+    loadTranslation loads an overlay's base alongside it; the PERF-3 verse
+    index is now a small LRU Map (chain lookups alternate two keys/chapter —
+    a single-entry cache would rebuild per verse).
+  - Registry: index.html TRANSLATION_OPTIONS ('rnkjv' after nkjv, 'rkjv' after
+    kjv) — Settings selector, hero eyebrow, home-card tag, SE5/SCR1 allowlist
+    all flow from it with no extra wiring.
+  - SW: the corpus-cache regex (/src\/data\/bible-[a-z-]+\.js$/) auto-covers
+    both files (cache-on-use); CORPUS_VERSION c12→c13 (+ CORPUS_CONTENT_VERSION
+    in src/search/cache.js — gate-enforced equality).
+  - Chrome (chapter titles/headings) is the separate, pre-existing
+    settings.restoredNames layer (BOOKS_RESTORED, default ON) — restored chrome
+    composes with restored verses on both new editions.
+  - Validation: tools/validate-schemas.js Format E gained `sparse` entries —
+    gap warnings suppressed (sparseness is the design), completeness swapped
+    for an INVERSE subset check (every overlay verse must exist in BIBLE_KJV).
+  - check_balance.py / esprima and the corpus-version lock cover the new files
+    automatically (the DATA_CORPUS glob matches bible-r*.js).
+
+TESTS + GATES (all green 2026-07-12)
+------------------------------------
+  - src/data/restored-names.test.js ×18 — structure (NT-only, every entry a
+    real change, exact changed-verse totals 1212/1217), no-token-left-behind
+    sweep, non-Lord bearers untouched, and 13 golden verses pinning every
+    exception + rule class.
+  - src/data/translations.test.js +6 — base-chain (overlay hit, base fallback,
+    both-miss → verse.text, base-not-yet-loaded, rnkjv no-chain, LRU sanity).
+  - validate:data 0 errors · check_balance ALL OK · vitest 2508/138 · lint
+    --max-warnings 0 · typecheck · smoke:ci PASS (0 crashed / 0 console errors).
+  - Preview-verified live: Settings selector rows; NKJV-R Matthew 1 (v1 pair,
+    v16 "called Mashiach", v17 articular, v21/25 YAHUSHUA caps) with restored
+    chrome composed; hero eyebrow "NKJV RESTORED NAME"; KJV-R loads BOTH
+    scripts, Matthew 1 in true KJV wording restored, and Psalm 23 renders the
+    real KJV via the chain ("my cup runneth over"); 0 console errors.
+
+PHASE 2 CANDIDATES (not started — deliberate scope cuts)
+--------------------------------------------------------
+  1. OLD TESTAMENT: LORD/GOD (YHWH) → YAHUWAH etc. Owner said "later; needs
+     real textual analysis of the originating language" — ~7,000+ instances,
+     Hebrew-side homework (YHWH vs Adonai vs Elohim distinctions, the Ha-Adon
+     cases, "GOD" smallcaps = YHWH after Adonai, etc.).
+  2. The letter-embedded NKJV footnote dicts (letters' nkjv{} + wtlb-scriptures
+     .js) still quote "Jesus/Christ" in scripture sheets opened from letters —
+     a runtime restore-transform at the sheet render site (or a generator pass
+     over the dicts) would extend restoration there. Matthew Study Bible
+     (matthew.js) is ALREADY restored (its own earlier convention: YahuShua +
+     "The Messiah") and was not touched.
+  3. Daniel 9:25-26 "Messiah the Prince" (OT, anarthrous in Hebrew) — belongs
+     to phase 2's OT pass.
+
+REGENERATION
+------------
+  node tools/gen-restored-nt.mjs     # rewrites both data files deterministically
+  npm run build && npx vitest run app/src/main/assets/src/data/restored-names.test.js
+  (a ruleset change that alters totals must update the two pinned counts in
+  restored-names.test.js — that is the deliberate tripwire)
+================================================================================

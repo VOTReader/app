@@ -35,7 +35,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-zIgP1GH38bpC/W9siuymsRqDqkMmZZcbfBWshzc/3Rc=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-ZSQg/H3S68EFRlNhv3zOLh08hDE6tldBnhHgRWy3b1Q=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-zIgP1GH38bpC/W9siuymsRqDqkMmZZcbfBWshzc/3Rc=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-SjzMm7YEfNApvj8cznQMkgJkgX8DYtu6udJ3jN3UOGE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -406,10 +406,12 @@ const READING_SCREENS = new Set([
 
 const TRANSLATION_OPTIONS = [
 { id: 'nkjv', label: 'NKJV', desc: 'New King James Version — default' },
+{ id: 'rnkjv', label: 'NKJV-R', desc: 'NKJV Restored Name — His true Name restored in the New Testament: YahuShua HaMashiach' },
 { id: 'web', label: 'WEB', desc: 'World English Bible — modern, public domain' },
 { id: 'bsb', label: 'BSB', desc: 'Berean Standard Bible — modern literal' },
 { id: 'hnv', label: 'HNV', desc: 'Hebrew Names Version — names restored (Yeshua, Mattityahu)' },
 { id: 'kjv', label: 'KJV', desc: 'King James Version 1769 — traditional' },
+{ id: 'rkjv', label: 'KJV-R', desc: 'KJV Restored Name — His true Name restored in the New Testament: YahuShua HaMashiach', base: 'kjv' },
 { id: 'asv', label: 'ASV', desc: 'American Standard Version 1901 — classical literal' },
 { id: 'lsv', label: 'LSV', desc: 'Literal Standard Version — uses YHWH for the Name' },
 { id: 'ylt', label: 'YLT', desc: "Young's Literal Translation 1898 — hyper-literal" }];
