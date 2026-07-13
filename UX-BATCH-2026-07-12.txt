@@ -73,6 +73,15 @@ deliberately — a keyframes+forwards approach would compute to TRANSPARENT
 under that override). Preview: computed rgba(200,164,86,0.22)+spread proven
 (hidden preview tab freezes transitions — verify computed style with
 transition:none, not by eye).
+FOLLOW-UP 2 (owner: "lit-up square, not the text"): the wash moved OFF the
+block container onto the verse's inner [data-hl-key] span (HighlightableText
+root — inline, wraps exactly the verse text, hugs line boxes like a real
+highlighter) and now reuses the letters' tap-through look verbatim: same
+--hl-* palette vars + the letter-highlight-pulse double-pulse keyframes
+(single 8.4s run — both pulses land inside the 4s window), light-theme
+variant included. Container styling fully removed. Verified: inner span
+inline + rgba(200,164,86,0.38) base + letter-highlight-pulse animation,
+container transparent.
 
 ───────────────────────────────────────────────────────────────────────────
 SESSION 2 — Link picker overhaul (items 3 + 6 + 7)

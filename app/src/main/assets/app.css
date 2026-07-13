@@ -1055,21 +1055,29 @@
          The transient anchor highlight BibleChapterView/ChapterView apply on
          a verse-targeted arrival (Surprise button, library/link deep-links,
          the scripture-sheet "Go to Scripture" action) and clear after 4s.
-         The class was applied but had NO rule — the "flash" was invisible
-         and only the scroll betrayed the landing spot. A gold wash + soft
-         spread now marks the verse; the base transition fades it in AND
-         fades the 4s clear out. Under prefers-reduced-motion the global
-         0.01ms transition override degrades this to a static 4s highlight
-         (never an instant vanish). */
-      .verse, .verse-row { transition: background-color 0.5s ease, box-shadow 0.5s ease; }
-      .verse-surprise {
-        background-color: rgba(200,164,86,0.22);
-        box-shadow: 0 0 0 5px rgba(200,164,86,0.22);
-        border-radius: 4px;
+         The look is the letters' tap-through highlight (.letter-highlight
+         below — same palette vars, same double-pulse keyframes) applied to
+         the verse's TEXT: the styling sits on the inner [data-hl-key] span
+         (the HighlightableText root, which wraps exactly the verse text and
+         hugs its line boxes like a real highlighter) — NOT on the block
+         container, whose full-width wash read as a lit-up square. The
+         transition fades the 4s clear out; under prefers-reduced-motion the
+         pulse collapses and the base wash remains as a static highlight. */
+      .verse [data-hl-key], .verse-row [data-hl-key] { transition: background-color 0.5s ease; }
+      .verse-surprise [data-hl-key] {
+        --hl-r: 200; --hl-g: 164; --hl-b: 86;
+        --hl-peak-r: 255; --hl-peak-g: 235; --hl-peak-b: 180;
+        --hl-base-a: 0.38; --hl-peak-a: 0.60; --hl-glow-a: 0.40;
+        background: rgba(var(--hl-r), var(--hl-g), var(--hl-b), var(--hl-base-a));
+        color: inherit;
+        border-radius: 3px;
+        padding: 0 0.12em;
+        animation: letter-highlight-pulse 8.4s ease;
       }
-      body.light .verse-surprise {
-        background-color: rgba(166,124,32,0.28);
-        box-shadow: 0 0 0 5px rgba(166,124,32,0.28);
+      body.light .verse-surprise [data-hl-key] {
+        --hl-r: 168; --hl-g: 126; --hl-b: 40;
+        --hl-peak-r: 255; --hl-peak-g: 230; --hl-peak-b: 150;
+        --hl-base-a: 0.32; --hl-peak-a: 0.58; --hl-glow-a: 0.35;
       }
     
     /* ── LETTER META ── */
