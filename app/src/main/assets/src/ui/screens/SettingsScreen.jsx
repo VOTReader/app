@@ -96,6 +96,54 @@ function DataActionRow({ label, desc = null, children = null, className = '' }) 
   );
 }
 
+/* TranslationInfoDesc — the Bible Translation row's ⓘ content: the base
+   sentence, then the Restored-Name editions' reasoning laid out concisely,
+   then the AI-assistance disclaimer (owner directive 2026-07-12). The full
+   evidence trail and the generator live in RESTORED-NAMES-PLAN.txt /
+   tools/gen-restored-nt.mjs — this block is the reader-facing summary. */
+function TranslationInfoDesc() {
+  return (
+    <>
+      Verse text for the 66-book reading flow. Section headings stay in place
+      across translations. Does not affect the Matthew Study Bible, which uses
+      its own curated text.
+      <p>
+        <strong>NKJV-R / KJV-R — the Restored Name editions.</strong> “His name
+        is YahuShua HaMashiach” (“Death and Deliverance”; “Proclaim The Name of
+        The Lord”). These editions restore the Name across the New Testament —
+        1,212 NKJV and 1,217 KJV verses, each checked against the Textus
+        Receptus, the Greek text behind both versions. The Old Testament is not
+        yet restored.
+      </p>
+      <ul>
+        <li>Jesus → YahuShua, “YAH Is Salvation” (Zechariah 6:11). The naming
+        verses and the cross inscription keep their capitals: YAHUSHUA
+        (Matthew 1:21; John 19:19).</li>
+        <li>Jesus Christ and Christ Jesus → YahuShua HaMashiach — always in the
+        commanded order of the Name.</li>
+        <li>Christ standing alone → HaMashiach. “Ha” is Hebrew for “the,” so
+        “the Christ” becomes simply HaMashiach (Matthew 16:16).</li>
+        <li>Hebrew never puts “Ha” on a possessed title: “His Mashiach”
+        (Acts 4:26), “the Lord’s Mashiach” (Luke 2:26), “called Mashiach”
+        (Matthew 1:16), “both Lord and Mashiach” (Acts 2:36).</li>
+        <li>“False christs” becomes “false messiahs” — a generic plural, not
+        His title. “Antichrist” and “Christian” are unchanged.</li>
+        <li>John’s translation notes render the meaning, “the Anointed,” so
+        they don’t repeat themselves (John 1:41; 4:25).</li>
+        <li>Other bearers of the name are untouched — Bar-Jesus (Acts 13:6),
+        Jesus called Justus (Colossians 4:11) — and the KJV’s two Joshua verses
+        (Acts 7:45; Hebrews 4:8) now read “Joshua,” as in the NKJV.</li>
+      </ul>
+      <p>
+        <strong>Please note:</strong> the Restored Name editions were prepared
+        with AI assistance (Claude, 2026). Every change was rule-generated and
+        machine-checked against the Greek, but errors are possible — where a
+        rendering matters, compare the base NKJV or KJV.
+      </p>
+    </>
+  );
+}
+
 function SectionClearBtn({ label, disabled, onClear }) {
   const [confirming, setConfirming] = React.useState(false);
   if (confirming) {
@@ -855,7 +903,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               eyebrow="Appearance"
               title="Bible Translation"
               label="Bible Translation"
-              desc="Verse text for the 66-book reading flow. Section headings stay in place across translations. Does not affect the Matthew Study Bible, which uses its own curated text."
+              desc={<TranslationInfoDesc />}
               value={settings.translation || "nkjv"}
               options={TRANSLATION_OPTIONS}
               onChange={(v) => onSetting("translation", v)}

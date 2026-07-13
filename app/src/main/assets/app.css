@@ -1757,6 +1757,12 @@
     .settings-row-label { font-family:'Cinzel',serif; font-size:0.82rem; letter-spacing:0.05em; color:var(--cream); }
     .settings-row-value { font-size:0.84rem; color:var(--gold); font-style:italic; text-align:right; }
     .settings-row-desc { font-size:0.82rem; color:var(--cream-muted); font-style:italic; line-height:1.45; padding:0 0.95rem 0.72rem; }
+    /* Structured ⓘ content (the Bible Translation explainer passes a node,
+       not a string): default p/ul margins are too chunky at this size. */
+    .settings-row-desc p { margin:0.6em 0 0; }
+    .settings-row-desc ul { margin:0.5em 0 0; padding-left:1.15em; }
+    .settings-row-desc li { margin-top:0.35em; }
+    .settings-row-desc li::marker { color:var(--gold-dim); }
     .settings-data-value { font-size:0.8rem; color:var(--gold-dim); font-style:italic; line-height:1.45; padding:0 0.95rem 0.66rem; }
     .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; flex-shrink:0; padding:0; line-height:1; border:1px solid var(--gold-border); border-radius:50%; background:transparent; color:var(--gold-dim); font-family:'Cinzel',serif; font-style:italic; font-size:0.6rem; cursor:pointer; }
     @media (hover:hover){ .settings-info-btn:hover{ color:var(--gold); border-color:var(--gold-dim); } }
