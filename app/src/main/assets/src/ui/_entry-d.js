@@ -55,6 +55,7 @@ import {
 import { describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab } from '../utils/tabs.js';
 import {
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
+  contentDocToNavItem, buildNavTree,
 } from '../utils/nav-index.js';
 import { _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav } from '../utils/note-source.js';
 import {
@@ -197,6 +198,7 @@ Object.assign(window, {
   getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits,
   describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab,
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
+  contentDocToNavItem, buildNavTree,
   _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav,
   READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
   countReadFor, groupBooks, tallyGroup,

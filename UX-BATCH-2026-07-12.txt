@@ -84,8 +84,51 @@ inline + rgba(200,164,86,0.38) base + letter-highlight-pulse animation,
 container transparent.
 
 ───────────────────────────────────────────────────────────────────────────
-SESSION 2 — Link picker overhaul (items 3 + 6 + 7)
+SESSION 2 — Link picker overhaul (items 3 + 6 + 7) ✅ DONE 2026-07-13
 ───────────────────────────────────────────────────────────────────────────
+LANDED (owner also reported: "search only searches titles and chapters" —
+confirmed, searchNavIndex is titles/refs only; full-text added):
+- LinkPicker has THREE MODES via a segmented control: [Search] [Browse]
+  [Recent]. All feed the same create/refine pipeline, so journal card/
+  excerpt insert modes get every mode for free.
+- SEARCH now adds an "In the text" group: MiniSearch (VotSearchMini,
+  bundle-e — picker mount kicks __loadScreensE + a deferred engine init)
+  searches every verse + letter/entry body; results map to nav items via
+  new contentDocToNavItem (nav-index.js; Hidden Manna maps to null → can
+  never surface), render with snippets, dedupe against title hits, cap 8.
+  Verse hits are verse-precise → direct create in link mode.
+- BROWSE: new buildNavTree (nav-index.js) groups the index into the app's
+  own hierarchy — The Holy Bible → 66 books → chapter GRID; Matthew Study
+  Bible → chapters; every letters collection → entries; each Bible study →
+  chapters. Breadcrumb ‹ back per level. The STUDY 'matthew' bookId is
+  excluded from the Bible book list (it has its own root — was showing two
+  identical "Matthew" rows).
+- RECENT: the link network — LinkStore.all() newest-first as From ⇄ To
+  endpoint chips; tapping either endpoint reuses that exact (already-
+  refined) place as the new target in ONE tap (no re-refinement).
+- LATENT BUG FIXED: buildNavIndex cached FOREVER on first call — built
+  before a lazy corpus landed, it permanently lost whole corpora (e.g. no
+  Bible chapters in the picker until app reload). Now signature-guarded
+  (books+collections+studies+matthew counts) and rebuilds when corpora
+  arrive; the picker mount kicks all loaders.
+- VERSE PICKER: got the same document-selectionchange fix as the excerpt
+  picker (handle drags fire no page touch events) + a live VERSE FILTER
+  ("Find a verse by its words…", count badge, tap-number still selects).
+- EXCERPT PICKER: "Find in this letter…" bar — match count + ‹ › cycling,
+  current hit gets a gold wash + scroll-to-center; nothing hidden (the
+  full letter stays selectable).
+Preview-proven at 375px on the real corpus: phrase "my cup runs over" (no
+title match) → Psalms 23:5 top hit with snippet → verse picker → filter
+"anoint" = 1 of 6 → footer enabled; Browse walked Bible→Psalms→150-grid→
+ch23→verse picker, all 23 roots present; Recent chips created a real link
+in one tap (+ Undo verified); find bar cycled 1 of 5 → 2 of 5 with the
+wash moving. 0 console errors. Gates: 2567 vitest / 144 files (+16),
+lint(440 globals — contentDocToNavItem + buildNavTree), typecheck,
+smoke:ci PASS.
+NOTE (deferred): the picker's content search indexes under the DEFAULT
+translation (nkjv) — fine for finding places; the main Search screen still
+owns translation-aware indexing.
+OLD PLAN (for reference):
 Owner items:
   (3) "Network of links — link picker has optional second tab/screen showing
       targets and sources of recent links."

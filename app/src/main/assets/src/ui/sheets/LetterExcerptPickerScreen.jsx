@@ -121,6 +121,30 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     };
   }, [captureSelectionSync]);
 
+  // Find-in-letter — long letters made locating the passage to excerpt a
+  // scroll hunt. Typing counts the matching paragraphs; ‹ › cycle through
+  // them (scroll-to + a gold wash on the current hit). Nothing is hidden or
+  // filtered — the full letter stays selectable, because the excerpt itself
+  // is still made by selecting text.
+  const [findQ, setFindQ] = React.useState('');
+  const [findIdx, setFindIdx] = React.useState(0);
+  const findTrim = findQ.trim().toLowerCase();
+  const findMatches = React.useMemo(() => {
+    if (findTrim.length < 2) return [];
+    return blocks.filter(b => b.text.toLowerCase().includes(findTrim)).map(b => b.key);
+  }, [blocks, findTrim]);
+  React.useEffect(() => { setFindIdx(0); }, [findTrim]);
+  const findHitKey = findMatches.length ? findMatches[Math.min(findIdx, findMatches.length - 1)] : null;
+  React.useEffect(() => {
+    if (!findHitKey || !bodyRef.current) return;
+    const el = bodyRef.current.querySelector('[data-block-key="' + findHitKey + '"]');
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [findHitKey]);
+  const findStep = (dir) => {
+    if (!findMatches.length) return;
+    setFindIdx((i) => (i + dir + findMatches.length) % findMatches.length);
+  };
+
   const confirmLink = React.useCallback(() => {
     const refinedTarget = { ...target };
     // Fall back to a fresh synchronous capture so a tap-confirm-faster-
@@ -193,13 +217,30 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
       >
         <div className="picker-letter-title">{titleText}</div>
         {subtitleText && <div className="picker-letter-subtitle">{subtitleText}</div>}
+        <div className="picker-find">
+          <input
+            className="picker-find-input"
+            type="search"
+            placeholder={"Find in this " + entryNoun + "…"}
+            value={findQ}
+            onChange={e => setFindQ(e.target.value)}
+            aria-label={"Find text in this " + entryNoun}
+          />
+          {findTrim.length >= 2 && (
+            <>
+              <span className="picker-find-count">{findMatches.length ? (Math.min(findIdx, findMatches.length - 1) + 1) + ' of ' + findMatches.length : '0 found'}</span>
+              <button type="button" className="picker-find-nav" onClick={() => findStep(-1)} disabled={!findMatches.length} aria-label="Previous match">{"‹"}</button>
+              <button type="button" className="picker-find-nav" onClick={() => findStep(1)} disabled={!findMatches.length} aria-label="Next match">{"›"}</button>
+            </>
+          )}
+        </div>
         {hasSelection && <div className="picker-selection-hint">{'"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + '…' : selInfo.text) + '"'}</div>}
         {!hasSelection && <div className="picker-selection-hint picker-selection-hint-empty">Long-press and drag to select an excerpt — or use the button below to link the whole {entryNoun}.</div>}
         {blocks.map(b => (
           <p
             key={b.key}
             data-block-key={b.key}
-            className="picker-letter-block"
+            className={"picker-letter-block" + (b.key === findHitKey ? " picker-find-hit" : "")}
           >{b.text}</p>
         ))}
       </div>

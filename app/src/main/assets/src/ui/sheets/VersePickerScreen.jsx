@@ -102,6 +102,41 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     }, 150);
   }, [captureSelectionSync]);
 
+  // Same Android reality as the excerpt picker (owner-reported there): the
+  // WebView delivers a long-press selection's touchend NON-BUBBLING and
+  // selection-HANDLE drags fire no page touch events at all, so the
+  // touchend fast path above never runs for a real drag-selection.
+  // document 'selectionchange' fires for EVERY selection path; debounced
+  // because handle drags fire it continuously.
+  React.useEffect(() => {
+    let t = null;
+    const onSelectionChange = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        t = null;
+        const info = captureSelectionSync();
+        if (info) setSelInfo(info);
+      }, 150);
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', onSelectionChange);
+      if (t) clearTimeout(t);
+    };
+  }, [captureSelectionSync]);
+
+  // Verse filter — long chapters (Psalm 119 is 176 verses) had no way to
+  // find a verse by its words; typing narrows the list live, and the tap-a-
+  // verse-number path selects from the narrowed list as usual. Clearing
+  // restores the full chapter (drag-selection across verses wants context,
+  // so the filter is opt-in, never sticky).
+  const [verseFilter, setVerseFilter] = React.useState('');
+  const filterQ = verseFilter.trim().toLowerCase();
+  const shownVerses = React.useMemo(() => {
+    if (!filterQ) return verses;
+    return verses.filter(v => (v.text || '').toLowerCase().includes(filterQ) || String(v.n) === filterQ);
+  }, [verses, filterQ]);
+
   const handleVerseTap = React.useCallback((vn) => {
     // Tap a verse number to quick-select the whole verse. Sets a synthetic
     // selInfo and visually selects the verse in the DOM so the user gets a
@@ -214,6 +249,19 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
       >
         <div className="picker-letter-title">{titleText}</div>
         <div className="picker-letter-subtitle">{isStudy ? "Matthew Study Bible" : "Bible Chapter"}</div>
+        <div className="picker-find">
+          <input
+            className="picker-find-input"
+            type="search"
+            placeholder="Find a verse by its words…"
+            value={verseFilter}
+            onChange={e => setVerseFilter(e.target.value)}
+            aria-label="Filter verses by text"
+          />
+          {filterQ && (
+            <span className="picker-find-count">{shownVerses.length} of {verses.length}</span>
+          )}
+        </div>
         <div
           className={"picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")}
         >{hasSelection
@@ -221,7 +269,10 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
           : "Highlight any portion, or tap a verse number to grab the whole verse."
         }</div>
         <div ref={bodyRef} className="picker-verses">
-          {verses.map(v => (
+          {filterQ && shownVerses.length === 0 && (
+            <div className="picker-find-none">No verse in this chapter contains “{verseFilter.trim()}”.</div>
+          )}
+          {shownVerses.map(v => (
             <p
               key={v.n}
               className="picker-verse-selectable"

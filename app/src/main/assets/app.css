@@ -3321,6 +3321,130 @@
       font-family: 'EB Garamond', serif; font-size: 0.92rem;
       color: var(--cream-muted); line-height: 1.5;
     }
+    /* ── LinkPicker mode tabs (Search / Browse / Recent) ── */
+    .navpick-tabs {
+      display: flex; gap: 6px;
+      margin: 2px 18px 10px; padding: 3px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--gold-border); border-radius: 999px;
+    }
+    body.light .navpick-tabs { background: rgba(0,0,0,0.05); }
+    .navpick-tab {
+      flex: 1; min-height: 38px;
+      background: transparent; border: none; border-radius: 999px;
+      font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--cream-muted);
+      cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .navpick-tab.active {
+      background: rgba(200,164,86,0.16); color: var(--gold-bright);
+      border: 1px solid var(--gold-border);
+    }
+    body.light .navpick-tab.active { color: #7a5c1e; }
+    /* ── Browse breadcrumb (back one level + current group) ── */
+    .navpick-crumb {
+      display: flex; align-items: center; gap: 10px;
+      margin: 0 18px 6px;
+    }
+    .navpick-crumb-back {
+      width: 38px; height: 38px; flex-shrink: 0;
+      background: rgba(200,164,86,0.10); border: 1px solid var(--gold-border);
+      border-radius: 999px; color: var(--gold-bright);
+      font-size: 1.25rem; line-height: 1; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .navpick-crumb-label {
+      font-family: 'Cinzel', serif; font-size: 0.82rem; letter-spacing: 0.08em;
+      color: var(--cream); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .navpick-row-chevron { margin-left: auto; color: var(--gold-dim); font-size: 1.15rem; flex-shrink: 0; }
+    /* ── Chapter grid (a Bible book / Matthew Study Bible) ── */
+    .navpick-ch-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+      gap: 8px; padding: 10px 2px 4px;
+    }
+    .navpick-ch-btn {
+      min-height: 44px; border-radius: 8px;
+      background: rgba(200,164,86,0.07); border: 1px solid var(--gold-border);
+      color: var(--cream); font-family: 'EB Garamond', serif; font-size: 1.02rem;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s ease;
+    }
+    .navpick-ch-btn:active { background: rgba(200,164,86,0.2); }
+    /* ── Full-text search result snippet ── */
+    .navpick-row-snippet {
+      font-size: 0.88rem; color: var(--cream-muted); font-style: italic;
+      margin-top: 2px; line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .navpick-hintline {
+      font-family: 'EB Garamond', serif; font-size: 0.9rem; font-style: italic;
+      color: var(--cream-muted); padding: 12px 4px 8px; line-height: 1.4;
+    }
+    /* ── Recent links — the link network (From ⇄ To endpoint chips) ── */
+    .navpick-link-row {
+      display: flex; align-items: stretch; gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(110,98,76,0.12);
+    }
+    .navpick-link-endpoint {
+      flex: 1; min-width: 0; min-height: 52px;
+      display: flex; flex-direction: column; justify-content: center; gap: 2px;
+      padding: 8px 10px; text-align: left;
+      background: rgba(200,164,86,0.06); border: 1px solid var(--gold-border);
+      border-radius: 8px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s ease;
+    }
+    .navpick-link-endpoint:active { background: rgba(200,164,86,0.18); }
+    .navpick-link-ep-eyebrow {
+      font-family: 'Cinzel', serif; font-size: 0.56rem; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--gold-dim);
+    }
+    .navpick-link-ep-label {
+      font-family: 'EB Garamond', serif; font-size: 0.95rem; color: var(--cream);
+      line-height: 1.25;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .navpick-link-arrow { align-self: center; color: var(--gold-dim); font-size: 1rem; flex-shrink: 0; }
+    /* ── Picker find bars (verse filter / find-in-letter) ── */
+    .picker-find {
+      display: flex; align-items: center; gap: 8px;
+      margin: 10px 0 4px;
+    }
+    .picker-find-input {
+      flex: 1; min-width: 0; min-height: 40px;
+      padding: 8px 14px; border-radius: 999px;
+      background: rgba(0,0,0,0.25); border: 1px solid var(--gold-border);
+      color: var(--cream); font-family: 'EB Garamond', serif; font-size: 0.98rem;
+    }
+    body.light .picker-find-input { background: var(--bg); color: var(--input-text); }
+    .picker-find-input::placeholder { color: var(--cream-muted); }
+    .picker-find-input:focus { border-color: var(--gold); outline: none; }
+    .picker-find-count {
+      font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.06em;
+      color: var(--cream-muted); flex-shrink: 0; white-space: nowrap;
+    }
+    .picker-find-nav {
+      width: 40px; height: 40px; flex-shrink: 0;
+      background: rgba(200,164,86,0.10); border: 1px solid var(--gold-border);
+      border-radius: 999px; color: var(--gold-bright);
+      font-size: 1.2rem; line-height: 1; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .picker-find-nav:disabled { opacity: 0.35; cursor: default; }
+    .picker-find-none {
+      font-family: 'EB Garamond', serif; font-style: italic; font-size: 0.94rem;
+      color: var(--cream-muted); padding: 14px 2px;
+    }
+    /* Current find hit — the letters' highlight wash, block-scoped and
+       transitioned so cycling ‹ › reads as the highlight moving. */
+    .picker-letter-block { transition: background-color 0.35s ease; border-radius: 4px; }
+    .picker-letter-block.picker-find-hit { background-color: rgba(200,164,86,0.16); }
+    body.light .picker-letter-block.picker-find-hit { background-color: rgba(168,126,40,0.18); }
     .navpick-flash {
       display: flex; align-items: center; gap: 8px;
       margin: 0 18px 8px;

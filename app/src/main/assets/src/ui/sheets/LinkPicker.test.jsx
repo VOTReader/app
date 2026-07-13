@@ -8,22 +8,25 @@
    bare globals, so we stub them. */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { LinkPicker } from './LinkPicker.jsx';
 
 function stubGlobals() {
   window.RecentNavStore = { list: () => [], add: vi.fn() };
   window.searchNavIndex = () => [];
   window.navItemToEndpoint = (item) => ({ type: 'bible', key: 'k', label: item.label });
-  window.LinkStore = { remove: vi.fn() };
+  window.LinkStore = { remove: vi.fn(), all: () => [] };
   window.buildSourceEndpoint = () => ({ key: 's', label: 'src' });
   window.persistLink = vi.fn(() => ({ id: 'lnk1', target: { label: 'Genesis 1:1' } }));
   window.COL_NAV_ICON = new Map();
+  window.buildNavTree = () => ({ bibleBooks: [], matthewChapters: [], collections: [], studies: [] });
+  window.contentDocToNavItem = () => null;
 }
 
 afterEach(() => {
   cleanup();
-  ['RecentNavStore', 'searchNavIndex', 'navItemToEndpoint', 'LinkStore', 'buildSourceEndpoint', 'persistLink', 'COL_NAV_ICON'].forEach(k => delete window[k]);
+  ['RecentNavStore', 'searchNavIndex', 'navItemToEndpoint', 'LinkStore', 'buildSourceEndpoint',
+    'persistLink', 'COL_NAV_ICON', 'buildNavTree', 'contentDocToNavItem', 'VotSearchMini'].forEach(k => delete window[k]);
 });
 
 const baseProps = {
@@ -90,5 +93,115 @@ describe('LinkPicker close keeps the created link', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalled();
     expect(window.LinkStore.remove).not.toHaveBeenCalled();
+  });
+});
+
+/* ── SESSION-2 overhaul (UX-BATCH-2026-07-12): tabs, Browse, Recent, text ── */
+
+describe('LinkPicker mode tabs', () => {
+  it('renders Search / Browse / Recent with Search active by default', () => {
+    stubGlobals();
+    const { container } = render(<LinkPicker {...baseProps} />);
+    const tabs = [...container.querySelectorAll('.navpick-tab')];
+    expect(tabs.map(t => t.textContent)).toEqual(['Search', 'Browse', 'Recent']);
+    expect(tabs[0].className).toContain('active');
+    expect(container.querySelector('.navpick-search-input')).toBeTruthy();
+  });
+});
+
+describe('LinkPicker Browse mode', () => {
+  it('walks Bible → book → chapter grid and requests VERSE refinement on a chapter', () => {
+    stubGlobals();
+    const ch = (n) => ({ kind: 'bible-chapter', bookId: 'genesis', chapter: n, label: 'Genesis ' + n, category: 'Old Testament', title: 'Genesis' });
+    window.buildNavTree = () => ({
+      bibleBooks: [{ bookId: 'genesis', title: 'Genesis', category: 'Old Testament', chapters: [ch(1), ch(2)] }],
+      matthewChapters: [],
+      collections: [{ label: 'Volume One', entries: [{ kind: 'letter', letterId: 'l1', label: 'First Letter', category: 'Volume One', collection: 'Volume One' }] }],
+      studies: [],
+    });
+    const onRequestRefine = vi.fn();
+    const { container } = render(<LinkPicker {...baseProps} onRequestRefine={onRequestRefine} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Browse' }));
+    // Roots: the app's own sections
+    expect(screen.getByText('The Holy Bible')).toBeTruthy();
+    expect(screen.getByText('Volume One')).toBeTruthy();
+    fireEvent.click(screen.getByText('The Holy Bible'));
+    expect(screen.getByText('Genesis')).toBeTruthy();
+    fireEvent.click(screen.getByText('Genesis'));
+    const grid = container.querySelector('.navpick-ch-grid');
+    expect(grid).toBeTruthy();
+    expect([...grid.querySelectorAll('.navpick-ch-btn')].map(b => b.textContent)).toEqual(['1', '2']);
+    fireEvent.click(grid.querySelectorAll('.navpick-ch-btn')[0]);
+    expect(onRequestRefine).toHaveBeenCalledWith(expect.objectContaining({ kind: 'verse' }));
+    // Breadcrumb back pops one level (grid → book list)
+    fireEvent.click(container.querySelector('.navpick-crumb-back'));
+    expect(screen.getByText('Genesis')).toBeTruthy();
+  });
+});
+
+describe('LinkPicker Recent mode — the link network', () => {
+  it('lists recent links as From ⇄ To chips; tapping an endpoint reuses it as the target', () => {
+    stubGlobals();
+    window.LinkStore.all = () => [{
+      id: 'L1', created: 5,
+      source: { key: 'bible:john:3:16', label: 'John 3:16', type: 'bible' },
+      target: { key: 'letter:l1:0', label: 'First Letter', type: 'letter' },
+    }];
+    const onLinkCreated = vi.fn();
+    const { container } = render(<LinkPicker {...baseProps} onLinkCreated={onLinkCreated} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Recent' }));
+    const chipLabels = [...container.querySelectorAll('.navpick-link-ep-label')].map(e => e.textContent);
+    expect(chipLabels).toEqual(['John 3:16', 'First Letter']);
+    const chips = [...container.querySelectorAll('.navpick-link-endpoint')];
+    fireEvent.click(chips[1]); // the To chip
+    expect(window.persistLink).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 's' }),
+      expect.objectContaining({ key: 'letter:l1:0', label: 'First Letter' }),
+    );
+    expect(onLinkCreated).toHaveBeenCalled();
+  });
+
+  it('shows an honest empty state before any links exist', () => {
+    stubGlobals();
+    render(<LinkPicker {...baseProps} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Recent' }));
+    expect(screen.getByText('No links yet')).toBeTruthy();
+  });
+});
+
+describe('LinkPicker full-text search ("In the text")', () => {
+  it('renders engine hits with snippets and creates directly from a verse hit', async () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    window.navItemToEndpoint = (item) => ({ type: 'bible', key: 'k', label: item.label, verse: item.verse || null });
+    window.contentDocToNavItem = (doc) => ({
+      kind: 'bible-chapter', bookId: doc.bookId, chapter: doc.chapterNum, verse: doc.verseNum,
+      label: doc.ref, category: 'New Testament', title: doc.ref,
+    });
+    window.VotSearchMini = {
+      init: vi.fn(async () => true),
+      getState: () => ({ ready: true }),
+      snippet: (text) => text.slice(0, 40),
+      search: vi.fn(async () => ({
+        parsedTerms: ['loved'],
+        results: [{ score: 9, doc: { kind: 'verse', volumeId: 'bible', bookId: 'john', chapterNum: 3, verseNum: 16, ref: 'John 3:16', text: 'For God so loved the world…' } }],
+      })),
+    };
+    const { container } = render(<LinkPicker {...baseProps} />);
+    try {
+      fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
+      await act(async () => { vi.advanceTimersByTime(300); });
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText('In the text')).toBeTruthy();
+      const hitRow = [...container.querySelectorAll('.navpick-row')]
+        .find(r => r.querySelector('.navpick-row-label')?.textContent === 'John 3:16');
+      expect(hitRow).toBeTruthy();
+      expect(hitRow.querySelector('.navpick-row-snippet').textContent).toContain('For God so loved');
+      fireEvent.click(hitRow);
+      // Verse-precise hit → direct create, no refinement step.
+      expect(window.persistLink).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -7,7 +7,7 @@
    Reads bare globals, so we stub them. */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { VersePickerScreen } from './VersePickerScreen.jsx';
 
 function stubGlobals() {
@@ -81,5 +81,49 @@ describe('VersePickerScreen breadcrumb + footer', () => {
     // return-target mode hands the refined target back through onClose, no link persisted
     expect(window.persistLink).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+/* ── SESSION-2 (UX-BATCH-2026-07-12): verse filter + selectionchange ── */
+
+describe('VersePickerScreen find + selectionchange', () => {
+  it('the verse filter narrows the list live and clears back to the full chapter', () => {
+    stubGlobals();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    expect(container.querySelectorAll('.picker-verse-selectable').length).toBe(2);
+    fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'without form' } });
+    expect(container.querySelectorAll('.picker-verse-selectable').length).toBe(1);
+    expect(container.querySelector('.picker-find-count').textContent).toBe('1 of 2');
+    fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: '' } });
+    expect(container.querySelectorAll('.picker-verse-selectable').length).toBe(2);
+  });
+
+  it('a drag-selection with NO touchend (native handles) still enables the footer', () => {
+    // Same WebView reality as the excerpt picker: the long-press selection's
+    // touchend arrives non-bubbling and handle drags fire no page touch
+    // events — document selectionchange must drive the commit.
+    vi.useFakeTimers();
+    stubGlobals();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    const textNode = container.querySelectorAll('.picker-verse-text')[0].firstChild;
+    const getSelectionOrig = window.getSelection;
+    window.getSelection = /** @type {any} */ (() => ({
+      isCollapsed: false, rangeCount: 1,
+      getRangeAt: () => ({
+        startContainer: textNode, startOffset: 0,
+        endContainer: textNode, endOffset: 16,
+        toString: () => 'In the beginning',
+      }),
+    }));
+    try {
+      act(() => { document.dispatchEvent(new Event('selectionchange')); });
+      act(() => { vi.advanceTimersByTime(200); });
+      const btn = /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
+      expect(btn.disabled).toBe(false);
+      expect(btn.textContent).toBe('Link this selection');
+    } finally {
+      window.getSelection = getSelectionOrig;
+      vi.useRealTimers();
+    }
   });
 });

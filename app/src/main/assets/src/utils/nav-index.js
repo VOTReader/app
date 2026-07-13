@@ -29,10 +29,20 @@
  * COLLECTION, Matthew study chapters, plus Bible Study (non-Matthew)
  * chapters.
  *
+ * The memo is SIGNATURE-GUARDED: the corpora are lazy-loaded, so an index
+ * built before (say) the Bible bundle landed would otherwise be missing all
+ * 1,189 chapters FOREVER (the cache never expired — a picker opened early
+ * permanently lost whole corpora until an app reload). When a corpus count
+ * changes, the index rebuilds once and re-memoizes.
+ *
  * @returns {NavItem[]}
  */
 export function buildNavIndex() {
-  if (window.__NAV_INDEX) return window.__NAV_INDEX;
+  const sig = Object.keys(_allBooks()).length
+    + ':' + (typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.length : 0)
+    + ':' + (Array.isArray(window.BIBLE_STUDIES) ? window.BIBLE_STUDIES.length : 0)
+    + ':' + (_matthew() ? 1 : 0);
+  if (window.__NAV_INDEX && window.__NAV_INDEX_SIG === sig) return window.__NAV_INDEX;
   const items = [];
 
   /* Bible books → chapters. Each book gets a chapter-level entry. */
@@ -199,7 +209,110 @@ export function buildNavIndex() {
   }
 
   window.__NAV_INDEX = items;
+  window.__NAV_INDEX_SIG = sig;
   return items;
+}
+
+/**
+ * Map a MiniSearch content doc (VotSearchMini.search result `.doc`) to a
+ * NavItem the LinkPicker can render + convert via navItemToEndpoint — the
+ * bridge that lets the picker search TEXT, not just titles/references.
+ *
+ *   verse docs        → synthesized chapter+verse item (same shape as the
+ *                       searchNavIndex Bible-ref hit; Matthew study verses
+ *                       route to the study edition)
+ *   letter/entry docs → the REAL nav item looked up by id (heading
+ *                       disambiguates id collisions across collections);
+ *                       Hidden Manna letters have no nav item → null →
+ *                       excluded, preserving the never-index rule
+ *   bible-study docs  → the study-chapter item (studyId + chapterNum)
+ *
+ * @param {any} doc
+ * @returns {NavItem | null}
+ */
+export function contentDocToNavItem(doc) {
+  if (!doc) return null;
+  if (doc.kind === 'verse') {
+    if (doc.volumeId === 'matthew-study') {
+      return {
+        kind: 'study-chapter', bookId: 'matthew',
+        chapter: doc.chapterNum, verse: doc.verseNum,
+        screen: 'matthew-ch',
+        label: 'Matthew ' + doc.chapterNum + ':' + doc.verseNum,
+        category: 'Study Bible', title: 'Matthew',
+      };
+    }
+    return {
+      kind: 'bible-chapter', bookId: doc.bookId,
+      chapter: doc.chapterNum, verse: doc.verseNum,
+      label: doc.ref, category: bookCategory(doc.bookId), title: doc.ref,
+    };
+  }
+  const items = buildNavIndex();
+  const ENTRY_KIND = { wtlb: 'wtlb-entry', blessed: 'blessed-entry', 'holy-day': 'holy-days-entry' };
+  if (doc.kind === 'letter') {
+    const matches = items.filter((i) => i.kind === 'letter' && i.letterId === doc.letterId);
+    return matches.find((i) => i.collection === doc.heading) || matches[0] || null;
+  }
+  if (ENTRY_KIND[doc.kind]) {
+    const matches = items.filter((i) => i.kind === ENTRY_KIND[doc.kind] && i.entryId === doc.letterId);
+    return matches.find((i) => i.collection === doc.heading) || matches[0] || null;
+  }
+  if (doc.kind === 'bible-study') {
+    return items.find((i) => i.kind === 'study-letter-chapter' && i.studyId === doc.letterId && i.chapterNum === doc.chapterNum) || null;
+  }
+  return null;
+}
+
+/**
+ * Group the nav index into the Browse drill-down tree the LinkPicker's
+ * Browse mode renders — the same top-down hierarchy the app's own menus
+ * use, so finding a link target works exactly like navigating the app.
+ *
+ * @returns {{
+ *   bibleBooks: Array<{bookId:string,title:string,category:string,chapters:NavItem[]}>,
+ *   matthewChapters: NavItem[],
+ *   collections: Array<{label:string,entries:NavItem[]}>,
+ *   studies: Array<{label:string,chapters:NavItem[]}>
+ * }}
+ */
+export function buildNavTree() {
+  const items = buildNavIndex();
+  const bibleBooks = [];
+  const bookMap = new Map();
+  const colMap = new Map();   // insertion order == COLLECTIONS registry order
+  const studyMap = new Map();
+  const matthewChapters = [];
+  for (const it of items) {
+    if (it.kind === 'bible-chapter') {
+      // bookId 'matthew' is the STUDY edition (it lives in _allBooks so refs
+      // resolve); in the tree it has its own "Matthew Study Bible" root —
+      // listing it under The Holy Bible would show two identical "Matthew"
+      // rows ('matthew-plain' is the plain-Bible one).
+      if (it.bookId === 'matthew') continue;
+      let b = bookMap.get(it.bookId);
+      if (!b) {
+        b = { bookId: it.bookId, title: it.title, category: it.category, chapters: [] };
+        bookMap.set(it.bookId, b);
+        bibleBooks.push(b); // _allBooks() iterates in canonical book order
+      }
+      b.chapters.push(it);
+    } else if (it.kind === 'study-chapter') {
+      matthewChapters.push(it);
+    } else if (it.kind === 'study-letter-chapter') {
+      if (!studyMap.has(it.collection)) studyMap.set(it.collection, []);
+      studyMap.get(it.collection).push(it);
+    } else {
+      if (!colMap.has(it.category)) colMap.set(it.category, []);
+      colMap.get(it.category).push(it);
+    }
+  }
+  return {
+    bibleBooks,
+    matthewChapters,
+    collections: Array.from(colMap, ([label, entries]) => ({ label, entries })),
+    studies: Array.from(studyMap, ([label, chapters]) => ({ label, chapters })),
+  };
 }
 
 /**

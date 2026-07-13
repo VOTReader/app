@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 438 distinct identifiers.
+// Total: 440 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -303,6 +303,7 @@ declare const blockBoundaryOffsets: any;
 declare const bookCategory: any;
 declare const buildExportPayload: any;
 declare const buildNavIndex: any;
+declare const buildNavTree: any;
 declare const buildProgressGroups: any;
 declare const buildScreenRoutes: any;
 declare const buildSourceEndpoint: any;
@@ -314,6 +315,7 @@ declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
 declare const colLetters: any;
 declare const colPreface: any;
+declare const contentDocToNavItem: any;
 declare const countReadFor: any;
 declare const data: any;
 declare const describeTab: any;

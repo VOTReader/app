@@ -63,6 +63,17 @@ describe('LetterExcerptPickerScreen breadcrumb + footer', () => {
     expect(container.querySelector('.picker-footer-btn').textContent).toBe('Insert the whole letter');
   });
 
+  it('find-in-letter counts matching paragraphs and washes the current hit', () => {
+    stubGlobals();
+    const { container } = render(<LetterExcerptPickerScreen {...baseProps} />);
+    fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'earth' } });
+    expect(container.querySelector('.picker-find-count').textContent).toBe('1 of 1');
+    expect(container.querySelector('.picker-letter-block').className).toContain('picker-find-hit');
+    fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'zzz-nowhere' } });
+    expect(container.querySelector('.picker-find-count').textContent).toBe('0 found');
+    expect(container.querySelector('.picker-find-hit')).toBeNull();
+  });
+
   /* Owner-reported: on Android a long-press selection's touchend is delivered
      NON-BUBBLING by the WebView, and selection-HANDLE drags fire no page touch
      events at all — so the touchend fast path never ran and the footer only
