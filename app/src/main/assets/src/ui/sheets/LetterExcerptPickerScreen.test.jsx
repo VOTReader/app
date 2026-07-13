@@ -6,7 +6,7 @@
    whole-letter link. Reads bare globals, so we stub them. */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { LetterExcerptPickerScreen } from './LetterExcerptPickerScreen.jsx';
 
 function stubGlobals() {
@@ -61,5 +61,38 @@ describe('LetterExcerptPickerScreen breadcrumb + footer', () => {
     stubGlobals();
     const { container } = render(<LetterExcerptPickerScreen {...baseProps} returnTargetInsteadOfLink={true} />);
     expect(container.querySelector('.picker-footer-btn').textContent).toBe('Insert the whole letter');
+  });
+
+  /* Owner-reported: on Android a long-press selection's touchend is delivered
+     NON-BUBBLING by the WebView, and selection-HANDLE drags fire no page touch
+     events at all — so the touchend fast path never ran and the footer only
+     recognized the selection after a later scroll gesture. The document
+     'selectionchange' listener must commit the selection with NO touch/mouse
+     event ever reaching the picker body. (RED vs the pre-fix component.) */
+  it('a selection made with NO touchend (native handles) still enables the excerpt footer', () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    const { container } = render(<LetterExcerptPickerScreen {...baseProps} />);
+    const block = container.querySelector('[data-block-key]');
+    const textNode = block.firstChild;
+    // Selection-like over "of the earth" inside the real rendered block —
+    // captureSelectionSync builds its preRange from real jsdom Ranges.
+    const getSelectionOrig = window.getSelection;
+    window.getSelection = /** @type {any} */ (() => ({
+      isCollapsed: false,
+      rangeCount: 1,
+      getRangeAt: () => ({ startContainer: textNode, startOffset: 8, toString: () => 'of the earth' }),
+    }));
+    try {
+      expect(container.querySelector('.picker-footer-btn').textContent).toBe('Link the whole letter');
+      // ONLY selectionchange — no mouseup, no touchend.
+      act(() => { document.dispatchEvent(new Event('selectionchange')); });
+      act(() => { vi.advanceTimersByTime(200); }); // past the 150ms debounce
+      expect(container.querySelector('.picker-footer-btn').textContent).toBe('Link this excerpt');
+      expect(container.querySelector('.picker-selection-hint').textContent).toContain('of the earth');
+    } finally {
+      window.getSelection = getSelectionOrig;
+      vi.useRealTimers();
+    }
   });
 });

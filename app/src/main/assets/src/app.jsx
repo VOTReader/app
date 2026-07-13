@@ -295,7 +295,7 @@ function App() {
   const { tabThumbnails, setTabThumbnails, captureActiveTabThumbnail } = useThumbnails({
     tabs, activeTabIdx, activeTab,
     tabsEnabled: settings.tabsEnabled,
-    tabsOverviewOpen,
+    tabsOverviewOpen, theme,
   });
   const navOriginRef = useRefMirror(navOrigin);
 

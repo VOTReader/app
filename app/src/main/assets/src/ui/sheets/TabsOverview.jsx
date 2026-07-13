@@ -25,6 +25,11 @@
 
 export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onMenu, onReorder, onClearAll, onDedupe, MAX_TABS, thumbnails }) {
   const total = tabs.length;
+  // Current theme for thumbnail theme-normalization (see the map below).
+  // Read from the body class — the authoritative live-theme signal — so no
+  // new prop threads through AppShellOverlays; the overview remounts per
+  // open, and the theme can't change while it covers the screen.
+  const currentTheme = (typeof document !== 'undefined' && document.body.classList.contains('light')) ? 'light' : 'dark';
   const [confirmingClearAll, setConfirmingClearAll] = React.useState(false);
 
   /* ── Drag-to-reorder state (CSS-class drivers only) + imperative refs ── */
@@ -398,7 +403,17 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
           const pctLive = saved == null ? 0 :
             typeof saved === 'object' && typeof saved.pct === 'number' ? saved.pct : 0;
           const isActive = i === activeTabIdx;
-          const thumb = thumbnails ? thumbnails[tabContentKey(t)] : null;
+          // Thumbnail entries are { url, theme } ({@link useThumbnails});
+          // legacy bare-string rows still render (theme unknown → as-is).
+          // A card whose screenshot was captured under the OTHER theme gets
+          // .thumb-theme-flip (an invert+hue-rotate that reads as the current
+          // theme) so a theme switch never shows a mixed dark/light wall —
+          // the next visit to that tab recaptures true pixels. Garden tabs
+          // are exempt: photographs invert badly and are theme-neutral.
+          const thumbEntry = thumbnails ? thumbnails[tabContentKey(t)] : null;
+          const thumb = thumbEntry ? (typeof thumbEntry === 'string' ? thumbEntry : thumbEntry.url) : null;
+          const thumbFlip = !!(thumbEntry && typeof thumbEntry === 'object' && thumbEntry.theme &&
+            thumbEntry.theme !== currentTheme && t.screen !== 'garden-view');
           return (
             <div
               key={i}
@@ -426,7 +441,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
               >{"\xD7"}</button>
               <div className="tab-card-thumb-wrap">
                 {thumb
-                  ? <img className="tab-card-thumb" src={thumb} alt="" />
+                  ? <img className={`tab-card-thumb${thumbFlip ? ' thumb-theme-flip' : ''}`} src={thumb} alt="" />
                   : <div className="tab-card-thumb-placeholder">
                       <div className="tab-card-thumb-sigil">{"✦"}</div>
                     </div>

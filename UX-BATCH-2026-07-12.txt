@@ -192,6 +192,33 @@ PLAN:
   with fresh eyes on Settings + Search + Library headers).
 
 ───────────────────────────────────────────────────────────────────────────
+OWNER FOLLOW-UPS LANDED SAME DAY (outside the 5 sessions)
+───────────────────────────────────────────────────────────────────────────
+(A) TAB THUMBNAILS vs THEME SWITCH — owner: mixed dark/light cards after a
+theme change; asked for dual-theme screenshots or always-dark capture.
+NEITHER is possible: Android capture is native PixelCopy (only what's on
+screen). Shipped instead: every thumbnail records its capture theme
+({url, theme} in vot-thumbs, legacy strings normalized theme:null); the
+overview theme-normalizes a mismatched card via .thumb-theme-flip
+(invert(1) hue-rotate(180deg) — lightness flips, hues survive) so the wall
+is never mixed; a theme change also re-captures the ACTIVE tab (new theme
+dep on the after-nav effect) and every visit re-captures — filters are
+transitional, true pixels self-heal. Garden tabs exempt (photos invert
+badly). useThumbnails gained a `theme` param (app.jsx passes it).
+Live-proven: 2 tabs, theme flip → background card filtered, active card
+self-healed unfiltered, 0 console errors.
+(B) EXCERPT-PICKER "can't save until I scroll" — the picker only captured
+selection on mouseup/touchend over the body, but Android's long-press
+selection delivers its touchend NON-BUBBLING (same WebView behavior as the
+tab-drag lockup) and HANDLE drags fire no page touch events at all — a
+later scroll's touchend was what finally ran the capture. Fixed: document
+'selectionchange' listener (150ms debounce) drives the state commit; touch/
+mouse handlers stay as fast path. Live-proven: programmatic Selection.addRange
+(fires ONLY selectionchange) flipped the footer to "Insert this excerpt".
+PREVIEW GOTCHA: hidden-tab setTimeout clamps to ~1s — sample AFTER generous
+settles or the 150ms debounce looks broken.
+
+───────────────────────────────────────────────────────────────────────────
 STATUS LOG
 ───────────────────────────────────────────────────────────────────────────
 2026-07-12  File created; recon of all 9 items done (surfaces verified in

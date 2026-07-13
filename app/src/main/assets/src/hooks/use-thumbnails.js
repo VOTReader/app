@@ -66,10 +66,11 @@ import { PlatformBridge } from '../utils/platform-bridge.js';
  *   activeTabIdx: number,
  *   activeTab: any,
  *   tabsEnabled: boolean,
- *   tabsOverviewOpen: boolean
+ *   tabsOverviewOpen: boolean,
+ *   theme: string
  * }} args
  * @returns {{
- *   tabThumbnails: Record<string, string>,
+ *   tabThumbnails: Record<string, { url: string, theme: string | null }>,
  *   setTabThumbnails: (val: any) => void,
  *   captureActiveTabThumbnail: () => void
  * }}
@@ -80,16 +81,26 @@ export function useThumbnails({
   activeTab,
   tabsEnabled,
   tabsOverviewOpen,
+  theme,
 }) {
   // ── State ──────────────────────────────────────────────────────────────
   const [tabThumbnails, setTabThumbnails] = React.useState({});
 
   // ── Load previously-saved thumbnails on mount ──────────────────────────
+  // Entries are { url, theme } — theme is the theme the screenshot was
+  // captured under, so the Tabs overview can theme-normalize a mismatched
+  // card at render time. Legacy rows (bare data-URL strings from before the
+  // theme field existed) normalize to theme:null = "unknown, render as-is".
   React.useEffect(() => {
     let cancelled = false;
     idbReadAll().then((thumbs) => {
       if (cancelled) return;
-      setTabThumbnails(thumbs || {});
+      const norm = {};
+      for (const k of Object.keys(thumbs || {})) {
+        const v = thumbs[k];
+        norm[k] = (typeof v === 'string') ? { url: v, theme: null } : v;
+      }
+      setTabThumbnails(norm);
     });
     return () => { cancelled = true; };
   }, []);
@@ -117,6 +128,9 @@ export function useThumbnails({
   const activeTabIdxRef = useRefMirror(activeTabIdx);
   const tabsRef = useRefMirror(tabs);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
+  // Theme rides a ref so applyThumb reads it call-time fresh without
+  // breaking the captureActiveTabThumbnail [tabsEnabled] identity invariant.
+  const themeRef = useRefMirror(theme);
   const captureInFlightRef = React.useRef(false);
   const thumbnailsRef = React.useRef({});
 
@@ -140,9 +154,13 @@ export function useThumbnails({
 
     const applyThumb = (dataUrl) => {
       if (!dataUrl) return;
-      thumbnailsRef.current[key] = dataUrl;
-      setTabThumbnails((prev) => ({ ...prev, [key]: dataUrl }));
-      idbPut(key, dataUrl); // write-through to IndexedDB — survives app restart
+      // Record the theme the pixels were captured under — the overview
+      // theme-normalizes mismatched cards so a theme switch never shows a
+      // mixed wall of dark+light thumbnails.
+      const entry = { url: dataUrl, theme: themeRef.current === 'light' ? 'light' : 'dark' };
+      thumbnailsRef.current[key] = entry;
+      setTabThumbnails((prev) => ({ ...prev, [key]: entry }));
+      idbPut(key, entry); // write-through to IndexedDB — survives app restart
     };
 
     // Hide floating UI chrome (sticky arrows, reading dot) for the duration
@@ -209,7 +227,9 @@ export function useThumbnails({
   }, []);
 
   // ── Capture-after-nav effect ───────────────────────────────────────────
-  // Capture shortly after any screen/tab change.
+  // Capture shortly after any screen/tab change — and after a THEME change
+  // (the active tab re-renders in the new theme; recapturing swaps its
+  // filtered overview card for true pixels).
   React.useEffect(() => {
     if (!tabsEnabled) return;
     if (tabsOverviewOpen) return;
@@ -217,7 +237,7 @@ export function useThumbnails({
     return () => clearTimeout(timer);
   }, [activeTab.screen, activeTab.bookId, activeTab.chapterNum, activeTab.letterId,
   activeTab.studyId, activeTab.studyChapterId, activeTab.genreId,
-  activeTab.gardenPage, activeTabIdx, tabsEnabled, tabsOverviewOpen,
+  activeTab.gardenPage, activeTabIdx, tabsEnabled, tabsOverviewOpen, theme,
   captureActiveTabThumbnail]);
 
   // ── Return ─────────────────────────────────────────────────────────────

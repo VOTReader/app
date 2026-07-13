@@ -93,6 +93,34 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
     }, 150);
   }, [captureSelectionSync]);
 
+  // The mouseup/touchend fast path NEVER fires for the two ways a real
+  // Android selection is actually made: the WebView's native text-selection
+  // machinery delivers the long-press gesture's touchend NON-BUBBLING (the
+  // same device behavior behind the 2026-07-03 tab-drag lockup), and
+  // dragging the selection HANDLES dispatches no page touch events at all.
+  // Owner-reported symptom: select text → the footer never offers the
+  // excerpt — until some later unrelated gesture (a scroll's touchend)
+  // finally runs a capture. document 'selectionchange' fires for EVERY
+  // selection path (long-press, handle drags, mouse, keyboard), so it
+  // drives the state commit; debounced because handle drags fire it
+  // continuously. The touch/mouse handlers stay as a faster path.
+  React.useEffect(() => {
+    let t = null;
+    const onSelectionChange = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        t = null;
+        const info = captureSelectionSync();
+        if (info) setSelInfo(info);
+      }, 150);
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', onSelectionChange);
+      if (t) clearTimeout(t);
+    };
+  }, [captureSelectionSync]);
+
   const confirmLink = React.useCallback(() => {
     const refinedTarget = { ...target };
     // Fall back to a fresh synchronous capture so a tap-confirm-faster-

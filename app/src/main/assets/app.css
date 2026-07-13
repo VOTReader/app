@@ -1079,6 +1079,15 @@
         --hl-peak-r: 255; --hl-peak-g: 230; --hl-peak-b: 150;
         --hl-base-a: 0.32; --hl-peak-a: 0.58; --hl-glow-a: 0.35;
       }
+
+      /* Theme-normalized tab thumbnails: a card whose screenshot was captured
+         under the OTHER theme renders through invert+hue-rotate — lightness
+         flips while hues survive the double rotation, so a dark capture reads
+         as light chrome (and vice versa) and a theme switch never shows a
+         mixed wall of dark+light cards. Applied by TabsOverview when the
+         entry's recorded capture theme ≠ the current theme; the tab's next
+         visit recaptures true pixels. Garden tabs are exempt (photos). */
+      .tab-card-thumb.thumb-theme-flip { filter: invert(1) hue-rotate(180deg); }
     
     /* ── LETTER META ── */
     
