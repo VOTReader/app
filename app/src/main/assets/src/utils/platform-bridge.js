@@ -568,13 +568,20 @@ function _ensureHtml2canvas() {
  */
 async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
   const h2c = await _ensureHtml2canvas();
-  if (typeof h2c !== 'function') return '';
+  if (typeof h2c !== 'function') { _thumbFail('html2canvas not loaded'); return ''; }
   const isLight = forceTheme
     ? forceTheme === 'light'
     : (typeof document !== 'undefined') && document.body.classList.contains('light');
   const bg = isLight ? '#f7f2e8' : '#07070e';
   try {
-    const canvas = await h2c(document.body, {
+    // Capture the app's #root, not document.body: browser extensions inject
+    // their own nodes as direct body children (password managers, blockers…)
+    // and an exotic injected node can make html2canvas throw on EVERY capture
+    // — a PC-only "no thumbnails ever" failure the app can't see otherwise.
+    // #root also excludes body-portaled sheets, so a card never shows a
+    // half-open bottom sheet. (Falls back to body if the mount ever renames.)
+    const target = document.getElementById('root') || document.body;
+    const canvas = await h2c(target, {
       backgroundColor: bg,
       onclone: (/** @type {Document} */ clonedDoc) => {
         if (forceTheme && clonedDoc && clonedDoc.body) {
@@ -602,7 +609,7 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
     // (background tabs never recapture, so the blank stuck). Treat it as the
     // failure it is: '' → the caller skips the store and the next
     // nav/scroll-stop capture retries.
-    if (w < 16 || h < 16) return '';
+    if (w < 16 || h < 16) { _thumbFail('degenerate canvas ' + w + 'x' + h); return ''; }
     const scale = Math.min(maxDim / w, maxDim / h, 1);
     let out = canvas;
     if (scale < 1) {
@@ -617,11 +624,49 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
       }
       out = c2;
     }
+    // Uniformity probe: a solid-color capture (all-white / all-background) is
+    // a FAILED render, not a screenshot — real app screens always carry text
+    // contrast. Storing one paints a blank card that background tabs can
+    // never heal. Probe errors are ignored (a tainted canvas would make
+    // toDataURL throw below anyway).
+    try {
+      const p = document.createElement('canvas');
+      p.width = 16; p.height = 16;
+      const pctx = p.getContext('2d');
+      if (pctx) {
+        pctx.drawImage(out, 0, 0, 16, 16);
+        const d = pctx.getImageData(0, 0, 16, 16).data;
+        let mn = 255, mx = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          if (l < mn) mn = l;
+          if (l > mx) mx = l;
+        }
+        if (mx - mn < 6) { _thumbFail('uniform capture (blank render), range ' + Math.round(mx - mn)); return ''; }
+      }
+    } catch (_probeErr) { /* probe is best-effort */ }
     const url = out.toDataURL('image/jpeg', Math.max(0, Math.min(100, jpegQuality)) / 100);
-    return url.length > 1000 ? url : ''; // "data:," / degenerate encodes → failure
-  } catch (_e) {
+    if (url.length <= 1000) { _thumbFail('degenerate encode, length ' + url.length); return ''; }
+    return url;
+  } catch (e) {
+    _thumbFail('html2canvas threw: ' + String(e).slice(0, 120));
     return '';
   }
+}
+
+/**
+ * Thumbnail-capture failure trace — the ONLY visibility into a device where
+ * every capture fails (owner's PC: cards stayed blank with no error anywhere).
+ * console.warn for a live devtools look + DiagnosticLog for the offline trail.
+ * @param {string} reason
+ */
+function _thumbFail(reason) {
+  try { console.warn('[thumb] web capture failed: ' + reason); } catch (_e) { /* ignore */ }
+  try {
+    if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof DiagnosticLog.error === 'function') {
+      DiagnosticLog.error('thumb', reason);
+    }
+  } catch (_e) { /* ignore */ }
 }
 
 // Web audio recording — MediaRecorder + AnalyserNode (W1.2 Tier C).

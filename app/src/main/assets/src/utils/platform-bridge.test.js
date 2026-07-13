@@ -797,9 +797,13 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
       })),
       toDataURL: vi.fn(() => DOWNSCALED_URL),
     };
+    // The FIRST created canvas is the downscale target; the SECOND is the
+    // uniformity-probe canvas (getContext null → probe skips, like jsdom).
+    const probeCanvas = { width: 0, height: 0, getContext: vi.fn(() => null) };
+    let canvasCalls = 0;
     const realCreate = document.createElement.bind(document);
     const spy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-      if (tag === 'canvas') return /** @type {any} */ (downscaleCanvas);
+      if (tag === 'canvas') return /** @type {any} */ (canvasCalls++ === 0 ? downscaleCanvas : probeCanvas);
       return realCreate(tag);
     });
 
@@ -810,6 +814,25 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     expect(downscaleCanvas.height).toBe(768);
     expect(downscaleCanvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.9);
 
+    spy.mockRestore();
+  });
+
+  it('rejects a UNIFORM capture (blank render — e.g. canvas-blocked PCs) with an empty string', async () => {
+    const stubCanvas = { width: 800, height: 600, toDataURL: vi.fn(() => FULLSIZE_URL) };
+    /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
+    // Probe canvas whose 2d context reads back uniform white — a failed
+    // render, not a screenshot (real app screens always carry text contrast).
+    const uniform = new Uint8ClampedArray(16 * 16 * 4).fill(255);
+    const probeCanvas = {
+      width: 0, height: 0,
+      getContext: vi.fn(() => ({ drawImage: vi.fn(), getImageData: vi.fn(() => ({ data: uniform })) })),
+    };
+    const realCreate = document.createElement.bind(document);
+    const spy = vi.spyOn(document, 'createElement').mockImplementation((tag) =>
+      tag === 'canvas' ? /** @type {any} */ (probeCanvas) : realCreate(tag));
+    bridge = await importBridge();
+    expect(await bridge.takeScreenshot(0, 1024, 80)).toBe('');
+    expect(stubCanvas.toDataURL).not.toHaveBeenCalled();
     spy.mockRestore();
   });
 
@@ -833,7 +856,7 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
   it('topCropDp is accepted but unused on web (chrome hidden via classes)', async () => {
     const stubCanvas = {
       width: 800, height: 600,
-      toDataURL: vi.fn(() => 'data:image/jpeg;base64,X'),
+      toDataURL: vi.fn(() => FULLSIZE_URL),
     };
     /** @type {any} */ (globalThis).html2canvas = vi.fn(async () => stubCanvas);
     bridge = await importBridge();
@@ -841,6 +864,7 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     // Multiple topCropDp values yield identical results — the param is web no-op
     const r1 = await bridge.takeScreenshot(0, 1024, 80);
     const r2 = await bridge.takeScreenshot(200, 1024, 80);
+    expect(r1).toBe(FULLSIZE_URL);
     expect(r1).toBe(r2);
   });
 });

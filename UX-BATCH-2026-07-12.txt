@@ -225,6 +225,20 @@ floors incoming URLs; the load-on-mount SCRUBS stored degenerate variants
 (drops the field, deletes emptied rows → placeholder until the next good
 capture heals it). Live-proven: seeded {dark:'data:,',light:'data:,'} row
 deleted at boot; overview Home tap closes the overlay + lands Home.
+(A3, owner re-test: PC STILL blank; Android fine) — local repro is healthy
+(reading-screen captures 110KB primary + 102KB themed, ~750ms each), so the
+PC failure is ENVIRONMENTAL (prime suspect: an extension injecting body
+nodes that make html2canvas throw, or canvas-read blocking; extensions run
+in installed PWAs too — matches PWA+site failing while Android's native
+path works). Hardened 3 ways: (1) capture targets #root, not document.body
+— extension junk is body-level, so it can no longer break the render (also
+excludes body-portaled sheets from cards); (2) a 16×16 uniformity probe
+rejects blank renders (luma range <6 → '' — real screens carry text
+contrast; also catches canvas-blocker white-outs at the store level);
+(3) every web-capture failure now traces via _thumbFail → console.warn
+"[thumb] …" + DiagnosticLog('thumb'). If the owner's PC still shows
+placeholders after this build: F12 → Console → send the [thumb] lines —
+they name the exact cause.
 (B) EXCERPT-PICKER "can't save until I scroll" — the picker only captured
 selection on mouseup/touchend over the body, but Android's long-press
 selection delivers its touchend NON-BUBBLING (same WebView behavior as the
