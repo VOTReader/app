@@ -543,7 +543,9 @@ export function JournalViewerScreen(props) {
       onOpenJournalEntry && onOpenJournalEntry(eid);
     },
     onNotebookCard: function(nbId) {
-      if (onOpenNotebook) onOpenNotebook(nbId);
+      // Pass the source label so the notebook screen can raise the same
+      // "Back to My Journal · <title>" pill the reading screens get.
+      if (onOpenNotebook) onOpenNotebook(nbId, sourceMeta.sourceLetterTitle);
     },
     onScriptureRef: function(ref) {
       // {{ref:Book C:V}} in journal text used to call window.__openScriptureSheet,

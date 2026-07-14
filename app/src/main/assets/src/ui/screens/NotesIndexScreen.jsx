@@ -49,6 +49,11 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const _notesRet = (typeof window !== 'undefined' && window.navHandoff) ? window.navHandoff.peek('notesReturnCtx') : null;
   const [tab, setTab] = React.useState((_notesRet && _notesRet.tab) || 'notebooks'); // 'notebooks' | 'all-notes'
   const [drilledNbId, setDrilledNbId] = React.useState((_notesRet && _notesRet.drilledNbId) || null); // null | 'uncategorized' | <notebookId>
+  // "Back to <source>" pill — set when this screen was opened as a link-out
+  // (e.g. a journal entry's Notebook card). Mirrors the reading screens'
+  // fromLetterStack pill so every journal card returns to its source in one
+  // tap. Lives in component state (resets on unmount = single-shot).
+  const [backPill, setBackPill] = React.useState((_notesRet && _notesRet.backPill) || null);
   React.useEffect(() => { if (typeof window !== 'undefined' && window.navHandoff) window.navHandoff.clear('notesReturnCtx'); }, []);
   const [newNbInline, setNewNbInline] = React.useState(false);
   const [newNbName, setNewNbName] = React.useState('');
@@ -187,6 +192,18 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   return (
     <ScreenLayout navChildren={LibraryNav({ onBack: handleNavBack, onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}>
       <div className="notes-index-screen">
+        {backPill && (
+          <div className="back-hint-row">
+            <button
+              className="back-hint-pill"
+              onClick={() => { setBackPill(null); onBack(); }}
+              aria-label={'Back to ' + backPill.title}
+            >
+              <span className="back-hint-arrow">‹</span>Back to{' '}
+              <span className="back-hint-title">{backPill.title}</span>
+            </button>
+          </div>
+        )}
         <div className="notes-index-header">
           <h1 className="notes-index-title">My Notes</h1>
           <span className="notes-index-count">{allNotes.length}{allNotes.length === 1 ? " note" : " notes"}</span>

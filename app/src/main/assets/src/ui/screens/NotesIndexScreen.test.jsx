@@ -9,7 +9,7 @@
    (NoteStore/NotebookStore/ScreenLayout/LibraryNav/NoteRow/noteSourceLabel),
    so we stub them; NoteRow is the REAL component. */
 
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { NotesIndexScreen, filterNotesByQuery } from './NotesIndexScreen.jsx';
 import { NoteRow } from '../components/NoteRow.jsx';
@@ -91,6 +91,27 @@ describe('filterNotesByQuery', () => {
   it('returns [] on no match and tolerates missing body/fullText', () => {
     expect(filterNotesByQuery(NOTES, 'zzqxjv')).toEqual([]);
     expect(filterNotesByQuery([{ groupId: 'g0', keys: [] }], 'anything')).toEqual([]);
+  });
+});
+
+describe('NotesIndexScreen — link-out back pill', () => {
+  afterEach(() => { delete window.navHandoff; delete window.__screenBack; });
+
+  it('renders the "Back to <source>" pill from notesReturnCtx.backPill and returns to source in one tap', () => {
+    const store = { notesReturnCtx: { tab: 'notebooks', drilledNbId: 'nb1', backPill: { title: 'My Journal · Morning' } } };
+    window.navHandoff = { peek: (k) => store[k] || null, set: (k, v) => { store[k] = v; }, clear: (k) => { delete store[k]; } };
+    const onBack = vi.fn();
+    const { container, getByText } = render(<NotesIndexScreen {...props} onBack={onBack} />);
+    const pill = container.querySelector('.back-hint-pill');
+    expect(pill).not.toBeNull();
+    expect(getByText('My Journal · Morning')).toBeTruthy();
+    fireEvent.click(pill);
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it('shows no back pill on a normal open (no backPill in the return context)', () => {
+    const { container } = render(<NotesIndexScreen {...props} />);
+    expect(container.querySelector('.back-hint-pill')).toBeNull();
   });
 });
 

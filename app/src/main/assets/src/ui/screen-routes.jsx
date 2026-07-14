@@ -436,12 +436,14 @@ export function buildScreenRoutes({
           }
         }}
         onOpenJournalEntry={(eid) => goJournalViewer(eid)}
-        onOpenNotebook={(nbId) => {
+        onOpenNotebook={(nbId, sourceTitle) => {
           // Drop the user straight into that notebook's screen in the Notes
           // hub. The navHandoff 'notesReturnCtx' slot is consumed by
           // NotesIndexScreen on mount to pre-drill the right notebook (same
-          // channel the back-pill uses; see utils/nav-handoff.js).
-          window.navHandoff.set('notesReturnCtx', { tab: 'notebooks', drilledNbId: nbId });
+          // channel the back-pill uses; see utils/nav-handoff.js). backPill
+          // raises the "Back to My Journal · <title>" pill so this link-out
+          // returns in one tap, matching every other journal card.
+          window.navHandoff.set('notesReturnCtx', { tab: 'notebooks', drilledNbId: nbId, backPill: sourceTitle ? { title: sourceTitle } : null });
           setNavOrigin({ screen: 'journal-viewer' });
           setScreen('notes-index');
         }}
