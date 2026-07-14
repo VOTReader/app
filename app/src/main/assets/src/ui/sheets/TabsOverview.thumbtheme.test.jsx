@@ -10,6 +10,9 @@
 import { it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { TabsOverview } from './TabsOverview.jsx';
+import { createPressDrag } from '../../utils/press-drag.js';
+
+/** @type {any} */ (globalThis).createPressDrag = createPressDrag;
 
 /** @type {any} */ (globalThis).describeTab = () => ({ title: 'Home', subtitle: '', resolved: true });
 /** @type {any} */ (globalThis).tabContentKey = (t) => `k${t.__i}`;

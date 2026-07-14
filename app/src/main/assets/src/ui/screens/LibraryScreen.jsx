@@ -14,6 +14,17 @@
    React re-renders so the useEffect-only path leaves the refs stale.
    ═══════════════════════════════════════════════════════════════════════ */
 
+// Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
+// failing device names itself (same pattern as [tabdrag]/[thumb]).
+function _libDragTrace(msg) {
+  try { console.warn('[libdrag] ' + msg); } catch (_e) { /* ignore */ }
+  try {
+    if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof DiagnosticLog.error === 'function') {
+      DiagnosticLog.error('libdrag', msg);
+    }
+  } catch (_e) { /* ignore */ }
+}
+
 export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, readCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to all 5 stores so tile counts re-render on any mutation.
   React.useSyncExternalStore(
@@ -126,44 +137,16 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     },
   };
 
-  // ── Drag-to-reorder state (CSS-class drivers only) + imperative refs ─
+  /* ── Drag-to-reorder — the SHARED pointer-events lifecycle ────────────
+     (utils/press-drag.js — createPressDrag, extracted from the tabs v2
+     redesign). This screen owns only the 2D grid geometry + visuals. */
   const [order, setOrder] = React.useState(() => LibraryOrderStore.get());
   const [pressingIdx, setPressingIdx] = React.useState(-1);
   const [dragIdx, setDragIdx] = React.useState(-1);
 
-  const cardRefs          = React.useRef([]);
-  const pressTimerRef     = React.useRef(null);
-  const visualDelayTimerRef = React.useRef(null);
-  const pressStartXRef    = React.useRef(0);
-  const pressStartYRef    = React.useRef(0);
-  const pressStartTsRef   = React.useRef(0);
-  const dragIdxRef        = React.useRef(-1);
-  const targetIdxRef      = React.useRef(-1);
-  const pressingIdxRef    = React.useRef(-1);
-  const orderRef          = React.useRef(order);
-  const justDraggedRef    = React.useRef(false);
-  const activeCleanupRef  = React.useRef(null);
-  const dragCloneRef      = React.useRef(null);
-  const fingerOffsetXRef  = React.useRef(0);
-  const fingerOffsetYRef  = React.useRef(0);
-  const naturalRectsRef   = React.useRef([]); // [{left,top,cx,cy,w,h}] per card at drag-start
-  const touchIdRef        = React.useRef(null); // identifier of the pointer that owns the press ('mouse' for pointer)
-  const finishDragRef     = React.useRef(null); // pending drop-commit; flushed early if a new press arrives
-  const commitTimerRef    = React.useRef(null);
-  const lastDragEvtRef    = React.useRef(0);    // last time the active drag saw one of its own events (zombie detector)
-
-  React.useEffect(() => { dragIdxRef.current     = dragIdx;   }, [dragIdx]);
-  React.useEffect(() => { pressingIdxRef.current = pressingIdx; }, [pressingIdx]);
-  React.useEffect(() => { orderRef.current       = order;     }, [order]);
-
-  // Cleanup timers, doc listeners, and the flying clone on unmount.
-  React.useEffect(() => () => {
-    clearTimeout(pressTimerRef.current);
-    clearTimeout(visualDelayTimerRef.current);
-    if (activeCleanupRef.current) activeCleanupRef.current();
-    if (dragCloneRef.current && dragCloneRef.current.parentNode)
-      dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
-  }, []);
+  const cardRefs = React.useRef([]);
+  const orderRef = React.useRef(order);
+  React.useEffect(() => { orderRef.current = order; }, [order]);
 
   const setCardRef = (i) => (el) => { cardRefs.current[i] = el; };
 
@@ -176,9 +159,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
   };
 
   // FLIP sibling shifts — 2D because the grid wraps rows.
-  const applySiblingShifts = (to) => {
-    const from = dragIdxRef.current;
-    const rects = naturalRectsRef.current;
+  const applySiblingShifts = (from, to, rects) => {
     cardRefs.current.forEach((el, i) => {
       if (!el || i === from) return;
       let visualIdx = i;
@@ -193,8 +174,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
   };
 
   // Nearest card by 2D squared distance.
-  const pickTarget = (cx, cy) => {
-    const rects = naturalRectsRef.current;
+  const pickTarget = (cx, cy, rects) => {
     let best = 0, bestD = Infinity;
     for (let i = 0; i < rects.length; i++) {
       const dx = cx - rects[i].cx, dy = cy - rects[i].cy;
@@ -204,220 +184,115 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     return Math.max(0, Math.min(orderRef.current.length - 1, best));
   };
 
-  // Multi-touch discipline: the press belongs to ONE pointer. Moves from other
-  // fingers are ignored, and only that pointer lifting (or a touchcancel that
-  // swallowed it) ends the press — a stray second finger can no longer commit
-  // the drag early at whatever slot the tile happened to be passing over.
-  const trackedPoint = (e) => {
-    if (e.touches) {
-      for (let i = 0; i < e.touches.length; i++)
-        if (e.touches[i].identifier === touchIdRef.current) return e.touches[i];
-      return null;
-    }
-    return touchIdRef.current === 'mouse' ? e : null;
-  };
-  const trackedEnded = (e) => {
-    if (!e.changedTouches) return touchIdRef.current === 'mouse';
-    for (let i = 0; i < e.changedTouches.length; i++)
-      if (e.changedTouches[i].identifier === touchIdRef.current) return true;
-    for (let i = 0; i < e.touches.length; i++)
-      if (e.touches[i].identifier === touchIdRef.current) return false;
-    return true; // ours vanished without a changedTouches entry (some touchcancels)
-  };
+  const dragRef = React.useRef(/** @type {any} */ (null));
 
-  const startPress = (idx, clientX, clientY, pointerId) => {
-    // A just-dropped drag parks its commit in finishDragRef while the snap
-    // animation plays; flush it so this grab is never silently swallowed.
-    if (finishDragRef.current) finishDragRef.current();
-    // Zombie self-heal: a LIVE drag sees its own events continuously. If a
-    // drag is "active" but has seen nothing for seconds, its end event was
-    // lost — abort it, uncommitted, and let this fresh grab proceed.
-    if (dragIdxRef.current >= 0 && Date.now() - lastDragEvtRef.current > 2500) {
-      if (activeCleanupRef.current) activeCleanupRef.current();
-      if (dragCloneRef.current && dragCloneRef.current.parentNode)
-        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
-      dragCloneRef.current = null;
-      clearInlineTransforms();
-      dragIdxRef.current = -1;
-      setDragIdx(-1);
-      targetIdxRef.current = -1;
-      justDraggedRef.current = false;
-    }
-    if (pressingIdxRef.current >= 0 || dragIdxRef.current >= 0) return;
-    touchIdRef.current = pointerId != null ? pointerId : 'mouse';
-    pressStartXRef.current  = clientX;
-    pressStartYRef.current  = clientY;
-    pressStartTsRef.current = Date.now();
-    pressingIdxRef.current  = idx;
-
-    clearTimeout(visualDelayTimerRef.current);
-    visualDelayTimerRef.current = setTimeout(() => {
-      if (pressingIdxRef.current === idx && dragIdxRef.current < 0) setPressingIdx(idx);
-    }, 280);
-
-    const onMove = (e) => {
-      const p = trackedPoint(e);
-      if (!p) return;
-      lastDragEvtRef.current = Date.now();
-      const x = p.clientX, y = p.clientY;
-      if (dragIdxRef.current >= 0 && e.cancelable) {
-        try { e.preventDefault(); } catch (_err) { /* passive — ignore */ }
-      }
-      if (dragIdxRef.current >= 0) {
-        const clone = dragCloneRef.current;
-        if (clone) {
-          clone.style.transition = 'none';
-          clone.style.left = (x - fingerOffsetXRef.current) + 'px';
-          clone.style.top  = (y - fingerOffsetYRef.current) + 'px';
-          clone.style.transform = 'scale(1.05)';
-        }
-        const r0 = naturalRectsRef.current[dragIdxRef.current];
-        const cx = (x - fingerOffsetXRef.current) + (r0 ? r0.w * 0.5 : 0);
-        const cy = (y - fingerOffsetYRef.current) + (r0 ? r0.h * 0.5 : 0);
-        const newTarget = pickTarget(cx, cy);
-        if (newTarget !== targetIdxRef.current) {
-          targetIdxRef.current = newTarget;
-          applySiblingShifts(newTarget);
-        }
-      } else if (pressingIdxRef.current >= 0) {
-        if (Math.abs(x - pressStartXRef.current) > 10 || Math.abs(y - pressStartYRef.current) > 10) {
-          clearTimeout(pressTimerRef.current);
-          clearTimeout(visualDelayTimerRef.current);
-          setPressingIdx(-1);
-          pressingIdxRef.current = -1;
-          if (Date.now() - pressStartTsRef.current > 400) {
-            justDraggedRef.current = true;
-            setTimeout(() => { justDraggedRef.current = false; }, 300);
-          }
-        }
-      }
-    };
-    const onEnd = (e) => {
-      if (!trackedEnded(e)) return;
-      if (activeCleanupRef.current) activeCleanupRef.current();
-      endPress();
-    };
-
-    // CAPTURE phase — document-capture runs before ScreenLayout's
-    // tap-suppressor can stopPropagation a long-hold lift (see the
-    // TabsOverview comment; same lock-up class on this screen).
-    document.addEventListener('touchmove',   onMove, { passive: false, capture: true });
-    document.addEventListener('touchend',    onEnd, true);
-    document.addEventListener('touchcancel', onEnd, true);
-    document.addEventListener('mousemove',   onMove, true);
-    document.addEventListener('mouseup',     onEnd, true);
-    activeCleanupRef.current = () => {
-      document.removeEventListener('touchmove',   onMove, { capture: true });
-      document.removeEventListener('touchend',    onEnd, true);
-      document.removeEventListener('touchcancel', onEnd, true);
-      document.removeEventListener('mousemove',   onMove, true);
-      document.removeEventListener('mouseup',     onEnd, true);
-      activeCleanupRef.current = null;
-    };
-
-    clearTimeout(pressTimerRef.current);
-    pressTimerRef.current = setTimeout(() => {
-      // Refs must be set synchronously — setDragIdx/setPressingIdx are async
-      // React state updates that only reach the refs via useEffect after the
-      // next render. touchmove fires before that render on mobile.
-      justDraggedRef.current = true;
-      pressingIdxRef.current = -1;
-      dragIdxRef.current     = idx;
-      lastDragEvtRef.current = Date.now();
-      setPressingIdx(-1);
-      setDragIdx(idx);
-      targetIdxRef.current = idx;
-
-      // Capture every card's natural viewport rect at drag start.
-      naturalRectsRef.current = cardRefs.current.map((el) => {
-        if (!el) return { left: 0, top: 0, cx: 0, cy: 0, w: 0, h: 0 };
-        const r = el.getBoundingClientRect();
-        return { left: r.left, top: r.top, cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height };
-      });
-
-      const el = cardRefs.current[idx];
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        fingerOffsetXRef.current = pressStartXRef.current - rect.left;
-        fingerOffsetYRef.current = pressStartYRef.current - rect.top;
-        const clone = el.cloneNode(true);
-        clone.className = 'library-tile drag-flying';
-        clone.style.cssText = [
-          'position:fixed',
-          'top:'    + rect.top    + 'px',
-          'left:'   + rect.left   + 'px',
-          'width:'  + rect.width  + 'px',
-          'height:' + rect.height + 'px',
-          'z-index:9999',
-          'pointer-events:none',
-          'margin:0',
-          'box-sizing:border-box',
-          'transition:transform 0.16s cubic-bezier(0.2,0.8,0.3,1)',
-          'transform:scale(1.05)',
-        ].join(';');
-        document.body.appendChild(clone);
-        dragCloneRef.current = clone;
-      }
-      if (navigator.vibrate) { try { navigator.vibrate(55); } catch (_e) { /* unsupported */ } }
-    }, 1380);
-  };
-
-  const endPress = () => {
-    clearTimeout(pressTimerRef.current);
-    clearTimeout(visualDelayTimerRef.current);
-    const wasPressing = pressingIdxRef.current >= 0;
-    const wasDragging = dragIdxRef.current >= 0;
+  // Drop commit — SYNCHRONOUS at release: order write + transform clear land
+  // in ONE paint while the ghost glides into the target slot above the
+  // hidden real tile (tiles are keyed by ID, so the grabbed NODE persists
+  // across the reorder — it is the reveal target).
+  const commitDrop = (g) => {
+    const from = g.idx;
+    const to = g.targetIdx >= 0 ? Math.min(g.targetIdx, orderRef.current.length - 1) : from;
+    clearInlineTransforms();
+    setDragIdx(-1);
     setPressingIdx(-1);
-    pressingIdxRef.current = -1;
-    touchIdRef.current = null;
-
-    if (wasDragging) {
-      const from  = dragIdxRef.current;
-      const to    = targetIdxRef.current >= 0 ? targetIdxRef.current : from;
-      const clone = dragCloneRef.current;
-      const rects = naturalRectsRef.current;
-      if (clone) {
-        const snap = rects[to] || rects[from];
-        clone.style.transition =
-          'left 0.22s cubic-bezier(0.2,0.8,0.3,1),top 0.22s cubic-bezier(0.2,0.8,0.3,1),transform 0.22s cubic-bezier(0.2,0.8,0.3,1)';
-        clone.style.left      = (snap ? snap.left : 0) + 'px';
-        clone.style.top       = (snap ? snap.top  : 0) + 'px';
-        clone.style.transform = 'scale(1)';
+    const grabbedEl = g.data.el || null;
+    if (grabbedEl) grabbedEl.style.opacity = '0';
+    try {
+      if (to !== from && to >= 0) {
+        const newOrder = [...orderRef.current];
+        const [moved]  = newOrder.splice(from, 1);
+        newOrder.splice(to, 0, moved);
+        setOrder(newOrder);
+        LibraryOrderStore.set(newOrder);
       }
-      // The commit runs at most once: normally the timer fires it after the snap
-      // animation; a new press flushes it early via finishDragRef. The finally
-      // guarantees the drag refs reset even if the order write throws.
-      const finish = () => {
-        if (finishDragRef.current !== finish) return;
-        finishDragRef.current = null;
-        clearTimeout(commitTimerRef.current);
-        try {
-          if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
-          dragCloneRef.current = null;
-          clearInlineTransforms();
-          if (to !== from && to >= 0) {
-            const newOrder = [...orderRef.current];
-            const [moved]  = newOrder.splice(from, 1);
-            newOrder.splice(to, 0, moved);
-            setOrder(newOrder);
-            LibraryOrderStore.set(newOrder);
-          }
-        } finally {
-          dragIdxRef.current   = -1;   // sync immediately; setDragIdx's useEffect is async
-          setDragIdx(-1);
-          targetIdxRef.current = -1;
-          setTimeout(() => { justDraggedRef.current = false; }, 120);
-        }
-      };
-      finishDragRef.current = finish;
-      commitTimerRef.current = setTimeout(finish, 240);
-    } else if (wasPressing) {
-      if (Date.now() - pressStartTsRef.current > 400) {
-        justDraggedRef.current = true;
-        setTimeout(() => { justDraggedRef.current = false; }, 300);
+    } catch (err) {
+      _libDragTrace('reorder commit threw: ' + String(err).slice(0, 120));
+    }
+    const ghost = g.data.ghost;
+    if (ghost) {
+      const snap = g.data.rects && (g.data.rects[to] || g.data.rects[from]);
+      if (snap) {
+        ghost.style.transition =
+          'left 0.22s cubic-bezier(0.2,0.8,0.3,1),top 0.22s cubic-bezier(0.2,0.8,0.3,1),transform 0.22s cubic-bezier(0.2,0.8,0.3,1)';
+        ghost.style.left      = snap.left + 'px';
+        ghost.style.top       = snap.top  + 'px';
+        ghost.style.transform = 'scale(1)';
       }
     }
+    dragRef.current.land(ghost, grabbedEl, 230);
   };
+
+  if (!dragRef.current) {
+    dragRef.current = createPressDrag({
+      trace: _libDragTrace,
+      onGlow: (idx) => setPressingIdx(idx),
+      onGlowClear: () => setPressingIdx(-1),
+      onEngage: (g) => {
+        setDragIdx(g.idx);
+        // Capture every card's natural viewport rect at drag start.
+        g.data.rects = cardRefs.current.map((el) => {
+          if (!el) return { left: 0, top: 0, cx: 0, cy: 0, w: 0, h: 0 };
+          const r = el.getBoundingClientRect();
+          return { left: r.left, top: r.top, cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height };
+        });
+        const el = cardRefs.current[g.idx];
+        g.data.el = el || null;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          g.data.offX = g.startX - rect.left;
+          g.data.offY = g.startY - rect.top;
+          const ghost = el.cloneNode(true);
+          ghost.className = 'library-tile drag-flying';
+          ghost.style.cssText = [
+            'position:fixed',
+            'top:'    + rect.top    + 'px',
+            'left:'   + rect.left   + 'px',
+            'width:'  + rect.width  + 'px',
+            'height:' + rect.height + 'px',
+            'z-index:9999',
+            'pointer-events:none',
+            'margin:0',
+            'box-sizing:border-box',
+            'transition:transform 0.16s cubic-bezier(0.2,0.8,0.3,1)',
+            'transform:scale(1.05)',
+          ].join(';');
+          document.body.appendChild(ghost);
+          g.data.ghost = ghost;
+        }
+        if (navigator.vibrate) { try { navigator.vibrate(55); } catch (_e) { /* unsupported */ } }
+      },
+      onDragMove: (g, x, y) => {
+        const ghost = g.data.ghost;
+        if (ghost) {
+          ghost.style.transition = 'none';
+          ghost.style.left = (x - g.data.offX) + 'px';
+          ghost.style.top  = (y - g.data.offY) + 'px';
+          ghost.style.transform = 'scale(1.05)';
+        }
+        const r0 = g.data.rects && g.data.rects[g.idx];
+        const cx = (x - g.data.offX) + (r0 ? r0.w * 0.5 : 0);
+        const cy = (y - g.data.offY) + (r0 ? r0.h * 0.5 : 0);
+        const t = pickTarget(cx, cy, g.data.rects || []);
+        if (t !== g.targetIdx) {
+          g.targetIdx = t;
+          applySiblingShifts(g.idx, t, g.data.rects || []);
+        }
+      },
+      onCommit: commitDrop,
+      onAbortDrag: (g) => {
+        if (g.data.ghost && g.data.ghost.parentNode) g.data.ghost.parentNode.removeChild(g.data.ghost);
+        clearInlineTransforms();
+        setDragIdx(-1);
+      },
+    });
+  }
+
+  // Unmount mid-gesture: one call tears down timers, listeners, ghost, landing.
+  React.useEffect(() => () => { dragRef.current.destroy(); }, []);
+
+  const startPress = (idx, clientX, clientY, pointerId) =>
+    dragRef.current.start(idx, clientX, clientY, pointerId, cardRefs.current[idx]);
 
   // Trim stale refs when a future reorder changes card count (safe no-op here,
   // but mirrors the TabsOverview pattern for consistency).
@@ -440,11 +315,15 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
               ref={setCardRef(i)}
               className={'library-tile' + (i === pressingIdx ? ' pressing' : '') + (i === dragIdx ? ' dragging' : '')}
               onClick={(e) => {
-                if (justDraggedRef.current) { e.preventDefault(); e.stopPropagation(); return; }
+                if (dragRef.current.suppressed()) { e.preventDefault(); e.stopPropagation(); return; }
                 tile.onClick();
               }}
-              onTouchStart={(e) => { if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientX, e.touches[0].clientY, e.touches[0].identifier); }}
-              onMouseDown={(e) => { if (e.button === 0) startPress(i, e.clientX, e.clientY); }}
+              onPointerDown={(e) => {
+                if (e.isPrimary === false) return; // a second finger never owns a gesture
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                startPress(i, e.clientX, e.clientY, e.pointerId);
+              }}
+              onDragStart={(e) => e.preventDefault()}
             >
               <span className="library-tile-icon">{tile.icon}</span>
               <span className="library-tile-eyebrow">{tile.eyebrow}</span>

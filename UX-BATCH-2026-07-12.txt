@@ -338,9 +338,21 @@ commit, hidden-dest landing swap, SECOND-drag-after-success, non-bubbling
 pointerup, pointercancel commit, multi-pointer identity, non-primary
 ignore, drift cancel, onReorder-throw recovery, unmount leak-free).
 Live-proven: 3 consecutive drags engaged + committed, ghost glide with the
-order already final beneath, 0 leaks, 0 console errors. NOTE: HomeScreen/
-LibraryScreen/journal-editor still run the old touch-event drag idiom —
-migrate them to this machinery if the owner confirms the tabs feel right.
+order already final beneath, 0 leaks, 0 console errors.
+(C2, owner confirmed "they feel great" → MIGRATION COMPLETE) — the
+lifecycle extracted into utils/press-drag.js (createPressDrag: gesture
+object, capture listeners, scroll suppressor, hold/glow/drift, pointer-
+cancel commit+trace, force-reset, landing glide, click suppression; hosts
+own geometry via onEngage/onDragMove/onCommit/onAbortDrag + g.data).
+TabsOverview rebased (10 pins unchanged = equivalence proof); HomeScreen +
+LibraryScreen + JournalEditorScreen (holdMs:0 grip) ported — all commits
+now synchronous at release with the seamless hidden-dest drop (ID-keyed
+tiles reveal the GRABBED node; index-keyed tabs reveal cardRefs[to]); the
+journal's 220ms parked-commit window is gone (pagehide-flush guarantee now
+unconditional). Traces: [homedrag]/[libdrag]/[jrndrag]. Journal reorder
+suite rewritten to pointer events (×9). Live-proven on all three ported
+surfaces (reorder + persist + second drag + restore each), 0 console
+errors. Gates: 2572 vitest / 144 files, lint(441), typecheck, smoke PASS.
 
 ───────────────────────────────────────────────────────────────────────────
 STATUS LOG

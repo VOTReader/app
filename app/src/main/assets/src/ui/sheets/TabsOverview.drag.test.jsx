@@ -23,6 +23,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { TabsOverview } from './TabsOverview.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
+import { createPressDrag } from '../../utils/press-drag.js';
+
+// The REAL shared lifecycle — these tests drive the actual factory through
+// the component (integration pair), not a stub.
+/** @type {any} */ (globalThis).createPressDrag = createPressDrag;
 
 // The tab-label/key helpers resolve through corpus-registry globals (absent in
 // jsdom); the drag tests only exercise geometry + lifecycle, so pure fakes

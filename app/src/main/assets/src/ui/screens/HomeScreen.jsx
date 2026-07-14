@@ -2,6 +2,17 @@
    HomeScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+// Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
+// failing device names itself (same pattern as [tabdrag]/[thumb]).
+function _homeDragTrace(msg) {
+  try { console.warn('[homedrag] ' + msg); } catch (_e) { /* ignore */ }
+  try {
+    if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof DiagnosticLog.error === 'function') {
+      DiagnosticLog.error('homedrag', msg);
+    }
+  } catch (_e) { /* ignore */ }
+}
+
 export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, historyEnabled, onAbout, history: _history, theme, onThemeChange, translation }) {
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
@@ -37,31 +48,16 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
      element.style.transform are effectively instant. We only keep state
      for what drives CSS classes (.pressing, .dragging) and for the final
      order commit. */
+  /* Drag-to-reorder rides the SHARED pointer-events lifecycle
+     (utils/press-drag.js — createPressDrag, extracted from the tabs v2
+     redesign): one gesture object, document-capture listeners, force-reset
+     on every new grab, explicit pointercancel commit, landing glide, click
+     suppression. This screen owns only the 1D geometry + visuals. */
   const [pressingIdx, setPressingIdx] = React.useState(-1);
   const [dragIdx, setDragIdx] = React.useState(-1);
 
   const cardRefs = React.useRef([]); // DOM refs to each card
-  const pressTimerRef = React.useRef(null);
-  const visualDelayTimerRef = React.useRef(null);
-  const pressStartYRef = React.useRef(0);
-  const pressStartTsRef = React.useRef(0);
-  const tileHeightRef = React.useRef(80);
-  const dragIdxRef = React.useRef(-1);
-  const targetIdxRef = React.useRef(-1);
-  const pressingIdxRef = React.useRef(-1);
   const orderRef = React.useRef(order);
-  const justDraggedRef = React.useRef(false);
-  const activeCleanupRef = React.useRef(null);
-  const dragCloneRef = React.useRef(null);
-  const fingerOffsetYRef = React.useRef(0);
-  const naturalCardTopsRef = React.useRef([]);
-  const touchIdRef = React.useRef(null);        // identifier of the pointer that owns the press ('mouse' for pointer)
-  const finishDragRef = React.useRef(null);     // pending drop-commit; flushed early if a new press arrives
-  const commitTimerRef = React.useRef(null);
-  const lastDragEvtRef = React.useRef(0);       // last time the active drag saw one of its own events (zombie detector)
-
-  React.useEffect(() => {dragIdxRef.current = dragIdx;}, [dragIdx]);
-  React.useEffect(() => {pressingIdxRef.current = pressingIdx;}, [pressingIdx]);
   React.useEffect(() => {orderRef.current = order;}, [order]);
 
   // Q8.3: pre-fire the VOT corpus load on home screen mount. Users
@@ -93,14 +89,6 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     }
   }, [showSurprise]);
 
-  // Cleanup timer + any in-flight doc listeners on unmount
-  React.useEffect(() => () => {
-    clearTimeout(pressTimerRef.current);
-    if (activeCleanupRef.current) activeCleanupRef.current();
-    if (dragCloneRef.current && dragCloneRef.current.parentNode)
-    dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
-  }, []);
-
   const setCardRef = (i) => (el) => {cardRefs.current[i] = el;};
 
   const clearInlineTransforms = () => {
@@ -114,9 +102,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   };
 
   // Shift siblings out of the way of the dragged card based on current target slot.
-  const applySiblingShifts = (newTarget) => {
-    const from = dragIdxRef.current;
-    const h = tileHeightRef.current;
+  const applySiblingShifts = (from, newTarget, h) => {
     cardRefs.current.forEach((el, i) => {
       if (!el || i === from) return;
       let shift = 0;
@@ -127,234 +113,121 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     });
   };
 
-  // Multi-touch discipline: the press belongs to ONE pointer. Moves from other
-  // fingers are ignored, and only that pointer lifting (or a touchcancel that
-  // swallowed it) ends the press — a stray second finger can no longer commit
-  // the drag early at whatever slot the tile happened to be passing over.
-  const trackedPoint = (e) => {
-    if (e.touches) {
-      for (let i = 0; i < e.touches.length; i++)
-        if (e.touches[i].identifier === touchIdRef.current) return e.touches[i];
-      return null;
-    }
-    return touchIdRef.current === 'mouse' ? e : null;
-  };
-  const trackedEnded = (e) => {
-    if (!e.changedTouches) return touchIdRef.current === 'mouse';
-    for (let i = 0; i < e.changedTouches.length; i++)
-      if (e.changedTouches[i].identifier === touchIdRef.current) return true;
-    for (let i = 0; i < e.touches.length; i++)
-      if (e.touches[i].identifier === touchIdRef.current) return false;
-    return true; // ours vanished without a changedTouches entry (some touchcancels)
-  };
+  // The shared lifecycle — created once; the callbacks below read only refs
+  // + stable setters, so first-render closures stay correct.
+  const dragRef = React.useRef(/** @type {any} */ (null));
 
-  const startPress = (idx, clientY, pointerId) => {
-    // A just-dropped drag parks its commit in finishDragRef while the snap
-    // animation plays; flush it so this grab is never silently swallowed.
-    if (finishDragRef.current) finishDragRef.current();
-    // Zombie self-heal: a LIVE drag sees its own events continuously. If a
-    // drag is "active" but has seen nothing for seconds, its end event was
-    // lost — abort it, uncommitted, and let this fresh grab proceed.
-    if (dragIdxRef.current >= 0 && Date.now() - lastDragEvtRef.current > 2500) {
-      if (activeCleanupRef.current) activeCleanupRef.current();
-      if (dragCloneRef.current && dragCloneRef.current.parentNode)
-        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
-      dragCloneRef.current = null;
-      clearInlineTransforms();
-      dragIdxRef.current = -1;
-      setDragIdx(-1);
-      targetIdxRef.current = -1;
-      justDraggedRef.current = false;
-    }
-    if (pressingIdxRef.current >= 0 || dragIdxRef.current >= 0) return;
-    touchIdRef.current = pointerId != null ? pointerId : 'mouse';
-    pressStartYRef.current = clientY;
-    pressStartTsRef.current = Date.now();
-    // Track the intent in a ref immediately (for drift detection), but
-    // delay the visible "pressing" glow + progress bar until the press
-    // looks intentional (~280ms). Short taps should never flash it.
-    pressingIdxRef.current = idx;
-    clearTimeout(visualDelayTimerRef.current);
-    visualDelayTimerRef.current = setTimeout(() => {
-      if (pressingIdxRef.current === idx && dragIdxRef.current < 0) {
-        setPressingIdx(idx);
-      }
-    }, 280);
-
-    // Attach document listeners SYNCHRONOUSLY. No useEffect gap, no missed moves.
-    const onMove = (e) => {
-      const p = trackedPoint(e);
-      if (!p) return;
-      lastDragEvtRef.current = Date.now();
-      const y = p.clientY;
-      if (dragIdxRef.current >= 0 && e.cancelable) {
-        try {e.preventDefault();} catch (_err) { /* DOM access — element may not exist or API unsupported */ }
-      }
-
-      if (dragIdxRef.current >= 0) {
-        // ACTIVE DRAG: move the fixed clone to follow the finger precisely
-        const clone = dragCloneRef.current;
-        if (clone) {
-          clone.style.transition = "none";
-          clone.style.top = y - fingerOffsetYRef.current + "px";
-          clone.style.transform = "scale(1.05)";
-        }
-        // Determine drop slot by comparing clone's vertical center to natural card positions
-        const naturalTops = naturalCardTopsRef.current;
-        const h = tileHeightRef.current || 80;
-        const centerY = y - fingerOffsetYRef.current + h * 0.5;
-        let newTarget = 0;
-        for (let i = 1; i < naturalTops.length; i++) {
-          if (centerY >= naturalTops[i] - h * 0.3) newTarget = i;
-        }
-        newTarget = Math.max(0, Math.min(orderRef.current.length - 1, newTarget));
-        if (newTarget !== targetIdxRef.current) {
-          targetIdxRef.current = newTarget;
-          applySiblingShifts(newTarget);
-        }
-      } else if (pressingIdxRef.current >= 0) {
-        // PRESSING (pre-drag): cancel if finger drifts
-        if (Math.abs(y - pressStartYRef.current) > 10) {
-          clearTimeout(pressTimerRef.current);
-          clearTimeout(visualDelayTimerRef.current);
-          setPressingIdx(-1);
-          pressingIdxRef.current = -1;
-          if (Date.now() - pressStartTsRef.current > 400) {
-            justDraggedRef.current = true;
-            setTimeout(() => {justDraggedRef.current = false;}, 300);
-          }
-        }
-      }
-    };
-
-    const onEnd = (e) => {
-      if (!trackedEnded(e)) return;
-      if (activeCleanupRef.current) activeCleanupRef.current();
-      endPress();
-    };
-
-    // CAPTURE phase — document-capture runs before ScreenLayout's
-    // tap-suppressor can stopPropagation a long-hold lift (see the
-    // TabsOverview comment; same lock-up class on this screen).
-    document.addEventListener("touchmove", onMove, { passive: false, capture: true });
-    document.addEventListener("touchend", onEnd, true);
-    document.addEventListener("touchcancel", onEnd, true);
-    document.addEventListener("mousemove", onMove, true);
-    document.addEventListener("mouseup", onEnd, true);
-    activeCleanupRef.current = () => {
-      document.removeEventListener("touchmove", onMove, { capture: true });
-      document.removeEventListener("touchend", onEnd, true);
-      document.removeEventListener("touchcancel", onEnd, true);
-      document.removeEventListener("mousemove", onMove, true);
-      document.removeEventListener("mouseup", onEnd, true);
-      activeCleanupRef.current = null;
-    };
-
-    clearTimeout(pressTimerRef.current);
-    pressTimerRef.current = setTimeout(() => {
-      // ~1.4s total from tap → ENTER DRAG MODE (280ms buffer + 1100ms hold)
-      // Measure live slot height (card height + gap) from the DOM
-      if (cardRefs.current[0] && cardRefs.current[1]) {
-        tileHeightRef.current = cardRefs.current[1].offsetTop - cardRefs.current[0].offsetTop;
-      } else if (cardRefs.current[0]) {
-        tileHeightRef.current = cardRefs.current[0].offsetHeight + 10;
-      }
-      // Refs must be set synchronously — setDragIdx/setPressingIdx are async React
-      // state updates that only reach the refs via useEffect after the next render.
-      // touchmove fires before that render on mobile, so without direct ref writes
-      // the drag branch is never entered (same bug fixed in TabsOverview).
-      justDraggedRef.current = true;
-      pressingIdxRef.current = -1;
-      dragIdxRef.current = idx;
-      lastDragEvtRef.current = Date.now();
-      setPressingIdx(-1);
-      setDragIdx(idx);
-      targetIdxRef.current = idx;
-
-      // The "pop" — card lifts off screen as a fixed-position clone that follows the finger.
-      // The original becomes an invisible ghost that holds its space in the flow.
-      const el = cardRefs.current[idx];
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        fingerOffsetYRef.current = pressStartYRef.current - rect.top;
-        naturalCardTopsRef.current = cardRefs.current.map((r) => r ? r.getBoundingClientRect().top : 0);
-        // Flying clone: fixed to viewport, floats above everything
-        const clone = el.cloneNode(true);
-        clone.className = "home-nav-item drag-flying";
-        clone.style.cssText = [
-        "position:fixed",
-        "top:" + rect.top + "px",
-        "left:" + rect.left + "px",
-        "width:" + rect.width + "px",
-        "height:" + rect.height + "px",
-        "z-index:9999",
-        "pointer-events:none",
-        "margin:0",
-        "box-sizing:border-box",
-        "transition:transform 0.16s cubic-bezier(0.2,0.8,0.3,1)",
-        "transform:scale(1.05)"].
-        join(";");
-        document.body.appendChild(clone);
-        dragCloneRef.current = clone;
-      }
-      if (navigator.vibrate) {try {navigator.vibrate(55);} catch (_e) { /* DOM access — element may not exist or API unsupported */ }}
-    }, 1380); // 280ms buffer + 1100ms hold — forgiving enough to avoid false triggers on quick taps
-  };
-
-  const endPress = () => {
-    clearTimeout(pressTimerRef.current);
-    clearTimeout(visualDelayTimerRef.current);
-    const wasPressing = pressingIdxRef.current >= 0;
-    const wasDragging = dragIdxRef.current >= 0;
+  // Drop commit — SYNCHRONOUS at release: the order write + transform clear
+  // land in ONE paint while the ghost glides into the target slot above the
+  // hidden real tile. Tiles are keyed by ID, so the grabbed NODE persists
+  // across the reorder — it is the reveal target at landing.
+  const commitDrop = (g) => {
+    const from = g.idx;
+    const to = g.targetIdx >= 0 ? Math.min(g.targetIdx, orderRef.current.length - 1) : from;
+    clearInlineTransforms();
+    setDragIdx(-1);
     setPressingIdx(-1);
-    pressingIdxRef.current = -1;
-    touchIdRef.current = null;
-
-    if (wasDragging) {
-      const from = dragIdxRef.current;
-      const to = targetIdxRef.current >= 0 ? targetIdxRef.current : from;
-      const clone = dragCloneRef.current;
-      // Snap the flying clone to the target slot's natural position, then remove it.
-      if (clone) {
-        const snapTop = naturalCardTopsRef.current[to] ?? naturalCardTopsRef.current[from] ?? 0;
-        clone.style.transition = "top 0.22s cubic-bezier(0.2,0.8,0.3,1), transform 0.22s cubic-bezier(0.2,0.8,0.3,1)";
-        clone.style.top = snapTop + "px";
-        clone.style.transform = "scale(1)";
+    const grabbedEl = g.data.el || null;
+    if (grabbedEl) grabbedEl.style.opacity = "0";
+    try {
+      if (to !== from && to >= 0) {
+        const newOrder = [...orderRef.current];
+        const [moved] = newOrder.splice(from, 1);
+        newOrder.splice(to, 0, moved);
+        setOrder(newOrder);
+        HomeOrderStore.set(newOrder);
       }
-      // The commit runs at most once: normally the timer fires it after the snap
-      // animation; a new press flushes it early via finishDragRef. The finally
-      // guarantees the drag refs reset even if the order write throws.
-      const finish = () => {
-        if (finishDragRef.current !== finish) return;
-        finishDragRef.current = null;
-        clearTimeout(commitTimerRef.current);
-        try {
-          if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
-          dragCloneRef.current = null;
-          clearInlineTransforms();
-          if (to !== from && to >= 0) {
-            const newOrder = [...orderRef.current];
-            const [moved] = newOrder.splice(from, 1);
-            newOrder.splice(to, 0, moved);
-            setOrder(newOrder);
-            HomeOrderStore.set(newOrder);
-          }
-        } finally {
-          dragIdxRef.current = -1;  // sync ref immediately; setDragIdx's useEffect is async
-          setDragIdx(-1);
-          targetIdxRef.current = -1;
-          setTimeout(() => {justDraggedRef.current = false;}, 120);
-        }
-      };
-      finishDragRef.current = finish;
-      commitTimerRef.current = setTimeout(finish, 240);
-    } else if (wasPressing) {
-      if (Date.now() - pressStartTsRef.current > 400) {
-        justDraggedRef.current = true;
-        setTimeout(() => {justDraggedRef.current = false;}, 300);
-      }
+    } catch (err) {
+      _homeDragTrace('reorder commit threw: ' + String(err).slice(0, 120));
     }
+    const ghost = g.data.ghost;
+    if (ghost) {
+      const snapTop = (g.data.tops && (g.data.tops[to] ?? g.data.tops[from])) ?? 0;
+      ghost.style.transition = "top 0.22s cubic-bezier(0.2,0.8,0.3,1), transform 0.22s cubic-bezier(0.2,0.8,0.3,1)";
+      ghost.style.top = snapTop + "px";
+      ghost.style.transform = "scale(1)";
+    }
+    dragRef.current.land(ghost, grabbedEl, 230);
   };
+
+  if (!dragRef.current) {
+    dragRef.current = createPressDrag({
+      trace: _homeDragTrace,
+      onGlow: (idx) => setPressingIdx(idx),
+      onGlowClear: () => setPressingIdx(-1),
+      // DRAG MODE (~1.4s hold): measure the live slot height, capture the
+      // natural tops, and lift the tile off as a fixed-position ghost.
+      onEngage: (g) => {
+        setDragIdx(g.idx);
+        let h = 80;
+        if (cardRefs.current[0] && cardRefs.current[1]) {
+          h = cardRefs.current[1].offsetTop - cardRefs.current[0].offsetTop;
+        } else if (cardRefs.current[0]) {
+          h = cardRefs.current[0].offsetHeight + 10;
+        }
+        g.data.h = h;
+        g.data.tops = cardRefs.current.map((r) => r ? r.getBoundingClientRect().top : 0);
+        const el = cardRefs.current[g.idx];
+        g.data.el = el || null;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          g.data.offY = g.startY - rect.top;
+          const ghost = el.cloneNode(true);
+          ghost.className = "home-nav-item drag-flying";
+          ghost.style.cssText = [
+          "position:fixed",
+          "top:" + rect.top + "px",
+          "left:" + rect.left + "px",
+          "width:" + rect.width + "px",
+          "height:" + rect.height + "px",
+          "z-index:9999",
+          "pointer-events:none",
+          "margin:0",
+          "box-sizing:border-box",
+          "transition:transform 0.16s cubic-bezier(0.2,0.8,0.3,1)",
+          "transform:scale(1.05)"].
+          join(";");
+          document.body.appendChild(ghost);
+          g.data.ghost = ghost;
+        }
+        if (navigator.vibrate) {try {navigator.vibrate(55);} catch (_e) { /* unsupported — ignore */ }}
+      },
+      // ACTIVE DRAG: the ghost follows the finger vertically; the drop slot
+      // is picked against the captured natural tops.
+      onDragMove: (g, _x, y) => {
+        const ghost = g.data.ghost;
+        if (ghost) {
+          ghost.style.transition = "none";
+          ghost.style.top = (y - g.data.offY) + "px";
+          ghost.style.transform = "scale(1.05)";
+        }
+        const tops = g.data.tops || [];
+        const h = g.data.h || 80;
+        const centerY = y - g.data.offY + h * 0.5;
+        let t = 0;
+        for (let i = 1; i < tops.length; i++) {
+          if (centerY >= tops[i] - h * 0.3) t = i;
+        }
+        t = Math.max(0, Math.min(orderRef.current.length - 1, t));
+        if (t !== g.targetIdx) {
+          g.targetIdx = t;
+          applySiblingShifts(g.idx, t, h);
+        }
+      },
+      onCommit: commitDrop,
+      onAbortDrag: (g) => {
+        if (g.data.ghost && g.data.ghost.parentNode) g.data.ghost.parentNode.removeChild(g.data.ghost);
+        clearInlineTransforms();
+        setDragIdx(-1);
+      },
+    });
+  }
+
+  // Unmount mid-gesture: one call tears down timers, listeners, ghost, landing.
+  React.useEffect(() => () => { dragRef.current.destroy(); }, []);
+
+  const startPress = (idx, clientX, clientY, pointerId) =>
+    dragRef.current.start(idx, clientX, clientY, pointerId, cardRefs.current[idx]);
 
   const handleTap = (id) => {
     if (id === "settings") {onSettings();return;}
@@ -405,14 +278,14 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
               key={item.id}
               ref={setCardRef(i)}
               className={`home-nav-item${i === pressingIdx ? " pressing" : ""}${i === dragIdx ? " dragging" : ""}`}
-              onTouchStart={(e) => {
-                if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientY, e.touches[0].identifier);
+              onPointerDown={(e) => {
+                if (e.isPrimary === false) return; // a second finger never owns a gesture
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                startPress(i, e.clientX, e.clientY, e.pointerId);
               }}
-              onMouseDown={(e) => {
-                if (e.button === 0) startPress(i, e.clientY);
-              }}
+              onDragStart={(e) => e.preventDefault()}
               onClick={(e) => {
-                if (justDraggedRef.current) {e.preventDefault();e.stopPropagation();return;}
+                if (dragRef.current.suppressed()) {e.preventDefault();e.stopPropagation();return;}
                 handleTap(item.id);
               }}
             >

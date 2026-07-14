@@ -1,23 +1,24 @@
 // @ts-nocheck — test constructs partial JournalEntry / block literals
-/* Journal block drag-to-reorder (FABLE5 [6]).
+/* Journal block drag-to-reorder (FABLE5 [6]) — on the SHARED press-drag core.
    ──────────────────────────────────────────────────────────────────────
    A grip handle in each block's left gutter drags the block to a new
-   position; siblings FLIP out of the way and the drop commits via
-   JournalHelpers.moveBlock + the editor's normal save path. The drag
-   lifecycle carries the TabsOverview hardening: a grab during the
-   post-drop snap window flushes the parked commit (never swallowed),
-   moves/lifts are matched to the owning pointer, and the commit body is
-   try/finally. Integration-style over the REAL JournalStore + helpers;
-   far-boundary UI chrome stubbed (same harness as the J1/J2 suite).
-   Block geometry comes from per-element getBoundingClientRect stubs —
-   jsdom rects are all zeros otherwise, which would collapse every slot
-   onto index 0. */
+   position; siblings FLIP out of the way. The lifecycle is the shared
+   createPressDrag factory (utils/press-drag.js — the tabs v2 redesign)
+   with holdMs:0 (the grip is the affordance, the grab is instant). The
+   commit is SYNCHRONOUS at release: moveBlock + blocksRef land in the same
+   task (one paint; a pagehide/unmount flush persists the NEW order with no
+   parked window), while the clone glides into its slot and swaps for the
+   real block at landing. Integration-style over the REAL JournalStore +
+   helpers + the REAL factory; far-boundary UI chrome stubbed. Block
+   geometry comes from per-element getBoundingClientRect stubs — jsdom
+   rects are all zeros otherwise. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, act, fireEvent } from '@testing-library/react';
+import { render, cleanup, act } from '@testing-library/react';
 import { JournalEditorScreen } from './JournalEditorScreen.jsx';
 import { JournalStore } from '../../stores/journal-store.js';
 import { JournalHelpers } from '../../data/journal-helpers.js';
+import { createPressDrag } from '../../utils/press-drag.js';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -25,6 +26,7 @@ beforeEach(() => {
   JournalStore._resetForTests({ forceLoaded: true });
   globalThis.JournalStore = JournalStore;
   globalThis.JournalHelpers = JournalHelpers;
+  globalThis.createPressDrag = createPressDrag; // the REAL shared lifecycle
   globalThis.JournalMediaStore = { compressImage: vi.fn(), put: vi.fn(), delete: vi.fn() };
   globalThis.showToast = () => {};
   globalThis.StorageHealth = { onWriteFailure: () => {} };
@@ -70,13 +72,26 @@ function renderEditor(texts) {
 
 const storedTexts = (id) => JournalStore.get(id).blocks.map((b) => b.text);
 
-// Drag block `i`'s grip with the mouse from its grip to absolute y `toY`.
-function mouseGrab(i) {
+// Pointer-event driver — jsdom-safe (MouseEvent fallback + direct field assign).
+const firePointer = (target, type, init) => {
+  const Ctor = /** @type {any} */ (window).PointerEvent || window.MouseEvent;
+  const e = new Ctor(type, { bubbles: true, cancelable: true, ...init });
+  ['pointerId', 'isPrimary', 'pointerType'].forEach((k) => {
+    if (init && k in init && /** @type {any} */ (e)[k] !== init[k]) {
+      try { Object.defineProperty(e, k, { value: init[k] }); } catch (_e) { /* ignore */ }
+    }
+  });
+  act(() => { target.dispatchEvent(e); });
+  return e;
+};
+
+// Grab block i's grip — instant drag (holdMs 0), no timers needed.
+function grab(i, pointerId = 1) {
   const grips = document.querySelectorAll('.jrn-block-drag-btn');
-  fireEvent.mouseDown(grips[i], { button: 0, clientX: 20, clientY: TOP(i) + 10 });
+  firePointer(grips[i], 'pointerdown', { pointerId, isPrimary: true, pointerType: 'touch', clientX: 20, clientY: TOP(i) + 10 });
 }
-const dragTo = (y) => fireEvent.mouseMove(document, { clientX: 20, clientY: y });
-const drop = (y) => fireEvent.mouseUp(document, { clientX: 20, clientY: y });
+const dragTo = (y, pointerId = 1) => firePointer(document, 'pointermove', { pointerId, clientX: 20, clientY: y });
+const drop = (y, pointerId = 1) => firePointer(document, 'pointerup', { pointerId, clientX: 20, clientY: y });
 
 describe('JournalHelpers.moveBlock', () => {
   const arr = ['a', 'b', 'c', 'd'].map((t) => ({ id: t, type: 'p', text: t }));
@@ -103,35 +118,35 @@ describe('journal block drag-to-reorder', () => {
     expect(document.querySelectorAll('.jrn-block-drag-btn').length).toBe(0);
   });
 
-  it('dragging a block down by its grip commits the new order to the store', () => {
+  it('dragging a block down by its grip commits the new order SYNCHRONOUSLY at release', () => {
     const entry = renderEditor(['a', 'b', 'c', 'd']);
     stubRects();
-    mouseGrab(0);
+    grab(0);
     // grabbing is immediate — clone flying, original ghosted
     expect(document.querySelector('.jrn-block.drag-flying')).toBeTruthy();
     expect(document.querySelectorAll('.jrn-block')[0].className).toContain('dragging');
-    // clone center passes block 2's center (395): y=380 → cy 370+45=415
+    // clone center passes block 2's center: y=380 → cy 370+45=415
     dragTo(380);
     drop(380);
-    act(() => { vi.advanceTimersByTime(300); });   // snap window → commit
-    expect(document.querySelector('.jrn-block.drag-flying')).toBeNull();
-    act(() => { vi.advanceTimersByTime(1500); });  // auto-save debounce
+    // The reorder is applied in the SAME task as the release (blocksRef is
+    // current immediately); only the debounced SAVE still needs its timer.
+    act(() => { vi.advanceTimersByTime(1500); });
     expect(storedTexts(entry.id)).toEqual(['b', 'c', 'a', 'd']);
+    // The clone glides for ~210ms, then swaps for the real block.
+    expect(document.querySelector('.jrn-block.drag-flying')).toBeNull();
   });
 
-  it('a grab inside the snap window flushes the pending commit and starts a new tracked drag', () => {
+  it('a grab DURING the landing glide flushes it and the second drag works end-to-end', () => {
     const entry = renderEditor(['a', 'b', 'c', 'd']);
     stubRects();
-    mouseGrab(0);
+    grab(0);
     dragTo(380);
-    drop(380);
-    act(() => { vi.advanceTimersByTime(50); });    // still inside the 220ms window
-    // re-grab another block — the parked commit must flush synchronously…
-    mouseGrab(3);
-    expect(document.querySelector('.jrn-block.drag-flying')).toBeTruthy();
-    // …and the first reorder is already applied once the debounce runs
-    drop(TOP(3) + 10);
-    act(() => { vi.advanceTimersByTime(300); });
+    drop(380); // landing glide starts (~210ms)
+    // Re-grab immediately — the new pointerdown must flush the landing and
+    // own a fresh gesture (the "works once then never" class).
+    grab(3, 7);
+    expect(document.querySelectorAll('.jrn-block.drag-flying').length).toBe(1);
+    drop(TOP(3) + 10, 7); // no move — commits nothing
     act(() => { vi.advanceTimersByTime(1500); });
     expect(storedTexts(entry.id)).toEqual(['b', 'c', 'a', 'd']);
   });
@@ -139,57 +154,57 @@ describe('journal block drag-to-reorder', () => {
   it('only the pointer that grabbed the grip can move or end the drag', () => {
     const entry = renderEditor(['a', 'b', 'c']);
     stubRects();
-    const grips = document.querySelectorAll('.jrn-block-drag-btn');
-    const touch = (id, y) => ({ identifier: id, clientX: 20, clientY: y });
-    fireEvent.touchStart(grips[0], { touches: [touch(1, TOP(0) + 10)], changedTouches: [touch(1, TOP(0) + 10)] });
+    grab(0, 1);
     expect(document.querySelector('.jrn-block.drag-flying')).toBeTruthy();
     // a stray second finger lifting must NOT end the drag
-    fireEvent.touchEnd(document, { touches: [touch(1, TOP(0) + 10)], changedTouches: [touch(9, 600, 600)] });
+    drop(600, 9);
     expect(document.querySelector('.jrn-block.drag-flying')).toBeTruthy();
     // the owning finger moves past block 1's center, then lifts → commit
-    fireEvent.touchMove(document, { touches: [touch(1, 270)], changedTouches: [touch(1, 270)] });
+    dragTo(270, 1);
     // the FLIP shift proves the move was accepted and the target advanced
     expect(document.querySelectorAll('.jrn-block')[1].style.transform).toContain('translateY');
-    fireEvent.touchEnd(document, { touches: [], changedTouches: [touch(1, 270)] });
-    // two advances: the snap-window commit renders first (its effect
-    // schedules the debounced save), then the debounce fires
-    act(() => { vi.advanceTimersByTime(300); });
+    drop(270, 1);
     act(() => { vi.advanceTimersByTime(1500); });
     expect(storedTexts(entry.id)).toEqual(['b', 'a', 'c']);
   });
 
-  it('a NON-BUBBLING touchend (WebView selection machinery) still ends and commits the drag', () => {
-    // Android WebView's native selection machinery delivers a claimed
-    // gesture's touchend non-bubbling — document-BUBBLE listeners starve
-    // (the tabs lock-up class). The drag listens in CAPTURE, which no
-    // intermediate consumer can block.
+  it('a NON-BUBBLING pointerup (WebView delivery) still ends and commits the drag', () => {
+    // Android WebView machinery can deliver a claimed gesture's end event
+    // non-bubbling — document-BUBBLE listeners starve (the tabs lock-up
+    // class). The factory listens at document CAPTURE, first in propagation.
     const entry = renderEditor(['a', 'b', 'c']);
     stubRects();
-    const grips = document.querySelectorAll('.jrn-block-drag-btn');
-    const touch = (id, y) => ({ identifier: id, clientX: 20, clientY: y });
-    fireEvent.touchStart(grips[0], { touches: [touch(1, TOP(0) + 10)], changedTouches: [touch(1, TOP(0) + 10)] });
-    expect(document.querySelector('.jrn-block.drag-flying')).toBeTruthy();
-    const raw = (type, y, touches) => {
-      const e = new Event(type, { bubbles: false, cancelable: true });
-      Object.defineProperty(e, 'touches', { value: touches, configurable: true });
-      Object.defineProperty(e, 'changedTouches', { value: [touch(1, y)], configurable: true });
-      grips[0].dispatchEvent(e);
-    };
-    raw('touchmove', 270, [touch(1, 270)]);
-    raw('touchend', 270, []);
-    act(() => { vi.advanceTimersByTime(300); });
+    grab(0);
+    dragTo(270);
+    const Ctor = /** @type {any} */ (window).PointerEvent || window.MouseEvent;
+    const e = new Ctor('pointerup', { bubbles: false, cancelable: true, clientX: 20, clientY: 270 });
+    try { Object.defineProperty(e, 'pointerId', { value: 1 }); } catch (_e) { /* ignore */ }
+    act(() => { document.dispatchEvent(e); });
+    act(() => { vi.advanceTimersByTime(1500); });
     expect(document.querySelector('.jrn-block.drag-flying')).toBeNull();
-    act(() => { vi.advanceTimersByTime(1500); });
     expect(storedTexts(entry.id)).toEqual(['b', 'a', 'c']);
   });
 
-  it('unmounting mid-snap-window still persists the reorder (flush + commitSave)', () => {
+  it('pointercancel MID-DRAG commits at the current slot (the browser claimed the stream)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const entry = renderEditor(['a', 'b', 'c']);
     stubRects();
-    mouseGrab(0);
+    grab(0);
+    dragTo(270);
+    firePointer(document, 'pointercancel', { pointerId: 1, clientX: 20, clientY: 270 });
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(storedTexts(entry.id)).toEqual(['b', 'a', 'c']);
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('[jrndrag]'))).toBe(true);
+    warn.mockRestore();
+  });
+
+  it('unmounting right after release persists the reorder (synchronous commit, no parked window)', () => {
+    const entry = renderEditor(['a', 'b', 'c']);
+    stubRects();
+    grab(0);
     dragTo(270); // past block 1's center
     drop(270);
-    cleanup();   // unmount before the 220ms commit timer fires
+    cleanup();   // unmount immediately — nothing is parked anymore
     expect(storedTexts(entry.id)).toEqual(['b', 'a', 'c']);
   });
 });

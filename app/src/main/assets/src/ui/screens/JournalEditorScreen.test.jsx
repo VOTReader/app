@@ -24,6 +24,7 @@ import { render, cleanup, act, fireEvent } from '@testing-library/react';
 import { JournalEditorScreen } from './JournalEditorScreen.jsx';
 import { JournalStore } from '../../stores/journal-store.js';
 import { JournalHelpers } from '../../data/journal-helpers.js';
+import { createPressDrag } from '../../utils/press-drag.js';
 
 beforeEach(() => {
   localStorage.clear();
@@ -33,6 +34,8 @@ beforeEach(() => {
   // onto window). Real store + helpers; far-boundary UI chrome stubbed.
   globalThis.JournalStore = JournalStore;
   globalThis.JournalHelpers = JournalHelpers;
+  globalThis.createPressDrag = createPressDrag; // the shared drag lifecycle
+
   globalThis.JournalMediaStore = { compressImage: vi.fn(), put: vi.fn(), delete: vi.fn() };
   globalThis.showToast = () => {};
   globalThis.StorageHealth = { onWriteFailure: () => {} };

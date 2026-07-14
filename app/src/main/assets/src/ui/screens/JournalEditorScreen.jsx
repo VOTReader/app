@@ -25,6 +25,17 @@ function _journalSig(o) {
   return JSON.stringify([(o && o.title) || '', (o && o.blocks) || [], (o && o.mood) || null]);
 }
 
+// Abnormal-path trace for the block drag — console.warn + DiagnosticLog so a
+// failing device names itself (same pattern as [tabdrag]/[thumb]).
+function _jrnDragTrace(msg) {
+  try { console.warn('[jrndrag] ' + msg); } catch (_e) { /* ignore */ }
+  try {
+    if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof DiagnosticLog.error === 'function') {
+      DiagnosticLog.error('jrndrag', msg);
+    }
+  } catch (_e) { /* ignore */ }
+}
+
 export function JournalEditorScreen(props) {
   var useState = React.useState;
   var useEffect = React.useEffect;
@@ -102,13 +113,12 @@ export function JournalEditorScreen(props) {
   const [confirmDelIdx, setConfirmDelIdx] = useState(null);
 
   // ─── Block drag-to-reorder (grip handle) ────────────────────
-  // Imperative-DOM drag like TabsOverview/HomeScreen, but with NO
-  // long-press phase: the grip is an explicit affordance (touch-action:
-  // none), so the grab starts the instant it's touched. State machine
-  // carries the same hardening as the tab drag: the drop-commit parks in
-  // finishBlockDragRef (a new grab flushes it), moves/lifts are matched
-  // to the pointer that owns the drag, and the commit body is
-  // try/finally so the refs can never stay poisoned.
+  // Block drag rides the SHARED pointer-events lifecycle (utils/press-drag.js
+  // — createPressDrag, extracted from the tabs v2 redesign) with holdMs:0 —
+  // the grip is an explicit affordance (touch-action:none), so the grab
+  // starts the instant it's touched. This screen owns only the variable-
+  // height geometry, the edge autoscroll, and the seamless commit; the
+  // factory owns listeners, pointer identity, pointercancel, force-reset.
   var _dragIdx = useState(-1);
   var dragIdx = _dragIdx[0]; var setDragIdx = _dragIdx[1];
   var blockRefs = useRef([]);
@@ -117,27 +127,20 @@ export function JournalEditorScreen(props) {
   var dragCloneRef = useRef(null);
   var dragRectsRef = useRef([]);        // CONTAINER-coordinate rects (viewport + scrollTop) at grab
   var dragScrollerRef = useRef(null);
-  var dragTouchIdRef = useRef(null);    // pointer that owns the drag ('mouse' for pointer)
-  var finishBlockDragRef = useRef(null);
-  var dragCommitTimerRef = useRef(null);
-  var dragCleanupRef = useRef(null);
   var dragFingerOffYRef = useRef(0);
   var dragLastYRef = useRef(0);
   var dragAutoDirRef = useRef(0);       // -1 scroll up / 0 / 1 scroll down (edge autoscroll)
   var dragScrollRafRef = useRef(0);
-  var lastDragEvtRef = useRef(0);       // last time the active drag saw one of its own events (zombie detector)
+  var dragCtl = useRef(null);           // the shared createPressDrag instance
 
-  // Tear down listeners, the rAF autoscroll loop, and the flying clone if
-  // the editor unmounts mid-drag; flush a parked commit so the reorder is
-  // not lost (finish() updates blocksRef synchronously, and commitSave()
-  // persists it even though the store-flush cleanup ran on the old array).
+  // Unmount mid-gesture: one call tears down listeners, timers, ghost, and
+  // landing. The reorder itself commits SYNCHRONOUSLY at release now, so
+  // nothing can be parked; commitSave() still flushes any debounced edit.
   useEffect(function() {
     return function() {
-      if (dragCleanupRef.current) dragCleanupRef.current();
+      if (dragCtl.current) dragCtl.current.destroy();
       if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
-      if (finishBlockDragRef.current) { finishBlockDragRef.current(); commitSave(); }
-      if (dragCloneRef.current && dragCloneRef.current.parentNode)
-        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
+      commitSave();
     };
   }, []);
 
@@ -314,25 +317,6 @@ export function JournalEditorScreen(props) {
   // ─── Block drag-to-reorder mechanics ────────────────────────
   var setBlockRef = function(i) { return function(el) { blockRefs.current[i] = el; }; };
 
-  // Multi-touch discipline (same contract as TabsOverview): only the
-  // pointer that grabbed the grip moves the block or ends the drag.
-  function _dragPoint(e) {
-    if (e.touches) {
-      for (var i = 0; i < e.touches.length; i++)
-        if (e.touches[i].identifier === dragTouchIdRef.current) return e.touches[i];
-      return null;
-    }
-    return dragTouchIdRef.current === 'mouse' ? e : null;
-  }
-  function _dragEnded(e) {
-    if (!e.changedTouches) return dragTouchIdRef.current === 'mouse';
-    for (var i = 0; i < e.changedTouches.length; i++)
-      if (e.changedTouches[i].identifier === dragTouchIdRef.current) return true;
-    for (var j = 0; j < e.touches.length; j++)
-      if (e.touches[j].identifier === dragTouchIdRef.current) return false;
-    return true; // ours vanished without a changedTouches entry (some touchcancels)
-  }
-
   // The dragged block's full slot delta (height + inter-block spacing) —
   // what its neighbors must shift by. Blocks have VARIABLE heights, so
   // this is measured from adjacent captured rects, not assumed uniform.
@@ -414,117 +398,45 @@ export function JournalEditorScreen(props) {
     }
   }
 
-  function startBlockDrag(idx, clientY, pointerId) {
-    // A just-dropped drag parks its commit while the snap animation plays;
-    // flush it so this grab is never silently swallowed.
-    if (finishBlockDragRef.current) finishBlockDragRef.current();
-    // Zombie self-heal: a LIVE drag sees its own events continuously. If a
-    // drag is "active" but has seen nothing for seconds, its end event was
-    // lost — abort it, uncommitted, and let this fresh grab proceed.
-    if (dragIdxRef.current >= 0 && Date.now() - lastDragEvtRef.current > 2500) {
-      if (dragCleanupRef.current) dragCleanupRef.current();
-      if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
-      if (dragCloneRef.current && dragCloneRef.current.parentNode)
-        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
-      dragCloneRef.current = null;
-      blockRefs.current.forEach(function(n) { if (n) { n.style.transform = ''; n.style.transition = ''; } });
-      dragIdxRef.current = -1;
-      setDragIdx(-1);
-      dragTargetRef.current = -1;
-    }
-    if (dragIdxRef.current >= 0) return;
-    var container = blocksContainerRef.current;
-    var el = blockRefs.current[idx];
-    if (!container || !el) return;
-    var scroller = container.closest('.screen-scroll') || document.documentElement;
-    dragScrollerRef.current = scroller;
-    // Open confirm strips target blocks BY INDEX — close them before the
-    // indices move (and before their banner height skews the rect capture).
-    setConfirmDelIdx(null);
-    setConfirmAudioDelete(null);
-    dragTouchIdRef.current = pointerId != null ? pointerId : 'mouse';
-    var st = scroller.scrollTop;
-    dragRectsRef.current = blockRefs.current.map(function(n) {
-      if (!n) return null;
-      var r = n.getBoundingClientRect();
-      return { top: r.top + st, bottom: r.bottom + st, cy: r.top + st + r.height / 2, h: r.height };
-    });
-    var rect = el.getBoundingClientRect();
-    dragFingerOffYRef.current = clientY - rect.top;
-    dragLastYRef.current = clientY;
-    dragIdxRef.current = idx;
-    dragTargetRef.current = idx;
-    lastDragEvtRef.current = Date.now();
-    setDragIdx(idx);
-
-    // Flying clone — framed card that follows the finger. React renders a
-    // textarea's text via the value PROPERTY, which cloneNode does not
-    // copy, so mirror form-field values onto the clone by hand.
-    var clone = el.cloneNode(true);
-    var srcFields = el.querySelectorAll('textarea, input');
-    var dstFields = clone.querySelectorAll('textarea, input');
-    for (var i = 0; i < srcFields.length; i++) {
-      if (dstFields[i]) dstFields[i].value = srcFields[i].value;
-    }
-    clone.className = 'jrn-block drag-flying';
-    clone.style.cssText = [
-      'position:fixed',
-      'top:' + rect.top + 'px',
-      'left:' + rect.left + 'px',
-      'width:' + rect.width + 'px',
-      'height:' + rect.height + 'px',
-      'z-index:9999',
-      'pointer-events:none',
-    ].join(';');
-    document.body.appendChild(clone);
-    dragCloneRef.current = clone;
-
-    var onMove = function(e) {
-      var p = _dragPoint(e);
-      if (!p) return;
-      lastDragEvtRef.current = Date.now();
-      if (e.cancelable) { try { e.preventDefault(); } catch (_er) { /* passive — ignore */ } }
-      dragLastYRef.current = p.clientY;
-      var c = dragCloneRef.current;
-      if (c) c.style.top = (p.clientY - dragFingerOffYRef.current) + 'px';
-      _updateAutoScroll(p.clientY);
-      _updateDragTarget(p.clientY);
-    };
-    var onEnd = function(e) {
-      if (!_dragEnded(e)) return;
-      if (dragCleanupRef.current) dragCleanupRef.current();
-      endBlockDrag();
-    };
-    // CAPTURE phase — document-capture runs before ScreenLayout's
-    // tap-suppressor can stopPropagation a long-hold lift over the grip
-    // (a button = interactive target; see the TabsOverview comment).
-    document.addEventListener('touchmove', onMove, { passive: false, capture: true });
-    document.addEventListener('touchend', onEnd, true);
-    document.addEventListener('touchcancel', onEnd, true);
-    document.addEventListener('mousemove', onMove, true);
-    document.addEventListener('mouseup', onEnd, true);
-    dragCleanupRef.current = function() {
-      document.removeEventListener('touchmove', onMove, { capture: true });
-      document.removeEventListener('touchend', onEnd, true);
-      document.removeEventListener('touchcancel', onEnd, true);
-      document.removeEventListener('mousemove', onMove, true);
-      document.removeEventListener('mouseup', onEnd, true);
-      dragCleanupRef.current = null;
-    };
-    if (navigator.vibrate) { try { navigator.vibrate(35); } catch (_e) { /* unsupported — ignore */ } }
-  }
-
-  function endBlockDrag() {
-    dragTouchIdRef.current = null;
+  // Drop commit — SYNCHRONOUS at release (the factory's onCommit): the
+  // transforms clear + the reorder land in ONE paint of the final
+  // arrangement (blocksRef is written in the same tick, so a pagehide/
+  // unmount flush persists the NEW order immediately — the old parked-
+  // commit window is gone), while the clone glides into its slot above the
+  // hidden real block (blocks are keyed by id — the grabbed NODE persists
+  // across the reorder and is the reveal target at landing).
+  function commitBlockDrop() {
     dragAutoDirRef.current = 0;
     if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
-    if (dragIdxRef.current < 0) return;
     var from = dragIdxRef.current;
+    if (from < 0) return;
     var to = dragTargetRef.current >= 0 ? dragTargetRef.current : from;
     var clone = dragCloneRef.current;
     var rects = dragRectsRef.current;
     var r0 = rects[from];
-    // Snap the clone to the slot it will occupy, then commit + clean up.
+    blockRefs.current.forEach(function(n) {
+      if (n) { n.style.transform = ''; n.style.transition = ''; }
+    });
+    dragIdxRef.current = -1;
+    setDragIdx(-1);
+    dragTargetRef.current = -1;
+    var grabbedEl = blockRefs.current[from] || null;
+    if (grabbedEl) grabbedEl.style.opacity = '0';
+    try {
+      if (to !== from) {
+        var moved = JournalHelpers.moveBlock(blocksRef.current, from, to);
+        if (moved !== blocksRef.current) {
+          // Write the ref synchronously too: a pagehide/unmount flush in
+          // the same tick must persist the NEW order, not wait a render.
+          blocksRef.current = moved;
+          setBlocks(moved);
+          activeTextareaRef.current = null; // caret index is stale after a move
+          scheduleSave();
+        }
+      }
+    } catch (err) {
+      _jrnDragTrace('reorder commit threw: ' + String(err).slice(0, 120));
+    }
     if (clone && r0) {
       var st = dragScrollerRef.current ? dragScrollerRef.current.scrollTop : 0;
       var snapTop = to === from ? r0.top
@@ -533,35 +445,84 @@ export function JournalEditorScreen(props) {
       clone.style.transition = 'top 0.2s cubic-bezier(0.2,0.8,0.3,1)';
       clone.style.top = (snapTop - st) + 'px';
     }
-    var finish = function() {
-      if (finishBlockDragRef.current !== finish) return;
-      finishBlockDragRef.current = null;
-      clearTimeout(dragCommitTimerRef.current);
-      try {
-        if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
-        dragCloneRef.current = null;
-        blockRefs.current.forEach(function(n) {
-          if (n) { n.style.transform = ''; n.style.transition = ''; }
+    dragCloneRef.current = null;
+    dragCtl.current.land(clone, grabbedEl, 210);
+  }
+
+  if (!dragCtl.current) {
+    dragCtl.current = createPressDrag({
+      holdMs: 0, // the grip IS the affordance — the grab starts instantly
+      trace: _jrnDragTrace,
+      onEngage: function(g) {
+        var idx = g.idx;
+        var container = blocksContainerRef.current;
+        var el = blockRefs.current[idx];
+        if (!container || !el) return; // nothing to drag — release no-ops (to===from)
+        var scroller = container.closest('.screen-scroll') || document.documentElement;
+        dragScrollerRef.current = scroller;
+        // Open confirm strips target blocks BY INDEX — close them before the
+        // indices move (and before their banner height skews the rect capture).
+        setConfirmDelIdx(null);
+        setConfirmAudioDelete(null);
+        var st = scroller.scrollTop;
+        dragRectsRef.current = blockRefs.current.map(function(n) {
+          if (!n) return null;
+          var r = n.getBoundingClientRect();
+          return { top: r.top + st, bottom: r.bottom + st, cy: r.top + st + r.height / 2, h: r.height };
         });
-        if (to !== from) {
-          var moved = JournalHelpers.moveBlock(blocksRef.current, from, to);
-          if (moved !== blocksRef.current) {
-            // Write the ref synchronously too: a pagehide/unmount flush in
-            // the same tick must persist the NEW order, not wait a render.
-            blocksRef.current = moved;
-            setBlocks(moved);
-            activeTextareaRef.current = null; // caret index is stale after a move
-            scheduleSave();
-          }
+        var rect = el.getBoundingClientRect();
+        dragFingerOffYRef.current = g.startY - rect.top;
+        dragLastYRef.current = g.startY;
+        dragIdxRef.current = idx;
+        dragTargetRef.current = idx;
+        setDragIdx(idx);
+        // Flying clone — framed card that follows the finger. React renders a
+        // textarea's text via the value PROPERTY, which cloneNode does not
+        // copy, so mirror form-field values onto the clone by hand.
+        var clone = el.cloneNode(true);
+        var srcFields = el.querySelectorAll('textarea, input');
+        var dstFields = clone.querySelectorAll('textarea, input');
+        for (var i = 0; i < srcFields.length; i++) {
+          if (dstFields[i]) dstFields[i].value = srcFields[i].value;
         }
-      } finally {
+        clone.className = 'jrn-block drag-flying';
+        clone.style.cssText = [
+          'position:fixed',
+          'top:' + rect.top + 'px',
+          'left:' + rect.left + 'px',
+          'width:' + rect.width + 'px',
+          'height:' + rect.height + 'px',
+          'z-index:9999',
+          'pointer-events:none',
+        ].join(';');
+        document.body.appendChild(clone);
+        dragCloneRef.current = clone;
+        if (navigator.vibrate) { try { navigator.vibrate(35); } catch (_e) { /* unsupported — ignore */ } }
+      },
+      onDragMove: function(g, _x, y) {
+        dragLastYRef.current = y;
+        var c = dragCloneRef.current;
+        if (c) c.style.top = (y - dragFingerOffYRef.current) + 'px';
+        _updateAutoScroll(y);
+        _updateDragTarget(y);
+      },
+      onCommit: function() { commitBlockDrop(); },
+      onAbortDrag: function() {
+        dragAutoDirRef.current = 0;
+        if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
+        if (dragCloneRef.current && dragCloneRef.current.parentNode)
+          dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
+        dragCloneRef.current = null;
+        blockRefs.current.forEach(function(n) { if (n) { n.style.transform = ''; n.style.transition = ''; } });
         dragIdxRef.current = -1;
         setDragIdx(-1);
         dragTargetRef.current = -1;
-      }
-    };
-    finishBlockDragRef.current = finish;
-    dragCommitTimerRef.current = setTimeout(finish, 220);
+      },
+    });
+  }
+
+  function startBlockDrag(idx, clientX, clientY, pointerId) {
+    dragCtl.current.start(idx, clientX, clientY, pointerId, blockRefs.current[idx]);
   }
 
   // ─── Cursor-aware insertion ─────────────────────────────────
@@ -741,8 +702,13 @@ export function JournalEditorScreen(props) {
     return (
       <button
         className="jrn-block-drag-btn"
-        onTouchStart={function(e) { e.stopPropagation(); if (e.touches && e.touches[0]) startBlockDrag(idx, e.touches[0].clientY, e.touches[0].identifier); }}
-        onMouseDown={function(e) { e.stopPropagation(); if (e.button === 0) startBlockDrag(idx, e.clientY); }}
+        onPointerDown={function(e) {
+          e.stopPropagation();
+          if (e.isPrimary === false) return; // a second finger never owns a gesture
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          startBlockDrag(idx, e.clientX, e.clientY, e.pointerId);
+        }}
+        onDragStart={function(e) { e.preventDefault(); }}
         onClick={function(e) { e.stopPropagation(); e.preventDefault(); }}
         title="Drag to reorder"
         aria-label="Drag to reorder"
