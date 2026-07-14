@@ -95,6 +95,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
       <div className="jrn-embed-letter" onClick={function() { callbacks.onLetterCard && callbacks.onLetterCard(b.volKey, b.letterId); }}>
         <div className="jrn-emb-eyebrow">Letter</div>
         <h4 className="jrn-emb-title">{b.letterId}</h4>
+        <span className="jrn-emb-arrow" aria-hidden="true">›</span>
       </div>
     );
     return (
@@ -103,6 +104,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
         <div className="jrn-emb-eyebrow">{lc.isExcerpt ? lc.eyebrow + ' · Excerpt' : lc.eyebrow}</div>
         <h4 className="jrn-emb-title">{lc.title}</h4>
         {lc.body && <JrnExpandable text={lc.body} threshold={lc.isExcerpt ? 240 : 180} className={'jrn-emb-body' + (lc.isExcerpt ? ' jrn-emb-excerpt' : '')} />}
+        <span className="jrn-emb-arrow" aria-hidden="true">›</span>
       </div>
     );
   }
@@ -112,6 +114,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
       <div className="jrn-embed-chapter" onClick={function() { callbacks.onChapterCard && callbacks.onChapterCard(b.bookId, b.chapter, b.isStudy); }} role="button">
         <div className="jrn-emb-eyebrow">{cc ? cc.eyebrow : 'Bible'}</div>
         <h4 className="jrn-emb-title">{cc ? cc.title : (b.bookId + ' ' + b.chapter)}</h4>
+        <span className="jrn-emb-arrow" aria-hidden="true">›</span>
       </div>
     );
   }
@@ -133,6 +136,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
         {verseText
           ? <JrnExpandable text={verseText} threshold={240} className={'jrn-emb-text' + (isExcerpt ? ' jrn-emb-excerpt' : '')} />
           : <div className="jrn-emb-text"><em style={{ color: 'var(--gold-dim)' }}>Verse text not available offline.</em></div>}
+        {b.bookId != null && <span className="jrn-emb-arrow" aria-hidden="true">›</span>}
       </div>
     );
   }
@@ -143,6 +147,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
         <div className="jrn-emb-eyebrow">{bc ? bc.eyebrow : 'Bookmark'}</div>
         <h4 className="jrn-emb-title">{bc ? bc.title : 'Bookmark'}</h4>
         {bc && bc.body && <JrnExpandable text={bc.body} threshold={200} className="jrn-emb-body" />}
+        <span className="jrn-emb-arrow" aria-hidden="true">›</span>
       </div>
     );
   }
@@ -153,6 +158,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
         <div className="jrn-emb-eyebrow">{nc ? nc.eyebrow : 'Note'}</div>
         <h4 className="jrn-emb-title">{nc ? nc.title : 'Note'}</h4>
         {nc && nc.body && <JrnExpandable text={nc.body} threshold={200} className="jrn-emb-body" tapToToggle />}
+        <span className="jrn-emb-arrow" aria-hidden="true">›</span>
       </div>
     );
   }
@@ -166,6 +172,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
         {/* A link card shows a 2-line teaser (CSS-clamped), not an expandable
             body — tapping the card opens the full entry. No "Show more". */}
         {jcPreview && <div className="jrn-emb-body">{jcPreview}</div>}
+        <span className="jrn-emb-arrow" aria-hidden="true">›</span>
       </div>
     );
   }

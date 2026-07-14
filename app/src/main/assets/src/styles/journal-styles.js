@@ -175,7 +175,7 @@
   R('.jrn-block:has(.jrn-embed-image), .jrn-block:has(.jrn-embed-audio), .jrn-block:has(.jrn-embed-letter), .jrn-block:has(.jrn-embed-chapter), .jrn-block:has(.jrn-embed-bookmark), .jrn-block:has(.jrn-embed-note), .jrn-block:has(.jrn-embed-journal), .jrn-block:has(.jrn-embed-verse) { margin: 8px 0; }');
 
   // Embed cards
-  R('.jrn-embed-letter, .jrn-embed-chapter, .jrn-embed-bookmark, .jrn-embed-note, .jrn-embed-journal { background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 8px; padding: 14px 16px; cursor: pointer; position: relative; transition: background 0.15s, border-color 0.15s; }');
+  R('.jrn-embed-letter, .jrn-embed-chapter, .jrn-embed-bookmark, .jrn-embed-note, .jrn-embed-journal { background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 8px; padding: 14px 38px 14px 16px; cursor: pointer; position: relative; transition: background 0.15s, border-color 0.15s; }');
   R('body.light .jrn-embed-letter, body.light .jrn-embed-chapter, body.light .jrn-embed-bookmark, body.light .jrn-embed-note, body.light .jrn-embed-journal { background: #f3ecdc; }');
   R('.jrn-embed-letter:hover, .jrn-embed-chapter:hover, .jrn-embed-bookmark:hover, .jrn-embed-note:hover, .jrn-embed-journal:hover { border-color: var(--gold); }');
   // Notebook embed — compact row: icon, name, chevron. Tapping opens the
@@ -189,6 +189,11 @@
   R('.jrn-emb-notebook-text .jrn-emb-eyebrow { margin-bottom: 2px; }');
   R('.jrn-emb-notebook-text .jrn-emb-title { margin: 0; }');
   R('.jrn-emb-notebook-arrow { color: var(--gold-dim); font-size: 1.25rem; flex-shrink: 0; }');
+  // Shared "this links out" chevron for the stacked cards (letter/chapter/
+  // verse/bookmark/note/journal). Vertically centred at the right edge; the
+  // cards reserve 38px of right padding so title/body never run under it.
+  R('.jrn-emb-arrow { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--gold-dim); font-size: 1.35rem; line-height: 1; pointer-events: none; }');
+  R('.jrn-embed-letter:hover .jrn-emb-arrow, .jrn-embed-chapter:hover .jrn-emb-arrow, .jrn-embed-bookmark:hover .jrn-emb-arrow, .jrn-embed-note:hover .jrn-emb-arrow, .jrn-embed-journal:hover .jrn-emb-arrow, .jrn-embed-verse:hover .jrn-emb-arrow { color: var(--gold); }');
   R('.jrn-emb-eyebrow { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); margin-bottom: 4px; }');
   R('.jrn-emb-title { font-family: var(--font-cinzel); color: var(--cream); font-size: 1rem; font-weight: 500; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }');
   R('body.light .jrn-emb-title { color: #2a2520; }');
@@ -202,7 +207,7 @@
   R('.jrn-emb-delete { position: absolute; bottom: 6px; right: 6px; background: none; border: none; color: var(--gold-dim); width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: 0.875rem; display: none; align-items: center; justify-content: center; }');
   R('.jrn-block:hover .jrn-emb-delete { display: flex; }');
   R('.jrn-emb-delete:hover { background: rgba(199, 92, 74, 0.15); color: #c75c4a; }');
-  R('.jrn-embed-verse { background: var(--bg3); border-left: 3px solid var(--gold); border-radius: 6px; padding: 14px 16px; position: relative; transition: border-color 0.15s; }');
+  R('.jrn-embed-verse { background: var(--bg3); border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); border-radius: 6px; padding: 14px 38px 14px 16px; position: relative; transition: border-color 0.15s; }');
   R('body.light .jrn-embed-verse { background: #f3ecdc; }');
   R('.jrn-embed-verse[role="button"]:hover { border-left-color: var(--gold-bright); }');
   R('.jrn-embed-verse .jrn-emb-cite { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); margin-bottom: 6px; }');
@@ -231,7 +236,7 @@
   R('.is-expanded .jrn-expand-toggle { margin-top: 4px; }');
 
   // Image embed
-  R('.jrn-embed-image { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); position: relative; }');
+  R('.jrn-embed-image { border-radius: 10px; overflow: hidden; border: 1px solid var(--gold-border); position: relative; }');
   R('.jrn-embed-image img { width: 100%; display: block; max-height: 420px; object-fit: cover; }');
   R('.jrn-embed-image .jrn-img-caption { padding: 8px 14px; background: var(--bg2); font-family: var(--font-garamond); font-style: italic; font-size: 0.8125rem; color: var(--cream-dim); border: none; width: 100%; outline: none; }');
   R('body.light .jrn-embed-image .jrn-img-caption { background: #f3ecdc; color: #5a4f3d; }');
@@ -376,6 +381,17 @@
   R('.jrn-block-edit.is-text .jrn-block-del-btn { opacity: 0.22; }');
   R('.jrn-block-edit.is-text:focus-within .jrn-block-del-btn { opacity: 0.8; }');
   R('.jrn-block-edit.is-text .jrn-block-del-btn:hover { opacity: 1; }');
+  // Every editor block reads as a discrete gold-outlined card. Text, quote and
+  // divider blocks (which have no inner embed border of their own) get the same
+  // outline the card / image / audio blocks already carry, so the editor is
+  // visually uniform — one gold-bordered box per block.
+  R('.jrn-block-edit .jrn-grow-p, .jrn-block-edit .jrn-grow-h2 { border: 1px solid var(--gold-border); border-radius: 8px; background: var(--bg3); padding: 8px 12px; transition: border-color 0.15s; }');
+  R('body.light .jrn-block-edit .jrn-grow-p, body.light .jrn-block-edit .jrn-grow-h2 { background: #f3ecdc; }');
+  R('.jrn-block-edit .jrn-grow-p:focus-within, .jrn-block-edit .jrn-grow-h2:focus-within { border-color: var(--gold); }');
+  R('.jrn-block-edit .jrn-block-quote { border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); border-radius: 8px; background: var(--bg3); padding: 10px 14px 10px 15px; }');
+  R('body.light .jrn-block-edit .jrn-block-quote { background: #f3ecdc; }');
+  R('.jrn-block-edit .jrn-divider { border: 1px solid var(--gold-border); border-radius: 8px; background: var(--bg3); padding: 12px 0; margin: 0; }');
+  R('body.light .jrn-block-edit .jrn-divider { background: #f3ecdc; }');
   // Drag-to-reorder grip — lives in a left gutter (the editor's .jrn-blocks
   // gets padding-left:44px below), the opposite corner from the delete x —
   // the same grab-left / destroy-right separation the tab cards use.
