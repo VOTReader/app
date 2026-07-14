@@ -158,12 +158,14 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   }
   if (b.type === 'journal-card') {
     var je = (typeof JournalStore !== 'undefined') ? JournalStore.get(b.entryId) : null;
-    var jcPreview = je ? JournalHelpers.previewText(je, 320) : '';
+    var jcPreview = je ? JournalHelpers.previewText(je, 180) : '';
     return (
       <div className="jrn-embed-journal" onClick={function() { callbacks.onJournalCard && callbacks.onJournalCard(b.entryId); }} role="button">
         <div className="jrn-emb-eyebrow">Linked Entry</div>
         <h4 className="jrn-emb-title">{je ? (JournalHelpers.entryDisplayTitle(je) || 'Untitled') : '(Deleted)'}</h4>
-        {jcPreview && <JrnExpandable text={jcPreview} threshold={180} className="jrn-emb-body" />}
+        {/* A link card shows a 2-line teaser (CSS-clamped), not an expandable
+            body — tapping the card opens the full entry. No "Show more". */}
+        {jcPreview && <div className="jrn-emb-body">{jcPreview}</div>}
       </div>
     );
   }

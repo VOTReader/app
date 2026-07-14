@@ -297,19 +297,26 @@
   R('.jrn-del-btn { color: var(--gold-dim); transition: color 0.15s; margin-left: 0.5rem; }');
   R('.jrn-del-btn:hover { color: #c75c4a; }');
 
-  // Insert sheet
-  R('.jrn-insert-section { padding: 14px 20px 6px; }');
-  R('.jrn-insert-section h4 { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--gold-dim); margin: 0 0 10px; }');
-  R('.jrn-insert-list { display: flex; flex-direction: column; gap: 2px; }');
-  R('.jrn-insert-item { display: flex; align-items: center; gap: 14px; padding: 12px 10px; border-radius: 8px; cursor: pointer; transition: background 0.12s; background: none; border: none; width: 100%; text-align: left; }');
-  R('.jrn-insert-item:hover { background: var(--bg3); }');
-  R('body.light .jrn-insert-item:hover { background: #f3ecdc; }');
-  R('.jrn-insert-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--gold-faint); display: flex; align-items: center; justify-content: center; color: var(--gold); flex-shrink: 0; font-family: var(--font-cinzel); font-size: 0.8125rem; }');
-  R('.jrn-insert-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }');
-  R('.jrn-insert-text { display: flex; flex-direction: column; }');
-  R('.jrn-insert-label { font-family: var(--font-garamond); font-size: 1rem; color: var(--cream); }');
+  // Insert sheet — grabber handle (matches .fn-sheet-handle / .select-sheet-handle)
+  R('.jrn-insert-sheet::before { content: ""; align-self: center; flex: 0 0 auto; width: 36px; height: 4px; border-radius: 999px; background: var(--gold-border); margin-bottom: 12px; }');
+  R('.jrn-insert-section { padding: 12px 18px 4px; }');
+  R('.jrn-insert-section + .jrn-insert-section { border-top: 1px solid var(--gold-border); }');
+  R('.jrn-insert-section h4 { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold); opacity: 0.72; margin: 0 0 8px; }');
+  R('.jrn-insert-list { display: flex; flex-direction: column; gap: 1px; }');
+  R('.jrn-insert-item { display: flex; align-items: center; gap: 14px; padding: 11px 10px; border-radius: 10px; cursor: pointer; transition: background 0.12s; background: none; border: none; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent; }');
+  R('@media (hover: hover) { .jrn-insert-item:hover { background: var(--bg3); } body.light .jrn-insert-item:hover { background: #f3ecdc; } }');
+  R('.jrn-insert-item:active { background: var(--bg2); }');
+  R('body.light .jrn-insert-item:active { background: #ece2cc; }');
+  R('.jrn-insert-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--gold-faint); border: 1px solid var(--gold-border); display: flex; align-items: center; justify-content: center; color: var(--gold); flex-shrink: 0; font-family: var(--font-cinzel); font-size: 0.8125rem; transition: background 0.12s, border-color 0.12s, transform 0.1s; }');
+  R('.jrn-insert-icon svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.75; }');
+  R('@media (hover: hover) { .jrn-insert-item:hover .jrn-insert-icon { background: var(--gold-border); border-color: var(--gold); } }');
+  R('.jrn-insert-item:active .jrn-insert-icon { transform: scale(0.93); }');
+  R('.jrn-insert-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }');
+  R('.jrn-insert-label { font-family: var(--font-garamond); font-size: 1.0625rem; color: var(--cream); }');
   R('body.light .jrn-insert-label { color: #2a2520; }');
-  R('.jrn-insert-desc { font-family: var(--font-garamond); font-style: italic; font-size: 0.75rem; color: var(--gold-dim); }');
+  R('.jrn-insert-desc { font-family: var(--font-garamond); font-style: italic; font-size: 0.75rem; color: var(--cream-dim); }');
+  R('.jrn-insert-chevron { flex-shrink: 0; margin-left: 6px; color: var(--gold-dim); font-size: 1.35rem; line-height: 1; font-family: var(--font-cinzel); transition: transform 0.12s, color 0.12s; }');
+  R('@media (hover: hover) { .jrn-insert-item:hover .jrn-insert-chevron { color: var(--gold); transform: translateX(2px); } }');
 
   // Library / Note / Journal pickers (sheet shell + LinkPicker-style search)
   R('.jrn-picker-search-row { padding: 8px 14px 6px; }');

@@ -239,14 +239,17 @@ export function JournalInsertSheet(props) {
     )
   };
 
-  function insertItem(icon, label, desc, onClick) {
+  // `drill` items open a further picker (a chevron signals "choose next");
+  // the rest act immediately (insert a block / open the device UI).
+  function insertItem(icon, label, desc, onClick, drill) {
     return (
-      <button type="button" className="jrn-insert-item" onClick={onClick}>
+      <button type="button" className={'jrn-insert-item' + (drill ? ' has-drill' : '')} onClick={onClick}>
         <span className="jrn-insert-icon">{icon}</span>
         <span className="jrn-insert-text">
           <span className="jrn-insert-label">{label}</span>
           <span className="jrn-insert-desc">{desc}</span>
         </span>
+        {drill && <span className="jrn-insert-chevron" aria-hidden="true">›</span>}
       </button>
     );
   }
@@ -257,17 +260,17 @@ export function JournalInsertSheet(props) {
         <div className="jrn-insert-section">
           <h4>From the Library</h4>
           <div className="jrn-insert-list">
-            {insertItem(ICONS.card,    'Card',    'Embed a chapter or letter title',         openCardPicker)}
-            {insertItem(ICONS.excerpt, 'Excerpt', 'Embed a portion — pick word-precise text', openExcerptPicker)}
+            {insertItem(ICONS.card,    'Card',    'Embed a chapter or letter title',         openCardPicker, true)}
+            {insertItem(ICONS.excerpt, 'Excerpt', 'Embed a portion — pick word-precise text', openExcerptPicker, true)}
           </div>
         </div>
         <div className="jrn-insert-section">
           <h4>From Your Annotations</h4>
           <div className="jrn-insert-list">
-            {insertItem(ICONS.bookmark, 'Bookmark',      'Pull in a saved passage',         pickBookmark)}
-            {insertItem(ICONS.note,     'Note',          'Reference one of your annotations', pickNote)}
-            {insertItem(ICONS.journal,  'Journal Entry', 'Link to another journal entry',   pickJournal)}
-            {insertItem(ICONS.notebook, 'Notebook',      'Link to a notebook of notes',     pickNotebook)}
+            {insertItem(ICONS.bookmark, 'Bookmark',      'Pull in a saved passage',         pickBookmark, true)}
+            {insertItem(ICONS.note,     'Note',          'Reference one of your annotations', pickNote, true)}
+            {insertItem(ICONS.journal,  'Journal Entry', 'Link to another journal entry',   pickJournal, true)}
+            {insertItem(ICONS.notebook, 'Notebook',      'Link to a notebook of notes',     pickNotebook, true)}
           </div>
         </div>
         <div className="jrn-insert-section">

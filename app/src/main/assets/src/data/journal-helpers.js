@@ -217,7 +217,6 @@ export var JournalHelpers = (function() {
     var ctx = findEntryContext(letterId, col.kind === 'letter' ? 'letter' : col.kind);
     if (!ctx || !ctx.entry) return null;
     var e = ctx.entry;
-    var body;
     if (excerpt && typeof excerpt === 'string' && excerpt.trim().length) {
       // Don't truncate here — the viewer renderer handles collapse/expand
       // for long bodies via JrnExpandable.
@@ -231,23 +230,14 @@ export var JournalHelpers = (function() {
         isExcerpt: true
       };
     }
-    body = '';
-    if (e.blocks && e.blocks.length) {
-      for (var i = 0; i < e.blocks.length; i++) {
-        var b = e.blocks[i];
-        if (b.type === 'para' && b.segments) {
-          body = b.segments.map(function(s) { return s.v || ''; }).join(' ').trim();
-          if (body) break;
-        }
-      }
-    }
-    if (!body && e.paragraphs && e.paragraphs.length) {
-      body = (e.paragraphs[0].text || '').replace(/\{\{[^}]+\}\}/g, '').replace(/[_*]/g, '').trim();
-    }
+    // A plain Card embeds the letter/entry TITLE only — no opening-paragraph
+    // preview. The derived preview was truncated at the source, so the
+    // viewer's "Show more" button revealed nothing (it re-showed the same
+    // clipped text). Embedding body text is the "Excerpt" flow's job.
     return {
       title: e.title || ctx.title || letterId,
       eyebrow: col.label,
-      body: body.length > 180 ? body.substring(0, 180) + '…' : body,
+      body: '',
       date: e.date || ''
     };
   }
@@ -277,8 +267,14 @@ export var JournalHelpers = (function() {
     var n = NoteStore.get(noteGroupId);
     if (!n) return null;
     var anchor = normalizeExcerptDisplay(n.fullText).substring(0, 100);
+    // Title = where the note is anchored (e.g. "Genesis 1:1", "The Wide
+    // Path") so the card names its source instead of a generic "Note".
+    var title = 'Note';
+    if (typeof noteSourceLabel === 'function') {
+      try { title = noteSourceLabel(n) || 'Note'; } catch (_e) { title = 'Note'; }
+    }
     return {
-      title: 'Note',
+      title: title,
       eyebrow: 'My Note',
       body: n.body || anchor
     };
