@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- maximum-scale/user-scalable: the app is deliberately non-zoomable (the
+       APK already disables WebView zoom — setSupportZoom(false) — and text
+       size has its own Settings control). Without these, the INSTALLED PWA
+       could pinch/auto-zoom (e.g. focusing a small input) into a state the
+       app's own touch handlers then fought — zoom-OUT pinches snapped back
+       and only an app restart recovered (owner-reported). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <!-- CSP — defensive containment. 'self' resolves to the serving origin on
        BOTH targets — appassets.androidplatform.net (Android WebViewAssetLoader)
        and the GitHub Pages origin (web PWA) — so a single policy covers both

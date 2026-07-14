@@ -2370,13 +2370,16 @@
          menu that used to fire on top of the JS gesture. */
       touch-action:pan-y;
       user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+      /* Native drag on the card (esp. its thumbnail <img>) cancels the touch
+         stream and killed the reorder gesture — never draggable. */
+      -webkit-user-drag:none;
     }
     /* Thumbnail fills the entire card; text sits on top with a scrim */
     .tab-card-thumb-wrap {
       position:absolute; inset:0; overflow:hidden;
       background:var(--bg3);
     }
-    .tab-card-thumb { display:block; width:100%; height:100%; object-fit:cover; object-position:center top; }
+    .tab-card-thumb { display:block; width:100%; height:100%; object-fit:cover; object-position:center top; -webkit-user-drag:none; pointer-events:none; }
     .tab-card-thumb-placeholder {
       width:100%; height:100%;
       display:flex; align-items:center; justify-content:center;

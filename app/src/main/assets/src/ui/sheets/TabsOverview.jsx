@@ -32,44 +32,57 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
   const currentTheme = (typeof document !== 'undefined' && document.body.classList.contains('light')) ? 'light' : 'dark';
   const [confirmingClearAll, setConfirmingClearAll] = React.useState(false);
 
-  /* ── Drag-to-reorder state (CSS-class drivers only) + imperative refs ── */
+  /* ── Drag-to-reorder — v2, a pointer-events state machine ────────────────
+     REDESIGNED (owner-reported, after two rounds of touch-event lifecycle
+     patches still left device-only failures): "first drag works, then none
+     until an app restart" + "the real card visibly moves again after the
+     ghost lands". Principles:
+
+     ONE GESTURE OBJECT — every per-gesture value lives in gestureRef.current,
+       created at pointerdown and destroyed by a single idempotent endGesture()
+       from EVERY exit path. A new pointerdown FORCE-resets whatever survived,
+       so no leaked state can ever refuse grabs until restart (the old code
+       only healed a zombie after 2.5s of event silence — anything else wedged
+       it permanently).
+
+     POINTER EVENTS at document CAPTURE — one event model for mouse + touch
+       (no dual paths, no touch-identifier bookkeeping), still first-in-line
+       in propagation (the WebView's non-bubbling touchend delivery can't
+       starve capture), and pointercancel is an EXPLICIT signal: the browser
+       claiming the stream used to just go silent — now it commits the drag
+       at the current slot, tears down, and traces "[tabdrag] …" so a device
+       failure names itself (F12 / DiagnosticLog).
+
+     SEAMLESS DROP — the reorder and the sibling-transform clear happen in the
+       SAME synchronous task at release (one paint: final order, no leftover
+       transforms) while the ghost glides to the target rect ABOVE the real
+       card, which stays hidden until the ghost lands and swaps 1:1. The old
+       sequence cleared transforms → painted the OLD arrangement → reordered
+       240ms later — the visible double-move.
+
+     The scroll suppressor stays a NON-PASSIVE capture touchmove listener
+     (pointermove can't preventDefault native scrolling and touch-action can't
+     change mid-gesture), active only while the drag is live. */
   const [pressingIdx, setPressingIdx] = React.useState(-1);
   const [dragIdx, setDragIdx] = React.useState(-1);
 
   const cardRefs = React.useRef([]);            // REAL tab cards only (not the New-Tab sentinel)
-  const pressTimerRef = React.useRef(null);
-  const visualDelayTimerRef = React.useRef(null);
-  const pressStartXRef = React.useRef(0);
-  const pressStartYRef = React.useRef(0);
-  const pressStartTsRef = React.useRef(0);
-  const dragIdxRef = React.useRef(-1);
-  const targetIdxRef = React.useRef(-1);
-  const pressingIdxRef = React.useRef(-1);
-  const justDraggedRef = React.useRef(false);   // suppresses the post-drag click (the bug fix)
-  const activeCleanupRef = React.useRef(null);
-  const dragCloneRef = React.useRef(null);
-  const fingerOffsetXRef = React.useRef(0);
-  const fingerOffsetYRef = React.useRef(0);
-  const naturalRectsRef = React.useRef([]);     // [{left,top,cx,cy,w,h}] per real card, captured at drag start
+  const gestureRef = React.useRef(/** @type {any} */ (null)); // the ONE live gesture, or null
+  const landingRef = React.useRef(/** @type {any} */ (null)); // post-drop ghost glide {ghost,timer,tgtEl}
+  const justDraggedRef = React.useRef(false);   // suppresses the post-drag click
   const tabsLenRef = React.useRef(total);
-  const touchIdRef = React.useRef(null);        // identifier of the pointer that owns the press ('mouse' for pointer)
-  const finishDragRef = React.useRef(null);     // pending drop-commit; flushed early if a new press arrives
-  const commitTimerRef = React.useRef(null);
-  const lastDragEvtRef = React.useRef(0);       // last time the active drag saw one of its own events (zombie detector)
-
-  React.useEffect(() => {dragIdxRef.current = dragIdx;}, [dragIdx]);
-  React.useEffect(() => {pressingIdxRef.current = pressingIdx;}, [pressingIdx]);
   React.useEffect(() => {tabsLenRef.current = total;}, [total]);
 
-  // The overview is an overlay — it can unmount mid-press (Back / tab switch).
-  // Tear down any timers, document listeners, and the flying clone so nothing leaks.
-  React.useEffect(() => () => {
-    clearTimeout(pressTimerRef.current);
-    clearTimeout(visualDelayTimerRef.current);
-    if (activeCleanupRef.current) activeCleanupRef.current();
-    if (dragCloneRef.current && dragCloneRef.current.parentNode)
-      dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
-  }, []);
+  // Abnormal-path trace — mirrors the [thumb] pattern: console.warn for a
+  // live devtools look + DiagnosticLog for the offline trail.
+  const _dragTrace = (msg) => {
+    try { console.warn('[tabdrag] ' + msg); } catch (_e) { /* ignore */ }
+    try {
+      if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof DiagnosticLog.error === 'function') {
+        DiagnosticLog.error('tabdrag', msg);
+      }
+    } catch (_e) { /* ignore */ }
+  };
 
   const setCardRef = (i) => (el) => {cardRefs.current[i] = el;};
 
@@ -84,9 +97,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
   // original index i, find the slot it occupies once `from` is removed and
   // re-inserted at `to`, then translate it there (FLIP on captured 2D rects —
   // handles row-wrap diagonals because the rects are real grid coordinates).
-  const applySiblingShifts = (to) => {
-    const from = dragIdxRef.current;
-    const rects = naturalRectsRef.current;
+  const applySiblingShifts = (from, to, rects) => {
     cardRefs.current.forEach((el, i) => {
       if (!el || i === from) return;
       let visualIdx = i;
@@ -100,10 +111,9 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     });
   };
 
-  // Drop slot = the card whose natural center is nearest the dragged clone's
+  // Drop slot = the card whose natural center is nearest the dragged ghost's
   // center (squared distance; clamped to the real tabs, never the New-Tab card).
-  const pickTarget = (cx, cy) => {
-    const rects = naturalRectsRef.current;
+  const pickTarget = (cx, cy, rects) => {
     let best = 0, bestD = Infinity;
     for (let i = 0; i < rects.length; i++) {
       const dx = cx - rects[i].cx, dy = cy - rects[i].cy;
@@ -113,160 +123,214 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
     return Math.max(0, Math.min(tabsLenRef.current - 1, best));
   };
 
-  // Multi-touch discipline: the press belongs to ONE pointer. Moves from other
-  // fingers are ignored, and only that pointer lifting (or a touchcancel that
-  // swallowed it) ends the press — a stray second finger can no longer commit
-  // the drag early at whatever slot the card happened to be passing over.
-  const trackedPoint = (e) => {
-    if (e.touches) {
-      for (let i = 0; i < e.touches.length; i++)
-        if (e.touches[i].identifier === touchIdRef.current) return e.touches[i];
-      return null;
-    }
-    return touchIdRef.current === 'mouse' ? e : null;
-  };
-  const trackedEnded = (e) => {
-    if (!e.changedTouches) return touchIdRef.current === 'mouse';
-    for (let i = 0; i < e.changedTouches.length; i++)
-      if (e.changedTouches[i].identifier === touchIdRef.current) return true;
-    for (let i = 0; i < e.touches.length; i++)
-      if (e.touches[i].identifier === touchIdRef.current) return false;
-    return true; // ours vanished without a changedTouches entry (some touchcancels)
+  // Land the in-flight ghost NOW: remove it and reveal the real card beneath.
+  // Idempotent; runs from its own glide timer, from a superseding grab, and
+  // from unmount — the ghost can never outlive its moment.
+  const flushLanding = () => {
+    const L = landingRef.current;
+    if (!L) return;
+    landingRef.current = null;
+    clearTimeout(L.timer);
+    if (L.ghost && L.ghost.parentNode) L.ghost.parentNode.removeChild(L.ghost);
+    if (L.tgtEl) L.tgtEl.style.opacity = "";
   };
 
-  const startPress = (idx, clientX, clientY, pointerId) => {
-    // A just-dropped drag parks its commit in finishDragRef while the snap
-    // animation plays; flush it so this grab is never silently swallowed
-    // (pre-fix, a re-grab inside that window left the press untracked — the
-    // finger just scrolled the grid and nothing could be dropped).
-    if (finishDragRef.current) finishDragRef.current();
-    // Zombie self-heal: a LIVE drag sees its own events continuously (the
-    // clone follows the finger). If a drag is "active" but has seen nothing
-    // for seconds, its end event was lost (e.g. eaten by an event consumer
-    // between the card and document) — abort it, uncommitted, and let this
-    // fresh grab proceed instead of refusing until an app restart.
-    if (dragIdxRef.current >= 0 && Date.now() - lastDragEvtRef.current > 2500) {
-      if (activeCleanupRef.current) activeCleanupRef.current();
-      if (dragCloneRef.current && dragCloneRef.current.parentNode)
-        dragCloneRef.current.parentNode.removeChild(dragCloneRef.current);
-      dragCloneRef.current = null;
-      clearInlineTransforms();
-      dragIdxRef.current = -1;
-      setDragIdx(-1);
-      targetIdxRef.current = -1;
-      justDraggedRef.current = false;
+  // Drop commit — runs SYNCHRONOUSLY at release/cancel. The grid reaches its
+  // final state in this one task (sibling transforms cleared + reorder →
+  // ONE paint of the final order) while the ghost glides to the target rect
+  // above the real card, which stays hidden until the ghost lands.
+  const commitDrop = (g) => {
+    const from = g.idx;
+    const to = g.targetIdx >= 0 ? Math.min(g.targetIdx, tabsLenRef.current - 1) : from;
+    clearInlineTransforms();
+    setDragIdx(-1);
+    setPressingIdx(-1);
+    // Cards are keyed by INDEX, so after the reorder the node at `to` shows
+    // the dragged tab. Hide it inline (React doesn't manage these nodes'
+    // style) so only the gliding ghost is visible until it lands.
+    const tgtEl = cardRefs.current[to] || null;
+    if (tgtEl) tgtEl.style.opacity = "0";
+    try {
+      if (to !== from && onReorder) onReorder(from, to);
+    } catch (err) {
+      _dragTrace('reorder commit threw: ' + String(err).slice(0, 120));
     }
-    if (pressingIdxRef.current >= 0 || dragIdxRef.current >= 0) return;
-    touchIdRef.current = pointerId != null ? pointerId : 'mouse';
-    pressStartXRef.current = clientX; pressStartYRef.current = clientY;
-    pressStartTsRef.current = Date.now();
-    // Track intent immediately (drift detection); delay the visible "pressing"
-    // glow until the press looks intentional (~280ms) so quick taps never flash it.
-    pressingIdxRef.current = idx;
-    clearTimeout(visualDelayTimerRef.current);
-    visualDelayTimerRef.current = setTimeout(() => {
-      if (pressingIdxRef.current === idx && dragIdxRef.current < 0) setPressingIdx(idx);
+    const ghost = g.ghost;
+    if (ghost) {
+      const snap = g.rects && (g.rects[to] || g.rects[from]);
+      if (snap) {
+        ghost.style.transition = "left 0.22s cubic-bezier(0.2,0.8,0.3,1), top 0.22s cubic-bezier(0.2,0.8,0.3,1), transform 0.22s cubic-bezier(0.2,0.8,0.3,1)";
+        ghost.style.left = snap.left + "px";
+        ghost.style.top = snap.top + "px";
+        ghost.style.transform = "scale(1)";
+      }
+      landingRef.current = { ghost, tgtEl, timer: setTimeout(flushLanding, 230) };
+    } else if (tgtEl) {
+      tgtEl.style.opacity = "";
+    }
+  };
+
+  // The ONE exit for a gesture — idempotent (gestureRef identity check), used
+  // by every path: lift (commit), drift-cancel, pointercancel, force-reset,
+  // unmount. Nothing else mutates gesture lifecycle state.
+  const endGesture = (g, commit, trace) => {
+    if (gestureRef.current !== g) return;
+    gestureRef.current = null;
+    clearTimeout(g.pressTimer);
+    clearTimeout(g.glowTimer);
+    if (g.cleanup) g.cleanup();
+    if (trace) _dragTrace(trace);
+    if (g.drag) {
+      if (commit) {
+        commitDrop(g); // ghost ownership moves to landingRef
+      } else {
+        if (g.ghost && g.ghost.parentNode) g.ghost.parentNode.removeChild(g.ghost);
+        clearInlineTransforms();
+        setDragIdx(-1);
+        setPressingIdx(-1);
+      }
+      justDraggedRef.current = true;
+      setTimeout(() => {justDraggedRef.current = false;}, 300);
+    } else {
+      setPressingIdx(-1);
+      // A long-but-undragged press isn't a tap — suppress the trailing click.
+      if (Date.now() - g.startTs > 400) {
+        justDraggedRef.current = true;
+        setTimeout(() => {justDraggedRef.current = false;}, 300);
+      }
+    }
+  };
+
+  // Destroy whatever the last gesture left behind — unconditionally. Called
+  // by every new pointerdown and by unmount, so no wedged state (lost events,
+  // an in-flight landing, a stray ghost) can ever refuse future grabs.
+  const forceReset = (trace) => {
+    const g = gestureRef.current;
+    if (g) endGesture(g, false, g.drag ? trace : null);
+    flushLanding();
+  };
+
+  // The overview is an overlay — it can unmount mid-gesture (Back / tab
+  // switch). One call tears down timers, listeners, ghost, and landing.
+  React.useEffect(() => () => { forceReset(); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- unmount-only; forceReset reads refs + stable setters, so the first render's closure stays correct.
+
+  // pointerdown on a card — begins the ONE gesture. Everything the gesture
+  // needs lives on `g`; every exit path funnels through endGesture(g, …).
+  const startPress = (idx, clientX, clientY, pointerId) => {
+    // UNCONDITIONAL heal: whatever a previous gesture left behind (a lost end
+    // event on-device, an in-flight landing, a stray ghost) dies here — a
+    // fresh grab must never be refused. The old machinery only healed a
+    // zombie after 2.5s of silence; any other leaked state refused every
+    // future grab until an app restart (owner-reported).
+    if (gestureRef.current) forceReset('force-reset of a live gesture at new pointerdown');
+    else flushLanding();
+
+    const g = {
+      pointerId, idx,
+      startX: clientX, startY: clientY, startTs: Date.now(),
+      drag: false, targetIdx: idx,
+      rects: /** @type {any[]} */ (null),
+      ghost: /** @type {any} */ (null), offX: 0, offY: 0,
+      pressTimer: /** @type {any} */ (null), glowTimer: /** @type {any} */ (null),
+      cleanup: /** @type {any} */ (null),
+    };
+    gestureRef.current = g;
+
+    const onPointerMove = (e) => {
+      if (gestureRef.current !== g || e.pointerId !== g.pointerId) return;
+      const x = e.clientX, y = e.clientY;
+      if (g.drag) {
+        // ACTIVE DRAG: the ghost follows the finger in both axes.
+        const ghost = g.ghost;
+        if (ghost) {
+          ghost.style.transition = "none";
+          ghost.style.left = (x - g.offX) + "px";
+          ghost.style.top = (y - g.offY) + "px";
+          ghost.style.transform = "scale(1.05)";
+        }
+        const r0 = g.rects && g.rects[g.idx];
+        const cx = (x - g.offX) + (r0 ? r0.w * 0.5 : 0);
+        const cy = (y - g.offY) + (r0 ? r0.h * 0.5 : 0);
+        const t = pickTarget(cx, cy, g.rects || []);
+        if (t !== g.targetIdx) {
+          g.targetIdx = t;
+          applySiblingShifts(g.idx, t, g.rects || []);
+        }
+      } else if (Math.abs(x - g.startX) > 10 || Math.abs(y - g.startY) > 10) {
+        // PRESSING (pre-drag): the finger drifted — it's a scroll, not a hold.
+        endGesture(g, false);
+      }
+    };
+    const onPointerUp = (e) => {
+      if (gestureRef.current !== g || e.pointerId !== g.pointerId) return;
+      endGesture(g, true);
+    };
+    const onPointerCancel = (e) => {
+      if (gestureRef.current !== g || e.pointerId !== g.pointerId) return;
+      // The browser/native layer claimed the pointer stream. Pre-drag that's
+      // a normal scroll takeover; MID-drag it's abnormal — commit at the
+      // current slot (the user had positioned the card) and say so.
+      endGesture(g, true, g.drag ? 'pointercancel mid-drag (browser claimed the stream)' : null);
+    };
+    // Scroll suppressor: pointermove can't preventDefault native scrolling
+    // and touch-action can't change mid-gesture, so while the DRAG is live
+    // every cancelable touchmove is cancelled here (non-passive, capture).
+    const onTouchMoveSuppress = (e) => {
+      if (gestureRef.current === g && g.drag && e.cancelable) {
+        try { e.preventDefault(); } catch (_err) { /* passive — ignore */ }
+      }
+    };
+    // Document CAPTURE — first in propagation; nothing between the card and
+    // the document can starve these (the old tabs lock-up's root cause).
+    document.addEventListener("pointermove", onPointerMove, true);
+    document.addEventListener("pointerup", onPointerUp, true);
+    document.addEventListener("pointercancel", onPointerCancel, true);
+    document.addEventListener("touchmove", onTouchMoveSuppress, { passive: false, capture: true });
+    g.cleanup = () => {
+      document.removeEventListener("pointermove", onPointerMove, true);
+      document.removeEventListener("pointerup", onPointerUp, true);
+      document.removeEventListener("pointercancel", onPointerCancel, true);
+      document.removeEventListener("touchmove", onTouchMoveSuppress, { capture: true });
+      g.cleanup = null;
+    };
+    // Pointer capture (hardening, best-effort): keeps this pointer's stream
+    // retargeted to the card even mid-scroll/off-element on engines that
+    // support it. Document-capture listeners above are the real guarantee.
+    const cardEl = cardRefs.current[idx];
+    if (cardEl && cardEl.setPointerCapture) {
+      try { cardEl.setPointerCapture(pointerId); } catch (_e) { /* inactive pointer etc. — ignore */ }
+    }
+
+    // Visible "pressing" glow only once the press looks intentional (~280ms)
+    // so quick taps never flash it…
+    g.glowTimer = setTimeout(() => {
+      if (gestureRef.current === g && !g.drag) setPressingIdx(idx);
     }, 280);
 
-    // Attach document listeners SYNCHRONOUSLY — no useEffect gap, no missed moves.
-    const onMove = (e) => {
-      const p = trackedPoint(e);
-      if (!p) return;
-      lastDragEvtRef.current = Date.now();
-      const x = p.clientX, y = p.clientY;
-      if (dragIdxRef.current >= 0 && e.cancelable) {
-        try {e.preventDefault();} catch (_err) { /* passive/unsupported — ignore */ }
-      }
-      if (dragIdxRef.current >= 0) {
-        // ACTIVE DRAG: move the fixed clone to follow the finger in both axes.
-        const clone = dragCloneRef.current;
-        if (clone) {
-          clone.style.transition = "none";
-          clone.style.left = (x - fingerOffsetXRef.current) + "px";
-          clone.style.top = (y - fingerOffsetYRef.current) + "px";
-          clone.style.transform = "scale(1.05)";
-        }
-        const r0 = naturalRectsRef.current[dragIdxRef.current];
-        const cx = (x - fingerOffsetXRef.current) + (r0 ? r0.w * 0.5 : 0);
-        const cy = (y - fingerOffsetYRef.current) + (r0 ? r0.h * 0.5 : 0);
-        const newTarget = pickTarget(cx, cy);
-        if (newTarget !== targetIdxRef.current) {
-          targetIdxRef.current = newTarget;
-          applySiblingShifts(newTarget);
-        }
-      } else if (pressingIdxRef.current >= 0) {
-        // PRESSING (pre-drag): cancel if the finger drifts (it's a scroll, not a hold).
-        if (Math.abs(x - pressStartXRef.current) > 10 || Math.abs(y - pressStartYRef.current) > 10) {
-          clearTimeout(pressTimerRef.current);
-          clearTimeout(visualDelayTimerRef.current);
-          setPressingIdx(-1);
-          pressingIdxRef.current = -1;
-          if (Date.now() - pressStartTsRef.current > 400) {
-            justDraggedRef.current = true;
-            setTimeout(() => {justDraggedRef.current = false;}, 300);
-          }
-        }
-      }
-    };
-    const onEnd = (e) => {
-      if (!trackedEnded(e)) return;
-      if (activeCleanupRef.current) activeCleanupRef.current();
-      endPress();
-    };
-
-    // CAPTURE phase: document-capture is the FIRST node in propagation, so no
-    // intermediate handler can starve these. Bubble registration was the tabs
-    // lock-up's root cause — ScreenLayout's tap-suppressor stopPropagation()s
-    // the touchend of any >300ms hold lifting over an interactive target (in
-    // capture, on .screen-scroll), so a long-press drag's RELEASE never
-    // reached a document-bubble listener unless the motion was horizontal
-    // enough to set its wasSwipeX escape (why sideways drags worked and
-    // vertical reorders froze mid-air).
-    document.addEventListener("touchmove", onMove, { passive: false, capture: true });
-    document.addEventListener("touchend", onEnd, true);
-    document.addEventListener("touchcancel", onEnd, true);
-    document.addEventListener("mousemove", onMove, true);
-    document.addEventListener("mouseup", onEnd, true);
-    activeCleanupRef.current = () => {
-      document.removeEventListener("touchmove", onMove, { capture: true });
-      document.removeEventListener("touchend", onEnd, true);
-      document.removeEventListener("touchcancel", onEnd, true);
-      document.removeEventListener("mousemove", onMove, true);
-      document.removeEventListener("mouseup", onEnd, true);
-      activeCleanupRef.current = null;
-    };
-
-    clearTimeout(pressTimerRef.current);
-    pressTimerRef.current = setTimeout(() => {
-      // ~1.4s tap → ENTER DRAG MODE (280ms buffer + 1100ms hold — same as Home).
-      // Refs must be set synchronously here — setDragIdx/setPressingIdx are async
-      // React state updates that only reach the refs via useEffect after the next
-      // render. touchmove fires before that render on mobile, so without the direct
-      // ref writes the drag branch is never entered (all three drag bugs: no 2D
-      // movement, no sibling shifts, no auto-drop on lift).
+    // …and DRAG MODE after ~1.4s of holding still (280ms buffer + 1100ms
+    // hold — same feel as the Home/Library tiles).
+    g.pressTimer = setTimeout(() => {
+      if (gestureRef.current !== g) return;
+      g.drag = true;
       justDraggedRef.current = true;
-      pressingIdxRef.current = -1;
-      dragIdxRef.current = idx;
-      lastDragEvtRef.current = Date.now();
       setPressingIdx(-1);
       setDragIdx(idx);
-      targetIdxRef.current = idx;
       // Capture every real card's natural rect (real 2D coords of each slot).
-      naturalRectsRef.current = cardRefs.current.map((el) => {
+      g.rects = cardRefs.current.map((el) => {
         if (!el) return { left: 0, top: 0, cx: 0, cy: 0, w: 0, h: 0 };
         const r = el.getBoundingClientRect();
         return { left: r.left, top: r.top, cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height };
       });
-      // The "pop": the card lifts off as a fixed-position clone that follows the
-      // finger; the original becomes an invisible ghost holding its grid space.
+      // The "pop": the card lifts off as a fixed-position ghost that follows
+      // the finger; the original becomes invisible, holding its grid space.
       const el = cardRefs.current[idx];
       if (el) {
         const rect = el.getBoundingClientRect();
-        fingerOffsetXRef.current = pressStartXRef.current - rect.left;
-        fingerOffsetYRef.current = pressStartYRef.current - rect.top;
-        const clone = el.cloneNode(true);
-        clone.className = "tab-card drag-flying";
-        clone.style.cssText = [
+        g.offX = g.startX - rect.left;
+        g.offY = g.startY - rect.top;
+        const ghost = el.cloneNode(true);
+        ghost.className = "tab-card drag-flying";
+        ghost.style.cssText = [
           "position:fixed",
           "top:" + rect.top + "px",
           "left:" + rect.left + "px",
@@ -279,64 +343,11 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
           "transition:transform 0.16s cubic-bezier(0.2,0.8,0.3,1)",
           "transform:scale(1.05)",
         ].join(";");
-        document.body.appendChild(clone);
-        dragCloneRef.current = clone;
+        document.body.appendChild(ghost);
+        g.ghost = ghost;
       }
       if (navigator.vibrate) {try {navigator.vibrate(55);} catch (_e) { /* unsupported — ignore */ }}
     }, 1380);
-  };
-
-  const endPress = () => {
-    clearTimeout(pressTimerRef.current);
-    clearTimeout(visualDelayTimerRef.current);
-    const wasPressing = pressingIdxRef.current >= 0;
-    const wasDragging = dragIdxRef.current >= 0;
-    setPressingIdx(-1);
-    pressingIdxRef.current = -1;
-    touchIdRef.current = null;
-
-    if (wasDragging) {
-      const from = dragIdxRef.current;
-      const to = targetIdxRef.current >= 0 ? targetIdxRef.current : from;
-      const clone = dragCloneRef.current;
-      const rects = naturalRectsRef.current;
-      // Snap the flying clone to the target slot's natural position, then remove it.
-      if (clone) {
-        const snap = rects[to] || rects[from];
-        clone.style.transition =
-          "left 0.22s cubic-bezier(0.2,0.8,0.3,1), top 0.22s cubic-bezier(0.2,0.8,0.3,1), transform 0.22s cubic-bezier(0.2,0.8,0.3,1)";
-        clone.style.left = (snap ? snap.left : 0) + "px";
-        clone.style.top = (snap ? snap.top : 0) + "px";
-        clone.style.transform = "scale(1)";
-      }
-      // The commit runs at most once: normally the timer fires it after the snap
-      // animation; a new press flushes it early via finishDragRef. The finally
-      // guarantees the drag refs reset even if onReorder throws — pre-fix, an
-      // exception here left dragIdxRef poisoned and every future grab refused.
-      const finish = () => {
-        if (finishDragRef.current !== finish) return;
-        finishDragRef.current = null;
-        clearTimeout(commitTimerRef.current);
-        try {
-          if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
-          dragCloneRef.current = null;
-          clearInlineTransforms();
-          if (to !== from && to >= 0) onReorder && onReorder(from, to);
-        } finally {
-          dragIdxRef.current = -1;  // sync ref immediately; setDragIdx's useEffect is async
-          setDragIdx(-1);
-          targetIdxRef.current = -1;
-          setTimeout(() => {justDraggedRef.current = false;}, 120);
-        }
-      };
-      finishDragRef.current = finish;
-      commitTimerRef.current = setTimeout(finish, 240);
-    } else if (wasPressing) {
-      if (Date.now() - pressStartTsRef.current > 400) {
-        justDraggedRef.current = true;
-        setTimeout(() => {justDraggedRef.current = false;}, 300);
-      }
-    }
   };
 
   // Count duplicates (same content signature) — surface the number on the button
@@ -436,28 +447,34 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
               ref={setCardRef(i)}
               className={`tab-card${isActive ? ' active' : ''}${thumb ? ' has-thumb' : ''}${i === pressingIdx ? ' pressing' : ''}${i === dragIdx ? ' dragging' : ''}`}
               onClick={(e) => { if (justDraggedRef.current) { e.preventDefault(); e.stopPropagation(); return; } onSelect(i); }}
-              onTouchStart={(e) => { if (e.touches && e.touches[0]) startPress(i, e.touches[0].clientX, e.touches[0].clientY, e.touches[0].identifier); }}
-              onMouseDown={(e) => { if (e.button === 0) startPress(i, e.clientX, e.clientY); }}
+              onPointerDown={(e) => {
+                if (e.isPrimary === false) return; // a second finger never owns a gesture
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                startPress(i, e.clientX, e.clientY, e.pointerId);
+              }}
+              onDragStart={(e) => e.preventDefault()}
             >
               <button
                 className="tab-card-menu"
                 onClick={(e) => {e.stopPropagation();onMenu && onMenu(i);}}
-                onTouchStart={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 title="Tab actions"
                 aria-label="Tab actions"
               >{"⋮"}</button>
               <button
                 className="tab-card-close"
                 onClick={(e) => {e.stopPropagation();onClose(i);}}
-                onTouchStart={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 title="Close tab"
                 aria-label="Close tab"
               >{"\xD7"}</button>
               <div className="tab-card-thumb-wrap">
+                {/* draggable=false: a long-press/drag landing on the thumbnail
+                    IMAGE otherwise starts the browser's native image drag,
+                    which cancels the touch stream and killed the reorder
+                    gesture (desktop mouse drags too). */}
                 {thumb
-                  ? <img className={`tab-card-thumb${thumbFlip ? ' thumb-theme-flip' : ''}`} src={thumb} alt="" />
+                  ? <img className={`tab-card-thumb${thumbFlip ? ' thumb-theme-flip' : ''}`} src={thumb} alt="" draggable={false} />
                   : <div className="tab-card-thumb-placeholder">
                       <div className="tab-card-thumb-sigil">{"✦"}</div>
                     </div>

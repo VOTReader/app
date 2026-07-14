@@ -307,6 +307,41 @@ mouse handlers stay as fast path. Live-proven: programmatic Selection.addRange
 PREVIEW GOTCHA: hidden-tab setTimeout clamps to ~1s — sample AFTER generous
 settles or the 150ms debounce looks broken.
 
+(C) ZOOM STUCK + TAB-DRAG REDESIGN (owner-reported 2026-07-13) —
+(1) STUCK ZOOM: the APK disables WebView zoom, but the viewport meta had no
+maximum-scale/user-scalable — the INSTALLED PWA could pinch/auto-zoom
+(small-input focus) and the app's own touch handlers (pager preventDefault)
+then fought the zoom-OUT pinch, snapping it back until an app restart.
+Fixed: `maximum-scale=1.0, user-scalable=no` (the app is deliberately
+non-zoomable; text size has its own Settings control).
+(2) TAB DRAG REBUILT (v2) after two patch rounds still left device
+failures ("works once then never until restart" + "the real card moves
+again after the ghost lands"): now a POINTER-EVENTS state machine — one
+gesture object per pointerdown, destroyed by a single idempotent
+endGesture() from every exit path; a new pointerdown FORCE-resets anything
+a previous gesture leaked (no wedged state can refuse grabs); pointercancel
+(the browser claiming the stream — the silent device killer) explicitly
+commits at the current slot + traces "[tabdrag] …" (console + Diagnostic-
+Log); document-CAPTURE listeners kept; the touchmove preventDefault scroll
+suppressor kept (pointer events can't cancel scrolling). SEAMLESS DROP:
+the reorder + sibling-transform clear now commit in the SAME task at
+release (one paint of the final order) while the ghost glides above the
+inline-hidden destination card and swaps 1:1 at landing — the old path
+cleared transforms → painted the OLD arrangement → reordered 240ms later
+(the visible double-move). Also: the thumbnail <img> was natively
+DRAGGABLE — a long-press/drag landing on it could start the browser's
+image-drag and kill the touch stream (a "worked once, then thumbnails
+appeared, then never again" candidate); draggable=false + onDragStart
+preventDefault + -webkit-user-drag:none + pointer-events:none on the img.
+TabsOverview.drag.test.jsx rewritten: ×10 pointer-event pins (synchronous
+commit, hidden-dest landing swap, SECOND-drag-after-success, non-bubbling
+pointerup, pointercancel commit, multi-pointer identity, non-primary
+ignore, drift cancel, onReorder-throw recovery, unmount leak-free).
+Live-proven: 3 consecutive drags engaged + committed, ghost glide with the
+order already final beneath, 0 leaks, 0 console errors. NOTE: HomeScreen/
+LibraryScreen/journal-editor still run the old touch-event drag idiom —
+migrate them to this machinery if the owner confirms the tabs feel right.
+
 ───────────────────────────────────────────────────────────────────────────
 STATUS LOG
 ───────────────────────────────────────────────────────────────────────────

@@ -1,21 +1,26 @@
-/* TabsOverview drag-to-reorder — lifecycle hardening.
+/* TabsOverview drag-to-reorder — v2 pointer-events state machine.
    ─────────────────────────────────────────────────────────────────
-   Owner-reported on device: after dropping a dragged tab, grabbing another
-   immediately left the press untracked (the finger only scrolled the grid and
-   nothing could be dropped), and a stray second finger lifting mid-drag
-   committed the drag early at the wrong slot. Root causes: (1) startPress
-   refused any grab while the drop-commit sat in a 240ms setTimeout, with no
-   way to flush it; (2) the document touchend/touchcancel handlers ended the
-   press for ANY finger, not the one that owns it; (3) an exception in the
-   commit left dragIdxRef poisoned forever.
+   REDESIGN pins (owner-reported, after two rounds of touch-event patches
+   still left device failures):
+     1. "first drag works, then none until an app restart" — every gesture is
+        ONE object torn down by a single endGesture(); a new pointerdown
+        FORCE-resets anything a previous gesture leaked, so a second/third
+        drag always works.
+     2. "the real card visibly moves again after the ghost lands" — the
+        reorder now commits SYNCHRONOUSLY at release (one paint of the final
+        order) while the ghost glides above the hidden destination card and
+        swaps 1:1 at landing.
+     3. pointercancel (the browser claiming the stream — the silent device
+        killer) explicitly commits at the current slot and resets.
 
-   These tests drive the REAL component: the mouse path (jsdom-native) for the
-   lifecycle, fabricated touch lists for the multi-finger identity cases.
-   Geometry comes from per-card getBoundingClientRect stubs (jsdom rects are
-   all zeros otherwise, which would collapse every slot onto index 0). */
+   Tests drive the REAL component with pointer events; geometry comes from
+   per-card getBoundingClientRect stubs (jsdom rects are all zeros otherwise,
+   which would collapse every slot onto index 0). jsdom may lack the
+   PointerEvent constructor, so the driver falls back to MouseEvent and
+   assigns pointerId/isPrimary/pointerType directly. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup, act } from '@testing-library/react';
+import { render, cleanup, act } from '@testing-library/react';
 import { TabsOverview } from './TabsOverview.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 
@@ -57,15 +62,27 @@ function renderOverview(overrides = {}) {
   return { ...utils, props, cards };
 }
 
-// Long-press card i with the mouse, entering drag mode.
-function mouseGrab(cards, i) {
+// Pointer-event driver — jsdom-safe (MouseEvent fallback + direct field assign).
+const firePointer = (target, type, init) => {
+  const Ctor = /** @type {any} */ (window).PointerEvent || window.MouseEvent;
+  const e = new Ctor(type, { bubbles: true, cancelable: true, ...init });
+  ['pointerId', 'isPrimary', 'pointerType'].forEach((k) => {
+    if (init && k in init && /** @type {any} */ (e)[k] !== init[k]) {
+      try { Object.defineProperty(e, k, { value: init[k] }); } catch (_e) { /* ignore */ }
+    }
+  });
+  act(() => { target.dispatchEvent(e); });
+  return e;
+};
+
+// Long-press card i, entering drag mode (280ms glow buffer + 1100ms hold).
+function grab(cards, i, pointerId = 1) {
   const c = center(i);
-  fireEvent.mouseDown(cards[i], { button: 0, clientX: c.x, clientY: c.y });
+  firePointer(cards[i], 'pointerdown', { pointerId, isPrimary: true, pointerType: 'touch', clientX: c.x, clientY: c.y });
   act(() => { vi.advanceTimersByTime(1400); });
 }
-
-const dragMove = (x, y) => fireEvent.mouseMove(document, { clientX: x, clientY: y });
-const drop = (x, y) => fireEvent.mouseUp(document, { clientX: x, clientY: y });
+const dragTo = (x, y, pointerId = 1) => firePointer(document, 'pointermove', { pointerId, clientX: x, clientY: y });
+const drop = (x, y, pointerId = 1) => firePointer(document, 'pointerup', { pointerId, clientX: x, clientY: y });
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => {
@@ -75,159 +92,145 @@ afterEach(() => {
   document.querySelectorAll('.tab-card.drag-flying').forEach((n) => n.remove());
 });
 
-describe('TabsOverview drag lifecycle', () => {
-  it('a full drag commits the reorder and cleans up the clone', () => {
+describe('TabsOverview drag v2 — reorder + seamless drop', () => {
+  it('drag to another slot commits the reorder SYNCHRONOUSLY at release (no double-move window)', () => {
     const { props, cards } = renderOverview();
-    mouseGrab(cards, 0);
+    grab(cards, 0);
     expect(cards[0].className).toContain('dragging');
-    expect(document.querySelector('.tab-card.drag-flying')).toBeTruthy();
+    expect(document.body.querySelector('.drag-flying')).toBeTruthy();
     const c1 = center(1);
-    dragMove(c1.x, c1.y);
+    dragTo(c1.x, c1.y);
     drop(c1.x, c1.y);
-    act(() => { vi.advanceTimersByTime(300); });
+    // The old machinery deferred this 240ms behind the snap animation — the
+    // visible "real card moves after the ghost lands". Now it's immediate.
     expect(props.onReorder).toHaveBeenCalledWith(0, 1);
-    expect(document.querySelector('.tab-card.drag-flying')).toBeNull();
   });
 
-  it('a grab inside the 240ms commit window flushes the pending commit and starts a NEW press (the owner-reported swallow)', () => {
-    const { props, cards } = renderOverview();
-    mouseGrab(cards, 0);
+  it('the ghost glides above the HIDDEN destination card, then swaps 1:1 at landing', () => {
+    const { cards } = renderOverview();
+    grab(cards, 0);
     const c1 = center(1);
-    dragMove(c1.x, c1.y);
+    dragTo(c1.x, c1.y);
     drop(c1.x, c1.y);
-    // Only 50ms into the snap window: the commit is still parked.
-    act(() => { vi.advanceTimersByTime(50); });
-    expect(props.onReorder).not.toHaveBeenCalled();
-    // Re-grab another card — the pending commit must flush synchronously…
-    const c2 = center(2);
-    fireEvent.mouseDown(cards[2], { button: 0, clientX: c2.x, clientY: c2.y });
-    expect(props.onReorder).toHaveBeenCalledWith(0, 1);
-    expect(document.querySelector('.tab-card.drag-flying')).toBeNull();
-    // …and the new press must be TRACKED: holding enters drag mode again.
-    act(() => { vi.advanceTimersByTime(1400); });
-    expect(cards[2].className).toContain('dragging');
+    // Post-release: ghost still gliding, destination card hidden beneath it.
+    const dest = /** @type {HTMLElement} */ (cards[1]);
+    expect(document.body.querySelector('.drag-flying')).toBeTruthy();
+    expect(dest.style.opacity).toBe('0');
+    // Landing: ghost removed + the real card revealed in the same moment.
+    act(() => { vi.advanceTimersByTime(260); });
+    expect(document.body.querySelector('.drag-flying')).toBeNull();
+    expect(dest.style.opacity).toBe('');
+  });
+
+  it('a SECOND drag right after a successful one works (the "works once then never" class)', () => {
+    const { props, cards } = renderOverview();
+    grab(cards, 0);
+    const c1 = center(1);
+    dragTo(c1.x, c1.y);
+    drop(c1.x, c1.y);
+    // No settling wait — grab again immediately (mid-landing): the new
+    // pointerdown must flush the landing and own a fresh gesture.
+    grab(cards, 2, 7);
+    expect(document.body.querySelectorAll('.drag-flying').length).toBe(1);
     const c3 = center(3);
-    dragMove(c3.x, c3.y);
-    drop(c3.x, c3.y);
-    act(() => { vi.advanceTimersByTime(300); });
-    expect(props.onReorder).toHaveBeenCalledWith(2, 3);
+    dragTo(c3.x, c3.y, 7);
+    drop(c3.x, c3.y, 7);
+    expect(props.onReorder).toHaveBeenCalledTimes(2);
+    expect(props.onReorder).toHaveBeenLastCalledWith(2, 3);
   });
 
-  it('the commit does not double-fire when the timer runs after a flush', () => {
+  it('a NON-BUBBLING pointerup (the WebView device delivery) still ends + commits the drag', () => {
     const { props, cards } = renderOverview();
-    mouseGrab(cards, 0);
-    const c1 = center(1);
-    dragMove(c1.x, c1.y);
-    drop(c1.x, c1.y);
+    grab(cards, 0);
     const c2 = center(2);
-    fireEvent.mouseDown(cards[2], { button: 0, clientX: c2.x, clientY: c2.y }); // flush
-    drop(c2.x, c2.y);                                                           // abandon the new press
-    act(() => { vi.advanceTimersByTime(1000); });                               // old timer fires into the guard
-    expect(props.onReorder).toHaveBeenCalledTimes(1);
+    dragTo(c2.x, c2.y);
+    // bubbles:false — the faithful analog of the device's non-bubbling
+    // delivery; document-capture listeners are first in propagation and
+    // still see it.
+    const Ctor = /** @type {any} */ (window).PointerEvent || window.MouseEvent;
+    const e = new Ctor('pointerup', { bubbles: false, cancelable: true, clientX: c2.x, clientY: c2.y });
+    try { Object.defineProperty(e, 'pointerId', { value: 1 }); } catch (_e) { /* ignore */ }
+    act(() => { document.dispatchEvent(e); });
+    expect(props.onReorder).toHaveBeenCalledWith(0, 2);
   });
 
-  it('an onReorder exception cannot poison the state machine — the next drag still works', () => {
-    const onReorder = vi.fn(() => { if (onReorder.mock.calls.length === 1) throw new Error('boom'); });
-    const { cards } = renderOverview({ onReorder });
-    mouseGrab(cards, 0);
-    const c1 = center(1);
-    dragMove(c1.x, c1.y);
-    drop(c1.x, c1.y);
-    expect(() => { act(() => { vi.advanceTimersByTime(300); }); }).toThrow('boom');
-    // The refs reset in the finally — a fresh drag must still engage and commit.
-    mouseGrab(cards, 2);
-    expect(cards[2].className).toContain('dragging');
-    const c3 = center(3);
-    dragMove(c3.x, c3.y);
-    drop(c3.x, c3.y);
-    act(() => { vi.advanceTimersByTime(300); });
-    expect(onReorder).toHaveBeenCalledWith(2, 3);
-  });
-});
-
-describe('TabsOverview device event-delivery hardening', () => {
-  // Android WebView's native text-selection machinery, when it claims a
-  // long-press, delivers the release touchend NON-BUBBLING (the documented
-  // tap->chip bug, MainActivity.kt) - and ScreenLayout's tap-suppressor can
-  // stopPropagation a >300ms lift. Both starve document-BUBBLE listeners.
-  // The drag listeners are registered in the CAPTURE phase, which no
-  // intermediate consumer can block; these tests deliver events the hostile
-  // way (non-bubbling, targeted at the card) and expect the drag to survive.
-  const touch = (id, x, y) => ({ identifier: id, clientX: x, clientY: y });
-  const rawTouchEvent = (type, target, id, x, y, bubbles) => {
-    const e = new Event(type, { bubbles, cancelable: true });
-    Object.defineProperty(e, 'touches', { value: type === 'touchend' ? [] : [touch(id, x, y)], configurable: true });
-    Object.defineProperty(e, 'changedTouches', { value: [touch(id, x, y)], configurable: true });
-    target.dispatchEvent(e);
-  };
-
-  it('a NON-BUBBLING touchend (WebView selection machinery) still ends and commits the drag', () => {
+  it('pointercancel MID-DRAG commits at the current slot and resets — the next drag works', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { props, cards } = renderOverview();
-    const c0 = center(0);
-    fireEvent.touchStart(cards[0], { touches: [touch(1, c0.x, c0.y)], changedTouches: [touch(1, c0.x, c0.y)] });
-    act(() => { vi.advanceTimersByTime(1400); });
-    expect(cards[0].className).toContain('dragging');
+    grab(cards, 0);
     const c1 = center(1);
-    rawTouchEvent('touchmove', cards[0], 1, c1.x, c1.y, false);   // non-bubbling move too
-    rawTouchEvent('touchend', cards[0], 1, c1.x, c1.y, false);    // the zombie-maker pre-fix
+    dragTo(c1.x, c1.y);
+    firePointer(document, 'pointercancel', { pointerId: 1, clientX: c1.x, clientY: c1.y });
+    expect(props.onReorder).toHaveBeenCalledWith(0, 1);
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('[tabdrag]'))).toBe(true);
     act(() => { vi.advanceTimersByTime(300); });
-    expect(document.querySelector('.tab-card.drag-flying')).toBeNull();
+    grab(cards, 2, 9);
+    expect(document.body.querySelector('.drag-flying')).toBeTruthy();
+    drop(center(2).x, center(2).y, 9);
+    warn.mockRestore();
+  });
+
+  it('other pointers never disturb the owning gesture (multi-touch identity)', () => {
+    const { props, cards } = renderOverview();
+    grab(cards, 0, 1);
+    // A stray second finger moves and lifts — ignored entirely.
+    dragTo(center(3).x, center(3).y, 2);
+    drop(center(3).x, center(3).y, 2);
+    expect(props.onReorder).not.toHaveBeenCalled();
+    expect(document.body.querySelector('.drag-flying')).toBeTruthy();
+    // The owner finger finishes normally.
+    const c1 = center(1);
+    dragTo(c1.x, c1.y, 1);
+    drop(c1.x, c1.y, 1);
     expect(props.onReorder).toHaveBeenCalledWith(0, 1);
   });
 
-  it('a zombied drag (end event fully lost) self-heals on the next grab instead of refusing forever', () => {
-    const { props, cards } = renderOverview();
-    const c0 = center(0);
-    fireEvent.touchStart(cards[0], { touches: [touch(1, c0.x, c0.y)], changedTouches: [touch(1, c0.x, c0.y)] });
-    act(() => { vi.advanceTimersByTime(1400); });
-    expect(document.querySelector('.tab-card.drag-flying')).toBeTruthy();
-    // the end event NEVER arrives (worst case); 3s later the user grabs again
-    act(() => { vi.advanceTimersByTime(3000); });
-    const c2 = center(2);
-    fireEvent.touchStart(cards[2], { touches: [touch(4, c2.x, c2.y)], changedTouches: [touch(4, c2.x, c2.y)] });
-    // the stale drag was aborted (uncommitted) and the new press is live
-    expect(document.querySelector('.tab-card.drag-flying')).toBeNull();
-    expect(props.onReorder).not.toHaveBeenCalled();
-    act(() => { vi.advanceTimersByTime(1400); });
-    expect(cards[2].className).toContain('dragging');
-    const c3 = center(3);
-    fireEvent.touchMove(document, { touches: [touch(4, c3.x, c3.y)], changedTouches: [touch(4, c3.x, c3.y)] });
-    fireEvent.touchEnd(document, { touches: [], changedTouches: [touch(4, c3.x, c3.y)] });
-    act(() => { vi.advanceTimersByTime(300); });
-    expect(props.onReorder).toHaveBeenCalledWith(2, 3);
-  });
-});
-
-describe('TabsOverview multi-touch identity', () => {
-  const touch = (id, x, y) => ({ identifier: id, clientX: x, clientY: y });
-
-  it('a second finger lifting mid-drag does not end the drag; only the owning finger commits', () => {
-    const { props, cards } = renderOverview();
-    const c0 = center(0);
-    fireEvent.touchStart(cards[0], { touches: [touch(1, c0.x, c0.y)], changedTouches: [touch(1, c0.x, c0.y)] });
-    act(() => { vi.advanceTimersByTime(1400); });
-    expect(cards[0].className).toContain('dragging');
-    const c1 = center(1);
-    fireEvent.touchMove(document, { touches: [touch(1, c1.x, c1.y)], changedTouches: [touch(1, c1.x, c1.y)] });
-    // Finger 9 (a stray touch elsewhere) lifts — must be ignored.
-    fireEvent.touchEnd(document, { touches: [touch(1, c1.x, c1.y)], changedTouches: [touch(9, 600, 1000)] });
-    expect(cards[0].className).toContain('dragging');
-    expect(props.onReorder).not.toHaveBeenCalled();
-    // The owning finger lifts — now it commits.
-    fireEvent.touchEnd(document, { touches: [], changedTouches: [touch(1, c1.x, c1.y)] });
-    act(() => { vi.advanceTimersByTime(300); });
-    expect(props.onReorder).toHaveBeenCalledWith(0, 1);
-  });
-
-  it('moves from a non-owning finger neither drag the clone nor cancel the press', () => {
+  it('a non-primary pointerdown never starts a gesture', () => {
     const { cards } = renderOverview();
     const c0 = center(0);
-    fireEvent.touchStart(cards[0], { touches: [touch(1, c0.x, c0.y)], changedTouches: [touch(1, c0.x, c0.y)] });
-    // Pre-drag: a big move from finger 9 must NOT drift-cancel the press.
-    fireEvent.touchMove(document, { touches: [touch(1, c0.x, c0.y), touch(9, 700, 50)], changedTouches: [touch(9, 700, 50)] });
-    act(() => { vi.advanceTimersByTime(1400); });
-    expect(cards[0].className).toContain('dragging');
-    fireEvent.touchEnd(document, { touches: [], changedTouches: [touch(1, c0.x, c0.y)] });
+    firePointer(cards[0], 'pointerdown', { pointerId: 2, isPrimary: false, pointerType: 'touch', clientX: c0.x, clientY: c0.y });
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(document.body.querySelector('.drag-flying')).toBeNull();
+  });
+
+  it('pre-drag finger drift (>10px) cancels the press — it was a scroll', () => {
+    const { props, cards } = renderOverview();
+    const c0 = center(0);
+    firePointer(cards[0], 'pointerdown', { pointerId: 1, isPrimary: true, pointerType: 'touch', clientX: c0.x, clientY: c0.y });
     act(() => { vi.advanceTimersByTime(300); });
+    dragTo(c0.x, c0.y + 40); // drift
+    act(() => { vi.advanceTimersByTime(1500); });
+    expect(document.body.querySelector('.drag-flying')).toBeNull();
+    drop(c0.x, c0.y + 40);
+    expect(props.onReorder).not.toHaveBeenCalled();
+  });
+
+  it('an exception in onReorder is traced and never wedges the next drag', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onReorder = vi.fn(() => { throw new Error('boom'); });
+    const { cards } = renderOverview({ onReorder });
+    grab(cards, 0);
+    const c1 = center(1);
+    dragTo(c1.x, c1.y);
+    drop(c1.x, c1.y);
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('[tabdrag]'))).toBe(true);
+    // The machinery is intact: the very next drag runs end-to-end.
+    /** @type {any} */ (onReorder).mockImplementation(() => {});
+    act(() => { vi.advanceTimersByTime(300); });
+    grab(cards, 2, 5);
+    const c3 = center(3);
+    dragTo(c3.x, c3.y, 5);
+    drop(c3.x, c3.y, 5);
+    expect(onReorder).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
+  it('unmount mid-drag leaks nothing — the ghost dies with the overlay', () => {
+    const { unmount, cards } = renderOverview();
+    grab(cards, 0);
+    expect(document.body.querySelector('.drag-flying')).toBeTruthy();
+    unmount();
+    expect(document.body.querySelector('.drag-flying')).toBeNull();
   });
 });
