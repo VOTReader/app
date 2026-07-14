@@ -207,9 +207,9 @@
   R('.jrn-emb-delete { position: absolute; bottom: 6px; right: 6px; background: none; border: none; color: var(--gold-dim); width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: 0.875rem; display: none; align-items: center; justify-content: center; }');
   R('.jrn-block:hover .jrn-emb-delete { display: flex; }');
   R('.jrn-emb-delete:hover { background: rgba(199, 92, 74, 0.15); color: #c75c4a; }');
-  R('.jrn-embed-verse { background: var(--bg3); border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); border-radius: 6px; padding: 14px 38px 14px 16px; position: relative; transition: border-color 0.15s; }');
+  R('.jrn-embed-verse { background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 8px; padding: 14px 38px 14px 16px; position: relative; transition: border-color 0.15s; }');
   R('body.light .jrn-embed-verse { background: #f3ecdc; }');
-  R('.jrn-embed-verse[role="button"]:hover { border-left-color: var(--gold-bright); }');
+  R('.jrn-embed-verse[role="button"]:hover { border-color: var(--gold); }');
   R('.jrn-embed-verse .jrn-emb-cite { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); margin-bottom: 6px; }');
   R('.jrn-embed-verse .jrn-emb-text { font-family: var(--font-garamond); color: var(--cream); font-size: 1rem; line-height: 1.6; }');
   R('body.light .jrn-embed-verse .jrn-emb-text { color: #2a2520; }');
@@ -219,7 +219,6 @@
   R('.jrn-emb-excerpt { font-style: italic; color: var(--cream); position: relative; padding-left: 12px; }');
   R('body.light .jrn-emb-excerpt { color: #2a2520; }');
   R('.jrn-emb-excerpt::before { content: "\\201C"; position: absolute; left: 0; top: -2px; color: var(--gold); font-family: var(--font-cinzel); font-size: 1.375rem; line-height: 1; }');
-  R('.jrn-embed-letter.is-excerpt, .jrn-embed-verse.is-excerpt { border-left-style: solid; }');
 
   // Quote body in the viewer — italic + matching size, used both for short
   // quotes and the JrnExpandable wrapper of long ones.
@@ -357,7 +356,7 @@
   R('.jrn-linked-wrap.is-linked > .jrn-excerpt-source:hover { background: var(--gold-border); }');
 
   // Journal-excerpt block — text from another entry, rendered as a card
-  R('.jrn-embed-journal-excerpt { background: var(--bg3); border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); border-radius: 6px; padding: 12px 16px; position: relative; }');
+  R('.jrn-embed-journal-excerpt { background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 8px; padding: 12px 16px; position: relative; }');
   R('body.light .jrn-embed-journal-excerpt { background: #f3ecdc; }');
   R('.jrn-embed-journal-excerpt .jrn-excerpt-source { display: inline-block; cursor: pointer; padding: 2px 0 4px; font-size: 0.625rem; color: var(--gold); }');
   R('.jrn-embed-journal-excerpt .jrn-excerpt-source:hover { color: var(--gold-bright); text-decoration: underline; }');
