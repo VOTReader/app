@@ -77,16 +77,25 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     expect(container.querySelector('.jrn-del-btn')).toBeNull();
   });
 
-  it('⋯ opens a Pin/Delete-only menu — Open AND Edit are gone (the pen FAB is THE edit affordance)', () => {
+  it('⋯ opens Edit/Pin/Delete — the pen FAB is gone (Edit now lives in the menu); Open stays hidden', () => {
     setupGlobals();
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} />);
-    // The pen FAB is on-screen, so the menu never duplicates Edit.
-    expect(container.querySelector('.jrn-fab-action.is-edit')).toBeTruthy();
+    // No floating pen — the edit affordance moved INTO the ⋯ menu.
+    expect(container.querySelector('.jrn-fab-action.is-edit')).toBeNull();
     fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    expect(screen.queryByText('Open Entry')).toBeNull();
-    expect(screen.queryByText('Edit Entry')).toBeNull();
-    expect(screen.getByText('Unpin Entry')).toBeTruthy(); // ENTRY.pinned = true
+    expect(screen.queryByText('Open Entry')).toBeNull();       // already inside the entry
+    expect(screen.getByText('Edit Entry')).toBeTruthy();
+    expect(screen.getByText('Unpin Entry')).toBeTruthy();      // ENTRY.pinned = true
     expect(screen.getByText('Delete Entry')).toBeTruthy();
+  });
+
+  it('the menu Edit item calls onEdit', () => {
+    const onEdit = vi.fn();
+    setupGlobals();
+    const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={onEdit} />);
+    fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
+    fireEvent.click(screen.getByText('Edit Entry'));
+    expect(onEdit).toHaveBeenCalled();
   });
 
   it('the menu pin item toggles the pin in the store', () => {

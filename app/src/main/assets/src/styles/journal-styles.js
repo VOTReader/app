@@ -473,9 +473,6 @@
   //   .jrn-fab            — base FAB (gold filled, bottom-right by default)
   //   .jrn-fab-plus       — editor's + insert button (bottom-right)
   //   .jrn-fab-mic        — editor's mic record button (bottom-left, outlined)
-  //   .jrn-fab-action     — hub/viewer action FAB
-  //   .jrn-fab-action.is-edit   — pencil icon (default state)
-  //   .jrn-fab-action.is-create — + icon (hub edit-mode + viewer N/A)
   R('.jrn-fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: calc(22px + env(safe-area-inset-right)); width: 56px; height: 56px; border-radius: 50%; background: var(--gold); color: var(--bg); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(212, 183, 114, 0.4); z-index: 35; transition: transform 0.15s, background 0.15s, box-shadow 0.15s; padding: 0; }');
   R('.jrn-fab:hover { transform: scale(1.05); }');
   R('.jrn-fab:active { transform: scale(0.96); }');
@@ -484,14 +481,6 @@
   R('.jrn-fab-mic { left: calc(22px + env(safe-area-inset-left)); right: auto; background: var(--bg3); color: var(--gold); border: 2px solid var(--gold); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }');
   R('.jrn-fab-mic:hover { background: var(--gold-faint); }');
   R('body.light .jrn-fab-mic { background: #fbf6e8; }');
-  // Edit-state FAB — neutral background with gold outline so it reads as
-  // "enter edit mode" rather than the primary "+ create" action.
-  R('.jrn-fab-action.is-edit { background: var(--bg3); color: var(--gold); border: 2px solid var(--gold); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }');
-  R('.jrn-fab-action.is-edit:hover { background: var(--gold-faint); }');
-  R('body.light .jrn-fab-action.is-edit { background: #fbf6e8; }');
-  // Create-state FAB (hub edit-mode active) — filled gold, signals primary
-  // "add new entry" action with the box-shadow glow.
-  R('.jrn-fab-action.is-create { background: var(--gold); color: var(--bg); box-shadow: 0 6px 20px rgba(212, 183, 114, 0.55); }');
   // "New Entry" pill — the hub's primary create action. Wider than a round
   // FAB so the label reads clearly; the "+" insert FAB lives only in the
   // editor now.

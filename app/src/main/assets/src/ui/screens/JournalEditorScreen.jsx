@@ -850,12 +850,14 @@ export function JournalEditorScreen(props) {
       );
     }
     // Everything else (letter-card, chapter-card, verse-block, bookmark-card,
-    // note-card, journal-card, journal-excerpt) renders via JournalBlockView
-    // for parity with the viewer, then gets the unified delete button.
+    // note-card, journal-card, journal-excerpt, notebook-card) renders via
+    // JournalBlockView for parity with the viewer, then gets the unified
+    // delete button AND the same left-gutter drag grip as every other block.
     return (
       <div {...common}>
         <JournalBlockView block={b} callbacks={{}} />
         {blockDeleteUI(idx)}
+        {blockDragUI(idx)}
       </div>
     );
   }

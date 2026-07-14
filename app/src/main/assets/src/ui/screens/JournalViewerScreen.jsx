@@ -641,23 +641,12 @@ export function JournalViewerScreen(props) {
           })}
         </div>
       </div>
-      <button
-        className="jrn-fab jrn-fab-action is-edit"
-        onClick={onEdit}
-        title="Edit entry"
-        aria-label="Edit entry"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" />
-        </svg>
-      </button>
       {menuOpen && (
         <JournalCardMenu
           entry={entry}
           hideOpen
-          hideEdit
           onClose={function() { setMenuOpen(false); }}
+          onEdit={onEdit}
           onTogglePin={togglePin}
           onDelete={doDelete}
         />
