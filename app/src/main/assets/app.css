@@ -3342,6 +3342,30 @@
       border: 1px solid var(--gold-border);
     }
     body.light .navpick-tab.active { color: #7a5c1e; }
+    /* ── Search scope toggle (Titles & refs / Full text) ── */
+    .navpick-scope {
+      display: flex; gap: 18px;
+      margin: 4px 22px 0; padding: 0 2px;
+    }
+    .navpick-scope-btn {
+      background: transparent; border: none; border-bottom: 2px solid transparent;
+      padding: 8px 2px; min-height: 36px;
+      font-family: 'Cinzel', serif; font-size: 0.64rem; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--cream-muted); cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .navpick-scope-btn.active { color: var(--gold-bright); border-bottom-color: var(--gold); }
+    body.light .navpick-scope-btn.active { color: #7a5c1e; }
+    .navpick-scope-jump {
+      margin-top: 16px; padding: 10px 22px; min-height: 44px;
+      background: rgba(200,164,86,0.10); border: 1px solid var(--gold-border);
+      border-radius: 999px; color: var(--gold-bright);
+      font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.1em;
+      text-transform: uppercase; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .navpick-scope-jump:active { background: rgba(200,164,86,0.2); }
     /* ── Browse breadcrumb (back one level + current group) ── */
     .navpick-crumb {
       display: flex; align-items: center; gap: 10px;

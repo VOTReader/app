@@ -4,10 +4,13 @@
    The "pick a link target" sheet, in three modes (SESSION-2 overhaul,
    UX-BATCH-2026-07-12):
 
-     Search — the original nav-index search (titles, refs, abbreviations)
-              PLUS full-text results from the MiniSearch engine ("In the
-              text"), so a remembered PHRASE finds its verse/letter, not
-              just a remembered title. Content docs map to nav items via
+     Search — TWO SCOPES behind an explicit toggle (owner-requested):
+              "Titles & refs" = the original nav-index search (titles,
+              references, abbreviations — the default; refs like "Eph 6:5"
+              live here), and "Full text" = the MiniSearch engine over
+              every verse + letter body, so a remembered PHRASE finds its
+              place. A no-title-match empty state offers a one-tap jump to
+              Full text. Content docs map to nav items via
               contentDocToNavItem; Hidden Manna can never surface (it has
               no nav item, and the mapper returns null).
      Browse — the app's own top-down hierarchy as a drill-down tree
@@ -25,6 +28,9 @@
 export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
   const [input, setInput] = React.useState('');
   const [view, setView] = React.useState('search'); // 'search' | 'browse' | 'recent'
+  // Search scope — 'titles' (nav index: titles/refs/abbreviations, the fast
+  // default) vs 'text' (MiniSearch full-text over verses + letter bodies).
+  const [searchScope, setSearchScope] = React.useState('titles');
   const [browsePath, setBrowsePath] = React.useState(/** @type {any[]} */ ([]));
   // Full-text results: null = idle (no query / too short), 'building' =
   // engine still preparing its index, [] / [...] = resolved rows.
@@ -75,17 +81,17 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
     return searchNavIndex(input.trim(), 30).map(s => s.item);
   }, [input]);
 
-  // Identity key for de-duplicating a content hit against a nav hit for the
-  // same destination (a query matching a letter's TITLE and its BODY should
-  // list that letter once, in the titles group).
+  // Identity key for de-duplicating full-text hits that resolve to the same
+  // destination (a phrase can match several docs folding to one letter).
   const rowKey = (it) => it.kind + '|' + (it.bookId || '') + '|' + (it.chapter || '') + '|' + (it.verse || '')
     + '|' + (it.letterId || it.entryId || '') + '|' + (it.studyChapterId || '');
 
   // Full-text search — debounced; rides the MiniSearch engine (bundle-e).
-  // Structured/reference queries return no text results by design (the
-  // nav-index ref hit already answers those), so the group simply hides.
+  // Runs ONLY in the 'text' scope (the toggle keeps the two searches
+  // predictable and separate). Structured/reference queries return no text
+  // results by design — the empty state points back to Titles & refs.
   React.useEffect(() => {
-    if (view !== 'search') return undefined;
+    if (view !== 'search' || searchScope !== 'text') return undefined;
     const q = input.trim();
     if (q.length < 3) { setContentHits(null); return undefined; }
     let cancelled = false;
@@ -94,9 +100,8 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       if (!eng) { setContentHits(null); return; }
       try {
         if (!eng.getState().ready) setContentHits('building');
-        const res = await eng.search(q, { limit: 40 });
+        const res = await eng.search(q, { limit: 60 });
         if (cancelled) return;
-        const navKeys = new Set(results.map(rowKey));
         const seen = new Set();
         const rows = [];
         const terms = (res.parsedTerms && res.parsedTerms.length) ? res.parsedTerms : q.split(/\s+/);
@@ -104,19 +109,18 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
           const item = contentDocToNavItem(r.doc);
           if (!item) continue;
           const k = rowKey(item);
-          if (seen.has(k) || navKeys.has(k)) continue;
+          if (seen.has(k)) continue;
           seen.add(k);
           rows.push({ item, snippet: eng.snippet(r.doc.text || '', terms, 110) });
-          if (rows.length >= 8) break;
+          if (rows.length >= 20) break;
         }
         setContentHits(rows);
       } catch (_e) {
-        if (!cancelled) setContentHits(null); // engine unavailable — group hides
+        if (!cancelled) setContentHits([]); // engine failed — honest empty state
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `results` is derived from `input` (useMemo on the same dep); listing input alone re-fires exactly when the query changes without double-firing on the memo identity.
-  }, [input, view]);
+  }, [input, view, searchScope]);
 
   const createLinkTo = React.useCallback((item) => {
     if (!item) return;
@@ -397,16 +401,36 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
         </div>
         {/* Search input (rounded pill matching reference) — search view only */}
         {view === 'search' && (
-          <div className="navpick-search-wrap">
-            <input
-              ref={inputRef}
-              className="navpick-search-input"
-              placeholder="Search titles, references, or any phrase…"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && results.length > 0) createLinkTo(results[0]); }}
-            />
-          </div>
+          <>
+            <div className="navpick-search-wrap">
+              <input
+                ref={inputRef}
+                className="navpick-search-input"
+                placeholder={searchScope === 'text' ? "Search any phrase in the text…" : "Search titles & references…"}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key !== 'Enter') return;
+                  if (searchScope === 'titles' && results.length > 0) createLinkTo(results[0]);
+                  else if (searchScope === 'text' && Array.isArray(contentHits) && contentHits.length > 0) createLinkTo(contentHits[0].item);
+                }}
+              />
+            </div>
+            {/* Scope toggle — index search (titles/refs) vs full-text search.
+                Explicitly separate (owner-requested) so each stays predictable. */}
+            <div className="navpick-scope" role="radiogroup" aria-label="Search scope">
+              <button
+                type="button" role="radio" aria-checked={searchScope === 'titles'}
+                className={"navpick-scope-btn" + (searchScope === 'titles' ? " active" : "")}
+                onClick={() => setSearchScope('titles')}
+              >Titles &amp; refs</button>
+              <button
+                type="button" role="radio" aria-checked={searchScope === 'text'}
+                className={"navpick-scope-btn" + (searchScope === 'text' ? " active" : "")}
+                onClick={() => setSearchScope('text')}
+              >Full text</button>
+            </div>
+          </>
         )}
         {/* Browse breadcrumb — back one level + where you are */}
         {view === 'browse' && browsePath.length > 0 && (
@@ -428,19 +452,29 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
             ) : (
               <div className="navpick-empty">
                 <div className="navpick-empty-title">Search to link</div>
-                <div className="navpick-empty-hint">Try a title, a reference like &quot;Eph 6:5&quot;, or any phrase you remember — the text itself is searched too.</div>
+                <div className="navpick-empty-hint">Try a title or a reference like &quot;Eph 6:5&quot; — or flip to Full text to search any phrase inside the verses and letters.</div>
+              </div>
+            )
+          ) : searchScope === 'titles' ? (
+            results.length > 0 ? (
+              <>
+                <div className="navpick-section-label">Titles &amp; places</div>
+                {results.map((item, i) => renderItemRow(item, 's' + i))}
+              </>
+            ) : (
+              <div className="navpick-empty">
+                <div className="navpick-empty-title">No titles match</div>
+                <div className="navpick-empty-hint">Try &quot;Genesis 1&quot;, &quot;Eph 6:5&quot;, &quot;The Wide Path&quot; — or search inside the text itself.</div>
+                <button type="button" className="navpick-scope-jump" onClick={() => setSearchScope('text')}>Search the full text instead</button>
               </div>
             )
           ) : (
             <>
-              {results.length > 0 && (
-                <>
-                  <div className="navpick-section-label">Titles &amp; places</div>
-                  {results.map((item, i) => renderItemRow(item, 's' + i))}
-                </>
-              )}
               {contentHits === 'building' && (
                 <div className="navpick-hintline">Preparing text search — the first run can take a few seconds…</div>
+              )}
+              {contentHits === null && (
+                <div className="navpick-hintline">Type at least three letters to search the text.</div>
               )}
               {Array.isArray(contentHits) && contentHits.length > 0 && (
                 <>
@@ -448,10 +482,10 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
                   {contentHits.map((h, i) => renderItemRow(h.item, 'c' + i, h.snippet ? '“' + h.snippet + '”' : null))}
                 </>
               )}
-              {results.length === 0 && (!Array.isArray(contentHits) || contentHits.length === 0) && contentHits !== 'building' && (
+              {Array.isArray(contentHits) && contentHits.length === 0 && (
                 <div className="navpick-empty">
-                  <div className="navpick-empty-title">No matches</div>
-                  <div className="navpick-empty-hint">Try &quot;Genesis 1&quot;, &quot;Eph 6:5&quot;, &quot;The Wide Path&quot;, or a phrase from the passage you want.</div>
+                  <div className="navpick-empty-title">Nothing in the text matches</div>
+                  <div className="navpick-empty-hint">Full text finds phrases inside verses and letters. For references like &quot;Eph 6:5&quot; or titles, switch to Titles &amp; refs.</div>
                 </div>
               )}
             </>

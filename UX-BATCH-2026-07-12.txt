@@ -91,12 +91,15 @@ confirmed, searchNavIndex is titles/refs only; full-text added):
 - LinkPicker has THREE MODES via a segmented control: [Search] [Browse]
   [Recent]. All feed the same create/refine pipeline, so journal card/
   excerpt insert modes get every mode for free.
-- SEARCH now adds an "In the text" group: MiniSearch (VotSearchMini,
-  bundle-e — picker mount kicks __loadScreensE + a deferred engine init)
-  searches every verse + letter/entry body; results map to nav items via
-  new contentDocToNavItem (nav-index.js; Hidden Manna maps to null → can
-  never surface), render with snippets, dedupe against title hits, cap 8.
-  Verse hits are verse-precise → direct create in link mode.
+- SEARCH has an explicit SCOPE TOGGLE (owner follow-up): "Titles & refs"
+  (nav-index — the default; refs like "Eph 6:5" live here) vs "Full text"
+  (MiniSearch over every verse + letter/entry body; VotSearchMini in
+  bundle-e — picker mount kicks __loadScreensE + a deferred engine init).
+  Full-text results map to nav items via contentDocToNavItem (nav-index.js;
+  Hidden Manna maps to null → can never surface), render with snippets,
+  cap 20; verse hits are verse-precise → direct create in link mode. The
+  no-titles-match empty state offers a one-tap "Search the full text
+  instead" jump; placeholders + empty states are scope-specific.
 - BROWSE: new buildNavTree (nav-index.js) groups the index into the app's
   own hierarchy — The Holy Bible → 66 books → chapter GRID; Matthew Study
   Bible → chapters; every letters collection → entries; each Bible study →

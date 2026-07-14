@@ -169,10 +169,8 @@ describe('LinkPicker Recent mode — the link network', () => {
   });
 });
 
-describe('LinkPicker full-text search ("In the text")', () => {
-  it('renders engine hits with snippets and creates directly from a verse hit', async () => {
-    vi.useFakeTimers();
-    stubGlobals();
+describe('LinkPicker search scope toggle (Titles & refs / Full text)', () => {
+  function stubEngine() {
     window.navItemToEndpoint = (item) => ({ type: 'bible', key: 'k', label: item.label, verse: item.verse || null });
     window.contentDocToNavItem = (doc) => ({
       kind: 'bible-chapter', bookId: doc.bookId, chapter: doc.chapterNum, verse: doc.verseNum,
@@ -187,8 +185,52 @@ describe('LinkPicker full-text search ("In the text")', () => {
         results: [{ score: 9, doc: { kind: 'verse', volumeId: 'bible', bookId: 'john', chapterNum: 3, verseNum: 16, ref: 'John 3:16', text: 'For God so loved the world…' } }],
       })),
     };
+  }
+
+  it('defaults to Titles & refs — the engine is NOT queried and no text group renders', async () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    stubEngine();
     const { container } = render(<LinkPicker {...baseProps} />);
     try {
+      const scopes = [...container.querySelectorAll('.navpick-scope-btn')];
+      expect(scopes.map(b => b.textContent)).toEqual(['Titles & refs', 'Full text']);
+      expect(scopes[0].className).toContain('active');
+      fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
+      await act(async () => { vi.advanceTimersByTime(600); });
+      await act(async () => { await Promise.resolve(); });
+      expect(window.VotSearchMini.search).not.toHaveBeenCalled();
+      expect(screen.queryByText('In the text')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the no-titles-match empty state offers a one-tap jump to Full text', async () => {
+    vi.useFakeTimers();
+    stubGlobals(); // searchNavIndex → [] : no title matches
+    stubEngine();
+    const { container } = render(<LinkPicker {...baseProps} />);
+    try {
+      fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
+      expect(screen.getByText('No titles match')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Search the full text instead' }));
+      expect([...container.querySelectorAll('.navpick-scope-btn')][1].className).toContain('active');
+      await act(async () => { vi.advanceTimersByTime(300); });
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText('In the text')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Full text scope renders engine hits with snippets and creates directly from a verse hit', async () => {
+    vi.useFakeTimers();
+    stubGlobals();
+    stubEngine();
+    const { container } = render(<LinkPicker {...baseProps} />);
+    try {
+      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
       fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
       await act(async () => { vi.advanceTimersByTime(300); });
       await act(async () => { await Promise.resolve(); });
