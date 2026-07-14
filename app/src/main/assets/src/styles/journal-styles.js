@@ -140,15 +140,34 @@
   R('body.light .jrn-editor-title { color: #8b6f30; }');
   R('.jrn-editor-title::placeholder { color: var(--gold-dim); opacity: 0.6; font-style: italic; text-transform: none; letter-spacing: 0.02em; font-weight: 400; }');
   R('.jrn-saved-ind { font-style: italic; color: var(--gold-dim); font-family: var(--font-garamond); font-size: 0.75rem; text-transform: none; letter-spacing: 0; padding: 0 8px; }');
+  // Entry date under the editor title — same quiet eyebrow the viewer shows,
+  // so the editor reads as the same document, not a different place.
+  R('.jrn-editor-date { font-family: var(--font-cinzel); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 6px; }');
   R('.jrn-blocks { padding: 6px 18px 24px; display: flex; flex-direction: column; gap: 0; }');
   R('.jrn-body-surface { min-height: 65vh; cursor: text; }');
   R('.jrn-block { position: relative; padding: 0; }');
-  R('.jrn-block-textarea { width: 100%; background: none; border: none; color: var(--cream-dim); font-family: var(--font-garamond); font-size: 1.0625rem; line-height: 1.65; resize: none; outline: none; padding: 4px 4px; border-radius: 4px; transition: background 0.15s; min-height: 28px; }');
+  // Auto-growing textareas — CSS grid replica, NO JS measuring. The wrapper
+  // renders the live value invisibly in ::after; replica + textarea share one
+  // grid cell, so the cell (and the textarea stretched into it) is exactly as
+  // tall as the text at all times. The old per-render height:auto→scrollHeight
+  // JS resize forced a layout at the COLLAPSED height on every render, which
+  // clamped the scroller's scrollTop on long entries — the Android "scroll
+  // keeps jerking while editing" glitch. Layout-affecting typography lives on
+  // the WRAPPER (both children inherit it) so the two can never drift.
+  R('.jrn-grow { display: grid; width: 100%; }');
+  R('.jrn-grow::after { content: attr(data-rep) " "; visibility: hidden; pointer-events: none; }');
+  R('.jrn-grow::after, .jrn-grow > textarea { grid-area: 1 / 1 / 2 / 2; font: inherit; letter-spacing: inherit; text-transform: inherit; white-space: pre-wrap; overflow-wrap: break-word; box-sizing: border-box; width: 100%; min-width: 0; border: none; margin: 0; padding: 4px; overflow: hidden; }');
+  R('.jrn-grow > textarea { resize: none; }');
+  R('.jrn-grow-p { font-family: var(--font-garamond); font-size: 1.0625rem; line-height: 1.65; }');
+  R('.jrn-grow-h2 { font-family: var(--font-cinzel); font-size: 1.125rem; font-weight: 600; line-height: 1.65; text-transform: uppercase; letter-spacing: 0.05em; }');
+  R('.jrn-grow-quote { font-family: var(--font-garamond); font-style: italic; font-size: 1.0625rem; line-height: 1.6; }');
+  R('.jrn-grow-quote::after, .jrn-grow-quote > textarea { padding: 2px 0; }');
+  R('.jrn-block-textarea { background: none; color: var(--cream-dim); outline: none; border-radius: 4px; transition: background 0.15s; min-height: 28px; }');
   R('body.light .jrn-block-textarea { color: #3a3528; }');
   R('.jrn-block-textarea:focus { background: rgba(212, 183, 114, 0.04); }');
-  R('.jrn-block-textarea.h2 { font-family: var(--font-cinzel); color: var(--gold); font-size: 1.125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }');
+  R('.jrn-block-textarea.h2 { color: var(--gold); }');
   R('.jrn-block-quote { border-left: 3px solid var(--gold); padding: 10px 0 10px 18px; margin: 4px 0; }');
-  R('.jrn-block-quote textarea { width: 100%; background: none; border: none; color: var(--cream); font-family: var(--font-garamond); font-style: italic; font-size: 1.0625rem; line-height: 1.6; resize: none; outline: none; padding: 2px 0; }');
+  R('.jrn-block-quote textarea { background: none; color: var(--cream); outline: none; }');
   R('body.light .jrn-block-quote textarea { color: #2a2520; }');
   R('.jrn-block-quote-cite { width: 100%; background: none; border: none; outline: none; font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); margin-top: 8px; }');
   R('.jrn-divider { text-align: center; padding: 16px 0; color: var(--gold); letter-spacing: 1em; font-size: 0.875rem; user-select: none; }');
@@ -344,6 +363,12 @@
   // 44px effective tap target (WL4 pattern): the visual stays a subtle 26px
   // circle but the hit area meets the touch-target floor.
   R('.jrn-block-del-btn::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; }');
+  // Plainness (session 3): TEXT blocks show their delete × as a whisper until
+  // the block is engaged — one always-on control per paragraph read as
+  // clutter. Media/card blocks (no focus state) keep the default visibility.
+  R('.jrn-block-edit.is-text .jrn-block-del-btn { opacity: 0.22; }');
+  R('.jrn-block-edit.is-text:focus-within .jrn-block-del-btn { opacity: 0.8; }');
+  R('.jrn-block-edit.is-text .jrn-block-del-btn:hover { opacity: 1; }');
   // Drag-to-reorder grip — lives in a left gutter (the editor's .jrn-blocks
   // gets padding-left:44px below), the opposite corner from the delete x —
   // the same grab-left / destroy-right separation the tab cards use.

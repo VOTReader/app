@@ -77,12 +77,14 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     expect(container.querySelector('.jrn-del-btn')).toBeNull();
   });
 
-  it('⋯ opens the entry menu WITHOUT the redundant "Open Entry" item', () => {
+  it('⋯ opens a Pin/Delete-only menu — Open AND Edit are gone (the pen FAB is THE edit affordance)', () => {
     setupGlobals();
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} />);
+    // The pen FAB is on-screen, so the menu never duplicates Edit.
+    expect(container.querySelector('.jrn-fab-action.is-edit')).toBeTruthy();
     fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
     expect(screen.queryByText('Open Entry')).toBeNull();
-    expect(screen.getByText('Edit Entry')).toBeTruthy();
+    expect(screen.queryByText('Edit Entry')).toBeNull();
     expect(screen.getByText('Unpin Entry')).toBeTruthy(); // ENTRY.pinned = true
     expect(screen.getByText('Delete Entry')).toBeTruthy();
   });

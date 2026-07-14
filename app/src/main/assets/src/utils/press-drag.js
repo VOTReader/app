@@ -19,6 +19,12 @@
        capture is first in propagation (the WebView's non-bubbling delivery
        can't starve it); pointercancel (the browser claiming the stream)
        EXPLICITLY commits the drag at its current state and traces.
+     ZOMBIE WATCHDOG — a SILENTLY-killed stream (no up, no cancel — the
+       on-device WebView failure mode) can't wedge the machine even on hosts
+       that rarely call start(): at any new touchstart, a gesture whose
+       stream has been silent >2.5s with no active touch near its last
+       position is declared dead and ended (drags COMMIT, pointercancel
+       policy) — so the scroll suppressor can never outlive its finger.
      SCROLL SUPPRESSION — a non-passive capture touchmove listener cancels
        native scrolling while the drag is live (pointermove can't, and
        touch-action can't change mid-gesture).
@@ -147,6 +153,7 @@ export function createPressDrag(cfg) {
     const g = {
       pointerId, idx,
       startX: x, startY: y, startTs: Date.now(),
+      lastX: x, lastY: y, lastEventTs: Date.now(),
       drag: false, targetIdx: idx,
       data: /** @type {any} */ ({}), // host scratch: rects, ghost, offsets…
       pressTimer: /** @type {any} */ (null),
@@ -157,6 +164,7 @@ export function createPressDrag(cfg) {
 
     const onPointerMove = (e) => {
       if (gesture !== g || e.pointerId !== g.pointerId) return;
+      g.lastX = e.clientX; g.lastY = e.clientY; g.lastEventTs = Date.now();
       if (g.drag) {
         safe(cfg.onDragMove, g, e.clientX, e.clientY);
       } else if (Math.abs(e.clientX - g.startX) > driftPx || Math.abs(e.clientY - g.startY) > driftPx) {
@@ -179,15 +187,37 @@ export function createPressDrag(cfg) {
         try { e.preventDefault(); } catch (_err) { /* passive — ignore */ }
       }
     };
+    // ZOMBIE WATCHDOG — the WebView can kill a pointer stream SILENTLY (no
+    // pointerup, no pointercancel; the documented on-device failure behind
+    // "works once, then never until an app restart"). A wedged gesture is
+    // healed at the next start(), but a host like the journal editor only
+    // calls start() from a grip — until then the touchmove suppressor above
+    // would eat ALL scrolling. So: at any NEW touchstart, if our stream has
+    // been silent > 2.5s AND no active touch sits near the gesture's last
+    // known position (a merely-PARKED finger is still in e.touches there),
+    // the stream is dead — end the gesture now. Commit if dragging (the
+    // user had positioned the element — same policy as pointercancel).
+    const onTouchStartHeal = (e) => {
+      if (gesture !== g) return;
+      const silent = Date.now() - g.lastEventTs;
+      if (silent < 2500) return;
+      const touches = e.touches || [];
+      for (let i = 0; i < touches.length; i++) {
+        if (Math.abs(touches[i].clientX - g.lastX) < 40 && Math.abs(touches[i].clientY - g.lastY) < 40) return;
+      }
+      endGesture(g, g.drag, g.drag ? 'zombie drag healed at new touch (stream silent ' + silent + 'ms)' : null);
+    };
     document.addEventListener('pointermove', onPointerMove, true);
     document.addEventListener('pointerup', onPointerUp, true);
     document.addEventListener('pointercancel', onPointerCancel, true);
     document.addEventListener('touchmove', onTouchMoveSuppress, { passive: false, capture: true });
+    document.addEventListener('touchstart', onTouchStartHeal, true);
     g.cleanup = () => {
       document.removeEventListener('pointermove', onPointerMove, true);
       document.removeEventListener('pointerup', onPointerUp, true);
       document.removeEventListener('pointercancel', onPointerCancel, true);
       document.removeEventListener('touchmove', onTouchMoveSuppress, { capture: true });
+      document.removeEventListener('touchstart', onTouchStartHeal, true);
       g.cleanup = null;
     };
     // Pointer capture (hardening, best-effort): keeps this pointer's stream

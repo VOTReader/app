@@ -331,3 +331,48 @@ describe('useScrollMemory — content anchor (reflow-proof restore)', () => {
     expect(saved.anchorOff).toBe(-30);      // v2 starts 30px below the viewport top
   });
 });
+
+describe('useScrollMemory — journal viewer/editor keys are PER-ENTRY', () => {
+  // The bare screen-name key made every journal entry share ONE scroll slot:
+  // opening entry B force-restored entry A's offset (a nonsense position the
+  // restore loop then re-applied against the user's finger — the Android
+  // "scroll keeps jerking me back" report, 2026-07-14).
+  it('saves under journal-viewer-<entryId>, not one shared journal-viewer slot', () => {
+    renderHook((p) => useScrollMemory(p), {
+      initialProps: baseProps({ screen: 'journal-viewer', letterId: null, journalEntryId: 'e1' }),
+    });
+    settleRestoreRaf();
+    act(() => { scrollTo(700); vi.advanceTimersByTime(150); });
+    expect(tab.scrollPositions['journal-viewer-e1']).toMatchObject({ y: 700 });
+    expect(tab.scrollPositions['journal-viewer']).toBeUndefined();
+  });
+
+  it('entry→entry nav restores EACH entry to its own offset (re-fires on journalEntryId)', () => {
+    const { rerender } = renderHook((p) => useScrollMemory(p), {
+      initialProps: baseProps({ screen: 'journal-viewer', letterId: null, journalEntryId: 'e1' }),
+    });
+    settleRestoreRaf();
+    act(() => { scrollTo(700); vi.advanceTimersByTime(150); });
+
+    // Open a DIFFERENT entry (screen unchanged — only the entry id moves).
+    rerender(baseProps({ screen: 'journal-viewer', letterId: null, journalEntryId: 'e2' }));
+    settleRestoreRaf();
+    expect(el.scrollTop).toBe(0); // e2 was never scrolled — starts at top, NOT e1's 700
+
+    act(() => { scrollTo(300); vi.advanceTimersByTime(150); });
+    rerender(baseProps({ screen: 'journal-viewer', letterId: null, journalEntryId: 'e1' }));
+    settleRestoreRaf();
+    act(() => { vi.advanceTimersByTime(100); });
+    expect(el.scrollTop).toBe(700); // back on e1 → e1's own offset
+    expect(tab.scrollPositions['journal-viewer-e2']).toMatchObject({ y: 300 });
+  });
+
+  it('the editor key is per-entry too', () => {
+    renderHook((p) => useScrollMemory(p), {
+      initialProps: baseProps({ screen: 'journal-editor', letterId: null, journalEntryId: 'e9' }),
+    });
+    settleRestoreRaf();
+    act(() => { scrollTo(450); vi.advanceTimersByTime(150); });
+    expect(tab.scrollPositions['journal-editor-e9']).toMatchObject({ y: 450 });
+  });
+});

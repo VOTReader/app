@@ -160,6 +160,61 @@ PLAN:
 
 ───────────────────────────────────────────────────────────────────────────
 SESSION 3 — Journal editor: insert-below + menu/nav redesign (items 8 + 9)
+✅ DONE 2026-07-14 — plus the owner's two new device reports (long-entry
+drag difficulty + the Android "scroll jerks back / won't scroll / restart
+required" glitch), root-caused to THREE compounding defects and fixed:
+(a) AUTOSIZE REBUILT — every render re-ran each textarea's JS resize
+    (height:auto → scrollHeight), forcing a layout at the COLLAPSED height
+    that clamped the scroller's scrollTop on long entries (fires per
+    keystroke AND at the 1.2s Saving…→Saved re-render = deterministic
+    jerk-back). Now the CSS grid-replica technique (.jrn-grow wrapper,
+    ::after renders data-rep invisibly in the same grid cell; typography on
+    the WRAPPER so textarea/replica can never drift) — zero JS measuring.
+    Live-proven: every textarea clientH === scrollH (up to 1326px/47
+    lines); scrollTop pixel-identical through typing + the debounce
+    re-render.
+(b) PER-ENTRY SCROLL KEYS — journal-viewer/journal-editor shared ONE
+    scroll-memory slot ('journal-editor'), so opening entry B force-
+    restored entry A's offset while the 90-frame restore loop re-applied
+    it against the user's finger. getScrollKey now keys journal screens
+    per-entry (journalEntryId param threaded App→useScrollMemory, added to
+    the restore-effect deps so entry→entry nav restores correctly). +3
+    scroll-memory tests.
+(c) ZOMBIE WATCHDOG in press-drag (ALL four drag surfaces) — a silently-
+    killed pointer stream (no up, no cancel — the documented device
+    failure) left the gesture live forever: its non-passive touchmove
+    suppressor ate EVERY scroll and the editor's autoscroll loop kept
+    yanking the page ("no way to fix except restart"). Now any NEW
+    touchstart while the stream is silent >2.5s (and no active touch near
+    the gesture's last position — a merely-PARKED finger is protected)
+    ends the gesture (drags COMMIT, pointercancel policy) + traces
+    "[jrndrag] zombie drag healed…". press-drag.test.js ×5 (RED-proven ×3
+    vs the pre-fix engine). Live-proven: wedged drag ate touchmoves → one
+    touch later ghost gone + scroll free + trace emitted.
+LONG-ENTRY DRAG — edge autoscroll rebuilt: zones derive from the
+    scroller's visible rect (the old window-edge zones buried ~60px of the
+    top zone under the nav), zone ~150px, speed = depth² curve × time ramp
+    (holding accelerates, cap ~48px/tick ≈ 3000px/s); loop also bails when
+    the engine reports the drag ended. Live-proven: full ~3800px
+    top→bottom drag in ONE gesture (1225px scrolled in the first 1.5s),
+    commit persisted.
+(9) INSERT NEVER SPLITS — insertAtCursor → insertBlockBelow: the new block
+    lands BELOW the caret's block, the paragraph stays whole, the caret is
+    restored in place (pendingFocusRef {id, caret}); if the insert becomes
+    last, ONE trailing empty paragraph is appended; the no-caret-context
+    fallback (reuse/append exactly one blank p) is preserved. +3 editor
+    tests (RED-proven ×2 vs the split behavior).
+(8) EDIT AFFORDANCE DECIDED — the viewer's pen FAB is THE edit affordance;
+    the ⋯ menu is Pin / Delete only (JournalCardMenu hideEdit; the hub
+    menu keeps Edit — no on-screen pen there). Plainness: the editor shows
+    the entry date under the title (same eyebrow as the viewer); TEXT
+    blocks' delete × is a whisper (0.22) until the block is focused (0.8,
+    :focus-within) — media/card blocks keep the always-visible ×. Menu
+    test updated to pin Edit's absence.
+Gates: 2583 vitest / 145 files (+11: press-drag ×5, scroll-memory ×3,
+editor insert ×3), lint --max-warnings 0 (441 globals unchanged),
+typecheck, build, smoke:ci PASS. Preview-proven at 375px on app-alt
+(another session held 8090): 0 console errors, no horizontal overflow.
 ───────────────────────────────────────────────────────────────────────────
 Owner items:
   (8) "Redesign in-journal entry menu and navigation to look better and be

@@ -162,3 +162,62 @@ describe('JournalEditorScreen — background-kill data safety', () => {
     expect(localStorage.getItem('vot-journal-draft')).toBeNull();
   });
 });
+
+describe('JournalEditorScreen — insert never splits (UX-BATCH session 3, item 9)', () => {
+  // Pre-fix, inserting with the caret mid-paragraph SPLIT the paragraph at
+  // the caret (head/tail slices). The contract now: the new block always
+  // lands BELOW the caret's block and the paragraph stays whole.
+  it('inserting with the caret mid-paragraph lands the block BELOW — the paragraph stays whole', () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'hello world' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+
+    const ta = document.querySelector('.jrn-block-textarea');
+    ta.setSelectionRange(5, 5);            // caret between "hello" and " world"
+    fireEvent.focus(ta);                   // focusTextarea tracks { idx, caret }
+
+    fireEvent.click(document.querySelector('.jrn-fab-plus'));
+    fireEvent.click(document.querySelector('[data-testid="open-rec"]'));
+    fireEvent.click(document.querySelector('[data-testid="rec-save"]'));
+
+    const saved = JournalStore.get(entry.id);
+    expect(saved.blocks.map((b) => b.type)).toEqual(['p', 'audio', 'p']); // trailing p keeps writing flowing
+    expect(saved.blocks[0].text).toBe('hello world');                     // NOT split into 'hello' / ' world'
+    expect(saved.blocks[1].mediaId).toBe('m_test');
+  });
+
+  it('inserting between two paragraphs adds NO extra blank paragraph', () => {
+    const entry = JournalStore.add({
+      title: 't',
+      blocks: [JournalHelpers.newBlock('p', { text: 'first' }), JournalHelpers.newBlock('p', { text: 'second' })],
+    });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+
+    const ta = document.querySelectorAll('.jrn-block-textarea')[0];
+    ta.setSelectionRange(2, 2);
+    fireEvent.focus(ta);
+
+    fireEvent.click(document.querySelector('.jrn-fab-plus'));
+    fireEvent.click(document.querySelector('[data-testid="open-rec"]'));
+    fireEvent.click(document.querySelector('[data-testid="rec-save"]'));
+
+    const saved = JournalStore.get(entry.id);
+    expect(saved.blocks.map((b) => b.type)).toEqual(['p', 'audio', 'p']);
+    expect(saved.blocks[0].text).toBe('first');
+    expect(saved.blocks[2].text).toBe('second'); // the NEXT paragraph is the pre-existing one, untouched
+  });
+
+  it('no caret context: appends before a trailing blank paragraph (exactly one, reused)', () => {
+    const entry = JournalStore.add({
+      title: 't',
+      blocks: [JournalHelpers.newBlock('p', { text: 'body' }), JournalHelpers.newBlock('p', { text: '' })],
+    });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    // No focus event — activeTextareaRef is empty (picker-style insert).
+    fireEvent.click(document.querySelector('.jrn-fab-plus'));
+    fireEvent.click(document.querySelector('[data-testid="open-rec"]'));
+    fireEvent.click(document.querySelector('[data-testid="rec-save"]'));
+
+    const saved = JournalStore.get(entry.id);
+    expect(saved.blocks.map((b) => b.type)).toEqual(['p', 'audio', 'p']); // reused the blank p — no litter
+  });
+});

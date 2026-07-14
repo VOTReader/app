@@ -300,9 +300,14 @@ function App() {
   const navOriginRef = useRefMirror(navOrigin);
 
   /* useScrollMemory — per-tab/per-screen scroll position capture +
-     restore. Extracted to src/hooks/use-scroll-memory.js (P6e). */
+     restore. Extracted to src/hooks/use-scroll-memory.js (P6e).
+     journalEntryId is declared here (not at useNav below) because the
+     journal viewer/editor scroll keys are PER-ENTRY — one shared key made
+     every entry restore the previous entry's offset. */
+  const [journalEntryId, setJournalEntryId] = useState(null);
   const { flushScrollToActiveTab } = useScrollMemory({
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    journalEntryId,
     activeTab, activeTabIdx,
     updateActiveTab,
     surpriseAnchor,
@@ -420,8 +425,8 @@ function App() {
   const activeLetter = activeVolKey ? _findLetter(activeVolKey) : null;
 
   /* App-shell nav surface (20 helpers) → src/hooks/use-nav.js (P7b).
-     goTabs / goNavOrigin / goSearch / goSearchOrigin stay below (P7c). */
-  const [journalEntryId, setJournalEntryId] = useState(null);
+     goTabs / goNavOrigin / goSearch / goSearchOrigin stay below (P7c).
+     journalEntryId state lives up at useScrollMemory (per-entry keys). */
   const {
     goHome, goScripturesHome, goScriptureGenre, goVolumesHome,
     goSettings, goHistory, goAbout, goLibrary, goProgress,

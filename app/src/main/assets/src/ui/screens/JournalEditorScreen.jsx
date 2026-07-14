@@ -131,6 +131,8 @@ export function JournalEditorScreen(props) {
   var dragLastYRef = useRef(0);
   var dragAutoDirRef = useRef(0);       // -1 scroll up / 0 / 1 scroll down (edge autoscroll)
   var dragScrollRafRef = useRef(0);
+  var dragZoneRef = useRef({ top: 0, bottom: 800, zone: 110 });  // visible scroll box + zone size, derived per move
+  var dragZoneEnterTsRef = useRef(0);   // when the finger entered the current edge zone (speed ramp)
   var dragCtl = useRef(null);           // the shared createPressDrag instance
 
   // Unmount mid-gesture: one call tears down listeners, timers, ghost, and
@@ -165,7 +167,7 @@ export function JournalEditorScreen(props) {
   // split. caret stays current via onSelect/onKeyUp/onClick on the textarea.
   var activeTextareaRef = useRef(null);
   var blocksContainerRef = useRef(null);
-  var pendingFocusIdRef = useRef(null);  // block id to focus after the next render
+  var pendingFocusRef = useRef(null);  // { id, caret } to focus after the next render
   var firstRunRef = useRef(true);
   // Set true right before inserting a media block so the next auto-save is
   // IMMEDIATE (not the 1.2s debounce) — see the auto-save effect below and
@@ -371,26 +373,44 @@ export function JournalEditorScreen(props) {
   }
 
   // Edge autoscroll: a long entry must keep scrolling while the finger
-  // parks near the top/bottom edge. 16ms timeout loop (~rAF cadence on a
+  // parks near the top/bottom of the VISIBLE scroll area. Zones derive from
+  // the scroller's own rect — the old window-edge zones buried most of the
+  // top zone under the top nav, which is why long-distance drags felt
+  // impossible. Speed = depth² curve × a time ramp (holding in the zone
+  // accelerates, capped ~48px/tick ≈ 3000px/s) so top↔bottom drags across
+  // very long entries are practical. 16ms timeout loop (~rAF cadence on a
   // visible page, but unlike rAF it still fires in hidden/headless test
-  // hosts); speed scales with how deep into the edge zone the finger
-  // sits; re-derives the target each step because the content moves
+  // hosts); re-derives the target each step because the content moves
   // under a stationary finger.
   function _updateAutoScroll(clientY) {
     var vh = window.innerHeight || 800;
-    var EDGE = 110;
-    var dir = clientY < EDGE ? -1 : (clientY > vh - EDGE ? 1 : 0);
+    var top = 0, bottom = vh;
+    var scroller = dragScrollerRef.current;
+    if (scroller && scroller.getBoundingClientRect) {
+      var r = scroller.getBoundingClientRect();
+      // Degenerate rects (jsdom, mid-boot) fall back to the window box.
+      if (r.bottom - r.top > 100) { top = Math.max(0, r.top); bottom = Math.min(vh, r.bottom); }
+    }
+    var zone = Math.min(150, Math.max(60, (bottom - top) * 0.22));
+    var dir = clientY < top + zone ? -1 : (clientY > bottom - zone ? 1 : 0);
+    if (dir !== dragAutoDirRef.current) dragZoneEnterTsRef.current = Date.now();
     dragAutoDirRef.current = dir;
+    dragZoneRef.current = { top: top, bottom: bottom, zone: zone };
     if (dir !== 0 && !dragScrollRafRef.current) {
       var step = function() {
         dragScrollRafRef.current = 0;
         if (dragIdxRef.current < 0 || dragAutoDirRef.current === 0) return;
-        var scroller = dragScrollerRef.current;
-        if (!scroller) return;
+        if (dragCtl.current && !dragCtl.current.isDragging()) return; // engine ended the drag — never scroll on
+        var sc = dragScrollerRef.current;
+        if (!sc) return;
         var y = dragLastYRef.current;
         var d = dragAutoDirRef.current;
-        var depth = d < 0 ? (EDGE - y) : (y - (vh - EDGE));
-        scroller.scrollTop += d * (4 + Math.min(18, depth * 0.25));
+        var z = dragZoneRef.current;
+        var depth = d < 0 ? (z.top + z.zone - y) : (y - (z.bottom - z.zone));
+        var norm = Math.max(0, Math.min(1, depth / z.zone));
+        var ramp = 1 + Math.min(1.4, (Date.now() - dragZoneEnterTsRef.current) / 900);
+        var spd = Math.min(48, (6 + 24 * norm * norm) * ramp);
+        sc.scrollTop += d * spd;
         _updateDragTarget(y);
         dragScrollRafRef.current = setTimeout(step, 16);
       };
@@ -525,65 +545,53 @@ export function JournalEditorScreen(props) {
     dragCtl.current.start(idx, clientX, clientY, pointerId, blockRefs.current[idx]);
   }
 
-  // ─── Cursor-aware insertion ─────────────────────────────────
-  // The "single body surface" UX: when the user picks a media/card from
-  // the FAB +, we split the focused paragraph at the cursor, drop the
-  // new block in between, and create a continuation paragraph that we
-  // auto-focus so typing keeps flowing.
-  function insertAtCursor(block) {
+  // ─── Insert below — a new block NEVER splits an existing one ─
+  // Item 9 (UX-BATCH session 3): picking a media/card from the FAB + used
+  // to split the focused paragraph in half at the caret. Now the new block
+  // always lands BELOW the block the caret is in — the paragraph stays
+  // whole and the caret goes back to exactly where it was, so typing keeps
+  // flowing. If the insert becomes the last block, one trailing empty
+  // paragraph is appended so there is always somewhere to write below it.
+  function insertBlockBelow(block) {
     var info = activeTextareaRef.current;
     var idx = info && info.idx != null ? info.idx : -1;
-    var cur = idx >= 0 ? blocks[idx] : null;
-    var supportsSplit = cur && (cur.type === 'p' || cur.type === 'h2' || cur.type === 'quote');
-    if (!supportsSplit) {
-      // No useful caret context (e.g. picker insert with no focused
-      // textarea). Append the block, then ensure EXACTLY ONE trailing
-      // empty paragraph to keep writing in — never one-per-insert, which
-      // previously littered the entry with blank gaps after several embeds.
-      var tailIdNoSplit = JournalHelpers.blockId();
-      setBlocks(function(arr) {
-        var next = arr.slice();
-        // Reuse a trailing empty paragraph if there already is one.
-        var last = next[next.length - 1];
-        if (last && last.type === 'p' && !(last.text || '').trim()) {
-          next.splice(next.length - 1, 0, block); // insert before the blank p
-        } else {
-          next.push(block);
-          next.push({ id: tailIdNoSplit, type: 'p', text: '' });
-        }
-        return next;
-      });
-      pendingFocusIdRef.current = tailIdNoSplit;
-      scheduleSave();
-      return;
-    }
-    var caret = info.caret != null ? info.caret : (info.el ? info.el.selectionStart : (cur.text || '').length);
-    var text = cur.text || '';
-    var head = text.slice(0, caret);
-    var tail = text.slice(caret);
-    var tailId = JournalHelpers.blockId();
-    var tailBlock = { id: tailId, type: cur.type === 'h2' ? 'p' : cur.type, text: tail };
-    if (cur.type === 'quote') tailBlock.cite = '';
-    setBlocks(function(arr) {
-      var next = arr.slice();
-      next[idx] = Object.assign({}, next[idx], { text: head });
+    var next = blocks.slice();
+    var focusTarget; // { id, caret } for the post-render focus effect
+    if (idx >= 0 && idx < next.length) {
+      var caret = info.caret != null ? info.caret : (info.el ? info.el.selectionStart : 0);
+      focusTarget = { id: next[idx].id, caret: caret };
       next.splice(idx + 1, 0, block);
-      next.splice(idx + 2, 0, tailBlock);
-      return next;
-    });
-    pendingFocusIdRef.current = tailId;
+      if (idx + 1 === next.length - 1) next.push({ id: JournalHelpers.blockId(), type: 'p', text: '' });
+    } else {
+      // No caret context (e.g. picker insert with no focused textarea).
+      // Append, then ensure EXACTLY ONE trailing empty paragraph to keep
+      // writing in — never one-per-insert, which previously littered the
+      // entry with blank gaps after several embeds.
+      var last = next[next.length - 1];
+      if (last && last.type === 'p' && !(last.text || '').trim()) {
+        next.splice(next.length - 1, 0, block); // insert before the blank p
+        focusTarget = { id: last.id, caret: 0 };
+      } else {
+        var tailId = JournalHelpers.blockId();
+        next.push(block);
+        next.push({ id: tailId, type: 'p', text: '' });
+        focusTarget = { id: tailId, caret: 0 };
+      }
+    }
+    setBlocks(next);
+    pendingFocusRef.current = focusTarget;
     scheduleSave();
   }
 
-  // After every render, if pendingFocusIdRef is set, focus that block's
-  // textarea and move the caret to the start of the tail text.
+  // After every render, if pendingFocusRef is set, focus that block's
+  // textarea and put the caret back where the insert flow left it.
   useEffect(function() {
-    var pid = pendingFocusIdRef.current;
-    if (!pid) return;
-    pendingFocusIdRef.current = null;
-    var el = blocksContainerRef.current && blocksContainerRef.current.querySelector('[data-block-id="' + pid + '"] textarea');
+    var pf = pendingFocusRef.current;
+    if (!pf) return;
+    pendingFocusRef.current = null;
+    var el = blocksContainerRef.current && blocksContainerRef.current.querySelector('[data-block-id="' + pf.id + '"] textarea');
     if (el) {
-      try { el.focus(); el.setSelectionRange(0, 0); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
+      try { el.focus(); el.setSelectionRange(pf.caret || 0, pf.caret || 0); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
     }
   });
 
@@ -592,7 +600,7 @@ export function JournalEditorScreen(props) {
     setShowInsert(true);
   }
   function handleBlockInsert(block) {
-    insertAtCursor(block);
+    insertBlockBelow(block);
   }
   function handleInsertImage() {
     if (fileInputRef.current) fileInputRef.current.click();
@@ -636,7 +644,7 @@ export function JournalEditorScreen(props) {
       });
     }).then(function(mid) {
       immediateSaveRef.current = true;  // persist the new image block at once (skip the 1.2s debounce)
-      insertAtCursor(JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
+      insertBlockBelow(JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
     }).catch(function(err) {
       if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
       showToast('Could not save that image.');
@@ -648,7 +656,7 @@ export function JournalEditorScreen(props) {
     setShowRec(false);
     if (!info || !info.mediaId) return;
     immediateSaveRef.current = true;  // persist the new audio block at once (skip the 1.2s debounce)
-    insertAtCursor(JournalHelpers.newBlock('audio', { mediaId: info.mediaId, duration: info.duration, caption: '', samples: info.samples || null }));
+    insertBlockBelow(JournalHelpers.newBlock('audio', { mediaId: info.mediaId, duration: info.duration, caption: '', samples: info.samples || null }));
   }
 
   // ─── Caret tracking ─────────────────────────────────────────
@@ -724,28 +732,40 @@ export function JournalEditorScreen(props) {
 
   // ─── Block render — editable variants ───────────────────────
   function renderEditableBlock(b, idx) {
+    // Text blocks (p/h2/quote) get is-text: their delete × stays a whisper
+    // until the block is focused — a per-paragraph always-on control read
+    // as clutter ("not too crowded", session-3 plainness pass). Media/card
+    // blocks keep the always-visible × (they have no focus state).
+    var isText = b.type === 'p' || b.type === 'h2' || b.type === 'quote';
     var common = {
       key: b.id,
-      className: 'jrn-block jrn-block-edit' + (idx === dragIdx ? ' dragging' : ''),
+      className: 'jrn-block jrn-block-edit' + (isText ? ' is-text' : '') + (idx === dragIdx ? ' dragging' : ''),
       'data-block-id': b.id,
       ref: setBlockRef(idx)
     };
     if (b.type === 'p' || b.type === 'h2') {
+      // Auto-growing textarea via the CSS grid-replica wrapper (.jrn-grow):
+      // the wrapper's ::after renders data-rep invisibly in the same grid
+      // cell, so the cell is always exactly as tall as the text. No JS
+      // measuring — the old per-render height:auto collapse forced a layout
+      // at the SHORT height, which clamped the scroller's scrollTop on long
+      // entries (the Android "scroll keeps jumping while editing" glitch).
       return (
         <div {...common}>
-          <textarea
-            className={'jrn-block-textarea' + (b.type === 'h2' ? ' h2' : '')}
-            rows={1}
-            value={b.text || ''}
-            placeholder={idx === 0 ? 'Start writing…' : ''}
-            onChange={function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); }}
-            onFocus={function(e) { focusTextarea(idx, e.target); }}
-            onSelect={function(e) { trackCaret(idx, e.target); }}
-            onKeyUp={function(e) { trackCaret(idx, e.target); }}
-            onClick={function(e) { trackCaret(idx, e.target); }}
-            onBlur={function(e) { trackCaret(idx, e.target); commitSave(); }}
-            ref={function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-          />
+          <div className={'jrn-grow ' + (b.type === 'h2' ? 'jrn-grow-h2' : 'jrn-grow-p')} data-rep={b.text || ''}>
+            <textarea
+              className={'jrn-block-textarea' + (b.type === 'h2' ? ' h2' : '')}
+              rows={1}
+              value={b.text || ''}
+              placeholder={idx === 0 ? 'Start writing…' : ''}
+              onChange={function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); }}
+              onFocus={function(e) { focusTextarea(idx, e.target); }}
+              onSelect={function(e) { trackCaret(idx, e.target); }}
+              onKeyUp={function(e) { trackCaret(idx, e.target); }}
+              onClick={function(e) { trackCaret(idx, e.target); }}
+              onBlur={function(e) { trackCaret(idx, e.target); commitSave(); }}
+            />
+          </div>
           {blockDeleteUI(idx)}
           {blockDragUI(idx)}
         </div>
@@ -755,18 +775,19 @@ export function JournalEditorScreen(props) {
       return (
         <div {...common}>
           <div className="jrn-block-quote">
-            <textarea
-              rows={1}
-              value={b.text || ''}
-              placeholder="Quoted text…"
-              onChange={function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); }}
-              onFocus={function(e) { focusTextarea(idx, e.target); }}
-              onSelect={function(e) { trackCaret(idx, e.target); }}
-              onKeyUp={function(e) { trackCaret(idx, e.target); }}
-              onClick={function(e) { trackCaret(idx, e.target); }}
-              onBlur={function(e) { trackCaret(idx, e.target); commitSave(); }}
-              ref={function(el) { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
-            />
+            <div className="jrn-grow jrn-grow-quote" data-rep={b.text || ''}>
+              <textarea
+                rows={1}
+                value={b.text || ''}
+                placeholder="Quoted text…"
+                onChange={function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); }}
+                onFocus={function(e) { focusTextarea(idx, e.target); }}
+                onSelect={function(e) { trackCaret(idx, e.target); }}
+                onKeyUp={function(e) { trackCaret(idx, e.target); }}
+                onClick={function(e) { trackCaret(idx, e.target); }}
+                onBlur={function(e) { trackCaret(idx, e.target); commitSave(); }}
+              />
+            </div>
             <input
               type="text"
               className="jrn-block-quote-cite"
@@ -853,7 +874,7 @@ export function JournalEditorScreen(props) {
     }
     // No text block exists — append a fresh paragraph.
     var newId = JournalHelpers.blockId();
-    pendingFocusIdRef.current = newId;
+    pendingFocusRef.current = { id: newId, caret: 0 };
     setBlocks(function(arr) { return arr.concat([{ id: newId, type: 'p', text: '' }]); });
     scheduleSave();
   }
@@ -891,6 +912,12 @@ export function JournalEditorScreen(props) {
             onChange={function(e) { setTitle(e.target.value); scheduleSave(); }}
             onBlur={function() { commitSave(); }}
           />
+          {initial && initial.created ? (
+            <div className="jrn-editor-date">
+              {JournalHelpers.longDate(initial.created)}
+              <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(initial.created)}</span>
+            </div>
+          ) : null}
         </div>
         <div ref={blocksContainerRef} className="jrn-blocks jrn-body-surface" onClick={focusLastTextBlock}>
           {blocks.map(function(b, idx) { return renderEditableBlock(b, idx); })}

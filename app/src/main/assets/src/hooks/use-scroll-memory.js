@@ -35,6 +35,9 @@
      screen, bookId, chapterNum, letterId, studyId, studyChapterId
                      — current navigation state (useTabs via tabField);
                        used as effect deps and passed to getScrollKey.
+     journalEntryId  — App()-local journal nav state; keys the journal
+                       viewer/editor scroll slots PER-ENTRY (and re-fires
+                       the restore effect on entry→entry nav).
      activeTab       — active-tab object (useTabs); scrollPositions are
                        read from here to restore scroll on screen change.
      activeTabIdx    — active tab index (useTabs); in the restore-effect
@@ -70,10 +73,15 @@ import { useRefMirror } from './use-ref-mirror.js';
 // ── Module-private helper ──────────────────────────────────────────────────
 // Derives a stable localStorage / scrollPositions key for the current
 // screen. COL_BY_LETTER_SC is a bare-name window global (bundle-b.js).
-function getScrollKey(scr, bid, cnum, lid, sid, scid) {
+function getScrollKey(scr, bid, cnum, lid, sid, scid, jid) {
   if (scr === "matthew-ch" || scr === "bible-ch") return bid + '-' + cnum;
   if (scr === "bible-study-chapter") return 'study-' + (sid || '') + '-' + (scid || '');
   if (scr === "hm-letter") return 'entry-' + lid;
+  // Journal viewer/editor keys are PER-ENTRY: with the bare screen name,
+  // every entry shared ONE slot, so opening entry B force-restored entry A's
+  // offset — a nonsense position the 90-frame restore loop then re-applied
+  // against the user's finger ("scroll keeps jerking me back", Android).
+  if (scr === "journal-viewer" || scr === "journal-editor") return scr + '-' + (jid || '');
   var _sc = COL_BY_LETTER_SC.get(scr);
   if (_sc) {
     var pfx = _sc.kind === 'holy-days' ? 'holyday' : _sc.kind === 'letter' ? 'letter' : _sc.kind;
@@ -219,6 +227,7 @@ function startRestore(saved) {
  *   letterId: string | null,
  *   studyId: string | null,
  *   studyChapterId: string | null,
+ *   journalEntryId?: string | null,
  *   activeTab: any,
  *   activeTabIdx: number,
  *   updateActiveTab: (patchOrFn: any) => void,
@@ -229,6 +238,7 @@ function startRestore(saved) {
  */
 export function useScrollMemory({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+  journalEntryId,
   activeTab,
   activeTabIdx,
   updateActiveTab,
@@ -236,7 +246,7 @@ export function useScrollMemory({
   tabsOverviewOpen,
 }) {
   // ── Refs ───────────────────────────────────────────────────────────────
-  const scrollKeyRef = React.useRef(getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId));
+  const scrollKeyRef = React.useRef(getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId));
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
   // Last REAL scroll position, stamped on every scroll event. The debounced
   // flush only fires 120 ms after scrolling STOPS — navigating inside that
@@ -321,7 +331,7 @@ export function useScrollMemory({
   // shifted the offset — async content / images). Cleanup cancels a stale rAF so a
   // rapid re-fire can't fight the next restore.
   React.useLayoutEffect(() => {
-    const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId);
+    const key = getScrollKey(screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId);
     // NAV-TIME EXACT CAPTURE: commit the live stash for the key being LEFT,
     // before the new screen's restore runs. The debounced flush alone loses
     // any scrolling done within 120 ms of the nav tap (its timeout fires
@@ -361,7 +371,7 @@ export function useScrollMemory({
     // supersedes the restore.
     return startRestore(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent: restore-saved-scroll on nav-key change. activeTab derives from tabs[activeTabIdx]; activeTabIdx is already in deps so tab-switch correctly re-runs. surpriseAnchor is read as a guard (early-return when set) but should NOT trigger re-fire — only nav changes drive scroll restoration. updateActiveTab is useCallback([activeTabIdx]) — its identity only changes with activeTabIdx, which IS a dep, so the closure is never stale.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, activeTabIdx]);
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, activeTabIdx]);
 
   // ── Effect 4: publish saved positions for the pager's inert neighbor peek ─
   // The finger-follow swipe's neighbor peek (ScreenLayout `inert`) renders the

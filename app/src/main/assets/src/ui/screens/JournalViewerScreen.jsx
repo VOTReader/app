@@ -654,8 +654,8 @@ export function JournalViewerScreen(props) {
         <JournalCardMenu
           entry={entry}
           hideOpen
+          hideEdit
           onClose={function() { setMenuOpen(false); }}
-          onEdit={function() { onEdit && onEdit(); }}
           onTogglePin={togglePin}
           onDelete={doDelete}
         />
