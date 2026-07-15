@@ -512,11 +512,17 @@ function webPickImportFile() {
 //
 // IGNORE_CLASSES is coupled to the app's UI structure — if a new chrome
 // element is added that shouldn't appear in tab thumbnails, update this list.
-// Long-term cleanup (post-W1): drive chrome-hiding entirely via CSS tied to
-// the existing body.capturing-thumb class so the bridge doesn't need this knowledge.
+// This ignoreElements list is THE chrome-exclusion mechanism, and it acts on
+// html2canvas's DOM CLONE only — the live page is never touched. (The old
+// body.capturing-thumb class visibility-hid this same chrome ON SCREEN for
+// the duration of every capture, which blinked the dice/dot/arrows/pill out
+// for a split second on every scroll-stop — owner-reported; retired 2026-07-14.
+// Android's native PixelCopy shot can only photograph the real screen, so it
+// now includes the floating chrome rather than blinking it — a deliberate
+// trade.) The resume-reading dot lives inside .top-nav, covered by that entry.
 const SCREENSHOT_IGNORE_CLASSES = [
   'tabs-overview-layer', 'top-nav', 'back-hint-row',
-  'chapter-nav-sticky', 'reading-dot-global', 'surprise-fab',
+  'chapter-nav-sticky', 'surprise-fab',
   'mode-toggle-wrap',
 ];
 
@@ -553,7 +559,8 @@ function _ensureHtml2canvas() {
  * Web screenshot impl using html2canvas (lazy-loaded on demand — U13). Returns
  * a JPEG data URL string, or '' on failure / when html2canvas can't load.
  *
- * @param {number} _topCropDp  - ignored on web (chrome hidden via classes)
+ * @param {number} _topCropDp  - ignored on web (chrome excluded clone-side
+ *                                via the SCREENSHOT_IGNORE_CLASSES list)
  * @param {number} maxDim      - max width/height in CSS px; downscale if exceeded
  * @param {number} jpegQuality - 0-100 integer (matches Android contract);
  *                                converted to 0.0-1.0 for canvas.toDataURL

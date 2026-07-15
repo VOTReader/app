@@ -715,15 +715,12 @@ function App() {
 
   return (
     <TabsContext.Provider value={tabsCtxValue}>
-      {/* CSS is now a static app.css loaded via <link> in <head> — this slot
-          intentionally renders nothing (null is a valid no-op React child). */}
+    {/* Resume-reading dot — rendered by ScreenLayout inside the top nav
+        (ResumeReadingNavBtn owns the screen-eligibility list). The value is
+        deliberately un-memoized: goToLastRead reads live nav state from its
+        closure, and the sole consumer is one tiny button. */}
+    <ReadingDotContext.Provider value={{ screen, enabled: !!(settings.showReadingDot && activeReadKey), onGo: goToLastRead }}>
       {null}
-
-      {settings.showReadingDot && activeReadKey && !LETTER_SCREEN_SET.has(screen) && !["matthew-ch", "bible-ch", "search", "garden-view", "settings", "history", "library", "my-progress", "notes-index", "links-index", "bookmarks-index", "highlights-index", "journal-home", "journal-viewer", "journal-editor", "about"].includes(screen) && (
-        <button className="reading-dot-global" onClick={goToLastRead} title="Resume reading">
-          <span className="rdg-inner" />
-        </button>
-      )}
 
       {/* All 4 ephemeral overlays (welcome modal, tabs overview +
           TabActionSheet, disable-tabs prompt, garden warning) \u2014 see
@@ -792,6 +789,7 @@ function App() {
         inboundJournalPayload={inboundJournalPayload} setInboundJournalPayload={setInboundJournalPayload}
         goJournalViewer={goJournalViewer}
       />
+    </ReadingDotContext.Provider>
     </TabsContext.Provider>
   );
 

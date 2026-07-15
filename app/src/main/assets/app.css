@@ -506,14 +506,11 @@
       /* Sits inside the scroll container so it sticks to the top of the
          visible area just below the nav bar. Buttons are large, premium,
          and split left/right for thumb-friendly one-handed nav. */
-      /* Everything hidden during thumbnail capture so screenshots are pure content */
-      body.capturing-thumb .chapter-nav-sticky,
-      body.capturing-thumb .reading-dot-global,
-      body.capturing-thumb .surprise-fab,
-      body.capturing-thumb .mode-toggle-wrap,
-      body.capturing-thumb .back-hint-row {
-        visibility: hidden !important;
-      }
+      /* (The body.capturing-thumb hide block that lived here is RETIRED —
+         it visibility-hid the floating chrome on the LIVE page during every
+         thumbnail capture, blinking the dice/dot/arrows/pill for a split
+         second on every scroll-stop. Thumbnail chrome exclusion is now
+         clone-side only: SCREENSHOT_IGNORE_CLASSES in platform-bridge.js.) */
       /* Floating — pinned to the viewport just under the top nav. Takes zero
          layout space, so the hero tucks flush under the nav bar with no gap.
          Top offset = inset-top + nav button height (44px) + nav padding (1.4rem). */
@@ -1741,7 +1738,7 @@
       /* Inline Surprise Me button — sits below the last home card, in the
          home-screen-app flex flow so it pushes scroll height when the cards
          already fill the viewport. align-items:center on the parent
-         centers it horizontally. intensity/interval synced with .reading-dot-global */
+         centers it horizontally. intensity/interval synced with .reading-dot-nav */
       @keyframes surprise-breathe {
         0%, 100% { transform:scale(1);    opacity:0.7; filter:drop-shadow(0 0 2px rgba(200,164,86,0.25)); }
         50%      { transform:scale(1.08); opacity:1;   filter:drop-shadow(0 0 8px rgba(200,164,86,0.55)); }
@@ -2152,8 +2149,13 @@
     .study-external-card { border-style:dashed; border-color:var(--gold-border); text-decoration:none; }
     .study-external-card .chapter-card-num { font-size:1.2rem; color:var(--gold-dim); }
     @keyframes dot-pulse { 0%,100% { box-shadow:0 0 6px var(--gold-glow); opacity:0.7; } 50% { box-shadow:0 0 18px var(--gold), 0 0 30px var(--gold-dim); opacity:1; } }
-    .reading-dot-global { position:fixed; top:calc(var(--inset-top, 0px) + 5rem); right:0.6rem; z-index:200; width:28px; height:28px; border-radius:50%; background:none; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0; }
-    .reading-dot-global .rdg-inner { width:10px; height:10px; border-radius:50%; background:var(--gold); animation: dot-pulse 2.8s ease-in-out infinite; }
+    /* Resume-reading dot — lives IN the top nav (right cluster, left of the
+       Tabs button), rendered by ScreenLayout via ResumeReadingNavBtn. It was
+       a position:fixed float over the top-right of index screens; in the nav
+       it overlaps nothing and is excluded from tab thumbnails for free (the
+       nav is cropped natively / ignored by html2canvas). 40px hit target. */
+    .reading-dot-nav { width:2.5rem; height:2.5rem; flex-shrink:0; border-radius:50%; background:none; border:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0; }
+    .reading-dot-nav .rdg-inner { width:10px; height:10px; border-radius:50%; background:var(--gold); animation: dot-pulse 2.8s ease-in-out infinite; }
     .history-empty {
       text-align:center; color:var(--cream-dim);
       font-family:'EB Garamond',serif; padding:3.5rem 1.5rem 4rem;

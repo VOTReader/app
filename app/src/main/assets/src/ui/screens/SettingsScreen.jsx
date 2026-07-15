@@ -987,7 +987,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             />
             <SettingsRow
               label="Reading Position Dot"
-              desc="A pulsing gold dot in the upper right that takes you back to where you were last reading."
+              desc="A pulsing gold dot in the top navigation bar that takes you back to where you were last reading."
               checked={settings.showReadingDot}
               onToggle={() => onToggle("showReadingDot")}
             />

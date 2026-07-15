@@ -177,4 +177,27 @@ describe('useThumbnails — dual-theme variants', () => {
     await advance(900); // only the NEW schedule may fire
     expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
   });
+
+  it('NEVER touches the live page — no capturing-thumb body class during either pass', async () => {
+    // Owner-reported Android glitch: the old engine visibility-hid the
+    // floating chrome (dice FAB, reading dot, sticky arrows, back pill) on
+    // the REAL body for the duration of both the primary capture and the
+    // ~900ms deferred themed render — a split-second blink on every
+    // scroll-stop/nav. Chrome exclusion is clone-side only now
+    // (SCREENSHOT_IGNORE_CLASSES); the live body class must never return.
+    const classDuring = [];
+    takeScreenshot.mockImplementation(async () => {
+      classDuring.push(document.body.classList.contains('capturing-thumb'));
+      return PRIMARY;
+    });
+    takeThemedScreenshot.mockImplementation(async () => {
+      classDuring.push(document.body.classList.contains('capturing-thumb'));
+      return THEMED;
+    });
+    renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350); // primary
+    await advance(900); // deferred themed render
+    expect(classDuring).toEqual([false, false]); // both passes ran, neither hid chrome
+    expect(document.body.classList.contains('capturing-thumb')).toBe(false);
+  });
 });

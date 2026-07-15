@@ -109,6 +109,7 @@ import { NavButtons } from './components/NavButtons.jsx';
 import { ProphecyExpandToggle } from './components/ProphecyExpandToggle.jsx';
 import { HomeBtn } from './components/HomeBtn.jsx';
 import { TabsNavBtn } from './components/TabsNavBtn.jsx';
+import { ReadingDotContext, ResumeReadingNavBtn } from './components/ResumeReadingNavBtn.jsx';
 import { LibraryNav } from './components/LibraryNav.jsx';
 import { FootnoteListSection } from './components/FootnoteListSection.jsx';
 import { StickyChapterNav } from './components/StickyChapterNav.jsx';
@@ -229,7 +230,7 @@ Object.assign(window, {
   ModeToggle, renderCommentaryCite,
   InlineNotes, InlineEcho, StudyPanels,
   ChapterBookmarkBtn, NavButtons, ProphecyExpandToggle,
-  HomeBtn, TabsNavBtn, LibraryNav,
+  HomeBtn, TabsNavBtn, ReadingDotContext, ResumeReadingNavBtn, LibraryNav,
   FootnoteListSection, StickyChapterNav, ClearProgressRow, ConfirmStrip,
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, VolumeLetterIndex, HistoryEntryCard,

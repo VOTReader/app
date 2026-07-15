@@ -5,6 +5,7 @@
 import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
 import { AnnotationHint } from './AnnotationHint.jsx';
+import { ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
 
 // Apply a saved scroll record ({ anchorKey, anchorOff, y } | legacy number) to a
 // given scroll container — used for the inert peek so it renders already at the
@@ -268,6 +269,7 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
     <div className="screen-layout">
       <nav className="top-nav">
         {navChildren}
+        <ResumeReadingNavBtn />
         {hideTabsBtn ? null : <TabsNavBtn />}
       </nav>
       {pager ? (

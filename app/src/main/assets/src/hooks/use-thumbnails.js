@@ -270,8 +270,8 @@ export function useThumbnails({
     updateCardAr();
 
     // Measure nav height (in CSS px) so the native side can crop it. Web
-    // ignores topCropDp (chrome hidden via the capturing-thumb body class
-    // + the bridge's SCREENSHOT_IGNORE_CLASSES selector list).
+    // ignores topCropDp (the nav + floating chrome are excluded clone-side
+    // via the bridge's SCREENSHOT_IGNORE_CLASSES ignoreElements list).
     const navEl = document.querySelector('.top-nav');
     const navHeightDp = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0;
 
@@ -312,31 +312,32 @@ export function useThumbnails({
     // so both variants exist without the user ever seeing a theme flash.
     // Deferred ~900ms so it never contends with the visible nav/scroll settle,
     // and dropped if a newer capture supersedes it meanwhile.
+    // NOTE: no live-body class, no on-screen hiding — html2canvas draws from
+    // a DOM clone and drops the chrome via SCREENSHOT_IGNORE_CLASSES, so the
+    // visible page is never touched. (The old `capturing-thumb` body class
+    // hid the floating chrome ON SCREEN for the full render — the owner's
+    // "dice/dot/arrows blink out for a split second" glitch. Never re-add it.)
     const scheduleOtherTheme = () => {
       if (isGarden) return;
       variantTimerRef.current = setTimeout(async () => {
         variantTimerRef.current = null;
         if (captureSeqRef.current !== seq) return;        // superseded
         if (tabsOverviewOpenRef.current) return;          // overview covers the page
-        document.body.classList.add('capturing-thumb');   // clone inherits it
         try {
           const dataUrl = await PlatformBridge.takeThemedScreenshot(otherTheme, 1440, 90);
           if (captureSeqRef.current === seq) mergeVariant(otherTheme, dataUrl);
         } catch (_e) {
           // best-effort — the overview falls back to the flip filter
-        } finally {
-          document.body.classList.remove('capturing-thumb');
         }
       }, 900);
     };
 
-    // Hide floating UI chrome (sticky arrows, reading dot) for the duration
-    // of the capture so the thumbnail shows pure content only.
-    document.body.classList.add('capturing-thumb');
-    // Force a synchronous layout so the visibility:hidden takes effect
-    // before we hand control to the bridge.
-    void document.body.offsetHeight;
-
+    // Primary capture. On web this is another chrome-free clone render; on
+    // Android it's native PixelCopy of the REAL screen, so the floating
+    // chrome (sticky arrows, Matthew mode pill) appears in the shot — a
+    // deliberate trade: hiding it on the live page blinked the visible UI
+    // on every scroll-stop/nav capture (owner-reported glitch), and at tab-
+    // card scale the true-pixel chrome is honest and unobtrusive.
     captureInFlightRef.current = true;
     try {
       const dataUrl = await PlatformBridge.takeScreenshot(navHeightDp, 1440, 90);
@@ -347,7 +348,6 @@ export function useThumbnails({
       // sugar; missing one isn't an error worth surfacing to the user).
     } finally {
       captureInFlightRef.current = false;
-      document.body.classList.remove('capturing-thumb');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTabIdxRef/tabsOverviewOpenRef/tabsRef are useRef refs read via .current inside the callback — call-time fresh, never stale. The ref objects themselves are stable; inclusion would add noise without changing behavior.
   }, [tabsEnabled]);
