@@ -50,7 +50,7 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
 
   const navBar = (
     <>
-      <button className="nav-home" onClick={onBack}>{"← Home"}</button>
+      <button className="nav-home nav-back-icon" onClick={onBack} title="← Home" aria-label="Back to Home">{"‹"}</button>
       <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
     </>
   );

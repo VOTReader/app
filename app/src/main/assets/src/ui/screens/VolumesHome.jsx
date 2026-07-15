@@ -45,7 +45,7 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
     <ScreenLayout
       navChildren={
         <>
-          <button className="nav-home" onClick={onBack}>{"← Home"}</button>
+          <button className="nav-home nav-back-icon" onClick={onBack} title="← Home" aria-label="Back to Home">{"‹"}</button>
           <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
         </>
       }

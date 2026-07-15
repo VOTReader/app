@@ -237,7 +237,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   return (
     <ScreenLayout hideTabsBtn={true} navChildren={
       <>
-        <button className="nav-home" onClick={onBack} aria-label="Back">{"←"}</button>
+        <button className="nav-home nav-back-icon" onClick={onBack} title="Back" aria-label="Back">{"‹"}</button>
         <div className="srch-input-row">
           <input
             ref={inputRef}

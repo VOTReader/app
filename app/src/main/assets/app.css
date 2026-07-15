@@ -446,8 +446,12 @@
       }
       .top-nav {
         flex-shrink: 0; z-index: 100;
-        display: flex; align-items: center; gap: 0.25rem;
-        padding: 0.7rem 0.7rem 0.7rem;
+        /* gap trimmed 0.25→0.12rem + side padding 0.7→0.5rem so the full
+           icon set (back, home, gear, history, search, theme) + the reading
+           dot + the tabs button all fit without overflow on a 360-375px
+           phone — the owner's dot-cut-off / tabs-gone report. */
+        display: flex; align-items: center; gap: 0.12rem;
+        padding: 0.7rem 0.5rem 0.7rem;
         /* --inset-top is injected by MainActivity in correct logical px (dp).
            Accounts for camera cutout, status bar, notch — whatever this device
            has. 0px fallback = no cutout device. No hardcoded numbers. */
@@ -462,12 +466,16 @@
         white-space: nowrap; opacity: 0.85; min-height: 44px; display: flex; align-items: center;
       }
       @media (hover: hover) { .nav-home:hover { color: var(--gold-bright); opacity: 1; } }
-      /* Icon-only back button on reading screens — saves horizontal space for the
-         prev/next letter buttons while still giving a clear "back up one level" target. */
+      /* Icon-only back button — a plain, large ‹ chevron. Used on EVERY screen
+         with a back-up-one-level action (reading screens AND the index/hub
+         screens, which dropped their "← Scriptures"/"← Volumes"/… text labels
+         to decongest the nav — the label ate the room the reading dot + tabs
+         button now need). Bigger glyph = a clear, thumb-friendly target that
+         still costs far less width than the old text. */
       .nav-back-icon {
-        font-size: 1.5rem; padding: 0 0.4rem; letter-spacing: 0;
-        min-width: 1.8rem; justify-content: center; line-height: 1;
-        max-width: none;
+        font-size: 2.1rem; padding: 0 0.35rem; letter-spacing: 0;
+        min-width: 2rem; justify-content: center; line-height: 1;
+        max-width: none; opacity: 1;
       }
       .nav-volume {
         font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.18em;
@@ -1275,27 +1283,20 @@
        Only renders when fromLetterStack is non-empty. Tappable — same as back. */
     .back-hint-row {
       /* Stick to the top of the scroll container so the user can always see
-         (and tap) the return path while reading long letters. Gradient fades
-         out at the bottom so content behind it has a soft transition, not a
-         hard cut. */
+         (and tap) the return path while reading long letters. A SOLID band
+         in the page background (var(--bg), so it matches both themes) fully
+         hides the content that scrolls under it — a clean sticky sub-header.
+         (The old fade gradient + backdrop-filter blur left blurred, half-
+         opaque ghost text in the fade zone — the owner's "weird fuzzing".
+         Never re-add the blur.) A gold hairline gives a crisp bottom edge. */
       position: sticky; top: 0; z-index: 5;
       display: flex; justify-content: center;
-      padding: 0.45rem 1rem 0.7rem;
-      background: linear-gradient(to bottom,
-        rgba(0,0,0,0.96) 0%,
-        rgba(0,0,0,0.90) 65%,
-        rgba(0,0,0,0) 100%);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--gold-border);
       pointer-events: none;
     }
     .back-hint-row .back-hint-pill { pointer-events: auto; }
-    body.light .back-hint-row {
-      background: linear-gradient(to bottom,
-        rgba(247,242,232,0.96) 0%,
-        rgba(247,242,232,0.90) 65%,
-        rgba(247,242,232,0) 100%);
-    }
     .back-hint-pill {
       display:inline-flex; align-items:center; gap:0.35rem;
       max-width:100%;

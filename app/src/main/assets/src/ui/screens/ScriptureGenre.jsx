@@ -10,7 +10,7 @@ export function ScriptureGenre({ genreId, onSelect, onBack, onSearch, onHistory,
     <ScreenLayout
       navChildren={
         <>
-          <button className="nav-home" onClick={onBack}>{"← Scriptures"}</button>
+          <button className="nav-home nav-back-icon" onClick={onBack} title="← Scriptures" aria-label="Back to Scriptures">{"‹"}</button>
           <HomeBtn />
           <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
         </>

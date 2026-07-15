@@ -24,7 +24,7 @@ export function ChapterIndex({ book, onSelect, onBack, onSearch, onHistory, onSe
     <ScreenLayout
       navChildren={
         <>
-          <button className="nav-home" onClick={onBack}>{"← Books"}</button>
+          <button className="nav-home nav-back-icon" onClick={onBack} title="← Books" aria-label="Back to Books">{"‹"}</button>
           <HomeBtn />
           <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
         </>

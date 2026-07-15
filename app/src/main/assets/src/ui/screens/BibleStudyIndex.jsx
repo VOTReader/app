@@ -49,7 +49,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
 
   const navBar = (
     <>
-      <button className="nav-home" onClick={onBack}>{"← Studies"}</button>
+      <button className="nav-home nav-back-icon" onClick={onBack} title="← Studies" aria-label="Back to Studies">{"‹"}</button>
       <HomeBtn />
       <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
     </>
