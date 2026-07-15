@@ -46,9 +46,11 @@
      on mount. Keys are content-signature strings produced by
      tabContentKey(tab) — survive tab-index shifts (close/reorder).
 
-   WINDOW: none — no window.__* handler bridges wired. The screenshot
-     capture goes through PlatformBridge.takeScreenshot() — bridge owns
-     the platform branch (native PixelCopy on Android, html2canvas on web).
+   WINDOW: none — no window.__* handler bridges wired. Content-tab captures
+     go through PlatformBridge.takeThemedScreenshot(curTheme) — an html2canvas
+     DOM-clone render on BOTH platforms (chrome-free + blink-free: the live
+     page is never photographed). Garden tabs go through takeScreenshot()
+     (native PixelCopy on Android, html2canvas on web) for true pixels.
 
    ┌─ HARD INVARIANT — captureActiveTabThumbnail identity stability ───────┐
    │ captureActiveTabThumbnail MUST be the direct return value of          │
@@ -255,8 +257,9 @@ export function useThumbnails({
 
   // ── Capture callback ───────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
-  // Single async-await path: PlatformBridge.takeScreenshot() handles the
-  // platform branch.
+  // Single async-await path: clone render (takeThemedScreenshot) for content
+  // tabs, true-pixel shot (takeScreenshot) for Garden — see the primary-
+  // capture comment below.
   const captureActiveTabThumbnail = React.useCallback(async () => {
     if (!tabsEnabled) return;
     if (tabsOverviewOpenRef.current) return; // overview open → no point capturing
@@ -269,8 +272,9 @@ export function useThumbnails({
     // still covers the route.
     updateCardAr();
 
-    // Measure nav height (in CSS px) so the native side can crop it. Web
-    // ignores topCropDp (the nav + floating chrome are excluded clone-side
+    // Measure nav height (in CSS px) so the native side can crop it — only
+    // the Garden true-pixel shot uses it (web ignores topCropDp; content-tab
+    // captures are clone renders where the nav + floating chrome are excluded
     // via the bridge's SCREENSHOT_IGNORE_CLASSES ignoreElements list).
     const navEl = document.querySelector('.top-nav');
     const navHeightDp = navEl ? Math.round(navEl.getBoundingClientRect().height) : 0;
@@ -306,11 +310,10 @@ export function useThumbnails({
       if (isGarden) mergeVariant(otherTheme, dataUrl);
     };
 
-    // The OTHER theme can't be photographed (native capture only shoots the
-    // on-screen pixels) but it CAN be rendered: html2canvas draws from a DOM
-    // clone whose theme class we force (PlatformBridge.takeThemedScreenshot),
-    // so both variants exist without the user ever seeing a theme flash.
-    // Deferred ~900ms so it never contends with the visible nav/scroll settle,
+    // The OTHER theme rides the same clone-render path with the opposite
+    // theme class forced on the clone, so both variants exist without the
+    // user ever seeing a theme flash. Deferred ~900ms so the two html2canvas
+    // renders never contend with each other or the visible nav/scroll settle,
     // and dropped if a newer capture supersedes it meanwhile.
     // NOTE: no live-body class, no on-screen hiding — html2canvas draws from
     // a DOM clone and drops the chrome via SCREENSHOT_IGNORE_CLASSES, so the
@@ -332,15 +335,22 @@ export function useThumbnails({
       }, 900);
     };
 
-    // Primary capture. On web this is another chrome-free clone render; on
-    // Android it's native PixelCopy of the REAL screen, so the floating
-    // chrome (sticky arrows, Matthew mode pill) appears in the shot — a
-    // deliberate trade: hiding it on the live page blinked the visible UI
-    // on every scroll-stop/nav capture (owner-reported glitch), and at tab-
-    // card scale the true-pixel chrome is honest and unobtrusive.
+    // Primary capture — CONTENT tabs render from a DOM clone in the CURRENT
+    // theme (takeThemedScreenshot(curTheme): html2canvas on both platforms,
+    // chrome-free via SCREENSHOT_IGNORE_CLASSES, and blink-free by
+    // construction — the live page is never photographed, so nothing ever
+    // needs hiding on screen). On web this is the same html2canvas path the
+    // primary always used; on Android it replaces the native PixelCopy shot,
+    // which could only stay chrome-free by visibility-hiding the floating
+    // chrome on the REAL screen (the owner's split-second blink glitch).
+    // GARDEN keeps the native true-pixel shot (photo pages are html2canvas's
+    // priciest case, are theme-neutral, and carry no floating chrome — so
+    // the native path is both cheaper and blink-free there).
     captureInFlightRef.current = true;
     try {
-      const dataUrl = await PlatformBridge.takeScreenshot(navHeightDp, 1440, 90);
+      const dataUrl = isGarden
+        ? await PlatformBridge.takeScreenshot(navHeightDp, 1440, 90)
+        : await PlatformBridge.takeThemedScreenshot(curTheme, 1440, 90);
       applyThumb(dataUrl);
       if (dataUrl) scheduleOtherTheme();
     } catch (_e) {

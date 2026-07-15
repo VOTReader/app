@@ -21,9 +21,9 @@ import { renderHook, act } from '@testing-library/react';
 // Realistic-length data URLs — mergeVariant + the load scrub floor at 1000
 // chars (a real viewport JPEG is tens of KB; "data:," is 5).
 const U = (tag) => 'data:image/jpeg;base64,' + tag + 'x'.repeat(1200);
-const PRIMARY = U('primary');
-const THEMED = U('themed');
-const PRIMARY_LIGHT = U('primary-light');
+const PRIMARY = U('primary');            // takeScreenshot (Garden true pixels)
+const RENDER_DARK = U('render-dark');    // takeThemedScreenshot('dark')
+const RENDER_LIGHT = U('render-light');  // takeThemedScreenshot('light')
 
 vi.mock('../utils/platform-bridge.js', () => ({
   PlatformBridge: {
@@ -48,7 +48,9 @@ beforeEach(() => {
   takeScreenshot.mockReset();
   takeScreenshot.mockResolvedValue(PRIMARY);
   takeThemedScreenshot.mockReset();
-  takeThemedScreenshot.mockResolvedValue(THEMED);
+  // Content-tab captures are clone renders for BOTH the primary (current
+  // theme) and the deferred other-theme pass — tag the result by theme.
+  takeThemedScreenshot.mockImplementation(async (theme) => (theme === 'light' ? RENDER_LIGHT : RENDER_DARK));
 });
 
 afterEach(() => {
@@ -105,46 +107,49 @@ describe('useThumbnails — dual-theme variants', () => {
     expect(g.idbDelete).toHaveBeenCalledWith('k3');
   });
 
-  it('captures the CURRENT theme, then renders the OTHER theme from a clone ~900ms later', async () => {
+  it('renders the CURRENT theme from a clone, then the OTHER theme ~900ms later — native never photographs a content tab', async () => {
     const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps({ theme: 'light' }) });
     await advance(350); // after-nav primary capture
-    expect(takeScreenshot).toHaveBeenCalledTimes(1);
-    expect(result.current.tabThumbnails['key-a']).toEqual({ light: PRIMARY });
+    expect(takeThemedScreenshot).toHaveBeenCalledWith('light', 1440, 90);
+    expect(takeScreenshot).not.toHaveBeenCalled(); // the anti-blink guarantee on Android
+    expect(result.current.tabThumbnails['key-a']).toEqual({ light: RENDER_LIGHT });
     await advance(900); // deferred other-theme render
     expect(takeThemedScreenshot).toHaveBeenCalledWith('dark', 1440, 90);
-    expect(result.current.tabThumbnails['key-a']).toEqual({ light: PRIMARY, dark: THEMED });
-    expect(g.idbPut).toHaveBeenLastCalledWith('key-a', { light: PRIMARY, dark: THEMED });
+    expect(result.current.tabThumbnails['key-a']).toEqual({ light: RENDER_LIGHT, dark: RENDER_DARK });
+    expect(g.idbPut).toHaveBeenLastCalledWith('key-a', { light: RENDER_LIGHT, dark: RENDER_DARK });
   });
 
   it('a degenerate capture ("data:,") is REJECTED — nothing stored, card keeps its placeholder', async () => {
-    takeScreenshot.mockResolvedValue('data:,');
+    takeThemedScreenshot.mockImplementation(async () => 'data:,');
     const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
     await advance(350);
-    expect(takeScreenshot).toHaveBeenCalled();
+    expect(takeThemedScreenshot).toHaveBeenCalled();
     expect(result.current.tabThumbnails['key-a']).toBeUndefined();
     expect(g.idbPut).not.toHaveBeenCalled();
   });
 
-  it('a theme flip recaptures TRUE pixels into the same entry (replacing the rendered approximation)', async () => {
+  it('a theme flip re-renders the active tab into the new current-theme slot', async () => {
     const { result, rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps({ theme: 'dark' }) });
     await advance(350);
     await advance(900);
-    expect(result.current.tabThumbnails['key-a']).toEqual({ dark: PRIMARY, light: THEMED });
-    // Flip the theme → the active tab re-photographs; the light slot upgrades
-    // from the html2canvas render to genuine pixels.
-    takeScreenshot.mockResolvedValueOnce(PRIMARY_LIGHT);
+    expect(result.current.tabThumbnails['key-a']).toEqual({ dark: RENDER_DARK, light: RENDER_LIGHT });
+    // Flip the theme → the active tab re-captures; the light slot refreshes
+    // with a NEW render of the now-current theme.
+    const FRESH_LIGHT = U('fresh-light');
+    takeThemedScreenshot.mockImplementationOnce(async () => FRESH_LIGHT);
     rerender(hookProps({ theme: 'light' }));
     await advance(350);
-    expect(result.current.tabThumbnails['key-a'].light).toBe(PRIMARY_LIGHT);
-    expect(result.current.tabThumbnails['key-a'].dark).toBe(PRIMARY);
+    expect(result.current.tabThumbnails['key-a'].light).toBe(FRESH_LIGHT);
+    expect(result.current.tabThumbnails['key-a'].dark).toBe(RENDER_DARK);
   });
 
-  it('garden tabs fill BOTH slots from one capture and never run the themed render', async () => {
+  it('garden tabs keep the TRUE-PIXEL shot, fill BOTH slots from it, and never run the clone render', async () => {
     const garden = { id: 'a', screen: 'garden-view' };
     renderHook((p) => useThumbnails(p), {
       initialProps: hookProps({ tabs: [garden], activeTab: garden }),
     });
     await advance(350);
+    expect(takeScreenshot).toHaveBeenCalledTimes(1); // native PixelCopy on Android
     expect(g.idbPut).toHaveBeenLastCalledWith('key-a', { dark: PRIMARY, light: PRIMARY });
     await advance(1500);
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
@@ -175,7 +180,10 @@ describe('useThumbnails — dual-theme variants', () => {
     rerender(hookProps({ theme: 'dark', tabs: [tab2], activeTab: tab2 }));
     await advance(350); // primary #2
     await advance(900); // only the NEW schedule may fire
-    expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
+    // Two primaries rendered ('dark'), but the OTHER-theme render ('light')
+    // fired exactly once — the stale schedule was superseded.
+    expect(takeThemedScreenshot.mock.calls.filter((c) => c[0] === 'light').length).toBe(1);
+    expect(takeThemedScreenshot).toHaveBeenCalledTimes(3);
   });
 
   it('NEVER touches the live page — no capturing-thumb body class during either pass', async () => {
@@ -190,14 +198,15 @@ describe('useThumbnails — dual-theme variants', () => {
       classDuring.push(document.body.classList.contains('capturing-thumb'));
       return PRIMARY;
     });
-    takeThemedScreenshot.mockImplementation(async () => {
+    takeThemedScreenshot.mockImplementation(async (theme) => {
       classDuring.push(document.body.classList.contains('capturing-thumb'));
-      return THEMED;
+      return theme === 'light' ? RENDER_LIGHT : RENDER_DARK;
     });
     renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
-    await advance(350); // primary
-    await advance(900); // deferred themed render
+    await advance(350); // primary (current-theme clone render)
+    await advance(900); // deferred other-theme render
     expect(classDuring).toEqual([false, false]); // both passes ran, neither hid chrome
+    expect(takeScreenshot).not.toHaveBeenCalled(); // content tabs never photograph the real screen
     expect(document.body.classList.contains('capturing-thumb')).toBe(false);
   });
 });

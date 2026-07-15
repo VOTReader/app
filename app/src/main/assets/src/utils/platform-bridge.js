@@ -517,9 +517,9 @@ function webPickImportFile() {
 // body.capturing-thumb class visibility-hid this same chrome ON SCREEN for
 // the duration of every capture, which blinked the dice/dot/arrows/pill out
 // for a split second on every scroll-stop — owner-reported; retired 2026-07-14.
-// Android's native PixelCopy shot can only photograph the real screen, so it
-// now includes the floating chrome rather than blinking it — a deliberate
-// trade.) The resume-reading dot lives inside .top-nav, covered by that entry.
+// Content-tab thumbnails are clone renders on BOTH platforms now; Android's
+// native PixelCopy shot survives only for Garden, which carries none of this
+// chrome.) The resume-reading dot lives inside .top-nav, covered by that entry.
 const SCREENSHOT_IGNORE_CLASSES = [
   'tabs-overview-layer', 'top-nav', 'back-hint-row',
   'chapter-nav-sticky', 'surprise-fab',
