@@ -19,13 +19,35 @@
    mount state. The decision primitives (decideAxis / isCommit / rubberBand /
    velocityFromSamples) are exported for direct testing.
 
-   COEXISTENCE: listeners are bubble-phase; ScreenLayout's capture-phase
-   tap-suppressor still sees touches first. They partition on axis — the
-   suppressor only acts on vertical lifts (dy>8 && dy>dx), the pager only
-   engages on horizontal intent (|dx|>|dy|*1.3) — so neither fights the other.
-   __scrollEl, scroll-memory, and the annotation engine are untouched: a child
-   transform changes no scrollTop/scrollHeight, and the peek carries no
-   data-hl-* so every annotation pass ignores it.
+   COEXISTENCE: touchstart/touchmove are element-level bubble-phase;
+   ScreenLayout's capture-phase tap-suppressor still sees touches first. They
+   partition on axis — the suppressor only acts on vertical lifts (dy>8 &&
+   dy>dx), the pager only engages on horizontal intent (|dx|>|dy|*1.3) — so
+   neither fights the other. __scrollEl, scroll-memory, and the annotation
+   engine are untouched: a child transform changes no scrollTop/scrollHeight,
+   and the peek carries no data-hl-* so every annotation pass ignores it.
+
+   ROBUSTNESS (press-drag parity, 2026-07-18): the same lifecycle hardening
+   the four drag surfaces got in the tab-drag rebuild:
+     - touchend/touchcancel are handled at DOCUMENT CAPTURE — propagation's
+       first node, which nothing can starve. The documented on-device WebView
+       failure (a gesture's end delivered non-bubbling, e4d0be8) can therefore
+       never strand a swipe with the page frozen mid-slide.
+     - The gesture tracks its OWN touch identifier. Foreign fingers landing,
+       moving, or lifting mid-swipe are ignored entirely — a stray second
+       touch can no longer end (or corrupt the dx of) the primary drag.
+     - A move event whose touch list no longer contains our finger means the
+       OS dropped the stream without telling us → the gesture ends NOW with
+       the commit decision its frozen position earns (drags commit — same
+       policy as press-drag's pointercancel), and traces.
+     - ZOMBIE WATCHDOG: a gesture whose stream has been event-silent >2.5s
+       ends itself the same way (armed per event; a silent gesture can't
+       keep the track translated forever).
+     - FORCE-RESET: a new touchstart while a leaked gesture is live resets
+       the track + peeks instantly and starts clean — no wedged state can
+       ever refuse the next swipe.
+     - Every abnormal path traces via io.trace → "[pageswipe] …" (console +
+       DiagnosticLog) so a failing device names itself.
    ═══════════════════════════════════════════════════════════════════════ */
 
 // Begin a gesture only past this px slop; matches ScreenLayout's tap-suppressor.
@@ -114,13 +136,33 @@ export function velocityFromSamples(samples) {
  *   reducedMotion: () => boolean,
  *   schedule: (fn: () => void, ms?: number) => any,
  *   cancelScheduled?: (token: any) => void,
- *   hasSelection?: () => boolean
+ *   hasSelection?: () => boolean,
+ *   trace?: (msg: string) => void
  * }} io
  */
+// A gesture whose stream has produced no events for this long is a zombie
+// (silently-killed touch stream — the on-device WebView failure).
+const SWIPE_SILENT_MS = 2500;
+// Watchdog check delay — re-armed on every event, so when it fires the
+// gesture is guaranteed silent for its full delay.
+const SWIPE_WATCHDOG_MS = 3000;
+
 export function createPagerGesture(io) {
   let s = null;          // active gesture, or null
   let settling = false;  // true while a settle animation is running
   let settleToken = null; // pending settle timer (cancelled on dispose)
+  let watchdogToken = null; // pending zombie check (re-armed per event)
+
+  const trace = (msg) => { try { if (io.trace) io.trace(msg); } catch (_e) { /* trace must never wedge */ } };
+
+  /** Find OUR touch in a TouchList-ish array by identifier. */
+  const findTouch = (touches, id) => {
+    if (!touches) return null;
+    for (let i = 0; i < touches.length; i++) {
+      if (touches[i].identifier === id) return touches[i];
+    }
+    return null;
+  };
 
   const setStyle = (el, transition, transform) => {
     if (!el || !el.style) return;
@@ -134,6 +176,35 @@ export function createPagerGesture(io) {
   function parkPeek(dir) {
     const pk = io.getPeek(dir);
     if (pk && pk.style) { pk.style.transition = 'none'; pk.style.transform = ''; pk.style.willChange = ''; }
+  }
+
+  // Reset the track to its rest position with NO animation. Used by the
+  // force-reset path — a leaked gesture may have left the track translated
+  // mid-drag, and the new gesture must begin from a clean baseline
+  // immediately (a spring-back settle here would set `settling` and refuse
+  // the very touchstart that triggered the reset).
+  function resetTrack() {
+    const tr = io.getTrack();
+    if (tr && tr.style) { tr.style.transition = 'none'; tr.style.transform = ''; tr.style.willChange = ''; }
+  }
+
+  function disarmWatchdog() {
+    if (watchdogToken != null && io.cancelScheduled) io.cancelScheduled(watchdogToken);
+    watchdogToken = null;
+  }
+
+  // Re-armed on every gesture event, so a firing check means the stream has
+  // been silent for the full delay. Synchronous-scheduler test hosts self-
+  // neutralize here (silent≈0 → no-op, no re-arm → no recursion).
+  function armWatchdog() {
+    disarmWatchdog();
+    watchdogToken = io.schedule(() => {
+      watchdogToken = null;
+      if (!s) return;
+      const silent = Date.now() - s.lastEventTs;
+      if (silent < SWIPE_SILENT_MS) return;
+      endGesture('commit-decide', s.axis === 'x' ? 'zombie swipe healed (stream silent ' + silent + 'ms)' : null);
+    }, SWIPE_WATCHDOG_MS);
   }
 
   // Park BOTH peeks back to their CSS rest position. Called at the start of every
@@ -233,10 +304,42 @@ export function createPagerGesture(io) {
     settleToken = io.schedule(() => finishSettle(committed, dir), SETTLE_MS);
   }
 
+  // THE single exit path — every ending (normal lift, cancel, heal, force-
+  // reset) funnels through here, idempotently (a second call finds s null).
+  //   mode 'commit-decide' — full threshold/velocity decision (normal end,
+  //                          finger-gone heal, zombie heal)
+  //   mode 'spring'        — spring back, never commit (touchcancel)
+  //   mode 'instant-reset' — no animation at all (force-reset at a new
+  //                          touchstart; the caller starts a fresh gesture
+  //                          in the same tick)
+  function endGesture(mode, traceMsg) {
+    if (!s) return;
+    const st = s;
+    s = null;
+    disarmWatchdog();
+    if (traceMsg) trace(traceMsg + ' — dx ' + Math.round(st.dx));
+    if (st.axis !== 'x') return;               // never engaged: nothing to unwind
+    if (mode === 'instant-reset') { resetTrack(); parkAllPeeks(); return; }
+    if (mode === 'spring') { beginSettle(false, st.dir, st.width); return; }
+    const hasSel = io.hasSelection ? io.hasSelection() : false;
+    const vx = velocityFromSamples(st.samples);
+    const committed = !hasSel && !!st.desc && isCommit(st.dx, vx, st.width);
+    if (committed && st.desc.kind === 'boundary') { instantCommit(st.dir); return; }
+    beginSettle(committed, st.dir, st.width);
+  }
+
   return {
     start(e) {
       if (settling) return;
-      if (!e.touches || e.touches.length !== 1) { s = null; return; }
+      // A live gesture whose finger is STILL down means this touchstart is a
+      // foreign second finger — ignore it entirely (identifier tracking keeps
+      // the primary drag clean; a stray touch can no longer end it early).
+      if (s && e.touches && findTouch(e.touches, s.touchId)) return;
+      // FORCE-RESET (press-drag parity): a live gesture at a new touchstart
+      // whose finger is GONE means the previous stream died silently. Reset
+      // instantly and start clean — no wedged state can refuse the swipe.
+      if (s) endGesture('instant-reset', s.axis === 'x' ? 'force-reset of a leaked swipe at new touchstart' : null);
+      if (!e.touches || e.touches.length !== 1) return;
       // Start clean: clear any leftover peek transform from a prior gesture (e.g.
       // a committed peek still covering the screen before its rAF de-promote) so
       // this swipe can never coexist with a stale neighbor pane.
@@ -247,20 +350,36 @@ export function createPagerGesture(io) {
       // gesture is behaviorally identical to tapping a nav arrow. A tap on a
       // ref still opens it: axis only locks on real horizontal travel, and a
       // multi-px drag cancels the browser's synthetic click. The text-selection
-      // guard (in end()) still blocks a flip while selecting.
-      s = { startX: t0.clientX, startY: t0.clientY, axis: null, dir: null, desc: null, dx: 0, samples: [], width: io.getWidth() };
+      // guard (in endGesture) still blocks a flip while selecting.
+      s = {
+        touchId: t0.identifier, startX: t0.clientX, startY: t0.clientY,
+        axis: null, dir: null, desc: null, dx: 0, samples: [],
+        width: io.getWidth(), lastEventTs: Date.now(),
+      };
+      armWatchdog();
     },
 
     move(e) {
       if (!s || settling) return;
-      const t = e.touches && e.touches[0];
-      if (!t) return;
+      // Track OUR finger by identifier — a second finger's moves can't
+      // corrupt the dx, and ordering in e.touches is irrelevant.
+      const t = findTouch(e.touches, s.touchId);
+      if (!t) {
+        // A move arrived and the OS's active-touch list no longer contains
+        // our finger — its end was swallowed (non-bubbling delivery / the
+        // stream was claimed). Heal NOW with the commit decision the frozen
+        // position earns; the new stream scrolls natively, unclaimed.
+        endGesture('commit-decide', s.axis === 'x' ? 'swipe finger vanished from the touch list (end swallowed)' : null);
+        return;
+      }
+      s.lastEventTs = Date.now();
+      armWatchdog();
       const dx = t.clientX - s.startX;
       const dy = t.clientY - s.startY;
       if (s.axis === null) {
         const ax = decideAxis(dx, dy);
         if (ax === null) return;
-        if (ax === 'y') { s = null; return; }   // vertical → release to native scroll
+        if (ax === 'y') { endGesture('spring', null); return; }   // vertical → release to native scroll
         s.axis = 'x';
         // Lock direction + promote the track/peek to a compositing layer (cleared
         // in finishSettle so the live page renders on the main thread at rest).
@@ -278,34 +397,31 @@ export function createPagerGesture(io) {
       applyDrag(s.desc ? dx : rubberBand(dx, s.width), s.dir, s.width);
     },
 
-    end() {
+    end(e) {
       if (!s) return;
-      const st = s;
-      s = null;
-      if (st.axis !== 'x') return;               // not a horizontal gesture
-      const hasSel = io.hasSelection ? io.hasSelection() : false;
-      const vx = velocityFromSamples(st.samples);
-      const committed = !hasSel && !!st.desc && isCommit(st.dx, vx, st.width);
-      if (committed && st.desc.kind === 'boundary') { instantCommit(st.dir); return; }
-      beginSettle(committed, st.dir, st.width);
+      // Only OUR finger lifting ends the gesture; a foreign finger's lift is
+      // ignored. Calls without an event (tests / unmount) end unconditionally.
+      if (e && e.changedTouches && !findTouch(e.changedTouches, s.touchId)) return;
+      endGesture('commit-decide', null);
     },
 
-    cancel() {
+    cancel(e) {
       if (!s) return;
-      const st = s;
-      s = null;
-      if (st.axis === 'x') beginSettle(false, st.dir, st.width);
+      if (e && e.changedTouches && e.changedTouches.length > 0 && !findTouch(e.changedTouches, s.touchId)) return;
+      endGesture('spring', s.axis === 'x' ? 'touchcancel — browser claimed the stream, sprung back' : null);
     },
 
     isSettling() { return settling; },
 
-    // Cancel a pending settle — called on ScreenLayout unmount so a settle
+    // Cancel pending timers — called on ScreenLayout unmount so a settle
     // that was mid-flight when the screen changed (e.g. a boundary commit that
     // remounts a different screen type) can't fire its commit twice.
     dispose() {
       if (settleToken != null && io.cancelScheduled) io.cancelScheduled(settleToken);
       settleToken = null;
       settling = false;
+      disarmWatchdog();
+      s = null;
     },
   };
 }
@@ -353,21 +469,33 @@ export function usePagerGesture(scrollRef, pager) {
       },
       cancelScheduled: (tok) => clearTimeout(tok),
       hasSelection: () => typeof window !== 'undefined' && !!window.getSelection && !!String(window.getSelection()),
+      trace: (msg) => {
+        try { console.warn('[pageswipe] ' + msg); } catch (_e) { /* trace must never wedge */ }
+        try {
+          if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && DiagnosticLog.error) DiagnosticLog.error('pageswipe', msg);
+        } catch (_e) { /* ignore */ }
+      },
     });
     const onStart = (e) => ctrl.start(e);
     const onMove = (e) => ctrl.move(e);
-    const onEnd = () => ctrl.end();
-    const onCancel = () => ctrl.cancel();
+    const onEnd = (e) => ctrl.end(e);
+    const onCancel = (e) => ctrl.cancel(e);
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: false });
-    el.addEventListener('touchend', onEnd, { passive: true });
-    el.addEventListener('touchcancel', onCancel, { passive: true });
+    // touchend/touchcancel at DOCUMENT CAPTURE — propagation's first node,
+    // which nothing can starve. The on-device WebView failure delivers a
+    // gesture's end at document-capture but NOT to bubble listeners
+    // (e4d0be8); with the terminators here, a swipe can never be stranded
+    // mid-slide by non-bubbling delivery. The controller filters by touch
+    // identifier, so foreign end/cancel events are ignored.
+    document.addEventListener('touchend', onEnd, { passive: true, capture: true });
+    document.addEventListener('touchcancel', onCancel, { passive: true, capture: true });
     return () => {
       mounted.v = false;
       el.removeEventListener('touchstart', onStart);
       el.removeEventListener('touchmove', onMove);
-      el.removeEventListener('touchend', onEnd);
-      el.removeEventListener('touchcancel', onCancel);
+      document.removeEventListener('touchend', onEnd, { capture: true });
+      document.removeEventListener('touchcancel', onCancel, { capture: true });
       ctrl.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- attach once per ScreenLayout instance; scrollRef.current is stable for the instance's life, and `pager` is read call-time-fresh via pagerRef. Re-running on pager identity churn would needlessly re-bind listeners every render.

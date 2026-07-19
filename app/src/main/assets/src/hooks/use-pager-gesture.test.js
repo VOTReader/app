@@ -252,7 +252,9 @@ describe('createPagerGesture controller', () => {
     expect(track.style.transform).toBe('');       // reset in the same tick
     expect(nextPeek.style.transform).toBe('');    // card gone in the same tick
     expect(g.isSettling()).toBe(false);           // no settle state at all
-    expect(scheduled).toEqual([]);                // nothing deferred → nothing to dispose
+    // No settle timer, no rAF park deferred — only the zombie-watchdog arms
+    // (3000ms checks, one per gesture event) ever hit the scheduler.
+    expect(scheduled.filter((ms) => ms !== 3000)).toEqual([]);
   });
 
   it('a below-threshold BOUNDARY drag still springs back (no navigate)', () => {
@@ -286,6 +288,114 @@ describe('createPagerGesture controller', () => {
     expect(g.isSettling()).toBe(true);
     if (settleFn) settleFn();             // settle animation completes
     expect(calls.commits).toEqual(['next']);
+  });
+
+  it('ROBUSTNESS: a foreign finger lifting does not end the primary drag', () => {
+    // The tabs-drag class (b) bug: "a stray second touch committed early at
+    // whatever slot the card was passing". Identifier tracking kills it.
+    const { io, calls, track } = makeIO();
+    const g = createPagerGesture(io);
+    const ourTouch = (x) => ({ identifier: 7, clientX: x, clientY: 100 });
+    g.start({ touches: [ourTouch(300)] });
+    g.move({ touches: [ourTouch(250)], timeStamp: 0, cancelable: true, preventDefault: () => {} });
+    g.move({ touches: [ourTouch(120), { identifier: 9, clientX: 40, clientY: 400 }], timeStamp: 40, cancelable: true, preventDefault: () => {} });
+    // The foreign finger (id 9) lifts — must NOT end our gesture.
+    g.end({ changedTouches: [{ identifier: 9, clientX: 40, clientY: 400 }] });
+    expect(calls.commits).toEqual([]);
+    expect(track.style.transform).toBe('translateX(-180px)'); // drag still live
+    // OUR finger lifts → normal commit.
+    g.end({ changedTouches: [ourTouch(120)] });
+    expect(calls.commits).toEqual(['next']);
+  });
+
+  it('ROBUSTNESS: foreign touches in the move stream cannot corrupt the dx', () => {
+    const { io, track } = makeIO();
+    const g = createPagerGesture(io);
+    const ourTouch = (x) => ({ identifier: 7, clientX: x, clientY: 100 });
+    g.start({ touches: [ourTouch(300)] });
+    // Foreign finger listed FIRST in e.touches — the old touches[0] read
+    // would have computed dx from the wrong finger.
+    g.move({ touches: [{ identifier: 9, clientX: 900, clientY: 40 }, ourTouch(250)], timeStamp: 0, cancelable: true, preventDefault: () => {} });
+    expect(track.style.transform).toBe('translateX(-50px)');
+  });
+
+  it('ROBUSTNESS: our finger vanishing from the touch list heals with the commit decision', () => {
+    // The end was swallowed (non-bubbling delivery); the next move event's
+    // touch list no longer contains our finger → heal NOW, commit because
+    // the frozen dx is past threshold, and trace.
+    const traces = [];
+    const { io, calls } = makeIO({ trace: (m) => traces.push(m) });
+    const g = createPagerGesture(io);
+    const ourTouch = (x) => ({ identifier: 7, clientX: x, clientY: 100 });
+    g.start({ touches: [ourTouch(300)] });
+    g.move({ touches: [ourTouch(250)], timeStamp: 0, cancelable: true, preventDefault: () => {} });
+    g.move({ touches: [ourTouch(120)], timeStamp: 40, cancelable: true, preventDefault: () => {} });
+    // A new stream's move arrives; our finger is gone from e.touches.
+    g.move({ touches: [{ identifier: 11, clientX: 200, clientY: 300 }], timeStamp: 80, cancelable: true, preventDefault: () => {} });
+    expect(calls.commits).toEqual(['next']);
+    expect(traces.some((m) => m.includes('finger vanished'))).toBe(true);
+  });
+
+  it('ROBUSTNESS: a new touchstart force-resets a leaked gesture instantly (no wedge)', () => {
+    // The stream died with no end at all. The next touchstart must reset the
+    // track in the SAME tick (no settle animation — settling would refuse
+    // this very gesture) and the fresh swipe must work end-to-end.
+    const traces = [];
+    const { io, calls, track } = makeIO({ trace: (m) => traces.push(m) });
+    const g = createPagerGesture(io);
+    const t1 = (x) => ({ identifier: 7, clientX: x, clientY: 100 });
+    g.start({ touches: [t1(300)] });
+    g.move({ touches: [t1(250)], timeStamp: 0, cancelable: true, preventDefault: () => {} });
+    expect(track.style.transform).toMatch(/translateX/); // mid-drag, then the stream dies silently
+    const t2 = (x) => ({ identifier: 8, clientX: x, clientY: 100 });
+    g.start({ touches: [t2(300)] });                     // new finger, old gesture leaked
+    expect(track.style.transform).toBe('');              // reset in the same tick
+    expect(g.isSettling()).toBe(false);
+    expect(traces.some((m) => m.includes('force-reset'))).toBe(true);
+    g.move({ touches: [t2(250)], timeStamp: 100, cancelable: true, preventDefault: () => {} });
+    g.move({ touches: [t2(120)], timeStamp: 140, cancelable: true, preventDefault: () => {} });
+    g.end({ changedTouches: [t2(120)] });
+    expect(calls.commits).toEqual(['next']);             // the machine never wedges
+  });
+
+  it('ROBUSTNESS: a second finger landing mid-drag is ignored (drag continues)', () => {
+    const { io, calls, track } = makeIO();
+    const g = createPagerGesture(io);
+    const t1 = (x) => ({ identifier: 7, clientX: x, clientY: 100 });
+    g.start({ touches: [t1(300)] });
+    g.move({ touches: [t1(250)], timeStamp: 0, cancelable: true, preventDefault: () => {} });
+    // Second finger lands (touchstart with BOTH touches listed, ours included).
+    g.start({ touches: [{ identifier: 9, clientX: 50, clientY: 500 }, t1(250)] });
+    expect(track.style.transform).toBe('translateX(-50px)'); // untouched
+    g.move({ touches: [t1(120)], timeStamp: 40, cancelable: true, preventDefault: () => {} });
+    g.end({ changedTouches: [t1(120)] });
+    expect(calls.commits).toEqual(['next']);
+  });
+
+  it('ROBUSTNESS: the zombie watchdog heals a silent gesture with the commit decision', () => {
+    // Deferred scheduler so the watchdog check is controllable; fake the
+    // gesture's clock so the check sees a >2.5s-silent stream.
+    /** @type {(() => void) | null} */
+    let watchdog = null;
+    const traces = [];
+    const { io, calls } = makeIO({
+      schedule: (fn, ms) => { if (ms === 3000) { watchdog = fn; return 1; } fn(); return 0; },
+      cancelScheduled: () => {},
+      trace: (m) => traces.push(m),
+    });
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(100000);
+    const g = createPagerGesture(io);
+    const t1 = (x) => ({ identifier: 7, clientX: x, clientY: 100 });
+    g.start({ touches: [t1(300)] });
+    g.move({ touches: [t1(250)], timeStamp: 0, cancelable: true, preventDefault: () => {} });
+    g.move({ touches: [t1(120)], timeStamp: 40, cancelable: true, preventDefault: () => {} });
+    expect(typeof watchdog).toBe('function');
+    nowSpy.mockReturnValue(103100); // 3.1s later, no events since
+    if (watchdog) watchdog();
+    nowSpy.mockRestore();
+    expect(calls.commits).toEqual(['next']); // frozen dx was past threshold
+    expect(traces.some((m) => m.includes('zombie swipe healed'))).toBe(true);
   });
 
   it('selection guard blocks commit', () => {
