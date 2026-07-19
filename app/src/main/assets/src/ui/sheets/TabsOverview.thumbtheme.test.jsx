@@ -9,7 +9,7 @@
 
 import { it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
-import { TabsOverview } from './TabsOverview.jsx';
+import { TabsOverview, thumbAspectMismatch } from './TabsOverview.jsx';
 import { createPressDrag } from '../../utils/press-drag.js';
 
 /** @type {any} */ (globalThis).createPressDrag = createPressDrag;
@@ -87,4 +87,27 @@ it('interim {url, theme} rows still render (compat branch) with the mismatch fil
   const img = thumbImg();
   expect(img.getAttribute('src')).toBe('data:interim-shot');
   expect(img.className).toContain('thumb-theme-flip');
+});
+
+/* ── Aspect guard (thumbAspectMismatch) — the PC stale-geometry glitch ──
+   A thumb captured under a different window geometry, cover-cropped into
+   the current card box, blows a corner up into giant text. The overview
+   letterboxes any thumb whose aspect strays >12% from the card's. */
+it('thumbAspectMismatch: same-geometry captures pass (cover stays)', () => {
+  // exact
+  expect(thumbAspectMismatch(760, 800, 228, 240)).toBe(false);
+  // scrollbar-gutter wobble (~2%) never letterboxes
+  expect(thumbAspectMismatch(744, 800, 228, 240)).toBe(false);
+});
+
+it('thumbAspectMismatch: a phone-era capture in a desktop card letterboxes', () => {
+  // 376x812 (0.46) vs 228/240 (0.95) — the owner's giant-text card
+  expect(thumbAspectMismatch(376, 812, 228, 240)).toBe(true);
+  // and the reverse: a desktop capture in a phone-shaped card
+  expect(thumbAspectMismatch(760, 800, 245, 395)).toBe(true);
+});
+
+it('thumbAspectMismatch: degenerate inputs never letterbox', () => {
+  expect(thumbAspectMismatch(0, 0, 228, 240)).toBe(false);
+  expect(thumbAspectMismatch(760, 800, 0, 0)).toBe(false);
 });

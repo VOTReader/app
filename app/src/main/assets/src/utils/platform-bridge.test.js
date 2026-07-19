@@ -823,6 +823,9 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     /** @type {any} */ (globalThis).html2canvas = h2c;
     const col = document.createElement('div');
     col.className = 'screen-layout';
+    // captureTargetEl skips zero-sized layouts (jsdom's default rect) — a
+    // real column always has size, so stub one.
+    col.getBoundingClientRect = () => /** @type {any} */ ({ width: 760, height: 900 });
     document.body.appendChild(col);
     try {
       bridge = await importBridge();
@@ -1343,5 +1346,66 @@ describe('PlatformBridge — v3 backup I/O (web)', () => {
     const orig = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((/** @type {any} */ tag) => (tag === 'input' ? fakeInput : orig(tag)));
     expect(await bridge.pickImportFile()).toBe(file);
+  });
+});
+
+/* ── captureTargetEl — robust thumbnail capture-target selection ──────────
+   The naive first-.screen-layout read burned in production: with the Tabs
+   overview open its OWN layout sits first in document order (captures shot
+   the overview), and transient zero-sized / inert-peek layouts produced the
+   "degenerate canvas 376x0" + "Unable to find element in cloned iframe"
+   PC failures. */
+describe('captureTargetEl', () => {
+  /** @type {any} */ let mod;
+  beforeEach(async () => {
+    vi.resetModules();
+    delete (/** @type {any} */ (window).AndroidBridge);
+    mod = await import('./platform-bridge.js');
+    document.body.innerHTML = '';
+  });
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  const mkLayout = (parent, w, h) => {
+    const el = document.createElement('div');
+    el.className = 'screen-layout';
+    el.getBoundingClientRect = () => /** @type {any} */ ({ width: w, height: h });
+    parent.appendChild(el);
+    return el;
+  };
+
+  it('skips the tabs-overview overlay layout and returns the live column', () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'tabs-overview-layer';
+    document.body.appendChild(overlay);
+    mkLayout(overlay, 600, 800);           // the overview's own screen — first in order
+    const live = mkLayout(document.body, 600, 800);
+    expect(mod.captureTargetEl()).toBe(live);
+  });
+
+  it('skips zero-sized transient layouts', () => {
+    mkLayout(document.body, 376, 0);       // the "degenerate canvas 376x0" node
+    const live = mkLayout(document.body, 760, 800);
+    expect(mod.captureTargetEl()).toBe(live);
+  });
+
+  it('skips layouts inside a pager peek or any inert subtree', () => {
+    const peek = document.createElement('div');
+    peek.className = 'pager-peek';
+    document.body.appendChild(peek);
+    mkLayout(peek, 760, 800);
+    const inertWrap = document.createElement('div');
+    inertWrap.setAttribute('inert', '');
+    document.body.appendChild(inertWrap);
+    mkLayout(inertWrap, 760, 800);
+    const live = mkLayout(document.body, 760, 800);
+    expect(mod.captureTargetEl()).toBe(live);
+  });
+
+  it('falls back to #root when no live layout qualifies', () => {
+    const root = document.createElement('div');
+    root.id = 'root';
+    document.body.appendChild(root);
+    mkLayout(document.body, 0, 0);
+    expect(mod.captureTargetEl()).toBe(root);
   });
 });

@@ -30,6 +30,9 @@ vi.mock('../utils/platform-bridge.js', () => ({
     takeScreenshot: vi.fn(async () => 'data:image/jpeg;base64,MOCK'),
     takeThemedScreenshot: vi.fn(async () => 'data:image/jpeg;base64,MOCK'),
   },
+  // Simple stand-in for the robust live-column selector — these tests build
+  // at most one .screen-layout and never mount the overview overlay.
+  captureTargetEl: () => (typeof document !== 'undefined' ? document.querySelector('.screen-layout') : null),
 }));
 import { PlatformBridge } from '../utils/platform-bridge.js';
 import { useThumbnails } from './use-thumbnails.js';
@@ -184,6 +187,63 @@ describe('useThumbnails — dual-theme variants', () => {
     // fired exactly once — the stale schedule was superseded.
     expect(takeThemedScreenshot.mock.calls.filter((c) => c[0] === 'light').length).toBe(1);
     expect(takeThemedScreenshot).toHaveBeenCalledTimes(3);
+  });
+
+  it('OVERVIEW-OPEN HEAL: opening the overview captures the active content tab', async () => {
+    // A tab whose captures all failed while it was live stayed a blank ✦
+    // forever — the overview suppressed ALL captures while open, and no
+    // scroll/nav can fire under the overlay. Clone renders exclude the
+    // overlay (SCREENSHOT_IGNORE_CLASSES), so the open itself now heals
+    // the active card.
+    const { result, rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await flush();
+    expect(takeThemedScreenshot).not.toHaveBeenCalled();
+    rerender(hookProps({ tabsOverviewOpen: true }));
+    await advance(60);
+    expect(takeThemedScreenshot).toHaveBeenCalledWith('dark', 1440, 90);
+    expect(result.current.tabThumbnails['key-a'].dark).toBe(RENDER_DARK);
+  });
+
+  it('OVERVIEW-OPEN: garden tabs stay suppressed (native shot would photograph the overlay)', async () => {
+    const garden = { id: 'a', screen: 'garden-view' };
+    renderHook((p) => useThumbnails(p), {
+      initialProps: hookProps({ tabs: [garden], activeTab: garden, tabsOverviewOpen: true }),
+    });
+    await advance(1500);
+    expect(takeScreenshot).not.toHaveBeenCalled();
+    expect(takeThemedScreenshot).not.toHaveBeenCalled();
+  });
+
+  it('BOUNDED RETRY: a failed capture retries after 2.5s and heals on success', async () => {
+    takeThemedScreenshot
+      .mockImplementationOnce(async () => '')      // primary fails
+      .mockImplementationOnce(async () => RENDER_DARK); // retry succeeds
+    const { result } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350);
+    expect(result.current.tabThumbnails['key-a']).toBeUndefined(); // failed, nothing stored
+    await advance(2500);
+    expect(result.current.tabThumbnails['key-a'].dark).toBe(RENDER_DARK); // healed
+  });
+
+  it('BOUNDED RETRY: a permanently-failing environment stops after 3 retries', async () => {
+    takeThemedScreenshot.mockImplementation(async () => '');
+    renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350);                       // attempt 1 (after-nav)
+    await advance(2500);                      // retry 1
+    await advance(2500);                      // retry 2
+    await advance(2500);                      // retry 3 — budget exhausted
+    await advance(10000);                     // nothing further
+    expect(takeThemedScreenshot).toHaveBeenCalledTimes(4);
+  });
+
+  it('RESIZE: a settled window resize recaptures the active tab at the new geometry', async () => {
+    renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350); // after-nav primary
+    await advance(900); // other-theme render
+    const before = takeThemedScreenshot.mock.calls.length;
+    await act(async () => { window.dispatchEvent(new Event('resize')); });
+    await advance(600); // debounce settles → recapture
+    expect(takeThemedScreenshot.mock.calls.length).toBeGreaterThan(before);
   });
 
   it('NEVER touches the live page — no capturing-thumb body class during either pass', async () => {

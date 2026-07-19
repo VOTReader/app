@@ -2383,6 +2383,14 @@
       background:var(--bg3);
     }
     .tab-card-thumb { display:block; width:100%; height:100%; object-fit:cover; object-position:center top; -webkit-user-drag:none; pointer-events:none; }
+    /* A thumb whose capture geometry no longer matches the card (window was
+       resized / phone-era capture on desktop): cover-cropping it blows up a
+       corner into giant text, so letterbox it intact until a fresh capture
+       at the current geometry replaces it (TabsOverview._fitThumb). */
+    .tab-card-thumb.thumb-ar-mismatch {
+      object-fit:contain; object-position:center;
+      background:linear-gradient(160deg, var(--bg3) 0%, var(--bg2) 100%);
+    }
     .tab-card-thumb-placeholder {
       width:100%; height:100%;
       display:flex; align-items:center; justify-content:center;

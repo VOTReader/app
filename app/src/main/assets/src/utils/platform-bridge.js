@@ -526,6 +526,36 @@ const SCREENSHOT_IGNORE_CLASSES = [
   'mode-toggle-wrap',
 ];
 
+/**
+ * Resolve the LIVE app column to capture. `document.querySelector`'s naive
+ * first-match burned in production: with the Tabs overview open, ITS OWN
+ * `.screen-layout` (the overlay renders one) sits first in document order —
+ * a capture then shoots the overview instead of the reading screen; and a
+ * transient/zero-sized layout (mid-transition, an inert pager peek) yields
+ * the "degenerate canvas 376x0" / "Unable to find element in cloned iframe"
+ * failures in the owner's PC [thumb] traces. Pick the first CONNECTED,
+ * visibly-sized `.screen-layout` that is not inside the overview overlay,
+ * a pager peek, or any inert subtree; fall back to #root (keeps extension-
+ * injected body junk out), then body.
+ *
+ * @returns {Element | null}
+ */
+export function captureTargetEl() {
+  if (typeof document === 'undefined') return null;
+  const layouts = document.querySelectorAll('.screen-layout');
+  for (let i = 0; i < layouts.length; i++) {
+    const el = layouts[i];
+    if (!el.isConnected) continue;
+    if (el.closest('.tabs-overview-layer')) continue;
+    if (el.closest('.pager-peek')) continue;
+    if (el.closest('[inert]')) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 16 || r.height < 16) continue;
+    return el;
+  }
+  return document.getElementById('root') || document.body;
+}
+
 /** @type {Promise<any> | null} */
 let _h2cPromise = null;
 /**
@@ -587,12 +617,12 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
     // tab cards look like a thin strip floating in blackness (owner-reported).
     // The column IS the app's "device viewport", so cards now look like a
     // mini device on every platform; on phones the column equals the window,
-    // so Android/mobile output is byte-identical. Falling back to #root (not
-    // document.body) keeps extension-injected body nodes and body-portaled
-    // sheets out of the render — an exotic injected node can make html2canvas
-    // throw on EVERY capture (a PC-only "no thumbnails ever" failure).
-    const target = document.querySelector('.screen-layout')
-      || document.getElementById('root') || document.body;
+    // so Android/mobile output is byte-identical. Target selection lives in
+    // captureTargetEl(): the LIVE column only — never the overview overlay's
+    // own layout, an inert pager peek, or a zero-sized transient node (the
+    // PC failure classes in the [thumb] traces).
+    const target = captureTargetEl();
+    if (!target) { _thumbFail('no capture target'); return ''; }
     const canvas = await h2c(target, {
       backgroundColor: bg,
       onclone: (/** @type {Document} */ clonedDoc) => {

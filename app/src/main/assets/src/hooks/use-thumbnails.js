@@ -61,7 +61,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
-import { PlatformBridge } from '../utils/platform-bridge.js';
+import { PlatformBridge, captureTargetEl } from '../utils/platform-bridge.js';
 
 /**
  * Publish the tab-card aspect ratio (--card-ar) from the APP COLUMN
@@ -73,8 +73,13 @@ import { PlatformBridge } from '../utils/platform-bridge.js';
  * so the capture path re-measures once real screens exist.
  */
 function updateCardAr() {
-  const layout = document.querySelector('.screen-layout');
-  const colW = layout ? layout.getBoundingClientRect().width : 0;
+  // Same target selection as the capture itself (captureTargetEl) so the
+  // card box and the pixels that fill it always agree — the naive
+  // first-.screen-layout read could measure the overview overlay's own
+  // layout or a transient zero-sized node.
+  const layout = captureTargetEl();
+  const colW = (layout && layout.classList && layout.classList.contains('screen-layout'))
+    ? layout.getBoundingClientRect().width : 0;
   const w = colW || window.innerWidth || 1;
   const h = window.innerHeight || 1;
   document.documentElement.style.setProperty('--card-ar', Math.round(w) + ' / ' + h);
@@ -254,6 +259,9 @@ export function useThumbnails({
   // primary superseded it (fresh scroll position or content).
   const captureSeqRef = React.useRef(0);
   const variantTimerRef = React.useRef(/** @type {any} */ (null));
+  // Bounded failed-capture retry (see the tail of captureActiveTabThumbnail).
+  const captureRetryCountRef = React.useRef(0);
+  const captureRetryTimerRef = React.useRef(/** @type {any} */ (null));
 
   // ── Capture callback ───────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
@@ -262,10 +270,19 @@ export function useThumbnails({
   // capture comment below.
   const captureActiveTabThumbnail = React.useCallback(async () => {
     if (!tabsEnabled) return;
-    if (tabsOverviewOpenRef.current) return; // overview open → no point capturing
     if (captureInFlightRef.current) return;
     const tab = tabsRef.current[activeTabIdxRef.current];
     if (!tab) return;
+    // Garden pages are photographs — theme-neutral content where a themed
+    // re-render buys nothing (and html2canvas re-rasterizing large images is
+    // the priciest case). One capture fills BOTH variant slots.
+    const isGarden = tab.screen === 'garden-view';
+    // While the overview overlay is up only the GARDEN capture is suppressed:
+    // its native shot photographs the real screen (overlay included). Content
+    // tabs are clone renders that exclude the overlay via
+    // SCREENSHOT_IGNORE_CLASSES ('tabs-overview-layer'), so capturing under
+    // it is safe — and the overview-open heal below depends on it.
+    if (tabsOverviewOpenRef.current && isGarden) return;
     const key = tabContentKey(tab);
     // Re-measure the card aspect now that a real screen is up — the mount
     // effect can fire while a lazy-corpus placeholder (no .screen-layout)
@@ -281,10 +298,6 @@ export function useThumbnails({
 
     const curTheme = themeRef.current === 'light' ? 'light' : 'dark';
     const otherTheme = curTheme === 'light' ? 'dark' : 'light';
-    // Garden pages are photographs — theme-neutral content where a themed
-    // re-render buys nothing (and html2canvas re-rasterizing large images is
-    // the priciest case). One capture fills BOTH variant slots.
-    const isGarden = tab.screen === 'garden-view';
     const seq = ++captureSeqRef.current;
     if (variantTimerRef.current) { clearTimeout(variantTimerRef.current); variantTimerRef.current = null; }
 
@@ -325,7 +338,6 @@ export function useThumbnails({
       variantTimerRef.current = setTimeout(async () => {
         variantTimerRef.current = null;
         if (captureSeqRef.current !== seq) return;        // superseded
-        if (tabsOverviewOpenRef.current) return;          // overview covers the page
         try {
           const dataUrl = await PlatformBridge.takeThemedScreenshot(otherTheme, 1440, 90);
           if (captureSeqRef.current === seq) mergeVariant(otherTheme, dataUrl);
@@ -347,10 +359,12 @@ export function useThumbnails({
     // priciest case, are theme-neutral, and carry no floating chrome — so
     // the native path is both cheaper and blink-free there).
     captureInFlightRef.current = true;
+    let gotUrl = false;
     try {
       const dataUrl = isGarden
         ? await PlatformBridge.takeScreenshot(navHeightDp, 1440, 90)
         : await PlatformBridge.takeThemedScreenshot(curTheme, 1440, 90);
+      gotUrl = !!dataUrl;
       applyThumb(dataUrl);
       if (dataUrl) scheduleOtherTheme();
     } catch (_e) {
@@ -359,13 +373,46 @@ export function useThumbnails({
     } finally {
       captureInFlightRef.current = false;
     }
+    // BOUNDED RETRY: a failed capture used to wait for the next scroll-stop
+    // or nav — on a tab the user just opens the overview from, that's never,
+    // and the card stays a blank ✦ forever (owner's PC). Retry up to 3
+    // consecutive times, 2.5s apart, seq-guarded so a real capture (or a
+    // newer failure chain) supersedes the pending retry. Success resets the
+    // budget; a permanently-broken environment stops after 3 traces.
+    if (gotUrl) {
+      captureRetryCountRef.current = 0;
+    } else if (captureRetryCountRef.current < 3) {
+      captureRetryCountRef.current += 1;
+      if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
+      captureRetryTimerRef.current = setTimeout(() => {
+        captureRetryTimerRef.current = null;
+        if (captureSeqRef.current !== seq) return; // superseded by a newer capture
+        captureActiveTabThumbnail();
+      }, 2500);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTabIdxRef/tabsOverviewOpenRef/tabsRef are useRef refs read via .current inside the callback — call-time fresh, never stale. The ref objects themselves are stable; inclusion would add noise without changing behavior.
   }, [tabsEnabled]);
 
-  // ── Pending other-theme capture — clear on unmount ─────────────────────
+  // ── Pending other-theme capture + failed-capture retry — clear on unmount ─
   React.useEffect(() => () => {
     if (variantTimerRef.current) clearTimeout(variantTimerRef.current);
+    if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
   }, []);
+
+  // ── Overview-open heal ─────────────────────────────────────────────────
+  // The moment the overview opens is the one guaranteed chance to refresh
+  // the ACTIVE card the user is about to look at — and the only trigger
+  // available while it's open (the page under the overlay neither scrolls
+  // nor navigates). Clone renders exclude the overlay via
+  // SCREENSHOT_IGNORE_CLASSES, so this is safe for content tabs; the
+  // callback itself suppresses Garden (native shot would photograph the
+  // overlay). Heals both the blank-✦ card (all captures failed while the
+  // tab was live) and a stale-geometry thumb after a window resize.
+  React.useEffect(() => {
+    if (!tabsEnabled || !tabsOverviewOpen) return undefined;
+    const timer = setTimeout(captureActiveTabThumbnail, 60);
+    return () => clearTimeout(timer);
+  }, [tabsOverviewOpen, tabsEnabled, captureActiveTabThumbnail]);
 
   // ── Scroll-stop capture effect ─────────────────────────────────────────
   // Keep tab thumbnails fresh: capture on scroll-stop (300ms idle).
@@ -407,9 +454,24 @@ export function useThumbnails({
   // race where this effect fires while a lazy corpus placeholder is up.)
   React.useEffect(() => {
     updateCardAr();
-    window.addEventListener('resize', updateCardAr);
-    return () => window.removeEventListener('resize', updateCardAr);
-  }, []);
+    let recaptureTimer = /** @type {any} */ (null);
+    const onResize = () => {
+      updateCardAr();
+      // A resize changes the column geometry the cards mirror — every stored
+      // thumb is now the WRONG aspect for the new --card-ar (cover-cropping
+      // them is the PC "giant text / cropped garbage" glitch). Recapture the
+      // active tab once the resize settles; background tabs heal when
+      // visited (and render letterboxed meanwhile — TabsOverview's aspect
+      // guard).
+      clearTimeout(recaptureTimer);
+      recaptureTimer = setTimeout(captureActiveTabThumbnail, 600);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      clearTimeout(recaptureTimer);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [captureActiveTabThumbnail]);
 
   // ── Capture-after-nav effect ───────────────────────────────────────────
   // Capture shortly after any screen/tab change — and after a THEME change

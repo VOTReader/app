@@ -22,6 +22,38 @@
    "Tab actions" (Close others / to the right) live on the ⋮ button.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * True when a stored thumbnail's aspect no longer matches the card box it
+ * must fill — a thumb captured under a different window geometry (resize,
+ * phone→desktop, the pre-column capture era). Cover-cropping such a thumb
+ * shows a blown-up top-corner crop (the PC "giant text" glitch); the
+ * overview letterboxes it instead (object-fit:contain) until a fresh
+ * capture at the current geometry replaces it. 12% tolerance: scrollbar
+ * gutters and rounding never letterbox a same-geometry capture.
+ *
+ * @param {number} naturalW @param {number} naturalH
+ * @param {number} boxW @param {number} boxH
+ * @returns {boolean}
+ */
+export function thumbAspectMismatch(naturalW, naturalH, boxW, boxH) {
+  if (!naturalW || !naturalH || !boxW || !boxH) return false;
+  const thumbAr = naturalW / naturalH;
+  const boxAr = boxW / boxH;
+  return Math.abs(thumbAr - boxAr) / boxAr > 0.12;
+}
+
+// Apply the aspect guard to a thumb <img>. Runs from BOTH the ref callback
+// (cached images are already complete before onLoad can fire) and onLoad
+// (fresh loads). Pure DOM class toggle — no React state, no re-render.
+function _fitThumb(img) {
+  if (!img || !img.complete || !img.parentElement) return;
+  const box = img.parentElement.getBoundingClientRect();
+  img.classList.toggle(
+    'thumb-ar-mismatch',
+    thumbAspectMismatch(img.naturalWidth, img.naturalHeight, box.width, box.height),
+  );
+}
+
 // Abnormal-path trace — mirrors the [thumb] pattern: console.warn for a
 // live devtools look + DiagnosticLog for the offline trail.
 function _tabsDragTrace(msg) {
@@ -341,7 +373,11 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                     which cancels the touch stream and killed the reorder
                     gesture (desktop mouse drags too). */}
                 {thumb
-                  ? <img className={`tab-card-thumb${thumbFlip ? ' thumb-theme-flip' : ''}`} src={thumb} alt="" draggable={false} />
+                  ? <img
+                      className={`tab-card-thumb${thumbFlip ? ' thumb-theme-flip' : ''}`}
+                      src={thumb} alt="" draggable={false}
+                      ref={_fitThumb} onLoad={(e) => _fitThumb(e.target)}
+                    />
                   : <div className="tab-card-thumb-placeholder">
                       <div className="tab-card-thumb-sigil">{"✦"}</div>
                     </div>
