@@ -390,6 +390,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     'vot-journal-notebooks':   { store: JournalNotebookStore, method: 'replaceAll' },
     'vot-journal-index':       { store: JournalIndexStore,    method: 'replaceAll' },
     'vot-journal-stats':       { store: JournalStatsStore,    method: 'replaceAll' },
+    'vot-reading-streak':      { store: ReadingStreakStore,   method: 'replaceAll' },
     'vot-recent-nav':          { store: RecentNavStore,       method: 'replaceAll' },
     'vot-history':             { store: HistoryStore,         method: 'setAll' },
     'vot-prophecy-cards':      { store: ProphecyCardsStore,   method: 'setAll' },

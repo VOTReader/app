@@ -76,6 +76,16 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     () => (typeof JournalStatsStore !== 'undefined') ? JournalStatsStore.getVersion() : 0
   );
   React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof ReadingStreakStore !== 'undefined') ? ReadingStreakStore.subscribe(cb) : () => {}, []),
+    () => (typeof ReadingStreakStore !== 'undefined') ? ReadingStreakStore.getVersion() : 0
+  );
+  // Re-check the reading streak on every Progress open — an app left
+  // running across midnight would otherwise show a stale unbroken streak
+  // (the module-load recompute only runs once per boot).
+  React.useEffect(() => {
+    if (typeof ReadingStreakStore !== 'undefined') ReadingStreakStore.recomputeFromLoad();
+  }, []);
+  React.useSyncExternalStore(
     React.useCallback((cb) => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.subscribe(cb) : () => {}, []),
     () => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.getVersion() : 0
   );
@@ -84,6 +94,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   const totalRead = readItems ? Object.keys(readItems).length : 0;
   const jrnStats = (typeof JournalStatsStore !== 'undefined') ? JournalStatsStore.get() : { currentStreak: 0 };
   const streak = jrnStats.currentStreak || 0;
+  const readStreak = (typeof ReadingStreakStore !== 'undefined') ? (ReadingStreakStore.get().currentStreak || 0) : 0;
   const journalCount = (typeof JournalStore !== 'undefined') ? JournalStore.count() : 0;
   const noteCount = (typeof NoteStore !== 'undefined') ? NoteStore.count() : 0;
   const linkCount = (typeof LinkStore !== 'undefined') ? LinkStore.all().length : 0;
@@ -102,7 +113,8 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
 
   const heroStats = [
     { num: totalRead, label: 'Read', sub: totalRead === 1 ? 'chapter or letter' : 'chapters & letters' },
-    { num: streak, label: 'Streak', sub: streak === 1 ? 'day of journaling' : 'days of journaling' },
+    { num: readStreak, label: 'Reading Streak', sub: readStreak === 1 ? 'day of reading' : 'days of reading' },
+    { num: streak, label: 'Journal Streak', sub: streak === 1 ? 'day of journaling' : 'days of journaling' },
     { num: journalCount, label: journalCount === 1 ? 'Entry' : 'Entries', sub: 'in your journal' },
   ];
   const libraryRows = [

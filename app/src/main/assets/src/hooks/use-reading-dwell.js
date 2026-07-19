@@ -84,6 +84,21 @@
  *   cancelDwell: () => void
  * }}
  */
+/**
+ * Record today as a reading day on the ReadingStreakStore (the days-
+ * reading streak on My Progress). Called from both dwell-commit sites —
+ * a dwell commit is the one honest "the user actually read today"
+ * signal (manual mark-as-read toggles don't count). Bare-name +
+ * typeof-guarded (cluster-B idiom) so bare test hosts need no stub;
+ * same-day repeat calls are store-side no-ops.
+ */
+function _recordReadingDay() {
+  if (typeof ReadingStreakStore !== 'undefined' && ReadingStreakStore) {
+    try { ReadingStreakStore.recordReadingDay(Date.now()); }
+    catch (e) { console.warn('reading-streak record failed', e); }
+  }
+}
+
 export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   // ── State ──────────────────────────────────────────────────────────────
   const [activeReadKey, setActiveReadKeyRaw] = React.useState(initialActiveReadKey);
@@ -112,6 +127,7 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
     if (pendingReadCommitRef.current) {pendingReadCommitRef.current();pendingReadCommitRef.current = null;}
     setActiveReadKeyRaw(dwellKeyRef.current);
     dwellAccRef.current = 0;dwellStartRef.current = null;dwellKeyRef.current = null;
+    _recordReadingDay();
   };
 
   const cancelDwell = () => {
@@ -129,6 +145,7 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
       setActiveReadKeyRaw(dwellKeyRef.current);
       dwellTimerRef.current = null;dwellAccRef.current = 0;
       dwellStartRef.current = null;dwellKeyRef.current = null;
+      _recordReadingDay();
     }, remaining);
   };
 

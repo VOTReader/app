@@ -72,6 +72,7 @@ const STORE_SHAPES = {
   'vot-notes': 'objectOfObjects',          // groupId → note
   'vot-prophecy-cards': 'object',          // "id:idx:type" → boolean
   'vot-journal-stats': 'object',           // {totalEntries, currentStreak, …}
+  'vot-reading-streak': 'object',          // {currentStreak, lastReadDate, …}
   'vot-state': 'object',                   // {tabs?, settings?, …} — store does NOT coerce
   'vot-bookmarks': 'array',
   'vot-links': 'array',

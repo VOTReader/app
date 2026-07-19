@@ -48,6 +48,7 @@ import { NotebookStore } from '../stores/notebook-store.js';
 import { JournalStore, JournalNotebookStore } from '../stores/journal-store.js';
 import { JournalIndexStore } from '../stores/journal-index-store.js';
 import { JournalStatsStore } from '../stores/journal-stats-store.js';
+import { ReadingStreakStore } from '../stores/reading-streak-store.js';
 import { RecentNavStore } from '../stores/recent-nav-store.js';
 import { HistoryStore } from '../stores/history-store.js';
 import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
@@ -714,6 +715,7 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
   const ALL_STORES = [
     AnnotationStore, NoteStore, BookmarkStore, LinkStore, NotebookStore,
     JournalStore, JournalNotebookStore, JournalIndexStore, JournalStatsStore,
+    ReadingStreakStore,
     RecentNavStore, HistoryStore, ProphecyCardsStore, HomeOrderStore, StateStore,
     WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore,
   ];
@@ -728,6 +730,7 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     'vot-journal-notebooks': { store: JournalNotebookStore, method: 'replaceAll' },
     'vot-journal-index':     { store: JournalIndexStore,    method: 'replaceAll' },
     'vot-journal-stats':     { store: JournalStatsStore,    method: 'replaceAll' },
+    'vot-reading-streak':    { store: ReadingStreakStore,   method: 'replaceAll' },
     'vot-recent-nav':        { store: RecentNavStore,       method: 'replaceAll' },
     'vot-history':           { store: HistoryStore,         method: 'setAll' },
     'vot-prophecy-cards':    { store: ProphecyCardsStore,   method: 'setAll' },
@@ -792,6 +795,7 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     JournalNotebookStore.replaceAll({ list: [{ id: 'jnb_a', name: 'Daily', sortIndex: 0, created: 1, updated: 1 }] });
     JournalIndexStore.replaceAll({ 'chapter:matthew:5': ['j1'] });
     JournalStatsStore.replaceAll({ totalEntries: 42, currentStreak: 7, longestStreak: 14, lastEntryDate: today, milestonesUnlocked: ['first', 'streak-7'] });
+    ReadingStreakStore.replaceAll({ currentStreak: 3, longestStreak: 9, lastReadDate: today, totalDays: 50 });
     RecentNavStore.replaceAll([{ kind: 'letter', letterId: 'wide-path', ts: 2000 }]);
     HistoryStore.setAll([{ type: 'letter', letterId: 'wide-path', key: 'lt:wide-path', ts: 2000 }]);
     ProphecyCardsStore.setAll({ 'matthew-1:0:prophecy': true });
@@ -826,6 +830,7 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     AnnotationStore.replaceAll(null); NoteStore.replaceAll(null); BookmarkStore.replaceAll(null);
     LinkStore.replaceAll(null); NotebookStore.replaceAll(null); JournalStore.replaceAll(null);
     JournalNotebookStore.replaceAll(null); JournalIndexStore.replaceAll(null); JournalStatsStore.replaceAll(null);
+    ReadingStreakStore.replaceAll(null);
     RecentNavStore.replaceAll(null); HistoryStore.setAll(null); ProphecyCardsStore.setAll(null);
     HomeOrderStore.set([]); StateStore.set({});
     WelcomedFlagStore.clear(); AboutSeenFlagStore.clear(); GardenWarningFlagStore.clear();
@@ -868,6 +873,11 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(stats.longestStreak).toBe(14);
     expect(stats.lastEntryDate).toBe(today);
     expect(stats.milestonesUnlocked).toEqual(['first', 'streak-7']);
+    const rdStreak = ReadingStreakStore.get();
+    expect(rdStreak.currentStreak).toBe(3);
+    expect(rdStreak.longestStreak).toBe(9);
+    expect(rdStreak.lastReadDate).toBe(today);
+    expect(rdStreak.totalDays).toBe(50);
     expect(RecentNavStore.list()[0].letterId).toBe('wide-path');
     expect(HistoryStore.list()[0].letterId).toBe('wide-path');
     expect(ProphecyCardsStore.getOne('matthew-1:0:prophecy')).toBe(true);

@@ -17,7 +17,7 @@ import { tallyGroup, countReadFor, mostAnnotatedSources } from '../../utils/prog
 const STUBBED = [
   'ScreenLayout', 'LibraryNav',
   'NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore',
-  'JournalStatsStore', 'AnnotationStore',
+  'JournalStatsStore', 'ReadingStreakStore', 'AnnotationStore',
   'buildProgressGroups', 'tallyGroup', 'countReadFor', 'mostAnnotatedSources',
   'findEntryContext', 'BIBLE_BOOK_LIST',
 ];
@@ -32,6 +32,10 @@ function setupGlobals(over = {}) {
   globalThis.BookmarkStore = mkStore({ count: () => over.bookmarks || 0 });
   globalThis.JournalStore = mkStore({ count: () => over.journal || 0 });
   globalThis.JournalStatsStore = mkStore({ get: () => ({ currentStreak: over.streak || 0 }) });
+  globalThis.ReadingStreakStore = mkStore({
+    get: () => ({ currentStreak: over.readStreak || 0 }),
+    recomputeFromLoad: () => {},
+  });
   globalThis.AnnotationStore = mkStore({ all: () => over.ann || {} });
   globalThis.buildProgressGroups = () => over.groups || [];
   globalThis.tallyGroup = tallyGroup;
@@ -68,16 +72,19 @@ describe('MyProgressScreen — hero + empty states (brand-new user)', () => {
     setupGlobals();
     const { container } = renderScreen();
     const nums = [...container.querySelectorAll('.prg-stat-num')].map((n) => n.textContent);
-    expect(nums).toEqual(['0', '0', '0']);
+    expect(nums).toEqual(['0', '0', '0', '0']);
     expect(container.textContent).toContain('Nothing marked yet');
     expect(container.textContent).toContain('Loading your library…'); // corpora not loaded
   });
 
-  it('fills the hero from readItems + journal stats + journal count', () => {
-    setupGlobals({ streak: 6, journal: 4 });
+  it('fills the hero from readItems + reading streak + journal stats + journal count', () => {
+    setupGlobals({ streak: 6, journal: 4, readStreak: 12 });
     const { container } = renderScreen({ readItems: { 'v1:mark:1': 1, 'v1:mark:2': 1 } });
     const nums = [...container.querySelectorAll('.prg-stat-num')].map((n) => n.textContent);
-    expect(nums).toEqual(['2', '6', '4']);
+    expect(nums).toEqual(['2', '12', '6', '4']);
+    const labels = [...container.querySelectorAll('.prg-stat-label')].map((n) => n.textContent);
+    expect(labels).toEqual(['Read', 'Reading Streak', 'Journal Streak', 'Entries']);
+    expect(container.textContent).toContain('days of reading');
   });
 });
 
