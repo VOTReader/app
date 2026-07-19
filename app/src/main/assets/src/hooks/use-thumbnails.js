@@ -14,10 +14,16 @@
      - IDB load-on-mount  (idbReadAll — reads IndexedDB on first render)
      - GC effect          (debounced, removes stale keys no longer tied
                            to any open tab)
-     - captureActiveTabThumbnail  (React.useCallback, stable on tabsEnabled)
+     - captureActiveTabThumbnail  (React.useCallback, stable on tabsEnabled;
+                                   failed captures retry up to 3× @2.5s)
      - scroll-stop capture effect (attaches to __scrollEl with polling)
-     - aspect-ratio CSS var effect (sets --card-ar on resize)
+     - aspect-ratio CSS var effect (sets --card-ar on resize; a settled
+                                   resize also RECAPTURES the active tab —
+                                   stored thumbs would be the wrong aspect)
      - capture-after-nav effect   (fires 350 ms after screen/tab change)
+     - overview-open heal effect  (opening the overview captures the active
+                                   content tab — safe: clone renders exclude
+                                   the overlay; heals blank/stale cards)
 
    DOES NOT OWN:
      - tabContentKey / idbReadAll / idbPut / idbDelete — global helpers
