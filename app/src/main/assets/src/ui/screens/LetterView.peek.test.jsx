@@ -86,3 +86,64 @@ describe('LetterView pager.peek with a host resolvePeek', () => {
     expect(desc.title).toBe('Section Three');
   });
 });
+
+/* ── Cross-VOLUME chain peek (2026-07-19, owner-directed native feel) ────
+   At a reading-chain boundary whose destination is another LetterView
+   collection, the peek is the REAL first/last letter of that volume —
+   not a card. Only different-component destinations keep the card. */
+describe('LetterView pager.peek across a volume boundary', () => {
+  const V2_FIRST = { id: 'the-wide-path', title: 'The Wide Path', num: 1, blocks: [], footnotes: {}, nkjv: {}, prevLetter: null, nextLetter: null };
+  const LAST_LETTER = { ...LETTER, nextLetter: null }; // end of the current volume
+
+  beforeEach(() => {
+    globalThis.COL_BY_KEY = new Map([
+      ['two', { volKey: 'two', kind: 'letter', label: 'Volume Two', letterScreen: 'vot-letter' }],
+      ['wtlb1', { volKey: 'wtlb1', kind: 'wtlb', label: 'Words To Live By: Part One', letterScreen: 'wtlb-one-entry' }],
+    ]);
+    globalThis.colLetterArr = (col) => (col.volKey === 'two' ? [V2_FIRST] : []);
+    globalThis.colPreface = () => null;
+  });
+  afterEach(() => {
+    for (const k of ['COL_BY_KEY', 'colLetterArr', 'colPreface']) delete globalThis[k];
+  });
+
+  it('peeks the REAL first letter of the next volume (annotated screen, not a card)', () => {
+    renderLetter({
+      letter: LAST_LETTER, volKey: 'one',
+      nextBoundary: { short: 'Volume Two', title: 'The Wide Path', volKey: 'two', letterId: 'the-wide-path' },
+    });
+    const desc = capturedPager.peek('next');
+    expect(desc.kind).toBe('screen');
+    expect(desc.el.props.letter).toBe(V2_FIRST);
+    expect(desc.el.props.volKey).toBe('two');
+    expect(desc.el.props.volumeLabel).toBe('Volume Two');
+    expect(desc.el.props.inert).toBe(true);
+  });
+
+  it('keeps the card when the destination is a different component family (WTLB)', () => {
+    renderLetter({
+      letter: LAST_LETTER, volKey: 'rebuke',
+      nextBoundary: { short: 'Words To Live By', title: 'Impasse', volKey: 'wtlb1', letterId: 'impasse' },
+    });
+    const desc = capturedPager.peek('next');
+    expect(desc.kind).toBe('boundary');
+    expect(desc.eyebrow).toBe('Next \xB7 Words To Live By');
+  });
+
+  it('keeps the card when the destination letter cannot resolve (corpus not loaded)', () => {
+    globalThis.colLetterArr = () => []; // volume two's corpus absent
+    renderLetter({
+      letter: LAST_LETTER, volKey: 'one',
+      nextBoundary: { short: 'Volume Two', title: 'The Wide Path', volKey: 'two', letterId: 'the-wide-path' },
+    });
+    expect(capturedPager.peek('next').kind).toBe('boundary');
+  });
+
+  it('keeps the card for special edges that carry no destination (the Revelation bridge)', () => {
+    renderLetter({
+      letter: { ...LETTER, prevLetter: null }, volKey: 'one',
+      prevBoundary: { short: 'Revelation', title: 'Revelation \xB7 Chapter 22' },
+    });
+    expect(capturedPager.peek('prev').kind).toBe('boundary');
+  });
+});

@@ -250,12 +250,17 @@ export function useReadingChainNav({
           onPrevBoundary = goToRevelationLast;
         }
       } else if (idx > 0) {
-        // Walk back through chain skipping empties
+        // Walk back through chain skipping empties. volKey + letterId name the
+        // DESTINATION _goLast lands on, so the host screen can peek the REAL
+        // last letter of the previous collection instead of a card (2026-07-19).
         for (let i = idx - 1; i >= 0; i--) {
           const pCol = COL_BY_KEY.get(READING_CHAIN[i]);
           const pArr = colLetterArr(pCol);
           if (pArr.length === 0) continue;
-          prevBoundary = { short: _boundaryShort(sourceCol, pCol), title: pArr[pArr.length - 1].title || pCol.short };
+          prevBoundary = {
+            short: _boundaryShort(sourceCol, pCol), title: pArr[pArr.length - 1].title || pCol.short,
+            volKey: pCol.volKey, letterId: pArr[pArr.length - 1].id,
+          };
           onPrevBoundary = _goLast[pCol.volKey];
           break;
         }
@@ -273,7 +278,13 @@ export function useReadingChainNav({
           const nArr = colLetterArr(nCol);
           if (nArr.length === 0) continue;
           const pref = colPreface(nCol);
-          nextBoundary = { short: _boundaryShort(sourceCol, nCol), title: (pref ? pref.title : nArr[0].title) || nCol.short };
+          // volKey + letterId name the DESTINATION _goFirst lands on
+          // (preface first when the collection has one — _firstPreface),
+          // so the host can peek the REAL first page of the next collection.
+          nextBoundary = {
+            short: _boundaryShort(sourceCol, nCol), title: (pref ? pref.title : nArr[0].title) || nCol.short,
+            volKey: nCol.volKey, letterId: pref ? pref.id : nArr[0].id,
+          };
           onNextBoundary = _goFirst[nCol.volKey];
           break;
         }

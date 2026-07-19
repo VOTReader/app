@@ -216,6 +216,10 @@ describe('useReadingChainNav — boundaryConfig', () => {
     expect(cfg.prevBoundary.short).toBe('V2');
     // Last letter of V2 is v2-z with title 'V2 Z'.
     expect(cfg.prevBoundary.title).toBe('V2 Z');
+    // Destination refs (2026-07-19): name the exact page onPrevBoundary
+    // lands on, so the host can peek the REAL last letter instead of a card.
+    expect(cfg.prevBoundary.volKey).toBe('two');
+    expect(cfg.prevBoundary.letterId).toBe('v2-z');
   });
 
   it('mid-chain volKey walks forward to next non-empty collection (skips empties)', () => {
@@ -224,6 +228,23 @@ describe('useReadingChainNav — boundaryConfig', () => {
     const cfg = result.current.boundaryConfig('two', null);
     expect(cfg.nextBoundary.short).toBe('V3');
     expect(cfg.nextBoundary.title).toBe('V3 A');  // first letter
+    expect(cfg.nextBoundary.volKey).toBe('three');
+    expect(cfg.nextBoundary.letterId).toBe('v3-a');
+  });
+
+  it('next-boundary destination is the PREFACE when the collection has one (matches _goFirst)', () => {
+    // 'three' → 'wtlb1' which has a preface: _firstPreface lands on the
+    // preface, so the peek destination must be the preface too.
+    const { result } = setup();
+    const cfg = result.current.boundaryConfig('three', null);
+    expect(cfg.nextBoundary.volKey).toBe('wtlb1');
+    expect(cfg.nextBoundary.letterId).toBe('wtlb1-preface');
+  });
+
+  it('special edges carry NO destination refs (Revelation / Garden keep the card)', () => {
+    const { result } = setup();
+    expect(result.current.boundaryConfig('one', null).prevBoundary.volKey).toBeUndefined();
+    expect(result.current.boundaryConfig('holydays', null).nextBoundary.volKey).toBeUndefined();
   });
 
   it('uses preface title when the next collection has one (wtlb1)', () => {

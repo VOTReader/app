@@ -142,12 +142,44 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       ),
     };
   };
+  // Cross-COLLECTION neighbor along the reading chain (2026-07-19): when the
+  // destination is another WTLB-family collection (wtlb/blessed — also
+  // rendered by THIS component), peek its REAL first/last entry exactly like
+  // an in-collection neighbor. Different-component destinations (the VOT
+  // letters on either side of the WTLB run) keep the boundary card. The
+  // partLabel mirrors what screen-routes passes for each collection.
+  const WTLB_PART_LABELS = { wtlb1: 'Part One', wtlb2: 'Part Two', blessed: 'The Blessed' };
+  const _chainPeek = (b, side) => {
+    const card = { kind: 'boundary', eyebrow: b.short ? `${side === 'next' ? 'Next' : 'Previous'} \xB7 ${b.short}` : (side === 'next' ? 'Next' : 'Previous'), title: b.title };
+    const destCol = (b.volKey && typeof COL_BY_KEY !== 'undefined') ? COL_BY_KEY.get(b.volKey) : null;
+    if (!destCol || !_isWtlbFamily(destCol) || !b.letterId) return card;
+    const full = resolveNeighborLetter(b.volKey, b.letterId);
+    if (!full) return card;
+    return {
+      kind: 'screen',
+      el: (
+        // @ts-expect-error -- inert clone: only render-affecting props are passed (see _entryPeek)
+        <WtlbEntryView
+          entry={full}
+          volKey={b.volKey}
+          partLabel={WTLB_PART_LABELS[b.volKey] || partLabel}
+          scripturesDict={scripturesDict}
+          footnotesMode={footnotesMode}
+          theme={theme}
+          showProgressBar={showProgressBar}
+          markAsReadEnabled={false}
+          inert={true}
+          restoreScroll={savedScrollFor(letterScrollKey(b.volKey, full.id))}
+        />
+      ),
+    };
+  };
   const pager = {
     onPrev: goPrev,
     onNext: goNext,
     peek: (side) => side === 'next'
-      ? (nextEntry ? _entryPeek(nextEntry) : nextBoundary ? { kind: 'boundary', eyebrow: nextBoundary.short ? `Next \xB7 ${nextBoundary.short}` : 'Next', title: nextBoundary.title } : null)
-      : (prevEntry ? _entryPeek(prevEntry) : prevBoundary ? { kind: 'boundary', eyebrow: prevBoundary.short ? `Previous \xB7 ${prevBoundary.short}` : 'Previous', title: prevBoundary.title } : null),
+      ? (nextEntry ? _entryPeek(nextEntry) : nextBoundary ? _chainPeek(nextBoundary, 'next') : null)
+      : (prevEntry ? _entryPeek(prevEntry) : prevBoundary ? _chainPeek(prevBoundary, 'prev') : null),
   };
 
   const _attrCollectionLabel = (volStr) => {

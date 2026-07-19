@@ -26,18 +26,26 @@ describe('decideAxis', () => {
   });
 });
 
-describe('isCommit', () => {
-  it('commits past 35% of width', () => {
-    expect(isCommit(-140, 0, 400)).toBe(false); // exactly 35% → not past
-    expect(isCommit(-141, 0, 400)).toBe(true);
+describe('isCommit — native-feel decision (2026-07-19 retune)', () => {
+  it('slow release commits only past HALF the viewport', () => {
+    expect(isCommit(-200, 0, 400)).toBe(false);  // exactly 50% → not past
+    expect(isCommit(-201, 0, 400)).toBe(true);
+    expect(isCommit(-150, 0, 400)).toBe(false);  // 37.5% — the old 35% rule would have snapped here
   });
-  it('commits on a fast flick past a small minimum', () => {
-    expect(isCommit(-50, -1, 400)).toBe(true);   // 12.5% width, vx 1 px/ms
-    expect(isCommit(-50, 0.2, 400)).toBe(false);  // too slow
-    expect(isCommit(-20, -2, 400)).toBe(false);   // below the 8% minimum
+  it('a real flick TOWARD the neighbor commits from a modest distance', () => {
+    expect(isCommit(-50, -1, 400)).toBe(true);    // 12.5% width, vx 1 px/ms toward
+    expect(isCommit(-50, -0.5, 400)).toBe(false); // casual drift is not a flick (old 0.5 rule committed this)
+    expect(isCommit(-30, -2, 400)).toBe(false);   // below the 10% minimum
+    expect(isCommit(60, 1, 400)).toBe(true);      // prev-direction flick symmetrical
   });
-  it('never commits with non-positive width', () => {
+  it('a release clearly moving BACK toward the origin never commits — even past halfway', () => {
+    expect(isCommit(-260, 0.5, 400)).toBe(false); // 65% across but the finger was returning
+    expect(isCommit(260, -0.5, 400)).toBe(false); // symmetric
+    expect(isCommit(-260, 0.1, 400)).toBe(true);  // negligible reverse drift → position wins
+  });
+  it('never commits with non-positive width or zero displacement', () => {
     expect(isCommit(999, 9, 0)).toBe(false);
+    expect(isCommit(0, 9, 400)).toBe(false);
   });
 });
 

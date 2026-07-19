@@ -46,12 +46,12 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   // and inline highlight/link/bookmark icons before and after the swipe commits
   // (no more "section headings pop in after release"). Render-affecting settings
   // are threaded so the clone matches exactly what the committed chapter shows.
-  const _versesPeek = (ch) => ({
+  const _versesPeek = (bk, ch) => ({
     kind: 'screen',
     el: (
       // @ts-expect-error -- inert clone: only render-affecting props are passed; interactive callbacks (onIndex/onNavigate/…) are intentionally omitted (the peek is pointer-events:none + HTML inert, so they can never fire).
       <BibleChapterView
-        book={book}
+        book={bk}
         chapter={ch}
         translation={translation}
         restoredNames={restoredNames}
@@ -63,16 +63,28 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         showProgressBar={showProgressBar}
         markAsReadEnabled={false}
         inert={true}
-        restoreScroll={savedScrollFor(book.id + '-' + ch.num)}
+        restoreScroll={savedScrollFor(bk.id + '-' + ch.num)}
       />
     ),
   });
+  // A BOOK boundary peeks the REAL neighbor book's first/last chapter
+  // (2026-07-19, owner-directed "native feel") — prevBook/nextBook are full
+  // BIBLE_BOOK_LIST book objects from the same loaded corpus, so the peek is
+  // exactly the in-book chapter peek pointed at the neighbor book, and the
+  // commit (goNextCh → onNextBook) reconciles the SAME component in place —
+  // no remount, no flash. The lone pseudo-book (Revelation's "Volume One"
+  // bridge — a cross-corpus, cross-component edge) has no `id` and keeps
+  // the boundary card.
   const pager = {
     onPrev: goPrevCh,
     onNext: goNextCh,
     peek: (side) => side === 'next'
-      ? (nextCh ? _versesPeek(nextCh) : nextBook ? { kind: 'boundary', eyebrow: 'Next Book', title: nextBoundaryTitle || `${nextBook.title} 1` } : null)
-      : (prevCh ? _versesPeek(prevCh) : prevBook ? { kind: 'boundary', eyebrow: 'Previous Book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}` } : null),
+      ? (nextCh ? _versesPeek(book, nextCh)
+        : (nextBook && nextBook.id) ? _versesPeek(nextBook, nextBook.chapters[0])
+          : nextBook ? { kind: 'boundary', eyebrow: 'Next Book', title: nextBoundaryTitle || `${nextBook.title} 1` } : null)
+      : (prevCh ? _versesPeek(book, prevCh)
+        : (prevBook && prevBook.id) ? _versesPeek(prevBook, prevBook.chapters[prevBook.chapters.length - 1])
+          : prevBook ? { kind: 'boundary', eyebrow: 'Previous Book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}` } : null),
   };
 
   // An inert clone (a swipe peek) must never claim __onReadingComplete.

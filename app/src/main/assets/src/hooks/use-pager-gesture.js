@@ -69,17 +69,26 @@ export function decideAxis(dx, dy, slop = SLOP) {
 }
 
 /**
- * Commit when the drag passes 35% of the viewport width, OR a fast flick
- * (>0.5 px/ms) clears a small minimum (8% width).
+ * Native-feel commit decision (retuned 2026-07-19, owner-directed — the old
+ * 35%-width + 0.5px/ms flick committed nearly every partial drag, so
+ * "release part-way and return to the page you were on" effectively never
+ * happened and slow drags snapped early). ViewPager2 semantics:
+ *   - a REAL flick (>0.65 px/ms) TOWARD the neighbor commits from a modest
+ *     distance (10% width) — a quick page-turn gesture stays effortless;
+ *   - a release while clearly moving BACK toward the origin (>0.25 px/ms)
+ *     never commits, even past halfway — the user changed their mind;
+ *   - a slow release commits only past HALF the viewport — the page follows
+ *     the finger, and wherever most of the screen sits at release wins.
  * @param {number} dx @param {number} vx @param {number} width
  * @returns {boolean}
  */
 export function isCommit(dx, vx, width) {
   const adx = Math.abs(dx);
-  if (width <= 0) return false;
-  if (adx > width * 0.35) return true;
-  if (Math.abs(vx) > 0.5 && adx > width * 0.08) return true;
-  return false;
+  if (width <= 0 || dx === 0) return false;
+  const sameDir = dx < 0 ? vx < 0 : vx > 0;
+  if (sameDir && Math.abs(vx) > 0.65 && adx > width * 0.1) return true;
+  if (!sameDir && Math.abs(vx) > 0.25) return false;
+  return adx > width * 0.5;
 }
 
 /**

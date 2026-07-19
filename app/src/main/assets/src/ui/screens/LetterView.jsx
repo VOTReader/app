@@ -55,12 +55,45 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       ),
     };
   };
+  // Cross-VOLUME neighbor along the reading chain (2026-07-19, owner-directed
+  // "native feel"): when the destination is another LetterView collection
+  // (kind 'letter') and its letter resolves from the loaded corpus, peek the
+  // REAL first/last letter of that volume — identical to the in-volume peek
+  // (annotations painted, saved scroll, exact typography) — so a volume
+  // boundary looks and commits exactly like an ordinary page turn. Only a
+  // different-COMPONENT destination (WTLB/Blessed/Garden/Bible edges) keeps
+  // the boundary card. boundaryConfig supplies volKey + letterId naming the
+  // exact page its own commit handler lands on.
+  const _chainPeek = (b, side) => {
+    const card = { kind: 'boundary', eyebrow: b.short ? `${side === 'next' ? 'Next' : 'Previous'} \xB7 ${b.short}` : (side === 'next' ? 'Next' : 'Previous'), title: b.title };
+    const destCol = (b.volKey && typeof COL_BY_KEY !== 'undefined') ? COL_BY_KEY.get(b.volKey) : null;
+    if (!destCol || destCol.kind !== 'letter' || !b.letterId) return card;
+    const full = resolveNeighborLetter(b.volKey, b.letterId);
+    if (!full) return card;
+    return {
+      kind: 'screen',
+      el: (
+        // @ts-expect-error -- inert clone: only render-affecting props are passed (see _letterPeek)
+        <LetterView
+          letter={full}
+          volKey={b.volKey}
+          volumeLabel={destCol.label}
+          studyMode={studyMode}
+          theme={theme}
+          showProgressBar={showProgressBar}
+          markAsReadEnabled={false}
+          inert={true}
+          restoreScroll={savedScrollFor(letterScrollKey(b.volKey, full.id))}
+        />
+      ),
+    };
+  };
   const pager = {
     onPrev: goPrev,
     onNext: goNext,
     peek: (side) => side === 'next'
-      ? (letter.nextLetter ? _letterPeek(letter.nextLetter) : nextBoundary ? { kind: 'boundary', eyebrow: nextBoundary.short ? `Next \xB7 ${nextBoundary.short}` : 'Next', title: nextBoundary.title } : null)
-      : (letter.prevLetter ? _letterPeek(letter.prevLetter) : prevBoundary ? { kind: 'boundary', eyebrow: prevBoundary.short ? `Previous \xB7 ${prevBoundary.short}` : 'Previous', title: prevBoundary.title } : null),
+      ? (letter.nextLetter ? _letterPeek(letter.nextLetter) : nextBoundary ? _chainPeek(nextBoundary, 'next') : null)
+      : (letter.prevLetter ? _letterPeek(letter.prevLetter) : prevBoundary ? _chainPeek(prevBoundary, 'prev') : null),
   };
 
   // An inert clone (a swipe peek) must never claim the single __onReadingComplete
