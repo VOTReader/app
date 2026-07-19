@@ -48,6 +48,13 @@
 
    PARAMS:
      bookId                    selectBibleCh's destination bookId.
+     screen, chapterNum, letterId, studyId, studyChapterId
+                               The LIVE place identity — drives the
+                               catch-all arm effect (2026-07-19): any
+                               way of being on a reading screen (tab
+                               switch, cold-boot restore, the dot's own
+                               landing) arms the resume cursor; non-
+                               reading screens never touch it.
      activeReadKey             goToLastRead's branch-discriminator.
      lastReadLetterMap         goToLastRead reads it for the 'vol:'
                                branch's letter lookup.
@@ -100,6 +107,11 @@ import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
  *
  * @param {{
  *   bookId: string | null,
+ *   screen: string | null,
+ *   chapterNum: number | null,
+ *   letterId: string | null,
+ *   studyId: string | null,
+ *   studyChapterId: string | null,
  *   activeReadKey: string | null,
  *   lastReadLetterMap: Record<string, string>,
  *   lastReadChapters: Record<string, any>,
@@ -124,13 +136,41 @@ import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
  * }}
  */
 export function useReadingPositionNav({
-  bookId,
+  bookId, screen, chapterNum, letterId, studyId, studyChapterId,
   activeReadKey, lastReadLetterMap, lastReadChapters,
   setLetterId, setBookId, setChapterNum, setScreen,
   setActiveReadKey,
   setLastReadLetterMap, setLastReadChapters,
   getStudyById, selectStudy, selectStudyChapter,
 }) {
+  // ── Catch-all position arm (owner-reported 2026-07-19) ────────────────
+  // Every explicit nav selector arms the reading cursor, but some arrival
+  // paths had NO selector: switching to a TAB already sitting on a reading
+  // screen, a cold-boot restore into one, and the reading dot's own
+  // landing. Watch the live screen identity and arm from it — any way of
+  // BEING on a reading screen makes it the resume target (and arms the
+  // streak dwell). Explicit selectors still arm too; the duplicate arm is
+  // idempotent (same key, same cursor value, timer re-arm). Non-reading
+  // screens (home, journal, settings, …) match no branch and leave the
+  // cursor untouched — a detour can never move the dot.
+  React.useEffect(() => {
+    if (screen === 'bible-ch' || screen === 'matthew-ch') {
+      const bid = screen === 'matthew-ch' ? 'matthew' : bookId;
+      if (!bid || chapterNum == null) return;
+      setActiveReadKey(bid, () => setLastReadChapters((prev) => ({ ...prev, [bid]: chapterNum })));
+    } else if (screen === 'bible-study-chapter') {
+      if (!studyId || !studyChapterId) return;
+      const study = getStudyById(studyId);
+      if (!study) return;
+      const key = 'bible-study-' + study.slug;   // studyReadKey format (goToLastRead slices this prefix)
+      setActiveReadKey(key, () => setLastReadChapters((prev) => ({ ...prev, [key]: studyChapterId })));
+    } else {
+      const col = (typeof COL_BY_LETTER_SC !== 'undefined') ? COL_BY_LETTER_SC.get(screen) : null;
+      if (!col || !letterId) return;
+      setActiveReadKey('vol:' + col.volKey, () => setLastReadForVol(col.volKey, letterId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the PLACE identity only. The setters/lookups (setActiveReadKey, setLastReadChapters, setLastReadForVol, getStudyById) are recreated per render but read call-time state via closures/refs — including them would re-arm the dwell timer EVERY render (breaking the streak dwell) for zero behavioral gain.
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId]);
   // ── Prophecy card expand/collapse state (IDB-backed via ProphecyCardsStore) ─
   // Key format: "chapterId:blockIndex:cardType" → boolean.
   // The ref-cached pattern is preserved so consumers can batch mutations

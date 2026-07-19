@@ -989,30 +989,28 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             />
             <SettingsRow
               label="Reading Position Dot"
-              desc="A pulsing gold dot in the top navigation bar that takes you back to where you were last reading."
+              desc="A pulsing gold dot in the top navigation bar that takes you back to where you were last reading. It follows you the moment you open any chapter or letter."
               checked={settings.showReadingDot}
               onToggle={() => onToggle("showReadingDot")}
             />
-            {settings.showReadingDot && (
-              <SelectField
-                eyebrow="Reading"
-                title="Reading Dot Dwell Time"
-                label="Reading Dot Dwell Time"
-                desc="How long you must stay on a page before the reading dot updates to that position. Shorter = updates faster; longer = requires more settled reading."
-                value={settings.dwellMs || "20000"}
-                options={[
-                  { id: "3000",  label: "3 seconds",  desc: "Updates almost immediately" },
-                  { id: "5000",  label: "5 seconds",  desc: "Very quick" },
-                  { id: "10000", label: "10 seconds", desc: "Quick" },
-                  { id: "15000", label: "15 seconds", desc: "Moderate" },
-                  { id: "20000", label: "20 seconds", desc: "Standard (default)" },
-                  { id: "30000", label: "30 seconds", desc: "Relaxed" },
-                  { id: "45000", label: "45 seconds", desc: "Deliberate" },
-                  { id: "60000", label: "60 seconds", desc: "Requires a full minute on the page" }
-                ]}
-                onChange={(v) => onSetting("dwellMs", v)}
-              />
-            )}
+            <SelectField
+              eyebrow="Reading"
+              title="Reading Streak Dwell Time"
+              label="Reading Streak Dwell Time"
+              desc="How long you must stay reading before the day counts toward the reading streak on My Progress. The reading dot is not affected — it always follows where you are."
+              value={settings.dwellMs || "20000"}
+              options={[
+                { id: "3000",  label: "3 seconds",  desc: "Counts almost immediately" },
+                { id: "5000",  label: "5 seconds",  desc: "Very quick" },
+                { id: "10000", label: "10 seconds", desc: "Quick" },
+                { id: "15000", label: "15 seconds", desc: "Moderate" },
+                { id: "20000", label: "20 seconds", desc: "Standard (default)" },
+                { id: "30000", label: "30 seconds", desc: "Relaxed" },
+                { id: "45000", label: "45 seconds", desc: "Deliberate" },
+                { id: "60000", label: "60 seconds", desc: "Requires a full minute of reading" }
+              ]}
+              onChange={(v) => onSetting("dwellMs", v)}
+            />
             <SettingsRow
               label="Random Letter Button"
               desc="A breathing dice icon on the home screen that opens a random chapter or letter when tapped."

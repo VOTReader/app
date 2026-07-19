@@ -62,6 +62,7 @@ afterEach(() => {
 // ── Test helpers ────────────────────────────────────────────────────────
 const baseProps = () => ({
   bookId: null,
+  screen: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null,
   activeReadKey: null,
   lastReadLetterMap: {},
   lastReadChapters: {},
@@ -316,5 +317,86 @@ describe('useReadingPositionNav — goToLastRead (branch dispatch)', () => {
     act(() => { result.current.goToLastRead(); });
     expect(props.setBookId).not.toHaveBeenCalled();
     expect(props.setScreen).not.toHaveBeenCalled();
+  });
+});
+
+/* ── Catch-all position arm (owner-reported 2026-07-19) ──────────────────
+   BEING on a reading screen must make it the resume target — the gap
+   cases were tab-switch onto an already-open reading screen and a
+   cold-boot restore (no nav selector ran → the dot pointed somewhere
+   older). Non-reading screens (home / journal / settings) must NEVER
+   touch the cursor — the owner's detour repro. */
+describe('useReadingPositionNav — catch-all position arm', () => {
+  let _prevColByLetterSc;
+  beforeEach(() => {
+    _prevColByLetterSc = window.COL_BY_LETTER_SC;
+    window.COL_BY_LETTER_SC = new Map([
+      ['vot-letter', { volKey: 'two', letterScreen: 'vot-letter' }],
+      ['wtlb-entry', { volKey: 'wtlb-one', letterScreen: 'wtlb-entry' }],
+    ]);
+  });
+  afterEach(() => { window.COL_BY_LETTER_SC = _prevColByLetterSc; });
+
+  it('arms the cursor from a bible chapter the tab is sitting on (tab-switch/restore repro)', () => {
+    const { props } = setup({ screen: 'bible-ch', bookId: 'proverbs', chapterNum: 2 });
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+    const [key, commitFn] = props.setActiveReadKey.mock.calls[0];
+    expect(key).toBe('proverbs');
+    commitFn(); // the commit writes the chapter cursor
+    const updater = props.setLastReadChapters.mock.calls[0][0];
+    expect(updater({ psalms: 23 })).toEqual({ psalms: 23, proverbs: 2 });
+  });
+
+  it('arms matthew under its fixed key', () => {
+    const { props } = setup({ screen: 'matthew-ch', chapterNum: 5 });
+    expect(props.setActiveReadKey.mock.calls[0][0]).toBe('matthew');
+  });
+
+  it('arms a letter screen under its vol: key via COL_BY_LETTER_SC', () => {
+    const { props } = setup({ screen: 'vot-letter', letterId: 'grafted-in' });
+    const [key, commitFn] = props.setActiveReadKey.mock.calls[0];
+    expect(key).toBe('vol:two');
+    commitFn();
+    const updater = props.setLastReadLetterMap.mock.calls[0][0];
+    expect(updater({})).toEqual({ two: 'grafted-in' });
+  });
+
+  it('arms a study chapter under the bible-study-<slug> key', () => {
+    const { props } = setup({
+      screen: 'bible-study-chapter', studyId: 'more-than-a-man', studyChapterId: 'ch-2',
+      getStudyById: vi.fn(() => ({ slug: 'more-than-a-man' })),
+    });
+    const [key, commitFn] = props.setActiveReadKey.mock.calls[0];
+    expect(key).toBe('bible-study-more-than-a-man');
+    commitFn();
+    const updater = props.setLastReadChapters.mock.calls[0][0];
+    expect(updater({})).toEqual({ 'bible-study-more-than-a-man': 'ch-2' });
+  });
+
+  it('NEVER arms from non-reading screens — a home/journal/settings detour cannot move the dot', () => {
+    for (const screen of ['home', 'journal-viewer', 'journal-editor', 'settings', 'library', 'notes-index', 'search']) {
+      const { props } = setup({ screen, bookId: 'proverbs', chapterNum: 2, letterId: 'grafted-in' });
+      expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    }
+  });
+
+  it('does not arm from a half-populated place (screen set, chapter missing)', () => {
+    const { props } = setup({ screen: 'bible-ch', bookId: 'proverbs', chapterNum: null });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+  });
+
+  it('arms once per place — an unrelated re-render does not re-arm', () => {
+    const props = { ...baseProps(), screen: 'bible-ch', bookId: 'proverbs', chapterNum: 2 };
+    const { rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+    rerender({ ...props, activeReadKey: 'proverbs' }); // unrelated prop churn
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-arms when the chapter changes (swipe/arrow within the book)', () => {
+    const props = { ...baseProps(), screen: 'bible-ch', bookId: 'proverbs', chapterNum: 2 };
+    const { rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+    rerender({ ...props, chapterNum: 3 });
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(2);
+    expect(props.setActiveReadKey.mock.calls[1][0]).toBe('proverbs');
   });
 });

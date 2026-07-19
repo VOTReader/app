@@ -314,9 +314,9 @@ function App() {
     tabsOverviewOpen,
   });
 
-  /* useReadingDwell — dwell-timer mark-as-read (commits a read only
-     after dwellMs of visible reading). Extracted to
-     src/hooks/use-reading-dwell.js (P6f). */
+  /* useReadingDwell — the resume cursor (commits IMMEDIATELY at arm,
+     2026-07-19) + the dwellMs timer that gates only the reading-streak
+     day record. src/hooks/use-reading-dwell.js (P6f). */
   const { activeReadKey, setActiveReadKey, cancelDwell } = useReadingDwell({
     dwellMs: settings.dwellMs,
     initialActiveReadKey: saved.activeReadKey || null,
@@ -354,7 +354,7 @@ function App() {
     selectMatthewCh, selectBibleCh,
     goToLastRead,
   } = useReadingPositionNav({
-    bookId,
+    bookId, screen, chapterNum, letterId, studyId, studyChapterId,
     activeReadKey, lastReadLetterMap, lastReadChapters,
     setLetterId, setBookId, setChapterNum, setScreen,
     setActiveReadKey,

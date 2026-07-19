@@ -1,7 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   useReadingDwell — dwell-timer mark-as-read tracking
+   useReadingDwell — reading-position cursor + the streak dwell timer
    ═══════════════════════════════════════════════════════════════════════
    Global-scope module. Bundled into dist/bundle-b.js.
+
+   SEMANTICS (changed 2026-07-19, owner-reported): the reading POSITION
+   (activeReadKey + the caller's commitFn cursor write) commits
+   IMMEDIATELY at setActiveReadKey time — the resume dot must point at
+   wherever the user actually last WAS. It used to be gated behind a
+   completed dwell (dwellMs, default 20s, timer RESET on every re-arm):
+   read a chapter for less than the dwell and it never became your
+   resume point, so the dot jumped to wherever the LAST completed dwell
+   happened — an older chapter or a different book ("takes me somewhere
+   unexpected"). The dwell timer survives, but it now gates ONLY the
+   ReadingStreakStore day record — the honest "actually read today"
+   signal wants a real dwell; the resume cursor does not.
 
    OWNS:
      - activeReadKey state (init from initialActiveReadKey for cold-start
@@ -12,7 +24,6 @@
      - dwellAccRef            (hook-internal ref — accumulated dwell ms)
      - dwellStartRef          (hook-internal ref — last resume timestamp)
      - dwellKeyRef            (hook-internal ref — key being timed)
-     - pendingReadCommitRef   (hook-internal ref — optional commit fn)
      - DWELL_MS()             (hook-internal; reads the dwellMs param)
      - commitDwellNow         (hook-internal plain arrow fn; identity
                                churn each render is intentional — the
@@ -20,8 +31,8 @@
      - cancelDwell            (returned — also used by setActiveReadKey)
      - scheduleDwell          (hook-internal plain arrow fn)
      - pauseDwell             (hook-internal plain arrow fn)
-     - setActiveReadKey       (returned — public setter; wraps
-                               cancelDwell + scheduleDwell)
+     - setActiveReadKey       (returned — public setter; commits the
+                               position NOW + re-arms the streak dwell)
      - __onDwellCommit bridge effect (binds commitDwellNow onto window
                                so ScreenLayout's scroll/fit checks can
                                call it; dep [commitDwellNow] re-binds
@@ -108,7 +119,6 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   const dwellAccRef = React.useRef(0);
   const dwellStartRef = React.useRef(null);
   const dwellKeyRef = React.useRef(null);
-  const pendingReadCommitRef = React.useRef(null);
 
   // ── DWELL_MS ───────────────────────────────────────────────────────────
   // Returns the effective dwell threshold in ms. Reads the dwellMs param.
@@ -120,12 +130,12 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   // __onDwellCommit bridge effect's [commitDwellNow] dep relies on that
   // identity churn to re-bind the window hook each render.
 
+  // The dwell timer's ONLY job now: the reading-streak day record. The
+  // position (activeReadKey + cursor write) already committed at arm time.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional identity churn: commitDwellNow is a plain function per the invariant above; the __onDwellCommit bridge effect (below) relies on per-render identity to re-bind window.__onDwellCommit with a fresh closure. eslint's suggested fix (useCallback) would break the design.
   const commitDwellNow = () => {
     if (!dwellKeyRef.current) return;
     if (dwellTimerRef.current) {clearTimeout(dwellTimerRef.current);dwellTimerRef.current = null;}
-    if (pendingReadCommitRef.current) {pendingReadCommitRef.current();pendingReadCommitRef.current = null;}
-    setActiveReadKeyRaw(dwellKeyRef.current);
     dwellAccRef.current = 0;dwellStartRef.current = null;dwellKeyRef.current = null;
     _recordReadingDay();
   };
@@ -133,7 +143,6 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   const cancelDwell = () => {
     if (dwellTimerRef.current) {clearTimeout(dwellTimerRef.current);dwellTimerRef.current = null;}
     dwellAccRef.current = 0;dwellStartRef.current = null;dwellKeyRef.current = null;
-    pendingReadCommitRef.current = null;
   };
 
   const scheduleDwell = () => {
@@ -141,8 +150,6 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
     const remaining = DWELL_MS() - dwellAccRef.current;
     dwellStartRef.current = Date.now();
     dwellTimerRef.current = setTimeout(() => {
-      if (pendingReadCommitRef.current) {pendingReadCommitRef.current();pendingReadCommitRef.current = null;}
-      setActiveReadKeyRaw(dwellKeyRef.current);
       dwellTimerRef.current = null;dwellAccRef.current = 0;
       dwellStartRef.current = null;dwellKeyRef.current = null;
       _recordReadingDay();
@@ -158,8 +165,17 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
 
   const setActiveReadKey = (key, commitFn) => {
     cancelDwell();
+    if (!key) return; // null = cancel only — never clears a committed position
+    // POSITION IS IMMEDIATE (2026-07-19): the resume cursor tracks wherever
+    // the user actually IS the moment they land there. Gating it behind a
+    // completed dwell sent the reading dot to wherever the LAST completed
+    // dwell happened — an older chapter or a different book. The commitFn
+    // (the caller's lastReadChapters / lastReadForVol write) runs NOW; the
+    // re-armed timer below gates only the reading-streak day record.
+    try { if (commitFn) commitFn(); }
+    catch (e) { console.warn('read-position commit failed', e); }
+    setActiveReadKeyRaw(key);
     dwellKeyRef.current = key;
-    pendingReadCommitRef.current = commitFn || null;
     if (document.visibilityState === 'visible') scheduleDwell();
   };
 
