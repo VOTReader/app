@@ -233,6 +233,61 @@ describe('createPagerGesture controller', () => {
     expect(typeof raf).toBe('function');       // the deferred rAF was real (window existed)
   });
 
+  it('BOUNDARY commit navigates instantly — no card-settle interlude', () => {
+    // The card peek is drag feedback, not the destination: a committed
+    // boundary swipe must land on the next book in the touchend task, with
+    // track + peek reset in the same tick and NO settle scheduled (the
+    // "black screen with a card" flash was the SETTLE_MS card animation).
+    const scheduled = [];
+    const { io, calls, track, nextPeek } = makeIO({
+      peekFor: () => ({ kind: 'boundary', eyebrow: 'Next Book', title: 'Exodus 1' }),
+      schedule: (fn, ms) => { scheduled.push(ms || 'raf'); fn(); return 0; },
+    });
+    const g = createPagerGesture(io);
+    g.start(startEv(300, 100));
+    g.move(moveEv(250, 100, 0));
+    g.move(moveEv(120, 100, 40)); // past threshold
+    g.end();
+    expect(calls.commits).toEqual(['next']);      // navigated at release
+    expect(track.style.transform).toBe('');       // reset in the same tick
+    expect(nextPeek.style.transform).toBe('');    // card gone in the same tick
+    expect(g.isSettling()).toBe(false);           // no settle state at all
+    expect(scheduled).toEqual([]);                // nothing deferred → nothing to dispose
+  });
+
+  it('a below-threshold BOUNDARY drag still springs back (no navigate)', () => {
+    const { io, calls, nextPeek } = makeIO({
+      peekFor: () => ({ kind: 'boundary', eyebrow: 'Next Book', title: 'Exodus 1' }),
+    });
+    const g = createPagerGesture(io);
+    g.start(startEv(300, 100));
+    g.move(moveEv(270, 100, 0));
+    g.move(moveEv(265, 100, 200)); // short + slow
+    g.end();
+    expect(calls.commits).toEqual([]);
+    expect(nextPeek.style.transform).toBe('');
+  });
+
+  it('a SCREEN commit still uses the settle animation (deferred commit unchanged)', () => {
+    // Contrast pin: same-collection commits keep the settle→commit ordering —
+    // the peek is pixel-identical to the destination, so the animation is the
+    // seamless path there. Only kind:'boundary' takes the instant path.
+    /** @type {(() => void) | null} */
+    let settleFn = null;
+    const { io, calls } = makeIO({
+      schedule: (fn, ms) => { if (ms) { settleFn = fn; return 1; } fn(); return 0; },
+    });
+    const g = createPagerGesture(io);
+    g.start(startEv(300, 100));
+    g.move(moveEv(250, 100, 0));
+    g.move(moveEv(120, 100, 40));
+    g.end();
+    expect(calls.commits).toEqual([]);   // NOT committed yet — settle in flight
+    expect(g.isSettling()).toBe(true);
+    if (settleFn) settleFn();             // settle animation completes
+    expect(calls.commits).toEqual(['next']);
+  });
+
   it('selection guard blocks commit', () => {
     const { io, calls } = makeIO({ hasSelection: () => true });
     const g = createPagerGesture(io);

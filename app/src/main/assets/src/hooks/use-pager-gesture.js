@@ -205,6 +205,23 @@ export function createPagerGesture(io) {
     }
   }
 
+  // Boundary commit (the target is the next/prev BOOK, not a same-collection
+  // page): navigate NOW, in the touchend task, with track + peek reset to rest
+  // in the same tick. The card peek is honest feedback DURING the drag, but it
+  // is not the destination — animating it fullscreen for SETTLE_MS and only
+  // then navigating read as "a black screen with a card flashes before the
+  // next book" (owner-reported). React flushes the discrete-event update
+  // before the next paint, so the reveal is one atomic frame: old page and
+  // card gone, next book on screen. No settle state → nothing to dispose,
+  // and the settle-outlives-the-screen double-commit hazard can't exist here.
+  function instantCommit(dir) {
+    const tr = io.getTrack();
+    const pk = io.getPeek(dir);
+    if (tr && tr.style) { tr.style.transition = 'none'; tr.style.transform = ''; tr.style.willChange = ''; }
+    if (pk && pk.style) { pk.style.transition = 'none'; pk.style.transform = ''; pk.style.willChange = ''; }
+    io.commit(dir);
+  }
+
   function beginSettle(committed, dir, width) {
     const trackEnd = committed ? (dir === 'next' ? -width : width) : 0;
     const peekEnd = committed ? 0 : (dir === 'next' ? width : -width);
@@ -269,6 +286,7 @@ export function createPagerGesture(io) {
       const hasSel = io.hasSelection ? io.hasSelection() : false;
       const vx = velocityFromSamples(st.samples);
       const committed = !hasSel && !!st.desc && isCommit(st.dx, vx, st.width);
+      if (committed && st.desc.kind === 'boundary') { instantCommit(st.dir); return; }
       beginSettle(committed, st.dir, st.width);
     },
 
