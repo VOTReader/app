@@ -59,12 +59,14 @@ export const IDBAdapter = (function () {
   //       Same additive pattern.
   //   5 — added vot-reading-streak (days-reading streak on My Progress).
   //       Same additive pattern.
+  //   6 — added vot-garden-pos (durable last-Garden-page memory).
+  //       Same additive pattern.
   // W7.1 dropped 'vot-ann-migrated' from STORE_NAMES (its only consumer,
   // the pre-W2 annotation bootstrap migration, was deleted). Deliberately
   // NOT a version bump: fresh installs simply skip it; a pre-existing empty
   // store on older installs is orphaned + harmless (never accessed, since
   // STORE_SET no longer lists it).
-  const DB_VERSION = 5;
+  const DB_VERSION = 6;
 
   /**
    * The 17 vot-* localStorage keys that migrate into IDB, plus the
@@ -98,6 +100,7 @@ export const IDBAdapter = (function () {
     'vot-note-default',
     'vot-library-order',
     'vot-reading-streak',
+    'vot-garden-pos',
     'meta',
   ]);
   const STORE_SET = new Set(STORE_NAMES);

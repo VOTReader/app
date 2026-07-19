@@ -82,6 +82,40 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
     return () => { PlatformBridge.setImmersiveMode(false); };
   }, []);
 
+  // ── Durable page memory (GardenPosStore) ─────────────────────────────
+  // RECORD: write-through every real page CHANGE to IDB immediately —
+  // the per-tab gardenPage rides the debounced vot-state flush, which an
+  // Android background kill can eat (no guaranteed pagehide). The mount
+  // value is deliberately NOT recorded: recording the default page 1 on
+  // mount would clobber the memory before the heal below can read it.
+  const didRecordMountRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!didRecordMountRef.current) { didRecordMountRef.current = true; return; }
+    if (typeof GardenPosStore !== 'undefined') GardenPosStore.set(page);
+  }, [page]);
+
+  // HEAL: a Garden that opens on the default page 1 (fresh tab, or tab
+  // state lost to a background kill) jumps to the remembered page once
+  // the store hydrates. A deliberate return to page 1 is remembered as
+  // lastPage 1, so the heal never fights intentional navigation; any
+  // page turn before hydration lands (pageRef !== 1) wins over the heal.
+  React.useEffect(() => {
+    if (typeof GardenPosStore === 'undefined') return;
+    let unsub = null;
+    const tryHeal = () => {
+      if (GardenPosStore.getState() !== 'loaded') return false;
+      const remembered = GardenPosStore.get();
+      if (remembered > 1 && pageRef.current === 1) onPageChangeRef.current(remembered);
+      return true;
+    };
+    if (!tryHeal()) {
+      unsub = GardenPosStore.subscribe(() => {
+        if (tryHeal() && unsub) { unsub(); unsub = null; }
+      });
+    }
+    return () => { if (unsub) unsub(); };
+  }, []);
+
   // Reset error + zoom on page/tier change
   React.useEffect(() => {
     setError(false);

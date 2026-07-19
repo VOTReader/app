@@ -60,6 +60,7 @@ import {
   JournalStatsStore, jrnShowMilestoneToast,
 } from './journal-stats-store.js';
 import { ReadingStreakStore } from './reading-streak-store.js';
+import { GardenPosStore } from './garden-pos-store.js';
 import { JournalIndexStore } from './journal-index-store.js';
 import { jrnId, JournalStore, JournalNotebookStore } from './journal-store.js';
 
@@ -173,6 +174,7 @@ Object.assign(window, {
   _jrnDateStr, _jrnDaysBetween, MILESTONE_DEFS,
   JournalStatsStore, jrnShowMilestoneToast,
   ReadingStreakStore,
+  GardenPosStore,
   JournalIndexStore,
   jrnId, JournalStore, JournalNotebookStore,
   // Components
