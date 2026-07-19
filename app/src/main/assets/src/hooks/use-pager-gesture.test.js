@@ -212,33 +212,45 @@ describe('createPagerGesture controller', () => {
     expect(calls.commits).toEqual(['prev']);
   });
 
-  it('parks a leftover committed-cover peek when the next gesture starts (no split screen)', () => {
-    // Models the real cross-gesture window: after a commit, finishSettle clears
-    // `settling` and the committed peek sits at translateX(0) (covering) until a
-    // DEFERRED rAF parks it. A fast second swipe starting in that window must not
-    // drive the opposite peek while this one still covers the view (two panes =
-    // the "split screen"). Defer the no-ms rAF here so the cover persists.
-    let raf = null;
-    const { io, calls, nextPeek, prevPeek } = makeIO({
-      schedule: (fn, ms) => { if (ms) { fn(); return 0; } raf = fn; return 1; },
+  it('ATOMIC REVEAL: a committed settle parks + de-promotes the peek in the SAME task as commit — no deferred rAF gap', () => {
+    // The Android one-frame glitch: the old committed path queued the commit
+    // (async render) and parked the covering peek on a blind rAF — when the
+    // vsync deadline landed between the two tasks the browser painted a frame
+    // of the OLD page at rest. The contract now: io.commit is synchronous
+    // (the wrapper flushSyncs), and finishSettle parks the peek immediately
+    // after commit returns — nothing is left to a scheduled callback.
+    const rafs = [];
+    const { io, calls, track, nextPeek } = makeIO({
+      schedule: (fn, ms) => { if (ms) { fn(); return 0; } rafs.push(fn); return 1; }, // defer any rAF
     });
     const g = createPagerGesture(io);
-    // Gesture 1: commit NEXT. Settle timer (ms) runs finishSettle synchronously →
-    // commit fires, but the rAF that clears nextPeek is deferred (stored in raf).
     g.start(startEv(300, 100));
     g.move(moveEv(250, 100, 0));
     g.move(moveEv(120, 100, 40));
-    g.end();
+    g.end(); // settle timer runs synchronously → finishSettle(committed)
     expect(calls.commits).toEqual(['next']);
     expect(g.isSettling()).toBe(false);
-    expect(nextPeek.style.transform).toBe('translateX(0px)'); // still covering (rAF pending)
-    // Gesture 2 (opposite) starts INSIDE the window → must park the cover first.
+    // Parked + de-promoted IN the finishSettle call itself:
+    expect(nextPeek.style.transform).toBe('');
+    expect(nextPeek.style.willChange).toBe('');
+    expect(track.style.transform).toBe('');
+    expect(track.style.willChange).toBe('');
+    // …and NO deferred rAF was ever scheduled (the gap cannot exist).
+    expect(rafs).toEqual([]);
+  });
+
+  it('a new touchstart parks any leaked peek transform (split-screen guard)', () => {
+    // parkAllPeeks at gesture start stays as the belt-and-braces guarantee:
+    // if any prior state leaked a peek mid-transform (silently-died stream),
+    // a fresh gesture must begin from a clean baseline.
+    const { io, nextPeek, prevPeek } = makeIO();
+    const g = createPagerGesture(io);
+    nextPeek.style.transform = 'translateX(0px)'; // simulated leak: covering
     g.start(startEv(100, 100));
-    expect(nextPeek.style.transform).toBe(''); // parked by parkAllPeeks → no split
-    g.move(moveEv(160, 100, 60));              // dx +60 → prev peek drives in
+    expect(nextPeek.style.transform).toBe('');    // parked → no split screen
+    g.move(moveEv(160, 100, 60));                 // dx +60 → prev peek drives in
     expect(prevPeek.style.transform).toMatch(/translateX/);
-    expect(nextPeek.style.transform).toBe(''); // and the cover stays parked
-    expect(typeof raf).toBe('function');       // the deferred rAF was real (window existed)
+    expect(nextPeek.style.transform).toBe('');
   });
 
   it('BOUNDARY commit navigates instantly — no card-settle interlude', () => {
@@ -498,6 +510,48 @@ describe('usePagerGesture (React wiring)', () => {
     } finally {
       vi.useRealTimers();
       globalThis.requestAnimationFrame = origRaf;
+      document.body.removeChild(el);
+    }
+  });
+
+  it('commit flushes the navigation via ReactDOM.flushSync and paints the annotation layers in the same task', () => {
+    // ATOMIC REVEAL wrapper contract: the controller parks the covering peek
+    // the moment io.commit returns, so commit must (1) flushSync the nav
+    // render and (2) run the imperative annotation passes synchronously —
+    // both BEFORE returning. Pre-fix, neither happened (async render + the
+    // passive-effect repaint frames later) → this test is RED on that code.
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    vi.useFakeTimers();
+    const flushSync = vi.fn((fn) => fn());
+    const applies = {
+      applyDOMHighlights: vi.fn(), applyDOMLinks: vi.fn(), applyDOMBookmarks: vi.fn(),
+      applyNoteIcons: vi.fn(), applyActiveNoteState: vi.fn(),
+    };
+    const glob = /** @type {any} */ (globalThis);
+    glob.ReactDOM = { flushSync };
+    Object.assign(glob, applies);
+    try {
+      const onNext = vi.fn();
+      const pager = { peek: () => ({ kind: 'screen' }), onNext, onPrev: vi.fn() };
+      const { result } = renderHook(() => usePagerGesture({ current: el }, pager));
+      result.current.trackRef.current = { style: {} };
+      result.current.peekNextRef.current = { style: {} };
+      fire(el, 'touchstart', 800, 100);
+      fire(el, 'touchmove', 700, 100);
+      fire(el, 'touchmove', 100, 100);
+      fire(el, 'touchend', 100, 100);
+      vi.advanceTimersByTime(350); // settle timer → finishSettle → commit
+      expect(flushSync).toHaveBeenCalledTimes(1);
+      expect(onNext).toHaveBeenCalledTimes(1);        // navigation ran INSIDE flushSync
+      for (const fn of Object.values(applies)) expect(fn).toHaveBeenCalledTimes(1);
+      // Ordering: the annotation paint runs AFTER the flushed render.
+      const flushOrder = flushSync.mock.invocationCallOrder[0];
+      expect(applies.applyDOMHighlights.mock.invocationCallOrder[0]).toBeGreaterThan(flushOrder);
+    } finally {
+      vi.useRealTimers();
+      delete glob.ReactDOM;
+      for (const k of Object.keys(applies)) delete glob[k];
       document.body.removeChild(el);
     }
   });

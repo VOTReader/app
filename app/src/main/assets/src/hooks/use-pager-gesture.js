@@ -218,12 +218,11 @@ export function createPagerGesture(io) {
 
   // Park BOTH peeks back to their CSS rest position. Called at the start of every
   // gesture so a new swipe begins from a known-clean baseline even if a prior
-  // gesture left a peek mid-transform — most importantly the just-committed peek,
-  // which sits at translateX(0) covering the screen between finishSettle (which
-  // clears `settling`) and its deferred rAF de-promote. In that window a new
-  // gesture is allowed to start and would drive the OTHER peek while this one
-  // still covers the view → two panes on screen at once (the "split screen").
-  // Clearing both here closes that window regardless of rAF timing.
+  // gesture left a peek mid-transform (a stream that died silently, a foreign
+  // state leak). The committed peek used to sit at translateX(0) covering the
+  // screen until a deferred rAF parked it — that window is gone (finishSettle
+  // now parks synchronously, see ATOMIC REVEAL below) — but this stays as the
+  // belt-and-braces guarantee that two panes can never coexist ("split screen").
   function parkAllPeeks() {
     parkPeek('prev');
     parkPeek('next');
@@ -264,20 +263,23 @@ export function createPagerGesture(io) {
     // Snap the track back to its rest position (transform: none).
     if (tr && tr.style) { tr.style.transition = 'none'; tr.style.transform = ''; }
     if (committed) {
-      // Peek is at translateX(0) and z-index:50 (CSS), covering the track while
-      // React renders the new screen. Queue the commit now — React 18's scheduler
-      // uses MessageChannel which fires before rAF in the browser task queue, so
-      // the new content will be in the DOM before the peek parks.
+      // ATOMIC REVEAL (2026-07-19). io.commit is a SYNCHRONOUS contract: the
+      // React wrapper flushes the navigation render (flushSync — new DOM plus
+      // layout effects, so the scroll restore is applied) AND the imperative
+      // annotation paint before returning. The live pane is therefore fully
+      // presentable the moment commit returns, and the peek parks in this
+      // SAME task — no intermediate frame can ever paint. The old path queued
+      // the commit (async default-priority render under createRoot) and
+      // parked the peek on a blind rAF, assuming React's MessageChannel task
+      // would beat the next vsync; when it lost that race (routine on a
+      // loaded Android main thread) the browser painted ONE FRAME of the OLD
+      // page snapped back to rest — old scroll, no marks — before the render
+      // landed: the owner's brief per-swipe glitch. Never reintroduce a
+      // scheduled gap between commit and the peek park.
       if (pk && pk.style) { pk.style.transition = 'none'; }
       io.commit(dir);
-      // Park the peek on the next animation frame. By the time this fires, the
-      // MessageChannel flush has rendered the new content — the reveal is clean.
-      // De-promote both layers in the same rAF so the live page is back on the
-      // main-thread paint path before it's uncovered: no stale GPU rasterization.
-      io.schedule(() => {
-        if (tr && tr.style) tr.style.willChange = '';
-        if (pk && pk.style) { pk.style.transform = ''; pk.style.willChange = ''; }
-      });
+      if (tr && tr.style) tr.style.willChange = '';
+      if (pk && pk.style) { pk.style.transform = ''; pk.style.willChange = ''; }
     } else {
       // Spring-back: park the peek and de-promote both layers immediately.
       if (pk && pk.style) { pk.style.transition = 'none'; pk.style.transform = ''; pk.style.willChange = ''; }
@@ -349,9 +351,9 @@ export function createPagerGesture(io) {
       // instantly and start clean — no wedged state can refuse the swipe.
       if (s) endGesture('instant-reset', s.axis === 'x' ? 'force-reset of a leaked swipe at new touchstart' : null);
       if (!e.touches || e.touches.length !== 1) return;
-      // Start clean: clear any leftover peek transform from a prior gesture (e.g.
-      // a committed peek still covering the screen before its rAF de-promote) so
-      // this swipe can never coexist with a stale neighbor pane.
+      // Start clean: clear any leftover peek transform a prior gesture leaked
+      // (a silently-died stream) so this swipe can never coexist with a stale
+      // neighbor pane.
       parkAllPeeks();
       const t0 = e.touches[0];
       // No start-element guard: a swipe must work from ANYWHERE, including on
@@ -468,7 +470,30 @@ export function usePagerGesture(scrollRef, pager) {
       commit: (side) => {
         const p = pagerRef.current;
         if (!mounted.v || !p) return; // a settle that outlived this screen must not re-navigate
-        if (side === 'next') { if (p.onNext) p.onNext(); } else if (p.onPrev) p.onPrev();
+        const go = () => {
+          if (side === 'next') { if (p.onNext) p.onNext(); } else if (p.onPrev) p.onPrev();
+        };
+        // ATOMIC REVEAL, part 1 — flush the navigation SYNCHRONOUSLY. Under
+        // createRoot, a setState from the settle timer is an async default-
+        // priority update; the controller parks the covering peek the moment
+        // commit returns, so the new page's DOM must be committed by then.
+        // flushSync also runs layout effects, so the scroll restore
+        // (use-scroll-memory Effect 3) lands inside this call.
+        if (typeof ReactDOM !== 'undefined' && ReactDOM.flushSync) ReactDOM.flushSync(go);
+        else go();
+        // Part 2 — the imperative annotation layers (letters/WTLB highlights,
+        // links, bookmarks, note icons) normally repaint via a passive effect
+        // + setTimeout(0) (use-dom-annotation-sync) — frames AFTER the reveal.
+        // The peek being replaced was fully painted, so the freshly revealed
+        // live pane flashed unmarked, then the inline note icons popped in and
+        // reflowed the text. Paint the layers NOW, in the commit task, so the
+        // reveal frame already carries them. Each pass is idempotent and
+        // sig-skipped per element — the effect's later re-run is a cheap no-op.
+        try { if (typeof applyDOMHighlights === 'function') applyDOMHighlights(); } catch (e) { console.error('applyDOMHighlights failed', e); }
+        try { if (typeof applyDOMLinks === 'function') applyDOMLinks(); } catch (e) { console.error('applyDOMLinks failed', e); }
+        try { if (typeof applyDOMBookmarks === 'function') applyDOMBookmarks(); } catch (e) { console.error('applyDOMBookmarks failed', e); }
+        try { if (typeof applyNoteIcons === 'function') applyNoteIcons(); } catch (e) { console.error('applyNoteIcons failed', e); }
+        try { if (typeof applyActiveNoteState === 'function') applyActiveNoteState(); } catch (e) { console.error('applyActiveNoteState failed', e); }
       },
       reducedMotion: () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
         && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
