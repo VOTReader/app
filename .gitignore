@@ -106,3 +106,7 @@ quality-uplift-plan.txt
 # Untracked starting W1.2 Tier A.
 .idea/appInsightsSettings.xml
 .idea/caches/
+
+# one-shot audit intermediates (regenerate via tools/_audit-extract-html.py + _audit-dump-app.mjs)
+tools/_audit-app.json
+tools/_audit-html.json
