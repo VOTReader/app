@@ -1588,8 +1588,8 @@ var LETTERS_V6 = [
     ],
     "footnotes": {
       "1": {
-        "type": "note",
-        "text": "1 Kings 22"
+        "type": "scripture",
+        "ref": "1 Kings 22"
       }
     },
     "nkjv": {},

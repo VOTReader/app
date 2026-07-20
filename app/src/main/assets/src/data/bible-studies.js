@@ -8810,7 +8810,7 @@ var BIBLE_STUDIES = [
                     },
                     {
                       "t": "text",
-                      "v": " what good thing shall I do that I may have eternal life?\" - {{ref:Matthew 19:36}}"
+                      "v": " what good thing shall I do that I may have eternal life?\" - {{ref:Matthew 19:16}}"
                     }
                   ]
                 },
@@ -13981,7 +13981,7 @@ var BIBLE_STUDIES = [
           "Matthew 12:38": "Then some of the scribes and Pharisees answered, saying, “Teacher, we want to see a sign from You.”",
           "Matthew 13:54": "When He had come to His own country, He taught them in their synagogue, so that they were astonished and said, “Where did this Man get this wisdom and these mighty works?",
           "Matthew 17:1-5": "Now after six days Jesus took Peter, James, and John his brother, led them up on a high mountain by themselves; and He was transfigured before them. His face shone like the sun, and His clothes became as white as the light. And behold, Moses and Elijah appeared to them, talking with Him. Then Peter answered and said to Jesus, “Lord, it is good for us to be here; if You wish, let us make here three tabernacles: one for You, one for Moses, and one for Elijah.” While he was still speaking, behold, a bright cloud overshadowed them; and suddenly a voice came out of the cloud, saying, “This is My beloved Son, in whom I am well pleased. Hear Him!”",
-          "Matthew 19:36": "",
+          "Matthew 19:16": "Now behold, one came and said to Him, “Good Teacher, what good thing shall I do that I may have eternal life?”",
           "Matthew 21:4-5": "All this was done that it might be fulfilled which was spoken by the prophet, saying: “Tell  the daughter of Zion, ‘Behold, your King is coming to you, Lowly, and sitting on a donkey, A colt, the foal of a donkey.’ ”",
           "Matthew 22:16": "And they sent to Him their disciples with the Herodians, saying, “Teacher, we know that You are true, and teach the way of God in truth; nor do You care about anyone, for You do not regard the person of men.",
           "Matthew 22:36": "“Teacher, which is the great commandment in the law?”",

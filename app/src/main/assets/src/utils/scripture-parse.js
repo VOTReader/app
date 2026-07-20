@@ -156,7 +156,16 @@ export function parseRefRange(ref) {
  */
 export function splitIntoVerses(text, ref) {
   const range = parseRefRange(ref);
-  if (!range) return null;
+  if (!range) {
+    // Chapter-only refs ("1 Kings 22" — no verse part): the text is a whole
+    // chapter emitted by lookupVersesFromBooks' chapter path, which always
+    // carries sequential "N. " decimal markers from 1 — split on that explicit
+    // run so the numbers render as gold verse sups. Refs WITH a verse part
+    // that still parse to null (single verses like "John 3:16") keep the
+    // single-verse no-split contract.
+    if (!/:\d/.test(String(ref || ''))) return _splitChapterRun(text);
+    return null;
+  }
   // For comma refs like "7:7, 9", use explicit verse list; otherwise contiguous range
   const verseNums = range.verses || Array.from({ length: range.end - range.start + 1 }, (_, i) => range.start + i);
   const count = verseNums.length;
@@ -249,5 +258,36 @@ export function splitIntoVerses(text, ref) {
   // chunk-distribution were deleted — that guessing produced the white /
   // duplicated / mis-numbered footnote renders the data normalization replaced.)
   return [{ vNum: range.start, text }];
+}
+
+/**
+ * Split whole-chapter text on its explicit sequential "1. … 2. … N." decimal
+ * markers — the shape lookupVersesFromBooks emits for a chapter-only ref.
+ * Returns null unless a strictly-ascending run STARTING at "1." leads the
+ * text (truncated text keeps its leading run — partial prefixes split like
+ * Strategy 0); anything else isn't chapter-shaped and the caller degrades to
+ * the single-block render rather than guessing (the SC7 discipline).
+ * @param {string} text
+ * @returns {{ vNum: number, text: string }[] | null}
+ */
+function _splitChapterRun(text) {
+  const s = String(text || '');
+  const rx = /(?:^|(?<=\s))(\d+)\.\s+/g;
+  const markers = [];
+  let m;
+  while ((m = rx.exec(s)) !== null) {
+    markers.push({ vNum: parseInt(m[1], 10), start: m.index, markerEnd: m.index + m[0].length });
+  }
+  if (!markers.length || markers[0].vNum !== 1 || markers[0].start !== 0) return null;
+  let runLen = 1;
+  while (runLen < markers.length && markers[runLen].vNum === markers[runLen - 1].vNum + 1) runLen++;
+  if (runLen < 2) return null;
+  const segs = [];
+  for (let i = 0; i < runLen; i++) {
+    const tStart = markers[i].markerEnd;
+    const tEnd = i + 1 < runLen ? markers[i + 1].start : s.length;
+    segs.push({ vNum: markers[i].vNum, text: s.slice(tStart, tEnd).trim() });
+  }
+  return segs;
 }
 

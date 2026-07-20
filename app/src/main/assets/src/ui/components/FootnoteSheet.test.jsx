@@ -42,6 +42,19 @@ it('shows the missing-verse message instead of a blank sheet', () => {
   expect(document.body.textContent.toLowerCase()).toContain("isn’t available".toLowerCase());
 });
 
+/* The 2026-07-19 owner report: a chapter-only footnote ("1 Kings 22") must
+   render real verse content through the BOOKS fallback — the letter's nkjv
+   dict deliberately has no entry (dicts never embed whole chapters). */
+it('renders chapter content via the BOOKS fallback when the nkjv dict has no entry', () => {
+  /** @type {any} */ (globalThis).lookupVersesFromBooks = (ref) =>
+    ref === '1 Kings 22' ? '1. And they continued three years without war between Syria and Israel. 2. Then it came to pass…' : null;
+  const chFn = { type: 'scripture', ref: '1 Kings 22' };
+  render(<Sheet num={1} fn={chFn} nkjv={{}} footnotes={{ '1': chFn }} onClose={() => {}} />);
+  expect(document.body.querySelector('.fn-sheet-verse')).not.toBeNull();
+  expect(document.body.textContent).toContain('three years without war');
+  expect(document.body.textContent.toLowerCase()).not.toContain("isn’t available".toLowerCase());
+});
+
 /* "Go to Scripture" — a scripture footnote gets the jump-to-verse action when
    the host wires onGoToRef; the sheet passes the ref through and the action
    is absent when the host has no navigation to offer. */

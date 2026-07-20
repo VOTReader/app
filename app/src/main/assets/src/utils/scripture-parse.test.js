@@ -287,4 +287,33 @@ describe('splitIntoVerses — multi-strategy chain', () => {
       ]);
     });
   });
+
+  describe('chapter-only refs (whole-chapter text from lookupVersesFromBooks)', () => {
+    it('splits a sequential "1. … N." run so verse numbers render gold', () => {
+      expect(splitIntoVerses('1. alpha 2. beta 3. gamma', '1 Kings 22')).toEqual([
+        { vNum: 1, text: 'alpha' },
+        { vNum: 2, text: 'beta' },
+        { vNum: 3, text: 'gamma' },
+      ]);
+    });
+    it('a truncated preview keeps its leading run (ExpandableVerse clamp)', () => {
+      expect(splitIntoVerses('1. alpha 2. bet', 'Leviticus 23')).toEqual([
+        { vNum: 1, text: 'alpha' },
+        { vNum: 2, text: 'bet' },
+      ]);
+    });
+    it('a break in the run ends the split — no guessing past it', () => {
+      expect(splitIntoVerses('1. alpha 2. beta 5. rogue', 'Psalm 23')).toEqual([
+        { vNum: 1, text: 'alpha' },
+        { vNum: 2, text: 'beta 5. rogue' },
+      ]);
+    });
+    it('non-chapter-shaped text under a chapter ref degrades to null (plain render)', () => {
+      expect(splitIntoVerses('no markers at all', '1 Kings 22')).toBeNull();
+      expect(splitIntoVerses('3. starts mid-chapter 4. more', '1 Kings 22')).toBeNull();
+    });
+    it('single-verse refs keep the no-split contract (verse part present)', () => {
+      expect(splitIntoVerses('For God so loved the world', 'John 3:16')).toBeNull();
+    });
+  });
 });

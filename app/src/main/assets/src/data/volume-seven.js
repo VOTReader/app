@@ -6051,8 +6051,8 @@ var LETTERS_V7 = [
         "ref": "Matthew 27:25"
       },
       "7": {
-        "type": "note",
-        "text": "Leviticus 23"
+        "type": "scripture",
+        "ref": "Leviticus 23"
       },
       "8": {
         "type": "scripture",

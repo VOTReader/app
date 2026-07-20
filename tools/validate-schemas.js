@@ -24,7 +24,7 @@ import { createContext, runInNewContext } from 'vm';
 import { resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils/scripture-parse.js';
-import { COLLECTIONS } from '../app/src/main/assets/src/data/scripture-resolution.js';
+import { COLLECTIONS, parseRefStr, findBook } from '../app/src/main/assets/src/data/scripture-resolution.js';
 import { splitFormatBInline } from '../app/src/main/assets/src/utils/format-b-inline.js';
 
 // Consume Format B inline markup the SAME way WtlbEntryView.renderLine does
@@ -40,6 +40,25 @@ function visibleFormatBText(text) {
     if (/^\{\{(?:ref|nav):/.test(seg) || /^\[From /.test(seg)) return '';
     return seg;
   }).join('');
+}
+
+// ── Blank-footnote guards (the 2026-07-19 owner report) ──────────
+// A chapter-only scripture ref ("1 Kings 22") deliberately has NO nkjv dict
+// entry — letter dicts never embed whole chapters; lookupVersesFromBooks
+// resolves the full chapter from the bundled Bible at runtime. Existence of
+// the book/chapter is enforced by the runner's Bible-ref resolution pass.
+function isChapterOnlyRef(ref) {
+  const p = parseRefStr(ref);
+  return !!(p && p.verse == null);
+}
+// A note-type footnote whose entire text is a scripture reference renders as
+// bare text — no verse content, no Go-to-Scripture — i.e. a blank sheet to the
+// reader. Such footnotes must be type "scripture" so the verse pipeline runs.
+const BARE_REF_SHAPE = /^[1-3]?\s?[A-Za-z. ']+\s\d+(:\d+([-,]\d+)*)?(\s*\(\w+\))?$/;
+function isBareScriptureRef(text) {
+  const t = String(text || '').trim();
+  if (!t || t.length > 45 || !BARE_REF_SHAPE.test(t)) return false;
+  return !!parseRefStr(t);
 }
 
 // ── CORP-2: cross-reference resolution ───────────────────────────
@@ -330,7 +349,10 @@ export function validateFormatA(letters, opts = {}) {
           if (typeof fn.ref !== 'string' || fn.ref.length === 0) {
             errors.push(`${fp}: scripture footnote missing "ref" (string)`);
           } else if (nkjv && typeof nkjv === 'object' && !Array.isArray(nkjv)) {
-            if (!(fn.ref in nkjv)) {
+            // Chapter-only refs are exempt: the runtime resolves the whole
+            // chapter from the bundled Bible (letter dicts never embed one);
+            // the runner's Bible-ref resolution pass proves the ref exists.
+            if (!(fn.ref in nkjv) && !isChapterOnlyRef(fn.ref)) {
               errors.push(`${fp}: ref "${fn.ref}" not found in nkjv dict`);
             }
           }
@@ -339,6 +361,8 @@ export function validateFormatA(letters, opts = {}) {
         if (fn.type === 'note') {
           if (typeof fn.text !== 'string' || fn.text.length === 0) {
             errors.push(`${fp}: note footnote missing "text" (string)`);
+          } else if (!fn.link && !fn.url && isBareScriptureRef(fn.text)) {
+            errors.push(`${fp}: note text "${fn.text}" is a bare scripture reference — the sheet would show it with NO verse content; type it "scripture" with a ref instead`);
           }
         }
       }
@@ -1554,6 +1578,12 @@ function runCli() {
   // dead link. Surfaced so it can't silently rot if the renderer ever switches.
   /** @type {Array<{ collection: string, letterTitle: string, where: string }>} */
   const studyXrefs = [];
+  // Blank-footnote gate: every content owner (letter / entry / study chapter)
+  // is collected here so the Bible-ref resolution pass (runs last, once the
+  // Bible corpus is loaded) can prove its scripture footnotes + inline
+  // {{ref:…}} cites all produce verse content at runtime.
+  /** @type {Array<{ where: string, owner: any, dicts: any[] }>} */
+  const refOwners = [];
   const registerTitle = (rl, item) => { if (rl && item && typeof item.title === 'string') xrefRegistry.add(rl + '::' + item.title); };
   const add = (result, n) => {
     totals.errors += result.errors.length;
@@ -1587,6 +1617,8 @@ function runCli() {
       if (preface) for (const x of walkLetterXrefs(preface)) xrefs.push(x);
       for (const L of letters) { registerTitle(rl, L); for (const x of walkLetterXrefs(L)) xrefs.push(x); }
     }
+    if (preface) refOwners.push({ where: `${label}(preface)`, owner: preface, dicts: [preface.nkjv] });
+    for (const L of letters) refOwners.push({ where: `${label} "${L.id || L.title || '?'}"`, owner: L, dicts: [L.nkjv] });
   }
 
   // ── Format B ──
@@ -1606,6 +1638,7 @@ function runCli() {
     // their own cross-refs are text-embedded attributions, not structured links.
     const rlB = GLOBAL_TO_REGISTRY.get(entry.arrayVar);
     if (rlB) for (const e of entries) registerTitle(rlB, e);
+    for (const e of entries) refOwners.push({ where: `${label} "${e.id || e.title || '?'}"`, owner: e, dicts: [e.scriptures, scriptures] });
   }
 
   // ── Holy Days (hybrid) ──
@@ -1623,6 +1656,7 @@ function runCli() {
       // (their footnotes/seeAlso point back at the originals).
       const rlH = GLOBAL_TO_REGISTRY.get(HOLY_DAYS_FILE.arrayVar);
       if (rlH) for (const e of entries) { registerTitle(rlH, e); for (const x of walkLetterXrefs(e)) xrefs.push(x); }
+      for (const e of entries) refOwners.push({ where: `${label} "${e.id || e.title || '?'}"`, owner: e, dicts: [e.nkjv, e.scriptures] });
     } else if (entries !== undefined) {
       loadErr(label, `variable "${HOLY_DAYS_FILE.arrayVar}" is not an array`);
     }
@@ -1654,6 +1688,21 @@ function runCli() {
     add(result, studies.length);
     emit(result, label, studies.length, 'studies', '');
     collectLetterLinksDeep(studies, studyXrefs);   // CORP-2 (Format D, warn-only)
+    // Study chapters are letter-shaped content owners (blocks + footnotes +
+    // nkjv) nested inside parts — walk them out for the Bible-ref pass.
+    {
+      const seen = new Set();
+      (function collect(n) {
+        if (!n || typeof n !== 'object' || seen.has(n)) return;
+        seen.add(n);
+        if (Array.isArray(n)) { n.forEach(collect); return; }
+        if ((n.blocks || n.paragraphs) && (n.id || n.title)) {
+          refOwners.push({ where: `${label} "${n.id || n.title}"`, owner: n, dicts: [n.nkjv, n.scriptures] });
+          return;
+        }
+        for (const k of Object.keys(n)) collect(n[k]);
+      })(studies);
+    }
   }
 
   // ── Format E (translations / Study Bible / ref dicts) ──
@@ -1816,6 +1865,98 @@ function runCli() {
   }
   totals.warnings += studyWarns;
   console.log(`  ${studyXrefs.length} Format-D study links checked — ${studyWarns} casing/label warning(s).`);
+
+  // ── Bible-ref resolution (blank-footnote gate, 2026-07-19) ──────
+  // Every scripture footnote ref and inline {{ref:…}} cite must produce verse
+  // content at runtime: either its owner's dict carries non-empty text, or the
+  // ref resolves against the bundled NKJV Bible (book + chapter + every named
+  // verse exist — the lookupVersesFromBooks chain, incl. its whole-chapter
+  // path for chapter-only refs). Catches the "Matthew 19:36" class (a typo'd
+  // verse with an empty dict value → a blank sheet) and proves the pure
+  // validator's chapter-only nkjv exemption safe.
+  console.log('\nBible-ref resolution (footnote + inline {{ref}} content):');
+  {
+    let books = null;
+    try {
+      books = loadVar(resolve(dataDir, 'books.js'), 'BOOKS');
+      const mp = loadVar(resolve(dataDir, 'matthew-plain.js'), 'MATTHEW_PLAIN');
+      if (books && mp) books['matthew-plain'] = mp; // mirror tools/build.py's corpus merge
+    } catch (e) { console.warn(`  WARN:  Bible corpus failed to load — resolution pass skipped: ${e.message}`); totals.warnings++; }
+    if (books) {
+      // findBook reads window.__ALL_BOOKS at call time (the app's runtime
+      // contract) — point it at the freshly loaded corpus for this pass.
+      if (typeof globalThis.window === 'undefined') globalThis.window = globalThis;
+      globalThis.window.__ALL_BOOKS = books;
+      const chapterVerses = (bookKey, chapter) => {
+        const b = books[bookKey];
+        const ch = b && Array.isArray(b.chapters) ? b.chapters.find((c) => c.num === chapter) : null;
+        if (!ch) return null;
+        return ch.sections ? ch.sections.flatMap((s) => s.verses || []) : (ch.verses || []);
+      };
+      // Compound refs ("Isaiah 40:13; Romans 11:34") split on ';' exactly like
+      // lookupVersesFromBooks — every part must resolve.
+      const resolvesInBible = (ref) => String(ref).split(';').every((part) => {
+        const p = parseRefStr(part.trim());
+        if (!p) return false;
+        const bookKey = findBook(p.rawBook);
+        const verses = bookKey ? chapterVerses(bookKey, p.chapter) : null;
+        if (!verses || verses.length === 0) return false;
+        if (p.verse == null) return true; // chapter-only → the whole chapter
+        const has = (n) => verses.some((v) => v.n === n);
+        return has(p.verse) && (p.verseEnd == null || has(p.verseEnd));
+      });
+      let checked = 0;
+      let refErrors = 0;
+      const refRe = /\{\{ref:([^}]+)\}\}/g;
+      for (const { where, owner, dicts } of refOwners) {
+        const dictList = dicts.filter((d) => d && typeof d === 'object' && !Array.isArray(d));
+        const dictText = (ref) => dictList.some((d) => String(d[ref] || '').trim().length > 0);
+        const fail = (ref, kind) => {
+          console.error(`  ERROR: [${where}] ${kind} "${ref}" has no dict text and does not resolve in the Bible corpus — renders a BLANK sheet.`);
+          refErrors++;
+        };
+        for (const fn of Object.values(owner.footnotes || {})) {
+          if (fn && fn.type === 'scripture' && typeof fn.ref === 'string' && fn.ref) {
+            checked++;
+            if (!dictText(fn.ref) && !resolvesInBible(fn.ref)) fail(fn.ref, 'scripture footnote');
+          }
+        }
+        // inline {{ref:…}} anywhere in the owner's rendered content (block
+        // segments, paragraphs, headers) — the dict subtrees themselves are
+        // skipped (verse text, not markup).
+        const seen = new Set();
+        (function walk(n) {
+          if (n == null) return;
+          if (typeof n === 'string') {
+            for (const m of n.matchAll(refRe)) {
+              const ref = m[1].trim();
+              checked++;
+              if (!dictText(ref) && !resolvesInBible(ref)) fail(ref, 'inline {{ref}}');
+            }
+            return;
+          }
+          if (typeof n !== 'object' || seen.has(n)) return;
+          seen.add(n);
+          if (Array.isArray(n)) { n.forEach(walk); return; }
+          for (const k of Object.keys(n)) { if (k !== 'nkjv' && k !== 'scriptures') walk(n[k]); }
+        })(owner);
+        // an EMPTY dict value whose ref can't resolve from the Bible either is
+        // a guaranteed blank (the runtime falls through '' to the corpus)
+        for (const d of dictList) {
+          for (const [ref, txt] of Object.entries(d)) {
+            if (!String(txt || '').trim() && !resolvesInBible(ref)) {
+              console.error(`  ERROR: [${where}] dict entry "${ref}" is EMPTY and does not resolve in the Bible corpus.`);
+              refErrors++;
+            }
+          }
+        }
+      }
+      totals.errors += refErrors;
+      totals.items += checked;
+      console.log(`  ${checked} refs checked across ${refOwners.length} content owners — ${refErrors === 0 ? 'OK' : 'FAIL'} (${refErrors} unresolvable)`);
+      delete globalThis.window.__ALL_BOOKS;
+    }
+  }
 
   console.log(`\n=== TOTALS: ${totals.items} items validated, ${totals.errors} errors, ${totals.warnings} warnings ===`);
   if (strict && totals.errors > 0) process.exit(1);

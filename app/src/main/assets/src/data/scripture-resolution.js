@@ -328,8 +328,9 @@ export function findEntryContext(id, kindHint) {
 }
 
 /**
- * Look up a verse or verse-range and return concatenated text.
- * ref: "John 3:16" or "John 3:16-18" (optionally translation-tagged, e.g. "John 3:16 (KJV)").
+ * Look up a verse, verse-range, or whole chapter and return concatenated text.
+ * ref: "John 3:16" or "John 3:16-18" (optionally translation-tagged, e.g. "John 3:16 (KJV)"),
+ * or a chapter-only ref like "1 Kings 22" → every verse of the chapter, decimal-numbered.
  * @param {string} ref
  * @returns {string | null}
  */
@@ -347,10 +348,15 @@ export function lookupVersesFromBooks(ref) {
     }
   }
   const p = parseRefStr(ref);
-  if (!p || p.verse == null) return null;
+  if (!p) return null;
   const bookKey = findBook(p.rawBook);
   if (!bookKey) return null;
-  const vEnd = p.verseEnd || p.verse;
+  // Chapter-only ref ("1 Kings 22", no verse) → the WHOLE chapter. Bare-ref
+  // footnotes point the reader at an entire chapter; the bundled corpus is the
+  // content source (letter nkjv dicts never embed whole chapters), so an open
+  // range covers every verse and the multi-verse join numbers them.
+  const vStart = p.verse != null ? p.verse : 1;
+  const vEnd = p.verseEnd || p.verse || Infinity;
 
   // Translation-tagged refs (e.g. "John 14:6 (KJV)") read from the matching
   // alt-translation when it's already loaded. If the user hasn't activated
@@ -364,7 +370,7 @@ export function lookupVersesFromBooks(ref) {
     if (code !== 'nkjv') {
       const data = (typeof window !== 'undefined') ? window['BIBLE_' + code.toUpperCase()] : null;
       if (data && data[bookKey] && data[bookKey][p.chapter]) {
-        const altList = data[bookKey][p.chapter].filter(v => v.n >= p.verse && v.n <= vEnd);
+        const altList = data[bookKey][p.chapter].filter(v => v.n >= vStart && v.n <= vEnd);
         if (altList.length) {
           return altList.length === 1 ? altList[0].text : altList.map(v => `${v.n}. ${v.text}`).join(' ');
         }
@@ -383,7 +389,7 @@ export function lookupVersesFromBooks(ref) {
   const allVerses = chapter.sections ?
     chapter.sections.flatMap(s => s.verses || []) :
     chapter.verses || [];
-  const verses = allVerses.filter(v => v.n >= p.verse && v.n <= vEnd);
+  const verses = allVerses.filter(v => v.n >= vStart && v.n <= vEnd);
   if (!verses.length) return null;
   return verses.length === 1 ? verses[0].text : verses.map(v => `${v.n}. ${v.text}`).join(' ');
 }

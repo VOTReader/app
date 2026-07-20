@@ -297,7 +297,15 @@ describe('lookupVersesFromBooks', () => {
     expect(lookupVersesFromBooks('Xyz 1:1')).toBeNull();
     expect(lookupVersesFromBooks('John 99:1')).toBeNull();
     expect(lookupVersesFromBooks('John 3:99')).toBeNull();
-    expect(lookupVersesFromBooks('John 3')).toBeNull(); // no verse
+    expect(lookupVersesFromBooks('Xyz 1')).toBeNull();   // chapter-only still needs a real book
+    expect(lookupVersesFromBooks('John 99')).toBeNull(); // …and a real chapter
+  });
+  it('a chapter-only ref returns the WHOLE chapter, verse-numbered (the bare-ref footnote path)', () => {
+    expect(lookupVersesFromBooks('John 3')).toBe(
+      '16. For God so loved the world 17. For God did not send His Son to condemn 18. He who believes is not condemned'
+    );
+    // degenerate single-verse chapter renders bare text (no marker needed)
+    expect(lookupVersesFromBooks('Genesis 1')).toBe('In the beginning');
   });
   it('parses an en-dash range (defense-in-depth) — U12', () => {
     expect(lookupVersesFromBooks('John 3:16–18')).toBe(
