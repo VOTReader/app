@@ -280,6 +280,17 @@ PLAN:
 ───────────────────────────────────────────────────────────────────────────
 SESSION 5 — Polish batch: selection restriction + spacing audit (items 4 + 5)
 ───────────────────────────────────────────────────────────────────────────
+STATUS: DONE 2026-07-20. (4) chrome unselectable: `button` + top-nav +
+sheet chrome + chain-nav cards + back-pill get user-select/-webkit-user-
+select/touch-callout none (buttons never contain user prose here; inputs/
+textareas opt back in; programmatic Ranges — the annotation engine, the
+pickers, smoke's letterAnn/wtlbAnn round-trips — ignore user-select, all
+verified green). Reading text measures userSelect:auto. (5) Search group
+chevron: 24x24 rotating .srch-group-chevron replaces the 0.55rem glyph;
+Settings danger row: head wraps so "Clear All My Data" drops to its own
+line (the info-btn can never sit flush against it) + a 12px hard minimum
+gap on DataActionRow buttons.
+
 Owner items:
   (4) "Can't highlight anything (tabs number) besides text." → interpreted:
       UI chrome (e.g. the tabs-count button in the top nav) is long-press

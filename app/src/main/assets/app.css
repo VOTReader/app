@@ -5299,3 +5299,36 @@
       font-size: 1.02rem; line-height: 1.6; color: var(--cream);
       font-style: italic;
     }
+
+    /* ── SESSION-5 polish ─────────────────────────────────────────────── */
+    /* (5) Search group-header chevron: a real, rotating 24px affordance
+       (the old .srch-group-count ▾/▸ glyph was 0.55rem — invisible). */
+    .srch-group-chevron {
+      width: 24px; height: 24px; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 15px; line-height: 1; color: var(--gold);
+      transition: transform 0.18s ease;
+    }
+    .srch-group-chevron.open { transform: rotate(90deg); }
+    /* (5) Settings danger zone: on a narrow phone the row's grow-spacer
+       collapses and the ⓘ info button lands flush against "Clear All My
+       Data". Let the head WRAP so the danger button drops to its own line
+       instead, and keep a hard minimum gap when it doesn't wrap. */
+    .danger-zone .settings-row-head { flex-wrap: wrap; row-gap: 8px; }
+    .danger-zone .settings-clear-btn { margin-left: auto; }
+    .settings-row-head .settings-clear-btn { margin-left: 12px; }
+    /* (4) App chrome is NOT text — long-pressing the tabs badge, nav
+       buttons, sheet headers, or chain-nav cards must never start a text
+       selection (selection claiming a long-press is also the WebView
+       non-bubbling-touchend class the drag engines defend against).
+       Buttons never contain user prose in this app (reading text, journal
+       bodies, notes, and the excerpt pickers all render in divs/spans), so
+       button-level none is safe for the annotation flows; inputs/textareas
+       opt back in explicitly. Programmatic Ranges (annotation engine,
+       pickers, tests) ignore user-select entirely. */
+    button, .top-nav, .fn-sheet-handle, .fn-sheet-num-row, .sc-sheet-tag,
+    .settings-section-label, .bottom-nav-card, .mode-toggle-wrap,
+    .back-hint-row, .tabs-overview-header, .tabs-overview-meta {
+      user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    }
+    input, textarea { user-select: text; -webkit-user-select: text; }
