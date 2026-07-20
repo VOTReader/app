@@ -245,6 +245,14 @@ PLAN:
 ───────────────────────────────────────────────────────────────────────────
 SESSION 4 — Text size slider, text-only scaling (item 2)
 ───────────────────────────────────────────────────────────────────────────
+STATUS: DONE 2026-07-19 (commit 321f5c0). Slider 80-160% step 5% + live %
+readout + Reset + in-row preview line; same settings.fontScale key, numeric
+clamp [0.8,1.6] in use-settings + the boot script (pre-mount, no FOUC).
+Text-only scaling via the px chrome-pin block at the END of app.css (top
+nav, back glyph, arrows, dot, tabs badge, sel-toolbar, ann-chip, mode
+pill). Live-proven: nav 67.2px identical at 0.8/1.0/1.6; verse text scales
+exactly; icons never wrap (pinned, per the owner-question answer below).
+
 Owner: "Adjustable font size slider — shrink OR expand. Must NOT expand
 icons; icon scaling would be a separate feature. Wrap icons if they'd spill?"
 
