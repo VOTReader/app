@@ -53436,7 +53436,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "text",
-                "v": "2. If YahuShua (\"Jesus\") is The Greatest of All Loves, and ALL things were made through Him, and by Him ALL things consist ({{ref:Colossians 1:16-17}}) ({{ref:Colossians 1:16-17}}) , then He would have also had to create hell and maintain it, making Him a tormentor and evil, which directly contradicts what He taught and showed us about Himself. And what of God's"
+                "v": "2. If YahuShua (\"Jesus\") is The Greatest of All Loves, and ALL things were made through Him, and by Him ALL things consist ({{ref:Colossians 1:16-17}}), then He would have also had to create hell and maintain it, making Him a tormentor and evil, which directly contradicts what He taught and showed us about Himself. And what of God's"
               },
               {
                 "t": "bold-italic",
@@ -57607,7 +57607,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "italic",
-                "v": "*The punishment of damnation IS everlasting. Those that are damned are not everlasting... Unless you believe what >>the serpent<< said in {{ref:Genesis 3:4}} true... \""
+                "v": "*The punishment of damnation IS everlasting. Those that are damned are not everlasting... Unless you believe what >>the serpent<< said in {{ref:Genesis 3:4}} is true... \""
               },
               {
                 "t": "text",
@@ -57893,7 +57893,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "bold-italic",
-                "v": "Several popular translations read “had been thrown”, “were”, “were also thrown”, instead of “are” (NIV, ESV, GOD’S WORD Translation), respectively. b) The Greek word translated “forever and ever” is the word “aion” (used twice). The Greek noun “aion” literally means “an age” or “an indeterminate period of time.” {{ref:Hebrews 1:2}} us that “God made the ages,” and the Apostle Paul tells us that there was a state of existence BEFORE the ages (1 Cor. 2:7) and that the ages will END. (1 Cor. 10:11) Clearly, if something begins and ends, it cannot be unending. There are three problems with the way the King James translates this verse. First, if something is “for ever,” why bother adding another “ever?” Are we to think that there is more than one “for ever” or that we have to have an extra “ever” added so we get the point? Secondly, both uses of the word “aion” are in the plural form. The problem with this should be obvious to anyone who is honest. Are we to somehow think that there is more than one (plural) eternity? No theologian teaches that and yet there is no doubt that the plural form of “aion” is used in this verse. If the King James translators looked at the tense a bit more carefully, they would have written the above phrase to read “for evers and evers.” This, of course, makes absolutely no sense. However, if we properly interpret “aion” to mean “an indeterminate period of time,” then the verse makes perfect sense. Therefore, both Rev. 20:10 and Rev. 14:11(from #3 above) would be more accurately translated:"
+                "v": "Several popular translations read “had been thrown”, “were”, “were also thrown”, instead of “are” (NIV, ESV, GOD’S WORD Translation), respectively. b) The Greek word translated “forever and ever” is the word “aion” (used twice). The Greek noun “aion” literally means “an age” or “an indeterminate period of time.” {{ref:Hebrews 1:2}} tells us that “God made the ages,” and the Apostle Paul tells us that there was a state of existence BEFORE the ages (1 Cor. 2:7) and that the ages will END. (1 Cor. 10:11) Clearly, if something begins and ends, it cannot be unending. There are three problems with the way the King James translates this verse. First, if something is “for ever,” why bother adding another “ever?” Are we to think that there is more than one “for ever” or that we have to have an extra “ever” added so we get the point? Secondly, both uses of the word “aion” are in the plural form. The problem with this should be obvious to anyone who is honest. Are we to somehow think that there is more than one (plural) eternity? No theologian teaches that and yet there is no doubt that the plural form of “aion” is used in this verse. If the King James translators looked at the tense a bit more carefully, they would have written the above phrase to read “for evers and evers.” This, of course, makes absolutely no sense. However, if we properly interpret “aion” to mean “an indeterminate period of time,” then the verse makes perfect sense. Therefore, both Rev. 20:10 and Rev. 14:11(from #3 above) would be more accurately translated:"
               }
             ]
           },
@@ -58010,7 +58010,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "bold-italic",
-                "v": "*The word(s) translated “forever” in {{ref:Revelation 20:10}} been used in the Bible in other places in a figurative manner, and such is the case here."
+                "v": "*The word(s) translated “forever” in {{ref:Revelation 20:10}} have been used in the Bible in other places in a figurative manner, and such is the case here."
               }
             ]
           },
@@ -58531,7 +58531,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "bold-italic",
-                "v": "*In The Complete Jewish Bible {{ref:Luke 16:23}} as follows:"
+                "v": "*In The Complete Jewish Bible {{ref:Luke 16:23}} reads as follows:"
               }
             ]
           },
@@ -62812,7 +62812,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "text",
-                "v": "\"“The Spirit of the Truth,” in {{ref:John 14:17}} from the Greek to pneuma tees aleetheias, and is another designation for “The Holy Spirit.” In the New Testament Greek, “The Holy Spirit” is always a neuter noun, which truly reflects the Scriptural teaching that the Holy Spirit is the power of God and not a person. The Greek nouns for “Spirit,” “the Spirit,” “Holy Spirit” and “the Holy Spirit” (KJV “Holy Ghost”) are as follows: pneuma, to pneuma, pneuma hagion, to hagion pneuma, to pneuma to hagion, and the above referenced to pneuma tees aleetheias. These nouns, in their various forms, are always and only neuter in gender. Likewise, the pronouns for to pneuma to hagion are always and only neuter in gender. Therefore, it is absolutely incorrect to translate “the Spirit,” “the Holy Spirit,” or “the Spirit of the Truth” and its pronouns in the masculine gender. Since the Greek text reveals that “the Spirit of the Truth” is in the neuter gender, the author has correctly translated its pronouns as “it,” “which” and “that one,” as a neuter entity should properly be translated. To translate these neuter nouns and their pronouns in the masculine gender clearly violates the basic rules of translation. Pneuma and its various derivations are nowhere revealed in Scripture as masculine gendered nouns!"
+                "v": "\"“The Spirit of the Truth,” in {{ref:John 14:17}} comes from the Greek to pneuma tees aleetheias, and is another designation for “The Holy Spirit.” In the New Testament Greek, “The Holy Spirit” is always a neuter noun, which truly reflects the Scriptural teaching that the Holy Spirit is the power of God and not a person. The Greek nouns for “Spirit,” “the Spirit,” “Holy Spirit” and “the Holy Spirit” (KJV “Holy Ghost”) are as follows: pneuma, to pneuma, pneuma hagion, to hagion pneuma, to pneuma to hagion, and the above referenced to pneuma tees aleetheias. These nouns, in their various forms, are always and only neuter in gender. Likewise, the pronouns for to pneuma to hagion are always and only neuter in gender. Therefore, it is absolutely incorrect to translate “the Spirit,” “the Holy Spirit,” or “the Spirit of the Truth” and its pronouns in the masculine gender. Since the Greek text reveals that “the Spirit of the Truth” is in the neuter gender, the author has correctly translated its pronouns as “it,” “which” and “that one,” as a neuter entity should properly be translated. To translate these neuter nouns and their pronouns in the masculine gender clearly violates the basic rules of translation. Pneuma and its various derivations are nowhere revealed in Scripture as masculine gendered nouns!"
               }
             ]
           },
@@ -62821,7 +62821,7 @@ var BIBLE_STUDIES = [
             "segments": [
               {
                 "t": "text",
-                "v": "However, in {{ref:John 14:16}}, 26, and {{ref:John 15:26}}, we do find a masculine gendered noun used in reference to the Holy Spirit, as a descriptive noun, ho parakleetos, which is translated in the KJV as “the Comforter.” Ho parakleetos defines a function of “the Holy Spirit,” or “the Spirit of the Truth,” as “a helper,” and “the Helper,” or as “a comforter” and “the Comforter.” While this masculine gendered descriptive noun is used to describe a vital function of the Holy Spirit, it does not designate “the Holy Spirit,” or “the Spirit of the Truth,” as a person. In I {{ref:John 2:1}} masculine descriptive noun Parakleetos is used to describe a function of Jesus Christ as “an Advocate” for Christians."
+                "v": "However, in {{ref:John 14:16}}, 26, and {{ref:John 15:26}}, we do find a masculine gendered noun used in reference to the Holy Spirit, as a descriptive noun, ho parakleetos, which is translated in the KJV as “the Comforter.” Ho parakleetos defines a function of “the Holy Spirit,” or “the Spirit of the Truth,” as “a helper,” and “the Helper,” or as “a comforter” and “the Comforter.” While this masculine gendered descriptive noun is used to describe a vital function of the Holy Spirit, it does not designate “the Holy Spirit,” or “the Spirit of the Truth,” as a person. In I {{ref:John 2:1}} The masculine descriptive noun Parakleetos is used to describe a function of Jesus Christ as “an Advocate” for Christians."
               }
             ]
           },
