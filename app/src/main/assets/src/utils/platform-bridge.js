@@ -629,6 +629,26 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
         if (forceTheme && clonedDoc && clonedDoc.body) {
           clonedDoc.body.classList.toggle('light', forceTheme === 'light');
         }
+        // Word-spacing fix (owner-reported "weird spacing / punctuation" in
+        // tab thumbnails): html2canvas draws text whose letter-spacing is
+        // 'normal' WORD-BY-WORD — each word is painted into a slot measured
+        // in the clone, and when the canvas's drawn glyph run comes out wider
+        // than that slot, words visually fuse ("TheVolumesofTruth…"). Text
+        // with an explicit letter-spacing takes html2canvas's per-CHARACTER
+        // path, where every glyph lands at its own measured x — which is why
+        // the Cinzel headings (0.18em tracking) always rendered correctly
+        // while body prose crammed. Nudge everything onto the per-character
+        // path with a visually-nil letter-spacing. The bare `*` selector has
+        // ZERO specificity, so any element with an authored letter-spacing
+        // rule keeps its real tracking.
+        try {
+          if (clonedDoc && clonedDoc.head) {
+            const st = clonedDoc.createElement('style');
+            st.textContent = '* { letter-spacing: 0.0001px; }';
+            clonedDoc.head.appendChild(st);
+          }
+        } catch (_e) { /* style injection failed — render proceeds as before */ }
+        return undefined;
       },
       // PERF-1: capture at scale 1, NOT devicePixelRatio×2. The result is downscaled to
       // maxDim:1440 below regardless, so a DPR×2 capture of the WHOLE scrolled body (a

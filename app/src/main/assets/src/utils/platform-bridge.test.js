@@ -817,6 +817,33 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     spy.mockRestore();
   });
 
+  it('onclone nudges the clone onto the per-character text path (thumbnail word-spacing fix)', async () => {
+    // Owner-reported: thumbnail text rendered with words FUSED
+    // ("TheVolumesofTruth…") — html2canvas draws letter-spacing:'normal' text
+    // word-by-word into measured slots, and wider-than-measured glyph runs
+    // visually cram. The onclone hook must inject a zero-specificity
+    // letter-spacing nudge so every glyph is individually positioned, and
+    // must still toggle the forced theme class for dual-theme variants.
+    const stubCanvas = { width: 800, height: 600, toDataURL: vi.fn(() => FULLSIZE_URL) };
+    const h2c = /** @type {any} */ (vi.fn(async () => stubCanvas));
+    /** @type {any} */ (globalThis).html2canvas = h2c;
+    bridge = await importBridge();
+
+    await bridge.takeThemedScreenshot('light', 0, 1024, 80);
+    const opts = h2c.mock.calls[0][1];
+    expect(typeof opts.onclone).toBe('function');
+
+    const clonedDoc = document.implementation.createHTMLDocument('clone');
+    opts.onclone(clonedDoc);
+    // forced theme class lands on the clone body
+    expect(clonedDoc.body.classList.contains('light')).toBe(true);
+    // the per-character nudge style is injected with ZERO specificity (`*`),
+    // so authored letter-spacing (the Cinzel headings) still wins
+    const styles = [...clonedDoc.head.querySelectorAll('style')].map((s) => s.textContent).join('\n');
+    expect(styles).toContain('letter-spacing: 0.0001px');
+    expect(styles).toContain('*');
+  });
+
   it('captures the app COLUMN (.screen-layout) when present — not the whole window', async () => {
     const stubCanvas = { width: 760, height: 900, toDataURL: vi.fn(() => FULLSIZE_URL) };
     const h2c = /** @type {any} */ (vi.fn(async () => stubCanvas));
