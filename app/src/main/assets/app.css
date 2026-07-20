@@ -5246,3 +5246,56 @@
     }
 
     
+
+    /* ── SESSION-4 TEXT-ONLY SCALING — chrome pin (must stay LAST) ───────
+       --font-scale multiplies the ROOT font-size (the WL1 rule near the top
+       of this file), so every rem-based size scales: reading text, journal
+       entries, notes, search snippets — that IS the feature. App CHROME must
+       NOT scale (owner: "must NOT expand icons"): these overrides restate
+       the nav/floating chrome's type + box sizes in px (1rem = 16px at
+       scale 1), so the top nav, glyph icons, prev/next arrows, selection
+       toolbar labels, annotation chip, and the Matthew mode pill render
+       pixel-identical at every text size. Values are the px equivalents of
+       the original rem rules — keep BOTH in sync, keep this block at the
+       END of the file (same specificity: last wins), and add any new
+       floating chrome here. */
+    .top-nav { gap: 1.92px; padding: 11.2px 8px 11.2px; padding-top: calc(var(--inset-top, 0px) + 11.2px); }
+    .nav-home { font-size: 11.52px; padding: 7.2px 8.8px; }
+    .nav-back-icon { font-size: 33.6px; padding: 0 5.6px; min-width: 32px; }
+    .nav-volume { font-size: 11.52px; padding: 7.2px 8.8px; max-width: 104px; }
+    .nav-theme-btn, .nav-search-btn { padding: 8px; }
+    .reading-dot-nav { width: 40px; height: 40px; }
+    .tabs-nav-btn { font-size: 10.88px; padding: 5.6px 8px; gap: 4px; margin-left: 2.4px; }
+    .nav-arrows { gap: 4.8px; }
+    .nav-btn { font-size: 11.52px; padding: 7.2px 12px; }
+    .nav-arrow-btn { width: 30.4px; height: 30.4px; font-size: 16px; }
+    .sel-style-btn { font-size: 16px; }
+    .sel-action-btn { font-size: 8.8px; }
+    .ann-chip-btn { font-size: 8.96px; }
+    .mode-toggle-label { font-size: 8px; }
+    .mode-btn { font-size: 9.92px; padding: 8.8px 16px; gap: 7.2px; }
+    @media (max-width: 500px) { .mode-btn { font-size: 9.28px; padding: 8px 12px; } }
+
+    /* ── Text Size slider row (Settings) ── */
+    .txtsize-controls { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+    .txtsize-slider { flex: 1; accent-color: var(--gold); min-height: 28px; cursor: pointer; }
+    .txtsize-value {
+      font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 0.08em;
+      color: var(--gold); min-width: 44px; text-align: right; flex-shrink: 0;
+    }
+    .txtsize-reset {
+      font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--gold-dim);
+      background: transparent; border: 1px solid var(--gold-border); border-radius: 6px;
+      padding: 6px 10px; cursor: pointer; flex-shrink: 0;
+      transition: all 0.18s ease; -webkit-tap-highlight-color: transparent;
+    }
+    .txtsize-reset:disabled { opacity: 0.3; cursor: default; }
+    .txtsize-reset:active:not(:disabled) { background: var(--gold-faint); color: var(--gold); }
+    .txtsize-preview {
+      margin-top: 10px; padding: 10px 12px;
+      border: 1px solid var(--gold-border); border-radius: 8px;
+      background: var(--bg3);
+      font-size: 1.02rem; line-height: 1.6; color: var(--cream);
+      font-style: italic;
+    }

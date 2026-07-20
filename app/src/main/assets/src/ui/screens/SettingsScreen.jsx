@@ -2,15 +2,58 @@
    SettingsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* WL1 — Text Size options for the SelectField in the Text & Translation
-   section. The id is the raw --font-scale multiplier (string) applied to the
-   root font-size; "1" = the app's standard size. */
-const TEXT_SIZE_OPTIONS = [
-  { id: "1", label: "Standard", desc: "The app's standard reading size." },
-  { id: "1.15", label: "Large", desc: "15% larger text throughout." },
-  { id: "1.3", label: "Larger", desc: "30% larger text throughout." },
-  { id: "1.5", label: "Largest", desc: "50% larger text throughout." },
-];
+/* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
+   settings.fontScale key persists the raw --font-scale multiplier as a
+   numeric string, so old values "1"/"1.15"/"1.3"/"1.5" remain valid). The
+   whole app IS the live preview (the root font-size updates as you drag),
+   but the row carries its own preview line so the chosen body size is
+   visible right in Settings. Icons + navigation chrome are px-pinned in
+   app.css and never scale. */
+function clampFontScale(v) {
+  const f = parseFloat(String(v));
+  return Number.isFinite(f) ? Math.min(1.6, Math.max(0.8, f)) : 1;
+}
+
+function TextSizeSliderRow({ value, onChange }) {
+  const v = clampFontScale(value);
+  const pct = Math.round(v * 100);
+  return (
+    <div className="settings-row">
+      <div className="settings-row-head">
+        <span className="settings-row-label">Text Size</span>
+        <span className="settings-row-grow" />
+        <span className="settings-row-value">{pct === 100 ? "Standard" : pct + "%"}</span>
+      </div>
+      <div className="txtsize-controls">
+        <input
+          type="range"
+          className="txtsize-slider"
+          min="0.8"
+          max="1.6"
+          step="0.05"
+          value={v}
+          onChange={(e) => onChange(String(parseFloat(e.target.value)))}
+          aria-label="Text size"
+        />
+        <span className="txtsize-value">{pct}%</span>
+        <button
+          type="button"
+          className="txtsize-reset"
+          disabled={pct === 100}
+          onClick={() => onChange("1")}
+        >Reset</button>
+      </div>
+      <div className="txtsize-preview">
+        “Your word is a lamp to my feet and a light to my path.”
+      </div>
+      <div className="settings-row-desc">
+        Slide to shrink or enlarge reading text anywhere in the app. Icons and
+        navigation stay the same size. Independent of your device’s own
+        font-size setting.
+      </div>
+    </div>
+  );
+}
 
 /* Tiny per-row confirm helpers. Each owns its own confirm state and
    renders either the row's button OR the standardized ConfirmStrip in
@@ -910,13 +953,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               options={TRANSLATION_OPTIONS}
               onChange={(v) => onSetting("translation", v)}
             />
-            <SelectField
-              eyebrow="Appearance"
-              title="Text Size"
-              label="Text Size"
-              desc="Scale all text larger for easier reading. Affects every screen. Independent of your device's own font-size setting."
+            <TextSizeSliderRow
               value={settings.fontScale || "1"}
-              options={TEXT_SIZE_OPTIONS}
               onChange={(v) => onSetting("fontScale", v)}
             />
             <SettingsRow

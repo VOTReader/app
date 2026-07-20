@@ -164,14 +164,19 @@ export function useSettings({ savedSettings, theme }) {
     // handles the initial state; this effect handles runtime toggles.
     const customFontsEl = /** @type {HTMLStyleElement | null} */ (document.getElementById("custom-fonts"));
     if (customFontsEl) customFontsEl.disabled = settings.fontStyle !== "modern";
-    // WL1 — text-size scale. Mirror settings.fontScale onto the --font-scale
-    // CSS var on <html>; app.css multiplies it into the root font-size so all
-    // rem/em sizing scales. The index.html boot script sets the initial value
-    // pre-mount (no FOUC); this handles live changes from the Settings selector.
-    // SEC-3: clamp to the known set — settings (incl. fontScale) are import-restorable
-    // from a backup, and an out-of-range value would land in the --font-scale CSS var.
-    const _fs = String(settings.fontScale);
-    document.documentElement.style.setProperty("--font-scale", (_fs === "1.15" || _fs === "1.3" || _fs === "1.5") ? _fs : "1");
+    // WL1/Session-4 — text-size scale. Mirror settings.fontScale onto the
+    // --font-scale CSS var on <html>; app.css multiplies it into the root
+    // font-size so all rem/em sizing scales (chrome is px-pinned — see the
+    // "SESSION-4 TEXT-ONLY SCALING" block at the end of app.css). The
+    // index.html boot script sets the initial value pre-mount (no FOUC);
+    // this handles live changes from the Settings slider.
+    // SEC-3: clamp numerically to the slider's range — settings (incl.
+    // fontScale) are import-restorable from a backup, and an out-of-range
+    // value would land in the --font-scale CSS var. The old 4-step selector
+    // values ("1"/"1.15"/"1.3"/"1.5") all fall inside the range.
+    const _fs = parseFloat(String(settings.fontScale));
+    const _fsSafe = Number.isFinite(_fs) ? Math.min(1.6, Math.max(0.8, _fs)) : 1;
+    document.documentElement.style.setProperty("--font-scale", String(_fsSafe));
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
     // status bar + navigator.wakeLock fire-and-forget for the screen-on
