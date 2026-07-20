@@ -1638,6 +1638,8 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Abide in the Doctrine of The Messiah",
+    "metaAddendumLink": { "collection": "Volume Three", "letterTitle": "Abide in the Doctrine of The Messiah" },
     "blocks": [
       {
         "type": "para",

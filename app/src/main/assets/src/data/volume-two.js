@@ -736,7 +736,7 @@ var LETTERS = [
         { t: "fn", v: "4" },
       ]},
       { type: "para", segments: [
-        { t: "bold-italic", v: "Thus says The Lord God, The Holy One of Israel, to all who have ears to hear:" },
+        { t: "bold-italic", v: "Thus says The Lord to the deceptive harlot, to the mother of all fornications:" },
         { t: "text", v: " Woe, I say to you! Even three times, woe! For the atheist shall have it far better than you, when the wrath of the great and dreadful God has come! For when they seek forgiveness, they shall surely find it. Yet woe to you who blaspheme the Spirit; from you forgiveness has fled away!" },
         { t: "fn", v: "5" },
         { t: "text", v: " Behold, destruction waits for you as you continue to tread the wide path!" },
