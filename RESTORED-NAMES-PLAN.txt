@@ -14,6 +14,34 @@ Two new Bible translations, selectable at Settings → Bible Translation:
 New Testament ONLY (1,212 NKJV verses + 1,217 KJV verses changed). The Old
 Testament renders the base translation untouched. For personal use.
 
+┌─ 2026-07-20 RE-AUDIT (owner-directed: "diligently investigate each and every
+│  instance… look at the greek… as His Name is SUPPOSED to be spelled, YahuShua").
+│  The first pass (2026-07-12) was a rushed deterministic transform that rendered
+│  EVERY standalone "Christ" as "HaMashiach" — which strands English articles in
+│  front of the "the" baked into Ha- ("the very HaMashiach" = "the very THE-
+│  Messiah", John 7:26; owner-reported with a screenshot). Every Jesus/Christ
+│  occurrence in both bases was re-classified by grammatical context and re-
+│  adjudicated against the Textus Receptus Greek article + restored-name
+│  translations (CJB/Stern → "Mashiach"; the Cepher → "HAMASHIACH"; Delitzsch's
+│  Hebrew NT). Owner decided (2026-07-20): render the title NAME-LIKE and bare
+│  wherever the printed English isn't literally "the Christ".
+│
+│  ► THE TITLE RULE (now the single governing principle):
+│      printed "the Christ" (definite)  → HaMashiach   (Ha IS the article)
+│      every OTHER "Christ"              → bare Mashiach  (name-like, anarthrous)
+│      the full-Name pairs              → YahuShua HaMashiach   (commanded, kept)
+│    This makes a stranded English article STRUCTURALLY IMPOSSIBLE, and folds the
+│    old His/Lord's-/called-/Lord-and-Christ special cases into one rule (each is
+│    just "a Christ with no printed 'the'"). Owner's three explicit calls — (1)
+│    vocative → bare ("Prophesy to us, Mashiach!"), (2) appositive → bare
+│    ("Mashiach, a King"; "Mashiach the Lord"), (3) "in Christ" → "in Mashiach"
+│    (over Delitzsch's article) — all fall out of it, as do the four hard bugs
+│    (KJV John 7:26 "the very Mashiach", Acts 9:22 "very Mashiach", John 1:25 /
+│    6:69 "that Mashiach"). 233 NKJV-R + 268 KJV-R verses changed vs the first
+│    pass; changed-vs-base totals unchanged (1212/1217). CORPUS_VERSION c16→c17.
+└─
+
+
 DOCTRINE BASIS (why these forms)
 --------------------------------
 The Volumes of Truth — "Death and Deliverance": "I command all who have ears to
@@ -62,18 +90,22 @@ domain, via getbible.net). Key findings that shaped the rules:
 
 THE RULESET (tools/gen-restored-nt.mjs — regenerate there, never hand-edit)
 ---------------------------------------------------------------------------
-  JESUS (caps)              → YAHUSHUA                    (6 verses ×2)
+  Counts are (NKJV / KJV) instances. Ordered; first match wins.
+  JESUS (caps)              → YAHUSHUA                    (6 / 6)
   Jesus Christ['s]          → YahuShua HaMashiach['s]     (184+1 / 196+2)
-  Christ Jesus              → YahuShua HaMashiach         (69 / 58) [see CALLS]
+  Christ Jesus              → YahuShua HaMashiach         (69 / 58) [commanded order]
   false christs/Christs     → false messiahs/Messiahs     (Matt 24:24, Mk 13:22)
-  His/my/thy/your Christ    → … Mashiach                  (Acts 4:26, Rev 11:15, 12:10)
-  the Lord's Christ         → the Lord's Mashiach         (Luke 2:26)
-  is/was called Christ      → … called Mashiach           (Matt 1:16, 27:17, 27:22)
-  the Christ                → HaMashiach ("the" absorbed — Ha IS the) (55 / 18)
-  Christ's                  → HaMashiach's                (14 / 14)
-  Christ (standalone)       → HaMashiach                  (236 / 273)
+  the Christ (definite)     → HaMashiach ("the" absorbed — Ha IS the) (55 / 18)
+  Christ's (bare)           → Mashiach's                  (14 / 14)
+  Christ (every other)      → Mashiach  (name-like/anarthrous)      (244 / 281)
   Jesus' (possessive)       → YahuShua's                  (9 / 10)
   Jesus                     → YahuShua                    (710 / 708)
+  ─ the former His-/Lord's-/called-Christ and Acts-2:36 "Lord and Christ" rules
+    are GONE: each is just a bare "Christ" (no printed "the"), and the general
+    bare rule now yields "His Mashiach", "the Lord's Mashiach", "called Mashiach",
+    "both Lord and Mashiach" identically — one rule, no special cases. The John
+    1:41/4:25 glosses and the Acts 7:45 / Heb 4:8 Jesus→Joshua fixes remain
+    hand-adjudicated EXCEPTIONS (below).
 
 PER-VERSE EXCEPTIONS (hand-adjudicated)
 ---------------------------------------
@@ -93,22 +125,24 @@ PER-VERSE EXCEPTIONS (hand-adjudicated)
               "We have found the Mashiach" (which is translated, the Anointed) —
               rendering the gloss by MEANING avoids "Mashiach…, that is,
               Mashiach" circularity.
-  Acts 2:36   "both Lord and Mashiach" — anarthrous Hebrew predicate (Delitzsch).
+  (Acts 2:36 "both Lord and Mashiach" is NO LONGER a coded exception — the
+   general bare-Christ rule produces it. The 2026-07-20 re-audit removed it.)
 
 JUDGMENT CALLS AN OWNER MIGHT FLIP (each is a 1-line generator change + rerun)
 ------------------------------------------------------------------------------
   1. PAIR ORDER: "Christ Jesus" is normalized to "YahuShua HaMashiach" (the
-     commanded order; VOT never reverses it; the naive alternative "HaMashiach
-     YahuShua" was rejected as awkward — your call going in). The
-     order-preserving alternative "Mashiach YahuShua" (bare, per the anarthrous
-     Greek) is one constant away: PAIR_ORDER='preserve' in gen-restored-nt.mjs.
-  2. TITLE STYLE: standalone titular Christ → "HaMashiach". The Matthew Study
-     Bible instead uses English "The Messiah" in verse text (its own earlier
-     convention). If you ever want NKJV-R/KJV-R to match the Study Bible's
-     style, swap the three standalone rules' output to "the Messiah"/"Messiah"
-     and rerun.
-  3. Matt 26:68 vocative KJV reads "thou HaMashiach" (Delitzsch has the
-     article; English "thou" + Ha reads slightly oddly — flag if unwanted).
+     commanded order; VOT never reverses it). Order-preserving alternative
+     "Mashiach YahuShua" is one constant away: PAIR_ORDER='preserve'.
+  2. GENITIVE "of Christ" (~90 vv): the 2026-07-20 rule renders it bare —
+     "gospel of Mashiach" — consistent with the name-like treatment. The Greek
+     genitive is ARTICULAR (tou Christou), so "of the Messiah" is also defensible;
+     if you ever want the genitive to read "of HaMashiach" while the rest stays
+     bare, that needs a dedicated "of Christ"→"of HaMashiach" rule ABOVE the bare
+     rule (flag it and I'll add it).
+  ─ RESOLVED 2026-07-20 (were calls, now decided): standalone titular Christ →
+    bare "Mashiach" (name-like); vocative → bare ("Mashiach!"); appositive → bare
+    ("Mashiach, a King" / "Mashiach the Lord"); "in Christ" → "in Mashiach".
+    Only literal "the Christ" stays HaMashiach. See the RE-AUDIT box up top.
 
 ARCHITECTURE
 ------------
@@ -134,12 +168,21 @@ ARCHITECTURE
   - check_balance.py / esprima and the corpus-version lock cover the new files
     automatically (the DATA_CORPUS glob matches bible-r*.js).
 
-TESTS + GATES (all green 2026-07-12)
-------------------------------------
-  - src/data/restored-names.test.js ×18 — structure (NT-only, every entry a
+TESTS + GATES (re-audit green 2026-07-20; original 2026-07-12)
+-------------------------------------------------------------
+  - src/data/restored-names.test.js ×24 — structure (NT-only, every entry a
     real change, exact changed-verse totals 1212/1217), no-token-left-behind
-    sweep, non-Lord bearers untouched, and 13 golden verses pinning every
-    exception + rule class.
+    sweep, non-Lord bearers untouched, golden verses pinning every exception +
+    rule class, PLUS the 2026-07-20 re-audit goldens: a corpus-wide guard that
+    NO article/adjective/possessive precedes HaMashiach (the defect class is
+    structurally dead), the four stranded-determiner fixes, the vocative +
+    appositive + bare-title + kept-"the-Christ" cases.
+  - 2026-07-20 gates: 2684 vitest / 151 files, validate:data 0 errors (3,119
+    items), check_balance ALL OK, lint --max-warnings 0 (445 globals), typecheck,
+    build, smoke:ci PASS (0 crashed / 0 console errors). Live-verified in the
+    preview reader: translateVerse resolves John 7:26 KJV-R → "…the very
+    Mashiach?" and every adjudicated case correctly.
+  ── original 2026-07-12 ──
   - src/data/translations.test.js +6 — base-chain (overlay hit, base fallback,
     both-miss → verse.text, base-not-yet-loaded, rnkjv no-chain, LRU sanity).
   - validate:data 0 errors · check_balance ALL OK · vitest 2508/138 · lint

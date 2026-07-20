@@ -65,10 +65,6 @@ const EXCEPTIONS = [
   { ref: 'john 1:41', tr: 'kjv', pairs: [['the Messias', 'the Mashiach'], ['the Christ', 'the Anointed']] },
   { ref: 'john 4:25', tr: 'nkjv', pairs: [['that Messiah is coming', 'that Mashiach is coming'], ['who is called Christ', 'who is called the Anointed']] },
   { ref: 'john 4:25', tr: 'kjv', pairs: [['Messias cometh', 'Mashiach cometh'], ['which is called Christ', 'which is called the Anointed']] },
-  // Anarthrous Greek predicate ("God has made Him... Lord and Christ") — the
-  // Hebrew predicate is bare (Delitzsch: le'adon veli-mshiach), so Mashiach
-  // without the article. The verse's "this/that same Jesus" restores normally.
-  { ref: 'acts 2:36', tr: 'both', pairs: [['both Lord and Christ', 'both Lord and Mashiach']] },
 ];
 
 /* ── Protected tokens (never restored) ── */
@@ -78,7 +74,27 @@ const MASKS = [
   /Christians?\b/g,       // Acts 11:26, 26:28, 1 Pet 4:16 — historical label; VOT uses it (53x)
 ];
 
-/* ── Ordered rules ── */
+/* ── Ordered rules ──
+   Core principle (owner-decided 2026-07-20 — see RESTORED-NAMES-PLAN.txt "TITLE
+   RULE"): the PRINTED ENGLISH governs the title form.
+
+     • "the Christ"  (definite) → HaMashiach   — Ha IS the article, so the
+       English "the" is absorbed. Used only where the text actually reads
+       "the Christ" (a definite identification: "You are the Christ").
+     • every OTHER "Christ"     → bare "Mashiach"  — name-like, matching the
+       anarthrous Greek, and reading naturally after a preposition ("in
+       Mashiach"), a possessive ("Mashiach's"), a genitive ("gospel of
+       Mashiach"), a determiner/adjective ("the very Mashiach", "that
+       Mashiach"), in a vocative ("Prophesy to us, Mashiach!"), or an
+       appositive ("Mashiach, a King"; "Mashiach the Lord").
+
+   This single distinction makes it STRUCTURALLY IMPOSSIBLE for an English
+   article/adjective to collide with the "the" baked into Ha- (the
+   "the-very-HaMashiach" defect class the first pass produced). The one rule
+   also subsumes the former hand-cased His/thy/your-Christ, the-Lord's-Christ,
+   is-called-Christ, and Lord-and-Christ (Acts 2:36) exceptions — each is simply
+   "a Christ with no printed 'the'" and now falls out of the general rule.
+   The commanded full-Name pairs stay "YahuShua HaMashiach". */
 const PAIR = PAIR_ORDER === 'commanded' ? 'YahuShua HaMashiach' : 'Mashiach YahuShua';
 const RULES = [
   // The naming verses + cross inscriptions print the Name in capitals
@@ -91,18 +107,11 @@ const RULES = [
   // (the one place "Messiah" beats a transliteration).
   { re: /false Christs\b/g, to: 'false Messiahs', cat: 'false christs' },
   { re: /false christs\b/g, to: 'false messiahs', cat: 'false christs' },
-  // Hebrew grammar: a noun with a possessive suffix (meshicho, "His Anointed",
-  // Ps 2:2 quoted at Acts 4:26; Rev 11:15, 12:10) or in construct with a
-  // possessor (mashiach-YHWH, Luke 2:26) NEVER takes the article — bare Mashiach.
-  { re: /\b([Hh]is|[Mm]y|[Tt]hy|[Yy]our) Christ\b/g, to: '$1 Mashiach', cat: 'His Christ' },
-  { re: /\b(Lord|LORD)(['’])s Christ\b/g, to: '$1$2s Mashiach', cat: "Lord's Christ" },
-  // "who/which is called Christ" (Matt 1:16, 27:17, 27:22) — after niqra
-  // ("is called") the title stands bare in Hebrew (Delitzsch: haniqra Mashiach).
-  { re: /\b(is|was|be) called Christ\b/g, to: '$1 called Mashiach', cat: 'called Christ' },
-  // Standalone title: Ha IS the article — English "the" is absorbed.
-  { re: /[Tt]he Christ\b/g, to: 'HaMashiach', cat: 'the Christ' },
-  { re: /Christ(['’])s/g, to: 'HaMashiach$1s', cat: "Christ's" },
-  { re: /\bChrist\b/g, to: 'HaMashiach', cat: 'Christ (standalone)' },
+  // Definite title: English "the Christ" → HaMashiach (Ha absorbs "the").
+  { re: /[Tt]he Christ\b/g, to: 'HaMashiach', cat: 'the Christ (definite)' },
+  // Every other Christ is bare Mashiach (name-like / anarthrous).
+  { re: /Christ(['’])s/g, to: 'Mashiach$1s', cat: "Christ's (bare)" },
+  { re: /\bChrist\b/g, to: 'Mashiach', cat: 'Christ (bare)' },
   { re: /\bJesus(['’])(?![A-Za-z])/g, to: 'YahuShua$1s', cat: "Jesus' (possessive)" },
   { re: /\bJesus\b/g, to: 'YahuShua', cat: 'Jesus' },
   { re: /\bMessias\b/g, to: 'Mashiach', cat: 'Messias' },
@@ -235,6 +244,9 @@ const SAMPLE = [
   ['matthew-plain', '26', 68], ['matthew-plain', '27', 17], ['john', '1', 41], ['john', '4', 25],
   ['acts', '2', 36], ['acts', '4', 26], ['luke', '2', 26], ['revelation', '12', 10],
   ['romans', '8', 39], ['hebrews', '4', 8], ['acts', '7', 45], ['1john', '2', 22],
+  // adjudicated title cases (2026-07-20): stranded-determiner fixes + bare-title reads
+  ['john', '7', 26], ['acts', '9', 22], ['john', '1', 25], ['luke', '23', 2],
+  ['luke', '2', 11], ['romans', '6', 8], ['romans', '15', 19], ['1corinthians', '3', 23],
 ];
 console.log('\nSamples:');
 for (const [b, c, n] of SAMPLE) {

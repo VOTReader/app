@@ -116,6 +116,52 @@ describe('Restored-Name overlays — golden verses', () => {
     expect(verseOf(rnkjvMap, 'matthew-plain', '16', 16)).toContain('You are HaMashiach, the Son of the living God');
     expect(verseOf(rkjvMap, 'matthew-plain', '16', 16)).toContain('Thou art HaMashiach');
   });
+
+  /* ── Unified TITLE rule (owner-decided 2026-07-20): printed "the Christ" →
+     HaMashiach; every other Christ → bare Mashiach. These pin the re-audit so
+     the stranded-article defect class can never return. ── */
+  it('no stranded English article/adjective/possessive survives before HaMashiach (the "the very the-Messiah" defect class is dead)', () => {
+    // Ha- already means "the"; nothing may print a competing article, adjective,
+    // or possessive in front of it. ("that"/"this" are deliberately excluded —
+    // they legitimately precede a PREDICATE HaMashiach as a conjunction ("say
+    // that HaMashiach is…") or subject pronoun ("is not this HaMashiach?";
+    // "Art thou HaMashiach?" — thou is the subject of the inverted question).)
+    for (const [label, map] of [['rnkjv', rnkjvMap], ['rkjv', rkjvMap]]) {
+      for (const v of overlayVerses(map)) {
+        expect(
+          /\b(the|a|an|very|same|one|no|his|my|thy|your|our|their)\s+HaMashiach\b/i.test(v.text),
+          `${label} ${v.bookId} ${v.ch}:${v.n} strands a determiner before HaMashiach: ${v.text}`
+        ).toBe(false);
+      }
+    }
+  });
+  it('stranded-determiner bugs fixed: "the very Mashiach" / "very Mashiach" / "that Mashiach" (KJV John 7:26, Acts 9:22, John 1:25, 6:69)', () => {
+    expect(verseOf(rkjvMap, 'john', '7', 26)).toContain('the very Mashiach');
+    expect(verseOf(rkjvMap, 'acts', '9', 22)).toContain('very Mashiach');
+    expect(verseOf(rkjvMap, 'john', '1', 25)).toContain('not that Mashiach');
+    expect(verseOf(rkjvMap, 'john', '6', 69)).toContain('that Mashiach');
+  });
+  it('vocative / direct address is bare: "Prophesy to us, Mashiach!" (Matt 26:68)', () => {
+    expect(verseOf(rnkjvMap, 'matthew-plain', '26', 68)).toContain('Prophesy to us, Mashiach!');
+    expect(verseOf(rkjvMap, 'matthew-plain', '26', 68)).toContain('thou Mashiach');
+  });
+  it('appositives are bare: "Mashiach, a King" (Luke 23:2), "Mashiach the Lord" (Luke 2:11)', () => {
+    expect(verseOf(rnkjvMap, 'luke', '23', 2)).toContain('is Mashiach, a King');
+    expect(verseOf(rnkjvMap, 'luke', '2', 11)).toContain('is Mashiach the Lord');
+    expect(verseOf(rkjvMap, 'luke', '2', 11)).toContain('is Mashiach the Lord');
+  });
+  it('name-like bare title everywhere else: "in/with Mashiach", genitive "of Mashiach", "Mashiach died", possessive "Mashiach’s"', () => {
+    expect(verseOf(rnkjvMap, '2corinthians', '5', 17)).toContain('in Mashiach');       // "in Christ"
+    expect(verseOf(rnkjvMap, 'romans', '6', 8)).toContain('with Mashiach');            // "with Christ"
+    expect(verseOf(rnkjvMap, 'romans', '15', 19)).toContain('gospel of Mashiach');     // genitive
+    expect(verseOf(rnkjvMap, '1corinthians', '15', 3)).toContain('Mashiach died');     // anarthrous subject
+    expect(verseOf(rnkjvMap, '1corinthians', '3', 23)).toMatch(/are Mashiach['’]s/); // possessive
+  });
+  it('definite "the Christ" still absorbs to HaMashiach (predicate identification)', () => {
+    expect(verseOf(rnkjvMap, 'mark', '8', 29)).toContain('You are HaMashiach');
+    expect(verseOf(rnkjvMap, 'john', '1', 20)).toContain('I am not HaMashiach');
+    expect(verseOf(rnkjvMap, 'luke', '24', 26)).toContain('Ought not HaMashiach to have suffered');
+  });
   it('Hebrew possessive suffix takes NO article: "His Mashiach" (Acts 4:26; Rev 11:15, 12:10), "the Lord’s Mashiach" (Luke 2:26)', () => {
     expect(verseOf(rnkjvMap, 'acts', '4', 26)).toContain('His Mashiach');
     expect(verseOf(rkjvMap, 'acts', '4', 26)).toContain('his Mashiach');
