@@ -4716,7 +4716,7 @@ var LETTERS_V3 = [
     "date": "11/9/06",
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
-    "forLine": "For Someone Who Asked if They Can Still Serve The Lord as a Pastor",
+    "forLine": "For Someone Who Asked if They Can Still Serve The Lord as a Pastor, Even Though They Are Homosexual, and For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",

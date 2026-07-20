@@ -212,6 +212,45 @@ var LETTERS_V6 = [
     "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {
+        "type": "para",
+        "segments": [
+          {
+            "t": "italic",
+            "v": "My heart is heavy, My eyes shed tears without end, says The Lord. And what shall I say then? Shall I turn My face from all this evil, from all this murder and violence which breaks forth as a flood, covering the land in tears and blood? Shall I turn back from My purpose? Shall I turn My back, and let Israel burn?! For I tell you the truth, Jacob is about to stumble, Israel is about to make a grave error! Behold, the nations shall turn their backs as her enemies gather, and shut their eyes as they seek to strike her from existence!..."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Yet I shall not turn My back, nor will I turn My face from Israel! And though it greatly pains My heart, for I take no pleasure in the destruction of the wicked, My wrath shall be satisfied. For many shall cry for peace, yet there shall be no peace. And though many shall seek safety, none shall be found. For the hearts of all men shall sink and profound confusion shall overtake them; behold, the heart of man shall fail him for fear, because of those things coming to pass before his eyes! And many shall turn aside after satan, and many who say they are My people shall depart from Me, yet the penitent shall bow down and give Me glory. "
+          },
+          {
+            "t": "italic",
+            "v": "I AM THE LORD."
+          }
+        ]
+      },
+      {
+        "type": "para",
+        "segments": [
+          {
+            "t": "text",
+            "v": "Beloved, there is but One Refuge, only One Way to be found... "
+          },
+          {
+            "t": "italic",
+            "v": "In Mashiach ONLY shall you find refuge from all these troubles; through Him ONLY have I opened The Way."
+          },
+          {
+            "t": "text",
+            "v": " Yet in the world you will not find Him, nor is your place of rest and worship here on Earth; nor is it in any of these houses made of brick and wood, all these abominable temples and churches made by human hands. For what I have prepared can not be seen with the eyes, nor can it be attained by human means or mere proclamation. Yet within the hearts of My own it is clearly seen, and upon the lips of My bride the testimony is clearly heard. For that which has entered into the hearts of the chosen shall soon be realized, and that which has entered into the hearts of the wicked shall return upon their own heads. For hate brings forth suffering and violence; yet the love of The Messiah brings salvation, escape under the shadow of His healing wings!"
+          }
+        ]
+      },
+      {
         "type": "poetry",
         "lines": [
           [
@@ -964,6 +1003,8 @@ var LETTERS_V6 = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Spiritual Famine",
+    "metaAddendumLink": { "collection": "A Testament Against The World: The Lord's Rebuke", "letterTitle": "Spiritual Famine" },
     "blocks": [
       {
         "type": "para",
@@ -3337,7 +3378,7 @@ var LETTERS_V6 = [
     "title": "The Parable of The Aged Shepherd",
     "date": "7/14/12",
     "from": "From The Lord, Our God and Savior",
-    "spoken": "",
+    "spoken": "A Parable Given to Timothy",
     "forLine": "For All Those Who Have Ears to Hear",
     "blocks": [
       {

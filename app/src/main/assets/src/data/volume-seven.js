@@ -3117,6 +3117,7 @@ var LETTERS_V7 = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy, For All Those Who Have Ears to Hear",
     "forLine": "",
+    "noteLine": "(Regarding those who say the Holy Spirit would never tell you to obey The Moral Law, The Ten Commandments)",
     "blocks": [
       {
         "type": "para",
@@ -6141,7 +6142,7 @@ var LETTERS_V7 = [
     "date": "8/19/09",
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
-    "forLine": "For All Those Who Shall Be Sent In the Day",
+    "forLine": "For All Those Who Shall Be Sent In the Day, and For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -10085,7 +10086,7 @@ var LETTERS_V7 = [
     "date": "4/8/10",
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "",
-    "forLine": "For All Those Who Call of Themselves Christian",
+    "forLine": "For All Those Who Call of Themselves Christian, and For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",

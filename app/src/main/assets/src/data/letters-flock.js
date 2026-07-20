@@ -755,6 +755,8 @@ var LETTERS_FLOCK = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For Timothy, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Hearts Changed",
+    "metaAddendumLink": { "collection": "Volume Two", "letterTitle": "Hearts Changed" },
     "blocks": [
       {
         "type": "para",
@@ -1318,6 +1320,8 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For Timothy, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Woe to the Captives of This World",
+    "metaAddendumLink": { "collection": "Volume Three", "letterTitle": "Woe to the Captives of This World" },
     "blocks": [
       {
         "type": "para",
@@ -1437,7 +1441,7 @@ var LETTERS_FLOCK = [
     "date": "3/11/06",
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
-    "forLine": "For The Lord’s Little Flock, For All Believing Parents",
+    "forLine": "For The Lord’s Little Flock, For All Believing Parents, and For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -2177,7 +2181,9 @@ var LETTERS_FLOCK = [
     "date": "4/24/08",
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
-    "forLine": "For All Those Who Blow This Trumpet",
+    "forLine": "For All Those Who Blow This Trumpet, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Let All in the Earth Be Brought into Deep and Profound Silence",
+    "metaAddendumLink": { "collection": "Volume Seven", "letterTitle": "Let All in the Earth Be Brought into Deep and Profound Silence" },
     "blocks": [
       {
         "type": "para",
@@ -3111,6 +3117,8 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Watchmen, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Blow the Trumpet, Sound the Alarm",
+    "metaAddendumLink": { "collection": "Volume Seven", "letterTitle": "Blow the Trumpet, Sound the Alarm" },
     "blocks": [
       {
         "type": "para",
@@ -3716,6 +3724,8 @@ var LETTERS_FLOCK = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Be Instant In and Out of Season",
+    "metaAddendumLink": { "collection": "Volume Four", "letterTitle": "Be Instant In and Out of Season" },
     "blocks": [
       {
         "type": "para",
@@ -3877,6 +3887,8 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "In Spirit and in Truth",
+    "metaAddendumLink": { "collection": "Volume Five", "letterTitle": "In Spirit and in Truth" },
     "blocks": [
       {
         "type": "para",
@@ -4659,6 +4671,8 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Treasuries of Wrath and Mercy",
+    "metaAddendumLink": { "collection": "Volume Five", "letterTitle": "Treasuries of Wrath and Mercy" },
     "blocks": [
       {
         "type": "para",
@@ -5279,7 +5293,7 @@ var LETTERS_FLOCK = [
     "date": "2/18/11",
     "from": "From The Lord, Our God and Savior",
     "spoken": "",
-    "forLine": "For a Brother in Christ and For The Lord’s Little Flock",
+    "forLine": "For a Brother in Christ and For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -7276,6 +7290,8 @@ var LETTERS_FLOCK = [
     "from": "From The Lord, Our God and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Judgment and Woe",
+    "metaAddendumLink": { "collection": "A Testament Against The World: The Lord's Rebuke", "letterTitle": "Judgment and Woe" },
     "blocks": [
       {
         "type": "para",

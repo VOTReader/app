@@ -44,10 +44,14 @@ function record(L) {
   });
   const rt = Array.isArray(L.relatedTopics) ? L.relatedTopics.map((t) => ({ label: norm(t.label), url: t.url })) : [];
   const body = norm(blocksText(L.sectionIntro) + ' ' + blocksText(L.blocks));
+  // Header fields may be a plain string OR a segments array (e.g. The Shadow of
+  // The Almighty's `from` carries an fn bubble) — flatten either to text.
+  const hdr = (v) => norm(Array.isArray(v) ? segText(v) : v);
   return {
     id: L.id, title: norm(L.title),
-    date: norm(L.date), from: norm(L.from), spoken: norm(L.spoken), forLine: norm(L.forLine),
+    date: hdr(L.date), from: hdr(L.from), spoken: hdr(L.spoken), forLine: hdr(L.forLine),
     noteLine: noteText(L.noteLine),
+    sectionIntroText: norm(blocksText(L.sectionIntro)),
     bodyText: body, bodyWords: body ? body.split(' ').length : 0,
     fnCount: fnList.length, footnotes: fnList,
     nkjvKeys: (L.nkjv && typeof L.nkjv === 'object') ? Object.keys(L.nkjv) : [],

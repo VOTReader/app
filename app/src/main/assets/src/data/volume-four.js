@@ -2224,6 +2224,8 @@ var LETTERS_V4 = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy During an Online Fellowship",
     "forLine": "For The Lord’s Little Flock, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "Come to Me; No More Time to Tarry",
+    "metaAddendumLink": { "collection": "Volume Four", "letterTitle": "Come to Me; No More Time to Tarry" },
     "blocks": [
       {
         "type": "para",
@@ -2366,7 +2368,7 @@ var LETTERS_V4 = [
     "date": "1/5/10",
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "",
-    "forLine": "For Someone Who Claims the Apostle Paul Was False",
+    "forLine": "For Someone Who Claims the Apostle Paul Was False, and For All Those Who Have Ears to Hear",
     "blocks": [
       {
         "type": "para",
@@ -3661,6 +3663,8 @@ var LETTERS_V4 = [
     "from": "From YahuShua HaMashiach, Our Lord and Savior",
     "spoken": "The Word of The Lord Spoken to Timothy",
     "forLine": "For Timothy’s Wife, and For All Those Who Have Ears to Hear",
+    "metaAddendum": "A Trying of Your Trust, a Testing of Your Resolve... Your Faith Revealed",
+    "metaAddendumLink": { "collection": "Letters to The Lord's Little Flock", "letterTitle": "A Trying of Your Trust, a Testing of Your Resolve... Your Faith Revealed" },
     "blocks": [
       {
         "type": "para",

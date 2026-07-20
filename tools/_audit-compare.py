@@ -41,6 +41,62 @@ if mode == "titles":
         if not only_html and not only_app:
             print("  all titles matched.")
 
+elif mode == "headcov":
+    # Per-LINE header coverage (2026-07-19 owner ask: "A Parable Given to
+    # Timothy" — the italic attribution/summary lines at the top of every
+    # letter page). EVERY site header line must be represented in the app's
+    # rendered header. App fields are joined in LetterView's render order
+    # (date / from / spoken / forLine / noteLine / "Addendum to <meta>"), so a
+    # site line that merges adjacent fields ("7/23/11 A Parable Given to
+    # Timothy") still matches, and a compound occasion ("Regarding suicide -
+    # Addendum to ...") matches the noteLine+metaAddendum pair.
+    print("HEADER LINE COVERAGE (site header line missing from app header):\n")
+    total = miss = 0
+    for col in collections:
+        aa = app.get(col, [])
+        issues = []
+        for hr in html[col]:
+            ar = find(aa, hr["title"])
+            if not ar:
+                continue
+            # sectionIntro included: a site header paragraph the app renders as
+            # the letter's intro quote (Recompense's dream heading) still counts
+            # as represented.
+            joined = key(" ".join([
+                ar.get("date") or "", ar.get("from") or "", ar.get("spoken") or "",
+                ar.get("forLine") or "", ar.get("noteLine") or "",
+                ("Addendum to " + ar["metaAddendum"]) if ar.get("metaAddendum") else "",
+                ar.get("sectionIntroText") or "",
+            ]))
+            for l in hr["headerLines"]:
+                total += 1
+                lk = key(l)
+                # "An addendum to X" (Pentecost's site wording) matches the
+                # app's uniform "Addendum to X" renderer.
+                if lk.startswith("anaddendumto"):
+                    lk = lk[2:]
+                ok = lk and lk in joined
+                # A LONG line is a prose paragraph the site styles into the
+                # header <p> (Deliverance's opening) — the app renders it as
+                # body blocks, so accept body representation for prose only
+                # (short header meta lines must live in the header fields).
+                if not ok and len(lk) > 200:
+                    ok = lk in key(ar.get("bodyText") or "")
+                # A leading date may be recomposed elsewhere in the header
+                # (Recompense's dream heading carries its date at the end).
+                if not ok:
+                    dm = re.match(r"^(\d{4,8})(.*)$", lk)
+                    if dm and dm.group(2) and dm.group(2) in joined and dm.group(1) in joined:
+                        ok = True
+                if lk and not ok:
+                    issues.append((hr["title"], l))
+                    miss += 1
+        if issues:
+            print(f"--- {col} ({len(issues)}) ---")
+            for t, l in issues:
+                print(f"    {t[:50]:50} | missing: {l!r}")
+    print(f"\n{total} header lines checked, {miss} missing")
+
 elif mode == "headers":
     print("HEADER discrepancies (occasion / blank-header / date / from):\n")
     for col in collections:
