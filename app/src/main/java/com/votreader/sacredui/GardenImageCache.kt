@@ -3,7 +3,9 @@ package com.votreader.sacredui
 import android.webkit.WebResourceResponse
 import timber.log.Timber
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
@@ -127,8 +129,11 @@ class GardenImageCache(cacheRoot: File) {
         return m.groupValues[1]
     }
 
-    /** Fetch [url], following the GitHub redirect. Returns bytes or null. */
-    private fun download(url: String): ByteArray? {
+    /** Fetch [url], following the GitHub redirect. Returns bytes or null.
+     *  Visible for test (the streaming size guard is exercised against a
+     *  loopback chunked response, which the host allowlist would otherwise
+     *  keep unreachable from intercept()). */
+    internal fun download(url: String): ByteArray? {
         var conn: HttpURLConnection? = null
         return try {
             conn = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -143,20 +148,56 @@ class GardenImageCache(cacheRoot: File) {
                 return null
             }
             // NTV-2: reject an oversized asset by its declared Content-Length BEFORE
-            // reading it into heap (-1 = unknown falls through; GitHub sets it).
+            // reading it into heap. Early-out fast path only — a chunked response
+            // declares -1 and sails past this check, so the streaming guard below
+            // is what actually enforces the cap.
             val declared = conn.contentLength
             if (declared > MAX_DOWNLOAD_BYTES) {
                 Timber.tag("GardenCache").w("download too large (Content-Length %d) for %s", declared, url)
                 return null
             }
-            val bytes = conn.inputStream.use { it.readBytes() }
-            if (bytes.isEmpty()) null else bytes
+            val bytes = conn.inputStream.use { readCapped(it) }
+            if (bytes == null || bytes.isEmpty()) null else bytes
         } catch (e: Exception) {
             Timber.tag("GardenCache").w(e, "download failed for %s", url)
             null
         } finally {
             try { conn?.disconnect() } catch (_: Exception) {}
         }
+    }
+
+    /**
+     * Read [stream] into memory, failing closed (null) the moment the running
+     * total exceeds MAX_DOWNLOAD_BYTES.
+     *
+     * Why this exists: the declared Content-Length fast-reject in [download]
+     * is blind to chunked responses (Content-Length -1), so a cap checked
+     * only against the header has a hole exactly where it was meant to
+     * protect a budget device — an unknown-length body would be read
+     * UNBOUNDED into heap before any guard ran. Enforcing the cap on the
+     * bytes that ACTUALLY arrive closes it. The counter is checked before
+     * each chunk is appended, so the in-memory buffer can never outgrow the
+     * cap, and an over-cap body degrades to null (a cache miss — the WebView
+     * loads the image itself), never to an escaped exception.
+     */
+    private fun readCapped(stream: InputStream): ByteArray? {
+        val out = ByteArrayOutputStream()
+        val chunk = ByteArray(16 * 1024)
+        var total = 0
+        while (true) {
+            val n = stream.read(chunk)
+            if (n < 0) break
+            total += n
+            if (total > MAX_DOWNLOAD_BYTES) {
+                Timber.tag("GardenCache").w(
+                    "download aborted mid-stream past %d bytes (unknown or understated Content-Length)",
+                    MAX_DOWNLOAD_BYTES
+                )
+                return null
+            }
+            out.write(chunk, 0, n)
+        }
+        return out.toByteArray()
     }
 
     private fun response(bytes: ByteArray): WebResourceResponse {
@@ -258,7 +299,7 @@ class GardenImageCache(cacheRoot: File) {
         // NTV-2: per-IMAGE ceiling, checked against the declared Content-Length BEFORE
         // a download is read into heap. Ultra pages are ~3.5 MB (max ~8.3 MB on device),
         // so 48 MB is a generous backstop guarding a budget device against a huge or
-        // compromised asset that slipped past the host allowlist.
-        private const val MAX_DOWNLOAD_BYTES = 48 * 1024 * 1024
+        // compromised asset that slipped past the host allowlist. Visible for test.
+        internal const val MAX_DOWNLOAD_BYTES = 48 * 1024 * 1024
     }
 }

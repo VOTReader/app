@@ -1,9 +1,13 @@
 package com.votreader.sacredui
 
+import com.sun.net.httpserver.HttpServer
 import org.junit.Test
 import org.junit.Before
 import org.junit.After
 import java.io.File
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -126,5 +130,57 @@ class GardenImageCacheTest {
         assertNull(cache.intercept("https://evil.test/garden_001.jpg"))
         assertEquals(0L, cache.sizeBytes())
         assertTrue((gdir.listFiles() ?: emptyArray()).none { it.name.startsWith("garden_") })
+    }
+
+    // ─── NTV-2: streaming size guard (chunked / unknown Content-Length) ───
+
+    @Test
+    fun `chunked response over the per-image cap fails closed and caches nothing`() {
+        // NTV-2: the declared-length fast-reject in download() can only see a
+        // declared Content-Length. A chunked response declares NONE (contentLength
+        // == -1), so the cap must be enforced against the bytes that ACTUALLY
+        // arrive — otherwise the whole body is pulled into heap before any guard
+        // runs, which is exactly the budget-device blow-up MAX_DOWNLOAD_BYTES
+        // exists to prevent. One byte over the cap must fail CLOSED (null →
+        // cache miss; the WebView loads the image itself) and write nothing.
+        // No exception may escape (never-throw design).
+        val payload = ByteArray(GardenImageCache.MAX_DOWNLOAD_BYTES + 1) { 0x6A }
+        withServer(payload) { url ->
+            assertNull(cache.download(url))
+        }
+        assertEquals(0L, cache.sizeBytes())
+        val gdir = File(tmp, "garden")
+        assertTrue((gdir.listFiles() ?: emptyArray()).none { it.name.startsWith("garden_") })
+    }
+
+    @Test
+    fun `chunked response under the cap still downloads fully`() {
+        // Companion guard test: unknown Content-Length is legitimate for small
+        // bodies too, so the streaming cap must not break normal chunked
+        // downloads — a body under the cap must arrive intact.
+        val payload = ByteArray(64 * 1024) { 0x2E }
+        withServer(payload) { url ->
+            assertContentEquals(payload, cache.download(url))
+        }
+    }
+
+    /**
+     * Serve [payload] from a loopback HttpServer with NO Content-Length
+     * (sendResponseHeaders(200, 0) → chunked transfer encoding, so the
+     * client sees contentLength == -1), then run [block] against its URL.
+     * This is the response shape the declared-length guard is blind to.
+     */
+    private fun withServer(payload: ByteArray, block: (String) -> Unit) {
+        val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+        server.createContext("/garden_999.jpg") { ex ->
+            ex.sendResponseHeaders(200, 0) // 0 = chunked: body length unknown to the client
+            ex.responseBody.use { it.write(payload) }
+        }
+        server.start()
+        try {
+            block("http://127.0.0.1:${server.address.port}/garden_999.jpg")
+        } finally {
+            server.stop(0)
+        }
     }
 }
