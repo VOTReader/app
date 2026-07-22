@@ -49,6 +49,37 @@ class MainActivityLogicTest {
         assertNull(MainActivityLogic.deviceToCssPx(100f, 200f, -1f))
     }
 
+    @Test
+    fun `default scale of 1 is identical to the old two-factor result`() {
+        // Back-compat: the 3-arg form (scale defaulted to 1.0) must match the
+        // pre-#3 density-only math exactly.
+        val (x, y) = MainActivityLogic.deviceToCssPx(100f, 200f, 2.0f)!!
+        assertEquals(50f, x)
+        assertEquals(100f, y)
+    }
+
+    @Test
+    fun `scale divides out alongside density (1_5x zoom)`() {
+        // At density 2.0 and a 1.5x WebView zoom, a device tap at 300 maps to
+        // 300 / (2.0 * 1.5) = 100 CSS px. Ignoring scale would give 150 (wrong).
+        val (x, y) = MainActivityLogic.deviceToCssPx(300f, 600f, 2.0f, 1.5f)!!
+        assertEquals(100f, x)
+        assertEquals(200f, y)
+    }
+
+    @Test
+    fun `scale of 1 explicitly matches density-only`() {
+        val (x, y) = MainActivityLogic.deviceToCssPx(37f, 88f, 1.0f, 1.0f)!!
+        assertEquals(37f, x)
+        assertEquals(88f, y)
+    }
+
+    @Test
+    fun `non-positive scale drops the tap`() {
+        assertNull(MainActivityLogic.deviceToCssPx(100f, 200f, 2.0f, 0f))
+        assertNull(MainActivityLogic.deviceToCssPx(100f, 200f, 2.0f, -1f))
+    }
+
     // ── decideRecovery ─────────────────────────────────────────────────
     @Test
     fun `cold first crash starts the window, no retry`() {

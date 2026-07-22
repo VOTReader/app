@@ -522,7 +522,7 @@ class AppInterfaceTest {
         // touch the non-existent WebView). IllegalStateException = the
         // call made it through AppInterface -> JsBridge.callOptional ->
         // webViewProvider, which is the full bridge path under test.
-        val realBridge = JsBridge { error("test stub: no WebView") }
+        val realBridge = JsBridge(webViewProvider = { error("test stub: no WebView") })
         val vm = mockk<MainViewModel>(relaxed = true)
         every { vm.audioRecorder.stop() } returns
             NativeAudioRecorder.Result.Failure("test")

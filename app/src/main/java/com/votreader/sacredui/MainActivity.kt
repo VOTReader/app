@@ -151,11 +151,20 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // scoped, not WebView-scoped.
     private val gardenCache: GardenImageCache by lazy { GardenImageCache(cacheDir) }
 
+    // #5: the asset loader + its handler are stateless w.r.t. the WebView
+    // instance, so build them ONCE (lazy) and reuse across renderer-crash
+    // rebuilds instead of re-allocating in every createConfiguredWebView pass.
+    private val assetLoader: WebViewAssetLoader by lazy {
+        WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", AssetsPathHandler(this))
+            .build()
+    }
+
     // Single conduit for every JS callback this Activity fires. Reads
     // [webView] lazily via the lambda so onRenderProcessGone replacing
     // the WebView instance picks up automatically -- no re-instantiation
     // of the bridge required.
-    private val bridge: JsBridge = JsBridge { webView }
+    private val bridge: JsBridge = JsBridge(webViewProvider = { webView })
 
     // The JS-facing surface (window.AndroidBridge from the WebView side).
     // Constructor-injected with `this` as the BridgeHost so the class is
@@ -524,10 +533,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         CookieManager.getInstance().setAcceptCookie(false)
         CookieManager.getInstance().setAcceptThirdPartyCookies(wv, false)
 
-        val assetLoader = WebViewAssetLoader.Builder()
-            .addPathHandler("/assets/", AssetsPathHandler(this))
-            .build()
-
         wv.addJavascriptInterface(appInterface, "AndroidBridge")
         // Route JS console output to Logcat so production crashes / [object CSS]
         // React-warning class failures / WebView errors are visible via
@@ -854,7 +859,10 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 val dyDp = Math.abs(e.y - touchDownY) / density
                 val dxDp = Math.abs(e.x - touchDownX) / density
                 if (dyDp > 4f && dyDp > dxDp) return false
-                MainActivityLogic.deviceToCssPx(e.x, e.y, density)?.let { (cx, cy) ->
+                // #3: divide out the WebView scale too (vm.currentScale; 1.0 when
+                // unzoomed) so the tap maps to the correct CSS coordinate even if
+                // zoom is ever re-enabled via the setZoomEnabled bridge.
+                MainActivityLogic.deviceToCssPx(e.x, e.y, density, vm.currentScale)?.let { (cx, cy) ->
                     bridge.callOptional(JsEvent.AnnotationTap, cx, cy)
                 }
                 return false  // never consume — the tap still flows to the WebView

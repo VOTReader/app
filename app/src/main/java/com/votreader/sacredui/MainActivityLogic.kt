@@ -11,15 +11,27 @@ package com.votreader.sacredui
 object MainActivityLogic {
 
     /**
-     * Convert a device-pixel tap coordinate to CSS px by dividing by the display
-     * density. Zoom is disabled in this WebView (setSupportZoom(false) /
-     * useWideViewPort(false)), so the division is exact. Returns null when
-     * density <= 0 so the tap is dropped rather than dividing by zero / emitting
-     * Infinity coordinates (which would hit-test the wrong annotation).
+     * Convert a device-pixel tap coordinate to CSS px. The WebView reports the
+     * document at `density * scale` physical px per CSS px, so both factors
+     * divide out. [scale] is the app-normalized WebView scale (vm.currentScale;
+     * 1.0 == no zoom). Zoom is disabled today (setSupportZoom(false), no live JS
+     * caller of setZoomEnabled, index.html user-scalable=no), so scale is 1.0 in
+     * practice and this reduces to deviceX / density — but the setZoomEnabled/
+     * getZoomScale bridge is still exposed, so accounting for scale keeps the tap
+     * hit-test correct if zoom is ever re-enabled instead of silently off by the
+     * scale factor. Returns null on a non-positive density OR scale so the tap is
+     * dropped rather than emitting Infinity/NaN coordinates (which would hit-test
+     * the wrong annotation). [scale] defaults to 1.0 for callers that never zoom.
      */
-    fun deviceToCssPx(deviceX: Float, deviceY: Float, density: Float): Pair<Float, Float>? {
-        if (density <= 0f) return null
-        return Pair(deviceX / density, deviceY / density)
+    fun deviceToCssPx(
+        deviceX: Float,
+        deviceY: Float,
+        density: Float,
+        scale: Float = 1f
+    ): Pair<Float, Float>? {
+        if (density <= 0f || scale <= 0f) return null
+        val effective = density * scale
+        return Pair(deviceX / effective, deviceY / effective)
     }
 
     /** Outcome of a renderer-crash recovery decision. */

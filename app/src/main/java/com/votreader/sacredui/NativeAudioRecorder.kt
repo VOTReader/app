@@ -54,7 +54,14 @@ class NativeAudioRecorder(private val context: Context) {
         // Drop any prior instance defensively -- the JS side could double-
         // fire start without a stop / cancel in between (race with
         // recoveries, network hiccups). We never want two recorders alive.
-        try { recorder?.release() } catch (_: Exception) {}
+        // reset() returns the old recorder to its idle state (freeing the mic /
+        // encoder) BEFORE release(); on some OEMs this releases the hardware more
+        // promptly, reducing the chance the fresh MediaRecorder below hits a
+        // still-busy mic on a rapid restart.
+        recorder?.let {
+            try { it.reset() } catch (_: Exception) {}
+            try { it.release() } catch (_: Exception) {}
+        }
         recorder = null
         recordFile?.let { try { it.delete() } catch (_: Exception) {} }
         recordFile = null

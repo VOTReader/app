@@ -135,32 +135,54 @@ class GardenImageCacheTest {
     // ─── NTV-2: streaming size guard (chunked / unknown Content-Length) ───
 
     @Test
-    fun `chunked response over the per-image cap fails closed and caches nothing`() {
-        // NTV-2: the declared-length fast-reject in download() can only see a
-        // declared Content-Length. A chunked response declares NONE (contentLength
-        // == -1), so the cap must be enforced against the bytes that ACTUALLY
-        // arrive — otherwise the whole body is pulled into heap before any guard
-        // runs, which is exactly the budget-device blow-up MAX_DOWNLOAD_BYTES
-        // exists to prevent. One byte over the cap must fail CLOSED (null →
-        // cache miss; the WebView loads the image itself) and write nothing.
+    fun `chunked response over the per-image cap fails closed and writes no usable file`() {
+        // NTV-2 + #1: the declared-length fast-reject in downloadToFile() can only
+        // see a declared Content-Length. A chunked response declares NONE
+        // (contentLength == -1), so the cap must be enforced against the bytes
+        // that ACTUALLY arrive — and now that the download STREAMS to disk, the
+        // footprint stays ~16 KB regardless of body size. One byte over the cap
+        // must fail CLOSED (null → cache miss; the WebView loads the image itself).
         // No exception may escape (never-throw design).
         val payload = ByteArray(GardenImageCache.MAX_DOWNLOAD_BYTES + 1) { 0x6A }
+        val dest = File(tmp, "over.tmp")
         withServer(payload) { url ->
-            assertNull(cache.download(url))
+            assertNull(cache.downloadToFile(url, dest))
         }
+        // Nothing was published into the page cache.
         assertEquals(0L, cache.sizeBytes())
         val gdir = File(tmp, "garden")
         assertTrue((gdir.listFiles() ?: emptyArray()).none { it.name.startsWith("garden_") })
     }
 
     @Test
-    fun `chunked response under the cap still downloads fully`() {
+    fun `chunked response under the cap streams to the file intact`() {
         // Companion guard test: unknown Content-Length is legitimate for small
         // bodies too, so the streaming cap must not break normal chunked
-        // downloads — a body under the cap must arrive intact.
+        // downloads — a body under the cap must arrive on disk byte-for-byte.
         val payload = ByteArray(64 * 1024) { 0x2E }
+        val dest = File(tmp, "under.tmp")
         withServer(payload) { url ->
-            assertContentEquals(payload, cache.download(url))
+            assertEquals(payload.size.toLong(), cache.downloadToFile(url, dest))
+            assertContentEquals(payload, dest.readBytes())
+        }
+    }
+
+    // ─── #2: redirect target host re-verification (SSRF guard on the hop) ───
+
+    @Test
+    fun `redirect to a non-allowlisted host is refused and never fetched`() {
+        // The initial host is gated by intercept(); this proves the SECOND line of
+        // defense: a 302 whose Location points off the Garden allowlist is refused
+        // BEFORE the app connects to it. RED-provable — with automatic redirect
+        // following (the pre-#2 behaviour) the app would fetch the off-allowlist
+        // target and hand its bytes back to the WebView with ACAO:*. Here the
+        // target is a live loopback server, so a following implementation WOULD
+        // return its payload and set the hit flag; the fix returns null and the
+        // target is never contacted.
+        val dest = File(tmp, "redir.tmp")
+        withRedirectChain { redirectUrl, targetWasHit ->
+            assertNull(cache.downloadToFile(redirectUrl, dest))
+            assertFalse(targetWasHit(), "off-allowlist redirect target must never be contacted")
         }
     }
 
@@ -181,6 +203,39 @@ class GardenImageCacheTest {
             block("http://127.0.0.1:${server.address.port}/garden_999.jpg")
         } finally {
             server.stop(0)
+        }
+    }
+
+    /**
+     * Stand up TWO loopback servers: a "redirect" server that 302s to a live
+     * "target" server (both on 127.0.0.1, which is NOT on ALLOWED_HOSTS). Runs
+     * [block] with the redirect URL and a probe reporting whether the target was
+     * ever contacted. If the download follows the hop, the target sets its flag
+     * and returns bytes; if #2 refuses the hop, the flag stays false.
+     */
+    private fun withRedirectChain(block: (redirectUrl: String, targetWasHit: () -> Boolean) -> Unit) {
+        val hit = java.util.concurrent.atomic.AtomicBoolean(false)
+        val target = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+        target.createContext("/garden_998.jpg") { ex ->
+            hit.set(true)
+            val body = ByteArray(1024) { 0x5A }
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+        target.start()
+        val targetUrl = "http://127.0.0.1:${target.address.port}/garden_998.jpg"
+        val redirect = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+        redirect.createContext("/garden_999.jpg") { ex ->
+            ex.responseHeaders.add("Location", targetUrl)
+            ex.sendResponseHeaders(302, -1)
+            ex.close()
+        }
+        redirect.start()
+        try {
+            block("http://127.0.0.1:${redirect.address.port}/garden_999.jpg") { hit.get() }
+        } finally {
+            redirect.stop(0)
+            target.stop(0)
         }
     }
 }

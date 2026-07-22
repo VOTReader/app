@@ -36,9 +36,9 @@ class JsBridgeTest {
     //      "require() accepted, then tried to access webView"
     //      (IllegalStateException). The two exception types are the
     //      assertion seam for whether the guard fired.
-    private val bridge = JsBridge {
+    private val bridge = JsBridge(webViewProvider = {
         error("test stub: webViewProvider invoked (require passed, no real WebView)")
-    }
+    })
 
     // ─── quote ────────────────────────────────────────────────────────
 
@@ -254,6 +254,39 @@ class JsBridgeTest {
                 bridge.callOptional(name)
             }
         }
+    }
+
+    // ─── callWithResult UI-thread guard ──────────────────────────────
+
+    @Test
+    fun `callWithResult on a non-UI thread throws before touching the WebView`() {
+        // isMainThread injected false → the check must fail (IllegalStateException
+        // with the guard message) WITHOUT ever invoking webViewProvider. The
+        // throwing provider proves we never reached the WebView: if we had, the
+        // message would be the provider's, not the guard's.
+        val offThread = JsBridge(
+            webViewProvider = { error("callWithResult reached the WebView off-thread") },
+            isMainThread = { false }
+        )
+        val ex = assertThrows<IllegalStateException> {
+            offThread.callWithResult("1+1") {}
+        }
+        assertEquals("JsBridge.callWithResult must be called on the UI thread", ex.message)
+    }
+
+    @Test
+    fun `callWithResult on the UI thread proceeds past the guard to the WebView`() {
+        // isMainThread injected true → the check passes and control reaches the
+        // webViewProvider (here the throwing stub). Asserting the PROVIDER's
+        // message proves the guard did not block the legitimate UI-thread path.
+        val onThread = JsBridge(
+            webViewProvider = { error("reached WebView as expected") },
+            isMainThread = { true }
+        )
+        val ex = assertThrows<IllegalStateException> {
+            onThread.callWithResult("1+1") {}
+        }
+        assertEquals("reached WebView as expected", ex.message)
     }
 
     // ─── JsEvent typed overload ──────────────────────────────────────

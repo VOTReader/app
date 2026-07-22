@@ -1,5 +1,6 @@
 package com.votreader.sacredui
 
+import android.os.Looper
 import android.webkit.WebView
 
 /**
@@ -22,7 +23,15 @@ import android.webkit.WebView
  * to evaluateJavascript and must be called on the WebView's thread (the
  * back-press dispatcher already runs there).
  */
-class JsBridge(private val webViewProvider: () -> WebView) {
+class JsBridge(
+    private val webViewProvider: () -> WebView,
+    // Injected so the UI-thread guard in callWithResult is unit-testable without
+    // a real Looper (pure-JVM tests can't call Looper.*, which throws "not
+    // mocked"). Production uses the default (the real check, evaluated in
+    // MainActivity's construction — excluded from the coverage gate); tests pass
+    // a fixed true/false.
+    private val isMainThread: () -> Boolean = { Looper.myLooper() == Looper.getMainLooper() }
+) {
 
     private val webView: WebView get() = webViewProvider()
 
@@ -65,6 +74,17 @@ class JsBridge(private val webViewProvider: () -> WebView) {
      * values into it.
      */
     fun callWithResult(js: String, callback: (String) -> Unit) {
+        // evaluateJavascript is a WebView (View) method — UI-thread only. A future
+        // caller from a @JavascriptInterface binder thread would otherwise crash
+        // deep inside WebView with the opaque "Calling View methods on another
+        // thread than the UI thread was originally created". Fail loud + labelled
+        // at the real call site instead. The sole current caller (the back-press
+        // dispatcher) already runs on the UI thread, so this never fires in
+        // production — it's a guard against future misuse. (callOptional /
+        // setCssProperties don't need it: they route through webView.post.)
+        check(isMainThread()) {
+            "JsBridge.callWithResult must be called on the UI thread"
+        }
         webView.evaluateJavascript(js, callback)
     }
 

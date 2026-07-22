@@ -3,9 +3,11 @@ package com.votreader.sacredui
 import android.webkit.WebResourceResponse
 import timber.log.Timber
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
@@ -80,24 +82,35 @@ class GardenImageCache(cacheRoot: File) {
             val file = File(dir, name)
             val lock = locks.getOrPut(name) { Any() }
             synchronized(lock) {
+                // Cache hit: serve straight from disk via a FileInputStream so a
+                // page revisit never pulls the whole (multi-MB) image into heap.
+                // POSIX unlink semantics keep an in-flight read valid even if the
+                // cap-enforcer evicts this file mid-serve.
                 if (file.exists() && file.length() > 0L) {
-                    return response(file.readBytes())
+                    return response(FileInputStream(file))
                 }
-                val bytes = download(url) ?: return null
-                // Write to a temp file then atomic-rename so a crash mid-write
-                // never leaves a truncated image that would later be served as
-                // "cached". The page-keyed name means a new tier overwrites. A
-                // failed write (e.g. disk full) must NOT leak the .tmp — serve
-                // the just-downloaded bytes from memory regardless.
+                // Cache miss: stream the download straight to a temp file (constant
+                // ~16 KB footprint — never the whole image in heap), then atomic-
+                // rename into place and serve from the file. The page-keyed name
+                // means a new tier overwrites.
                 val tmp = File(dir, "$name.tmp")
-                try {
-                    tmp.writeBytes(bytes)
-                    if (!tmp.renameTo(file)) tmp.delete() else enforceCapAsync()
-                } catch (e: Exception) {
-                    Timber.tag("GardenCache").w(e, "cache write failed (serving from memory)")
+                val wrote = downloadToFile(url, tmp)
+                if (wrote == null || wrote <= 0L) {
                     try { tmp.delete() } catch (_: Exception) {}
+                    return null
                 }
-                return response(bytes)
+                return if (tmp.renameTo(file)) {
+                    enforceCapAsync()
+                    response(FileInputStream(file))
+                } else {
+                    // Rename failed (rare — same-filesystem cacheDir). Serve the
+                    // bytes we already have on disk, then drop the orphan .tmp.
+                    // This is the ONLY miss path that reads the image into memory,
+                    // and only when publishing to the cache itself failed.
+                    val bytes = try { tmp.readBytes() } catch (_: Exception) { null }
+                    try { tmp.delete() } catch (_: Exception) {}
+                    if (bytes != null && bytes.isNotEmpty()) response(bytes) else null
+                }
             }
         } catch (e: Exception) {
             Timber.tag("GardenCache").w(e, "intercept failed for %s", url)
@@ -129,35 +142,86 @@ class GardenImageCache(cacheRoot: File) {
         return m.groupValues[1]
     }
 
-    /** Fetch [url], following the GitHub redirect. Returns bytes or null.
-     *  Visible for test (the streaming size guard is exercised against a
-     *  loopback chunked response, which the host allowlist would otherwise
-     *  keep unreachable from intercept()). */
-    internal fun download(url: String): ByteArray? {
-        var conn: HttpURLConnection? = null
-        return try {
-            conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = true   // follow the 302 to release-assets
+    /**
+     * Open [urlStr] and return a connected [HttpURLConnection] positioned at a
+     * 200 OK body, following redirects MANUALLY so every hop's host can be
+     * re-verified against [ALLOWED_HOSTS] (#2). HttpURLConnection's automatic
+     * redirect-following is disabled precisely so a 30x Location can't bounce
+     * the app's network identity to an arbitrary host (SSRF-shaped) and have
+     * the result served back to the WebView with Access-Control-Allow-Origin:*.
+     * The INITIAL host is already gated by intercept()'s hostAllowed check (and
+     * by the caller in tests); this re-verifies each REDIRECT TARGET before
+     * following it. Returns null on a disallowed hop, a missing/unparseable
+     * Location, too many hops, or any non-200 terminal code. The caller reads
+     * inputStream then disconnect()s.
+     */
+    private fun openStream(urlStr: String): HttpURLConnection? {
+        var current = urlStr
+        var hops = 0
+        while (true) {
+            val conn = (URL(current).openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false   // #2: follow hops by hand + re-verify
                 connectTimeout = 15_000
                 readTimeout = 20_000
                 requestMethod = "GET"
             }
             val code = conn.responseCode
+            if (code in 300..399 && code != HttpURLConnection.HTTP_NOT_MODIFIED) {
+                val loc = conn.getHeaderField("Location")
+                conn.disconnect()
+                if (loc.isNullOrBlank()) {
+                    Timber.tag("GardenCache").w("redirect with no Location from %s", current)
+                    return null
+                }
+                if (++hops > MAX_REDIRECTS) {
+                    Timber.tag("GardenCache").w("too many redirects starting at %s", urlStr)
+                    return null
+                }
+                // Resolve a possibly-relative Location against the current URL.
+                val next = try { URL(URL(current), loc).toString() } catch (_: Exception) {
+                    Timber.tag("GardenCache").w("unparseable redirect Location: %s", loc)
+                    return null
+                }
+                // #2: the load-bearing check — refuse a redirect to any host not
+                // on the Garden allowlist BEFORE opening a connection to it.
+                if (!hostAllowed(next)) {
+                    Timber.tag("GardenCache").w("redirect to non-allowlisted host refused: %s", next)
+                    return null
+                }
+                current = next
+                continue
+            }
             if (code != HttpURLConnection.HTTP_OK) {
-                Timber.tag("GardenCache").w("download HTTP %d for %s", code, url)
+                Timber.tag("GardenCache").w("download HTTP %d for %s", code, current)
+                conn.disconnect()
                 return null
             }
+            return conn
+        }
+    }
+
+    /** Stream [url] to [dest] in constant memory (#1), following redirects via
+     *  [openStream] (each hop host-verified — #2) and enforcing the per-image cap
+     *  on the bytes that actually arrive. Returns the number of bytes written, or
+     *  null on any failure / over-cap (the caller deletes the partial file).
+     *  Visible for test (the streaming + redirect guards are exercised against a
+     *  loopback server, which the host allowlist keeps unreachable from
+     *  intercept()). */
+    internal fun downloadToFile(url: String, dest: File): Long? {
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = openStream(url) ?: return null
             // NTV-2: reject an oversized asset by its declared Content-Length BEFORE
-            // reading it into heap. Early-out fast path only — a chunked response
-            // declares -1 and sails past this check, so the streaming guard below
-            // is what actually enforces the cap.
+            // reading a byte. Fast path only — a chunked response declares -1 and
+            // sails past this, so streamCapped below is what actually enforces the cap.
             val declared = conn.contentLength
             if (declared > MAX_DOWNLOAD_BYTES) {
                 Timber.tag("GardenCache").w("download too large (Content-Length %d) for %s", declared, url)
                 return null
             }
-            val bytes = conn.inputStream.use { readCapped(it) }
-            if (bytes == null || bytes.isEmpty()) null else bytes
+            conn.inputStream.use { input ->
+                FileOutputStream(dest).use { output -> streamCapped(input, output) }
+            }
         } catch (e: Exception) {
             Timber.tag("GardenCache").w(e, "download failed for %s", url)
             null
@@ -167,25 +231,24 @@ class GardenImageCache(cacheRoot: File) {
     }
 
     /**
-     * Read [stream] into memory, failing closed (null) the moment the running
-     * total exceeds MAX_DOWNLOAD_BYTES.
+     * Copy [input] to [output] in 16 KB chunks, failing closed (null) the moment
+     * the running total exceeds MAX_DOWNLOAD_BYTES.
      *
-     * Why this exists: the declared Content-Length fast-reject in [download]
-     * is blind to chunked responses (Content-Length -1), so a cap checked
-     * only against the header has a hole exactly where it was meant to
-     * protect a budget device — an unknown-length body would be read
-     * UNBOUNDED into heap before any guard ran. Enforcing the cap on the
-     * bytes that ACTUALLY arrive closes it. The counter is checked before
-     * each chunk is appended, so the in-memory buffer can never outgrow the
-     * cap, and an over-cap body degrades to null (a cache miss — the WebView
+     * Why this exists: the declared Content-Length fast-reject in [downloadToFile]
+     * is blind to chunked responses (Content-Length -1), so a cap checked only
+     * against the header has a hole exactly where it was meant to protect a budget
+     * device — an unknown-length body would otherwise stream UNBOUNDED. Enforcing
+     * the cap on the bytes that ACTUALLY arrive closes it, and streaming to disk
+     * keeps the footprint at one 16 KB chunk regardless of image size (#1). The
+     * count is checked before each chunk is written, so nothing past the cap is
+     * ever written; an over-cap body degrades to null (a cache miss — the WebView
      * loads the image itself), never to an escaped exception.
      */
-    private fun readCapped(stream: InputStream): ByteArray? {
-        val out = ByteArrayOutputStream()
+    private fun streamCapped(input: InputStream, output: OutputStream): Long? {
         val chunk = ByteArray(16 * 1024)
-        var total = 0
+        var total = 0L
         while (true) {
-            val n = stream.read(chunk)
+            val n = input.read(chunk)
             if (n < 0) break
             total += n
             if (total > MAX_DOWNLOAD_BYTES) {
@@ -195,20 +258,25 @@ class GardenImageCache(cacheRoot: File) {
                 )
                 return null
             }
-            out.write(chunk, 0, n)
+            output.write(chunk, 0, n)
         }
-        return out.toByteArray()
+        output.flush()
+        return total
     }
 
-    private fun response(bytes: ByteArray): WebResourceResponse {
+    private fun response(body: InputStream): WebResourceResponse {
         val headers = mapOf(
             // Let the WebView keep its own in-memory copy across the session
             // too, so even the 1st repaint of an already-seen page is instant.
             "Cache-Control" to "max-age=31536000",
             "Access-Control-Allow-Origin" to "*"
         )
-        return WebResourceResponse("image/jpeg", null, 200, "OK", headers, ByteArrayInputStream(bytes))
+        return WebResourceResponse("image/jpeg", null, 200, "OK", headers, body)
     }
+
+    /** Fallback overload for the rare rename-fail miss path, which holds the
+     *  image bytes in memory. The disk paths use the InputStream overload. */
+    private fun response(bytes: ByteArray): WebResourceResponse = response(ByteArrayInputStream(bytes))
 
     /**
      * Backstop byte-cap. The page-key already bounds the COUNT to <=209
@@ -282,6 +350,11 @@ class GardenImageCache(cacheRoot: File) {
             "release-assets.githubusercontent.com",
             "objects.githubusercontent.com"
         )
+
+        // #2: cap the manual redirect chain. GitHub's release download is a
+        // single 302 to the signed asset host; a handful of hops is generous
+        // headroom while still bounding a pathological redirect loop.
+        private const val MAX_REDIRECTS = 5
 
         // garden_NNN.jpg — captures the zero-padded page number from either
         // the github.com release path or the redirected asset URL's

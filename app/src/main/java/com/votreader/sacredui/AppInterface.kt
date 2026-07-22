@@ -9,6 +9,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
+import androidx.annotation.RequiresApi
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import timber.log.Timber
@@ -402,12 +403,24 @@ class AppInterface(
     /**
      * Fire a short haptic vibration so WebView interactions feel native.
      * Styles: 0 = tick (light), 1 = click (medium), 2 = heavy click,
-     * 3 = double click. On API 29+ uses predefined platform effects;
-     * on API 26-28 falls back to duration/amplitude one-shots.
+     * 3 = double click.
+     *
+     * Three tiers, best-to-legacy, each falling through if unavailable:
+     *   • API 30+ (R): low-level actuator PRIMITIVES (a crisper, more
+     *     "mechanical" tick than the legacy constants) — but ONLY when the
+     *     device's vibrator actually reports support (many actuators don't),
+     *     so this never silently no-ops on unsupported hardware.
+     *   • API 29+ (Q): predefined platform effects (createPredefined).
+     *   • API 26-28: duration/amplitude one-shots (createOneShot).
+     * Older phones keep full haptic support via the last tier.
      * Safe to call from the binder thread (Vibrator is thread-safe).
      */
     @JavascriptInterface
     fun haptic(style: Int) {
+        // Tier 1: try the R+ composition path; it returns false (unsupported or
+        // error) to fall through to the predefined/one-shot tiers below.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && vibrateComposition(style)) return
+
         val effect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             VibrationEffect.createPredefined(
                 when (style) {
@@ -427,6 +440,51 @@ class AppInterface(
             vibrator.vibrate(effect)
         } catch (e: Exception) {
             Timber.w(e, "haptic(%d) failed", style)
+        }
+    }
+
+    /**
+     * API 30+ (R) composition path. Maps each style to a low-level primitive
+     * (with an intensity scale that preserves the light→medium→heavy→double
+     * gradient the predefined tier had), verifies the DEVICE actually supports
+     * every primitive it uses (areAllPrimitivesSupported — false on many
+     * actuators), and plays it. Returns true only when a composition was
+     * successfully dispatched; any unsupported/error case returns false so
+     * haptic() falls back to the predefined/one-shot tiers.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun vibrateComposition(style: Int): Boolean {
+        return try {
+            val comp = VibrationEffect.startComposition()
+            when (style) {
+                // medium click
+                1 -> {
+                    if (!vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK)) return false
+                    comp.addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.6f)
+                }
+                // heavy click (same primitive at full scale — R has no dedicated
+                // "heavy" primitive, so intensity is the lever)
+                2 -> {
+                    if (!vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK)) return false
+                    comp.addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 1.0f)
+                }
+                // double click: two clicks with an ~80 ms gap
+                3 -> {
+                    if (!vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK)) return false
+                    comp.addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.8f)
+                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.8f, 80)
+                }
+                // default: light tick
+                else -> {
+                    if (!vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK)) return false
+                    comp.addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 0.6f)
+                }
+            }
+            vibrator.vibrate(comp.compose())
+            true
+        } catch (e: Exception) {
+            Timber.w(e, "haptic composition(%d) failed", style)
+            false
         }
     }
 
