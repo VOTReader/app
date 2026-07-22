@@ -5247,6 +5247,54 @@
 
     
 
+    /* ── AUTO-SCROLL transport pill (AutoScrollControl) ──
+       Portaled to <body>, so a swipe-settle transform on .pager-track can
+       never displace it. width:max-content defeats the left:50% shrink-to-fit
+       trap (a transform-centered fixed box otherwise sizes against the HALF
+       viewport and needlessly wraps) — same fix as .ann-hint-pill.
+       z-index 195: above the first-run hint (190), below the Matthew mode
+       pill (200), which is bottom-RIGHT and so never overlaps anyway. */
+    .ascroll-pill {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem));
+      z-index: 195;
+      display: flex; align-items: center; gap: 2px;
+      width: max-content; max-width: calc(100vw - 24px);
+      padding: 3px 10px 3px 4px;
+      background: rgba(20,20,24,0.94);
+      border: 1px solid var(--gold-border);
+      border-radius: 999px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+      transition: opacity 260ms ease;
+    }
+    body.light .ascroll-pill { background: rgba(247,242,232,0.97); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+    /* IDLE FADE — reading text is the product; chrome that stays bright
+       competes with it. Any touch restores full opacity (the component
+       clears .is-dim on document touchstart/pointerdown). Kept above zero
+       so the control is never invisible-but-live. */
+    .ascroll-pill.is-dim { opacity: 0.25; }
+    .ascroll-btn {
+      background: none; border: none; cursor: pointer; color: var(--gold);
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 999px; padding: 0; flex-shrink: 0;
+    }
+    .ascroll-btn:disabled { opacity: 0.3; cursor: default; }
+    @media (hover: hover) { .ascroll-btn:not(:disabled):hover { color: var(--gold-bright); } }
+    .ascroll-btn:active:not(:disabled) { background: var(--gold-faint); }
+    .ascroll-step { width: 40px; height: 40px; line-height: 1; }
+    .ascroll-toggle { width: 44px; height: 44px; }
+    .ascroll-toggle svg { width: 22px; height: 22px; }
+    .ascroll-cancel { width: auto; height: 40px; padding: 0 12px; font-family: var(--font-cinzel, Georgia, serif); letter-spacing: 0.08em; text-transform: uppercase; }
+    .ascroll-readout {
+      font-family: var(--font-cinzel, Georgia, serif);
+      color: var(--cream-dim); letter-spacing: 0.06em;
+      white-space: nowrap; padding-left: 4px;
+    }
+    .ascroll-readout-wide { padding: 0 4px 0 12px; }
+    /* A reader who has switched auto-scroll on is not the audience for the
+       first-run annotation tip, and both sit bottom-centre. */
+    body.autoscroll-on .ann-hint-pill { display: none; }
+
     /* ── SESSION-4 TEXT-ONLY SCALING — chrome pin (must stay LAST) ───────
        --font-scale multiplies the ROOT font-size (the WL1 rule near the top
        of this file), so every rem-based size scales: reading text, journal
@@ -5273,6 +5321,9 @@
     .sel-action-btn { font-size: 8.8px; }
     .ann-chip-btn { font-size: 8.96px; }
     .mode-toggle-label { font-size: 8px; }
+    .ascroll-step { font-size: 20px; }
+    .ascroll-cancel { font-size: 9.6px; }
+    .ascroll-readout { font-size: 10.88px; }
     .mode-btn { font-size: 9.92px; padding: 8.8px 16px; gap: 7.2px; }
     @media (max-width: 500px) { .mode-btn { font-size: 9.28px; padding: 8px 12px; } }
 

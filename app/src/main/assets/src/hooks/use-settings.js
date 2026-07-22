@@ -122,6 +122,15 @@ export function useSettings({ savedSettings, theme }) {
       showScrollNotch: true,
       arrowLayout: "off", // "split" | "right" | "left" | "nav" | "off"
       fontScale: "1", // WL1 — text-size multiplier ("1" | "1.15" | "1.3" | "1.5"); drives --font-scale on <html>
+      // Autoscroll. Speed is stored in LINES PER MINUTE, never px/s: the text-
+      // size slider spans 80–160%, and a px/s speed would silently change
+      // reading pace by up to 2× when the reader resizes text. The controller
+      // derives px from a measured line height, so this value is scale-
+      // invariant. Off by default — the pill is chrome on every reading screen.
+      autoScroll: false,
+      autoScrollLpm: "16",
+      autoScrollNext: false,
+      autoScrollEndMs: "2500",
       ...savedS,
       ...migrated // migration wins over stale saved values
     };

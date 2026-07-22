@@ -220,6 +220,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
+      placeKey={(volKey || '') + ':' + (letter && letter.id)}
       stickyNav={<StickyChapterNav
         onPrev={() => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary()}
         onNext={() => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary()}

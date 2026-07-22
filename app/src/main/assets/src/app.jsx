@@ -715,11 +715,11 @@ function App() {
 
   return (
     <TabsContext.Provider value={tabsCtxValue}>
-    {/* Resume-reading dot — rendered by ScreenLayout inside the top nav
-        (ResumeReadingNavBtn owns the screen-eligibility list). The value is
-        deliberately un-memoized: goToLastRead reads live nav state from its
-        closure, and the sole consumer is one tiny button. */}
-    <ReadingDotContext.Provider value={{ screen, enabled: !!(settings.showReadingDot && activeReadKey), onGo: goToLastRead }}>
+    {/* Floating reading chrome App owns but doesn't render: the resume dot
+        (top nav, ResumeReadingNavBtn owns its eligibility list) and the
+        autoscroll transport (portaled pill). Config only — per-screen wiring
+        reaches the pill from ScreenLayout, where it exists. */}
+    <ReadingChromeProvider screen={screen} dotEnabled={!!(settings.showReadingDot && activeReadKey)} onGo={goToLastRead} settings={settings} updateSetting={updateSetting}>
       {null}
 
       {/* All 4 ephemeral overlays (welcome modal, tabs overview +
@@ -789,7 +789,7 @@ function App() {
         inboundJournalPayload={inboundJournalPayload} setInboundJournalPayload={setInboundJournalPayload}
         goJournalViewer={goJournalViewer}
       />
-    </ReadingDotContext.Provider>
+    </ReadingChromeProvider>
     </TabsContext.Provider>
   );
 

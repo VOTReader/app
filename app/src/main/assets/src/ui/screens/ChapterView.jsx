@@ -99,6 +99,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
+      placeKey={(book && book.id) + '-' + (chapter && chapter.num)}
       stickyNav={<StickyChapterNav
         onPrev={() => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary()}
         onNext={() => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary()}

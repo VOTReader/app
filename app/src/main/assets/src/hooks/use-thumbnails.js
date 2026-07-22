@@ -277,6 +277,16 @@ export function useThumbnails({
   const captureActiveTabThumbnail = React.useCallback(async () => {
     if (!tabsEnabled) return;
     if (captureInFlightRef.current) return;
+    // AUTO-SCROLL SUPPRESSION. A capture is an html2canvas clone render plus a
+    // ~900ms-deferred second render for the other theme — main-thread work that
+    // competes directly with a main-thread scroll. The scroll-stop path already
+    // starves itself while motion is continuous (its 300ms idle never arrives),
+    // but the after-nav capture fires on every auto-advance, which on short
+    // entries would mean two full-page renders per page. Suppress every path at
+    // this one choke point; the scroll-stop capture fires the moment the reader
+    // pauses, and the overview-open heal covers anything still stale.
+    if (typeof document !== 'undefined' && document.body
+      && document.body.classList.contains('autoscroll-running')) return;
     const tab = tabsRef.current[activeTabIdxRef.current];
     if (!tab) return;
     // Garden pages are photographs — theme-neutral content where a themed

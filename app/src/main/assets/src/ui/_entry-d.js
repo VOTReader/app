@@ -110,6 +110,10 @@ import { ProphecyExpandToggle } from './components/ProphecyExpandToggle.jsx';
 import { HomeBtn } from './components/HomeBtn.jsx';
 import { TabsNavBtn } from './components/TabsNavBtn.jsx';
 import { ReadingDotContext, ResumeReadingNavBtn } from './components/ResumeReadingNavBtn.jsx';
+import { AutoScrollContext, AutoScrollControl } from './components/AutoScrollControl.jsx';
+import { ReadingChromeProvider, clampEndDwell } from './components/ReadingChromeProvider.jsx';
+import { createAutoScroll, useAutoScroll, clampLpm, measureLineHeight, computeEndTarget } from '../hooks/use-autoscroll.js';
+import { commitReadingNav } from '../hooks/use-pager-gesture.js';
 import { LibraryNav } from './components/LibraryNav.jsx';
 import { FootnoteListSection } from './components/FootnoteListSection.jsx';
 import { StickyChapterNav } from './components/StickyChapterNav.jsx';
@@ -231,6 +235,9 @@ Object.assign(window, {
   InlineNotes, InlineEcho, StudyPanels,
   ChapterBookmarkBtn, NavButtons, ProphecyExpandToggle,
   HomeBtn, TabsNavBtn, ReadingDotContext, ResumeReadingNavBtn, LibraryNav,
+  AutoScrollContext, AutoScrollControl, ReadingChromeProvider, clampEndDwell,
+  createAutoScroll, useAutoScroll, clampLpm, measureLineHeight, computeEndTarget,
+  commitReadingNav,
   FootnoteListSection, StickyChapterNav, ClearProgressRow, ConfirmStrip,
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, VolumeLetterIndex, HistoryEntryCard,

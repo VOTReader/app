@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 445 distinct identifiers.
+// Total: 455 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -18,6 +18,8 @@ export const projectGlobals = {
   App: "readonly",
   AppShellOverlays: "readonly",
   AppShellSheets: "readonly",
+  AutoScrollContext: "readonly",
+  AutoScrollControl: "readonly",
   BIBLE_ASV: "readonly",
   BIBLE_BOOK_LIST: "readonly",
   BIBLE_BSB: "readonly",
@@ -187,6 +189,7 @@ export const projectGlobals = {
   READ_VERSION_ID: "readonly",
   React: "readonly",
   ReactDOM: "readonly",
+  ReadingChromeProvider: "readonly",
   ReadingDotContext: "readonly",
   ReadingStreakStore: "readonly",
   RecentNavStore: "readonly",
@@ -311,6 +314,8 @@ export const projectGlobals = {
   buildScreenRoutes: "readonly",
   buildSourceEndpoint: "readonly",
   buildV3Manifest: "readonly",
+  clampEndDwell: "readonly",
+  clampLpm: "readonly",
   classifyV3ImportBegin: "readonly",
   clearLegacyLs: "readonly",
   clearRecentSearches: "readonly",
@@ -318,8 +323,11 @@ export const projectGlobals = {
   colLetterArr: "readonly",
   colLetters: "readonly",
   colPreface: "readonly",
+  commitReadingNav: "readonly",
+  computeEndTarget: "readonly",
   contentDocToNavItem: "readonly",
   countReadFor: "readonly",
+  createAutoScroll: "readonly",
   createPressDrag: "readonly",
   data: "readonly",
   describeTab: "readonly",
@@ -369,6 +377,7 @@ export const projectGlobals = {
   loadBibleStudies: "readonly",
   loadTranslation: "readonly",
   lookupVersesFromBooks: "readonly",
+  measureLineHeight: "readonly",
   measureUserData: "readonly",
   modalRegistry: "readonly",
   mostAnnotatedSources: "readonly",
@@ -413,6 +422,7 @@ export const projectGlobals = {
   translationLabel: "readonly",
   translationName: "readonly",
   useAndroidBack: "readonly",
+  useAutoScroll: "readonly",
   useBackupReminder: "readonly",
   useBibleStudies: "readonly",
   useDesktopKeyboard: "readonly",

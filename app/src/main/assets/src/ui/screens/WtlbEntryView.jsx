@@ -284,6 +284,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
+      placeKey={(volKey || '') + ':' + (entry && entry.id)}
       stickyNav={<StickyChapterNav
         onPrev={() => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary()}
         onNext={() => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary()}

@@ -156,6 +156,40 @@ const SWIPE_SILENT_MS = 2500;
 // gesture is guaranteed silent for its full delay.
 const SWIPE_WATCHDOG_MS = 3000;
 
+/**
+ * THE ATOMIC READING-NAV CONTRACT. Runs a reading-screen navigation so the
+ * destination is fully painted — DOM, layout effects, and every imperative
+ * annotation layer — inside ONE task, with no intermediate frame.
+ *
+ * Part 1 — flush the navigation SYNCHRONOUSLY. Under createRoot, a setState
+ * from a timer is an async default-priority update; a caller that reveals or
+ * resumes the moment this returns needs the new page's DOM already committed.
+ * flushSync also runs layout effects, so the scroll restore (use-scroll-memory
+ * Effect 3) lands inside this call.
+ *
+ * Part 2 — the imperative annotation layers (letters/WTLB highlights, links,
+ * bookmarks, note icons) normally repaint via a passive effect + setTimeout(0)
+ * (use-dom-annotation-sync) — frames AFTER the navigation. That let a freshly
+ * revealed page flash unmarked, then reflow as the inline note icons popped in.
+ * Paint them NOW, in the same task. Each pass is idempotent and sig-skipped per
+ * element, so the effect's later re-run is a cheap no-op.
+ *
+ * Shared by the swipe commit (where the covering peek makes the sync render
+ * invisible) and by autoscroll's auto-advance (where motion must not resume
+ * over an unmarked page).
+ *
+ * @param {() => void} go  performs the actual navigation
+ */
+export function commitReadingNav(go) {
+  if (typeof ReactDOM !== 'undefined' && ReactDOM.flushSync) ReactDOM.flushSync(go);
+  else go();
+  try { if (typeof applyDOMHighlights === 'function') applyDOMHighlights(); } catch (e) { console.error('applyDOMHighlights failed', e); }
+  try { if (typeof applyDOMLinks === 'function') applyDOMLinks(); } catch (e) { console.error('applyDOMLinks failed', e); }
+  try { if (typeof applyDOMBookmarks === 'function') applyDOMBookmarks(); } catch (e) { console.error('applyDOMBookmarks failed', e); }
+  try { if (typeof applyNoteIcons === 'function') applyNoteIcons(); } catch (e) { console.error('applyNoteIcons failed', e); }
+  try { if (typeof applyActiveNoteState === 'function') applyActiveNoteState(); } catch (e) { console.error('applyActiveNoteState failed', e); }
+}
+
 export function createPagerGesture(io) {
   let s = null;          // active gesture, or null
   let settling = false;  // true while a settle animation is running
@@ -473,27 +507,10 @@ export function usePagerGesture(scrollRef, pager) {
         const go = () => {
           if (side === 'next') { if (p.onNext) p.onNext(); } else if (p.onPrev) p.onPrev();
         };
-        // ATOMIC REVEAL, part 1 — flush the navigation SYNCHRONOUSLY. Under
-        // createRoot, a setState from the settle timer is an async default-
-        // priority update; the controller parks the covering peek the moment
-        // commit returns, so the new page's DOM must be committed by then.
-        // flushSync also runs layout effects, so the scroll restore
-        // (use-scroll-memory Effect 3) lands inside this call.
-        if (typeof ReactDOM !== 'undefined' && ReactDOM.flushSync) ReactDOM.flushSync(go);
-        else go();
-        // Part 2 — the imperative annotation layers (letters/WTLB highlights,
-        // links, bookmarks, note icons) normally repaint via a passive effect
-        // + setTimeout(0) (use-dom-annotation-sync) — frames AFTER the reveal.
-        // The peek being replaced was fully painted, so the freshly revealed
-        // live pane flashed unmarked, then the inline note icons popped in and
-        // reflowed the text. Paint the layers NOW, in the commit task, so the
-        // reveal frame already carries them. Each pass is idempotent and
-        // sig-skipped per element — the effect's later re-run is a cheap no-op.
-        try { if (typeof applyDOMHighlights === 'function') applyDOMHighlights(); } catch (e) { console.error('applyDOMHighlights failed', e); }
-        try { if (typeof applyDOMLinks === 'function') applyDOMLinks(); } catch (e) { console.error('applyDOMLinks failed', e); }
-        try { if (typeof applyDOMBookmarks === 'function') applyDOMBookmarks(); } catch (e) { console.error('applyDOMBookmarks failed', e); }
-        try { if (typeof applyNoteIcons === 'function') applyNoteIcons(); } catch (e) { console.error('applyNoteIcons failed', e); }
-        try { if (typeof applyActiveNoteState === 'function') applyActiveNoteState(); } catch (e) { console.error('applyActiveNoteState failed', e); }
+        // ATOMIC REVEAL — the controller parks the covering peek the moment
+        // this returns, so the destination must be committed AND painted with
+        // its annotation layers before then. See commitReadingNav.
+        commitReadingNav(go);
       },
       reducedMotion: () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
         && window.matchMedia('(prefers-reduced-motion: reduce)').matches,

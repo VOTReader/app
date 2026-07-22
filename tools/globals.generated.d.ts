@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 445 distinct identifiers.
+// Total: 455 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -19,6 +19,8 @@ declare const AnnotationStore: any;
 declare const App: any;
 declare const AppShellOverlays: any;
 declare const AppShellSheets: any;
+declare const AutoScrollContext: any;
+declare const AutoScrollControl: any;
 declare const BIBLE_ASV: any;
 declare const BIBLE_BOOK_LIST: any;
 declare const BIBLE_BSB: any;
@@ -188,6 +190,7 @@ declare const READING_SCREENS: any;
 declare const READ_VERSION_ID: any;
 declare const React: any;
 declare const ReactDOM: any;
+declare const ReadingChromeProvider: any;
 declare const ReadingDotContext: any;
 declare const ReadingStreakStore: any;
 declare const RecentNavStore: any;
@@ -312,6 +315,8 @@ declare const buildProgressGroups: any;
 declare const buildScreenRoutes: any;
 declare const buildSourceEndpoint: any;
 declare const buildV3Manifest: any;
+declare const clampEndDwell: any;
+declare const clampLpm: any;
 declare const classifyV3ImportBegin: any;
 declare const clearLegacyLs: any;
 declare const clearRecentSearches: any;
@@ -319,8 +324,11 @@ declare const clearSuppressNextHistoryPush: any;
 declare const colLetterArr: any;
 declare const colLetters: any;
 declare const colPreface: any;
+declare const commitReadingNav: any;
+declare const computeEndTarget: any;
 declare const contentDocToNavItem: any;
 declare const countReadFor: any;
+declare const createAutoScroll: any;
 declare const createPressDrag: any;
 declare const data: any;
 declare const describeTab: any;
@@ -370,6 +378,7 @@ declare const lnkId: any;
 declare const loadBibleStudies: any;
 declare const loadTranslation: any;
 declare const lookupVersesFromBooks: any;
+declare const measureLineHeight: any;
 declare const measureUserData: any;
 declare const modalRegistry: any;
 declare const mostAnnotatedSources: any;
@@ -414,6 +423,7 @@ declare const translateVerse: any;
 declare const translationLabel: any;
 declare const translationName: any;
 declare const useAndroidBack: any;
+declare const useAutoScroll: any;
 declare const useBackupReminder: any;
 declare const useBibleStudies: any;
 declare const useDesktopKeyboard: any;

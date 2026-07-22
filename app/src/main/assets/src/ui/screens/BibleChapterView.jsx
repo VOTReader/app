@@ -96,6 +96,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
+      placeKey={(book && book.id) + '-' + (chapter && chapter.num)}
       stickyNav={<StickyChapterNav
         onPrev={goPrevCh}
         onNext={goNextCh}

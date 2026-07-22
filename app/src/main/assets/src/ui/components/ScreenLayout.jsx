@@ -6,6 +6,7 @@ import { usePagerGesture } from '../../hooks/use-pager-gesture.js';
 import { PagerPeek } from './pager-preview.jsx';
 import { AnnotationHint } from './AnnotationHint.jsx';
 import { ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
+import { AutoScrollControl } from './AutoScrollControl.jsx';
 
 // Apply a saved scroll record ({ anchorKey, anchorOff, y } | legacy number) to a
 // given scroll container — used for the inert peek so it renders already at the
@@ -28,7 +29,7 @@ function applySavedScrollToEl(el, saved) {
   if (y > 0) el.scrollTop = y;
 }
 
-export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null }) {
+export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '' }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
@@ -292,6 +293,11 @@ export function ScreenLayout({ navChildren, children, showProgress, hideTabsBtn,
           renders null unless the user has zero annotations (see the
           component header). */}
       {pager ? <AnnotationHint /> : null}
+      {/* Hands-free reading transport — reading screens only, and never in
+          an inert peek (the inert branch returns above). Portals itself to
+          <body>, so a swipe-settle transform on .pager-track can't displace
+          it; renders null unless the reader enabled it in Settings. */}
+      {pager ? <AutoScrollControl scrollRef={scrollRef} pager={pager} placeKey={placeKey} /> : null}
       <div className="scroll-notch-marker" ref={notchRef} />
     </div>
   );
