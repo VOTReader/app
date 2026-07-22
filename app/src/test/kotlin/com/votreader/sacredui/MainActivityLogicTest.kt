@@ -127,6 +127,39 @@ class MainActivityLogicTest {
         assertFalse(MainActivityLogic.isBackPressConsumed(null))
     }
 
+    // ── shouldTrimWebViewCache ─────────────────────────────────────────
+    // Prune the WebView in-memory cache only at TRIM_MEMORY_MODERATE(60)+ —
+    // background LRU-midpoint states. Foreground RUNNING_* levels (5/10/15) and
+    // the lighter background UI_HIDDEN(20)/BACKGROUND(40) signals must NOT trim,
+    // or the user gets re-fetch jank mid-read. The 60 boundary is inclusive.
+    @Test
+    fun `trims at MODERATE exactly (inclusive boundary)`() {
+        assertTrue(MainActivityLogic.shouldTrimWebViewCache(60))
+    }
+
+    @Test
+    fun `trims at COMPLETE (above MODERATE)`() {
+        assertTrue(MainActivityLogic.shouldTrimWebViewCache(80))
+    }
+
+    @Test
+    fun `does NOT trim just below MODERATE`() {
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(59))
+    }
+
+    @Test
+    fun `does NOT trim at BACKGROUND(40) or UI_HIDDEN(20)`() {
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(40))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(20))
+    }
+
+    @Test
+    fun `does NOT trim on foreground RUNNING levels (5,10,15)`() {
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(5))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(10))
+        assertFalse(MainActivityLogic.shouldTrimWebViewCache(15))
+    }
+
     @Test
     fun `custom window and threshold params are honored`() {
         val d = MainActivityLogic.decideRecovery(

@@ -68,4 +68,25 @@ object MainActivityLogic {
      */
     fun isBackPressConsumed(result: String?): Boolean =
         result == "\"true\"" || result == "true"
+
+    /**
+     * The onTrimMemory level at/above which MainActivity prunes the WebView's
+     * in-memory resource cache. Mirrors ComponentCallbacks2.TRIM_MEMORY_MODERATE
+     * (a frozen platform constant == 60), kept as a literal here so this module
+     * stays framework-free (no android import) and JaCoCo-instrumentable.
+     */
+    const val TRIM_MEMORY_MODERATE_LEVEL = 60
+
+    /**
+     * Decide whether an onTrimMemory([level]) signal is severe enough to drop
+     * the WebView's in-memory resource cache. True only at TRIM_MEMORY_MODERATE
+     * (60) and above — the background LRU-midpoint / COMPLETE(80) states — so the
+     * lighter background signals (UI_HIDDEN 20, BACKGROUND 40) and every
+     * foreground RUNNING_* level (5/10/15) are left alone: clearing the cache
+     * while the app is still interactive would only cost re-fetch jank for no
+     * pressure win. Assets are local (WebViewAssetLoader) so a background drop is
+     * cheap to repopulate on the next foregrounding.
+     */
+    fun shouldTrimWebViewCache(level: Int): Boolean =
+        level >= TRIM_MEMORY_MODERATE_LEVEL
 }

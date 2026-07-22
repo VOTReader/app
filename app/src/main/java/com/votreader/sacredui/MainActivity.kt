@@ -21,6 +21,7 @@ import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
+import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.ValueCallback
@@ -44,6 +45,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.webkit.WebResourceErrorCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
@@ -55,6 +57,7 @@ import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -73,6 +76,23 @@ class MainActivity : AppCompatActivity(), BridgeHost {
 
     private lateinit var webView: WebView
     private val screenshotInFlight = AtomicBoolean(false)
+
+    // Main-thread handler for the splash safety hatch (#3). Owns exactly one
+    // pending callback — the absolute-timeout splash release scheduled in
+    // onCreate and cancelled in onDestroy.
+    private val mainHandler = Handler(Looper.getMainLooper())
+    // #3: absolute splash-liveness backstop. onPageFinished + onReceivedError
+    // already release vm.splashHolding on every normal path (page loaded OR
+    // main-frame errored), so a stuck splash needs a WebView that fires NEITHER
+    // — a silently-wedged renderer. This fires unconditionally SPLASH_HATCH_MS
+    // after launch; releasing an already-false flag is a harmless no-op, so the
+    // common case pays nothing. Scheduled in onCreate, removed in onDestroy.
+    private val splashSafetyHatch = Runnable {
+        if (vm.splashHolding) {
+            Timber.w("Splash still holding after %d ms — releasing via safety hatch", SPLASH_HATCH_MS)
+            vm.splashHolding = false
+        }
+    }
     // Audio session management for voice recording. startAudioSession() puts
     // the device into MODE_IN_COMMUNICATION so the WebView's AudioRecord can
     // reliably acquire the mic on Android 8+ (Pixel/Samsung); endAudioSession()
@@ -216,6 +236,11 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // arbitrary apps or escalate. Asset-loader URLs are matched by
         // exact prefix earlier and don't reach this allowlist.
         private val ALLOWED_EXTERNAL_SCHEMES = setOf("https", "http", "mailto", "tel")
+
+        // #3: how long the splash may hold before the safety hatch force-releases
+        // it. 5s comfortably clears a normal cold boot (splash → first paint is
+        // sub-second on real devices) while still bounding a wedged-renderer hang.
+        private const val SPLASH_HATCH_MS = 5_000L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -239,27 +264,37 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 bridge.callOptional(JsEvent.ImportFile, null)
                 return@registerForActivityResult
             }
-            // Size cap + read + base64 all live in StorageManager;
-            // Failure here covers oversize, unknown-size, and read-error
-            // alike. All flow back to JS as the same null callback the
-            // cancel path uses -- JS has one generic error toast for the
-            // whole class of failures, so keeping them indistinguishable
-            // matches the existing UX contract.
-            when (val r = vm.storage.readUriAsBase64(uri)) {
-                is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ImportFile, r.value)
-                // Pass the oversize case through as a controlled "too_large" code
-                // so JS can show a specific "that file is too large" message. Every
-                // other failure stays a bare null (one arg) -- byte-identical to the
-                // cancel path above, so a generic read error remains silent as
-                // before. The raw reason (which may carry an exception message)
-                // never crosses the bridge; it is already in logcat via
-                // StorageManager's Timber.w.
-                is StorageManager.Result.Failure ->
-                    if (r.reason == "too_large") {
-                        bridge.callOptional(JsEvent.ImportFile, null, "too_large")
-                    } else {
-                        bridge.callOptional(JsEvent.ImportFile, null)
-                    }
+            // #1: the read + base64 encode (up to MAX_IMPORT_SIZE) is synchronous
+            // I/O + CPU work — run it OFF the Main thread so a large legacy pick
+            // can't jank the UI. (This is the legacy v2 import path; the primary
+            // v3 path already streams off the binder thread.) Result handling
+            // resumes on Main (lifecycleScope default); bridge.callOptional
+            // marshals onto the WebView thread itself, so its dispatch is
+            // thread-agnostic regardless.
+            //
+            // Size cap + read + base64 all live in StorageManager; Failure here
+            // covers oversize, unknown-size, and read-error alike. All flow back
+            // to JS as the same null callback the cancel path uses -- JS has one
+            // generic error toast for the whole class of failures, so keeping
+            // them indistinguishable matches the existing UX contract.
+            lifecycleScope.launch {
+                val r = withContext(Dispatchers.IO) { vm.storage.readUriAsBase64(uri) }
+                when (r) {
+                    is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ImportFile, r.value)
+                    // Pass the oversize case through as a controlled "too_large" code
+                    // so JS can show a specific "that file is too large" message. Every
+                    // other failure stays a bare null (one arg) -- byte-identical to the
+                    // cancel path above, so a generic read error remains silent as
+                    // before. The raw reason (which may carry an exception message)
+                    // never crosses the bridge; it is already in logcat via
+                    // StorageManager's Timber.w.
+                    is StorageManager.Result.Failure ->
+                        if (r.reason == "too_large") {
+                            bridge.callOptional(JsEvent.ImportFile, null, "too_large")
+                        } else {
+                            bridge.callOptional(JsEvent.ImportFile, null)
+                        }
+                }
             }
         }
 
@@ -273,13 +308,21 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             ActivityResultContracts.CreateDocument("application/json")
         ) { uri ->
             val content = pendingExportContent
+            // Clear the in-flight flag SYNCHRONOUSLY (before the async write) so
+            // the launchExportPicker double-launch guard sees the picker as done
+            // the instant its result lands; `content` is captured in the local
+            // val above, so it survives into the coroutine closure below.
             pendingExportContent = null
             when {
                 uri == null -> bridge.callOptional(JsEvent.ExportComplete, "cancelled")
                 content == null -> bridge.callOptional(JsEvent.ExportComplete, "error:no_content")
-                else -> when (val r = vm.storage.writeTextToUri(uri, content)) {
-                    is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ExportComplete, "ok")
-                    is StorageManager.Result.Failure -> bridge.callOptional(JsEvent.ExportComplete, "error:${r.reason}")
+                // #1: write the (potentially large) payload OFF the Main thread.
+                else -> lifecycleScope.launch {
+                    val r = withContext(Dispatchers.IO) { vm.storage.writeTextToUri(uri, content) }
+                    when (r) {
+                        is StorageManager.Result.Success -> bridge.callOptional(JsEvent.ExportComplete, "ok")
+                        is StorageManager.Result.Failure -> bridge.callOptional(JsEvent.ExportComplete, "error:${r.reason}")
+                    }
                 }
             }
         }
@@ -396,6 +439,11 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
         }
 
+        // #3: arm the absolute splash-release backstop once the load is kicked
+        // off. Idempotent with the onPageFinished / onReceivedError releases —
+        // whichever fires first wins; this only matters if none ever does.
+        mainHandler.postDelayed(splashSafetyHatch, SPLASH_HATCH_MS)
+
         onBackPressedDispatcher.addCallback(this) {
             // All in-app navigation is JS-driven, so webView.canGoBack() is
             // always false (single URL, no history stack). Route the
@@ -464,6 +512,17 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             loadWithOverviewMode = false
             useWideViewPort = false
         }
+
+        // #5 (WebView hardening): the app is entirely local and persists ALL
+        // state in DOM storage — no cookies are read or written anywhere, and
+        // external links open in a SEPARATE app via ACTION_VIEW (with its own
+        // cookie jar). Disable the WebView cookie jar outright to shed unused
+        // attack surface, aligned with the project's minimize-surface policy.
+        // setAcceptCookie is process-global; setAcceptThirdPartyCookies pins it
+        // for this instance too (belt-and-suspenders). mixedContentMode is
+        // already NEVER_ALLOW above.
+        CookieManager.getInstance().setAcceptCookie(false)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(wv, false)
 
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", AssetsPathHandler(this))
@@ -1043,7 +1102,29 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         webView.onPause()
     }
 
+    /**
+     * #2: relieve heap pressure by pruning the WebView's IN-MEMORY resource
+     * cache on a moderate+ trim signal. clearCache(false) drops only the memory
+     * cache — never disk, and never DOM storage (where every journal / note /
+     * bookmark / link record lives). Gated to TRIM_MEMORY_MODERATE+ via
+     * MainActivityLogic.shouldTrimWebViewCache so a foreground low-memory signal
+     * doesn't cost re-fetch jank mid-read; assets are local, so a background
+     * drop repopulates cheaply on the next foregrounding. Modest by design —
+     * the lazy JS corpora live on the renderer's JS heap, not this cache — but
+     * free and safe. Runs on the main thread (onTrimMemory's contract), so the
+     * WebView call needs no marshaling; guard the lateinit for an early signal.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (MainActivityLogic.shouldTrimWebViewCache(level) && ::webView.isInitialized) {
+            webView.clearCache(false)
+        }
+    }
+
     override fun onDestroy() {
+        // #3: drop the pending splash safety hatch — the Activity is gone, so
+        // there's nothing left to release (and nothing to leak).
+        mainHandler.removeCallbacks(splashSafetyHatch)
         // NTV1: restore the audio mode if a recording session was still active
         // (the activity is finishing; the JS teardown may not have run).
         restoreAudioModeIfActive()
