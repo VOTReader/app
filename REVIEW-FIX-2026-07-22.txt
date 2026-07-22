@@ -8,8 +8,51 @@ current source; the confirmed items were then implemented and verified the
 same day. 13 items: 10 DONE + 3 ADJUDICATED-no-action.
 
 ───────────────────────────────────────────────────────────────────────────
+!! POST-BATCH CORRECTION — ITEM 1 SHIPPED A SILENT ANDROID REGRESSION !!
+───────────────────────────────────────────────────────────────────────────
+Found by independent verification review of this batch (2026-07-22, same
+day). Item 1's exclusion list contained `<dir>src`, whose stated premise —
+"index.html only loads dist/ bundles, so assets/src/ is a dead dev tree" —
+was TRUE but INCOMPLETE. index.html's own tags are not the whole runtime
+surface: src/data/translations.js INJECTS scripts at runtime,
+
+    script.src = 'src/data/bible-' + code + '.js'     (9 translations)
+    script.src = 'src/data/bible-studies.js'          (Bible Studies)
+
+so `<dir>src` removed ~36 MB of LIVE data from the APK. Nothing failed
+loudly — the loader's onerror resolves — so on Android:
+  • every non-default translation silently fell back to NKJV, including
+    the owner's NKJV-R and KJV-R restored-name editions;
+  • Bible Studies dead-ended on its "Try again" affordance.
+PROVEN by building the APK and listing it: 36 asset entries / 11.3 MB with
+ZERO bible-*.js present. The batch's measured numbers were exactly right;
+only the "dead" classification was wrong. The genuine dead weight is
+~13 MB, not ~51 MB.
+
+FIX (2026-07-22): `<dir>src` replaced by explicit exclusions — the
+bundle-only source dirs (components/hooks/renderer/search/stores/styles/ui
++ app.jsx) and the src/data files build.py concatenates into dist/ (books*,
+matthew*, the VOT corpora, the ES modules). The ten runtime-injected files
+are KEPT. Re-verified by rebuild: 76 asset entries / 48.8 MB, all ten
+present, all dead weight still excluded.
+
+RECURRENCE GATE: tools/check-apk-assets.js parses the runtime `script.src`
+injections out of the assets tree, applies aapt's basename-matching rules
+to ignoreAssetsPatterns, and FAILS if any runtime-injected asset would be
+excluded. Wired into the pre-commit hook (Step 5c) + `npm run
+check:apk-assets`. RED-proven: reinstating `<dir>src` makes it list all ten
+files and exit 1.
+
+LESSON: an asset is not dead because index.html doesn't name it. Dynamic
+`script.src` injection is a first-class runtime surface, and a loader that
+degrades gracefully (onerror → fallback) turns a packaging mistake into a
+SILENT feature loss rather than a crash.
+
+───────────────────────────────────────────────────────────────────────────
 HANDOFF (READ FIRST)
 ───────────────────────────────────────────────────────────────────────────
+• 13 items closed (2026-07-22); item 1 CORRECTED same-day — see the box
+  above before touching app/build.gradle.kts.
 • ALL 13 items are closed (2026-07-22). Nothing here is pending. This file
   is the permanent record; do not re-litigate the ADJUDICATED items without
   NEW evidence (same convention as AUDIT-PLAN/BLIND-AUDIT).

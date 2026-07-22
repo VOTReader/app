@@ -78,13 +78,33 @@ android {
     // assets/ is shared with the PWA, so the files STAY in the repo — this is
     // purely a packaging exclusion.
     //
+    // NOT everything under assets/src/ is dead. `src/data/` holds TEN files
+    // that are injected AT RUNTIME as <script src="src/data/…"> by
+    // src/data/translations.js — the nine alternate Bible translations
+    // (including the NKJV-R / KJV-R restored-name editions) and
+    // bible-studies.js. They are ~36 MB, they are NOT in any dist/ bundle,
+    // and there is no native loader path. Excluding the whole `src` tree
+    // silently broke them in the APK: every non-NKJV translation fell back
+    // to NKJV via the onerror handler, and Studies dead-ended on "Try
+    // again". They must ship (Permanent policy: the app is self-contained
+    // and offline). So the exclusions below name the DEAD files instead of
+    // the whole tree — see SettingsScreen → Bible Translation.
+    //
     // Excluded:
-    //  - <dir>src        the dev ES-module source tree (283 entries, ~51 MB).
+    //  - the bundle-only source dirs (components/hooks/renderer/search/
+    //    stores/styles/ui) + app.jsx — all concatenated into dist/.
+    //  - the src/data files that build.py concatenates into a bundle
+    //    (books*, matthew*, the VOT corpora, and the ES modules).
     //  - *.lnk           Windows shortcut junk (one shipped in the June APK).
     //  - *.test.js       vitest files, incl. assets/service-worker.test.js.
     //  - the four dead root files already concatenated into dist/bundle-a.js
     //    (app.css → only dist/app.min.css is referenced; react.min.js,
     //    react-dom.min.js, search-data.js).
+    //
+    // KEPT ON PURPOSE (runtime-injected — do not add these):
+    //    bible-asv/bsb/hnv/kjv/lsv/rkjv/rnkjv/web/ylt.js, bible-studies.js
+    // tools/check-apk-assets.js enforces that; it fails the build if a
+    // runtime-injected path ever lands in this ignore list.
     //
     // Patterns are aapt-syntax and match each file/dir's BASENAME
     // (case-insensitive), not the full path — verified against AGP 9.2.1's
@@ -103,7 +123,22 @@ android {
             "!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*",
             "!CVS", "!thumbs.db", "!picasa.ini", "!*~",
             // VOT packaging exclusions (see comment block above).
-            "<dir>src",
+            // Bundle-only source trees + entry.
+            "<dir>components", "<dir>hooks", "<dir>renderer", "<dir>search",
+            "<dir>stores", "<dir>styles", "<dir>ui",
+            "app.jsx",
+            // src/data files concatenated into dist/ bundles by build.py.
+            "books.js", "books-restored.js",
+            "matthew.js", "matthew-plain.js", "matthew-nkjv.js",
+            "volume-one.js", "volume-two.js", "volume-three.js", "volume-four.js",
+            "volume-five.js", "volume-six.js", "volume-seven.js",
+            "letters-timothy.js", "letters-flock.js", "lords-rebuke.js",
+            "wtlb-one.js", "wtlb-two.js", "wtlb-scriptures.js",
+            "the-blessed.js", "holy-days.js", "hidden-manna.js",
+            // src/data ES modules (bundled into dist/bundle-b / -d).
+            "scripture-resolution.js", "translations.js",
+            "journal-helpers.js", "letter-linking.js",
+            // Junk + tests + root duplicates.
             "*.lnk",
             "*.test.js",
             "app.css",
