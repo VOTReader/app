@@ -161,16 +161,31 @@ Row schema (every field required unless marked optional):
     "before":    "...but look! He speaks boldly... Do the rulers know indeed that this is truly the very ",
     "after":     "? However we know where this Man is from...",
     "greek": {
-      "found":     true,
-      "form":      "Christos",             the TR word aligned to this instance
-      "lemma":     "Christos",
-      "article":   "none" | "ho" | "tou" | "to" | "ton" | ...,
-      "case":      "nominative" | ... ,
-      "witness":   "Stephanus1550",        which TR edition the form was read from
-      "variant":   "Scrivener1894 agrees"  optional; note real TR-internal variance
+      "found":       true,
+      "form":        "Christos",           the TR word aligned to this instance
+      "lemma":       "Christos",
+      "parse":       "N-NSM",              full morphology from the TAGGED TR
+      "case":        "nominative",
+      "number":      "singular",
+      "gender":      "masculine",
+      "article":     "none",               none | ho | tou | to | ton | to(i) | ...
+      "articleFn":   "n/a",                see section 6B: anaphoric | par-excellence |
+                                           monadic | idiomatic-with-proper-name |
+                                           omitted-after-preposition | generic | n/a
+      "force":       "titular",            titular | onomastic | transitional (6C)
+      "genitiveType": null,                subjective | objective | possessive | source |
+                                           relationship | apposition | ambiguous (6E)
+      "construction": null,                granville-sharp | set-formula | ot-quotation |
+                                           naming-formula | gloss | vocative | null
+      "witness":     "Stephanus1550",
+      "variant":     null                  real TR-internal variance, if any (6L)
     },
     "syntax":    "predicate-nominative",   role in the English clause
+    "speaker":   "narrator",               narrator | Yahushua | disciple | opponent |
+                                           demon | roman-official | crowd | apostle-writing
     "supplied":  false,                    true when the English has no Greek counterpart
+    "hebrew":    "Delitzsch reads HaMashiach here; construct forbids the article",
+                                           optional but required for every titular Christos
     "decision":  "Mashiach",               MUST be one of the forms in section 8
     "verseOut":  "...that this is truly the very Mashiach? However we know...",
     "rationale": "English prints 'the very' before the token, so an article-bearing
@@ -199,6 +214,28 @@ Rules for the ledger itself:
              Jesus 977 | Christ 576 | JESUS 6 | Messias 2 | christs 1
   TOTAL    3,120 instances   <- the ledger must contain exactly this many rows
 
+PER-BOOK DISTRIBUTION (both bases summed; this is what the slicing follows).
+The work is heavily front-loaded: John alone is 18 percent of the project, and
+the top six books carry 57 percent of it.
+
+    john            558      colossians       68      2peter          34
+    matthew         380      1peter           66      philemon        28
+    luke            227      1thessalonians   62      jude            20
+    romans          212      1timothy         60      titus           16
+    mark            209      2timothy         58      2john           12
+    acts            203      hebrews          53      james            8
+    1corinthians    192      2thessalonians   50      3john            0
+    2corinthians    138      revelation       50
+    ephesians       134      1john            46
+    philippians     120
+    galatians       116
+
+Note the shape this implies: the Gospels and Acts (1,577 instances) are where
+the TITULAR uses cluster and where the hard adjudications live, while the
+epistles (1,543) are dense with formulaic pairs and prepositional phrases that
+recognize faster but must still be individually confirmed. Section 6C is the
+reason those two halves feel different to work on.
+
 Sources walked: NT[] in tools/gen-restored-nt.mjs (27 books; Matthew is the
 'matthew-plain' key in both bases). NKJV verses come from books.js +
 matthew-plain.js; KJV from bible-kjv.js. Re-derive this count yourself in phase 1
@@ -209,70 +246,218 @@ totals will differ; that is expected and the pinned counts in the test file are
 the deliberate tripwire you update at the end, never before.
 
 
-6. THE GREEK: SOURCE, PROVENANCE, CACHING
------------------------------------------
-Base text is the TEXTUS RECEPTUS, because that is the text the KJV and NKJV New
-Testaments translate. Using NA28/UBS5 here would be a category error: you would
-be judging a translation against a text it did not render.
+6. THE GREEK: SOURCES AND THE PHENOMENA YOU MUST HANDLE
+-------------------------------------------------------
+This section is the technical heart of the commission. The owner asked for real
+engagement with the underlying language. Parsing a word is not that. Knowing
+WHICH Greek phenomenon you are looking at, and which of them are traps that
+produce confident-sounding nonsense, is that.
 
-  - Preferred witness: Stephanus 1550. Cross-check Scrivener 1894 where they
-    differ. Both are public domain.
-  - Vendor the text into the repo under tools/tr-greek/ with a PROVENANCE.md
-    recording source URL, edition, retrieval date, and license, following the
-    VENDORED-LIBS.md convention already used in this project.
-  - Cache it. Do NOT re-fetch per turn: a /goal loop that hits the network every
-    turn is slow, fragile, and non-reproducible offline.
+6A. SOURCES, PROVENANCE, CACHING
+  Base text is the TEXTUS RECEPTUS, because that is the text the KJV and NKJV
+  New Testaments translate. Judging them against NA28/UBS5 would be a category
+  error - you would be measuring a translation against a text it did not render.
 
-Textual-criticism obligations, all of which must appear in the ledger:
-  - ALIGNMENT. English word order differs from Greek. Align by clause and by
-    lemma, not by position. Where you cannot align confidently, set
-    greek.found=false and say so - never invent a form.
+  - Acquire a MORPHOLOGICALLY TAGGED TR, not a bare text. Hand-parsing 3,120
+    instances invites silent error; a tagged text makes the morphology field
+    mechanical and reliable and leaves your judgment for the parts that need it.
+    If no tagged TR is obtainable, a tagged Byzantine/Majority text is an
+    acceptable morphological aid PROVIDED the wording is checked against the TR
+    per instance and any divergence is recorded.
+  - Primary witness Stephanus 1550; cross-check Scrivener 1894 (the text
+    reconstructed behind the KJV). Beza 1598 and Elzevir 1633 where they bear.
+    All public domain.
+  - Lexical and grammatical authorities that are public domain and citable:
+    Thayer's Greek-English Lexicon, Strong's, Liddell-Scott-Jones, and
+    A.T. Robertson's Grammar of the Greek New Testament (1919). Standard modern
+    grammars may be cited by CATEGORY NAME without reproducing their text.
+  - Hebrew witnesses for retro-translation: Delitzsch's Hebrew NT and
+    Salkinson-Ginsburg. Both public domain.
+  - Vendor everything under tools/tr-greek/ with PROVENANCE.md recording edition,
+    source URL, retrieval date and license, per the VENDORED-LIBS.md convention.
+  - CACHE IT. Never re-fetch per turn: a /goal loop that hits the network every
+    turn is slow, fragile, and not reproducible offline.
+
+6B. THE ARTICLE WITH PROPER NAMES - THE BIGGEST TRAP IN THIS PROJECT
+  Koine routinely puts the article on personal names. "ho Iesous" is the normal
+  way to write "Jesus" in Gospel narrative; it does NOT mean "the Jesus" and it
+  does not make the name definite in any sense English marks. If you treat that
+  article as English "the", you will manufacture determiners across hundreds of
+  verses and reproduce the exact defect class that got v1 rejected.
+    RULE: for Iesous, the presence of the article is almost never a reason to
+    change the English rendering. Record it in articleFn as
+    "idiomatic-with-proper-name" and move on.
+  The article carries real weight for Christos, because Christos is a TITLE that
+  is drifting toward a name (6C). Distinguish its functions and record which:
+  anaphoric (points back to a previous mention), par excellence (the Anointed
+  One above all others - the confessional uses), monadic (a one-of-a-kind
+  referent), generic, and omitted-after-preposition (pure Greek syntax carrying
+  no semantic weight - established in v1 and still true).
+
+6C. CHRISTOS: THE TITULAR-TO-ONOMASTIC DRIFT
+  This is the single most useful piece of context-awareness available to you,
+  and it is why a per-instance reading beats a rule.
+    In the Synoptics, John and Acts, Christos is overwhelmingly TITULAR - "the
+    Anointed One" - and clusters in confession, interrogation and dispute
+    scenes: is this man the Anointed, do you claim to be the Anointed, we have
+    found the Anointed. There the title is doing titular work and an
+    article-bearing restored form is usually right.
+    In Paul it has largely lexicalized toward a PROPER NAME: frequently
+    anarthrous, frequently in fixed pairs and prepositional formulas, behaving
+    like a second name rather than a claim. There the bare name-like form is
+    usually right.
+    Hebrews, Peter and Revelation sit across the range.
+  Record where each instance falls in greek.force as titular, onomastic, or
+  transitional, and let that finding - not a global rule - drive the choice
+  between an article-bearing and a bare rendering, subject always to section 9.
+
+6D. PREDICATE NOMINATIVES AND CONFESSION FORMULAS
+  "su ei ho Christos" (You are the Anointed) and its relatives are the high-water
+  mark of titular force. Note that an anarthrous pre-verbal predicate nominative
+  can still be definite in Greek, so absence of the article in a predicate is NOT
+  evidence of a name-like use. Judge these by the confession context, not by the
+  article alone.
+
+6E. GENITIVE TYPE - AND THE OPEN QUESTION THIS SETTLES
+  Roughly ninety verses read "of Christ". English flattens every genitive to
+  "of", but the Greek relation differs and it changes what the phrase means:
+  subjective (the faithfulness that He exercises), objective (faith directed
+  toward Him), possessive, of source, of relationship, of apposition.
+  The "pistis Christou" phrases (Romans 3:22 and 3:26, Galatians 2:16 twice,
+  2:20, 3:22, Philippians 3:9, Ephesians 3:12) are the most contested genitive
+  in New Testament scholarship. You are not being asked to settle that debate;
+  you ARE being asked to notice that these instances are not interchangeable
+  with "the gospel of Christ" and to adjudicate them as their own class.
+  Record genitiveType per instance. The owner's ONE explicitly open decision -
+  whether "of Christ" reads bare or article-bearing - is to be answered from
+  this evidence, per instance first and as a reported pattern second.
+
+6F. VOCATIVES AND DIRECT ADDRESS
+  Christe occurs exactly once (Matthew 26:68). But direct address to Him using
+  Iesou as a vocative is frequent - the demons and the petitioners in Mark 1:24,
+  5:7, 10:47; Luke 4:34, 8:28, 17:13, 18:38 and their parallels. These are
+  people speaking TO Him. Mark construction as vocative and let the restored
+  form be the one a person would actually call out.
+
+6G. GRANVILLE SHARP AND OTHER BOUND CONSTRUCTIONS
+  The article-noun-kai-noun construction ("our great God and Savior Jesus
+  Christ", Titus 2:13; "our Lord and Savior Jesus Christ", 2 Peter 1:11 and
+  kin) binds the two nouns to a single referent. Your restored rendering must
+  not break that unity or insert a determiner that splits it. Mark
+  construction as granville-sharp and check the whole phrase reads as one.
+
+6H. SET FORMULAS AND LITURGICAL PHRASES
+  Epistolary greetings and benedictions, "our Lord Jesus Christ", "in Christ
+  Jesus", "through Jesus Christ" are FIXED phrases repeated dozens of times.
+  Two obligations: adjudicate them (they are not exempt), and then be
+  CONSISTENT within the formula - a greeting that renders one way in
+  Philippians and another way in Colossians reads as an error, not a nuance.
+  Where you deliberately vary a formula, the rationale must say why.
+
+6I. OLD TESTAMENT QUOTATION AND THE SEPTUAGINT SUBSTRATUM
+  Where the New Testament quotes an Old Testament passage containing mashiach -
+  Psalm 2:2 quoted at Acts 4:26, and the related Revelation 11:15 and 12:10
+  phrases - the HEBREW source governs the restored form. Hebrew construct and
+  suffixed forms cannot take the article, which is why "His Anointed" and "the
+  Lord's Anointed" must render bare. Mark construction as ot-quotation and cite
+  the source verse.
+
+6J. SEMITIC RETRO-TRANSLATION
+  For every titular Christos, record what Delitzsch does (greek.hebrew field).
+  The governing Hebrew fact: in a construct chain the first noun cannot carry
+  the article, and a pronominal suffix likewise blocks it. That is a grammatical
+  prohibition, not a preference, and it is the reason several v1 exceptions
+  exist. Salkinson-Ginsburg is a useful second witness where Delitzsch is
+  surprising. These are witnesses, not authorities - the doctrine and the
+  English sentence outrank them both.
+
+6K. THE TWO TRANSLITERATIONS
+  Messias appears only at John 1:41 and 4:25, where John transliterates the
+  Aramaic and then GLOSSES it into Greek for his readers. Any rendering that
+  translates the word into itself has failed. Mark construction as gloss and
+  render the gloss by meaning.
+
+6L. TEXTUAL VARIANCE INSIDE THE TR TRADITION
+  Stephanus, Beza, Elzevir and Scrivener differ at a number of places on the
+  presence of Iesous or Christos, especially in the longer "Lord Jesus Christ"
+  readings. Record divergence in greek.variant. Do NOT change what the English
+  base prints. You are restoring a name inside an existing translation, not
+  re-editing its text.
+
+6M. ALIGNMENT, SUPPLIED WORDS, AND THE SHADOW CENSUS
+  - ALIGNMENT. Greek and English word order differ. Align by clause and lemma,
+    never by position. Where alignment is not confident, set greek.found=false
+    and say so. NEVER invent a form.
   - SUPPLIED WORDS. The KJV italicizes words with no Greek counterpart, and both
-    translations sometimes supply a proper name where the Greek has only a
-    pronoun or nothing. Mark supplied=true. A supplied "Jesus" is still restored
-    (the referent is the Lord), but the rationale must not claim Greek evidence
+    translations sometimes supply the name where the Greek has only a pronoun or
+    nothing at all. Mark supplied=true. A supplied "Jesus" is still restored -
+    the referent is the Lord - but the rationale may not claim Greek evidence
     that is not there.
-  - TR-INTERNAL VARIANTS. Some instances exist in one TR edition and not another
-    (the longer "Lord Jesus Christ" readings especially). Record the variance in
-    greek.variant. Do not change what the English base prints - you are
-    restoring the Name in an existing translation, not re-editing its text.
-  - ARTICLE IS EVIDENCE, NOT VERDICT. v1 established, correctly, that Greek drops
-    the article after prepositions as pure syntax while Hebrew keeps it on a
-    definite title regardless (Delitzsch renders standalone Christos with the
-    article in both cases). So the Greek article informs the decision; the
-    ENGLISH determiner that is actually printed governs whether an article-
-    bearing form can be used at all. Section 9 is the hard constraint.
-  - CORROBORATION. Where a call is close, check how the restored-name editions
-    render it: CJB/Stern (Mashiach), the Cepher (HAMASHIACH), Delitzsch's Hebrew
-    NT. Cite which one you consulted in the rationale. They are witnesses, not
-    authorities - the doctrine and the English sentence outrank them.
+  - THE SHADOW CENSUS. The mirror case also exists: verses where the GREEK names
+    Him but the English renders only "he" or "him". Those are places where the
+    Name was lost in translation rather than obscured. Restoring them is OUT OF
+    SCOPE - it would change base wording, which section 14 forbids - but you must
+    COUNT them per book and report the total to the owner as a finding. He may
+    want a separate commission for it. Do not act on it unasked.
 
 
 7. THE ADJUDICATION RUBRIC (what "examining an instance" means)
 --------------------------------------------------------------
-For each row, in this order:
+For each row, in this order. Steps 3 through 6 are the language work the owner
+is asking for; do not compress them.
 
-  1. READ THE VERSE. The whole verse, both before and after the token. For
-     narrative, read the surrounding two verses; pronoun referents cross verse
-     boundaries constantly in the Gospels and Acts.
+  1. READ THE VERSE. The whole verse, before and after the token. In narrative,
+     read the surrounding two verses - pronoun referents cross verse boundaries
+     constantly in the Gospels and Acts. In the epistles, read to the end of the
+     sentence, which is often several verses long.
   2. IDENTIFY THE REFERENT. Is this the Lord, or another bearer (Bar-Jesus,
-     Justus, Joshua son of Nun)? Other bearers are UNCHANGED - decide and move
-     on.
-  3. LOCATE THE GREEK. Record form, lemma, article, case, witness. If it cannot
-     be aligned, say so.
-  4. CLASSIFY THE ENGLISH SYNTAX. What determiner, if any, is printed
-     immediately before? Is the token vocative, appositive, predicate,
-     genitive-of, possessive, construct-like ("His Christ", "the Lord's
-     Christ"), part of a name pair, or a naming formula ("call His name...")?
-  5. CHOOSE from the closed vocabulary in section 8.
-  6. WRITE THE FULL RESTORED VERSE into verseOut.
-  7. RE-READ verseOut AS A SENTENCE. Apply section 9. If it stumbles, go back to
-     step 5 and pick differently. Mark natural=pass only when it reads.
-  8. WRITE THE RATIONALE. It must reference BOTH the specific English words
-     adjacent to this instance AND what the Greek showed. A rationale that could
-     be pasted onto a different verse unchanged is not a rationale.
+     Justus, Joshua son of Nun)? Other bearers are UNCHANGED - decide and move on.
+  3. PARSE THE GREEK. From the tagged TR: form, lemma, full morphology, case,
+     number, gender, and the article if present. If the instance cannot be
+     aligned with confidence, set greek.found=false and say so. Never invent.
+  4. DIAGNOSE THE PHENOMENON. Walk section 6 and name what you are looking at:
+       - Is the article idiomatic-with-a-proper-name (6B), or is it doing
+         semantic work? For Iesous the answer is almost always the former.
+       - Where does this Christos sit on the titular-to-onomastic range (6C)?
+       - Is it a predicate in a confession (6D)? a genitive, and of which type
+         (6E)? a vocative or direct address (6F)? part of a Granville Sharp
+         construction (6G)? inside a set formula (6H)? an OT quotation whose
+         Hebrew governs (6I)? one of the two glosses (6K)?
+       - What does Delitzsch do with it, and does Hebrew construct or suffix
+         grammar forbid the article here (6J)?
+       - Do the TR editions agree at this point (6L)? Is the English word
+         supplied with no Greek behind it (6M)?
+     Record each finding in its field. A row whose greek block is filled but
+     whose articleFn, force and construction are all null has been parsed, not
+     diagnosed, and does not satisfy this step.
+  5. IDENTIFY THE SPEAKER AND FRAME. Who is talking - the narrator, the Lord
+     Himself, a disciple confessing, an opponent interrogating, a demon, a Roman
+     official, an apostle writing? An outsider's naming formula ("Jesus who is
+     called Christ") and a disciple's confession ("You are the Christ") are not
+     the same speech act and should not automatically render the same way.
+  6. CLASSIFY THE PRINTED ENGLISH. What determiner, adjective or possessive, if
+     any, stands immediately before the token? Is it a name pair, a possessive,
+     a naming formula? This is what constrains which forms are even available -
+     the Greek informs the choice, the printed English bounds it. Section 9.
+  7. CHOOSE from the closed vocabulary in section 8.
+  8. WRITE THE FULL RESTORED VERSE into verseOut.
+  9. RE-READ verseOut ALOUD AS A SENTENCE. Apply section 9. If it stumbles, go
+     back to step 7 and choose differently. Mark natural=pass only when it reads.
+ 10. WRITE THE RATIONALE. It must reference the specific English words adjacent
+     to this instance AND the specific Greek finding AND, where relevant, the
+     phenomenon from section 6 that decided it. A rationale that could be pasted
+     onto a different verse unchanged is not a rationale.
 
-Work in verse order within a book. Do not skip ahead to "the interesting ones."
+ON PACE AND REPEATS. Many instances are formulaic - the same greeting, the same
+"our Lord Jesus Christ", the same narrative "and Jesus said". Those legitimately
+go faster than a contested confession scene, and you should let them. What you
+may NOT do is auto-fill them: each still gets its own row, its own referent
+check, its own naturalness read, and a rationale naming the formula it belongs
+to and confirming it behaves the same here. Speed comes from recognition, never
+from skipping the read.
+
+Work in verse order within a book. Do not skip ahead to the interesting ones -
+the drift described in 6C is only visible if you walk the text in order.
 
 
 8. THE CLOSED DECISION VOCABULARY
@@ -445,8 +630,12 @@ PHASE 0 - DOCTRINE AND METHOD
 
 PHASE 1 - CORPUS, GREEK, AND THE EMPTY LEDGER
   /goal The instance ledger scaffold is built and verified. DONE means: (a)
-  tools/tr-greek/ contains a vendored public-domain Textus Receptus with a
-  PROVENANCE.md naming edition, source, retrieval date and license; (b)
+  tools/tr-greek/ contains a vendored public-domain MORPHOLOGICALLY TAGGED
+  Textus Receptus - or a tagged Byzantine text used strictly as a morphological
+  aid with TR wording checked per instance - plus the Delitzsch Hebrew NT, each
+  with a PROVENANCE.md naming edition, source, retrieval date and license, and I
+  have pasted a worked parse of three sample verses proving the tagging is
+  actually usable; (b)
   tools/build-name-ledger.mjs enumerates every Jesus/Christ/Messiah/Messias/
   christs instance in the New Testament of both bases and emits
   tools/restored-nt-ledger.jsonl with one row per instance, every row carrying
@@ -461,29 +650,81 @@ PHASE 1 - CORPUS, GREEK, AND THE EMPTY LEDGER
   instance for manual attention. Constraints: no decision is filled in this
   phase; no shipped data file is modified; ASCII only. Stop after 25 turns.
 
-PHASE 2 - ADJUDICATION (repeat until the ledger is full)
-  Run this once per slice. Slices, chosen to balance instance volume, both
-  translations together so the same verse is judged once:
-     A: Matthew, Mark          D: Romans, 1-2 Corinthians, Galatians
-     B: Luke, John             E: Ephesians through Philemon
-     C: Acts                   F: Hebrews through Revelation
+PHASE 1.5 - CALIBRATION, AND AN OWNER REVIEW GATE
+  Do NOT proceed to the full run until the owner has read a real sample and
+  confirmed the method is producing what he asked for. Committing a hundred and
+  fifty turns to a method he has not seen is the expensive way to find out it
+  drifted.
 
-  /goal Every ledger row in slice <A> is adjudicated. DONE means: zero rows in
-  the slice have decision, verseOut, rationale or natural unset, proven by
-  pasting `node tools/validate-ledger.mjs --slice <A>` showing 0 incomplete and
-  0 vocabulary violations and 0 rootedness flags; every decision was reached by
-  the section 7 procedure with the Greek consulted per instance; every verseOut
-  was re-read as a whole sentence against the section 9 forbidden patterns; and
-  I have run the section 10 spot audit on 25 random rows from the slice,
-  re-adjudicating them blind and pasting the agreement rate plus every
-  disagreement and its resolution. Constraints: no shipped file is modified in
-  this phase - the ledger is the only output; no rationale may be reused across
-  rows that do not share the same sentence; any instance where fidelity and
-  natural English conflict is marked natural=tension and listed in my summary
-  for the owner; any standing decision from section 8 that my evidence now
-  contradicts is FLAGGED, not changed. If the turn budget runs out, report the
-  first unadjudicated row id so the goal can be re-run to resume. Stop after 30
-  turns.
+  Calibration slice C0 = Philemon, Titus, James, 2 John, Jude - 84 instances.
+  Small, fast, and it exercises pair formulas, greetings, benedictions and a
+  couple of genuine title uses.
+
+  /goal Calibration slice C0 (Philemon, Titus, James, 2 John, Jude - 84
+  instances) is fully adjudicated to the RESTORED-NAMES-V2-BRIEF.txt section 7
+  procedure, and a review packet is ready for the owner. DONE means: every C0
+  row is complete with no null decision, verseOut, rationale or natural field,
+  proven by pasting `node tools/validate-ledger.mjs --slice C0`; the greek block
+  on every row carries a real morphological parse plus a non-null articleFn,
+  force and construction diagnosis per section 6; I have run the section 10 spot
+  audit on 25 of the 84 rows and pasted the agreement rate; and I have written
+  REVIEW-C0.md containing, in plain language, ten fully worked instances chosen
+  to span the decision vocabulary - each showing the base English, the Greek
+  finding, the phenomenon that decided it, the restored verse, and why it reads
+  naturally - plus every natural=tension row, every flagged standing decision,
+  and my running read on the genitive question. Constraints: no shipped file is
+  modified; the ledger and REVIEW-C0.md are the only outputs. Stop after 25 turns.
+
+  THE OWNER READS REVIEW-C0.md AND EITHER CONFIRMS OR CORRECTS THE METHOD BEFORE
+  PHASE 2 BEGINS. Corrections are folded into RESTORED-NAMES-METHOD.md and any
+  affected C0 rows are re-adjudicated.
+
+PHASE 2 - ADJUDICATION (repeat until the ledger is full)
+  Run this once per slice, both translations together so the same verse is
+  judged once. Slices follow the real distribution in section 5, not the book
+  order - they are sized so a slice is a plausible single goal run.
+
+     S1   John 1-11              S8   1 Corinthians
+     S2   John 12-21             S9   2 Corinthians + Galatians
+     S3   Matthew                S10  Ephesians + Philippians
+     S4   Mark                   S11  Colossians + 1-2 Thessalonians
+     S5   Luke                   S12  1-2 Timothy + Hebrews
+     S6   Acts                   S13  1-2 Peter + 1 John + Revelation
+     S7   Romans
+
+  (C0 already covers Philemon, Titus, James, 2 John and Jude. 3 John has zero
+  instances. Split S1/S2 at whichever chapter boundary balances the count.)
+
+  ORDER. Run S1 and S3 early. John and Matthew carry the densest titular usage,
+  so the drift analysis in 6C is established on the strongest evidence before
+  the epistles - where the formulaic pairs dominate - are judged against it.
+
+  SCALE, honestly. At genuine per-instance depth this is on the order of 150 to
+  250 adjudication turns across roughly thirteen goal runs, plus the surrounding
+  phases. A slice that does not finish inside its turn budget is not a failure:
+  the ledger is durable, so the same goal is simply re-run and resumes at the
+  first null row. Expect several slices to take two runs.
+
+  /goal Every ledger row in slice <S1> is adjudicated to the
+  RESTORED-NAMES-V2-BRIEF.txt section 7 procedure. DONE means: zero rows in the
+  slice have decision, verseOut, rationale or natural unset, proven by pasting
+  `node tools/validate-ledger.mjs --slice <S1>` showing 0 incomplete, 0
+  vocabulary violations, 0 rootedness flags and 0 rows diagnosed-null; every row
+  carries a real morphological parse from the tagged TR AND a section 6
+  diagnosis - articleFn, force and construction are filled, not left null - so
+  that no row is merely parsed instead of diagnosed; every verseOut was re-read
+  as a whole sentence against the section 9 forbidden patterns; and I have run
+  the section 10 spot audit on 25 random rows, re-adjudicating them blind and
+  pasting the agreement rate plus every disagreement and its resolution.
+  Constraints: no shipped file is modified in this phase - the ledger is the only
+  output; no rationale may be reused across rows that do not share the same
+  sentence; formulaic repeats still get their own referent check, naturalness
+  read and rationale naming the formula; any instance where fidelity and natural
+  English conflict is marked natural=tension and listed in my summary; any
+  standing decision from section 8 that my evidence now contradicts is FLAGGED,
+  not changed; I also report the running shadow-census count for this slice per
+  section 6M without acting on it. If the turn budget runs out, report the first
+  unadjudicated row id so the goal can be re-run to resume. Stop after 30 turns.
 
 PHASE 3 - APPLY, PROVE, LAND
   /goal The restored-name editions are regenerated from the ledger and landed.
@@ -521,12 +762,18 @@ PHASE 4 - OPTIONAL, OWNER'S CALL
 ----------------------
   - 3,120 ledger rows, every one adjudicated, every one with a rationale rooted
     in its own verse and its own Greek.
+  - Every row DIAGNOSED, not merely parsed: articleFn, force and construction
+    filled per section 6, so the reasoning names the phenomenon it turned on.
   - Zero forbidden patterns in the emitted text, enforced by RED-proven tests.
   - Every changed verse reads as English a person could read aloud.
   - The full gate stack green, live-proven in the reader, one commit, pushed.
   - A summary to the owner that names: the totals, every natural=tension row,
-    every flagged standing decision, the genitive-of-Christ recommendation, and
-    the spot-audit agreement rates per slice.
+    every flagged standing decision, the genitive-of-Christ recommendation
+    built from the per-instance genitiveType evidence, the shadow-census total
+    from section 6M, and the spot-audit agreement rates per slice.
+  - A short account of what the titular-to-onomastic drift (6C) actually looked
+    like in this corpus, book by book. That finding is a deliverable in its own
+    right: it is the evidence that the text was read rather than transformed.
 
 
 14. OUT OF SCOPE
