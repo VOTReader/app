@@ -251,7 +251,34 @@ source root — that absence, not any per-item gap, is why device walks
 can't be absorbed into an automated harness. If instrumented coverage is
 ever wanted, create the source root; until then the deferrals stand.
 
+ITEM 14 — export could miss a union inside the 250 ms debounce window
+                                            STATUS: DONE (2026-07-22)
+Finding: a vot-state change made within 250 ms of tapping Export could be
+silently missing from that backup — the app's ONLY backup mechanism (U1).
+Root cause: the persist sink's trailing-edge debounce holds the latest
+union in a ref without calling StateStore.set, while the v3/v2 export
+reads vot-state straight from IndexedDB after a whenSaved() durability
+barrier; since no write had been initiated, the barrier had nothing to
+await and the IDB read returned the pre-debounce union. (Flagged as the
+one accepted risk by the independent verification review of this batch.)
+Fix: usePersistedState publishes its existing flush as
+window.__flushPersistState for the life of App() — a window bridge, not a
+module export, because bundle-b/bundle-d are separate esbuild IIFEs and
+module-scope registrations don't cross — and both export drivers in
+SettingsScreen call it synchronously before buildV3Manifest, so the
+existing whenSaved() barrier awaits the flushed write before the manifest
+snapshots IDB. No-op when idle, clears the pending timer (no duplicate
+write), boot-critical immediate path untouched. Bridge registered in
+BRIDGES.md section 11.
+Verification: RED-first — pre-fix the exported manifest's vot-state
+dropped the pending union (searchQuery undefined); post-fix targeted
+suites pass and the full suite is 2792/2792, including an end-to-end
+test mounting the real hook against the real StateStore + fake IDB,
+driving the exact export sequence without advancing the debounce timer.
+Commit d1cc7f2.
+
 ═══════════════════════════════════════════════════════════════════════════
-END — 13/13 closed (10 DONE + 3 ADJUDICATED). Gates: Kotlin 189/0-fail,
-vitest 2787/2787, assembleDebug APK 36 assets / ~11.3 MB (was ~51 MB dead).
+END — 14/14 closed (11 DONE + 3 ADJUDICATED). Gates: Kotlin 189/0-fail,
+vitest 2792/2792, assembleDebug APK 76 assets / 48.8 MB (runtime-injected
+translations + Studies restored; ~13 MB dead weight excluded).
 ═══════════════════════════════════════════════════════════════════════════
