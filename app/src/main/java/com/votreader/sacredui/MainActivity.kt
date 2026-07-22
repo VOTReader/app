@@ -44,6 +44,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.webkit.WebResourceErrorCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 import androidx.webkit.WebViewClientCompat
@@ -87,7 +88,10 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     // supported API level (SAF is API 19+; minSdk here is 26), so Export is
     // reachable on Android 8/9 where Downloads-collection writes hard-failed.
     // The JSON payload is held in pendingExportContent between launch and the
-    // picker result, then written to the chosen URI and cleared.
+    // picker result, then written to the chosen URI and cleared. The field
+    // also serves as the picker's in-flight flag: launchExportPicker refuses
+    // a second launch while it's non-null (see its comment for the clobber
+    // that would otherwise result).
     private lateinit var exportPickerLauncher: ActivityResultLauncher<String>
     private var pendingExportContent: String? = null
 
@@ -152,8 +156,31 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         filePickerLauncher.launch("application/json")
     }
     override fun launchExportPicker(suggestedName: String, content: String) {
+        // Double-launch guard: pendingExportContent doubles as the in-flight
+        // flag (set just before launch, cleared FIRST in the result callback
+        // before any other work). Without this, a second export launched
+        // while the first picker is still open would clobber the stashed
+        // payload — the first picker's result would then write the SECOND
+        // export's content — and re-launching a pending
+        // ActivityResultLauncher can throw outright. The skip reports back
+        // through the existing "error:<reason>" contract so JS's generic
+        // export-error toast fires instead of the request vanishing silently.
+        if (pendingExportContent != null) {
+            Timber.w("Export picker already in flight; dropping re-launch")
+            bridge.callOptional(JsEvent.ExportComplete, "error:busy")
+            return
+        }
         pendingExportContent = content
-        exportPickerLauncher.launch(suggestedName)
+        try {
+            exportPickerLauncher.launch(suggestedName)
+        } catch (e: Exception) {
+            // Launch itself failed (e.g. Activity state already saved) —
+            // clear the flag so exports aren't permanently wedged, and
+            // report through the same error contract.
+            pendingExportContent = null
+            Timber.w(e, "Export picker launch failed")
+            bridge.callOptional(JsEvent.ExportComplete, "error:launch_failed")
+        }
     }
     override fun launchV3ExportPicker(suggestedName: String) {
         v3ExportPickerLauncher.launch(suggestedName)
@@ -378,10 +405,20 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // screen) and "false" when there's nothing to pop. On "false"
             // we finish() so the user actually exits, instead of being
             // stuck on the home screen.
+            //
+            // DUAL ENCODING: evaluateJavascript JSON-encodes the JS return
+            // value, so a JS string "true" arrives as `"true"` (quoted) but
+            // a JS boolean true arrives as `true` (unquoted). Today's JS
+            // returns the string; the classification accepts BOTH so a
+            // future JS refactor to a bare boolean can't silently flip the
+            // contract into "exit the app even though JS consumed the
+            // press". The encoding check is extracted to
+            // MainActivityLogic.isBackPressConsumed (unit-tested boundary
+            // cases in MainActivityLogicTest).
             bridge.callWithResult(
                 "(typeof window.handleAndroidBack === 'function') ? window.handleAndroidBack() : 'false'"
             ) { result ->
-                if (result != "\"true\"") finish()
+                if (!MainActivityLogic.isBackPressConsumed(result)) finish()
             }
         }
     }
@@ -577,6 +614,31 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 // without making the splash feel slow. If it's already
                 // dismissed (config change re-load), this is a no-op.
                 view.postDelayed({ vm.splashHolding = false }, 80L)
+            }
+
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: WebResourceErrorCompat
+            ) {
+                super.onReceivedError(view, request, error)
+                // Safety hatch for the splash contract: dismissal is driven
+                // solely by onPageFinished above, which never fires if the
+                // MAIN-FRAME load fails — the splash would stick on screen
+                // forever. Mirror the same 80ms-delayed release here so the
+                // user lands on the WebView's error surface instead of an
+                // unkillable splash. Conservative by design: index.html is
+                // a bundled asset served by WebViewAssetLoader, so a main-
+                // frame failure is near-impossible in practice; sub-resource
+                // errors (images, fonts) deliberately do NOT touch the
+                // splash — only the main frame gates it.
+                if (request.isForMainFrame) {
+                    Timber.w(
+                        "Main-frame load failed (%s) for %s — releasing splash hold",
+                        error.description, request.url
+                    )
+                    view.postDelayed({ vm.splashHolding = false }, 80L)
+                }
             }
 
             override fun onScaleChanged(view: WebView, oldScale: Float, newScale: Float) {
@@ -848,23 +910,37 @@ class MainActivity : AppCompatActivity(), BridgeHost {
 
         return withContext(Dispatchers.Default) {
             val (full, topCropPx) = capture
+            // Recycle bookkeeping: full/cropped/scaled live OUTSIDE the try so
+            // the finally can release every allocation on ALL paths. Previously
+            // the recycles were inline on the happy path only — any exception
+            // mid-pipeline (createBitmap OOM, compress failure) skipped them
+            // all, leaking multi-MB native bitmap allocations per failed shot.
+            var cropped: Bitmap? = null
+            var scaled: Bitmap? = null
             try {
-                val cropped = Bitmap.createBitmap(full, 0, topCropPx, full.width, full.height - topCropPx)
-                if (cropped != full) full.recycle() // createBitmap may return the source for a no-op crop
-                val longest = max(cropped.width, cropped.height)
+                val c = Bitmap.createBitmap(full, 0, topCropPx, full.width, full.height - topCropPx)
+                cropped = c
+                val longest = max(c.width, c.height)
                 val scale = if (longest > maxDim) maxDim.toFloat() / longest else 1f
-                val scaled = if (scale < 1f) {
-                    val sw = (cropped.width * scale).toInt().coerceAtLeast(1)
-                    val sh = (cropped.height * scale).toInt().coerceAtLeast(1)
-                    cropped.scale(sw, sh, filter = true).also { if (it != cropped) cropped.recycle() }
-                } else cropped
+                val s = if (scale < 1f) {
+                    val sw = (c.width * scale).toInt().coerceAtLeast(1)
+                    val sh = (c.height * scale).toInt().coerceAtLeast(1)
+                    c.scale(sw, sh, filter = true)
+                } else c
+                scaled = s
                 val stream = ByteArrayOutputStream()
-                scaled.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
-                scaled.recycle()
+                s.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
                 "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
             } catch (e: Exception) {
                 Timber.w(e, "Screenshot encode failed")
                 ""
+            } finally {
+                // createBitmap()/scale() may return their SOURCE bitmap for a
+                // no-op (zero-height crop / scale == 1f), so compare by
+                // identity and recycle each distinct instance exactly once.
+                scaled?.takeIf { it !== cropped && it !== full }?.recycle()
+                cropped?.takeIf { it !== full }?.recycle()
+                full.recycle()
             }
         }
     }

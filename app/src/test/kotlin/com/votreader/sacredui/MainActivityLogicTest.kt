@@ -91,6 +91,42 @@ class MainActivityLogicTest {
         assertFalse(d.showRetryView)
     }
 
+    // ── isBackPressConsumed ────────────────────────────────────────────
+    // The back-press contract: JS returns "true" when it consumed the press.
+    // evaluateJavascript JSON-encodes the return value, so a JS string "true"
+    // arrives as `"true"` (quoted) but a JS boolean true arrives as `true`
+    // (unquoted). Both encodings must mean "consumed" — missing either one
+    // finish()es the Activity even though JS handled the press.
+    @Test
+    fun `quoted string true means consumed (today's JS encoding)`() {
+        assertTrue(MainActivityLogic.isBackPressConsumed("\"true\""))
+    }
+
+    @Test
+    fun `unquoted boolean true means consumed (refactor-proof)`() {
+        assertTrue(MainActivityLogic.isBackPressConsumed("true"))
+    }
+
+    @Test
+    fun `quoted string false means NOT consumed`() {
+        assertFalse(MainActivityLogic.isBackPressConsumed("\"false\""))
+    }
+
+    @Test
+    fun `unquoted boolean false means NOT consumed`() {
+        assertFalse(MainActivityLogic.isBackPressConsumed("false"))
+    }
+
+    @Test
+    fun `js null (missing handler) means NOT consumed`() {
+        assertFalse(MainActivityLogic.isBackPressConsumed("null"))
+    }
+
+    @Test
+    fun `kotlin null result means NOT consumed`() {
+        assertFalse(MainActivityLogic.isBackPressConsumed(null))
+    }
+
     @Test
     fun `custom window and threshold params are honored`() {
         val d = MainActivityLogic.decideRecovery(

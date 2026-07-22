@@ -49,4 +49,23 @@ object MainActivityLogic {
         val newCount = baseCount + 1
         return RecoveryDecision(baseFirst, newCount, newCount > maxRecoveries)
     }
+
+    /**
+     * Classify the evaluateJavascript result of window.handleAndroidBack():
+     * true when JS consumed the hardware back press (closed a sheet, popped
+     * fromLetterStack, navigated to a parent screen), false when MainActivity
+     * should finish().
+     *
+     * DUAL ENCODING: evaluateJavascript JSON-encodes the JS return value, so
+     * the SAME logical answer arrives in two shapes depending on what the JS
+     * function returns — a JS string "true" arrives as `"true"` (quoted),
+     * while a JS boolean true arrives as `true` (unquoted). The JS side
+     * returns the string today, but a refactor to a bare boolean must not
+     * silently break the contract (the app would exit despite JS consuming
+     * the press) — so both encodings are accepted. Everything else ("false"
+     * either encoding, "null" when the handler is missing, a Kotlin null
+     * result) means not-consumed.
+     */
+    fun isBackPressConsumed(result: String?): Boolean =
+        result == "\"true\"" || result == "true"
 }
