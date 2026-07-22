@@ -60,8 +60,10 @@
    ScreenLayout's reading-progress effect already measures against it.
    Scrolling to scrollHeight would grind the reader through the entire
    footnote apparatus of a Format A letter before advancing. Motion stops
-   when the sentinel reaches the viewport bottom; pressing play again
-   scrolls on through the footnotes to true bottom.
+   with the sentinel at END_STOP_FRACTION down the viewport — people read
+   around the MIDDLE of the screen, so the last lines must travel through
+   the reading zone rather than halting at the bottom edge. Pressing play
+   again scrolls on through the footnotes to true bottom.
 
    AUTO-ADVANCE reuses the pager's own neighbor descriptor, so the
    boundary policy is inherited rather than reimplemented:
@@ -159,9 +161,30 @@ export function measureLineHeight(el) {
 }
 
 /**
- * scrollTop at which the `.reading-end` sentinel sits at the viewport
- * bottom — i.e. the last body-text line is fully read. Falls back to the
- * true scroll maximum on screens with no sentinel.
+ * Where the last line of body text should come to rest, as a fraction of
+ * viewport height from the top.
+ *
+ * People read around the MIDDLE of the screen, not the bottom edge. Landing
+ * the sentinel at the very bottom (fraction 1.0) stops the page while the
+ * final lines are still in the reader's periphery, so the last thing they
+ * actually read never reaches a comfortable position. 2/3 puts the end of
+ * the text at the top of the lower third — the highest resting place that
+ * still counts as "down the page" — which means the final lines pass
+ * through the middle of the screen like every other line did.
+ *
+ * The extra travel this asks for is one third of a viewport; on pages that
+ * cannot give it, computeEndTarget clamps to the true scroll maximum, so
+ * the page simply bottoms out instead.
+ */
+const END_STOP_FRACTION = 2 / 3;
+
+/**
+ * scrollTop at which the `.reading-end` sentinel comes to rest at
+ * END_STOP_FRACTION down the viewport — i.e. the last body-text line has
+ * travelled through the reading zone rather than stopping at the bottom
+ * edge. Clamped to the true scroll maximum (a page that cannot scroll that
+ * far just bottoms out) and to 0. Falls back to the scroll maximum on
+ * screens with no sentinel.
  */
 export function computeEndTarget(el) {
   if (!el) return 0;
@@ -169,7 +192,8 @@ export function computeEndTarget(el) {
   const sentinel = typeof el.querySelector === 'function' ? el.querySelector('.reading-end') : null;
   if (!sentinel || typeof sentinel.getBoundingClientRect !== 'function') return max;
   const contentTop = (sentinel.getBoundingClientRect().top - el.getBoundingClientRect().top) + el.scrollTop;
-  return Math.max(0, Math.min(max, Math.round(contentTop - (el.clientHeight || 0))));
+  const rest = contentTop - (el.clientHeight || 0) * END_STOP_FRACTION;
+  return Math.max(0, Math.min(max, Math.round(rest)));
 }
 
 /** Smoothstep — eases the ramp without touching the steady-state velocity. */

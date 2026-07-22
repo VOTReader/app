@@ -1,0 +1,539 @@
+================================================================================
+RESTORED-NAMES-V2-BRIEF.txt
+Commissioning brief for the per-instance Restored-Name New Testament (v2).
+Written 2026-07-21 as the handoff to a fresh conversation driven by /goal.
+Supersedes the ruleset METHOD of RESTORED-NAMES-PLAN.txt; that file remains the
+canonical record of what v1 shipped and why. Read BOTH before touching anything.
+================================================================================
+
+0. HOW TO USE THIS FILE
+-----------------------
+You are the model receiving this commission. This brief is the specification.
+The owner will drive you with /goal, one phase at a time (section 12 has the
+exact conditions). Every phase writes durable state to disk, so a goal that
+exhausts its turn budget is simply re-run and resumes where it stopped.
+
+Read, in this order, before your first edit:
+  1. https://answersonlygodcangive.com/Regarding_Sacred_Names   (the governing line)
+  2. https://answersonlygodcangive.com/The_Name_of_The_Lord
+  3. RESTORED-NAMES-PLAN.txt  (what v1 did, its evidence, its exceptions)
+  4. tools/gen-restored-nt.mjs  (257 lines; the v1 applier you will replace)
+  5. app/src/main/assets/src/data/restored-names.test.js  (the existing guards)
+  6. CLAUDE.md  Permanent Rules 1-6 and the working-directory rules
+
+Do not begin adjudicating until section 2 and section 9 are internalized. The
+owner has rejected one delivery already for violating them.
+
+
+1. THE COMMISSION
+-----------------
+Examine EVERY instance of Jesus / Christ / the Christ / Messiah / Messias /
+christs across the New Testament of both base translations - 3,120 of them -
+INDIVIDUALLY. For each one, consult the underlying Greek, weigh the syntax and
+the context, and decide the appropriate restored English rendering of the Name.
+
+The owner's words, and the two halves that matter equally:
+
+  "appropriately restore YahuShua HaMashiach"      <- fidelity
+  "not just 'The Very HaMashiach', avoid awkward translations"   <- readability
+
+A rendering that is technically defensible but reads as broken English is a
+FAILED instance, not a stylistic quibble. See section 2 for why that is a
+doctrinal judgment and not merely an editorial one.
+
+This is explicitly NOT a batch job. A regex ruleset that happens to produce a
+correct output for an instance is not an adjudication of that instance. The
+deliverable is a per-instance decision record with reasoning, and only then a
+machine that applies those records.
+
+
+2. THE DOCTRINAL LINE (the boundary you must not cross in either direction)
+--------------------------------------------------------------------------
+Read Regarding_Sacred_Names in full before writing the rubric. Summarized, with
+the tension stated plainly:
+
+  AFFIRMED. YAHUWAH is the Father's name; YAHUSHUA HAMASHIACH is the Son's. The
+  Volumes of Truth command calling upon His name "as it is, was, and has always
+  been, and not as they presume it to be" (Death and Deliverance). This is the
+  warrant for the whole edition.
+
+  BOUNDED. The same teaching refuses name-exclusivism outright. It condemns the
+  self-appointed teachers who assert that only by a certain name can one be
+  saved. It states that He hears and knows regardless of the name or the tongue
+  by which people have come to know Him. The restoration of a pure language is
+  spoken of as future - "not yet." And Proclaim The Name of The Lord commands
+  speaking His name as it is "and also in the tongue of the hearer."
+
+WHAT THIS MEANS FOR YOUR TRANSLATION DECISIONS - this is the load-bearing part:
+
+  (a) "In the tongue of the hearer" makes readable English a REQUIREMENT of the
+      command, not a concession to it. A calque that no English reader can parse
+      has not been spoken in the hearer's tongue. Awkwardness is therefore a
+      conformance failure. This is the doctrinal ground for section 9.
+
+  (b) The edition is a reverent reading aid, not a polemic. Nothing you write -
+      not the verses, not the Settings explainer, not a commit message - may
+      imply that other renderings are invalid or that this spelling is required
+      for salvation. That posture is the exact thing the page condemns.
+
+  (c) Restore what is HIS. Do not manufacture Hebrew elsewhere. Other bearers of
+      the name keep their traditional rendering (the Matthew Study Bible's own
+      precedent governs: only The Messiah's name was restored). Established
+      English derivatives with independent meaning - "Christian", "antichrist" -
+      are words of the hearer's tongue and stay.
+
+  (d) When fidelity and readability genuinely conflict on a single instance,
+      say so in that row's rationale and choose the reading that a reverent
+      English reader would understand on first pass. Record the tension; do not
+      silently pick one.
+
+DELIVERABLE FROM THIS SECTION: the Settings > Bible Translation info panel
+(TranslationInfoDesc in SettingsScreen.jsx) must carry a plain statement that
+these editions are a personal reading aid, that the traditional renderings are
+not thereby condemned, and that He is not bound to one spelling. If it does not
+already say this, adding it is part of the final phase.
+
+
+3. WHY V1 FAILED, AND WHY THE UNIT OF WORK MUST CHANGE
+------------------------------------------------------
+v1 (2026-07-12) mapped every standalone "Christ" to "HaMashiach". Because Ha IS
+the definite article, that stranded English determiners in front of it:
+
+  KJV John 7:26   "the very HaMashiach"   = "the very THE-Messiah"
+  Acts 9:22       "very HaMashiach"
+  John 1:25, 6:69 "that HaMashiach"
+
+The 2026-07-20 re-audit fixed the defect class with a better rule (printed "the
+Christ" -> HaMashiach; every other Christ -> bare Mashiach) and pinned it with a
+corpus-wide guard. That rule is sound and the guard must survive. But a rule is
+still the wrong UNIT: it decides a category, then hopes every member of that
+category reads well. The owner is asking for the members to be decided.
+
+Concretely, what per-instance work can do that no ruleset can:
+  - choose between "HaMashiach" and "the Mashiach" for articular Greek based on
+    which one the surrounding sentence actually wants
+  - catch a verse where the restored token collides with a nearby word, a
+    quotation frame, a parallelism, or a gloss
+  - notice where the English word has no Greek counterpart at all (supplied)
+  - read the whole verse aloud and reject a stiff result
+
+The architecture in section 4 is what lets that coexist with the project's hard
+rule that generated outputs are never hand-edited.
+
+
+4. ARCHITECTURE: A DECISION LEDGER PLUS A DUMB APPLIER
+------------------------------------------------------
+This is the central design decision of v2. Do not deviate from it without
+raising it with the owner first.
+
+  tools/restored-nt-ledger.jsonl     <- 3,120 rows. ONE ROW PER INSTANCE.
+                                        Human-readable, diffable, reviewable.
+                                        THIS is the work product.
+
+  tools/gen-restored-nt.mjs          <- rewritten. No linguistic rules left in
+                                        it. It reads the ledger, applies each
+                                        decision at its exact coordinates,
+                                        asserts total coverage, emits overlays.
+
+  src/data/bible-rnkjv.js            <- regenerated. Never hand-edited. Ever.
+  src/data/bible-rkjv.js
+
+Why this shape:
+  - Every emitted byte traces to one adjudicated row with a rationale. That is
+    the auditable proof that this was not a batch job.
+  - Regeneration stays deterministic and reproducible, so Permanent Rules 1-2
+    (ASCII hyphens, ASCII delimiters) and check_balance.py are never at risk
+    from hand-editing a 180 KB data file.
+  - The ledger is RESUMABLE STATE. A /goal that runs out of turns is re-run and
+    picks up at the first row with decision == null.
+  - Coverage is a NUMBER, which is exactly what a /goal evaluator can check.
+
+Row schema (every field required unless marked optional):
+
+  {
+    "id":        "kjv|john|7|26|1",        translation|book|chapter|verse|occurrence
+    "tr":        "nkjv" | "kjv",
+    "book":      "john",                   bookId as used in NT[] in the generator
+    "ch":        "7",
+    "v":         26,
+    "occ":       1,                        1-based index of this instance in the verse
+    "surface":   "Christ",                 the exact English token as printed
+    "before":    "...but look! He speaks boldly... Do the rulers know indeed that this is truly the very ",
+    "after":     "? However we know where this Man is from...",
+    "greek": {
+      "found":     true,
+      "form":      "Christos",             the TR word aligned to this instance
+      "lemma":     "Christos",
+      "article":   "none" | "ho" | "tou" | "to" | "ton" | ...,
+      "case":      "nominative" | ... ,
+      "witness":   "Stephanus1550",        which TR edition the form was read from
+      "variant":   "Scrivener1894 agrees"  optional; note real TR-internal variance
+    },
+    "syntax":    "predicate-nominative",   role in the English clause
+    "supplied":  false,                    true when the English has no Greek counterpart
+    "decision":  "Mashiach",               MUST be one of the forms in section 8
+    "verseOut":  "...that this is truly the very Mashiach? However we know...",
+    "rationale": "English prints 'the very' before the token, so an article-bearing
+                  form would strand a determiner; TR reads anarthrous Christos in a
+                  predicate after 'this is truly'. Bare Mashiach keeps the sentence
+                  intact and reads naturally.",
+    "natural":   "pass",                   pass | tension | fail  (fail may not ship)
+    "flag":      null                      optional: raise to the owner
+  }
+
+Rules for the ledger itself:
+  - One JSON object per line. ASCII only in every field. No smart quotes, no en
+    or em dashes anywhere in "verseOut" or "decision" - the emitted text must
+    survive Permanent Rules 1-2 and check_balance.py verbatim.
+  - "verseOut" holds the FULL restored verse text, not the token. Awkwardness is
+    only visible in the whole sentence, so the whole sentence is the evidence.
+  - Rows are never deleted. A reconsidered row is edited in place and its
+    rationale states what changed and why.
+
+
+5. THE NUMBERS (your denominator; verified 2026-07-21)
+------------------------------------------------------
+  NKJV NT  1,558 instances across 1,218 verses
+             Jesus 975 | Christ 572 | JESUS 6 | christs 3 | Messiah 2
+  KJV  NT  1,562 instances across 1,222 verses
+             Jesus 977 | Christ 576 | JESUS 6 | Messias 2 | christs 1
+  TOTAL    3,120 instances   <- the ledger must contain exactly this many rows
+
+Sources walked: NT[] in tools/gen-restored-nt.mjs (27 books; Matthew is the
+'matthew-plain' key in both bases). NKJV verses come from books.js +
+matthew-plain.js; KJV from bible-kjv.js. Re-derive this count yourself in phase 1
+and STOP if it disagrees - a mismatch means the corpus changed under this brief.
+
+For reference, v1's changed-verse totals were 1,212 NKJV and 1,217 KJV. Your
+totals will differ; that is expected and the pinned counts in the test file are
+the deliberate tripwire you update at the end, never before.
+
+
+6. THE GREEK: SOURCE, PROVENANCE, CACHING
+-----------------------------------------
+Base text is the TEXTUS RECEPTUS, because that is the text the KJV and NKJV New
+Testaments translate. Using NA28/UBS5 here would be a category error: you would
+be judging a translation against a text it did not render.
+
+  - Preferred witness: Stephanus 1550. Cross-check Scrivener 1894 where they
+    differ. Both are public domain.
+  - Vendor the text into the repo under tools/tr-greek/ with a PROVENANCE.md
+    recording source URL, edition, retrieval date, and license, following the
+    VENDORED-LIBS.md convention already used in this project.
+  - Cache it. Do NOT re-fetch per turn: a /goal loop that hits the network every
+    turn is slow, fragile, and non-reproducible offline.
+
+Textual-criticism obligations, all of which must appear in the ledger:
+  - ALIGNMENT. English word order differs from Greek. Align by clause and by
+    lemma, not by position. Where you cannot align confidently, set
+    greek.found=false and say so - never invent a form.
+  - SUPPLIED WORDS. The KJV italicizes words with no Greek counterpart, and both
+    translations sometimes supply a proper name where the Greek has only a
+    pronoun or nothing. Mark supplied=true. A supplied "Jesus" is still restored
+    (the referent is the Lord), but the rationale must not claim Greek evidence
+    that is not there.
+  - TR-INTERNAL VARIANTS. Some instances exist in one TR edition and not another
+    (the longer "Lord Jesus Christ" readings especially). Record the variance in
+    greek.variant. Do not change what the English base prints - you are
+    restoring the Name in an existing translation, not re-editing its text.
+  - ARTICLE IS EVIDENCE, NOT VERDICT. v1 established, correctly, that Greek drops
+    the article after prepositions as pure syntax while Hebrew keeps it on a
+    definite title regardless (Delitzsch renders standalone Christos with the
+    article in both cases). So the Greek article informs the decision; the
+    ENGLISH determiner that is actually printed governs whether an article-
+    bearing form can be used at all. Section 9 is the hard constraint.
+  - CORROBORATION. Where a call is close, check how the restored-name editions
+    render it: CJB/Stern (Mashiach), the Cepher (HAMASHIACH), Delitzsch's Hebrew
+    NT. Cite which one you consulted in the rationale. They are witnesses, not
+    authorities - the doctrine and the English sentence outrank them.
+
+
+7. THE ADJUDICATION RUBRIC (what "examining an instance" means)
+--------------------------------------------------------------
+For each row, in this order:
+
+  1. READ THE VERSE. The whole verse, both before and after the token. For
+     narrative, read the surrounding two verses; pronoun referents cross verse
+     boundaries constantly in the Gospels and Acts.
+  2. IDENTIFY THE REFERENT. Is this the Lord, or another bearer (Bar-Jesus,
+     Justus, Joshua son of Nun)? Other bearers are UNCHANGED - decide and move
+     on.
+  3. LOCATE THE GREEK. Record form, lemma, article, case, witness. If it cannot
+     be aligned, say so.
+  4. CLASSIFY THE ENGLISH SYNTAX. What determiner, if any, is printed
+     immediately before? Is the token vocative, appositive, predicate,
+     genitive-of, possessive, construct-like ("His Christ", "the Lord's
+     Christ"), part of a name pair, or a naming formula ("call His name...")?
+  5. CHOOSE from the closed vocabulary in section 8.
+  6. WRITE THE FULL RESTORED VERSE into verseOut.
+  7. RE-READ verseOut AS A SENTENCE. Apply section 9. If it stumbles, go back to
+     step 5 and pick differently. Mark natural=pass only when it reads.
+  8. WRITE THE RATIONALE. It must reference BOTH the specific English words
+     adjacent to this instance AND what the Greek showed. A rationale that could
+     be pasted onto a different verse unchanged is not a rationale.
+
+Work in verse order within a book. Do not skip ahead to "the interesting ones."
+
+
+8. THE CLOSED DECISION VOCABULARY
+---------------------------------
+Every "decision" value must be one of these. Introducing a new form requires
+amending this section and flagging the owner - it is a doctrinal change, not an
+implementation detail.
+
+  YahuShua              the Lord, standing for "Jesus"
+  YahuShua's            possessive
+  YAHUSHUA              the naming verses and the cross inscriptions, where the
+                        capitals carry the meaning "YAH Is Salvation"
+                        (Matt 1:21, 1:25; Luke 1:31, 2:21; Matt 27:37; John 19:19)
+  YahuShua HaMashiach   the full Name pairs, both "Jesus Christ" and "Christ Jesus"
+  YahuShua HaMashiach's possessive of the pair
+  HaMashiach            definite title where the English wants NO determiner
+  the Mashiach          definite title where the English sentence wants one
+  Mashiach              anarthrous, name-like, construct, suffixed, vocative,
+                        appositive, predicate - any instance with no printed "the"
+  Mashiach's            possessive
+  Messiah / messiahs    where the English word is functioning as a common noun
+                        ("false christs" -> "false messiahs")
+  the Anointed          gloss-by-meaning, to avoid circular self-translation
+                        (John 1:41, 4:25: "...which is translated, the Anointed")
+  Joshua                Acts 7:45 and Heb 4:8 in the KJV only - referent is
+                        Joshua son of Nun; NKJV already reads Joshua
+  UNCHANGED             other bearers of the name; "Christian(s)"; "antichrist(s)"
+
+NOTE the deliberate addition of "the Mashiach" alongside "HaMashiach". v1 forced
+articular Greek to a single output. Per-instance work may choose whichever reads
+better in that sentence. Both are faithful; only one will usually be natural.
+
+STANDING DECISIONS TO RE-CONFIRM, NOT TO SILENTLY REVERSE. Each was decided by
+the owner. If your per-instance work now argues against one, FLAG IT with the
+evidence and let him call it. Do not just change it.
+  - PAIR ORDER. "Christ Jesus" is normalized to "YahuShua HaMashiach", the
+    commanded order (the VOT corpus writes it that way 121x and reversed 0x; the
+    KJV itself already reversed 11 TR pairs, so order was never held inspired).
+  - GENITIVE "of Christ" (~90 verses). v1 renders it bare, "gospel of Mashiach".
+    The Greek is articular (tou Christou), so "of the Mashiach" is defensible.
+    This is the ONE call the owner left explicitly open. Per-instance work is
+    exactly what should settle it - adjudicate each genitive on its own sentence
+    and report the pattern you found with your recommendation.
+  - "Christian(s)" and "antichrist(s)" are kept (the VOT corpus uses them 53x
+    and 16x respectively).
+
+
+9. THE NATURALNESS GATE (the "no awkward translations" law)
+-----------------------------------------------------------
+This is the owner's headline requirement and the reason v1 was rejected. It is
+enforced three ways: mechanically, by re-reading, and by test.
+
+MECHANICAL - these patterns are FORBIDDEN in any verseOut and must be pinned by
+a test that scans the emitted overlays. The existing corpus-wide guard in
+restored-names.test.js already covers the first one; keep it and extend it.
+
+  no determiner, adjective, or possessive immediately before HaMashiach:
+      the|a|an|this|that|these|those|very|same|own|true|
+      his|her|its|their|our|my|your|whose|which   +  HaMashiach
+  no "of the HaMashiach"
+  no doubled token: "HaMashiach HaMashiach", "Mashiach Mashiach", "YahuShua YahuShua"
+  no circular gloss: a verse containing a translation formula
+      ("which is translated", "which is to say", "being interpreted")
+      with the SAME restored token on both sides of it
+  no "the the", "a the", or any doubled article created by a substitution
+
+BY RE-READING - for every changed verse, read verseOut start to finish as
+English prose. Ask: would a reader who does not know Hebrew stumble here? Would
+they have to re-read to parse the sentence? If yes, choose differently. Record
+natural=pass. A row marked natural=fail may not ship; a row marked tension must
+carry a rationale explaining the trade and is surfaced to the owner.
+
+BY TEST - phase 3 adds guards to restored-names.test.js for every forbidden
+pattern above, each RED-proven against a synthetic bad row before it goes green.
+
+WORKED EXAMPLES, the shape of a right answer:
+
+  KJV John 7:26  "...this is truly the very Christ?"
+     WRONG  "the very HaMashiach"     stranded determiner, the original defect
+     RIGHT  "the very Mashiach"       English prints "the very"; keep it intact
+
+  "Thou art the Christ, the Son of the living God"
+     RIGHT  "Thou art HaMashiach, the Son of the living God"
+     ALSO OK "Thou art the Mashiach, ..."  - adjudicate which reads better here
+
+  Matt 26:68 vocative  "Prophesy to us, Christ!"
+     RIGHT  "Prophesy to us, Mashiach!"   direct address takes the bare form
+
+  Luke 2:11 appositive "Christ the Lord"
+     RIGHT  "Mashiach the Lord"           an article here would collide
+
+  John 1:41 gloss  "We have found the Messias, which is, being interpreted, the Christ"
+     RIGHT  "...found the Mashiach, which is, being interpreted, the Anointed"
+            translate the gloss BY MEANING or the verse translates a word into itself
+
+
+10. ANTI-BATCH GUARDS (how we prove this was per-instance work)
+--------------------------------------------------------------
+The owner has already received one delivery that was a rule dressed as an audit.
+These guards exist so the claim is checkable, not merely asserted. Build them
+into tools/validate-ledger.mjs and run it as part of every phase's proof.
+
+  COVERAGE      ledger row count == 3,120, and every instance found in the
+                source has a matching row id. Zero orphans in either direction.
+  COMPLETENESS  zero rows with decision == null, natural == null, or an empty
+                rationale, at the end of a slice.
+  ROOTEDNESS    every rationale contains at least one substring of five or more
+                consecutive words drawn from that verse's own before/after
+                context. A rationale that cites nothing local is auto-flagged.
+  NON-UNIFORMITY  report the distribution of rationale texts. Identical
+                rationale strings repeated across many rows are a mechanical
+                tell of batch-filling and must be investigated, not explained
+                away. Near-duplicates are acceptable only where the sentences
+                genuinely are near-duplicates, and the report must say so.
+  VOCABULARY    every decision value is in the section 8 list. Any other value
+                fails the run.
+  SPOT AUDIT    at the end of each slice, re-open a random sample of 25 rows
+                WITHOUT looking at the prior decision, re-adjudicate from the
+                verse and the Greek, then compare. Report agreement rate and
+                every disagreement with its resolution. An agreement rate below
+                roughly 90 percent means the slice needs rework, not a note.
+
+None of these guarantee good judgment. They guarantee that bad judgment cannot
+hide behind a uniform output.
+
+
+11. HARD PROJECT CONSTRAINTS (violating any of these fails the phase)
+---------------------------------------------------------------------
+  - NEVER hand-edit bible-rnkjv.js or bible-rkjv.js. They are generated. All
+    change flows ledger -> generator -> file.
+  - ASCII ONLY in emitted verse text: ASCII hyphen in ranges, ASCII quote
+    delimiters. Permanent Rules 1 and 2. check_balance.py must report ALL OK.
+  - NEW TESTAMENT ONLY. The Old Testament stays untouched; the YAHUWAH pass is a
+    separate, deliberately deferred phase and needs Hebrew-side work.
+  - CORPUS_VERSION must be bumped (currently c18) and the CORPUS_CONTENT_VERSION
+    in src/search/cache.js kept equal - the gate enforces it.
+  - The pinned changed-verse totals in restored-names.test.js are a deliberate
+    tripwire. Update them ONCE, at the end, with the new numbers stated in the
+    commit body. Never loosen a test to make a run go green.
+  - Every existing golden in restored-names.test.js must be RE-ADJUDICATED, not
+    deleted. If your per-instance decision differs from a v1 golden, that is a
+    finding to report, with reasoning - it is not permission to drop the test.
+  - Do not touch matthew.js. The Matthew Study Bible is already restored under
+    its own earlier convention and was deliberately left alone.
+  - Preserve the sparse-overlay architecture and the rnkjv/rkjv base chain.
+  - One logical commit. The pre-commit hook rebuilds bundles from the working
+    tree, so unrelated edits in the tree get baked into the commit's bundles.
+  - Gate stack for any phase that changes shipped files:
+        npm test | npm run lint | npm run typecheck | npm run validate:data
+        npm run build | npm run smoke:ci | python check_balance.py
+    Every one exits 0; smoke:ci reports 0 crashed and 0 console errors.
+
+
+12. PHASES AND THEIR /goal CONDITIONS
+-------------------------------------
+One goal per phase. Run them in order. Phase 2 repeats until the ledger is full.
+Append the gate-stack clause from section 11 to any phase that ships files.
+
+PHASE 0 - DOCTRINE AND METHOD
+  /goal RESTORED-NAMES-METHOD.md exists and is complete: it records, in my own
+  words, the doctrinal line from answersonlygodcangive.com/Regarding_Sacred_Names
+  and /The_Name_of_The_Lord including BOTH the command to restore the Name and
+  the explicit refusal of name-exclusivism; the full adjudication rubric from
+  RESTORED-NAMES-V2-BRIEF.txt section 7; the closed decision vocabulary from
+  section 8 with at least one worked example per form drawn from a real verse I
+  have looked up; and the naturalness gate from section 9 with its forbidden
+  pattern list. DONE means the file is written and I have pasted into the
+  transcript the section headings plus the worked examples. Constraints: no code
+  or data file is modified in this phase. Stop after 12 turns.
+
+PHASE 1 - CORPUS, GREEK, AND THE EMPTY LEDGER
+  /goal The instance ledger scaffold is built and verified. DONE means: (a)
+  tools/tr-greek/ contains a vendored public-domain Textus Receptus with a
+  PROVENANCE.md naming edition, source, retrieval date and license; (b)
+  tools/build-name-ledger.mjs enumerates every Jesus/Christ/Messiah/Messias/
+  christs instance in the New Testament of both bases and emits
+  tools/restored-nt-ledger.jsonl with one row per instance, every row carrying
+  id, tr, book, ch, v, occ, surface, before, after and a greek block, and
+  decision set to null; (c) the row count is exactly 3120 and I have pasted the
+  count command and its output, with the per-token breakdown matching
+  RESTORED-NAMES-V2-BRIEF.txt section 5 - if it does not match I stop and report
+  rather than adjusting the number; (d) tools/validate-ledger.mjs implements the
+  coverage, completeness, vocabulary and rootedness checks from section 10 and I
+  have pasted its output; (e) an alignment report states what percentage of
+  instances received a confident Greek alignment and lists every unaligned
+  instance for manual attention. Constraints: no decision is filled in this
+  phase; no shipped data file is modified; ASCII only. Stop after 25 turns.
+
+PHASE 2 - ADJUDICATION (repeat until the ledger is full)
+  Run this once per slice. Slices, chosen to balance instance volume, both
+  translations together so the same verse is judged once:
+     A: Matthew, Mark          D: Romans, 1-2 Corinthians, Galatians
+     B: Luke, John             E: Ephesians through Philemon
+     C: Acts                   F: Hebrews through Revelation
+
+  /goal Every ledger row in slice <A> is adjudicated. DONE means: zero rows in
+  the slice have decision, verseOut, rationale or natural unset, proven by
+  pasting `node tools/validate-ledger.mjs --slice <A>` showing 0 incomplete and
+  0 vocabulary violations and 0 rootedness flags; every decision was reached by
+  the section 7 procedure with the Greek consulted per instance; every verseOut
+  was re-read as a whole sentence against the section 9 forbidden patterns; and
+  I have run the section 10 spot audit on 25 random rows from the slice,
+  re-adjudicating them blind and pasting the agreement rate plus every
+  disagreement and its resolution. Constraints: no shipped file is modified in
+  this phase - the ledger is the only output; no rationale may be reused across
+  rows that do not share the same sentence; any instance where fidelity and
+  natural English conflict is marked natural=tension and listed in my summary
+  for the owner; any standing decision from section 8 that my evidence now
+  contradicts is FLAGGED, not changed. If the turn budget runs out, report the
+  first unadjudicated row id so the goal can be re-run to resume. Stop after 30
+  turns.
+
+PHASE 3 - APPLY, PROVE, LAND
+  /goal The restored-name editions are regenerated from the ledger and landed.
+  DONE means: (a) tools/gen-restored-nt.mjs is rewritten as a pure ledger
+  applier with no linguistic rules remaining in it, and it hard-fails if any
+  source instance lacks a ledger row or any ledger row fails to apply; (b) both
+  overlays are regenerated and I have pasted the new changed-verse totals for
+  NKJV-R and KJV-R; (c) restored-names.test.js is updated - the pinned totals
+  changed once, deliberately, and every pre-existing golden was re-adjudicated
+  rather than deleted, with any that now differ called out in my summary; (d)
+  new guards enforce every forbidden pattern from section 9, each RED-proven
+  against a synthetic bad verse before going green, and a coverage guard asserts
+  ledger rows == source instances; (e) CORPUS_VERSION is bumped and
+  CORPUS_CONTENT_VERSION matches; (f) the Settings translation info panel states
+  plainly that this is a personal reading aid and does not condemn traditional
+  renderings; (g) the full gate stack is pasted green - npm test, npm run lint,
+  npm run typecheck, npm run validate:data, npm run build, npm run smoke:ci,
+  python check_balance.py - every one exiting 0 with smoke:ci showing 0 crashed
+  and 0 console errors; (h) I have live-proven in the preview reader, with
+  pasted output, that KJV-R John 7:26 reads naturally, that at least one verse
+  from each decision-vocabulary form renders correctly, and that the rkjv-to-kjv
+  base chain still falls through on an Old Testament verse; (i)
+  RESTORED-NAMES-PLAN.txt and CLAUDE.md are updated and the work is committed as
+  ONE logical commit and pushed. Constraints: the overlays are never hand-edited;
+  no test is weakened or deleted to reach green; the Old Testament is untouched.
+  Stop after 30 turns.
+
+PHASE 4 - OPTIONAL, OWNER'S CALL
+  The letter-embedded nkjv{} footnote dictionaries and wtlb-scriptures.js still
+  quote Jesus/Christ in the scripture sheets opened from letters. Extending the
+  ledger to cover them is a separate commission. Do not start it unasked.
+
+
+13. DEFINITION OF DONE
+----------------------
+  - 3,120 ledger rows, every one adjudicated, every one with a rationale rooted
+    in its own verse and its own Greek.
+  - Zero forbidden patterns in the emitted text, enforced by RED-proven tests.
+  - Every changed verse reads as English a person could read aloud.
+  - The full gate stack green, live-proven in the reader, one commit, pushed.
+  - A summary to the owner that names: the totals, every natural=tension row,
+    every flagged standing decision, the genitive-of-Christ recommendation, and
+    the spot-audit agreement rates per slice.
+
+
+14. OUT OF SCOPE
+----------------
+  Old Testament YAHUWAH restoration (needs Hebrew-side analysis; deferred by the
+  owner). matthew.js. Any claim, anywhere, that one spelling is required. Any
+  change to a non-Lord bearer's name. Any edit to the base NKJV or KJV wording
+  beyond the Name itself - you are restoring a name inside an existing
+  translation, not producing a new one.
+================================================================================

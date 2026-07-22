@@ -16,11 +16,15 @@ import { ReadingDotContext } from './ResumeReadingNavBtn.jsx';
 import { AutoScrollContext } from './AutoScrollControl.jsx';
 import { clampLpm } from '../../hooks/use-autoscroll.js';
 
-/** End-of-page dwell before an auto-advance, clamped to a sane window. */
+/**
+ * End-of-page dwell before an auto-advance, in ms, clamped to the range the
+ * Settings slider offers (0 = no pause, 15s = a long sit with the closing
+ * line). Legacy preset values (1500/2500/4000/6000) all fall inside it.
+ */
 export function clampEndDwell(v) {
   const n = parseFloat(String(v));
   if (!Number.isFinite(n)) return 2500;
-  return Math.min(10000, Math.max(0, n));
+  return Math.min(15000, Math.max(0, n));
 }
 
 export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, updateSetting, children }) {

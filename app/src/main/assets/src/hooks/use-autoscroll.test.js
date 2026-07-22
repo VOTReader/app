@@ -140,8 +140,34 @@ describe('end target', () => {
     // The sentinel sits before the footnote list / ornament / chain-nav cards.
     // Targeting scrollHeight would grind the reader through all of it.
     const el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 3000 });
-    expect(computeEndTarget(/** @type {any} */ (el))).toBe(2200); // 3000 - 800
+    // Rest with the sentinel 2/3 down the viewport: 3000 - (800 * 2/3).
+    expect(computeEndTarget(/** @type {any} */ (el))).toBe(2467);
     expect(computeEndTarget(/** @type {any} */ (el))).not.toBe(4200); // scrollHeight - clientHeight
+  });
+
+  it('rests the last line in the READING ZONE, not against the bottom edge', () => {
+    // People read around the middle of the screen. Stopping with the end of
+    // the text at the viewport bottom (the old contentTop - clientHeight)
+    // leaves the final lines in the reader's periphery, never travelling
+    // through the place they actually read.
+    const clientHeight = 900;
+    const endTop = 4000;
+    const el = makeEl({ scrollHeight: 20000, clientHeight, endTop });
+    const target = computeEndTarget(/** @type {any} */ (el));
+    const restY = endTop - target;              // where the last line lands
+    expect(restY).toBeCloseTo(clientHeight * (2 / 3), 0);
+    expect(restY).toBeLessThan(clientHeight);   // strictly above the bottom edge
+    expect(restY).toBeGreaterThan(clientHeight / 2); // still in the lower half
+    // It asks for a third of a viewport MORE travel than the old behaviour.
+    expect(target).toBeGreaterThan(endTop - clientHeight);
+  });
+
+  it('bottoms out instead when the page cannot scroll that far', () => {
+    // "…or the scroll function is bottomed out": the extra third of a
+    // viewport is best-effort, never a demand the page cannot meet.
+    const el = makeEl({ scrollHeight: 1000, clientHeight: 800, endTop: 950 });
+    const max = 1000 - 800;
+    expect(computeEndTarget(/** @type {any} */ (el))).toBe(max);
   });
 
   it('falls back to the true maximum when no sentinel exists', () => {
@@ -306,9 +332,9 @@ describe('end of page', () => {
     state.lpm = 40;
     const ctrl = createAutoScroll(io);
     ctrl.start();
-    runFrames(state, 400, 50);
+    runFrames(state, 900, 50); // the rest point is now 1/3 viewport further
     expect(ctrl.getState().state).toBe('ended');
-    expect(state.el.scrollTop).toBe(100); // 900 - 800
+    expect(state.el.scrollTop).toBe(367); // 900 - (800 * 2/3)
     expect(state.advanced).toBe(0);
     ctrl.destroy();
   });
@@ -320,7 +346,7 @@ describe('end of page', () => {
     state.lpm = 40;
     const ctrl = createAutoScroll(io);
     ctrl.start();
-    runFrames(state, 400, 50);
+    runFrames(state, 900, 50); // the rest point is now 1/3 viewport further
     expect(ctrl.getState().state).toBe('enddwell');
     runTimers(state, 6000);
     expect(state.advanced).toBe(1);
@@ -335,7 +361,7 @@ describe('end of page', () => {
     state.lpm = 40;
     const ctrl = createAutoScroll(io);
     ctrl.start();
-    runFrames(state, 400, 50);
+    runFrames(state, 900, 50); // the rest point is now 1/3 viewport further
     expect(ctrl.getState().state).toBe('ended');
     expect(ctrl.getState().pauseReason).toBe('boundary');
     expect(state.advanced).toBe(0);
@@ -367,7 +393,7 @@ describe('end of page', () => {
     state.lpm = 40;
     const ctrl = createAutoScroll(io);
     ctrl.start();
-    runFrames(state, 400, 50);
+    runFrames(state, 900, 50); // the rest point is now 1/3 viewport further
     state.restoring = true;
     runTimers(state, 6000);
     expect(state.advanced).toBe(1);

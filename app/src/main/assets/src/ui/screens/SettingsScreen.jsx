@@ -61,18 +61,50 @@ function TextSizeSliderRow({ value, onChange }) {
    from a measured line height, so this number means the same thing at every
    text size. The words/min estimate assumes ~9 words per line on a phone —
    it's an orientation aid, not a promise. */
-const AUTOSCROLL_DWELL_OPTIONS = [
-  { id: '1500', label: 'Brief · 1.5s', desc: 'Barely a beat before the next page.' },
-  { id: '2500', label: 'Standard · 2.5s', desc: 'Enough to notice the countdown and cancel. Default.' },
-  { id: '4000', label: 'Relaxed · 4s', desc: 'A clear pause between pages.' },
-  { id: '6000', label: 'Long · 6s', desc: 'Time to sit with the closing line.' },
-];
+function AutoScrollDwellRow({ value, onChange }) {
+  const ms = clampEndDwell(value);
+  const secs = Math.round(ms / 100) / 10;
+  return (
+    <div className="settings-row">
+      <div className="settings-row-head">
+        <span className="settings-row-label">Auto-Continue Pause</span>
+        <span className="settings-row-grow" />
+        <span className="settings-row-value">{secs === 0 ? 'None' : secs + 's'}</span>
+      </div>
+      <div className="txtsize-controls">
+        <input
+          type="range"
+          className="txtsize-slider"
+          min="0"
+          max="15000"
+          step="500"
+          value={ms}
+          onChange={(e) => onChange(String(clampEndDwell(e.target.value)))}
+          aria-label="Pause before continuing to the next page, in seconds"
+        />
+        <span className="txtsize-value">{secs === 0 ? '0s' : secs + 's'}</span>
+        <button
+          type="button"
+          className="txtsize-reset"
+          disabled={ms === 2500}
+          onClick={() => onChange('2500')}
+        >Reset</button>
+      </div>
+      <div className="settings-row-desc">
+        How long to wait at the end of the text before moving to the next page.
+        The countdown stays visible on the pill the whole time, and tapping
+        Cancel stops it. Very short pages hold a little longer than this so a
+        run of brief entries can’t flick past.
+      </div>
+    </div>
+  );
+}
 
-function AutoScrollSpeedRow({ value, disabled, onChange }) {
+function AutoScrollSpeedRow({ value, onChange }) {
   const v = clampLpm(value);
   const wpm = Math.round(v * 9);
   return (
-    <div className={'settings-row' + (disabled ? ' is-disabled' : '')}>
+    <div className="settings-row">
       <div className="settings-row-head">
         <span className="settings-row-label">Scroll Speed</span>
         <span className="settings-row-grow" />
@@ -86,7 +118,6 @@ function AutoScrollSpeedRow({ value, disabled, onChange }) {
           max="40"
           step="1"
           value={v}
-          disabled={disabled}
           onChange={(e) => onChange(String(clampLpm(e.target.value)))}
           aria-label="Auto-scroll speed in lines per minute"
         />
@@ -94,7 +125,7 @@ function AutoScrollSpeedRow({ value, disabled, onChange }) {
         <button
           type="button"
           className="txtsize-reset"
-          disabled={disabled || v === 16}
+          disabled={v === 16}
           onClick={() => onChange('16')}
         >Reset</button>
       </div>
@@ -1061,28 +1092,32 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={!!settings.autoScroll}
               onToggle={() => onToggle("autoScroll")}
             />
-            <AutoScrollSpeedRow
-              value={settings.autoScrollLpm || "16"}
-              disabled={!settings.autoScroll}
-              onChange={(v) => onSetting("autoScrollLpm", v)}
-            />
-            <SettingsRow
-              label="Auto-Continue"
-              desc="When auto-scroll reaches the end of the text, count down and move to the next chapter or letter on its own. It stops at the end of a book, a volume, or a study rather than crossing into a different collection — and it stops after a long unattended run."
-              checked={!!settings.autoScrollNext}
-              onToggle={() => onToggle("autoScrollNext")}
-              disabled={!settings.autoScroll}
-              disabledReason="Turn on Auto-Scroll to use Auto-Continue."
-            />
-            <SelectField
-              eyebrow="Reading"
-              title="Auto-Continue Pause"
-              label="Auto-Continue Pause"
-              desc="How long to wait at the end of the text before moving to the next page. The countdown is visible on the pill the whole time, and tapping Cancel stops it."
-              value={String(settings.autoScrollEndMs || "2500")}
-              options={AUTOSCROLL_DWELL_OPTIONS}
-              onChange={(v) => onSetting("autoScrollEndMs", v)}
-            />
+            {/* Auto-scroll's sub-settings are COLLAPSED, not merely disabled,
+                while the feature is off: a greyed control still occupies the
+                page and still reads as something you might be able to use.
+                They are unmounted, so they are also unreachable by tab/screen
+                reader. Auto-Continue Pause nests one level deeper — it means
+                nothing at all unless Auto-Continue is on. */}
+            {!!settings.autoScroll && (
+              <>
+                <AutoScrollSpeedRow
+                  value={settings.autoScrollLpm || "16"}
+                  onChange={(v) => onSetting("autoScrollLpm", v)}
+                />
+                <SettingsRow
+                  label="Auto-Continue"
+                  desc="When auto-scroll reaches the end of the text, count down and move to the next chapter or letter on its own. It stops at the end of a book, a volume, or a study rather than crossing into a different collection — and it stops after a long unattended run."
+                  checked={!!settings.autoScrollNext}
+                  onToggle={() => onToggle("autoScrollNext")}
+                />
+                {!!settings.autoScrollNext && (
+                  <AutoScrollDwellRow
+                    value={settings.autoScrollEndMs || "2500"}
+                    onChange={(v) => onSetting("autoScrollEndMs", v)}
+                  />
+                )}
+              </>
+            )}
             <SelectField
               eyebrow="Reading"
               title="Scripture Browser"
