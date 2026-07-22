@@ -821,11 +821,28 @@ class MainActivity : AppCompatActivity(), BridgeHost {
      * the cycle just repeats once more and lands back here.
      */
     private fun showRendererCrashRetryView() {
+        val message = "The page stopped responding. Tap to reload."
         val tv = TextView(this).apply {
-            text = "The page stopped responding. Tap to reload."
+            text = message
             gravity = Gravity.CENTER
             textSize = 18f
             setPadding(48, 48, 48, 48)
+            // A11y: the whole screen was just replaced under the user with no
+            // announcement — a screen-reader user would otherwise get silence
+            // at exactly the moment the app failed. Mark this as a heading (so
+            // it's a navigable landmark), give it a button role + full-sentence
+            // description including the tap action, and announce the change.
+            ViewCompat.setAccessibilityHeading(this, true)
+            contentDescription = "$message Double-tap anywhere to reload the app."
+            ViewCompat.setAccessibilityDelegate(this, object : androidx.core.view.AccessibilityDelegateCompat() {
+                override fun onInitializeAccessibilityNodeInfo(
+                    v: android.view.View,
+                    info: androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+                ) {
+                    super.onInitializeAccessibilityNodeInfo(v, info)
+                    info.className = android.widget.Button::class.java.name
+                }
+            })
             setOnClickListener {
                 vm.renderRecoveryCount = 0
                 vm.firstRecoveryMs = 0L
@@ -837,6 +854,14 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             }
         }
         setContentView(tv)
+        // Announce AFTER attach (post): a detached view drops the announcement.
+        // announceForAccessibility is soft-deprecated in favour of live regions,
+        // but for a ONE-SHOT "the screen just changed and here's why" it remains
+        // the correct + simplest call, and it works on the whole API 26+ range
+        // (a live region announces on content change, not reliably on first
+        // attach). Same deliberate-deprecation idiom as the Vibrator path.
+        @Suppress("DEPRECATION")
+        tv.post { tv.announceForAccessibility(message) }
     }
 
     private fun injectInsets() {
