@@ -29,8 +29,9 @@
         "tests pass but production breaks."
 
    All setters are vi.fn() — useNav's contract is the call shape, not
-   end-to-end persistence. The setters' real implementations live in
-   useTabs (tabField) / useState, both covered by their own tests.
+   end-to-end persistence. In production the setters come from useTabs'
+   tabField, whose cached setter-identity invariant and write behavior
+   are pinned by use-tabs.test.js (P6k).
 */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
