@@ -236,10 +236,10 @@ callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")
 
 ## 10. Latent / dead bridges
 
-### `__openScriptureSheet` — **NO SETTER**
-- **Setter:** `(none found in repo)` — every reference is a `typeof window.__openScriptureSheet === 'function'` guard
-- **Consumer:** `src/ui/screens/JournalViewerScreen.js:570-571` — checks before calling; the guard means the call is a silent no-op
-- **Status:** The guard was added defensively but no setter was ever wired. Either the feature was abandoned mid-flight or it's a forward stub. **Action item:** decide whether to wire it (set in App() with a scripture-sheet opener) or remove the consumer code. Don't leave it as a permanent no-op.
+### `__openScriptureSheet` — **RESOLVED 2026-07-12 (dead-UI sweep) — bridge removed, consumer rewired**
+- **Setter:** never existed — every reference was a `typeof window.__openScriptureSheet === 'function'` guard
+- **Consumer (rewired):** `JournalViewerScreen` — the guard made the tap on an inline journal `{{ref:Book C:V}}` gold link a silent no-op
+- **Resolution (2026-07-12):** the open action item on this bridge was settled by removing the bridge path, not by wiring a setter. Journals have no per-entry scriptures dict to feed a sheet, so `onScriptureRef` (`src/ui/screens/JournalViewerScreen.jsx` ~:550) now navigates straight to the verse instead: `parseRefStr` → `findBook` → `onNavigateToLink({type:'bible', bookId, chapter, verse[, verseEnd]})`, firing `window.__loadBibleCorpus()` with a 40×250ms retry when the lazy Bible corpus isn't resolvable yet. Verified 2026-07-22: no setter and no guarded consumer remain in `src/` — the name survives only in a historical comment at that callsite and in the regression test `JournalViewerScreen.menu.test.jsx` ("inline {{ref:}} links actually navigate (dead-UI sweep 2026-07-12)"). Entry kept as a tombstone so those surviving references stay greppable; no live bridge.
 
 ---
 

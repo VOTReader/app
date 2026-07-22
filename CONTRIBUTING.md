@@ -1,7 +1,9 @@
 # Contributing to VOTReader/app
 
-> Last updated: 2026-05-10. See **PLAN.txt** for the live improvement plan
-> and **CLAUDE.md** for stable project knowledge.
+> Last updated: 2026-07-22 (corrected — rewritten against the current tree;
+> the pre-modularization description that lived here since 2026-05-10 was
+> badly stale). See **PLAN.txt** for the live working plan and **CLAUDE.md**
+> for stable project knowledge.
 
 ---
 
@@ -20,17 +22,29 @@ files), but only edit on D:.
 
 ### PC (development)
 
-The simplest path is to open `app/src/main/assets/index.html` directly in a
-browser. The app is a self-contained single-file React app.
-
-For a more realistic dev environment (so relative URLs resolve correctly
-and you can test service-worker-style features later), run an HTTP server:
+The app is a modular ES-module build, not a single file — `index.html` loads
+prebuilt `dist/bundle-*.js` files, so you must build before previewing:
 
 ```bash
-cd app/src/main/assets
-python -m http.server 8090
-# Then visit http://localhost:8090/index.html
+git config core.hooksPath .githooks   # one-time: activate the pre-commit hook
+npm install                           # node_modules/ is gitignored
+npm run build                         # bundle-a (tools/build.py) + esbuild b/c/d/e/css + CSP + SW sync
 ```
+
+Then serve with the project's preview server and open `index.html`:
+
+```bash
+python tools/preview-server.py
+```
+
+**Do not use plain `python -m http.server`** — it caches `dist/bundle-*.js`
+heuristically and serves stale bundles after a rebuild. `preview-server.py`
+sends `Cache-Control: no-store` so reloads always fetch fresh bundles.
+
+To verify a boot, paste `tools/smoke.js` into the page console and call
+`votSmoke()` — expect the PASS line (globals ok, data ok, screens 0 crashed,
+console.error 0, resource404 0). `npm run smoke:ci` runs the same walk
+headless (puppeteer).
 
 ### Android APK
 
@@ -42,14 +56,14 @@ Build with Gradle:
 ```
 
 The Android shell is a thin WebView (`MainActivity.kt`) that loads
-`index.html` from assets. All UI lives in the HTML/JS — there is no
+`index.html` from assets. All UI lives in the JS bundles — there is no
 native Kotlin rendering.
 
 ---
 
 ## Validating data
 
-Run this after any data file edit:
+Run this after any corpus data edit:
 
 ```bash
 python check_balance.py
@@ -64,47 +78,82 @@ This catches three classes of bugs that ALL cause a black-screen failure:
 Other validators:
 
 ```bash
-python misattribution_check.py     # MTAM letter-link audit
-python excerpt_audit.py            # verify excerpt source titles exist
-python ocr_gap_check.py            # OCR coverage check (only if you ran OCR)
+npm run validate:data             # Format A/B/C/D/E schema validator (tools/validate-schemas.js --strict)
+npm run check:footnotes           # footnote-render audit gate
+python misattribution_check.py    # MTAM letter-link audit
+python excerpt_audit.py           # verify excerpt source titles exist
+python ocr_gap_check.py           # OCR coverage check (only if you ran OCR)
 ```
 
-See **CLAUDE.md** "Quick start" section for the full bug taxonomy.
+See **CLAUDE.md** "Quick start" section for the full black-screen bug
+taxonomy.
 
 ---
 
 ## Architecture overview
 
-The whole app is one file: `app/src/main/assets/index.html` (~12,500 lines,
-~708 KB). It's a pre-compiled React 18 app — raw `React.createElement`,
-no JSX, no bundler.
+Modularization (Phase 3 in the old plan) has long since landed. The app is
+~240 ES modules (non-test `.js`/`.jsx`, verified 2026-07-22) under
+`app/src/main/assets/src/`, built into classic-script IIFE bundles under
+`dist/`. `index.html` (619 lines) is boot infrastructure + data constants +
+the bundle load sequence; the `App()` composition root lives in
+`src/app.jsx` and is held at **≤800 lines** by the `tools/check-app-size.js`
+canary (currently 798).
 
 **Key files:**
 
 ```
 app/src/main/assets/
-├── index.html             ← THE WHOLE APP
-├── search.js              FlexSearch-based search engine (~1,500 lines)
-├── search-data.js         search data dictionaries (~600 lines)
-├── react.min.js, react-dom.min.js
-├── flexsearch.min.js, html2canvas.min.js
-├── data-schema.d.ts       NEW: unified schema for Phase 2 (design only)
-├── data-normalize.js      NEW: normalizer skeleton (Phase 2 starting point)
-└── data/                  ~28 data files, ~46 MB total
-    ├── volume-{one..seven}.js     Volumes 1-7
-    ├── lords-rebuke.js, letters-flock.js, letters-timothy.js
-    ├── wtlb-{one,two}.js, wtlb-scriptures.js
-    ├── the-blessed.js, holy-days.js, hidden-manna.js
-    ├── matthew.js, matthew-nkjv.js, matthew-plain.js
-    ├── bible-studies.js
-    ├── books.js, books-restored.js
-    └── bible-{kjv,asv,bsb,hnv,lsv,web,ylt}.js  (lazy-loaded alts)
+├── index.html                boot infra + data constants + bundle load sequence
+├── app.css                   static CSS → esbuild → dist/app.min.css
+├── react.min.js, react-dom.min.js, search-data.js
+│                             build inputs, concatenated into bundle-a
+│                             (excluded from the APK — see VENDORED-LIBS.md)
+├── html2canvas.min.js        shipped standalone, lazy-loaded for web thumbnails
+├── manifest.json, service-worker.js, offline.html, icons/   PWA layer
+├── dist/                     8 bundles + app.min.css, regenerated by npm run build
+│   ├── bundle-a.js           vendor (react/react-dom raw) + small corpus + search data
+│   ├── bundle-a-bible.js     lazy NKJV corpus (loaded via __loadBibleCorpus)
+│   ├── bundle-a-matthew.js   lazy Matthew Study Bible corpus
+│   ├── bundle-a-vot.js       lazy VOT collections corpus (volumes, letters, WTLB, …)
+│   ├── bundle-b.js           stores (esbuild, src/stores/_entry-b.js)
+│   ├── bundle-c.js           renderer/annotation engine (src/renderer/_entry.js)
+│   ├── bundle-d.js           UI screens/components/sheets (src/ui/_entry-d.js)
+│   └── bundle-e.js           search UI + MiniSearch engine (src/ui/_entry-e.js)
+└── src/
+    ├── app.jsx               function App() — composition root (≤800-line canary)
+    ├── data/                 scripture-resolution.js (COLLECTIONS registry) + corpus files
+    ├── stores/               localStorage/IndexedDB-backed stores
+    ├── renderer/             annotation-engine, dom-links, dom-bookmarks, dom-journal-chip
+    ├── hooks/                App()-level hooks (sheet orchestration, pager, autoscroll, …)
+    ├── ui/
+    │   ├── screen-routes.jsx buildScreenRoutes factory — the ROUTES table
+    │   ├── screens/          reading + index + hub screens
+    │   ├── components/       shared components
+    │   └── sheets/           sheets/pickers
+    ├── search/               MiniSearch engine (search-config.js is the single index shape)
+    ├── utils/                helper modules (platform-bridge, storage-health, backup, …)
+    ├── components/           ExpandableText, ErrorBoundary
+    └── styles/               journal-styles
 ```
 
-**Central registry:** the `COLLECTIONS` array in index.html (~line 3414)
-is the source of truth for all 15 content collections. Lookup maps
-(`COL_BY_KEY`, `COL_BY_CARD`, `COL_BY_LETTER_SC`, etc.) derive from it.
-When adding/removing/renaming a collection, edit COLLECTIONS first.
+**Build pipeline** (`npm run build`): `tools/build.py` concatenates bundle-a
+(raw vendor + PF2-minified data members) and the three lazy corpus bundles
+(esbuild-minified); esbuild (`--format=iife --target=chrome108 --minify`)
+builds bundles b/c/d/e and `app.min.css`; then `tools/sync-csp-hashes.js`
+syncs CSP `script-src` sha256 hashes and `tools/sync-sw-version.js` bumps
+the service-worker content-hash version.
+
+**Central registry:** the `COLLECTIONS` array in
+`src/data/scripture-resolution.js` is the source of truth for the 15 content
+collections. Lookup maps (`COL_BY_KEY`, `COL_BY_CARD`, `COL_BY_LETTER_SC`,
+etc.) derive from it. When adding/removing/renaming a collection, edit
+COLLECTIONS first. Corpus content edits must bump `CORPUS_VERSION` — the
+`npm run check:corpus` gate enforces the lock.
+
+**window.\_\_ bridges:** imperative escape hatches between bundles are
+registered in **BRIDGES.md** — add/remove/rename entries in the same commit
+as the code change.
 
 ---
 
@@ -116,36 +165,68 @@ When adding/removing/renaming a collection, edit COLLECTIONS first.
 3. **No regex at file scope.** Local string replacements only.
 4. **Preserve other entries.** When editing letter N in a multi-letter file,
    only touch letter N.
-5. **Verify after every batch.** Open the app, check the affected screen.
+5. **Verify after every batch.** Run the gates, preview the affected screen.
 6. **Format-preserving.** Volume Two uses unquoted JS keys (`id: "..."`);
    other volumes use JSON-quoted (`"id": "..."`). Match the file's
-   existing format. (Phase 2 will unify this.)
+   existing format.
+7. **New App()-level concerns go in a hook** under `src/hooks/`, not inline
+   in `app.jsx` — the size canary fails the commit otherwise.
+
+---
+
+## Gates, tests, and commit flow
+
+The versioned pre-commit hook (`.githooks/pre-commit`; activate with
+`git config core.hooksPath .githooks`) runs, gated on what's staged:
+
+- `check_balance.py` + `validate-schemas.js --strict` when corpus data changes
+- `eslint --max-warnings 0` on staged source files (lint-staged)
+- `tsc --noEmit` (checkJs; zero-tolerance) on source changes
+- `vitest run` — the full suite — on source changes
+- `npm run build` + re-stage when bundle sources change (bundles always land
+  in sync with source)
+
+CI mirrors these plus `check:csp`, `check:corpus`, `check:app-size`,
+`validate:data`, `check:footnotes`, and the headless smoke walk.
+
+**Test stack:** vitest + jsdom + `fake-indexeddb` +
+`@testing-library/react`; React-as-global and `window.__*` bridge stubs live
+in `vitest.setup.js`. Run with `npm run test` (or
+`./node_modules/.bin/vitest run`). **Test culture is RED-first:** a fix
+lands with a test that fails against the pre-fix code, then passes — say so
+in the commit. Counts drift; don't copy a test/file count from docs into
+commit messages without re-running.
+
+**Commit flow:** solo project — work commits directly to `main`, no PR
+process. Conventional-commit style subjects (`feat(scope): …`, `fix(…): …`,
+`test(…): …`, `docs: …`). Emergency hook bypass: `git commit --no-verify`
+(not recommended).
 
 ---
 
 ## Coordinating with parallel work
 
-This project may have multiple Claude sessions running concurrently. The
+This project may have multiple agent sessions running concurrently. The
 authoritative coordination document is **PLAN.txt** at the project root.
 Before making non-trivial changes:
 
-1. Re-read **PLAN.txt** for the current phase and active work.
-2. Check **CLAUDE.md** for stable conventions and the bug taxonomy.
-3. If you're starting a new feature or refactor, update PLAN.txt to claim
-   the work area before starting.
+1. Re-read **PLAN.txt** for the current priorities and claimed work areas.
+2. Check **CLAUDE.md** "Current state" for what just landed, and its
+   "Permanent rules" / "Editing principles" for conventions.
+3. If you're starting a new feature or refactor, note the work area in
+   PLAN.txt before starting.
 
-**Currently in progress (parallel session):**
-- **Notebooks feature** — UI for organizing notes by topic, in
-  `src/ui/screens/Library*` and related sheets. The data model already
-  exists in `NoteStore` (`notebookIds[]` field). Do NOT touch
-  `AnnotationStore` / `NoteStore` core in ways that conflict.
+Notebooks, journals, and the `NoteStore` data model all shipped long ago —
+they are production code now, so normal editing discipline applies (there is
+no "do not touch" embargo). The historical Phase 0–5 plan in PLAN.txt is
+closed; treat phase references as history.
 
 ---
 
 ## Common bug patterns to avoid
 
-The renderer has known data-quality patterns documented in CLAUDE.md
-section 6.6 as **D1 through D10**. Most common:
+The data-quality bug taxonomy (**D1 through D10**) lives in
+**ARCHITECTURE.md §6.6**. Most common:
 
 - **D3** — orphaned `[N]` brackets in body text (legacy footnote markers
   not converted to `{t:'fn',v:'N'}` segments)
@@ -162,38 +243,38 @@ hide future regressions.
 
 ## Getting started checklist
 
-1. Read **PLAN.txt** end-to-end — understand the 5-phase improvement strategy.
-2. Read **CLAUDE.md** sections 1-7 — understand the app's architecture and
-   the current data formats.
-3. Open `app/src/main/assets/index.html` in a browser — explore the app
-   from a user perspective.
-4. Run `python check_balance.py` — confirm your data files pass.
-5. Pick a Phase 1 task from PLAN.txt (smallest scope) — execute, verify,
-   move on.
+1. Read **CLAUDE.md** end-to-end — the 30-second briefing, permanent rules,
+   and current state.
+2. Read **PLAN.txt** — live priorities and claimed work areas (the Phase
+   0–5 sections are closed history).
+3. Run the health check: `git config core.hooksPath .githooks`,
+   `npm install`, `npm run build`.
+4. Run `npm run test` — confirm the suite is green on your machine.
+5. Preview via `python tools/preview-server.py`, run `votSmoke()` from
+   `tools/smoke.js`, and explore the app from a user perspective.
+6. Pick a task from PLAN.txt (smallest scope) — execute RED-first, run the
+   gates, verify, commit.
 
 ---
 
 ## Where to put new code
 
-Until Phase 3 (modularization) lands, all code goes into `index.html`.
-After Phase 3, the layout will be:
+The modular layout is the reality described in the Architecture overview
+above. Follow the layer rules: pure logic before atoms, atoms before sheets,
+sheets before screens. Concretely:
 
-```
-app/src/main/assets/
-├── index.html             ← thin shell (boot only)
-├── src/
-│   ├── stores/            ← localStorage-backed stores
-│   ├── data/              ← COLLECTIONS, scripture-refs, nav-index
-│   ├── hooks/             ← custom React hooks
-│   ├── ui/
-│   │   ├── atoms/         ← NavButtons, HomeBtn, etc.
-│   │   ├── sheets/        ← NoteSheet, LinkPicker, etc.
-│   │   └── screens/       ← LetterView, BibleChapterView, etc.
-│   ├── App.js             ← root component
-│   └── boot.js            ← CSS injection + ReactDOM mount
-└── (data/ unchanged)
-```
+- **New App()-level concern** (state + effects) → a hook under
+  `src/hooks/`, called from `app.jsx`. The composition root must stay
+  ≤800 lines (`npm run check:app-size`).
+- **New UI** → `src/ui/components/` (shared), `src/ui/sheets/`
+  (sheets/pickers), or `src/ui/screens/` (screens); register screens in
+  `src/ui/screen-routes.jsx`.
+- **New persisted state** → a store under `src/stores/`.
+- **New pure logic** → `src/utils/` (or `src/data/` for corpus/registry
+  concerns), with a colocated `*.test.js(x)`.
+- **New `window.__*` bridge** → register it in **BRIDGES.md** in the same
+  commit.
 
-When Phase 3 lands, follow the layer rules: pure logic before atoms,
-atoms before sheets, sheets before screens. See PLAN.txt §3.3 for the
-modularization order.
+After any source change, `npm run build` regenerates the bundles — the
+pre-commit hook does this automatically and stages the output, so a commit
+never lands with bundles out of sync with source.
