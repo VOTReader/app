@@ -31,6 +31,15 @@ class StorageManager(private val context: Context) {
      * and any URI whose provider does not expose a size -- the Export
      * format is one we own end-to-end, so an unknown size is suspicious
      * enough to refuse rather than read blindly.
+     *
+     * The declared size (OpenableColumns.SIZE) is only a HINT from the
+     * content provider: a buggy or malicious provider can declare a small
+     * size and then stream gigabytes. That's why the actual read goes
+     * through [readBounded] with the same [maxBytes] cap — enforcing the
+     * cap on the bytes really pulled from the stream, not just on the
+     * declared number, is what makes the OOM protection real. An
+     * over-delivering stream fails as "too_large", the same reason the
+     * declared-size check uses, so the JS side sees one failure mode.
      */
     fun readUriAsBase64(
         uri: Uri,
@@ -46,9 +55,22 @@ class StorageManager(private val context: Context) {
             return Result.Failure("too_large")
         }
         return try {
-            val bytes = context.contentResolver.openInputStream(uri)
-                ?.use { it.readBytes() }
-                ?: ByteArray(0)
+            val stream = context.contentResolver.openInputStream(uri)
+            val bytes = if (stream == null) {
+                ByteArray(0)
+            } else {
+                // Bounded read: a provider that lied about the size stops
+                // here instead of inflating into an OOM. (readBytes() was
+                // the unbounded pre-fix call.)
+                stream.use { readBounded(it, maxBytes) }
+                    ?: run {
+                        Timber.w(
+                            "Import rejected: stream exceeded %d bytes despite declared size=%d",
+                            maxBytes, size
+                        )
+                        return Result.Failure("too_large")
+                    }
+            }
             Result.Success(Base64.encodeToString(bytes, Base64.NO_WRAP))
         } catch (e: Exception) {
             Timber.w(e, "Import file read failed")
@@ -217,6 +239,9 @@ class StorageManager(private val context: Context) {
      * if the last frame was left short). [commit] false → close + best-effort
      * delete the partial document at [uri] so a truncated, misleading-looking
      * backup is never left behind (the only-backup must fail clean).
+     * The commit path applies the same cleanup when flush()/close() throws:
+     * the bytes already written leave a possibly-truncated container on disk
+     * that would only fail at import time, so the exception path deletes too.
      */
     fun finishV3Export(commit: Boolean, uri: Uri?): Result<Unit> = synchronized(v3Lock) {
         val out = exportOut ?: return Result.Failure("no_session")
@@ -240,6 +265,10 @@ class StorageManager(private val context: Context) {
             }
         } catch (e: Exception) {
             Timber.w(e, "finishV3Export failed")
+            // A failed flush/close means the destination may hold a truncated
+            // container — same cleanup contract as the abort / incomplete-frame
+            // paths: never leave a partial backup behind.
+            uri?.let { deleteDocumentQuietly(it) }
             Result.Failure(e.message ?: "finish_failed")
         }
     }
@@ -396,7 +425,8 @@ class StorageManager(private val context: Context) {
     }
 
     /** Read the whole stream into memory, or null if it exceeds [max] bytes
-     *  (the legacy-backup safety cap — v3 streaming has no such cap). */
+     *  (the safety cap for whole-file reads: the legacy-backup import path
+     *  and readUriAsBase64's picked-file read — v3 streaming has no such cap). */
     private fun readBounded(input: InputStream, max: Long): ByteArray? {
         val out = java.io.ByteArrayOutputStream()
         val buf = ByteArray(64 * 1024)

@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Base64
 import io.mockk.clearAllMocks
@@ -241,6 +242,46 @@ class StorageManagerTest {
         // Decoding the result must yield the original bytes.
         val decoded = Base64.decode(result.value, Base64.NO_WRAP)
         assertTrue(decoded.contentEquals(bytes))
+    }
+
+    @Test
+    fun `readUriAsBase64 rejects a lying provider whose stream over-delivers past maxBytes`() {
+        // REGRESSION (OOM): OpenableColumns.SIZE is only what the provider
+        // DECLARES — a buggy or malicious provider can claim 10 bytes and
+        // then stream gigabytes. The pre-fix code trusted the declared size
+        // and then called the UNBOUNDED InputStream.readBytes(), so the
+        // 50 MB cap was defeated and the app OOM'd. The cap must be enforced
+        // on the bytes actually pulled from the stream (the same readBounded
+        // helper the legacy import path uses).
+        val uri = Uri.parse("content://test/lying-provider")
+        every { cr.query(uri, any(), null, null, null) } returns
+            sizeCursor(10L)                                     // declares 10 B
+        val maxBytes = 1024L
+        val streamSize = 256 * 1024                             // actually yields 256 KB
+        var bytesRead = 0
+        every { cr.openInputStream(uri) } returns object : InputStream() {
+            private var remaining = streamSize
+            override fun read(): Int = if (remaining-- > 0) 0 else -1
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (remaining <= 0) return -1
+                val n = minOf(len, remaining)
+                remaining -= n
+                bytesRead += n
+                return n
+            }
+        }
+
+        val result = storage.readUriAsBase64(uri, maxBytes)
+        assertIs<StorageManager.Result.Failure>(result)
+        assertEquals("too_large", result.reason)
+        // The read must have been CUT SHORT once the cap was exceeded —
+        // draining the whole stream is exactly the OOM vector. (readBounded
+        // pulls 64 KB chunks, so the stream must exceed that for the early
+        // stop to be observable here.)
+        assertTrue(
+            bytesRead < streamSize,
+            "read must stop once maxBytes is exceeded, not drain the stream"
+        )
     }
 
     // ─── writeTextToUri (SAF export) ──────────────────────────────────
@@ -482,6 +523,41 @@ class StorageManagerTest {
         val r = storage.finishV3Export(commit = true, uri = uri)
         assertIs<StorageManager.Result.Failure>(r)
         assertEquals("frame_incomplete", r.reason)
+    }
+
+    @Test
+    fun `v3 export deletes the partial document when the final flush throws`() {
+        // REGRESSION: finishV3Export deleted the partial document on the
+        // incomplete-frame path and on abort (commit=false), but NOT when
+        // flush()/close() itself threw — leaving a possibly-truncated backup
+        // on disk that only failed at import time. The catch block must run
+        // the same deleteDocumentQuietly cleanup.
+        //
+        // The underlying stream throws on write, but the header bytes sit in
+        // BufferedOutputStream's 8 KB buffer, so beginV3Export succeeds and
+        // the failure only surfaces when flush() pushes the buffer through —
+        // exactly like a disk-full at commit time.
+        val uri = Uri.parse("content://test/v3-flush-fail")
+        every { cr.openOutputStream(uri) } returns object : OutputStream() {
+            override fun write(b: Int) = throw IOException("disk full")
+            override fun write(b: ByteArray, off: Int, len: Int) =
+                throw IOException("disk full")
+        }
+        // DocumentsContract.deleteDocument on the Robolectric android-all
+        // jar resolves to ContentResolver.call(authority,
+        // "android:deleteDocument", null, extras) — stub + verify THAT.
+        every { cr.call(any<String>(), any(), any(), any()) } returns Bundle()
+
+        assertIs<StorageManager.Result.Success<Unit>>(
+            storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
+        )
+        val r = storage.finishV3Export(commit = true, uri = uri)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("disk full", r.reason)
+        // The possibly-truncated partial must not survive a failed commit.
+        verify(exactly = 1) {
+            cr.call(eq("test"), eq("android:deleteDocument"), isNull(), any())
+        }
     }
 
     @Test
