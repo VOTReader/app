@@ -60,8 +60,13 @@ class AppInterface(
     @JavascriptInterface
     fun setLightStatusBar(light: Boolean) {
         host.postToUi {
-            WindowInsetsControllerCompat(host.activityWindow, host.activityWindow.decorView)
-                .isAppearanceLightStatusBars = light
+            val controller = WindowInsetsControllerCompat(host.activityWindow, host.activityWindow.decorView)
+            controller.isAppearanceLightStatusBars = light
+            // #6: match the navigation bar to the theme too. Without this, on a
+            // gesture-pill / soft-button device the light theme's nav icons stay
+            // white on the off-white background — effectively invisible. Same light
+            // flag as the status bar (dark icons for a light background).
+            controller.isAppearanceLightNavigationBars = light
         }
     }
 

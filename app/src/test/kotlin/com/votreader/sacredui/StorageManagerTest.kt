@@ -482,9 +482,9 @@ class StorageManagerTest {
     fun `beginV3Import rejects an over-cap manifest length before allocating`() {
         // A corrupt/garbage header declaring a manifest larger than the cap must
         // be refused at the length check — NOT allocated and then OOM-crashed.
-        // (The old 256 MB cap sat above the heap ceiling on many devices, so a
-        // 250 MB declaration passed the guard and crashed; the cap is now 128 MB
-        // and the alloc is additionally OOM-guarded.)
+        // (The cap is 16 MB — well above any real manifest but far below the point
+        // where the ByteArray + the ~2x-larger String decode would OOM; both allocs
+        // are additionally OOM-guarded. See MAX_V3_MANIFEST_SIZE.)
         val overCap = StorageManager.MAX_V3_MANIFEST_SIZE + 1
         val header = ByteArrayOutputStream().apply {
             write("VOTBACK1".toByteArray(Charsets.US_ASCII))

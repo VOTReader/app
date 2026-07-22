@@ -160,10 +160,14 @@ class GardenImageCache(cacheRoot: File) {
         var hops = 0
         while (true) {
             val conn = (URL(current).openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = false   // #2: follow hops by hand + re-verify
+                instanceFollowRedirects = false   // follow hops by hand + re-verify
                 connectTimeout = 15_000
                 readTimeout = 20_000
                 requestMethod = "GET"
+                // Identify ourselves to GitHub's asset hosts rather than sending the
+                // default "Java/<ver>" UA — a good-citizen header that eases any
+                // server-side rate-limit/throttle handling and traffic auditing.
+                setRequestProperty("User-Agent", USER_AGENT)
             }
             val code = conn.responseCode
             if (code in 300..399 && code != HttpURLConnection.HTTP_NOT_MODIFIED) {
@@ -351,10 +355,13 @@ class GardenImageCache(cacheRoot: File) {
             "objects.githubusercontent.com"
         )
 
-        // #2: cap the manual redirect chain. GitHub's release download is a
-        // single 302 to the signed asset host; a handful of hops is generous
-        // headroom while still bounding a pathological redirect loop.
+        // Cap the manual redirect chain. GitHub's release download is a single
+        // 302 to the signed asset host; a handful of hops is generous headroom
+        // while still bounding a pathological redirect loop.
         private const val MAX_REDIRECTS = 5
+
+        // Good-citizen UA for the Garden asset fetches (see openStream).
+        private const val USER_AGENT = "VOTReader-Android/1.0"
 
         // garden_NNN.jpg — captures the zero-padded page number from either
         // the github.com release path or the redirected asset URL's
