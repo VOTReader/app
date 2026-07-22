@@ -1,0 +1,214 @@
+═══════════════════════════════════════════════════════════════════════════
+REVIEW-FIX-2026-07-22 — external deep-review findings, adjudicated + fixed
+═══════════════════════════════════════════════════════════════════════════
+Canonical tracker for the 2026-07-22 remediation batch. Origin: an external
+deep review of the project (build-output forensics + source review) produced
+a findings list; a SECOND AI independently adjudicated each finding against
+current source; the confirmed items were then implemented and verified the
+same day. 13 items: 10 DONE + 3 ADJUDICATED-no-action.
+
+───────────────────────────────────────────────────────────────────────────
+HANDOFF (READ FIRST)
+───────────────────────────────────────────────────────────────────────────
+• ALL 13 items are closed (2026-07-22). Nothing here is pending. This file
+  is the permanent record; do not re-litigate the ADJUDICATED items without
+  NEW evidence (same convention as AUDIT-PLAN/BLIND-AUDIT).
+• The changes live in the working tree (coordinator commits). Touched:
+    app/build.gradle.kts                                  (packaging, item 1)
+    app/src/main/java/com/votreader/sacredui/StorageManager.kt      (2, 3)
+    app/src/main/java/com/votreader/sacredui/GardenImageCache.kt    (4)
+    app/src/main/java/com/votreader/sacredui/MainActivity.kt        (6, 7, 8)
+    app/src/main/java/com/votreader/sacredui/MainActivityLogic.kt   (5)
+    app/src/test/kotlin/com/votreader/sacredui/StorageManagerTest.kt
+    app/src/test/kotlin/com/votreader/sacredui/GardenImageCacheTest.kt
+    app/src/test/kotlin/com/votreader/sacredui/MainActivityLogicTest.kt
+    app/src/main/assets/src/hooks/use-persisted-state.js            (10)
+    app/src/main/assets/src/hooks/use-persisted-state.test.js (NEW) (10)
+    app/src/main/assets/src/hooks/use-tabs.test.js            (NEW) (9)
+    app/src/main/assets/src/hooks/use-nav.test.js                   (9 comment fix)
+  Plus two dead Windows shortcuts (*.lnk) deleted from assets/ (item 1).
+• GATES at close:
+    Kotlin `:app:testDebugUnitTest`  179 → 189 tests, 0 failures
+      (every behavioral fix RED-first: the new test failed pre-fix).
+    vitest                          2758 → 2787 / 2787
+      (all hydration / rebase / merge / store suites green).
+    Packaging VERIFIED WITH A REAL GRADLE BUILD: `assembleDebug` APK now
+    carries exactly 36 asset entries (~11.3 MB), zero from the excluded
+    set; dist/, index.html, service-worker.js, fonts/icons/images kept.
+• STRUCTURAL OBSERVATION (item 13): app/src has NO androidTest source
+  root — that is why device walks can't be absorbed into an automated
+  harness and stay owner-signed-off deferrals. If instrumented tests are
+  ever wanted, that's the missing root, not a per-item gap.
+
+───────────────────────────────────────────────────────────────────────────
+PACKAGING
+───────────────────────────────────────────────────────────────────────────
+
+ITEM 1 — APK shipped ~51 MB of dead assets                    STATUS: DONE
+Finding (build-output forensics on the signed APK): the packaged assets/
+carried the entire dev ES-module source tree assets/src/ (283 files incl.
+77 *.test.*, unminified JSX), four root files whose contents are already
+concatenated into dist/bundle-a.js (app.css, react.min.js, react-dom.min.js,
+search-data.js), service-worker.test.js, and a Windows shortcut junk file
+"index.html - Shortcut.lnk". Nothing at runtime reads any of it —
+index.html only loads dist/ bundles.
+Fix (app/build.gradle.kts): androidResources { ignoreAssetsPatterns += … }
+(AGP 9 DSL): "<dir>src", "*.lnk", "*.test.js", "app.css", "react.min.js",
+"react-dom.min.js", "search-data.js". Two gotchas handled + recorded in the
+kts comment block: (a) supplying ANY pattern REPLACES aapt's built-in
+default ignore set, so the defaults (gDefaultIgnoreAssets) are re-declared
+verbatim first; (b) patterns are aapt-syntax matched on each entry's
+BASENAME case-insensitively, so "app.css" is exact and cannot hit
+dist/app.min.css, and "*.test.js" has no match under dist/. assets/ is
+shared with the PWA, so the files STAY in the repo — this is purely a
+packaging exclusion. Both .lnk files deleted from the tree.
+Verified (real build, agent-run): assembleDebug APK = exactly 36 asset
+entries, ~11.3 MB, ZERO from the excluded set; dist/, index.html,
+service-worker.js, fonts/icons/images all retained.
+
+───────────────────────────────────────────────────────────────────────────
+KOTLIN (each RED-first; full suite 189 tests / 0 failures after)
+───────────────────────────────────────────────────────────────────────────
+
+ITEM 2 — readUriAsBase64 trusted provider-declared size       STATUS: DONE
+Finding: StorageManager.readUriAsBase64 checked the provider-DECLARED size
+(OpenableColumns.SIZE) against maxBytes, then read the stream with an
+UNBOUNDED readBytes(). A buggy/malicious provider can declare small and
+stream gigabytes → heap OOM on the import path.
+Fix: the actual read now routes through the existing readBounded(input,
+maxBytes) — the cap is enforced on the bytes REALLY pulled, not just the
+declared number. An over-delivering stream returns Failure("too_large"),
+the same reason the declared-size check uses, so the JS side sees ONE
+failure mode.
+Test (StorageManagerTest): regression with a LYING provider (declares
+under-cap, streams over-cap) → "too_large". RED-first.
+
+ITEM 3 — finishV3Export leaked the partial backup on flush throw  STATUS: DONE
+Finding: StorageManager.finishV3Export deleted the partial document on the
+abort / incomplete-frame paths, but if flush()/close() THREW at commit,
+the bytes already written stayed on disk — a truncated, misleading-looking
+.votbak that would only fail at import time (the only-backup must fail
+clean).
+Fix: the commit path's catch now runs deleteDocumentQuietly(uri) too —
+same cleanup contract as the abort paths.
+Test (StorageManagerTest): forces a flush-time throw, verifies the delete.
+RED-first.
+
+ITEM 4 — GardenImageCache.download unbounded on chunked responses  STATUS: DONE
+Finding: MAX_DOWNLOAD_BYTES was enforced only against the declared
+Content-Length; a chunked (-1) response read unbounded into the heap.
+Fix: new readCapped() streams with a running byte counter and fails CLOSED
+(cache miss) the moment the cap is passed — no reliance on the server
+telling the truth.
+Tests (GardenImageCacheTest): chunked over-cap rejected; under-cap payload
+intact. RED-first.
+
+ITEM 5 — back-press contract compared one encoding only       STATUS: DONE
+Finding: MainActivity's handleAndroidBack contract compared the
+evaluateJavascript result against "\"true\"" only. evaluateJavascript
+JSON-encodes the JS return value, so the SAME logical answer arrives in two
+shapes — JS string "true" → `"true"` (quoted), JS boolean true → `true`
+(unquoted). A JS refactor to a bare boolean would SILENTLY break the
+contract: the app would quit on back presses JS actually consumed.
+Fix: extracted MainActivityLogic.isBackPressConsumed(result) accepting both
+encodings; everything else ("false" either shape, "null" when the handler
+is missing, Kotlin null) = not-consumed.
+Tests (MainActivityLogicTest): 6 boundary cases. RED-first.
+
+ITEM 6 — splash could stick forever                           STATUS: DONE
+Finding: splash dismissal depended SOLELY on onPageFinished; a main-frame
+load error would hold the splash indefinitely.
+Fix: an onReceivedError override releases the hold for MAIN-FRAME errors
+only (subresource errors never release). Safety hatch — bundled assets
+make a main-frame error near-impossible in practice.
+
+ITEM 7 — double saveToFile clobbered pendingExportContent     STATUS: DONE
+Finding: a second saveToFile launch while the first picker was still open
+overwrote pendingExportContent — the FIRST picker's result would then write
+the SECOND export's payload.
+Fix: pendingExportContent now doubles as the in-flight guard: a re-launch
+while non-null is refused and surfaces error:busy through the existing JS
+error contract; launch() itself is wrapped in try/catch →
+error:launch_failed (a picker that can't open no longer strands the
+payload).
+
+ITEM 8 — screenshot pipeline recycled bitmaps only on the happy path  STATUS: DONE
+Finding: the tab-thumbnail screenshot pipeline recycled its bitmaps inline
+on success only; any exception mid-pipeline leaked every allocation.
+Fix: a finally-block recycles each DISTINCT allocation — identity-compared
+(it !==) because createBitmap/scale may return the SOURCE instance — so
+each real allocation is recycled exactly once on ALL paths.
+
+───────────────────────────────────────────────────────────────────────────
+WEB (vitest full suite 2787/2787 after)
+───────────────────────────────────────────────────────────────────────────
+
+ITEM 9 — CRITICAL INVARIANT 1 (cached setter identity) had zero tests  STATUS: DONE
+Finding: use-tabs.js carries the project's CRITICAL INVARIANT 1 — the
+cached setter must be REFERENTIALLY IDENTICAL across renders or every
+memoized consumer re-renders — and nothing pinned it: only a console.error
+probe guarded it at runtime, and use-nav.test.js falsely claimed useTabs
+was "covered by its own tests".
+Fix: NEW app/src/main/assets/src/hooks/use-tabs.test.js — 14 tests:
+referential identity across rerenders / state updates / tab switches,
+probe silence (the console.error never fires), behavioral correctness of
+the setter. MUTATION-TESTED: the identity assertions FAIL when the
+ref-cache is bypassed, proving the tests pin the invariant and not a
+coincidence. The false "covered" comment in use-nav.test.js corrected.
+
+ITEM 10 — per-keystroke full vot-state persist                STATUS: DONE
+Finding: every search keystroke triggered a full vot-state JSON.stringify +
+IndexedDB put + LS shim write — searchQuery is a tabField riding the FULL
+persist chain, with no debounce or coalescing anywhere.
+Fix (hooks/use-persisted-state.js — at the usePersistedState SINK, the one
+place all persist effects funnel through):
+  1. TRAILING-EDGE 250 ms COALESCING — rapid unions inside the window
+     coalesce to ONE StateStore.set carrying the LATEST union (each new
+     union resets the window). Safe because StateStore.set is
+     FULL-REPLACEMENT with no live readers between writes: intermediate
+     unions were never observable, so latest-union-wins loses nothing.
+  2. GUARANTEED FLUSH — a pending union is written SYNCHRONOUSLY on
+     visibilitychange→hidden, pagehide, beforeunload, and unmount. No
+     union that reached the hook is ever dropped on background/close.
+  3. BOOT-CRITICAL BYPASS — theme / fontStyle / fontScale (read
+     synchronously from the LS shim by the index.html boot script,
+     index.html:73) write IMMEDIATELY, superseding (not dropping) any
+     pending debounced union.
+  4. The initial mount write stays immediate (unchanged boot contract).
+Deliberately NOT in CachedStore._save: that would entangle the hydration
+state machine and the navigator.locks 3-way merge — the coalescing lives
+at the hook sink where none of that machinery can be disturbed.
+Tests: NEW use-persisted-state.test.js, 15 tests; all hydration / rebase /
+merge suites green; full suite 2758 → 2787.
+
+───────────────────────────────────────────────────────────────────────────
+ADJUDICATED — NO ACTION (rationale recorded; do not re-litigate
+without new evidence)
+───────────────────────────────────────────────────────────────────────────
+
+ITEM 11 — v3ImportReadChunk "no ceiling"          STATUS: ADJUDICATED (2026-07-22)
+The review OVERSTATED it. The chunk allocation is
+minOf(maxBytes, importFrameRemaining) and the SOLE caller passes a constant
+512 KB chunk size, so the frame loop can never inflate allocation — the
+"unbounded" premise requires a caller that doesn't exist. No fix; the
+ceiling is already structural. Recorded so the finding isn't re-raised.
+
+ITEM 12 — use-reading-dwell "untested"            STATUS: ADJUDICATED (2026-07-22)
+The review was WRONG: use-reading-dwell.test.js exists with 10 tests.
+Narrower truth: the identity-churn invariant (the deliberate
+do-NOT-useCallback contract on the dwell API — wrapping it would re-arm
+timers every render) is not specifically PINNED by a test. Accepted as a
+documented risk; a future session may pin it if a clean, non-brittle way
+presents itself (optional, only if trivial). No code change.
+
+ITEM 13 — device-walk deferrals + restored-names v2  STATUS: ADJUDICATED (2026-07-22)
+Both are documented, OWNER-SIGNED-OFF deferrals (recorded in prior
+trackers), not defects. Structural observation: app/src has NO androidTest
+source root — that absence, not any per-item gap, is why device walks
+can't be absorbed into an automated harness. If instrumented coverage is
+ever wanted, create the source root; until then the deferrals stand.
+
+═══════════════════════════════════════════════════════════════════════════
+END — 13/13 closed (10 DONE + 3 ADJUDICATED). Gates: Kotlin 189/0-fail,
+vitest 2787/2787, assembleDebug APK 36 assets / ~11.3 MB (was ~51 MB dead).
+═══════════════════════════════════════════════════════════════════════════
