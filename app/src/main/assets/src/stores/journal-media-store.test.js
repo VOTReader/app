@@ -311,4 +311,43 @@ describe('JournalMediaStore — objectUrl LRU cap (PERF2)', () => {
       URL.revokeObjectURL = origRevoke;
     }
   });
+
+  it('releaseObjectUrls revokes every cached URL, empties the cache, and stays regenerable', async () => {
+    // The memory-trim purge (window.__onTrimMemory → releaseObjectUrls). Each
+    // cached URL pins a blob in heap; on an OS memory-pressure signal we revoke
+    // them all. It must be a CACHE DROP (objectUrl re-creates from IDB), not data
+    // loss, and must report how many it freed.
+    const revoked = [];
+    let n = 0;
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = () => 'blob:trim-' + (++n);
+    URL.revokeObjectURL = (u) => { revoked.push(u); };
+    try {
+      await JournalMediaStore.pruneOrphans([]); // clean slate
+      await JournalMediaStore.put({ id: 't1', type: 'image', blob: new Blob([new Uint8Array([1])]) });
+      await JournalMediaStore.put({ id: 't2', type: 'image', blob: new Blob([new Uint8Array([2])]) });
+      const u1 = await JournalMediaStore.objectUrl('t1'); // populate the LRU
+      const u2 = await JournalMediaStore.objectUrl('t2');
+      expect(typeof u1).toBe('string');
+      expect(typeof u2).toBe('string');
+
+      const freed = JournalMediaStore.releaseObjectUrls();
+      expect(freed).toBe(2);                 // reported both
+      expect(revoked).toContain(u1);         // revoked both cached URLs
+      expect(revoked).toContain(u2);
+
+      // Regenerable: a fresh objectUrl() call re-creates a NEW url from IDB —
+      // the blob was never deleted, only its in-memory URL dropped.
+      const u1b = await JournalMediaStore.objectUrl('t1');
+      expect(typeof u1b).toBe('string');
+      expect(u1b).not.toBe(u1);
+
+      // A second release with nothing new cached reports 0 (the fresh u1b aside).
+      expect(JournalMediaStore.releaseObjectUrls()).toBe(1);
+    } finally {
+      URL.createObjectURL = origCreate;
+      URL.revokeObjectURL = origRevoke;
+    }
+  });
 });

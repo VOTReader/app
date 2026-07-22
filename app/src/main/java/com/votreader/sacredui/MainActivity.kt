@@ -1126,6 +1126,11 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         super.onTrimMemory(level)
         if (MainActivityLogic.shouldTrimWebViewCache(level) && ::webView.isInitialized) {
             webView.clearCache(false)
+            // Also tell the JS layer to shed its own regenerable caches (the
+            // journal media object-URL LRU) — the biggest in-heap wins live on the
+            // JS side, not in this native resource cache. No-ops if the handler is
+            // absent (web/PWA); routes through webView.post (bridge is thread-safe).
+            bridge.callOptional("__onTrimMemory")
         }
     }
 

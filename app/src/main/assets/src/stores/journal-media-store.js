@@ -292,6 +292,24 @@ export var JournalMediaStore = (function() {
     },
 
     /**
+     * TRIM: revoke every cached object URL and empty the LRU. Each entry pins
+     * its decoded blob in heap, so this frees that memory on an OS memory-
+     * pressure signal (Android MainActivity.onTrimMemory → window.__onTrimMemory).
+     * Safe by construction — objectUrl() transparently re-creates a URL from IDB
+     * on the next miss, so this is a CACHE DROP, not data loss. Returns the count
+     * released (diagnostics). Never throws.
+     * @returns {number}
+     */
+    releaseObjectUrls: function() {
+      var n = _urlCache.size;
+      _urlCache.forEach(function(url) {
+        try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
+      });
+      _urlCache.clear();
+      return n;
+    },
+
+    /**
      * Remove every blob NOT referenced by `referencedIds`. Returns the
      * count of removed records (for diagnostic logging). Used by the
      * orphan-cleanup pass on app start.

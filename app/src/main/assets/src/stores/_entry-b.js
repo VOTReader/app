@@ -247,3 +247,15 @@ Object.assign(window, HubScreen, ViewerScreen, EditorScreen);
 
 // ── Service worker (W3) — web-only, gated by PlatformBridge ────────────
 registerServiceWorker();
+
+// ── Memory-pressure trim signal (Android onTrimMemory → JS) ─────────────
+// MainActivity.onTrimMemory calls window.__onTrimMemory on a moderate+ memory-
+// pressure signal (background LRU states). The biggest in-heap wins live on the
+// JS side, not in the native WebView resource cache — so purge the regenerable
+// caches here: the journal media object-URL LRU, where each entry pins a decoded
+// blob in heap. Safe by construction (objectUrl re-creates from IDB on the next
+// miss — a cache drop, not data loss). Guarded so a purge error can never crash
+// the app; a no-op on web/PWA (nothing calls it there).
+window.__onTrimMemory = function() {
+  try { JournalMediaStore.releaseObjectUrls(); } catch (_e) { /* best-effort */ }
+};
