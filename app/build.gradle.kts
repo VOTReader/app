@@ -71,6 +71,48 @@ android {
         buildConfig = true
     }
 
+    // ── APK asset bloat fix: stop packaging dead weight from assets/ ──
+    // The signed release APK shipped ~51 MB of assets nothing at runtime
+    // reads: index.html only loads dist/ bundles (verified against the June
+    // APK: 283 entries under assets/src/, 77 *.test.* files, unminified JSX).
+    // assets/ is shared with the PWA, so the files STAY in the repo — this is
+    // purely a packaging exclusion.
+    //
+    // Excluded:
+    //  - <dir>src        the dev ES-module source tree (283 entries, ~51 MB).
+    //  - *.lnk           Windows shortcut junk (one shipped in the June APK).
+    //  - *.test.js       vitest files, incl. assets/service-worker.test.js.
+    //  - the four dead root files already concatenated into dist/bundle-a.js
+    //    (app.css → only dist/app.min.css is referenced; react.min.js,
+    //    react-dom.min.js, search-data.js).
+    //
+    // Patterns are aapt-syntax and match each file/dir's BASENAME
+    // (case-insensitive), not the full path — verified against AGP 9.2.1's
+    // PatternBasedFileFilter: "*suffix" / "prefix*" globs only, "<dir>"/
+    // "<file>" restrict by kind, "!" just suppresses the ignore warning.
+    // Basename matching makes these safe: "app.css" is an exact match and
+    // cannot hit dist/app.min.css; "*.test.js" has no match under dist/.
+    //
+    // IMPORTANT: providing ANY pattern replaces aapt's built-in default set
+    // (MergeSourceSetFolders only calls setIgnoredPatterns when the list is
+    // non-empty, which swaps the whole filter), so the defaults are
+    // re-declared first to keep dotfile / _dir / backup-file filtering.
+    androidResources {
+        ignoreAssetsPatterns += listOf(
+            // aapt defaults (gDefaultIgnoreAssets), re-declared verbatim.
+            "!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*",
+            "!CVS", "!thumbs.db", "!picasa.ini", "!*~",
+            // VOT packaging exclusions (see comment block above).
+            "<dir>src",
+            "*.lnk",
+            "*.test.js",
+            "app.css",
+            "react.min.js",
+            "react-dom.min.js",
+            "search-data.js",
+        )
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
