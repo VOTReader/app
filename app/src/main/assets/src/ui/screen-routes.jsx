@@ -755,6 +755,11 @@ export function buildScreenRoutes({
     )),
 
     'holy-days-entry': () => {
+      // Every other VOT reading route is a one-liner wrapped in _wrapVot; these
+      // two have block bodies and used to return a bare null before the corpus
+      // landed, so a cold-boot restore straight into one showed a permanently
+      // blank screen that never pulled the corpus. Take the same loading view.
+      if (!_votReady) return _wrapVot(null);
       const hdEntry = actL('holydays');
       if (!hdEntry) return null;
       const bc = boundaryConfig('holydays', hdEntry);
@@ -766,6 +771,7 @@ export function buildScreenRoutes({
     },
 
     'hm-letter': () => {
+      if (!_votReady) return _wrapVot(null); // see 'holy-days-entry'
       const hmEntry = actL('hm');
       if (!hmEntry) return null;
       const letterShim = { ...hmEntry, prevLetter: null, nextLetter: null };

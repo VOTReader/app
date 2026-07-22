@@ -147,3 +147,53 @@ describe('LetterView pager.peek across a volume boundary', () => {
     expect(capturedPager.peek('prev').kind).toBe('boundary');
   });
 });
+
+/* ── FORMAT GATE (regression, 2026-07-21) ───────────────────────────────
+   Holy Days is a MIXED collection: its ghost entries carry type 'letter'
+   (Format A, `blocks`) or 'wtlb' (Format B, `paragraphs`), and the route
+   branches on that. The peek did NOT — it only checked that the neighbor
+   RESOLVED — so a cross-format neighbor was rendered through the wrong
+   component and threw on arrival ("Cannot read properties of undefined
+   (reading 'forEach')"), wedging the screen behind an ErrorBoundary. */
+describe('LetterView pager.peek format gate (mixed Holy Days collection)', () => {
+  const FORMAT_B_NEIGHBOR = {
+    id: 'consider-my-love', title: 'Consider My Love', num: 4, type: 'wtlb',
+    paragraphs: [{ align: 'justify', text: 'Consider My love…' }],
+    prevEntry: null, nextEntry: null,
+  };
+
+  beforeEach(() => {
+    globalThis.COL_BY_KEY = new Map([
+      ['holydays', { volKey: 'holydays', kind: 'letter', label: 'Regarding The Holy Days', letterScreen: 'holy-days-entry' }],
+    ]);
+    globalThis.colLetterArr = () => [FORMAT_B_NEIGHBOR];
+    globalThis.colPreface = () => null;
+  });
+  afterEach(() => {
+    for (const k of ['COL_BY_KEY', 'colLetterArr', 'colPreface']) delete globalThis[k];
+  });
+
+  it('degrades to a boundary card when the neighbor is the OTHER format', () => {
+    renderLetter({
+      letter: { ...LETTER, nextLetter: { id: 'consider-my-love', title: 'Consider My Love' } },
+      volKey: 'holydays',
+    });
+    const desc = capturedPager.peek('next');
+    // Pre-fix this was kind:'screen' wrapping a paragraphs-only entry, which
+    // threw the moment LetterView's block memo ran.
+    expect(desc.kind).toBe('boundary');
+    expect(desc.title).toBe('Consider My Love');
+  });
+
+  it('still peeks a real screen when the neighbor IS Format A', () => {
+    const formatA = { id: 'keep-the-passover', title: 'Keep the Passover', num: 8, type: 'letter', blocks: [], footnotes: {}, nkjv: {}, prevLetter: null, nextLetter: null };
+    globalThis.colLetterArr = () => [formatA];
+    renderLetter({
+      letter: { ...LETTER, nextLetter: { id: 'keep-the-passover', title: 'Keep the Passover' } },
+      volKey: 'holydays',
+    });
+    const desc = capturedPager.peek('next');
+    expect(desc.kind).toBe('screen');
+    expect(desc.el.props.letter).toBe(formatA);
+  });
+});

@@ -36,7 +36,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     // override a same-study neighbor degraded to a generic boundary card.
     const custom = resolvePeek ? resolvePeek(nb) : null;
     const full = custom ? custom.letter : resolveNeighborLetter(volKey, nb.id);
-    if (!full) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
+    // FORMAT GATE. Holy Days is a MIXED collection: its ghost entries carry
+    // type 'letter' (Format A, `blocks`) or 'wtlb' (Format B, `paragraphs`),
+    // and the route branches on that. A neighbor of the OTHER format resolves
+    // fine here but has no `blocks`, so rendering it through this component
+    // threw on arrival. Peek the boundary card instead. (Study-chapter shims
+    // from `resolvePeek` are letter-shaped by construction and pass.)
+    if (!full || !full.blocks) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
     return {
       kind: 'screen',
       el: (
@@ -69,7 +75,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     const destCol = (b.volKey && typeof COL_BY_KEY !== 'undefined') ? COL_BY_KEY.get(b.volKey) : null;
     if (!destCol || destCol.kind !== 'letter' || !b.letterId) return card;
     const full = resolveNeighborLetter(b.volKey, b.letterId);
-    if (!full) return card;
+    if (!full || !full.blocks) return card; // format gate — see _letterPeek
     return {
       kind: 'screen',
       el: (

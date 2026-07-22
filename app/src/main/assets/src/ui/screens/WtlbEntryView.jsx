@@ -122,7 +122,14 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // swipe commits. A boundary (no in-collection neighbor) still peeks a card.
   const _entryPeek = (nb) => {
     const full = resolveNeighborLetter(volKey, nb.id);
-    if (!full) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
+    // FORMAT GATE. Holy Days is a MIXED collection: its ghost entries carry
+    // type 'wtlb' (Format B, `paragraphs`) or 'letter' (Format A, `blocks`),
+    // and the route branches on that. A neighbor of the OTHER format resolves
+    // fine here but has no `paragraphs`, so rendering it through this
+    // component threw on arrival (`entry.paragraphs.forEach`). Peek the
+    // boundary card instead — which is what a cross-format neighbor showed
+    // before real screen peeks existed.
+    if (!full || !full.paragraphs) return { kind: 'boundary', eyebrow: 'Continue', title: nb.title };
     return {
       kind: 'screen',
       el: (
@@ -154,7 +161,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     const destCol = (b.volKey && typeof COL_BY_KEY !== 'undefined') ? COL_BY_KEY.get(b.volKey) : null;
     if (!destCol || !_isWtlbFamily(destCol) || !b.letterId) return card;
     const full = resolveNeighborLetter(b.volKey, b.letterId);
-    if (!full) return card;
+    if (!full || !full.paragraphs) return card; // format gate — see _entryPeek
     return {
       kind: 'screen',
       el: (
