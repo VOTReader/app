@@ -33,6 +33,8 @@ import {
   buildV3Manifest, applyV3, verifyImportCounts, DEFAULT_MEDIA_LIMIT_BYTES, formatImportSpaceWarning,
 } from './backup.js';
 import { writeContainer, readContainer } from './backup-container.js';
+import { renderHook } from '@testing-library/react';
+import { usePersistedState } from '../hooks/use-persisted-state.js';
 
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { hydrateAllStores, hasAnyPendingStores } from '../stores/cached-store.js';
@@ -972,6 +974,61 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
     expect(hasAnyPendingStores()).toBe(false);
     vi.restoreAllMocks();
   });
+
+  /* Export-tap race (U1 + the persist debounce): buildV3Manifest reads
+     vot-state STRAIGHT FROM IDB after a whenSaved() barrier — but a union
+     still inside usePersistedState's 250ms debounce window has NOT initiated
+     a StateStore.set, so whenSaved() has nothing to await and that union
+     would be missing from the ONLY backup. The shipped guard is the
+     window.__flushPersistState bridge (module state can't cross the
+     bundle-b/bundle-d IIFE boundary): SettingsScreen calls it synchronously
+     before buildV3Manifest, flushing the pending union so the barrier then
+     awaits the flushed write. This mounts the REAL hook against the REAL
+     StateStore + fake IDB and drives the exact export sequence — without
+     advancing the debounce timer. */
+  it('a vot-state union still inside the persist debounce window lands in the export manifest', async () => {
+    const base = {
+      tabs: [{ id: 't1', screen: 'home' }],
+      activeTabIdx: 0,
+      theme: 'dark',
+      lastReadChapters: {},
+      lastReadLetterMap: {},
+      activeReadKey: null,
+      settings: { fontStyle: 'modern', fontScale: '1.0' },
+      readItems: {},
+    };
+    // Calls THROUGH the spy so the real IDB write path runs.
+    const setSpy = vi.spyOn(StateStore, 'set');
+    const { rerender, unmount } = renderHook((p) => usePersistedState(p), { initialProps: base });
+    await flushAll(); // the immediate mount write is durable
+
+    // Keystroke-level churn: a tabs-only union sits in the 250ms debounce
+    // window — pendingRef only, NO StateStore.set yet (real timers, never
+    // advanced, so the trailing edge cannot fire mid-test).
+    rerender({ ...base, tabs: [{ id: 't1', screen: 'search', searchQuery: 'typed-just-before-export' }] });
+    expect(setSpy).toHaveBeenCalledTimes(1);
+
+    // The exact SettingsScreen export prelude (_exportV3Web / _exportV3Android):
+    // flush any pending debounced union synchronously, THEN snapshot.
+    if (typeof (/** @type {any} */ (window).__flushPersistState) === 'function') {
+      /** @type {any} */ (window).__flushPersistState();
+    }
+    const built = await buildV3Manifest({
+      storesMap: storesMap(), flagMap: flagMap(),
+      idbAdapter: IDBAdapter, mediaStore: JournalMediaStore,
+    });
+
+    expect(built.ok).toBe(true);
+    expect(built.manifest.stores['vot-state'].tabs[0].searchQuery).toBe('typed-just-before-export');
+    // Exactly mount-write + flushed-write — the flush produced no duplicate
+    // and the manifest read itself wrote nothing.
+    expect(setSpy).toHaveBeenCalledTimes(2);
+
+    unmount(); // teardown: nothing pending → no third write
+    expect(setSpy).toHaveBeenCalledTimes(2);
+    setSpy.mockRestore();
+    delete /** @type {any} */ (window).__flushPersistState;
+  }, 20000);
 });
 
 /* ─────────────────────────────────────────────────────────────────────

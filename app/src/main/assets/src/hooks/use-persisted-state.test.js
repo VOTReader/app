@@ -72,6 +72,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   // Restore jsdom's default visibility for the next test file / case.
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  // The export flush bridge is hook-owned; never leak a registration.
+  delete /** @type {any} */ (window).__flushPersistState;
 });
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -247,5 +249,62 @@ describe('usePersistedState — boot-critical immediacy (lsShim / index.html:73)
     expect(setSpy).toHaveBeenCalledTimes(2);
     act(() => { vi.advanceTimersByTime(300); });
     expect(setSpy).toHaveBeenCalledTimes(3);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   G) window.__flushPersistState — the Export-tap race closer
+   ───────────────────────────────────────────────────────────────────
+   buildV3Manifest / buildExportPayload read vot-state STRAIGHT FROM IDB
+   (the durable truth) after a whenSaved() barrier. A union still inside
+   the 250ms debounce window has NOT initiated a StateStore.set, so no
+   write is in flight and whenSaved() cannot cover it — a change made
+   within 250ms of tapping Export would be missing from the ONLY backup.
+   The hook therefore publishes its flush on window.__flushPersistState
+   (module-scope state can't cross the bundle-b/bundle-d IIFE boundary —
+   the same reason navHandoff is window-backed); SettingsScreen calls it
+   synchronously before building the manifest. These tests pin the
+   bridge contract: registered on mount, unregistered on unmount,
+   synchronous flush, no-op when idle, no duplicate write, boot-critical
+   path untouched.
+   ═══════════════════════════════════════════════════════════════════ */
+
+describe('usePersistedState — export flush bridge (window.__flushPersistState)', () => {
+  it('registers the bridge on mount and unregisters on unmount', () => {
+    const { unmount } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    expect(typeof /** @type {any} */ (window).__flushPersistState).toBe('function');
+    unmount();
+    expect(/** @type {any} */ (window).__flushPersistState).toBe(null);
+  });
+
+  it('synchronously flushes a pending debounced union (the Export-tap race), with no duplicate trailing write', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    rerender(withQuery('typed-just-before-export'));
+    expect(setSpy).toHaveBeenCalledTimes(1); // pending inside the debounce window
+
+    // What SettingsScreen does before buildV3Manifest — no timer advance.
+    act(() => { /** @type {any} */ (window).__flushPersistState(); });
+
+    expect(setSpy).toHaveBeenCalledTimes(2);
+    expect(setSpy.mock.calls[1][0].tabs[0].searchQuery).toBe('typed-just-before-export');
+
+    // The pending timer was cleared — no duplicate trailing write.
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(setSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('is a no-op when nothing is pending (safe for the export path to call unconditionally)', () => {
+    renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    expect(setSpy).toHaveBeenCalledTimes(1); // mount write only
+    act(() => { /** @type {any} */ (window).__flushPersistState(); });
+    expect(setSpy).toHaveBeenCalledTimes(1); // no spurious write
+  });
+
+  it('does not alter the boot-critical immediate path (theme stays immediate; bridge flush afterwards is a no-op)', () => {
+    const { rerender } = renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    rerender(makeState({ theme: 'light' }));
+    expect(setSpy).toHaveBeenCalledTimes(2); // still synchronous, no debounce wait
+    act(() => { /** @type {any} */ (window).__flushPersistState(); });
+    expect(setSpy).toHaveBeenCalledTimes(2); // immediate write left nothing pending
   });
 });

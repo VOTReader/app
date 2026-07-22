@@ -540,6 +540,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const _exportV3Web = async () => {
     try {
       _showToast('Preparing export…', 0);
+      // U1 + persist-debounce race closer: a vot-state union still inside
+      // usePersistedState's 250ms debounce window has NOT initiated a
+      // StateStore.set, so the whenSaved() barrier inside buildV3Manifest
+      // cannot cover it — it would be missing from the ONLY backup. Flush it
+      // synchronously FIRST (no-op when nothing is pending; bridge owned by
+      // usePersistedState, contract 5); the barrier then awaits the flushed
+      // write before the manifest reads vot-state from IDB.
+      if (typeof window.__flushPersistState === 'function') window.__flushPersistState();
       const built = await buildV3Manifest({
         storesMap: _exportableStores(),
         flagMap: _flagStores(),
@@ -594,6 +602,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const _exportV3Android = async () => {
     try {
       _showToast('Preparing export…', 0);
+      // Same U1 + persist-debounce race closer as _exportV3Web: flush any
+      // vot-state union still inside usePersistedState's 250ms debounce
+      // window BEFORE buildV3Manifest's whenSaved() barrier + IDB read
+      // (no-op when nothing is pending; bridge owned by usePersistedState).
+      if (typeof window.__flushPersistState === 'function') window.__flushPersistState();
       const built = await buildV3Manifest({
         storesMap: _exportableStores(),
         flagMap: _flagStores(),

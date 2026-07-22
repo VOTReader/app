@@ -243,6 +243,16 @@ callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")
 
 ---
 
+## 11. Persistence / export
+
+### `__flushPersistState`
+- **Setter:** `src/hooks/use-persisted-state.js` (mount effect, contract 5) — `window.__flushPersistState = flush`, the SAME flush used by the visibilitychange/pagehide/beforeunload/unmount listeners.
+- **Cleanup:** `if (window.__flushPersistState === flush) window.__flushPersistState = null` on hook teardown (only clears if still mine — the `__onDwellCommit` pattern).
+- **Consumer:** `src/ui/screens/SettingsScreen.jsx` (`_exportV3Web` / `_exportV3Android`) — guarded `if (typeof window.__flushPersistState === 'function') window.__flushPersistState();` immediately before `buildV3Manifest(...)`.
+- **Why it exists (U1 + persist-debounce race):** the v3/v2 export reads vot-state STRAIGHT FROM IDB after a `whenSaved()` barrier, but a union still inside the 250 ms persist debounce window has not initiated a `StateStore.set`, so the barrier cannot cover it — a change made within 250 ms of tapping Export would be missing from the ONLY backup. Flushing synchronously first lets the existing barrier await the flushed write. A window bridge (not a module import) because bundle-b (hook) and bundle-d (SettingsScreen) are separate esbuild IIFEs — module-scope registrations do not cross the boundary (same rationale as `navHandoff`). No-op when nothing is pending; clears the pending timer so no duplicate trailing write follows.
+
+---
+
 ## Cross-references
 
 - **Hook DAG** for App()-level hooks: the comment block at the App()

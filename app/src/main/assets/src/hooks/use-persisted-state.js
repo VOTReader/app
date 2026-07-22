@@ -53,6 +53,20 @@
      4. The initial mount write stays immediate (unchanged boot
         semantics: during pre-hydration 'pending', StateStore.set
         simply queues the op for rebase).
+     5. EXPORT-TAP RACE CLOSER: buildV3Manifest / buildExportPayload
+        read vot-state STRAIGHT FROM IDB after a whenSaved() barrier —
+        but a union sitting in this debounce window has NOT initiated a
+        StateStore.set, so whenSaved() has nothing to await and the
+        change would be missing from the ONLY backup. The flush is
+        therefore published on window.__flushPersistState for the life
+        of App(); SettingsScreen calls it synchronously before building
+        the manifest, and the existing whenSaved() barrier then awaits
+        the flushed write. A window bridge (not a module-level export)
+        because esbuild compiles bundle-b (this hook) and bundle-d
+        (SettingsScreen) as separate IIFEs — each bundle would get its
+        own copy of any module-scope registration, exactly the gap
+        nav-handoff.js documents. No-op when nothing is pending; clears
+        the pending timer so no duplicate trailing write follows.
 
    OWNS:
      - the persist effect(s) that write the vot-state union, including
@@ -91,7 +105,8 @@
 
    WINDOW: PERSIST_DEBOUNCE_MS trailing debounce (below); flush listeners
            on window (pagehide, beforeunload) + document
-           (visibilitychange) for the life of App().
+           (visibilitychange) for the life of App(). Publishes
+           window.__flushPersistState (contract 5) for the export path.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { StateStore } from '../stores/state-store.js';
@@ -170,6 +185,13 @@ export function usePersistedState({
       StateStore.set(pending);
     };
     flushRef.current = flush;
+    // Contract 5: publish the SAME flush for the export path (see header).
+    // SettingsScreen calls window.__flushPersistState() synchronously before
+    // buildV3Manifest / buildExportPayload, so a union still inside the
+    // debounce window is written BEFORE the manifest's whenSaved() barrier
+    // + IDB read. Registered (not stubbed in vitest.setup) because this hook
+    // is the sole owner; callers guard with typeof === 'function'.
+    window.__flushPersistState = flush;
     const onVisibility = () => {
       // Only 'hidden' flushes — a return to 'visible' must not cut a
       // still-accumulating debounce window short.
@@ -183,6 +205,9 @@ export function usePersistedState({
       window.removeEventListener('pagehide', flush);
       window.removeEventListener('beforeunload', flush);
       flushRef.current = null;
+      // Only clear the bridge if it's still mine (the __onDwellCommit
+      // pattern) — a racing second registration must not be clobbered.
+      if (window.__flushPersistState === flush) window.__flushPersistState = null;
       flush();   // App teardown never strands a pending union
     };
   }, []);
