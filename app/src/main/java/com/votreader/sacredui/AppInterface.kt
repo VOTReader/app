@@ -185,16 +185,16 @@ class AppInterface(
     fun nativeRecordAmplitude(): Int = vm.audioRecorder.amplitude()
 
     /** Stop, then deliver the audio to JS via
-     *  window.__onNativeRecordingComplete(base64, durationMs, mime).
-     *  base64 is null on failure. The read/encode runs on this binder
-     *  thread (already off the UI thread) then posts to the WebView. */
+     *  window.__onNativeRecordingComplete(base64, durationMs, mime, blob, url).
+     *  Happy path (#1): the recorder moved the memo into the served recordings/
+     *  dir, so we pass a URL (5th arg) for JS to fetch() — no base64 string parsed
+     *  off the bridge. Fallback: a file-move failure delivers base64 (1st arg).
+     *  Both null = failure. Runs on this binder thread then posts to the WebView. */
     @JavascriptInterface
     fun nativeRecordStop() {
         when (val r = vm.audioRecorder.stop()) {
-            is NativeAudioRecorder.Result.Success ->
-                postNativeComplete(r.value.base64, r.value.durationMs)
-            is NativeAudioRecorder.Result.Failure ->
-                postNativeComplete(null, 0L)
+            is NativeAudioRecorder.Result.Success -> postNativeComplete(r.value)
+            is NativeAudioRecorder.Result.Failure -> postNativeComplete(null)
         }
     }
 
@@ -493,10 +493,21 @@ class AppInterface(
         }
     }
 
-    // Deliver a finished native recording to JS. base64 is null on failure;
-    // mime is always audio/mp4 (AAC in MPEG-4). The bridge marshals the call
-    // onto the WebView's thread; nativeRecordStop runs on a binder thread.
-    private fun postNativeComplete(base64: String?, durationMs: Long) {
-        bridge.callOptional(JsEvent.NativeRecordingComplete, base64, durationMs, "audio/mp4")
+    // Deliver a finished native recording to JS. On success we prefer a served-file
+    // URL (JS fetch()es it through the native networking layer, #1); base64 is the
+    // fallback when the file move failed; null result = failure. mime is always
+    // audio/mp4 (AAC in MPEG-4). Args match the JS callback shape
+    // (base64, durationMs, mime, blob, url) — blob is the web-only path, always
+    // null from Android. The bridge marshals the call onto the WebView's thread;
+    // nativeRecordStop runs on a binder thread.
+    private fun postNativeComplete(result: NativeAudioRecorder.RecordingResult?) {
+        if (result == null) {
+            bridge.callOptional(JsEvent.NativeRecordingComplete, null, 0L, "audio/mp4", null, null)
+            return
+        }
+        val url = result.fileName?.let { "https://appassets.androidplatform.net/recordings/$it" }
+        bridge.callOptional(
+            JsEvent.NativeRecordingComplete, result.base64, result.durationMs, "audio/mp4", null, url
+        )
     }
 }

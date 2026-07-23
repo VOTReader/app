@@ -49,8 +49,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.webkit.WebResourceErrorCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
+import androidx.webkit.WebViewAssetLoader.InternalStoragePathHandler
 import androidx.webkit.WebViewClientCompat
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.Locale
 import kotlin.coroutines.resume
@@ -157,6 +159,18 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     private val assetLoader: WebViewAssetLoader by lazy {
         WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", AssetsPathHandler(this))
+            // #1: serve finished voice memos from cacheDir/recordings/ so JS can
+            // fetch() them (native networking) instead of receiving a base64 string
+            // through the bridge. Same-origin as index.html, so CSP connect-src
+            // 'self' allows the fetch; InternalStoragePathHandler blocks any path
+            // traversal outside the dir.
+            .addPathHandler(
+                "/recordings/",
+                InternalStoragePathHandler(
+                    this,
+                    File(cacheDir, NativeAudioRecorder.RECORDINGS_DIR).apply { mkdirs() }
+                )
+            )
             .build()
     }
 

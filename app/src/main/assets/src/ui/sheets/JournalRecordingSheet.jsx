@@ -132,27 +132,32 @@ export function JournalRecordingSheet({ onSave, onClose }) {
 
     // __onNativeRecordingComplete: fires when the bridge finalizes the
     // recording (after PlatformBridge.nativeRecordStop). One callback shape for
-    // both platforms ([[callback-flow-unification]]): (b64, durMs, mime, blob?).
-    // Web (J3) passes the Blob DIRECTLY as the 4th arg — no base64 round-trip;
-    // Android passes base64 (string-only bridge) which we decode here. Either
-    // way we end with one audio Blob and transition to preview (or auto-save if
-    // Save was tapped while still recording).
-    window.__onNativeRecordingComplete = function(b64, durMs, mime, blob) {
+    // all platforms ([[callback-flow-unification]]): (b64, durMs, mime, blob?, url?).
+    //  • Web (J3): passes the Blob DIRECTLY as the 4th arg — no base64 round-trip.
+    //  • Android (#1 fetch bridge): passes a `url` (5th arg) to the served .m4a;
+    //    we fetch() it through native networking instead of parsing a ~6.7MB
+    //    base64 string off the bridge (which can freeze the renderer). Falls back
+    //    to base64 on any fetch error so a recording is never lost.
+    //  • Android (legacy/fallback): passes base64 (1st arg) which we decode here.
+    // Either way we end with one audio Blob and transition to preview (or auto-
+    // save if Save was tapped while still recording).
+    window.__onNativeRecordingComplete = function(b64, durMs, mime, blob, url) {
       if (cancelled) return;
       try { if (ampRef.current) clearInterval(ampRef.current); } catch (_e) { /* best-effort */ }
       try { if (tickRef.current) clearInterval(tickRef.current); } catch (_e) { /* best-effort */ }
       ampRef.current = 0;
       tickRef.current = 0;
-      try {
-        // Prefer the Blob the web path hands us (J3 — avoids holding a redundant
-        // ~1.33x base64 copy in heap); fall back to decoding Android's base64.
-        var audioBlob = (blob && typeof blob.size === 'number') ? blob : null;
-        if (!audioBlob && b64) {
-          var bin = atob(b64);
-          var arr = new Uint8Array(bin.length);
-          for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-          audioBlob = new Blob([arr], { type: mime || 'audio/webm' });
-        }
+
+      function decodeB64() {
+        var bin = atob(b64);
+        var arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return new Blob([arr], { type: mime || 'audio/webm' });
+      }
+
+      // Common tail: given the resolved audio Blob, preview it (or auto-save).
+      function finalize(audioBlob) {
+        if (cancelled) return;
         if (!audioBlob || audioBlob.size === 0) {
           setError('Nothing was recorded. Try again and speak after the timer starts.');
           setStage('error');
@@ -170,10 +175,34 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         } else {
           setStage('preview');
         }
-      } catch (e) {
+      }
+      function fail(e) {
         console.warn('recording decode failed', e);
         setError('Could not process the recording. Please try again.');
         setStage('error');
+      }
+
+      try {
+        // 1) Web: the Blob is handed to us directly (avoids a redundant base64 copy).
+        if (blob && typeof blob.size === 'number') { finalize(blob); return; }
+        // 2) Android fetch bridge (#1): stream the served file in via the browser's
+        //    networking layer. On any failure, fall back to base64 if we also got it.
+        if (url) {
+          fetch(url)
+            .then(function(r) { if (!r.ok) throw new Error('fetch ' + r.status); return r.blob(); })
+            .then(function(fb) { finalize(fb && !fb.type ? new Blob([fb], { type: mime || 'audio/mp4' }) : fb); })
+            .catch(function(e) {
+              if (b64) { try { finalize(decodeB64()); return; } catch (_e2) { /* fall through */ } }
+              fail(e);
+            });
+          return;
+        }
+        // 3) Android legacy/base64 path.
+        if (b64) { finalize(decodeB64()); return; }
+        // Nothing was delivered.
+        finalize(null);
+      } catch (e) {
+        fail(e);
       }
     };
 

@@ -8,6 +8,7 @@ import android.os.Build
 import android.util.Base64
 import androidx.core.content.ContextCompat
 import java.io.File
+import java.util.UUID
 import timber.log.Timber
 
 /**
@@ -44,6 +45,9 @@ class NativeAudioRecorder(private val context: Context) {
      * dangling temp file, no half-initialised recorder.
      */
     fun start(): Result<Unit> = synchronized(lock) {
+        // #1: clean any orphaned served memos from an interrupted prior session
+        // (the happy path fetches the file + drops the reference within a second).
+        sweepStaleRecordings()
         if (ContextCompat.checkSelfPermission(
                 context, Manifest.permission.RECORD_AUDIO
             ) != PackageManager.PERMISSION_GRANTED
@@ -154,12 +158,24 @@ class NativeAudioRecorder(private val context: Context) {
             return Result.Failure("stop_failed")
         }
         try { mr.release() } catch (_: Exception) {}
+        val safeDur = if (durMs < 0L) 0L else durMs
+        // #1 (fetch bridge): move the finished recording into the served
+        // recordings/ dir under a uuid name and hand JS a URL to fetch, instead of
+        // base64-inflating the whole file through the string bridge (a 5-min memo
+        // is ~6.7 MB of base64 for evaluateJavascript to parse). If the move fails
+        // for any reason, fall back to the base64 path so a recording is never lost.
+        val served = File(recordingsDir(), UUID.randomUUID().toString() + ".m4a")
+        val moved = try { f.renameTo(served) } catch (_: Exception) { false }
+        if (moved) {
+            recordFile = null
+            return Result.Success(RecordingResult(base64 = null, durationMs = safeDur, fileName = served.name))
+        }
         return try {
             val bytes = f.readBytes()
             val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
             try { f.delete() } catch (_: Exception) {}
             recordFile = null
-            Result.Success(RecordingResult(b64, if (durMs < 0L) 0L else durMs))
+            Result.Success(RecordingResult(base64 = b64, durationMs = safeDur, fileName = null))
         } catch (e: Exception) {
             Timber.w(e, "nativeRecordStop read failed")
             try { f.delete() } catch (_: Exception) {}
@@ -190,10 +206,41 @@ class NativeAudioRecorder(private val context: Context) {
      */
     fun release() = cancel()
 
-    data class RecordingResult(val base64: String, val durationMs: Long)
+    /** cacheDir/recordings — the WebViewAssetLoader-served dir for finished memos
+     *  (MainActivity registers a /recordings/ PathHandler over it). Files here are
+     *  transient + OS-evictable; the durable copy lives in the JS IndexedDB media
+     *  store once JS fetches the URL. */
+    private fun recordingsDir(): File = File(context.cacheDir, RECORDINGS_DIR).apply { mkdirs() }
+
+    /** Delete served recordings older than [RECORDING_TTL_MS] — orphans left when
+     *  the app died before JS fetched them (the happy path fetches within a second
+     *  of stop()). A just-served file is far newer than the cutoff, so an in-flight
+     *  fetch is never touched. Best-effort; never throws. */
+    private fun sweepStaleRecordings() {
+        try {
+            val cutoff = System.currentTimeMillis() - RECORDING_TTL_MS
+            recordingsDir().listFiles()?.forEach { file ->
+                if (file.isFile && file.lastModified() < cutoff) {
+                    try { file.delete() } catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) { /* best-effort */ }
+    }
+
+    /** base64 is set only on the fallback (file-move failed); fileName is the
+     *  served recordings/ file name on the happy fetch-bridge path. Exactly one of
+     *  the two is non-null on success. */
+    data class RecordingResult(val base64: String?, val durationMs: Long, val fileName: String? = null)
 
     sealed interface Result<out T> {
         data class Success<T>(val value: T) : Result<T>
         data class Failure(val reason: String) : Result<Nothing>
+    }
+
+    companion object {
+        const val RECORDINGS_DIR = "recordings"
+        // A served memo is fetched by JS within a second of stop(); anything older
+        // than this in recordings/ is an orphan from an interrupted session.
+        const val RECORDING_TTL_MS = 60_000L
     }
 }

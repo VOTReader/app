@@ -11,8 +11,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * NK4 — NativeAudioRecorder state-machine tests.
@@ -169,5 +172,34 @@ class NativeAudioRecorderTest {
         val r = NativeAudioRecorder.RecordingResult("dGVzdA==", 1234L)
         assertEquals("dGVzdA==", r.base64)
         assertEquals(1234L, r.durationMs)
+    }
+
+    @Test
+    fun `RecordingResult carries an optional served fileName`() {
+        // #1: the happy fetch-bridge path returns a fileName (no base64).
+        val r = NativeAudioRecorder.RecordingResult(base64 = null, durationMs = 500L, fileName = "abc.m4a")
+        assertEquals(null, r.base64)
+        assertEquals(500L, r.durationMs)
+        assertEquals("abc.m4a", r.fileName)
+    }
+
+    // ─── #1: served-recording orphan sweep ────────────────────────────
+
+    @Test
+    fun `start sweeps stale served recordings but keeps fresh ones`() {
+        // start() prunes recordings/ files older than the TTL (memos orphaned when
+        // the app died before JS fetched them) but never a just-served file (an
+        // in-flight fetch is only seconds old). The sweep runs at the TOP of
+        // start(), before the permission check, so it fires even though start()
+        // then denies below (RECORD_AUDIO revoked in @Before).
+        val dir = File(application.cacheDir, NativeAudioRecorder.RECORDINGS_DIR).apply { mkdirs() }
+        val stale = File(dir, "stale.m4a").apply { writeBytes(ByteArray(4)) }
+        val fresh = File(dir, "fresh.m4a").apply { writeBytes(ByteArray(4)) }
+        stale.setLastModified(System.currentTimeMillis() - NativeAudioRecorder.RECORDING_TTL_MS - 5_000L)
+
+        recorder.start()
+
+        assertFalse(stale.exists(), "a stale served recording should be swept on start")
+        assertTrue(fresh.exists(), "a just-served recording must survive (fetch may be in flight)")
     }
 }

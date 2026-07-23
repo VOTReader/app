@@ -104,17 +104,43 @@ class AppInterfaceTest {
     }
 
     @Test
-    fun `nativeRecordStop success posts NativeRecordingComplete with data`() {
+    fun `nativeRecordStop success with a served file posts a recordings URL (fetch bridge)`() {
+        // #1 happy path: the recorder moved the memo into recordings/ and returns
+        // its fileName → JS gets a URL (5th arg) to fetch; base64 (1st arg) is null.
         val vm = mockk<MainViewModel>(relaxed = true)
         every { vm.audioRecorder.stop() } returns
-            NativeAudioRecorder.Result.Success(NativeAudioRecorder.RecordingResult("b64data", 9876L))
+            NativeAudioRecorder.Result.Success(
+                NativeAudioRecorder.RecordingResult(base64 = null, durationMs = 9876L, fileName = "abc.m4a")
+            )
         val bridge = mockk<JsBridge>(relaxed = true)
         val (app, _, _) = newSubject(bridge = bridge, vm = vm)
 
         app.nativeRecordStop()
 
         verify(exactly = 1) {
-            bridge.callOptional(JsEvent.NativeRecordingComplete, "b64data", 9876L, "audio/mp4")
+            bridge.callOptional(
+                JsEvent.NativeRecordingComplete, null, 9876L, "audio/mp4", null,
+                "https://appassets.androidplatform.net/recordings/abc.m4a"
+            )
+        }
+    }
+
+    @Test
+    fun `nativeRecordStop success without a file posts base64 (fallback path)`() {
+        // Move-failed fallback: fileName null, base64 set → delivered as the 1st arg,
+        // url (5th) null.
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.audioRecorder.stop() } returns
+            NativeAudioRecorder.Result.Success(
+                NativeAudioRecorder.RecordingResult(base64 = "b64data", durationMs = 9876L, fileName = null)
+            )
+        val bridge = mockk<JsBridge>(relaxed = true)
+        val (app, _, _) = newSubject(bridge = bridge, vm = vm)
+
+        app.nativeRecordStop()
+
+        verify(exactly = 1) {
+            bridge.callOptional(JsEvent.NativeRecordingComplete, "b64data", 9876L, "audio/mp4", null, null)
         }
     }
 
@@ -128,7 +154,7 @@ class AppInterfaceTest {
         app.nativeRecordStop()
 
         verify(exactly = 1) {
-            bridge.callOptional(JsEvent.NativeRecordingComplete, null, 0L, "audio/mp4")
+            bridge.callOptional(JsEvent.NativeRecordingComplete, null, 0L, "audio/mp4", null, null)
         }
     }
 
