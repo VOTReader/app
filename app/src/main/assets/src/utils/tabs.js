@@ -107,6 +107,25 @@ export function describeTab(tab) {
   if (s === 'history') return { title: 'History', subtitle: 'Recently visited', resolved: true };
   if (s === 'settings') return { title: 'Settings', subtitle: 'App configuration', resolved: true };
 
+  // Personal content (P1-8). These used to fall through to the Home default —
+  // AND because that default is resolved:true, useTabTitleMemo trusted the
+  // mislabel and burned "Home" into the tab's stored title, so the Tabs
+  // overview called every journal/notes/library tab "Home" permanently.
+  // Titles match the screens' own H1s (My Journal, My Notes, My Links,
+  // My Bookmarks, Highlights & Underlines, Library, My Progress). All are
+  // corpus-independent → resolved:true (journalEntryId is App-global, not
+  // tab state, so viewer/editor get an honest generic 'Journal Entry').
+  if (s === 'journal-home') return { title: 'My Journal', subtitle: 'Journal entries', resolved: true };
+  if (s === 'journal-viewer') return { title: 'Journal Entry', subtitle: 'My Journal', resolved: true };
+  if (s === 'journal-editor') return { title: 'Journal Entry', subtitle: 'Editing · My Journal', resolved: true };
+  if (s === 'notes-index') return { title: 'My Notes', subtitle: 'Personal notes', resolved: true };
+  if (s === 'links-index') return { title: 'My Links', subtitle: 'Saved links', resolved: true };
+  if (s === 'bookmarks-index') return { title: 'My Bookmarks', subtitle: 'Saved places', resolved: true };
+  if (s === 'highlights-index') return { title: 'Highlights & Underlines', subtitle: 'Marked passages', resolved: true };
+  if (s === 'library') return { title: 'Library', subtitle: 'Your saved content', resolved: true };
+  if (s === 'my-progress') return { title: 'My Progress', subtitle: 'Reading progress', resolved: true };
+  if (s === 'about') return { title: 'About', subtitle: 'VOTReader', resolved: true };
+
   // Default → Home
   return { title: 'Home', subtitle: 'VOT Study Bible', resolved: true };
 }

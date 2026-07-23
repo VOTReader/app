@@ -70,6 +70,41 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 
+// ── scrollPositions LRU bound (Wave 0) ─────────────────────────────────────
+// The per-tab scrollPositions map grew MONOTONICALLY forever — every screen
+// ever scrolled added a key, and the whole tabs array (scrollPositions
+// included) is persisted to localStorage on every nav by usePersistedState,
+// so the vot-state blob grew without bound. Bound it to the 100 most-recently
+// -touched keys. Keys are always non-numeric strings ('genesis-3', 'letter-x',
+// 'study-…', 'journal-viewer-…'), never integer-like, so JS object insertion
+// order IS the LRU order; mergeScrollPosition delete+re-sets on touch to
+// refresh recency. 100 distinct screens is far beyond any real session, and
+// revisiting a screen re-touches its key (keeps it hot), so this cannot drop
+// a position the user is actually using. Pruning only ever drops the COLDEST
+// keys — the restore READ path (exact key lookup, content-anchor preferred)
+// is untouched; protect-list invariant preserved.
+export const SCROLL_POSITIONS_MAX = 100;
+
+/**
+ * Return a copy of `map` with `key` set to `record`, `key` marked
+ * most-recently-used, and the map pruned to SCROLL_POSITIONS_MAX entries
+ * (coldest-first). The ONLY write path for tab.scrollPositions.
+ *
+ * @param {object | undefined} map
+ * @param {string} key
+ * @param {{ y: number, pct: number, anchorKey: string | null, anchorOff: number }} record
+ * @returns {object}
+ */
+function mergeScrollPosition(map, key, record) {
+  const next = { ...(map || {}) };
+  delete next[key]; // re-insert → most-recently-used
+  next[key] = record;
+  const keys = Object.keys(next);
+  const excess = keys.length - SCROLL_POSITIONS_MAX;
+  for (let i = 0; i < excess; i++) delete next[keys[i]];
+  return next;
+}
+
 // ── Module-private helper ──────────────────────────────────────────────────
 // Derives a stable localStorage / scrollPositions key for the current
 // screen. COL_BY_LETTER_SC is a bare-name window global (bundle-b.js).
@@ -271,7 +306,7 @@ export function useScrollMemory({
     const pct = Math.max(0, Math.min(1, scrollTop / max));
     const a = captureAnchor(__scrollEl);
     updateActiveTab((t) => ({
-      scrollPositions: { ...(t.scrollPositions || {}), [key]: { y: scrollTop, pct, anchorKey: a.anchorKey, anchorOff: a.anchorOff } }
+      scrollPositions: mergeScrollPosition(t.scrollPositions, key, { y: scrollTop, pct, anchorKey: a.anchorKey, anchorOff: a.anchorOff })
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tabsOverviewOpenRef is a useRef ref read via .current — call-time fresh, stable object identity. Per HARD INVARIANT above, deps are intentionally [updateActiveTab] only.
   }, [updateActiveTab]);
@@ -346,7 +381,7 @@ export function useScrollMemory({
     const live = liveScrollRef.current;
     if (sameTab && prevKey !== key && live && live.key === prevKey) {
       updateActiveTab((t) => ({
-        scrollPositions: { ...(t.scrollPositions || {}), [prevKey]: { y: live.y, pct: live.pct, anchorKey: live.anchorKey, anchorOff: live.anchorOff } }
+        scrollPositions: mergeScrollPosition(t.scrollPositions, prevKey, { y: live.y, pct: live.pct, anchorKey: live.anchorKey, anchorOff: live.anchorOff })
       }));
     }
     scrollKeyRef.current = key;

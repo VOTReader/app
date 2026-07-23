@@ -376,3 +376,70 @@ describe('useScrollMemory — journal viewer/editor keys are PER-ENTRY', () => {
     expect(tab.scrollPositions['journal-editor-e9']).toMatchObject({ y: 450 });
   });
 });
+
+describe('useScrollMemory — scrollPositions LRU bound (Wave 0)', () => {
+  // The map grew MONOTONICALLY forever: every screen ever scrolled added a
+  // key, and the whole tabs array (scrollPositions included) is persisted to
+  // localStorage on every nav by usePersistedState — an unbounded vot-state
+  // blob. The bound keeps the N most-recently-touched keys; keys are strings
+  // ('letter-x', 'genesis-3'), never integer-like, so JS object insertion
+  // order IS the LRU order. The restore READ path is untouched (protect-list
+  // invariant) — pruning only ever drops the coldest keys.
+
+  it('prunes to the most recent keys when the map overflows (coldest dropped)', async () => {
+    const { SCROLL_POSITIONS_MAX } = await import('./use-scroll-memory.js');
+    for (let i = 0; i < SCROLL_POSITIONS_MAX; i++) tab.scrollPositions['cold-' + i] = { y: i, pct: 0, anchorKey: null, anchorOff: 0 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(500); vi.advanceTimersByTime(150); }); // flush adds key #101
+    const keys = Object.keys(tab.scrollPositions);
+    expect(keys.length).toBe(SCROLL_POSITIONS_MAX);
+    expect(keys).toContain('letter-alpha');          // the fresh write survives
+    expect(keys).not.toContain('cold-0');            // the coldest is dropped
+    expect(keys).toContain('cold-' + (SCROLL_POSITIONS_MAX - 1)); // hottest cold key kept
+  });
+
+  it('re-touching an existing key refreshes its recency (LRU, not FIFO)', async () => {
+    const { SCROLL_POSITIONS_MAX } = await import('./use-scroll-memory.js');
+    // letter-alpha inserted FIRST (coldest), then MAX cold keys on top — the
+    // map is one OVER the bound, so the flush's re-touch of alpha must evict
+    // cold-0 (now coldest) instead of alpha.
+    tab.scrollPositions['letter-alpha'] = { y: 1, pct: 0, anchorKey: null, anchorOff: 0 };
+    for (let i = 0; i < SCROLL_POSITIONS_MAX; i++) tab.scrollPositions['cold-' + i] = { y: i, pct: 0, anchorKey: null, anchorOff: 0 };
+    renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(500); vi.advanceTimersByTime(150); }); // re-touches alpha
+    const keys = Object.keys(tab.scrollPositions);
+    expect(keys.length).toBe(SCROLL_POSITIONS_MAX);
+    expect(keys).toContain('letter-alpha');          // refreshed, NOT evicted
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 500 });
+    expect(keys).not.toContain('cold-0');            // eviction falls to the next-coldest
+  });
+
+  it('the nav-time commit prunes too, and the pruned record keeps the anchor shape (restore invariant)', async () => {
+    const { SCROLL_POSITIONS_MAX } = await import('./use-scroll-memory.js');
+    for (let i = 0; i < SCROLL_POSITIONS_MAX; i++) tab.scrollPositions['cold-' + i] = { y: i, pct: 0, anchorKey: null, anchorOff: 0 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    act(() => { scrollTo(1500); });            // pending stash for letter-alpha
+    rerender(baseProps({ letterId: 'beta' })); // nav-time commit writes alpha → overflow
+    const keys = Object.keys(tab.scrollPositions);
+    expect(keys.length).toBe(SCROLL_POSITIONS_MAX);
+    // The committed record carries the full { y, pct, anchorKey, anchorOff }
+    // shape — the content-anchor restore contract survives pruning intact.
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 1500 });
+    expect(tab.scrollPositions['letter-alpha']).toHaveProperty('anchorKey');
+    expect(tab.scrollPositions['letter-alpha']).toHaveProperty('anchorOff');
+    expect(keys).not.toContain('cold-0');
+  });
+
+  it('a RETAINED key still restores exactly after pruning (read path untouched)', async () => {
+    const { SCROLL_POSITIONS_MAX } = await import('./use-scroll-memory.js');
+    tab.scrollPositions['letter-beta'] = { y: 1234, pct: 0.5, anchorKey: null, anchorOff: 0 };
+    for (let i = 0; i < SCROLL_POSITIONS_MAX - 1; i++) tab.scrollPositions['cold-' + i] = { y: i, pct: 0, anchorKey: null, anchorOff: 0 };
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(el.scrollTop).toBe(1234); // exact restore, unchanged by the LRU layer
+  });
+});

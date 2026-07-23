@@ -121,4 +121,41 @@ describe('describeTab', () => {
   it('falls back to Home for an unknown screen', () => {
     expect(describeTab({ screen: 'totally-unknown' })).toEqual({ title: 'Home', subtitle: 'VOT Study Bible', resolved: true });
   });
+
+  // P1-8: every personal-content screen used to fall THROUGH to the Home
+  // default — and because that default is resolved:true, useTabTitleMemo
+  // trusted it and burned "Home" into the tab's stored title, so the Tabs
+  // overview labeled every journal/notes/library tab "Home" forever.
+  describe('personal-content screens (P1-8: no more mislabeled "Home")', () => {
+    it('labels every personal screen honestly (titles match the screen H1s)', () => {
+      expect(describeTab({ screen: 'journal-home' })).toEqual({ title: 'My Journal', subtitle: 'Journal entries', resolved: true });
+      expect(describeTab({ screen: 'journal-viewer' })).toEqual({ title: 'Journal Entry', subtitle: 'My Journal', resolved: true });
+      expect(describeTab({ screen: 'journal-editor' })).toEqual({ title: 'Journal Entry', subtitle: 'Editing · My Journal', resolved: true });
+      expect(describeTab({ screen: 'notes-index' })).toEqual({ title: 'My Notes', subtitle: 'Personal notes', resolved: true });
+      expect(describeTab({ screen: 'links-index' })).toEqual({ title: 'My Links', subtitle: 'Saved links', resolved: true });
+      expect(describeTab({ screen: 'bookmarks-index' })).toEqual({ title: 'My Bookmarks', subtitle: 'Saved places', resolved: true });
+      expect(describeTab({ screen: 'highlights-index' })).toEqual({ title: 'Highlights & Underlines', subtitle: 'Marked passages', resolved: true });
+      expect(describeTab({ screen: 'library' })).toEqual({ title: 'Library', subtitle: 'Your saved content', resolved: true });
+      expect(describeTab({ screen: 'my-progress' })).toEqual({ title: 'My Progress', subtitle: 'Reading progress', resolved: true });
+      expect(describeTab({ screen: 'about' })).toEqual({ title: 'About', subtitle: 'VOTReader', resolved: true });
+    });
+
+    it('enumerates EVERY corpus-independent route — none but home itself may label "Home"', () => {
+      // Every screen that needs no corpus lookup must describe itself with
+      // resolved:true and a non-Home title; the Home default is reserved for
+      // actual home tabs and unknown screens only. If a new route is added
+      // without a describeTab case, this enumeration forces the oversight.
+      const corpusIndependent = [
+        'scriptures-home', 'volumes-home', 'studies-home', 'garden-view',
+        'search', 'history', 'settings', 'about', 'library', 'my-progress',
+        'journal-home', 'journal-viewer', 'journal-editor', 'notes-index',
+        'links-index', 'bookmarks-index', 'highlights-index', 'home',
+      ];
+      for (const screen of corpusIndependent) {
+        const d = describeTab({ screen });
+        expect(d.resolved).toBe(true);
+        if (screen !== 'home') expect(d.title).not.toBe('Home');
+      }
+    });
+  });
 });

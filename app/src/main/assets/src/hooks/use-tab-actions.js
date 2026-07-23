@@ -56,7 +56,22 @@
 import { DEFAULT_TAB } from './use-tabs.js';
 import { showToast, hideToast } from '../utils/toast.js';
 
-const MAX_TABS = 999;
+// Wave 0 tab cap: a HUMANE bound (was 999) with EXPLICIT feedback at the cap
+// instead of a silent no-op — at 999 nothing happened on "new tab" and the
+// user got no explanation. 50 is far beyond any real reading session (the
+// Tabs overview is a card grid; past ~20 it's already unwieldy) while still
+// generous. Both silent-fail sites (openNewTab, restoreClosedTab) toast.
+const MAX_TABS = 50;
+
+// Cap-hit feedback via the standard toast primitive (utils/toast.js); the
+// plain 'vot-toast' class is the existing neutral-toast styling (same class
+// notes-export uses). text (not html) — SEC-2 safe path; default 3 s,
+// aria-live polite per the toast live-region convention.
+const _tabCapToast = () => showToast({
+  id: 'vot-toast-tab-cap',
+  className: 'vot-toast',
+  text: `Tab limit reached (${MAX_TABS}). Close a tab to open a new one.`,
+});
 
 /**
  * Tab operations (open/close/switch + close-other variants + the long-
@@ -102,7 +117,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
     hideToast('vot-toast-undo');
     if (!snap) return;
     setTabs((prev) => {
-      if (prev.length >= MAX_TABS) return prev;
+      if (prev.length >= MAX_TABS) { _tabCapToast(); return prev; }
       const at = Math.max(0, Math.min(snap.idx, prev.length));
       const next = prev.slice();
       next.splice(at, 0, snap.tab);
@@ -125,7 +140,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
   // (setters) or destroy useCallback's referential stability (cancelDwell).
   const openNewTab = React.useCallback(() => {
     setTabs((prev) => {
-      if (prev.length >= MAX_TABS) return prev;
+      if (prev.length >= MAX_TABS) { _tabCapToast(); return prev; }
       const next = [...prev, { ...DEFAULT_TAB }];
       setActiveTabIdx(next.length - 1);
       return next;

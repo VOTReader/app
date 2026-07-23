@@ -112,3 +112,54 @@ describe('useTabActions — reorderTabs (drag-to-reorder)', () => {
     expect(ts.setActiveTabIdx).not.toHaveBeenCalled();
   });
 });
+
+/* Wave 0 tab cap: a HUMANE cap (50, was 999) with EXPLICIT toast feedback at
+   the cap instead of the silent no-op (`return prev`). At 999 the failure was
+   invisible — the user tapped "new tab", nothing happened, no explanation. */
+describe('useTabActions — tab cap + feedback (Wave 0)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+  const fiftyTabs = () => Array.from({ length: 50 }, (_, i) => tab('t' + i));
+
+  it('the cap is humane (50), not the old 999', () => {
+    const ts = makeTabState([tab('a')]);
+    const { result } = mount(ts);
+    expect(result.current.MAX_TABS).toBe(50);
+  });
+
+  it('openNewTab at the cap leaves the array unchanged AND tells the user (toast)', () => {
+    const ts = makeTabState(fiftyTabs());
+    const { result } = mount(ts);
+    act(() => { result.current.openNewTab(); });
+    const updater = ts.setTabs.mock.calls[0][0];
+    const prev = fiftyTabs();
+    expect(updater(prev)).toBe(prev); // still a no-op on the state…
+    expect(showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'vot-toast-tab-cap', text: expect.stringContaining('50') }),
+    ); // …but no longer a SILENT one
+  });
+
+  it('openNewTab below the cap adds a tab with NO cap toast', () => {
+    const ts = makeTabState([tab('a'), tab('b')]);
+    const { result } = mount(ts);
+    act(() => { result.current.openNewTab(); });
+    const next = ts.setTabs.mock.calls[0][0]([tab('a'), tab('b')]);
+    expect(next.length).toBe(3);
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('restoreClosedTab at the cap also surfaces the cap toast', () => {
+    // Seed the undo snapshot via a real close below the cap, then grow the
+    // array to the cap before undoing (e.g. closed one, opened others).
+    const ts = makeTabState([tab('a'), tab('b')]);
+    const { result } = mount(ts);
+    act(() => { result.current.closeTab(0); });
+    ts.setTabs.mock.calls[0][0]([tab('a'), tab('b')]); // apply close → snapshot {a, 0}
+    vi.clearAllMocks();
+    act(() => { result.current.restoreClosedTab(); });
+    const prev = fiftyTabs();
+    expect(ts.setTabs.mock.calls[0][0](prev)).toBe(prev);
+    expect(showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'vot-toast-tab-cap' }),
+    );
+  });
+});
