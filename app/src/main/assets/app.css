@@ -61,6 +61,32 @@
         border-color: rgba(176,144,56,0.5);
         box-shadow: 0 8px 28px rgba(0,0,0,0.18);
       }
+      /* .jrn-milestone-toast — the journal milestone celebration pill
+         (jrnShowMilestoneToast, journal-stats-store.js; lifecycle owned by
+         the showToast utility). Wave-0 (P1-5) RESTORE: these rules were
+         lost when the journal injected-stylesheet was dismantled (2db70f5
+         dropped them from journal-styles.js), leaving the toast an
+         unstyled, never-dismissing div — showToast's `.show` add/remove was
+         a visual no-op. Rules recovered verbatim from 5d518a4 (the original
+         gold TOP pill — vot-toast is the BOTTOM sheet, this one drops in
+         from the top, translateY(-20px) → 0). Theme-safe with no light
+         override: --bg3/--gold are per-theme tokens (light swaps them to
+         cream/olive at :root). prefers-reduced-motion is honored by the
+         global W10-lite block (transitions collapse to 0.01ms, so the
+         pill appears/disappears instantly instead of sliding). */
+      .jrn-milestone-toast {
+        position: fixed; top: 80px; left: 50%;
+        transform: translateX(-50%) translateY(-20px);
+        background: var(--bg3); border: 1px solid var(--gold); color: var(--gold);
+        padding: 10px 18px; border-radius: 999px;
+        font-family: var(--font-cinzel); font-size: 11px;
+        text-transform: uppercase; letter-spacing: 0.1em;
+        z-index: 9000; opacity: 0; pointer-events: none;
+        transition: opacity 0.3s, transform 0.3s;
+        display: flex; align-items: center; gap: 8px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+      }
+      .jrn-milestone-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
       .vot-toast-sw-update { position:fixed; z-index:9999; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + 2rem); max-width:min(92%,32rem); background:rgba(20,20,24,0.96); color:#f0e6d2; border:1px solid var(--gold-border,rgba(255,215,140,0.35)); border-radius:12px; padding:14px 20px; font-family:var(--font-cinzel,Georgia,serif); font-size:0.82rem; letter-spacing:0.04em; line-height:1.45; text-align:center; box-shadow:0 8px 28px rgba(0,0,0,0.55); cursor:pointer; pointer-events:auto; opacity:0; transition:opacity 220ms ease-out; }
       .vot-toast-sw-update.show { opacity:1; }
       body.light .vot-toast-sw-update { background:rgba(247,242,232,0.96); color:#2a2018; border-color:rgba(176,144,56,0.5); }
@@ -328,8 +354,39 @@
          mouse/touch focus while preserving it for Tab/Shift-Tab
          keyboard navigation. Replaces the previous global outline:none
          that killed keyboard focus app-wide. */
-      button:focus:not(:focus-visible), a:focus:not(:focus-visible), [role="button"]:focus:not(:focus-visible) { outline: none; }
-      button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+      button:focus:not(:focus-visible), a:focus:not(:focus-visible), [role="button"]:focus:not(:focus-visible),
+      [role="tab"]:focus:not(:focus-visible), [role="switch"]:focus:not(:focus-visible),
+      [role="radio"]:focus:not(:focus-visible), [role="slider"]:focus:not(:focus-visible),
+      [role="combobox"]:focus:not(:focus-visible) { outline: none; }
+      button:focus-visible, a:focus-visible, [role="button"]:focus-visible,
+      [role="tab"]:focus-visible, [role="switch"]:focus-visible,
+      [role="radio"]:focus-visible, [role="slider"]:focus-visible,
+      [role="combobox"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+      /* Wave-0: the ring previously stopped at buttons/links/cards. The
+         role selectors above extend the SAME token to the remaining
+         interactive families — tabs (SearchScreen corpus tabs, LinkPicker
+         scope radios today render as <button> and were already covered;
+         the role selectors make the guarantee hold for any future non-
+         button implementation), switches, radios, slider scrubs (journal
+         waveform), and combobox-style select triggers (SelectField).
+         The settings switch needs a PROJECTION, not just a selector —
+         its rule lives with the .settings-toggle block below. */
+      /* .sr-only — standard visually-hidden-but-screen-reader-available
+         utility (Wave-0). The app had none: several aria patterns
+         (icon-only buttons, state announcements, skip text) need text that
+         is rendered for AT but never painted. The clip/1px/nowrap pattern
+         is the battle-tested idiom — display:none / visibility:hidden /
+         0px sizing would all remove the node from the accessibility tree.
+         Do NOT restyle per-use; compose additional classes alongside. */
+      .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
       /* W10-lite — honor the OS "reduce motion" setting (vestibular a11y).
          Near-zero (not 0) keeps animationend/transitionend firing, so JS that
          awaits a transition (sheet close, toast fade) never hangs; scroll jumps
@@ -1005,6 +1062,17 @@
         border: 1px solid var(--gold-border); border-radius: 14px;
         box-shadow: 0 6px 24px rgba(0,0,0,0.5);
         animation: annHintIn 0.5s ease;
+        /* Wave-0 (P1-1): the pill teaches the long-press gesture yet sat
+           ON TOP of the reading text — a long-press landing under the pill
+           selected the pill's own label and raised the native Copy menu,
+           punishing the exact gesture it advertises. pointer-events:none
+           makes the whole pill click-through so the gesture reaches the
+           verse text beneath (the ✕ close re-enables events on itself
+           below); user-select:none keeps the pill's label out of any
+           selection that starts inside it. */
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-select: none;
       }
       body.light .ann-hint-pill { background: rgba(247,242,232,0.97); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
       @keyframes annHintIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
@@ -1014,6 +1082,9 @@
         font-size: 0.88rem; line-height: 1.35; color: var(--cream-dim);
       }
       .ann-hint-close {
+        /* Only interactive child of the click-through pill — re-enable
+           events here so the ✕ still dismisses (P1-1). */
+        pointer-events: auto;
         background: none; border: none; cursor: pointer;
         color: var(--gold-dim); font-size: 1.1rem; line-height: 1;
         padding: 10px 12px; flex-shrink: 0;
@@ -1746,11 +1817,19 @@
       }
       .surprise-fab {
         margin:1.2rem 0 calc(var(--inset-bottom, 0px) + 1.5rem);
-        width:52px; height:52px; padding:0;
-        display:flex; align-items:center; justify-content:center;
+        min-width:52px; min-height:52px; padding:0;
+        display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.4rem;
         background:transparent; border:none;
         color:var(--gold); cursor:pointer;
         transition:transform 0.2s ease;
+      }
+      /* Wave 0 — visible caption under the dice; matches the aria-label
+         (label-in-name). Styled after .home-rearrange-hint. */
+      .surprise-fab-caption {
+        font-family:'Cinzel', serif;
+        font-size:0.56rem; letter-spacing:0.22em; text-transform:uppercase;
+        color:var(--gold-dim); opacity:0.8;
+        pointer-events:none;
       }
       .surprise-fab svg {
         width:34px; height:34px;
@@ -1831,6 +1910,11 @@
     .settings-toggle input:checked ~ .settings-toggle-track { background:var(--gold); opacity:1; }
     .settings-toggle-thumb { position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--white); transition:transform 0.25s ease; pointer-events:none; box-shadow:0 1px 4px rgba(0,0,0,0.35); }
     .settings-toggle input:checked ~ .settings-toggle-thumb { transform:translateX(18px); }
+    /* P1-9: the switch input is visually hidden (opacity:0, 0×0), so the
+       global gold focus ring would be invisible/misplaced on it. Land the
+       ring on the TRACK instead — same :focus-visible gate as the global
+       button rule, so mouse taps still show no ring. */
+    .settings-toggle input:focus-visible ~ .settings-toggle-track { outline: 2px solid var(--gold); outline-offset: 2px; }
     /* ── ABOUT SCREEN ── */
     .about-screen { min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1.25rem 4rem; }
     .about-card { width:100%; max-width:560px; background:var(--bg2); border:1px solid var(--gold-border); border-radius:14px; padding:2rem 1.6rem 2.2rem; text-align:center; }
@@ -2079,11 +2163,25 @@
     .srch-quick-row { display:flex; flex-wrap:wrap; gap:0.45rem; justify-content:center; padding:0.6rem 1rem 1.2rem; }
     .srch-quick-chip { background:var(--gold-faint); border:1px solid var(--gold-border); color:var(--gold); font-family:'Cinzel',serif; font-size:0.56rem; letter-spacing:0.14em; text-transform:uppercase; padding:0.35rem 0.7rem; border-radius:20px; cursor:pointer; }
     .srch-quick-chip:active { background:rgba(200,164,86,0.2); }
+    /* W0 (micro-gap b): per-recent remove ✕. The wrap keeps the chip visually
+       identical (same padding/radius); the ✕ overlays its right end. 28px
+       floor on the remove button — below the 44px ideal but the chip itself
+       remains the primary (large) target; the ✕ is a secondary affordance. */
+    .srch-quick-chip-wrap { position:relative; display:inline-flex; }
+    .srch-quick-chip-wrap .srch-quick-chip { padding-right:1.6rem; }
+    .srch-chip-remove { position:absolute; right:0.1rem; top:50%; transform:translateY(-50%); min-width:28px; min-height:28px; background:none; border:none; color:var(--gold-dim); cursor:pointer; font-size:0.7rem; line-height:1; padding:0 0.2rem; }
+    .srch-chip-remove:active { color:var(--gold); }
 
     .srch-error { padding:1rem 1.2rem; color:#d98888; font-family:'EB Garamond',serif; font-size:0.9rem; background:rgba(217,136,136,0.06); border-bottom:1px solid rgba(217,136,136,0.3); }
     .srch-progress { padding:0.5rem 1rem; background:var(--bg2); color:var(--gold-dim); font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; }
     .srch-progress-bar { height:2px; background:var(--gold-border); margin-top:0.35rem; border-radius:1px; overflow:hidden; }
     .srch-progress-bar-fill { height:100%; background:var(--gold); transition:width 0.2s; }
+    /* W0 (micro-gap c): indeterminate variant for the in-flight search
+       indicator (no total to measure against). The global
+       prefers-reduced-motion rule near-zeros the animation, so reduced-motion
+       users get a static bar + the "Searching…" status text. */
+    .srch-progress-bar-fill.srch-indeterminate { width:38%; animation:srch-indet 1.2s ease-in-out infinite; }
+    @keyframes srch-indet { 0% { transform:translateX(-110%); } 100% { transform:translateX(270%); } }
 
     .srch-input-row { display:flex; align-items:center; gap:0.4rem; flex:1; min-width:0; }
     .srch-clear-btn { background:none; border:none; color:var(--gold-dim); cursor:pointer; font-size:1.2rem; padding:0 0.35rem; font-family:'Cinzel',serif; flex-shrink:0; }
@@ -3912,6 +4010,13 @@
       font-size: 0.86rem; color: var(--cream-muted);
       line-height: 1.35;
       margin-top: auto;
+    }
+    /* Wave 0 — empty-tile "how X happens" caption (LibraryScreen guide).
+       Sits under the italic detail line; non-italic, plainer, dimmer. */
+    .library-tile-guide {
+      font-family: 'EB Garamond', serif;
+      font-size: 0.78rem; color: var(--cream-dim);
+      line-height: 1.3; opacity: 0.85;
     }
     .library-tile-arrow {
       position: absolute; top: 1.1rem; right: 1.1rem;
