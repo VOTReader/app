@@ -264,7 +264,14 @@ export function useAndroidBack({
       if (s === "scriptures-home") {goHome();return "true";} else
       if (s === "volumes-home") {goHome();return "true";} else
       if (s === "matthew-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {setChapterNum(null);setScreen("matthew-idx");}return "true";} else
-      if (s === "matthew-idx") {if (fromStudiesRef.current) {setFromStudies(false);goStudiesHome();} else {goHome();}return "true";} else
+      // Wave 0 (P1-13 + matthew-idx hub parity): fromSearch is armed on
+      // book-level search results too (ref-book lands on the -idx screens),
+      // but was previously consumed only on chapter screens — a stale flag
+      // then teleported a later chapter-level Back into an old search
+      // session. Consume it FIRST on both index branches. The matthew-idx
+      // fallbacks now match bible-idx (genre → scriptures home) instead of
+      // skipping the parent hub straight to Home.
+      if (s === "matthew-idx") {if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else if (fromStudiesRef.current) {setFromStudies(false);goStudiesHome();} else if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}return "true";} else
       if (s === "studies-home") {goHome();return "true";} else
       if (s === "bible-study-index") {goStudiesHome();return "true";} else
       if (s === "bible-study-chapter") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");return "true";}const cur = getStudyById(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
@@ -279,7 +286,7 @@ export function useAndroidBack({
            arrives. */
         const _BOOKS = (typeof BOOKS !== 'undefined') ? BOOKS : null;
         if (bid && _BOOKS && _BOOKS[bid]?.chapters.length === 1) {if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}} else {setChapterNum(null);setScreen("bible-idx");}}return "true";} else
-      if (s === "bible-idx") {if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}return "true";} else
+      if (s === "bible-idx") {if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}return "true";} else
       // Letter screens: unified back via COLLECTIONS registry
       { const col = COL_BY_LETTER_SC.get(s);
       if (col) {

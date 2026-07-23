@@ -110,6 +110,11 @@
      setFromSearch            Marks the next nav as originated from
                               search (so back-from-letter knows to
                               return to search results).
+     setGenreId               Cleared on every handleSearchSelect
+                              dispatch — a search result is a non-genre
+                              entry, and a stale genreId would misroute
+                              a later index-level Back into a genre
+                              visited in an earlier session leg.
      setActiveReadKey         From useReadingDwell. Used by
                               handleSearchSelect to set the dwell-timer
                               gate when navigating into a letter.
@@ -188,6 +193,7 @@ import { useRefMirror } from './use-ref-mirror.js';
  *   setStudyChapterId: (v: any) => void,
  *   setSurpriseAnchor: (v: any) => void,
  *   setFromSearch: (v: any) => void,
+ *   setGenreId: (v: any) => void,
  *   setActiveReadKey: (key: string, commitFn?: (() => void) | null) => void,
  *   setLastReadForVol: (volKey: string, letterId: string) => void,
  *   handleSurprise: () => void,
@@ -210,7 +216,7 @@ export function useSearch({
   tabField,
   screen, bookId, chapterNum, letterId,
   setScreen, setBookId, setChapterNum, setLetterId,
-  setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch,
+  setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setGenreId,
   setActiveReadKey, setLastReadForVol,
   handleSurprise, goSettings, goHome,
 }) {
@@ -325,6 +331,13 @@ export function useSearch({
   // verse-anchor scroll) and routes to the destination screen.
   const handleSearchSelect = (entry) => {
     setFromSearch(true);
+    // Wave 0 (sticky genreId): genreId is set ONLY by goScriptureGenre and
+    // consulted by the bible-idx / matthew-idx / single-chapter back
+    // branches, but goHome doesn't clear it — so it can outlive the genre
+    // visit that set it. Every search-result dispatch is a non-genre entry
+    // into the corpus; clear it here (once, top-level) so a later
+    // index-level Back can't misroute into a genre never visited this leg.
+    setGenreId(null);
     // Direct parsed reference (from __direct entries)
     if (entry && entry.__direct && entry.ref) {
       const r = entry.ref;

@@ -34,15 +34,28 @@
    threaded as props) resolve from window at call time.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* Wave 0 (index-marker decouple): the current-chapter marker in a chapter
+   index answers "where was I in THIS book" and must NOT be coupled to
+   settings.showReadingDot — that toggle gates only the resume-reading dot
+   in the top nav (app.jsx → ReadingChromeProvider dotEnabled). Extracted
+   as a pure helper so the decoupling is pinned by test
+   (ChapterIndex.test.jsx). */
+export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
+  return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
+}
+
 export function buildScreenRoutes({
   // ── State + setters (tab-field-backed) ──
   screen, setScreen,
   bookId, setBookId, chapterNum, setChapterNum,
   letterId, setLetterId,
-  studyId, setStudyId, studyChapterId, setStudyChapterId,
+  // (setStudyId is intentionally NOT destructured — History onSelect now
+  //  routes study entries through navigateToLink, which owns that setter.)
+  studyId, studyChapterId, setStudyChapterId,
   fromStudies, setFromStudies,
+  fromSearch, setFromSearch,
   mode, setMode, showStudy, setShowStudy,
-  genreId, surpriseAnchor, setSurpriseAnchor,
+  genreId, setGenreId, surpriseAnchor, setSurpriseAnchor,
   // ── Theme + settings + display ──
   theme, setTheme,
   settings, setSettings, toggleSetting, updateSetting,
@@ -336,22 +349,32 @@ export function buildScreenRoutes({
         history={readHistory}
         onBack={goNavOrigin}
         onSelect={(entry) => {
+          // Wave 0 (P1-12): History was the only content entry point that set
+          // nav state directly with NO origin capture, so Back from the entry
+          // never returned to History. Route through navigateToLink — the same
+          // fromLetter-stack origin capture the Library index screens use —
+          // with the 'History' back-pill title; Back (step 3 / 3b in
+          // use-android-back) then unwinds to the history screen. The
+          // setActiveReadKey dwell-gate / last-read bookkeeping stays here:
+          // navigateToLink deliberately doesn't do it.
+          // Wave 0 (sticky genreId): entering content from History is a
+          // non-genre entry — clear genreId so a later index-level Back
+          // can't misroute into a genre visited in an earlier session leg.
           if (entry.type === 'study-chapter') {
             const study = getStudyById(entry.studyId);
             if (!study) return;
-            setStudyId(entry.studyId);
-            setStudyChapterId(entry.studyChapterId);
+            setGenreId(null);
             setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
-            setScreen('bible-study-chapter');
+            navigateToLink({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History' });
           } else if (entry.type === 'letter') {
-            setLetterId(entry.letterId);
             var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get('one') : COL_BY_KEY.get('two'));
+            setGenreId(null);
             setActiveReadKey('vol:' + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
-            setScreen(_hc.letterScreen);
+            navigateToLink({ screen: _hc.letterScreen, letterId: entry.letterId }, { sourceLetterTitle: 'History' });
           } else {
-            setBookId(entry.bookId);setChapterNum(entry.chapterNum);
+            setGenreId(null);
             setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
-            setScreen(entry.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
+            navigateToLink({ type: 'bible', bookId: entry.bookId, chapter: entry.chapterNum }, { sourceLetterTitle: 'History' });
           }
         }}
         onSearch={goSearch}
@@ -561,15 +584,26 @@ export function buildScreenRoutes({
     'matthew-idx': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
       if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
+      // Wave 0: onBack + backLabel mirror the matthew-idx hardware-back
+      // branch in use-android-back.js — fromSearch is consumed FIRST (a
+      // book-level search result lands here; P1-13), then fromStudies,
+      // then the genre / Scriptures hub fallbacks that bible-idx already
+      // had (matthew-idx previously skipped its parent hub to Home).
+      const _idxGenre = genreId && typeof SCRIPTURE_GENRES !== 'undefined'
+        ? [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt].find((g) => g.id === genreId)
+        : null;
       return (
         <ChapterIndex
           book={MATTHEW}
           onSelect={selectMatthewCh}
-          onBack={() => { if (fromStudies) { setFromStudies(false); goStudiesHome(); } else { goHome(); } }}
+          onBack={() => { if (fromSearch) { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
+          // Wave 0: label names the real destination (Search / Studies /
+          // the genre / Scriptures — never "Books").
+          backLabel={fromSearch ? 'Search' : fromStudies ? 'Studies' : _idxGenre ? _idxGenre.label : 'Scriptures'}
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
-          currentChapter={settings.showReadingDot && activeReadKey === 'matthew' ? lastReadChapters['matthew'] || null : null}
+          currentChapter={chapterIndexCurrentChapter('matthew', activeReadKey, lastReadChapters)}
           isRead={(num) => isRead('matthew', num)}
           markAsReadEnabled={settings.markAsRead}
           theme={theme} onThemeChange={setTheme}
@@ -598,15 +632,24 @@ export function buildScreenRoutes({
       />
     ),
     'bible-idx': () => {
+      // Wave 0: the index back goes to the GENRE screen when one is active
+      // (scripture-genre), otherwise to Scriptures — name that destination
+      // in the back tooltip + TalkBack label instead of "Books". fromSearch
+      // is consumed FIRST (a book-level search result lands here; P1-13) —
+      // mirrors the bible-idx hardware-back branch in use-android-back.js.
+      const _idxGenre = genreId && typeof SCRIPTURE_GENRES !== 'undefined'
+        ? [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt].find((g) => g.id === genreId)
+        : null;
       if (book) return (
         <ChapterIndex
           book={book}
           onSelect={selectBibleCh}
-          onBack={genreId ? () => setScreen('scripture-genre') : goScripturesHome}
+          onBack={fromSearch ? () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } : genreId ? () => setScreen('scripture-genre') : goScripturesHome}
+          backLabel={fromSearch ? 'Search' : _idxGenre ? _idxGenre.label : 'Scriptures'}
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
-          currentChapter={settings.showReadingDot && activeReadKey === bookId ? lastReadChapters[bookId] || null : null}
+          currentChapter={chapterIndexCurrentChapter(bookId, activeReadKey, lastReadChapters)}
           isRead={(num) => isRead(bookId, num)}
           markAsReadEnabled={settings.markAsRead}
           restoredNames={settings.restoredNames}

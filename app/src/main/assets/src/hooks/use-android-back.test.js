@@ -207,6 +207,107 @@ describe('useAndroidBack — "Back to …" pill parity on chapter tap-throughs',
   });
 });
 
+describe('useAndroidBack — P1-13 fromSearch consumed on index backs', () => {
+  // fromSearch is armed by handleSearchSelect for EVERY result kind — including
+  // ref-book, which lands on bible-idx / matthew-idx. Pre-fix those index
+  // branches never consumed the flag, so a later chapter-level Back teleported
+  // into a long-stale search session. The index branches now consume it first.
+  it('back from bible-idx with fromSearch armed returns to search (not the genre hub)', () => {
+    const props = baseProps({ screen: 'bible-idx', fromSearch: true, genreId: 'the-law' });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.setFromSearch).toHaveBeenCalledWith(false);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('search');
+    expect(props.setScreen).not.toHaveBeenCalledWith('scripture-genre');
+    expect(props.goScripturesHome).not.toHaveBeenCalled();
+  });
+
+  it('back from matthew-idx with fromSearch armed returns to search', () => {
+    const props = baseProps({ screen: 'matthew-idx', fromSearch: true });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setFromSearch).toHaveBeenCalledWith(false);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('search');
+    expect(props.goHome).not.toHaveBeenCalled();
+  });
+
+  it('fromSearch beats fromStudies on matthew-idx (most recent intent wins)', () => {
+    const props = baseProps({ screen: 'matthew-idx', fromSearch: true, fromStudies: true });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setScreen).toHaveBeenCalledWith('search');
+    expect(props.goStudiesHome).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAndroidBack — matthew-idx back matches the bible-idx hub pattern', () => {
+  it('plain matthew-idx back goes to Scriptures (its parent hub), not Home', () => {
+    const props = baseProps({ screen: 'matthew-idx' });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.goScripturesHome).toHaveBeenCalledTimes(1);
+    expect(props.goHome).not.toHaveBeenCalled();
+  });
+
+  it('matthew-idx back with an active genre returns to scripture-genre', () => {
+    const props = baseProps({ screen: 'matthew-idx', genreId: 'gospels' });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setScreen).toHaveBeenCalledWith('scripture-genre');
+    expect(props.goScripturesHome).not.toHaveBeenCalled();
+  });
+
+  it('matthew-idx back from a study still goes to Studies (regression guard)', () => {
+    const props = baseProps({ screen: 'matthew-idx', fromStudies: true });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setFromStudies).toHaveBeenCalledWith(false);
+    expect(props.goStudiesHome).toHaveBeenCalledTimes(1);
+    expect(props.goScripturesHome).not.toHaveBeenCalled();
+  });
+
+  it('bible-idx back with an active genre returns to scripture-genre (regression guard)', () => {
+    const props = baseProps({ screen: 'bible-idx', genreId: 'the-law' });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setScreen).toHaveBeenCalledWith('scripture-genre');
+    expect(props.goScripturesHome).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAndroidBack — P1-12 History tap-through return path', () => {
+  // History onSelect routes through navigateToLink, which pushes a
+  // { sourceScreen: 'history' } entry onto the fromLetter stack. Back from
+  // the destination must unwind it — the same machinery the Library index
+  // screens already use (step 3 for letters, step 3b for chapters).
+  it('back from a letter entered via History pops the stack and returns to history', () => {
+    const stack = [{ sourceScreen: 'history', sourceLetterTitle: 'History', sourceBookId: 'john', sourceChapterNum: 3 }];
+    const props = baseProps({ screen: 'vot-one-letter', fromLetterRef: { current: stack } });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.setFromLetterStack).toHaveBeenCalled();
+    expect(props.setScreen).toHaveBeenCalledWith('history');
+  });
+
+  it('back from a chapter entered via History defers to the back-pill handler (tapThroughBack)', () => {
+    const props = baseProps({
+      screen: 'bible-ch', bookId: 'john',
+      fromLetterRef: { current: [{ sourceScreen: 'history', sourceLetterTitle: 'History' }] },
+      backHint: { title: 'History', volumeLabel: null },
+    });
+    renderHook(() => useAndroidBack(props));
+    const res = window.handleAndroidBack();
+    expect(res).toBe('true');
+    expect(props.tapThroughBack).toHaveBeenCalledTimes(1);
+    expect(props.setScreen).not.toHaveBeenCalledWith('bible-idx');
+  });
+});
+
 describe('useAndroidBack — NAV1 modal registry consumes hardware-back', () => {
   it('an open registered modal is dismissed by Back and does NOT navigate the screen underneath', () => {
     // bible-ch WOULD route to bible-idx — prove the registered modal wins first.

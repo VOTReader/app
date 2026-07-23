@@ -148,6 +148,7 @@ const baseProps = () => ({
   setStudyChapterId: vi.fn(),
   setSurpriseAnchor: vi.fn(),
   setFromSearch: vi.fn(),
+  setGenreId: vi.fn(),
   setActiveReadKey: vi.fn(),
   setLastReadForVol: vi.fn(),
   handleSurprise: vi.fn(),
@@ -521,6 +522,37 @@ describe('useSearch — handleSearchSelect (Orama doc results)', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'unknown-kind' } }); });
     expect(props.setScreen).not.toHaveBeenCalled();
+  });
+});
+
+// ── handleSearchSelect — genreId clear (sticky-genre fix) ───────────────
+
+describe('useSearch — handleSearchSelect clears genreId (non-genre entry)', () => {
+  // genreId is set ONLY by goScriptureGenre and consulted by the bible-idx /
+  // matthew-idx / single-chapter back branches. It survives Home visits
+  // (goHome doesn't clear it), so without an entry-side clear a search
+  // session entered after an earlier genre visit would misroute a later
+  // index-level Back into that genre. Every search-result dispatch is a
+  // non-genre entry → the flag is cleared unconditionally on select.
+  it('ref-book (book-level result → index) clears genreId', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({
+      __direct: true, __corpus: 'volumes',
+      ref: { kind: 'ref-book', bookId: 'genesis' },
+    }); });
+    expect(props.setGenreId).toHaveBeenCalledWith(null);
+  });
+
+  it('verse doc (chapter hit) clears genreId', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1 } }); });
+    expect(props.setGenreId).toHaveBeenCalledWith(null);
+  });
+
+  it('letter doc clears genreId too (top-level, every dispatch path)', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'wide-path' } }); });
+    expect(props.setGenreId).toHaveBeenCalledWith(null);
   });
 });
 

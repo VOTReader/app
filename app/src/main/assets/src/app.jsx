@@ -617,6 +617,7 @@ function App() {
     screen, bookId, chapterNum, letterId,
     setScreen, setBookId, setChapterNum, setLetterId,
     setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch,
+    setGenreId, // Wave 0 (sticky genreId): useSearch clears it on every result dispatch
     setActiveReadKey, setLastReadForVol,
     handleSurprise, goSettings, goHome,
   });
@@ -673,8 +674,9 @@ function App() {
     letterId, setLetterId,
     studyId, setStudyId, studyChapterId, setStudyChapterId,
     fromStudies, setFromStudies,
+    fromSearch, setFromSearch, // Wave 0 (P1-13): index onBack props consume it
     mode, setMode, showStudy, setShowStudy,
-    genreId, surpriseAnchor, setSurpriseAnchor,
+    genreId, setGenreId, surpriseAnchor, setSurpriseAnchor,
     theme, setTheme,
     settings, setSettings, toggleSetting, updateSetting,
     titleFocusHidden, setTitleFocusHidden,
