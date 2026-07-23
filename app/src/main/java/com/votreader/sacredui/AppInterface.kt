@@ -1,6 +1,8 @@
 package com.votreader.sacredui
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.util.Base64
@@ -109,6 +111,20 @@ class AppInterface(
         }
     }
 
+    /**
+     * #1: JS calls this once the React tree has painted its first frame (the rAF
+     * trigger in useLazyBundles), so the splash releases on a DETERMINISTIC
+     * app-ready handshake instead of a hopeful post-onPageFinished delay — no
+     * black-background flash on a slow / thermally-throttled device. onPageFinished
+     * keeps a longer FALLBACK release and onReceivedError + the 5 s hatch remain
+     * backstops, so a page that loads but never signals still un-sticks the splash.
+     * Idempotent (setting an already-false flag is a no-op).
+     */
+    @JavascriptInterface
+    fun onAppReady() {
+        host.postToUi { vm.splashHolding = false }
+    }
+
     // Called by the JS voice recorder BEFORE getUserMedia. If RECORD_AUDIO
     // is already granted we tell JS immediately; otherwise we show the OS
     // permission dialog and report the result via micPrepLauncher's
@@ -155,6 +171,33 @@ class AppInterface(
             } catch (e: Exception) {
                 Timber.w(e, "startAudioSession setMode failed")
             }
+            // #3 ("polite" journaling): request TRANSIENT-EXCLUSIVE audio focus so
+            // other media (music, a podcast) PAUSES while the user records, then
+            // resumes when we abandon it (endAudioSession / teardown). Idempotent —
+            // a double start (recovery re-fire, re-mounted sheet) keeps the one
+            // existing request rather than stacking a second. AudioFocusRequest +
+            // requestAudioFocus(request) are API 26, so no version guard is needed.
+            if (vm.audioFocusRequest == null) {
+                try {
+                    val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                        .setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build()
+                        )
+                        // No-op listener: we don't duck/resume our OWN capture on a
+                        // focus change — abandoning the stored request object is what
+                        // restores the other app's playback.
+                        .setOnAudioFocusChangeListener { }
+                        .build()
+                    vm.audioFocusRequest = req
+                    am.requestAudioFocus(req)
+                } catch (e: Exception) {
+                    Timber.w(e, "requestAudioFocus failed")
+                    vm.audioFocusRequest = null
+                }
+            }
         }
     }
 
@@ -165,6 +208,11 @@ class AppInterface(
     fun endAudioSession() {
         host.postToUi {
             val am = host.audioSystemService ?: return@postToUi
+            // #3: release audio focus first so the other app's music resumes.
+            vm.audioFocusRequest?.let {
+                try { am.abandonAudioFocusRequest(it) } catch (e: Exception) { Timber.w(e, "abandonAudioFocus failed") }
+            }
+            vm.audioFocusRequest = null
             try {
                 am.mode = vm.previousAudioMode
             } catch (e: Exception) {

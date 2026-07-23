@@ -1,6 +1,7 @@
 package com.votreader.sacredui
 
 import android.app.Application
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
@@ -42,6 +43,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ---- Audio session ----
     var previousAudioMode: Int = AudioManager.MODE_NORMAL
+
+    // #3: the transient-exclusive audio-focus request held while recording, so
+    // other media pauses. Non-null only between startAudioSession() and the
+    // matching endAudioSession()/teardown abandon. @Volatile — requested on the UI
+    // thread, abandoned from UI (endAudioSession) or a teardown path.
+    @Volatile var audioFocusRequest: AudioFocusRequest? = null
 
     // ---- Native recorder. Owns its own lock + recorder + temp-file state. ----
     val audioRecorder: NativeAudioRecorder = NativeAudioRecorder(application)

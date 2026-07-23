@@ -264,6 +264,12 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // it. 5s comfortably clears a normal cold boot (splash → first paint is
         // sub-second on real devices) while still bounding a wedged-renderer hang.
         private const val SPLASH_HATCH_MS = 5_000L
+
+        // #1: onPageFinished fallback for the splash release — long enough that the
+        // deterministic onAppReady() handshake (a few hundred ms after paint) wins
+        // on a healthy boot, short enough that a page which loads but never signals
+        // ready still un-sticks well before the 5 s absolute hatch.
+        private const val PAGE_FINISHED_SPLASH_FALLBACK_MS = 1_500L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -687,11 +693,16 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
                 injectInsets()
-                // Release the splash after a short delay — React mounts a
-                // tick or two after onPageFinished, so 80ms covers the gap
-                // without making the splash feel slow. If it's already
-                // dismissed (config change re-load), this is a no-op.
-                view.postDelayed({ vm.splashHolding = false }, 80L)
+                // #1: the PRIMARY splash release is now the deterministic
+                // AppInterface.onAppReady() handshake (fired when React paints its
+                // first frame), which lands within a few hundred ms — before this
+                // FALLBACK. onPageFinished only means the DOCUMENT loaded, not that
+                // React mounted, so releasing at ~80 ms here used to risk dismissing
+                // to a black background on a slow device. This longer fallback only
+                // fires if onAppReady never arrives on an otherwise-loaded page (a
+                // JS error before the ready call); whichever fires first wins
+                // (setting an already-false flag is a no-op).
+                view.postDelayed({ vm.splashHolding = false }, PAGE_FINISHED_SPLASH_FALLBACK_MS)
             }
 
             override fun onReceivedError(
@@ -1137,6 +1148,13 @@ class MainActivity : AppCompatActivity(), BridgeHost {
      */
     private fun restoreAudioModeIfActive() {
         val am = audioManager ?: return
+        // #3: release any audio focus we still hold so a crash/finish mid-recording
+        // doesn't leave the user's music paused (the JS endAudioSession may never
+        // fire on these teardown paths).
+        vm.audioFocusRequest?.let {
+            try { am.abandonAudioFocusRequest(it) } catch (e: Exception) { Timber.w(e, "abandonAudioFocus (teardown) failed") }
+        }
+        vm.audioFocusRequest = null
         if (am.mode == AudioManager.MODE_IN_COMMUNICATION) {
             try { am.mode = vm.previousAudioMode } catch (e: Exception) { Timber.w(e, "restoreAudioMode failed") }
         }

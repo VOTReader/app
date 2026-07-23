@@ -59,14 +59,16 @@ class StorageManager(private val context: Context) {
             val bytes = if (stream == null) {
                 ByteArray(0)
             } else {
-                // Bounded read: a provider that lied about the size stops
-                // here instead of inflating into an OOM. (readBytes() was
-                // the unbounded pre-fix call.)
-                stream.use { readBounded(it, maxBytes) }
+                // Sized read: the file size is known (checked 0..maxBytes above),
+                // so read into ONE pre-allocated ByteArray — no ByteArrayOutputStream
+                // doubling + no toByteArray() copy, halving peak heap (~1x the payload
+                // vs ~2x+) on a large legacy import. Still fail-loud on a lying
+                // provider that declares small then streams large (see readSized).
+                stream.use { readSized(it, size, maxBytes) }
                     ?: run {
                         Timber.w(
-                            "Import rejected: stream exceeded %d bytes despite declared size=%d",
-                            maxBytes, size
+                            "Import rejected: stream over-delivered past declared size=%d (limit=%d)",
+                            size, maxBytes
                         )
                         return Result.Failure("too_large")
                     }
@@ -455,6 +457,58 @@ class StorageManager(private val context: Context) {
             read += r
         }
         return read
+    }
+
+    /**
+     * Read a stream whose provider DECLARED [declaredSize] bytes (already checked
+     * 0..[max]) into a SINGLE pre-allocated ByteArray for the common exact-size
+     * case — no ByteArrayOutputStream doubling + no toByteArray() copy, so peak heap
+     * is ~1x the payload instead of ~2x+ (the OOM a large legacy import could hit on
+     * a budget device). Real file-pick providers report accurate sizes, so this is
+     * the path taken in practice.
+     *
+     * The declared size is only a HINT, so it can't be trusted for the SAFETY cap:
+     *  • SHORTER than declared (provider over-reported): return only the bytes read.
+     *  • LONGER than declared (provider under-reported): DON'T reject a possibly-
+     *    legit backup — spill the remainder into a growable buffer, still capped at
+     *    [max] (return null past it, the same fail-loud [readBounded] gives). This
+     *    rare path costs the old ~2x memory, but the common path stays ~1x.
+     * Returns null past [max], or on an OOM at the pre-allocation itself (an Error,
+     * not an Exception, so the caller's try/catch would miss it).
+     */
+    private fun readSized(input: InputStream, declaredSize: Long, max: Long): ByteArray? {
+        val cap = minOf(declaredSize, max)
+        val buf = try {
+            ByteArray(cap.toInt())
+        } catch (_: OutOfMemoryError) {
+            Timber.w("Import rejected: could not allocate %d bytes", cap)
+            return null
+        }
+        var read = 0
+        while (read < buf.size) {
+            val r = input.read(buf, read, buf.size - read)
+            if (r < 0) break               // EOF before the declared size (short file)
+            read += r
+        }
+        // Short file: fewer bytes than declared. Return exactly what arrived.
+        if (read < buf.size) return buf.copyOf(read)
+        // Exact fit unless the provider under-reported — peek one byte to tell.
+        val extra = input.read()
+        if (extra == -1) return buf        // exact: the common, ~1x-memory path
+        // Under-reported: read the rest into a growable buffer, still capped at max.
+        val out = java.io.ByteArrayOutputStream(buf.size + 64 * 1024)
+        out.write(buf)
+        out.write(extra)
+        var total = read.toLong() + 1
+        val chunk = ByteArray(64 * 1024)
+        while (true) {
+            val r = input.read(chunk)
+            if (r < 0) break
+            total += r
+            if (total > max) return null   // fail-loud past the safety cap
+            out.write(chunk, 0, r)
+        }
+        return out.toByteArray()
     }
 
     /** Read the whole stream into memory, or null if it exceeds [max] bytes

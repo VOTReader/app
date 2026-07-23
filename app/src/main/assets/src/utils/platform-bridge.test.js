@@ -22,6 +22,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 const METHODS = [
   'setLightStatusBar',
   'setKeepScreenOn',
+  'onAppReady',
   'requestMicPermission',
   'startAudioSession',
   'endAudioSession',
@@ -67,6 +68,7 @@ function mockAndroidBridge() {
   return {
     setLightStatusBar: vi.fn(),
     setKeepScreenOn: vi.fn(),
+    onAppReady: vi.fn(),
     requestMicPermission: vi.fn(),
     startAudioSession: vi.fn(),
     endAudioSession: vi.fn(),
@@ -131,7 +133,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     delete (/** @type {any} */ (globalThis.window).AndroidBridge);
   });
 
-  it('exposes exactly the 35 expected keys', () => {
+  it('exposes exactly the 36 expected keys', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);
@@ -149,6 +151,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
   const voidCases = [
     ['setLightStatusBar', [true]],
     ['setKeepScreenOn', [false]],
+    ['onAppReady', []],
     ['setImmersiveMode', [true]],
     ['setZoomEnabled', [false]],
     ['resetZoom', []],

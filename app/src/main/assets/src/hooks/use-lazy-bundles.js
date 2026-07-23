@@ -13,6 +13,20 @@
    App() re-render when any of them flips, so the loading routes swap to the real
    screen. */
 export function useLazyBundles() {
+  // #1: signal the native splash to release the frame the React tree first paints —
+  // a DETERMINISTIC app-ready handshake (AppInterface.onAppReady), replacing the
+  // hopeful post-onPageFinished delay that could dismiss to a black background on a
+  // slow device. This hook is called once at App mount; the trigger lives HERE
+  // rather than in a dedicated app.jsx call because app.jsx is at its 800-line
+  // canary. requestAnimationFrame ensures a painted frame; onAppReady is a no-op on
+  // web (no native splash) + typeof-guarded so this is inert in unit tests.
+  React.useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      try { if (window.PlatformBridge) window.PlatformBridge.onAppReady(); } catch (_e) { /* best-effort */ }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.subscribe(cb) : () => {}), []),
     () => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.getVersion() : 0)

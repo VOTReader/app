@@ -284,6 +284,39 @@ class StorageManagerTest {
         )
     }
 
+    @Test
+    fun `readUriAsBase64 handles a provider that over-reports size (short file)`() {
+        // #2: the sized read pre-allocates the DECLARED size, but the stream may be
+        // shorter (a provider that over-reported). Return exactly the bytes that
+        // arrived, not a zero-padded declared-size buffer.
+        val uri = Uri.parse("content://test/short-file")
+        val actual = "abc".toByteArray(Charsets.UTF_8)   // 3 real bytes
+        every { cr.query(uri, any(), null, null, null) } returns
+            sizeCursor(100L)                             // declares 100
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(actual)
+
+        val result = storage.readUriAsBase64(uri)
+        assertIs<StorageManager.Result.Success<String>>(result)
+        assertTrue(Base64.decode(result.value, Base64.NO_WRAP).contentEquals(actual))
+    }
+
+    @Test
+    fun `readUriAsBase64 still imports when a provider under-reports size (within cap)`() {
+        // #2: a provider may under-report a POSITIVE size (fewer bytes than the file
+        // actually has). As long as the real content is within maxBytes we must NOT
+        // reject the user's backup — the sized read spills the remainder into a
+        // growable buffer and returns the FULL content (user-data safety).
+        val uri = Uri.parse("content://test/under-reported")
+        val actual = ByteArray(200) { (it and 0x7F).toByte() }  // 200 real bytes
+        every { cr.query(uri, any(), null, null, null) } returns
+            sizeCursor(10L)                                     // declares only 10
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(actual)
+
+        val result = storage.readUriAsBase64(uri, maxBytes = 1024L)  // 200 < 1024 cap
+        assertIs<StorageManager.Result.Success<String>>(result)
+        assertTrue(Base64.decode(result.value, Base64.NO_WRAP).contentEquals(actual))
+    }
+
     // ─── writeTextToUri (SAF export) ──────────────────────────────────
     // The export writer now targets a user-chosen SAF document URI
     // (ACTION_CREATE_DOCUMENT) instead of the MediaStore.Downloads

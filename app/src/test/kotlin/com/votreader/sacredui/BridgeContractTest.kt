@@ -27,6 +27,7 @@ class BridgeContractTest {
     private val expectedContract = mapOf(
         "setLightStatusBar" to 1,
         "setKeepScreenOn" to 1,
+        "onAppReady" to 0,
         "setImmersiveMode" to 1,
         "setZoomEnabled" to 1,
         "resetZoom" to 0,

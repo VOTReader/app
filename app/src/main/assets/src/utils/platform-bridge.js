@@ -47,6 +47,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @typedef {Object} PlatformBridgeShape
  * @property {(light: boolean) => void} setLightStatusBar
  * @property {(enabled: boolean) => void} setKeepScreenOn
+ * @property {() => void} onAppReady
  * @property {(immersive: boolean) => void} setImmersiveMode
  * @property {(enabled: boolean) => void} setZoomEnabled
  * @property {() => void} resetZoom
@@ -119,6 +120,7 @@ function mergeCrashLog(nativeJson) {
 const androidImpl = {
   setLightStatusBar: (light) => /** @type {any} */ (window).AndroidBridge.setLightStatusBar(light),
   setKeepScreenOn: (enabled) => /** @type {any} */ (window).AndroidBridge.setKeepScreenOn(enabled),
+  onAppReady: () => /** @type {any} */ (window).AndroidBridge.onAppReady(),
   setImmersiveMode: (immersive) => /** @type {any} */ (window).AndroidBridge.setImmersiveMode(immersive),
   setZoomEnabled: (enabled) => /** @type {any} */ (window).AndroidBridge.setZoomEnabled(enabled),
   resetZoom: () => /** @type {any} */ (window).AndroidBridge.resetZoom(),
@@ -999,6 +1001,7 @@ function webNativeRecordCancel() {
 const webImpl = {
   // Category 1 — genuine no-ops on web
   setLightStatusBar: () => {},   // CSS body.light handles the theme
+  onAppReady: () => {},          // #1: web has no native splash to release
   startAudioSession: () => {},   // Browser handles audio session natively
   endAudioSession: () => {},
 
