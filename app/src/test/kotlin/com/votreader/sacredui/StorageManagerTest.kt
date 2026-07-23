@@ -289,13 +289,15 @@ class StorageManagerTest {
     // (ACTION_CREATE_DOCUMENT) instead of the MediaStore.Downloads
     // collection. SAF is API 19+, so — unlike the old writer — there is
     // NO SDK floor; Android 8/9 (minSdk 26) can export. These tests stub
-    // only contentResolver.openOutputStream(uri).
+    // only contentResolver.openOutputStream(uri, "wt") — the streaming
+    // writer requests truncate mode explicitly (the picker can hand back
+    // a URI whose document already holds bytes).
 
     @Test
     fun `writeTextToUri success writes content to the chosen Uri`() {
         val uri = Uri.parse("content://com.android.providers.downloads.documents/document/42")
         val stream = ByteArrayOutputStream()
-        every { cr.openOutputStream(uri) } returns stream
+        every { cr.openOutputStream(uri, "wt") } returns stream
 
         val result = storage.writeTextToUri(uri, "{\"a\":1}")
         assertIs<StorageManager.Result.Success<Unit>>(result)
@@ -303,37 +305,88 @@ class StorageManagerTest {
     }
 
     @Test
+    fun `writeTextToUri opens the destination in truncate mode`() {
+        // WAVE-0 (streaming writer): the writer must request mode "wt" so an
+        // existing document at the picked URI is TRUNCATED, not appended to
+        // (SAF providers honor the mode string; the default mode is
+        // provider-specific and several default to plain "w" + keep).
+        val uri = Uri.parse("content://test/truncate")
+        every { cr.openOutputStream(uri, "wt") } returns ByteArrayOutputStream()
+
+        val result = storage.writeTextToUri(uri, "{}")
+        assertIs<StorageManager.Result.Success<Unit>>(result)
+        verify(exactly = 1) { cr.openOutputStream(uri, "wt") }
+    }
+
+    @Test
     fun `writeTextToUri fails when openOutputStream returns null`() {
         val uri = Uri.parse("content://test/no-stream")
-        every { cr.openOutputStream(uri) } returns null
+        every { cr.openOutputStream(uri, "wt") } returns null
 
         val result = storage.writeTextToUri(uri, "{}")
         assertIs<StorageManager.Result.Failure>(result)
         assertEquals("no_output_stream", result.reason)
+        // Nothing was written, so the fail-clean delete must NOT fire — the
+        // URI may point at the user's PRE-EXISTING document, which is still
+        // intact and must stay that way.
+        verify(exactly = 0) { cr.call(any<String>(), any(), any(), any()) }
     }
 
     @Test
-    fun `writeTextToUri fails when stream write throws`() {
+    fun `writeTextToUri fails and deletes the partial when stream write throws`() {
+        // WAVE-0 (fail-clean): a failed write leaves a possibly-truncated
+        // document behind. Same contract finishV3Export applies on a failed
+        // commit — delete the partial so it can't be mistaken for a
+        // complete export.
         val uri = Uri.parse("content://test/full-disk")
-        every { cr.openOutputStream(uri) } returns object : OutputStream() {
+        every { cr.openOutputStream(uri, "wt") } returns object : OutputStream() {
             override fun write(b: Int) = throw IOException("quota exceeded")
             override fun write(b: ByteArray) = throw IOException("quota exceeded")
             override fun write(b: ByteArray, off: Int, len: Int) =
                 throw IOException("quota exceeded")
         }
+        // DocumentsContract.deleteDocument on the Robolectric android-all
+        // jar resolves to ContentResolver.call(authority,
+        // "android:deleteDocument", null, extras) — stub + verify THAT.
+        every { cr.call(any<String>(), any(), any(), any()) } returns Bundle()
 
         val result = storage.writeTextToUri(uri, "{}")
         assertIs<StorageManager.Result.Failure>(result)
         assertEquals("quota exceeded", result.reason)
+        verify(exactly = 1) {
+            cr.call(eq("test"), eq("android:deleteDocument"), isNull(), any())
+        }
+    }
+
+    @Test
+    fun `writeTextToUri deletes the partial document when the close fails`() {
+        // WAVE-0 (fail-clean): with the streaming writer, a small payload
+        // sits in the encoder's 8 KB buffer, so a disk-full surfaces at
+        // CLOSE (encoder flush + underlying close) rather than at write.
+        // The failure must still fail-clean — same as the write-time case.
+        val uri = Uri.parse("content://test/close-fail")
+        every { cr.openOutputStream(uri, "wt") } returns object : OutputStream() {
+            override fun write(b: Int) {}
+            override fun write(b: ByteArray, off: Int, len: Int) {}
+            override fun close() = throw IOException("disk full on close")
+        }
+        every { cr.call(any<String>(), any(), any(), any()) } returns Bundle()
+
+        val result = storage.writeTextToUri(uri, "{}")
+        assertIs<StorageManager.Result.Failure>(result)
+        assertEquals("disk full on close", result.reason)
+        verify(exactly = 1) {
+            cr.call(eq("test"), eq("android:deleteDocument"), isNull(), any())
+        }
     }
 
     @Test
     fun `writeTextToUri encodes content as UTF-8`() {
         // The arrow / em-dash / ellipsis test: each is > 1 byte in UTF-8.
-        // Confirms toByteArray(Charsets.UTF_8) round-trips correctly.
+        // Confirms the writer's UTF-8 encoding round-trips correctly.
         val uri = Uri.parse("content://test/utf8")
         val stream = ByteArrayOutputStream()
-        every { cr.openOutputStream(uri) } returns stream
+        every { cr.openOutputStream(uri, "wt") } returns stream
 
         val payload = "—…—"  // 3 chars, 9 bytes UTF-8
         storage.writeTextToUri(uri, payload)

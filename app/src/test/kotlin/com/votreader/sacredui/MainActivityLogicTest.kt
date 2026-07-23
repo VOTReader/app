@@ -201,4 +201,48 @@ class MainActivityLogicTest {
         assertEquals(1, d.renderRecoveryCount)
         assertTrue(d.showRetryView)
     }
+
+    // ── gardenHttpErrorLogMessage (WAVE-0 Garden HTTP-error logging) ────
+    // onReceivedHttpError (HTTP 404/500) never fires onReceivedError, so a
+    // Garden image URL that fell through gardenCache.intercept() to the
+    // WebView's own load used to fail SILENTLY. The log must name ONLY
+    // host + status (the full URL can carry signed query params) and fire
+    // ONLY for Garden/github asset hosts — everything else is spam.
+    @Test
+    fun `garden http error on an allowed host renders host + status`() {
+        val msg = MainActivityLogic.gardenHttpErrorLogMessage(
+            isGardenHost = true, host = "github.com", statusCode = 404
+        )
+        assertEquals("Garden asset HTTP 404 for host github.com", msg)
+    }
+
+    @Test
+    fun `garden http error message carries no URL or query (no signed-token leak)`() {
+        val msg = MainActivityLogic.gardenHttpErrorLogMessage(
+            isGardenHost = true,
+            host = "release-assets.githubusercontent.com",
+            statusCode = 500
+        )!!
+        // Host + status only: no scheme, no path, no query delimiter.
+        assertFalse(msg.contains("://"))
+        assertFalse(msg.contains("?"))
+        assertFalse(msg.contains("/"))
+    }
+
+    @Test
+    fun `http error on a non-garden host logs nothing`() {
+        assertNull(
+            MainActivityLogic.gardenHttpErrorLogMessage(
+                isGardenHost = false, host = "evil.test", statusCode = 404
+            )
+        )
+    }
+
+    @Test
+    fun `garden http error with an unparseable host still logs the status`() {
+        val msg = MainActivityLogic.gardenHttpErrorLogMessage(
+            isGardenHost = true, host = null, statusCode = 503
+        )
+        assertEquals("Garden asset HTTP 503 for host <unknown>", msg)
+    }
 }

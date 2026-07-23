@@ -101,4 +101,26 @@ object MainActivityLogic {
      */
     fun shouldTrimWebViewCache(level: Int): Boolean =
         level >= TRIM_MEMORY_MODERATE_LEVEL
+
+    /**
+     * Decide what (if anything) MainActivity's WebViewClient should Timber-log
+     * from an onReceivedHttpError callback. HTTP-level failures (404/500) never
+     * fire onReceivedError, so a Garden image URL that fell through
+     * gardenCache.intercept() to the WebView's own load used to fail SILENTLY.
+     *
+     * Returns a message ONLY when [isGardenHost] (MainActivity computes that
+     * via GardenImageCache.hostAllowed — the same U7 allowlist the fetch path
+     * uses, so the fetch gate and the log gate can never drift apart) and the
+     * message names ONLY host + status: the full URL can carry signed query
+     * params (rscd tokens) that don't belong in the log. Every other host
+     * returns null — logging all sub-resource HTTP errors would spam the log
+     * with failures the app can't act on. Pure diagnostic; no UX change (the
+     * WebView still renders its own error surface).
+     */
+    fun gardenHttpErrorLogMessage(
+        isGardenHost: Boolean,
+        host: String?,
+        statusCode: Int
+    ): String? =
+        if (isGardenHost) "Garden asset HTTP $statusCode for host ${host ?: "<unknown>"}" else null
 }

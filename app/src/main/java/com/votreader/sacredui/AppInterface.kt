@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioManager
 import android.os.Build
 import android.util.Base64
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -54,6 +55,32 @@ class AppInterface(
         } else {
             @Suppress("DEPRECATION")
             host.activityContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+
+    // (WAVE-0) Tag every haptic USAGE_TOUCH so the system's touch-haptics
+    // master toggle can silence it — an untagged vibration is USAGE_UNKNOWN
+    // and ignores that setting. Gated at API 33 (TIRAMISU), NOT 30:
+    // VibrationAttributes itself exists from API 30, but the
+    // vibrate(VibrationEffect, VibrationAttributes) overload is API 33+ —
+    // calling it on 30-32 would NoSuchMethodError. Lazily built so the
+    // API-33 class is only ever touched on devices that have it.
+    @get:RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private val touchVibrationAttributes: VibrationAttributes by lazy {
+        VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_TOUCH).build()
+    }
+
+    /**
+     * Single dispatch point for BOTH haptic tiers (the R+ composition path
+     * and the predefined/one-shot fallback). API 33+: vibrate with the
+     * USAGE_TOUCH attributes; below 33: the pre-fix one-arg vibrate(),
+     * unchanged.
+     */
+    private fun dispatchVibrate(effect: VibrationEffect) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            vibrator.vibrate(effect, touchVibrationAttributes)
+        } else {
+            vibrator.vibrate(effect)
         }
     }
 
@@ -442,7 +469,7 @@ class AppInterface(
             )
         }
         try {
-            vibrator.vibrate(effect)
+            dispatchVibrate(effect)
         } catch (e: Exception) {
             Timber.w(e, "haptic(%d) failed", style)
         }
@@ -485,7 +512,7 @@ class AppInterface(
                     comp.addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 0.6f)
                 }
             }
-            vibrator.vibrate(comp.compose())
+            dispatchVibrate(comp.compose())
             true
         } catch (e: Exception) {
             Timber.w(e, "haptic composition(%d) failed", style)

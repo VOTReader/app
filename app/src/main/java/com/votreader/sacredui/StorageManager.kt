@@ -90,12 +90,32 @@ class StorageManager(private val context: Context) {
      */
     fun writeTextToUri(uri: Uri, content: String): Result<Unit> {
         return try {
-            context.contentResolver.openOutputStream(uri)?.use { stream ->
-                stream.write(content.toByteArray(Charsets.UTF_8))
-            } ?: return Result.Failure("no_output_stream")
+            // Mode "wt" = write + truncate: the picker can hand back a URI
+            // whose document already holds bytes (the user chose an existing
+            // filename), so truncation must be explicit rather than left to
+            // the provider's default mode.
+            //
+            // The stream is wrapped in a WRITER, not written as a one-shot
+            // byte[]: the old stream.write(content.toByteArray(UTF_8))
+            // materialized a SECOND full-size copy of the payload on the heap
+            // (peak ≈ 3x the export size — the source String's UTF-16 + the
+            // byte[] copy + the provider's own buffer), which a large
+            // notes-Markdown export could push into an OOM. The writer encodes
+            // through an 8 KB buffer, so the file grows on disk while heap
+            // stays flat. UTF-8 keeps the on-disk bytes identical.
+            context.contentResolver.openOutputStream(uri, "wt")
+                ?.writer(Charsets.UTF_8)?.use { w -> w.write(content) }
+                ?: return Result.Failure("no_output_stream")
             Result.Success(Unit)
         } catch (e: Exception) {
             Timber.w(e, "writeTextToUri failed")
+            // A failed write/flush/close leaves a possibly-truncated document
+            // behind — apply the same fail-clean contract finishV3Export uses
+            // on a failed commit: delete the partial so it can't be mistaken
+            // for a complete export. (NOT on no_output_stream above: nothing
+            // was written there, so a pre-existing user document is intact
+            // and must stay that way.)
+            deleteDocumentQuietly(uri)
             Result.Failure(e.message ?: "write_failed")
         }
     }

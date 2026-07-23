@@ -719,6 +719,29 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 }
             }
 
+            override fun onReceivedHttpError(
+                view: WebView,
+                request: WebResourceRequest,
+                errorResponse: WebResourceResponse
+            ) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                // Diagnostic only. HTTP-level failures (404/500) never fire
+                // onReceivedError above, so a Garden image URL that fell
+                // through gardenCache.intercept() to the WebView's own load
+                // used to fail SILENTLY. Logs host + status ONLY for the
+                // Garden/github asset hosts (same U7 allowlist as the fetch
+                // path, via gardenCache.hostAllowed); every other host is
+                // ignored to keep the log free of un-actionable spam. The
+                // gating + message shape is pinned by MainActivityLogicTest.
+                // No UX change: the WebView still renders its own error
+                // surface; nothing here touches the splash contract.
+                MainActivityLogic.gardenHttpErrorLogMessage(
+                    isGardenHost = gardenCache.hostAllowed(request.url.toString()),
+                    host = request.url.host,
+                    statusCode = errorResponse.statusCode
+                )?.let { Timber.w(it) }
+            }
+
             override fun onScaleChanged(view: WebView, oldScale: Float, newScale: Float) {
                 super.onScaleChanged(view, oldScale, newScale)
                 vm.currentScale = newScale
