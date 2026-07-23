@@ -25,12 +25,12 @@ import {
 // window-exposed here so cross-bundle callers (use-search's /clear history) can
 // reach them without bundling a second copy.
 import { VotSearchMini } from '../search/engine.js';
-import { getRecentSearches, addRecentSearch, clearRecentSearches } from '../search/recent-searches.js';
+import { getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches } from '../search/recent-searches.js';
 
 Object.assign(window, {
   SettingsScreen,
   SearchScreen,
   GARDEN_PRELOAD_AHEAD, GARDEN_CRAWL_DELAY, GardenView,
   VotSearchMini,
-  getRecentSearches, addRecentSearch, clearRecentSearches,
+  getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches,
 });

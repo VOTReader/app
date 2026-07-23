@@ -51,6 +51,21 @@ export function addRecentSearch(query) {
   return capped;
 }
 
+/**
+ * Remove a single recent query (the per-chip ✕ on SearchScreen — previously
+ * only the all-or-nothing "/clear history" command existed). Matches the
+ * addRecentSearch dedupe identity: case-insensitive on the trimmed query.
+ * @param {string} query
+ * @returns {string[]} the updated list
+ */
+export function removeRecentSearch(query) {
+  const q = (query || '').trim();
+  if (!q) return read();
+  const next = read().filter((x) => x.toLowerCase() !== q.toLowerCase());
+  write(next);
+  return next;
+}
+
 /** @returns {string[]} the (now empty) list */
 export function clearRecentSearches() {
   write([]);

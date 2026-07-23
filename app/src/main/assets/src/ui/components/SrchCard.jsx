@@ -2,6 +2,8 @@
    SrchCard — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { translationLabel } from '../../data/translations.js';
+
 export function SrchCard({ entry, terms, onSelect, isDirect }) {
   if (isDirect) {
     return (
@@ -40,7 +42,11 @@ export function SrchCard({ entry, terms, onSelect, isDirect }) {
       <div className="srch-card-top">
         <span className="srch-card-ref">{headline}</span>
         <span className={"srch-card-badge " + (meta.cls || '')}>{meta.label}</span>
-        {doc.translation && doc.translation !== 'nkjv' && <span className="srch-card-badge">{doc.translation.toUpperCase()}</span>}
+        {/* W0: resolve the engine's raw translation id ('rnkjv') through the
+            TRANSLATION_OPTIONS registry ('NKJV-R') — the same label the rest
+            of the app shows. Never render the raw id uppercased ('RNKJV');
+            translationLabel falls back to the NKJV default for unknown ids. */}
+        {doc.translation && doc.translation !== 'nkjv' && <span className="srch-card-badge">{translationLabel(doc.translation)}</span>}
         {doc.heading && doc.kind === 'verse' && <span className="srch-card-badge badge-heading">{doc.heading.length > 28 ? doc.heading.slice(0, 28) + '…' : doc.heading}</span>}
       </div>
       {locLine && <div className="srch-card-loc">{locLine}</div>}

@@ -36,13 +36,67 @@ function pickEngine() {
   return window.VotSearchMini;
 }
 
+// W0 (micro-gap a/c): the engine is asked for at most SEARCH_LIMIT hits, so a
+// result count of exactly SEARCH_LIMIT means "at least that many" — the summary
+// must say "400+", never present the cap as the full count.
+export const SEARCH_LIMIT = 400;
+
+/**
+ * Honest result-count label: "<limit>+" when the engine cap was hit, else the
+ * exact count as a string. Pure for testability.
+ * @param {number} count
+ * @param {number|null|undefined} limit 0/null/undefined = uncapped
+ * @returns {string}
+ */
+export function matchCountLabel(count, limit) {
+  return (limit && count >= limit) ? limit + '+' : String(count);
+}
+
+/**
+ * W0 (IME blur): exiting search cost up to 3 back presses because the input
+ * kept focus after the IME hid (back 1 closed the keyboard, back 2 only
+ * dropped the stranded focus, back 3 finally navigated). Mirrors the
+ * use-keyboard-inset signal — visualViewport diff with the same 80px noise
+ * clamp — and blurs the input when the keyboard height transitions >0 → 0
+ * while the input still holds focus, so the NEXT back press runs the
+ * single-dispatcher back contract immediately.
+ * @param {import('react').RefObject<HTMLInputElement|null>} inputRef
+ * @returns {void}
+ */
+export function useImeHideBlur(inputRef) {
+  const prevKbRef = React.useRef(0);
+  React.useEffect(() => {
+    if (!window.visualViewport) return;
+    const vv = window.visualViewport;
+    const onChange = () => {
+      const diff = Math.max(0, window.innerHeight - vv.height);
+      const kh = diff > 80 ? diff : 0; // same residual-noise clamp as use-keyboard-inset
+      if (kh === 0 && prevKbRef.current > 0 && inputRef.current && document.activeElement === inputRef.current) {
+        inputRef.current.blur();
+      }
+      prevKbRef.current = kh;
+    };
+    vv.addEventListener('resize', onChange);
+    vv.addEventListener('scroll', onChange);
+    return () => {
+      vv.removeEventListener('resize', onChange);
+      vv.removeEventListener('scroll', onChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only listener; inputRef identity is stable.
+  }, []);
+}
+
 export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand }) {
   const inputRef = React.useRef(null);
+  useImeHideBlur(inputRef);
   const [state, setState] = React.useState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });
   const [buildInfo, setBuildInfo] = React.useState({ ready: false, building: false, progress: null });
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState([]);
   const [recents, setRecents] = React.useState([]);
+  // W0 (micro-gap b): the recent-search query whose per-chip ✕ was tapped;
+  // non-null swaps the chips row for a ConfirmStrip ("remove" vocabulary).
+  const [confirmRecent, setConfirmRecent] = React.useState(null);
   const debounceRef = React.useRef(null);
 
   // Build the index on mount. The engine reads the lazy corpus globals
@@ -53,7 +107,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   React.useEffect(() => {
     const E = pickEngine();
     if (!E) {
-      setBuildInfo({ ready: false, building: false, progress: null, error: 'Search engine failed to load. Check browser console.' });
+      // Wave-0: was "…Check browser console." — dev-speak facing the user.
+      setBuildInfo({ ready: false, building: false, progress: null, error: "Search couldn't start. Try closing and reopening the app — your data is safe." });
       return;
     }
     if (E.getState().ready) {setBuildInfo({ ready: true, building: false, progress: null });return;}
@@ -100,13 +155,17 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (q.replace(/[^a-z0-9]/gi, '').length < 2) {setState({ phase: 'idle', parsed: null, results: [], terms: [], error: null, total: 0 });return;}
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
+      // W0 (micro-gap c): mark the search in-flight so the UI shows a
+      // live-region indicator until the engine resolves. Prior results stay
+      // on screen underneath (state.results is untouched here).
+      setState((s) => ({ ...s, phase: 'searching' }));
       pickEngine().search(q, {
         translation: settings.translation || 'nkjv',
         useStopWords: settings.searchUseStopWords !== false,
         synonyms: settings.searchSynonyms !== false,
         scope: searchScope || null,
         corpus: settings.searchCorpus || 'all',
-        limit: 400
+        limit: SEARCH_LIMIT
       }).then((r) => {
         // SRCH4: include the matched synonyms (when synonym search is on) so the
         // snippet highlights the word that actually surfaced the verse.
@@ -242,7 +301,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <input
             ref={inputRef}
             className="search-input"
-            type="text"
+            type="search"
             placeholder="Search scriptures, volumes, studies…"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
@@ -337,11 +396,37 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             {settings.historyEnabled !== false && recents.length > 0 && (
               <>
                 <div className="srch-section-label">Recent</div>
-                <div className="srch-quick-row">
-                  {recents.slice(0, 12).map((r) => (
-                    <button key={r} className="srch-quick-chip" onClick={() => onQueryChange(r)}>{r}</button>
-                  ))}
-                </div>
+                {confirmRecent != null ? (
+                  /* W0 (micro-gap b): per-recent removal. Follows the
+                     ConfirmStrip convention — per-instance useId registration
+                     (back dismisses the confirm, not the screen), "remove"
+                     vocabulary (the stored query list is recoverable by
+                     searching again, so this is not a "delete"). The strip
+                     replaces the chips row, the LinkCard actions-row swap
+                     pattern. */
+                  <ConfirmStrip
+                    question={'Remove “' + confirmRecent + '” from recent searches?'}
+                    yesLabel="Yes, remove"
+                    onCancel={() => setConfirmRecent(null)}
+                    onConfirm={() => {
+                      if (typeof window.removeRecentSearch === 'function') setRecents(window.removeRecentSearch(confirmRecent));
+                      setConfirmRecent(null);
+                    }}
+                  />
+                ) : (
+                  <div className="srch-quick-row">
+                    {recents.slice(0, 12).map((r) => (
+                      <span key={r} className="srch-quick-chip-wrap">
+                        <button className="srch-quick-chip" onClick={() => onQueryChange(r)}>{r}</button>
+                        <button
+                          className="srch-chip-remove"
+                          aria-label={'Remove recent search ' + r}
+                          onClick={() => setConfirmRecent(r)}
+                        >{"✕"}</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </>
             )}
             <div className="srch-section-label">Quick picks</div>
@@ -359,9 +444,23 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
+        {/* W0 (micro-gap c): in-flight indicator. role="status" + aria-live
+            polite per the live-region discipline (AutoScrollControl readout
+            precedent); the indeterminate bar animation is near-zeroed by the
+            global prefers-reduced-motion rule. */}
+        {query && buildInfo.ready && state.phase === 'searching' && (
+          <div className="srch-progress srch-searching" role="status" aria-live="polite">
+            <span>Searching…</span>
+            <div className="srch-progress-bar">
+              <div className="srch-progress-bar-fill srch-indeterminate" />
+            </div>
+          </div>
+        )}
+
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
           <div className="srch-results-summary">
-            Found <strong>{state.results.length} {state.results.length === 1 ? "match" : "matches"}</strong>
+            {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
+            Found <strong>{matchCountLabel(state.results.length, SEARCH_LIMIT)} {state.results.length === 1 ? "match" : "matches"}</strong>
             {" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong>
           </div>
         )}

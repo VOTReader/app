@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getRecentSearches, addRecentSearch, clearRecentSearches } from './recent-searches.js';
+import { getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches } from './recent-searches.js';
 
 describe('recent-searches', () => {
   beforeEach(() => { localStorage.clear(); });
@@ -44,5 +44,26 @@ describe('recent-searches', () => {
   it('survives malformed storage', () => {
     localStorage.setItem('vot-recent-searches', '{not json');
     expect(getRecentSearches()).toEqual([]);
+  });
+  /* W0 SEARCH-UI (micro-gap b) — per-recent removal backs the SearchScreen
+     per-chip ✕ affordance (previously only the all-or-nothing "/clear history"
+     command existed). Same case-insensitive identity as addRecentSearch's
+     dedupe so "MERCY" removes "mercy". */
+  it('removeRecentSearch drops one entry case-insensitively and returns the updated list', () => {
+    addRecentSearch('mercy');
+    addRecentSearch('grace');
+    expect(removeRecentSearch('MERCY')).toEqual(['grace']);
+    expect(getRecentSearches()).toEqual(['grace']);
+  });
+
+  it('removeRecentSearch is a no-op for an absent query', () => {
+    addRecentSearch('mercy');
+    expect(removeRecentSearch('zebra')).toEqual(['mercy']);
+    expect(getRecentSearches()).toEqual(['mercy']);
+  });
+
+  it('removeRecentSearch tolerates blanks and an empty store', () => {
+    expect(removeRecentSearch('')).toEqual([]);
+    expect(removeRecentSearch('  ')).toEqual([]);
   });
 });
