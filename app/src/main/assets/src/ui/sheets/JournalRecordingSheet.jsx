@@ -95,6 +95,14 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- setConfirmingDiscard is a useState setter (identity-stable); only the stage transition should re-fire this reset.
   useEffect(function() { setConfirmingDiscard(false); }, [stage]);
 
+  // W1.5(a.2)/P1-6 — the sheet registers its OWN Escape/Android-back entry
+  // (NoteSheet precedent, 2026-07-12): hardware back mid-take must route
+  // through requestDiscard — the same discard confirm as the backdrop and
+  // the header × — not a bare close dispatched by the parent screen, which
+  // destroyed an in-progress take silently. The sheet only exists while
+  // mounted, so the registration needs no `active` gate.
+  useModalRegistry({ id: 'journal-recording-sheet', dismiss: function() { requestDiscard(); } });
+
   // Refs the component owns for UI display + IDB save. The bridge owns the
   // recorder + MediaStream + AudioContext + AnalyserNode; nothing about
   // platform branching lives in this file.

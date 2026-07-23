@@ -62,3 +62,24 @@ describe('resolveNoteCard — titles by annotation source', () => {
     expect(nc.title).toBe('Note');
   });
 });
+
+/* shortTime — spelled-out meridiem (Wave 0 timestamp fix).
+   Every render site (.jrn-card-date / .jrn-editor-date / .jrn-viewer-date)
+   is text-transform:uppercase, so the old terse 'p'/'a' rendered as a lone
+   "4:53P" that read as a typo. The util now emits "4:53 PM" directly. */
+describe('shortTime — spelled-out AM/PM meridiem', () => {
+  it('renders "h:MM AM/PM" — no terse p/a suffix', () => {
+    expect(JournalHelpers.shortTime(new Date(2026, 4, 14, 16, 53).getTime())).toBe('4:53 PM');
+    expect(JournalHelpers.shortTime(new Date(2026, 4, 14, 9, 8).getTime())).toBe('9:08 AM');
+  });
+
+  it('12-hour edge cases: midnight is 12 AM, noon is 12 PM', () => {
+    expect(JournalHelpers.shortTime(new Date(2026, 4, 14, 0, 5).getTime())).toBe('12:05 AM');
+    expect(JournalHelpers.shortTime(new Date(2026, 4, 14, 12, 0).getTime())).toBe('12:00 PM');
+  });
+
+  it('falsy timestamp stays empty', () => {
+    expect(JournalHelpers.shortTime(0)).toBe('');
+    expect(JournalHelpers.shortTime(undefined)).toBe('');
+  });
+});

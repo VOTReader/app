@@ -227,6 +227,21 @@ describe('JournalStore.remove() — cross-store cascade', () => {
     // Stats decremented (recordDeletion clamps to 0).
     expect(JournalStatsStore.get().totalEntries).toBe(0);
   });
+
+  it('remove(id, { skipStats: true }) removes the entry WITHOUT the stats decrement (blank-entry prune-on-exit)', () => {
+    // P1-7/P1-5: the editor's prune-on-exit removes a blank entry whose
+    // stats were NEVER recorded (recording happens at the first non-empty
+    // save). A recordDeletion cascade there would under-count real entries.
+    const j1 = JournalStore.add({});
+
+    JournalStatsStore.recordNewEntry(Date.now());
+    expect(JournalStatsStore.get().totalEntries).toBe(1);
+
+    JournalStore.remove(j1.id, { skipStats: true });
+
+    expect(JournalStore.get(j1.id)).toBeNull();           // entry is gone
+    expect(JournalStatsStore.get().totalEntries).toBe(1); // no phantom decrement
+  });
 });
 
 /* ──────────────────────────────────────────────────────────────

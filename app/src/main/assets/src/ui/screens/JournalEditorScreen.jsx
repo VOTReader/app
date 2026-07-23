@@ -25,6 +25,33 @@ function _journalSig(o) {
   return JSON.stringify([(o && o.title) || '', (o && o.blocks) || [], (o && o.mood) || null]);
 }
 
+/* P1-5/P1-7 — the New-Entry flow (use-journal-mutations) no longer records
+   stats at creation: the milestone toast fired on the New-Entry tap before a
+   word was written, and a backed-out blank entry still advanced the streak.
+   Creation now leaves this localStorage marker instead; the editor records
+   stats + fires milestone toasts on the FIRST NON-EMPTY SAVE, and the
+   prune-on-exit path clears the marker when a blank entry dies. localStorage
+   (not a module variable) so the handoff survives a background-kill between
+   create and first save. The same key literal lives in use-journal-mutations.js. */
+var JRN_NEW_ENTRY_STATS_KEY = 'vot-journal-new-entry-stats';
+
+/* True when a block list carries any user content: non-empty text/cite on a
+   text block, or ANY non-text block (image, audio, card, divider — an entry
+   that is only a voice memo is content). The default single empty paragraph
+   is NOT content. Shared by the first-save stats trigger and prune-on-exit. */
+function _blocksHaveContent(blocks) {
+  var arr = Array.isArray(blocks) ? blocks : [];
+  for (var i = 0; i < arr.length; i++) {
+    var b = arr[i] || {};
+    if (b.type === 'p' || b.type === 'h2' || b.type === 'quote') {
+      if ((b.text || '').trim() || (b.cite || '').trim()) return true;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Abnormal-path trace for the block drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
 function _jrnDragTrace(msg) {
@@ -92,15 +119,15 @@ export function JournalEditorScreen(props) {
   // sheets owned here (insert sheet + voice recording sheet). Both render
   // conditionally further down; we register/unregister via `active` so
   // the hook calls stay unconditional at the top of the component body.
+  // (JournalRecordingSheet registers ITSELF with the modal registry — its
+  // dismissal is stateful (the discard confirm for an in-progress take),
+  // so Escape/Android-back must route through the component's own
+  // requestDiscard, not a bare setShowRec(false) here. NoteSheet precedent,
+  // 2026-07-12 / P1-6.)
   useModalRegistry({
     id: 'journal-insert-sheet',
     dismiss: function() { setShowInsert(false); },
     active: showInsert,
-  });
-  useModalRegistry({
-    id: 'journal-recording-sheet',
-    dismiss: function() { setShowRec(false); },
-    active: showRec,
   });
 
   var _confirmAudioDelete = useState(null);  // idx of audio block awaiting delete confirm
@@ -144,6 +171,7 @@ export function JournalEditorScreen(props) {
       if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
       commitSave();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only teardown: commitSave reads always-fresh refs (titleRef/blocksRef/entryIdRef), so the unmount flush is never stale; re-running per commitSave identity would re-bind every render for zero gain.
   }, []);
 
   // Tap anywhere outside the ConfirmStrip fully cancels it. Capture phase
@@ -180,6 +208,9 @@ export function JournalEditorScreen(props) {
   var blocksRef = useRef(blocks); blocksRef.current = blocks;
   var moodRef = useRef(mood); moodRef.current = mood;
   var entryIdRef = useRef(entryId); entryIdRef.current = entryId;
+  // The entry's creation timestamp, captured once — the first-save stats
+  // trigger (_maybeRecordNewEntryStats) dates the streak with it.
+  var createdRef = useRef((initial && initial.created) || 0);
 
   // Auto-save: debounce 1.2s after any title/blocks/mood change. Each
   // render re-runs this effect, capturing the latest state in its closure.
@@ -197,11 +228,13 @@ export function JournalEditorScreen(props) {
       // in the window can't lose the block (and orphan its already-durable blob).
       immediateSaveRef.current = false;
       JournalStore.update(entryId, { title: title, blocks: blocks, mood: mood });
+      _maybeRecordNewEntryStats(entryId, title, blocks);
       setSavedLabel('Saved');
       return;
     }
     var t = setTimeout(function() {
       JournalStore.update(entryId, { title: title, blocks: blocks, mood: mood });
+      _maybeRecordNewEntryStats(entryId, title, blocks);
       setSavedLabel('Saved');
     }, 1200);
     return function() { clearTimeout(t); };
@@ -212,9 +245,28 @@ export function JournalEditorScreen(props) {
   useEffect(function() {
     return function() {
       var eid = entryIdRef.current;
-      if (eid) {
-        JournalStore.update(eid, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
+      if (!eid) return;
+      var t = titleRef.current;
+      var bs = blocksRef.current;
+      // P1-7 prune-on-exit: backing out of a brand-new entry without writing
+      // anything must not leave an empty "Untitled" card in the hub. Title
+      // blank AND no block content → remove instead of save. skipStats: the
+      // entry's stats were never recorded (recording moved to the first
+      // non-empty save), so a recordDeletion cascade would under-count the
+      // real entries. The first-save stats marker and any JRNL-1 draft for
+      // this entry die with it. Deliberately NOT done in the pagehide flush:
+      // backgrounding keeps the editor mounted, and removing the entry under
+      // it would orphan the user's next keystroke.
+      if (!(t || '').trim() && !_blocksHaveContent(bs)) {
+        JournalStore.remove(eid, { skipStats: true });
+        try {
+          if (localStorage.getItem(JRN_NEW_ENTRY_STATS_KEY) === eid) localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY);
+        } catch (_e) { /* marker cleanup is best-effort */ }
+        var d = _readJournalDraft();
+        if (d && d.entryId === eid) _clearJournalDraft();
+        return;
       }
+      JournalStore.update(eid, { title: t, blocks: bs, mood: moodRef.current });
     };
   }, []);
 
@@ -244,6 +296,7 @@ export function JournalEditorScreen(props) {
       window.removeEventListener('pagehide', onHide);
       document.removeEventListener('visibilitychange', onVisibility);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only listener attach: onHide calls commitSave + reads entryIdRef/titleRef/blocksRef/moodRef via .current (call-time fresh per the always-fresh-refs pattern above), so the listeners can never capture stale state.
   }, []);
 
   // JRNL-1: consume a draft that was stale/identical at open. A RECOVERED draft (see
@@ -253,6 +306,28 @@ export function JournalEditorScreen(props) {
     if (loaded.draftAction === 'clear') _clearJournalDraft();
   }, [loaded]);
 
+  // P1-5 — record New-Entry stats + fire milestone toasts on the FIRST
+  // NON-EMPTY save of an entry created via the New-Entry flow (previously
+  // fired on the New-Entry tap, before a word was written). Marker-gated
+  // (JRN_NEW_ENTRY_STATS_KEY, set by use-journal-mutations) so an old entry
+  // opened from the hub never re-records, and consumed on success so it
+  // fires exactly once. Runs inside the data-safety save paths, so it must
+  // never throw — stats are best-effort next to the save itself.
+  function _maybeRecordNewEntryStats(eid, titleNow, blocksNow) {
+    try {
+      if (!eid) return;
+      if (typeof JournalStatsStore === 'undefined') return;
+      var marker = localStorage.getItem(JRN_NEW_ENTRY_STATS_KEY);
+      if (!marker || marker !== eid) return;
+      if (!(titleNow || '').trim() && !_blocksHaveContent(blocksNow)) return; // still blank — keep waiting
+      try { localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY); } catch (_e) { /* ignore */ }
+      var newly = JournalStatsStore.recordNewEntry(createdRef.current || Date.now());
+      if (newly && newly.length && typeof jrnShowMilestoneToast === 'function') {
+        newly.forEach(function(m) { jrnShowMilestoneToast(m); });
+      }
+    } catch (_e) { /* never break a save */ }
+  }
+
   function commitSave() {
     // Synchronous immediate save — Done nav, textarea blur, or page background.
     // Reads from refs so it's correct even when invoked from a long-lived
@@ -260,6 +335,7 @@ export function JournalEditorScreen(props) {
     var eid = entryIdRef.current;
     if (!eid) return;
     JournalStore.update(eid, { title: titleRef.current, blocks: blocksRef.current, mood: moodRef.current });
+    _maybeRecordNewEntryStats(eid, titleRef.current, blocksRef.current);
     setSavedLabel('Saved');
   }
 
@@ -646,8 +722,14 @@ export function JournalEditorScreen(props) {
       immediateSaveRef.current = true;  // persist the new image block at once (skip the 1.2s debounce)
       insertBlockBelow(JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
     }).catch(function(err) {
-      if (typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
-      showToast('Could not save that image.');
+      // Wave-0: only QUOTA-shaped failures belong to StorageHealth — this
+      // catch also covers decode/resize failures, and reporting those flipped
+      // the app to READONLY with the misleading "storage may be full" toast.
+      var quota = !!(err && (err.name === 'QuotaExceededError' || /quota/i.test(String(err.message || err))));
+      if (quota && typeof StorageHealth !== 'undefined') StorageHealth.onWriteFailure(err);
+      // Wave-0: was showToast('…') — a bare string; showToast requires opts.id
+      // and the call silently no-oped, so the user saw nothing at all.
+      showToast({ id: 'vot-toast-journal-image-save', className: 'vot-toast', text: 'Could not save that image.', ariaLive: 'assertive' });
     });
   }
 

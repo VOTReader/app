@@ -9,9 +9,11 @@
         If a future refactor drops this guard, a crash here would
         prevent the journal hub from rendering at all.
 
-     B) Milestone toast firing — JournalStatsStore.recordNewEntry can
-        return null OR an array (zero or more milestones crossed by
-        this entry). Both paths exist; tested separately.
+     B) Deferred stats handoff (P1-5/P1-7) — the hook must NOT record
+        stats or fire milestone toasts at creation (that fired the toast
+        on the New-Entry tap, before a word was written, and a backed-out
+        blank entry still advanced the streak). It leaves a localStorage
+        marker for the editor's first-non-empty-save trigger instead.
 
      C) The setter ordering matters semantically:
           setJournalEntryId FIRST (so editor knows what to render)
@@ -32,6 +34,7 @@ beforeEach(() => {
   _prevJournalStore = window.JournalStore;
   _prevJournalStatsStore = window.JournalStatsStore;
   _prevToast = window.jrnShowMilestoneToast;
+  localStorage.clear();
 
   window.JournalStore = { add: vi.fn(() => ({ id: 'jrn-1', created: 1700000000000 })) };
   window.JournalStatsStore = { recordNewEntry: vi.fn(() => []) };
@@ -65,37 +68,31 @@ describe('useJournalMutations — createAndEditJournal', () => {
     expect(setters.setScreen).toHaveBeenCalledWith('journal-editor');
   });
 
-  it('records milestone via JournalStatsStore.recordNewEntry with entry.created ts', () => {
+  it('does NOT record stats or fire milestone toasts at creation (P1-5 — deferred to the first non-empty save)', () => {
     const { result } = setup();
     act(() => { result.current.createAndEditJournal(); });
-    expect(window.JournalStatsStore.recordNewEntry).toHaveBeenCalledWith(1700000000000);
-  });
-
-  it('fires jrnShowMilestoneToast for EACH milestone crossed', () => {
-    window.JournalStatsStore.recordNewEntry = vi.fn(() => [
-      { kind: 'first-entry' },
-      { kind: '10-entries' },
-    ]);
-    const { result } = setup();
-    act(() => { result.current.createAndEditJournal(); });
-    expect(window.jrnShowMilestoneToast).toHaveBeenCalledTimes(2);
-    expect(window.jrnShowMilestoneToast).toHaveBeenNthCalledWith(1, { kind: 'first-entry' });
-    expect(window.jrnShowMilestoneToast).toHaveBeenNthCalledWith(2, { kind: '10-entries' });
-  });
-
-  it('does NOT fire toast when recordNewEntry returns an empty array', () => {
-    // recordNewEntry returns [] in beforeEach by default.
-    const { result } = setup();
-    act(() => { result.current.createAndEditJournal(); });
+    // The bug: the milestone toast fired on the New-Entry TAP, before a word
+    // was written. Both side-effects now live in the editor's first save.
+    expect(window.JournalStatsStore.recordNewEntry).not.toHaveBeenCalled();
     expect(window.jrnShowMilestoneToast).not.toHaveBeenCalled();
   });
 
-  it('does NOT fire toast when recordNewEntry returns null/undefined', () => {
-    // Guard against the .length call on a null return.
-    window.JournalStatsStore.recordNewEntry = vi.fn(() => null);
+  it('leaves the first-save stats marker naming the new entry id (editor handoff)', () => {
     const { result } = setup();
     act(() => { result.current.createAndEditJournal(); });
-    expect(window.jrnShowMilestoneToast).not.toHaveBeenCalled();
+    // JournalEditorScreen consumes/clears this on the first non-empty save
+    // (or on prune-on-exit if the entry dies blank).
+    expect(localStorage.getItem('vot-journal-new-entry-stats')).toBe('jrn-1');
+  });
+
+  it('still creates + navigates when the marker write is unavailable (localStorage throws)', () => {
+    const setSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied'); });
+    const { result, setters } = setup();
+    act(() => { result.current.createAndEditJournal(); });
+    expect(window.JournalStore.add).toHaveBeenCalledTimes(1);
+    expect(setters.setJournalEntryId).toHaveBeenCalledWith('jrn-1');
+    expect(setters.setScreen).toHaveBeenCalledWith('journal-editor');
+    setSpy.mockRestore();
   });
 
   it('is a no-op (early return) when JournalStore is undefined', () => {
@@ -106,11 +103,13 @@ describe('useJournalMutations — createAndEditJournal', () => {
     act(() => { result.current.createAndEditJournal(); });
     expect(setters.setJournalEntryId).not.toHaveBeenCalled();
     expect(setters.setScreen).not.toHaveBeenCalled();
+    expect(localStorage.getItem('vot-journal-new-entry-stats')).toBeNull();
   });
 
   it('still completes nav/state when JournalStatsStore is undefined (stats-store optional)', () => {
-    // JournalStatsStore is a softer dep — the entry still gets created
-    // and the user still navigates, just no milestone tracking.
+    // JournalStatsStore is not referenced by the hook at all anymore —
+    // recording happens in the editor. This pins that the hub flow never
+    // depends on the stats bundle being loaded.
     delete window.JournalStatsStore;
     const { result, setters } = setup();
     act(() => { result.current.createAndEditJournal(); });

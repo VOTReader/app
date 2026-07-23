@@ -221,3 +221,155 @@ describe('JournalEditorScreen — insert never splits (UX-BATCH session 3, item 
     expect(saved.blocks.map((b) => b.type)).toEqual(['p', 'audio', 'p']); // reused the blank p — no litter
   });
 });
+
+/* ────────────────────────────────────────────────────────────────────────
+   Wave 0 journal UX fixes (P1-5 / P1-6 / P1-7).
+
+   P1-6  The editor used to register a BARE setShowRec(false) as the modal-
+         registry dismiss for the recording sheet — hardware back mid-take
+         destroyed the recording without the discard confirm. The sheet now
+         registers itself (JournalRecordingSheet), so the editor must not
+         register anything for it.
+
+   P1-7  JournalStore.add() fires on the New-Entry tap, so backing out of a
+         blank entry left an empty "Untitled" card. The unmount flush now
+         PRUNES: blank title + no block content → remove (skipStats), and
+         the first-save stats marker + JRNL-1 draft for that entry die too.
+
+   P1-5  The milestone toast fired on the New-Entry tap, before a word was
+         written. Stats + toasts now wait for the FIRST NON-EMPTY SAVE,
+         handed off via the 'vot-journal-new-entry-stats' localStorage
+         marker that createAndEditJournal leaves.
+   ──────────────────────────────────────────────────────────────────────── */
+
+var JRN_STATS_MARKER_KEY = 'vot-journal-new-entry-stats'; // mirrors JournalEditorScreen.jsx / use-journal-mutations.js
+
+describe('JournalEditorScreen — P1-6: no bare registry dismiss for the recording sheet', () => {
+  beforeEach(() => { modalRegistry._reset(); });
+  afterEach(() => { modalRegistry._reset(); });
+
+  it('opening the recording sheet registers NOTHING from the editor (the sheet self-registers)', () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'x' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+
+    fireEvent.click(document.querySelector('.jrn-fab-plus'));            // openInsertSheet
+    fireEvent.click(document.querySelector('[data-testid="open-rec"]')); // handleInsertAudio → showRec
+
+    // The stubbed JournalRecordingSheet doesn't register itself, so anything
+    // here would be the EDITOR's old bare setShowRec(false) — the P1-6 bug.
+    expect(modalRegistry.openIds()).not.toContain('journal-recording-sheet');
+  });
+});
+
+describe('JournalEditorScreen — P1-7: blank entries prune on exit', () => {
+  it('backing out of a blank new entry REMOVES it (no empty Untitled card)', () => {
+    const entry = JournalStore.add(); // exactly what the New-Entry flow creates
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+
+    unmount(); // Done/back without writing a word
+
+    expect(JournalStore.get(entry.id)).toBeNull();
+  });
+
+  it('an entry with body text survives the unmount flush', () => {
+    const entry = JournalStore.add({ title: '', blocks: [JournalHelpers.newBlock('p', { text: 'real words' })] });
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    unmount();
+    expect(JournalStore.get(entry.id)).not.toBeNull();
+  });
+
+  it('a TITLE alone is content — the entry is kept', () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: '' })] });
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    unmount();
+    expect(JournalStore.get(entry.id)).not.toBeNull();
+  });
+
+  it('an entry that is ONLY a voice memo (no text) is content — kept', () => {
+    const entry = JournalStore.add({ title: '', blocks: [JournalHelpers.newBlock('audio', { mediaId: 'm_1', duration: 3 })] });
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    unmount();
+    expect(JournalStore.get(entry.id)).not.toBeNull();
+  });
+
+  it('the prune clears a stale JRNL-1 draft for the removed entry', () => {
+    const entry = JournalStore.add();
+    // A background draft for this entry that a kill prevented from saving.
+    localStorage.setItem('vot-journal-draft', JSON.stringify({
+      entryId: entry.id, title: '', blocks: [JournalHelpers.newBlock('p', { text: '' })], mood: null,
+      ts: (entry.updated || 0) + 5000,
+    }));
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    unmount();
+    expect(JournalStore.get(entry.id)).toBeNull();
+    expect(localStorage.getItem('vot-journal-draft')).toBeNull(); // no orphan draft for a dead entry
+  });
+});
+
+describe('JournalEditorScreen — P1-5: milestone/stats wait for the first non-empty save', () => {
+  afterEach(() => {
+    delete globalThis.JournalStatsStore;
+    delete globalThis.jrnShowMilestoneToast;
+  });
+
+  it('records stats + fires the milestone toast on the FIRST non-empty save, exactly once', () => {
+    const entry = JournalStore.add();
+    localStorage.setItem(JRN_STATS_MARKER_KEY, entry.id); // the createAndEditJournal handoff
+    const recordNewEntry = vi.fn(() => [{ key: 'first', label: 'First entry' }]);
+    globalThis.JournalStatsStore = { recordNewEntry, recordDeletion: vi.fn() };
+    globalThis.jrnShowMilestoneToast = vi.fn();
+
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    // The bug: the toast fired at New-Entry tap time. Here, nothing has been
+    // written yet, so nothing may have recorded.
+    expect(recordNewEntry).not.toHaveBeenCalled();
+
+    const ta = document.querySelector('.jrn-block-textarea');
+    fireEvent.change(ta, { target: { value: 'first words' } });
+    // pagehide drives the synchronous commitSave flush (no debounce wait) —
+    // the same proven J2 path as the data-safety tests above.
+    act(() => { window.dispatchEvent(new Event('pagehide')); });
+
+    expect(recordNewEntry).toHaveBeenCalledTimes(1);
+    expect(recordNewEntry).toHaveBeenCalledWith(entry.created);
+    expect(globalThis.jrnShowMilestoneToast).toHaveBeenCalledTimes(1);
+    expect(globalThis.jrnShowMilestoneToast).toHaveBeenCalledWith({ key: 'first', label: 'First entry' });
+    expect(localStorage.getItem(JRN_STATS_MARKER_KEY)).toBeNull(); // marker consumed
+
+    // A later save (the unmount flush) does NOT re-record.
+    cleanup();
+    expect(recordNewEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it('a blank entry records NO stats — and the prune neither decrements stats nor leaves the marker', () => {
+    const entry = JournalStore.add();
+    localStorage.setItem(JRN_STATS_MARKER_KEY, entry.id);
+    const recordNewEntry = vi.fn(() => []);
+    const recordDeletion = vi.fn();
+    globalThis.JournalStatsStore = { recordNewEntry, recordDeletion };
+
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    unmount(); // back out without writing
+
+    expect(JournalStore.get(entry.id)).toBeNull();
+    expect(recordNewEntry).not.toHaveBeenCalled();  // never counted in the first place
+    expect(recordDeletion).not.toHaveBeenCalled();  // skipStats — no phantom decrement
+    expect(localStorage.getItem(JRN_STATS_MARKER_KEY)).toBeNull();
+  });
+
+  it('a marker naming a DIFFERENT entry never triggers recording here', () => {
+    const entry = JournalStore.add({ title: 'old entry', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    localStorage.setItem(JRN_STATS_MARKER_KEY, 'j_someone_else_999');
+    const recordNewEntry = vi.fn(() => []);
+    globalThis.JournalStatsStore = { recordNewEntry, recordDeletion: vi.fn() };
+
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const ta = document.querySelector('.jrn-block-textarea');
+    fireEvent.change(ta, { target: { value: 'edited body' } });
+    act(() => { window.dispatchEvent(new Event('pagehide')); }); // synchronous commitSave
+
+    expect(recordNewEntry).not.toHaveBeenCalled();
+    expect(localStorage.getItem(JRN_STATS_MARKER_KEY)).toBe('j_someone_else_999'); // not consumed by us
+    localStorage.removeItem(JRN_STATS_MARKER_KEY);
+  });
+});

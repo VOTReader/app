@@ -107,8 +107,25 @@ export function AppShellSheets({
 
   return (
     // ERR3: a crash in any sheet/popover is caught HERE (fallback={null} → it
-    // vanishes + logs) instead of escaping to the root boundary and nuking the app.
-    <ErrorBoundary fallback={null}>
+    // vanishes + logs) instead of escaping to the root boundary and nuking the
+    // app. ERR3-ACK: the vanish is no longer SILENT — onCatch acknowledges the
+    // close with a toast so a mid-task crash doesn't leave the user wondering
+    // where the panel went. showToast resolves from window at call time
+    // (bundle-b assigns it); the try/catch keeps the ack from ever throwing
+    // inside an error boundary.
+    <ErrorBoundary fallback={null} onCatch={function() {
+      try {
+        if (typeof showToast === 'function') {
+          showToast({
+            id: 'vot-toast-sheet-crash',
+            className: 'vot-toast',
+            text: 'That panel hit a problem and closed — your data is safe.',
+            durationMs: 4500,
+            ariaLive: 'assertive',
+          });
+        }
+      } catch (_e) { /* the ack itself must never throw */ }
+    }}>
     <>
       <SelectionToolbar
         onLinkRequest={openLinkPicker}

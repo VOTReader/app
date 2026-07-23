@@ -466,17 +466,21 @@ export var JournalHelpers = (function() {
     return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
   }
 
-  /* Very concise time, e.g. "4:54p" / "11:08a" — shown subtly next to
-     the date. Entries already store millisecond `created`/`updated`, so
-     this is purely a display concern (the sort always had the precision). */
+  /* Concise 12-hour time, e.g. "4:53 PM" / "11:08 AM" — shown subtly next to
+     the date. The meridiem is spelled out uppercase because every render site
+     sits inside a text-transform:uppercase parent (.jrn-card-date /
+     .jrn-editor-date / .jrn-viewer-date): the old terse 'p'/'a' rendered as a
+     lone 'P'/'A' glued to the digits ("4:53P"), which read as a typo.
+     Entries already store millisecond `created`/`updated`, so this is purely
+     a display concern (the sort always had the precision). */
   function shortTime(ts) {
     if (!ts) return '';
     var d = new Date(ts);
     var h = d.getHours();
     var m = d.getMinutes();
-    var ap = h < 12 ? 'a' : 'p';
+    var ap = h < 12 ? 'AM' : 'PM';
     var h12 = h % 12; if (h12 === 0) h12 = 12;
-    return h12 + ':' + (m < 10 ? '0' + m : m) + ap;
+    return h12 + ':' + (m < 10 ? '0' + m : m) + ' ' + ap;
   }
 
   return {

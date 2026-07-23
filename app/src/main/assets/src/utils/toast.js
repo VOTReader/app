@@ -72,7 +72,14 @@ const _hideTimers = new Map();
 export function showToast(opts) {
   if (typeof document === 'undefined') return;
   const id = opts && opts.id;
-  if (!id) return;
+  // Wave-0: an id-less call used to return SILENTLY — a bare-string call
+  // (showToast('msg')) looked like it worked and showed nothing. Warn so the
+  // mistake surfaces in the console during development instead of shipping
+  // as a dead toast.
+  if (!id) {
+    try { console.warn('showToast called without opts.id — toast suppressed:', opts); } catch (_e) { /* console can throw in exotic hosts */ }
+    return;
+  }
   const html = (opts && opts.html != null) ? opts.html : '';
   const className = (opts && opts.className) || id;
   const durationMs = (opts && opts.durationMs != null) ? opts.durationMs : 3000;

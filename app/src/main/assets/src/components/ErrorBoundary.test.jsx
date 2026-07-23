@@ -77,3 +77,32 @@ describe('ErrorBoundary — ERR3 custom fallback (AppShell chrome boundaries)', 
     expect(getByText('Something went wrong')).toBeTruthy();
   });
 });
+
+/* ERR3-ACK (Wave 0): the AppShellSheets chrome boundary passes onCatch so a
+   crashed sheet acknowledges itself with a toast ("That panel hit a problem
+   and closed — your data is safe.") instead of vanishing silently mid-task.
+   The mechanism is pinned here; the wiring lives in AppShellSheets.jsx. */
+describe('ErrorBoundary — ERR3-ACK onCatch callback', () => {
+  it('onCatch fires once with the error while fallback={null} still renders nothing', () => {
+    const onCatch = vi.fn();
+    const { container, queryByText } = render(
+      <ErrorBoundary fallback={null} onCatch={onCatch}><Boom /></ErrorBoundary>,
+    );
+    expect(onCatch).toHaveBeenCalledTimes(1);
+    expect(String(onCatch.mock.calls[0][0])).toContain('kaboom');
+    expect(queryByText('Something went wrong')).toBeNull(); // fallback unchanged
+    expect(container.textContent).toBe('');                 // still a quiet vanish
+  });
+
+  it('a throwing onCatch cannot break the boundary (last line of defense holds)', () => {
+    const onCatch = () => { throw new Error('bad callback'); };
+    const { container } = render(<ErrorBoundary fallback={null} onCatch={onCatch}><Boom /></ErrorBoundary>);
+    expect(container.textContent).toBe('');
+    expect(sessionStorage.getItem('vot-crash-count')).toBe('1'); // still counted + logged
+  });
+
+  it('no onCatch — behavior is byte-identical to before (default panel path)', () => {
+    const { getByText } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
+    expect(getByText('Something went wrong')).toBeTruthy();
+  });
+});

@@ -55,6 +55,14 @@ export class ErrorBoundary extends React.Component {
     var count = _recordCrash();
     this.setState({ crashCount: count });
     try { DiagnosticLog.error('render', String(error)); } catch (_e) { /* swallow */ }
+    // ERR3-ACK: chrome boundaries (AppShellSheets) pass onCatch so a crashed
+    // sheet acknowledges itself with a toast ("That panel hit a problem and
+    // closed — your data is safe.") instead of vanishing silently mid-task.
+    // Wrapped like everything else here — a broken callback must never
+    // break the last line of defense.
+    if (typeof this.props.onCatch === 'function') {
+      try { this.props.onCatch(error); } catch (_e) { /* swallow */ }
+    }
   }
   render() {
     if (!this.state.error) return this.props.children;
@@ -71,7 +79,10 @@ export class ErrorBoundary extends React.Component {
       <div style={{ padding: "2rem", textAlign: "center", color: "#e0c97f", fontFamily: "Georgia, serif" }}>
         <h2 style={{ marginBottom: "1rem" }}>Something went wrong</h2>
         <p style={{ color: "#b0a080", fontSize: "0.85rem", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" }}>
-          {String(this.state.error)}
+          {/* Wave-0: was String(this.state.error) — raw stack text facing the
+              user. The technical detail is already in DiagnosticLog
+              (componentDidCatch); the panel speaks human. */}
+          This page hit an unexpected problem and could not finish loading. Your notes and data are safe.
         </p>
         <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
           <button

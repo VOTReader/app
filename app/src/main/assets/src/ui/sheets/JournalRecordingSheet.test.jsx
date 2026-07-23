@@ -150,3 +150,44 @@ describe('JournalRecordingSheet pause freezes the timer', () => {
     expect(timeText()).not.toBe(atPause);
   });
 });
+
+/* P1-6 — Escape / Android-back must route through the discard confirm.
+   ─────────────────────────────────────────────────────────────────────
+   The editor used to register a bare setShowRec(false) as the modal-registry
+   dismiss for this sheet, so hardware back while recording DESTROYED the
+   take without the discard confirm that every tap path (backdrop, ×, Cancel)
+   already had. The sheet now registers ITSELF (NoteSheet precedent) with
+   requestDiscard as the dismiss. Driven through the REAL modalRegistry
+   (vitest.setup.js supplies it), exactly like the app-level dispatcher. */
+describe('JournalRecordingSheet — registry dismiss routes through requestDiscard (P1-6)', () => {
+  beforeEach(() => { vi.useFakeTimers(); modalRegistry._reset(); });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    modalRegistry._reset();
+  });
+
+  it('back/Escape during a real take opens the discard confirm instead of destroying the take', () => {
+    const onClose = vi.fn();
+    renderRecording(onClose); // permission granted + ~1.3s recorded (seconds > 0)
+
+    expect(modalRegistry.openIds()).toContain('journal-recording-sheet');
+    act(() => { modalRegistry.peek().dismiss(); }); // the dispatcher's Escape/back path
+
+    // The bug: the sheet was already gone here, take destroyed, no confirm.
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText('Discard this recording?')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Yes, discard'));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('back/Escape with nothing recorded still closes instantly (nothing at risk)', () => {
+    const onClose = vi.fn();
+    render(<JournalRecordingSheet onSave={() => {}} onClose={onClose} />);
+    // Do NOT advance timers — permission unresolved, stage stays 'requesting'.
+    act(() => { modalRegistry.peek().dismiss(); });
+    expect(onClose).toHaveBeenCalled();
+    expect(screen.queryByText('Discard this recording?')).toBeNull();
+  });
+});

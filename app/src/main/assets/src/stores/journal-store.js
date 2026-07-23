@@ -343,11 +343,16 @@ export var JournalStore = extendStore(
      * delete path (hub card menu, viewer) routes through remove() — it
      * cannot be bypassed.
      * @param {string} id
+     * @param {{ skipStats?: boolean }} [opts]
+     *   skipStats: omit the JournalStatsStore.recordDeletion() cascade.
+     *   Used by the editor's blank-entry prune-on-exit — that entry's
+     *   stats were never recorded (recording happens at the first
+     *   non-empty save), so a decrement would under-count real entries.
      * @returns {void}
      */
-    remove(id) {
+    remove(id, opts) {
       if (!id) return;
-      if (this._shouldDefer('remove', id)) return;
+      if (this._shouldDefer('remove', id, opts)) return;
       // D6 — the cross-store cascade + index/stats updates are DURABLE
       // real-apply effects; they must NOT fire during the pending/degraded
       // overlay simulation (_applyToPendingCache → _applyingPending=true).
@@ -369,7 +374,7 @@ export var JournalStore = extendStore(
       this._bump();
       if (!this._applyingPending) {
         if (typeof JournalIndexStore !== 'undefined') JournalIndexStore.removeEntry(id);
-        if (typeof JournalStatsStore !== 'undefined') JournalStatsStore.recordDeletion();
+        if (!(opts && opts.skipStats) && typeof JournalStatsStore !== 'undefined') JournalStatsStore.recordDeletion();
       }
     },
 
