@@ -23,6 +23,9 @@ export function gardenSwipeDir(dx, dy) {
 export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeChange: _onThemeChange, tier }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(false);
+  // UX: retry counter, suffixed onto the <img> key so a retry REMOUNTS the
+  // img and the browser issues a fresh request for the same URL.
+  const [retryTick, setRetryTick] = React.useState(0);
   const [jumpMode, setJumpMode] = React.useState(false);
   const [jumpInput, setJumpInput] = React.useState("");
   const jumpRef = React.useRef(null);
@@ -187,6 +190,18 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
 
   const goNext = () => {if (page < GARDEN_TOTAL) onPageChange(page + 1);};
   const goPrev = () => {if (page > 1) onPageChange(page - 1);};
+
+  // UX: Garden is the app's ONE network feature — a failed page must not
+  // dead-end on "Failed to load". The retry first evicts the stale FAILED
+  // preload entry (gardenPreload no-ops while it lingers, so neither the
+  // crawl nor the look-ahead would ever re-fetch this page), then remounts
+  // the <img> via retryTick on its key to force a fresh request.
+  const retryImage = () => {
+    delete gardenImageCache[gardenCacheKey(page, tier)];
+    setError(false);
+    setLoading(true);
+    setRetryTick((t) => t + 1);
+  };
 
   const handleJump = () => {
     const n = parseInt(jumpInput, 10);
@@ -353,7 +368,7 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
   return (
     <div className="garden-fullscreen">
       <div className="garden-top-bar">
-        <button className="garden-back-btn" onClick={onBack}>
+        <button className="garden-back-btn" onClick={onBack} title="Back" aria-label="Back">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -370,6 +385,7 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
               onChange={(e) => setJumpInput(e.target.value)}
               onBlur={() => {setJumpMode(false);setJumpInput("");}}
               placeholder={`1–${GARDEN_TOTAL}`}
+              aria-label="Jump to page"
             />
             <span className="garden-jump-hint">/ {GARDEN_TOTAL}</span>
           </form>
@@ -383,14 +399,23 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
       <div className="garden-image-area" ref={imgAreaRef}>
         {loading && (
           <div className="garden-loading">
-            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" }}>
-              {error ? "Failed to load — check your connection" : `Loading page ${page}...`}
-            </div>
+            {error ? (
+              // Error surface mirrors the StudiesHome lazy-corpus convention:
+              // human copy + a pill "Try again" — never a dead-end.
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" }}>
+                <div>Failed to load — check your connection</div>
+                <button type="button" onClick={retryImage} style={{ padding: "8px 20px", borderRadius: "999px", border: "1px solid currentColor", background: "transparent", color: "inherit", font: "inherit", cursor: "pointer", opacity: 0.85 }}>Try again</button>
+              </div>
+            ) : (
+              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" }}>
+                {`Loading page ${page}...`}
+              </div>
+            )}
           </div>
         )}
         <img
           ref={imgElRef}
-          key={`${tier}-${page}`}
+          key={`${tier}-${page}-${retryTick}`}
           src={gardenUrl(page, tier)}
           alt={`Garden page ${page}`}
           className="garden-page-img"
@@ -401,12 +426,12 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
       </div>
 
       <div className="garden-bottom-bar">
-        <button className="garden-arrow-btn" onClick={goPrev} disabled={page <= 1}>
+        <button className="garden-arrow-btn" onClick={goPrev} disabled={page <= 1} title="Previous page" aria-label="Previous page">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <button className="garden-arrow-btn" onClick={goNext} disabled={page >= GARDEN_TOTAL}>
+        <button className="garden-arrow-btn" onClick={goNext} disabled={page >= GARDEN_TOTAL} title="Next page" aria-label="Next page">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="9 6 15 12 9 18" />
           </svg>

@@ -9,12 +9,14 @@
 */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { render, cleanup, act, fireEvent, screen } from '@testing-library/react';
+import { computeAccessibleName } from 'dom-accessibility-api';
 import { gardenSwipeDir, GardenView } from './GardenView.jsx';
 
 const GLOBALS = [
   'PlatformBridge', 'gardenTierLimits', 'gardenIsCached', 'gardenPreload',
   'gardenCrawled', 'gardenCacheKey', 'gardenUrl', 'GARDEN_TOTAL', 'GardenPosStore',
+  'gardenImageCache',
 ];
 
 function setupGardenGlobals(posStore) {
@@ -23,6 +25,7 @@ function setupGardenGlobals(posStore) {
   globalThis.gardenIsCached = () => true;
   globalThis.gardenPreload = () => {};
   globalThis.gardenCrawled = new Set();
+  globalThis.gardenImageCache = {};
   globalThis.gardenCacheKey = (p, t) => `${t}:${p}`;
   globalThis.gardenUrl = (p) => `https://example.test/${p}.jpg`;
   globalThis.GARDEN_TOTAL = 209;
@@ -128,5 +131,71 @@ describe('GardenView — durable page memory (GardenPosStore)', () => {
     setupGardenGlobals(undefined);
     delete globalThis.GardenPosStore;
     expect(() => renderGarden({ page: 1 })).not.toThrow();
+  });
+});
+
+describe('GardenView — image failure retry (Wave 0)', () => {
+  // The Garden is the app's ONE network feature: a failed page used to
+  // dead-end on "Failed to load" with no way back short of leaving the
+  // screen. The error surface must offer a retry, mirroring the StudiesHome
+  // "Try again" pill convention.
+  const failCurrentPage = () => fireEvent.error(document.querySelector('.garden-page-img'));
+
+  it('a failed page surfaces "Try again" instead of dead-ending', () => {
+    setupGardenGlobals(mkPos());
+    renderGarden({ page: 5 });
+    failCurrentPage();
+    expect(screen.getByText(/Failed to load/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
+
+  it('Try again evicts the stale failed preload and re-requests the image', () => {
+    setupGardenGlobals(mkPos());
+    // A stale FAILED preload entry: gardenPreload no-ops while it lingers,
+    // so retry must drop it for the crawl/preload path to ever re-fetch.
+    globalThis.gardenImageCache['std:5'] = { complete: false, naturalWidth: 0 };
+    renderGarden({ page: 5 });
+    failCurrentPage();
+    const before = document.querySelector('.garden-page-img');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(globalThis.gardenImageCache['std:5']).toBeUndefined();
+    const after = document.querySelector('.garden-page-img');
+    expect(after).not.toBe(before); // remounted via key → fresh request for the same URL
+    expect(screen.queryByText(/Failed to load/)).toBeNull();
+    expect(screen.getByText('Loading page 5...')).toBeTruthy();
+  });
+
+  it('a failure AFTER a retry re-surfaces the retry affordance (no one-shot)', () => {
+    setupGardenGlobals(mkPos());
+    renderGarden({ page: 5 });
+    failCurrentPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    failCurrentPage();
+    expect(screen.getByText(/Failed to load/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
+});
+
+describe('GardenView — accessible names (Wave 0)', () => {
+  it('every icon-only button has an accessible name', () => {
+    setupGardenGlobals(mkPos());
+    renderGarden({ page: 5 });
+    // The three svg-only buttons, pinned by their exact names…
+    screen.getByRole('button', { name: 'Back' });
+    screen.getByRole('button', { name: 'Previous page' });
+    screen.getByRole('button', { name: 'Next page' });
+    // …and the sweep: NO nameless button anywhere on the screen.
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const btn of buttons) {
+      expect(computeAccessibleName(btn).trim()).not.toBe('');
+    }
+  });
+
+  it('the jump-to-page number input is labeled', () => {
+    setupGardenGlobals(mkPos());
+    renderGarden({ page: 5 });
+    fireEvent.click(screen.getByRole('button', { name: '5 / 209' }));
+    expect(screen.getByRole('spinbutton', { name: 'Jump to page' })).toBeTruthy();
   });
 });
