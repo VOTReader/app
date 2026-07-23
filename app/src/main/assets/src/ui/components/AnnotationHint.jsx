@@ -13,14 +13,23 @@
      now, so on every future boot the condition is already false). No
      persisted "seen" flag is needed: the data itself is the flag, so
      there's no IDB schema change and nothing new to export/import.
-   - The ✕ dismisses for the SESSION (window-backed so it survives
-     screen navs). A dismisser who never annotates sees it again next
-     cold boot — acceptable for a tip aimed at first-run users, and it
-     avoids a persistence surface for a tail case.
+   - The ✕ dismissal is DURABLE (W0 P1-1): it records
+     AnnHintDismissedFlagStore (bundle-b, IDB 'vot-ann-hint-dismissed',
+     hydrated before App renders so the .is() read below is synchronous).
+     The old session-only window flag let the pill re-pitch on every cold
+     boot to exactly the dismissers who never annotate — the tail case the
+     old design called acceptable, but a re-teach on every launch is a
+     nag, not a tip. The window flag remains ONLY as the no-store fallback
+     for bare-test hosts.
    - Waits ~2.5s after the reading screen mounts so it never competes
      with the page-load moment, and renders position:fixed OUTSIDE the
      .pager-track (ScreenLayout renders it as a stickyNav sibling) so a
      swipe-settle transform can't displace it.
+   - The pill container is pointer-events:none (W0 P1-1, app.css) so it
+     stops swallowing the very long-press it teaches; the ✕ re-enables
+     pointer events on itself. That works because the ✕ is a native
+     <button> with its OWN onClick — nothing is delegated to the now
+     pointer-inert container. Keep it that way.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function AnnotationHint() {
@@ -45,8 +54,16 @@ export function AnnotationHint() {
   );
 
   const [delayDone, setDelayDone] = React.useState(false);
+  // Durable dismissal (W0 P1-1). AnnHintDismissedFlagStore is a bundle-b
+  // bare global (same bridge as the data stores above) and is hydrated
+  // before App renders, so the .is() read in the initializer is the
+  // synchronous, post-hydration truth. Missing global (bare-test hosts)
+  // → the old session-only window flag keeps those hosts working.
+  const _flag = typeof AnnHintDismissedFlagStore !== 'undefined'
+    ? AnnHintDismissedFlagStore : null;
   const [dismissed, setDismissed] = React.useState(
-    () => typeof window !== 'undefined' && !!window.__annHintDismissed
+    () => (_flag ? _flag.is()
+      : (typeof window !== 'undefined' && !!window.__annHintDismissed))
   );
   React.useEffect(() => {
     const t = setTimeout(() => setDelayDone(true), 2500);
@@ -73,7 +90,12 @@ export function AnnotationHint() {
       </span>
       <button
         className="ann-hint-close"
-        onClick={() => { window.__annHintDismissed = true; setDismissed(true); }}
+        onClick={() => {
+          // Persist first (survives the cold boot), then hide locally.
+          // The no-store fallback keeps the legacy session semantics.
+          if (_flag) _flag.set(); else window.__annHintDismissed = true;
+          setDismissed(true);
+        }}
         aria-label="Dismiss tip"
       >×</button>
     </div>

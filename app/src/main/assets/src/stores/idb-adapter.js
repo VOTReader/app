@@ -61,12 +61,15 @@ export const IDBAdapter = (function () {
   //       Same additive pattern.
   //   6 — added vot-garden-pos (durable last-Garden-page memory).
   //       Same additive pattern.
+  //   7 — added vot-ann-hint-dismissed (Wave-0 P1-1: the AnnotationHint
+  //       coach-mark ✕ dismissal, previously a session-only window flag).
+  //       Same additive pattern.
   // W7.1 dropped 'vot-ann-migrated' from STORE_NAMES (its only consumer,
   // the pre-W2 annotation bootstrap migration, was deleted). Deliberately
   // NOT a version bump: fresh installs simply skip it; a pre-existing empty
   // store on older installs is orphaned + harmless (never accessed, since
   // STORE_SET no longer lists it).
-  const DB_VERSION = 6;
+  const DB_VERSION = 7;
 
   /**
    * The 17 vot-* localStorage keys that migrate into IDB, plus the
@@ -101,6 +104,7 @@ export const IDBAdapter = (function () {
     'vot-library-order',
     'vot-reading-streak',
     'vot-garden-pos',
+    'vot-ann-hint-dismissed',
     'meta',
   ]);
   const STORE_SET = new Set(STORE_NAMES);

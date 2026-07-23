@@ -1,9 +1,10 @@
 /* AppFlagStores — is/set/clear + legacy compat + independence tests.
    ──────────────────────────────────────────────────────────────────
-   Three boolean presence flags: WelcomedFlagStore, AboutSeenFlagStore,
-   GardenWarningFlagStore. Each backs a one-byte LS key migrated to IDB.
-   is() normalizes via !! so legacy numeric/string truthies ("1", 1)
-   read as true.
+   Four boolean presence flags: WelcomedFlagStore, AboutSeenFlagStore,
+   GardenWarningFlagStore, AnnHintDismissedFlagStore. Each backs a
+   one-byte LS key migrated to IDB (the fourth is Wave-0-new, so it has
+   no legacy LS data). is() normalizes via !! so legacy numeric/string
+   truthies ("1", 1) read as true.
 */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -11,9 +12,10 @@ import {
   WelcomedFlagStore,
   AboutSeenFlagStore,
   GardenWarningFlagStore,
+  AnnHintDismissedFlagStore,
 } from './app-flag-stores.js';
 
-const ALL_FLAGS = [WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore];
+const ALL_FLAGS = [WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore];
 
 beforeEach(() => {
   localStorage.clear();

@@ -3,13 +3,16 @@
    ══════════════════════════════════════════════════════════════════════
    ES module. Bundled into bundle-b via _entry-b.js.
 
-   Three booleans that previously lived as direct localStorage.setItem
-   calls scattered across hooks and components:
+   Four booleans that previously lived as direct localStorage.setItem
+   calls scattered across hooks and components (the fourth, Wave-0 P1-1,
+   was born here — the AnnotationHint ✕ used to be a session-only
+   window flag that re-pitched on every cold boot):
 
      vot-welcomed               — first-run welcome modal dismissed
      vot-about-seen             — About screen seen at least once
      vot-garden-warning-acked   — Garden View "this is fan-made" modal
                                   acknowledged
+     vot-ann-hint-dismissed     — AnnotationHint coach-mark ✕ dismissed
 
    Each is IDB-backed via the W2.2 state machine so the W2.4 LS-
    clearing pass doesn't strip them out from under a hook still
@@ -28,12 +31,14 @@
      <Flag>Store.set()   → void  (records the flag as truthy)
      <Flag>Store.clear() → void  (records the flag as falsy)
 
-   The 3 stores are deliberately separate (not bundled into one
+   The 4 stores are deliberately separate (not bundled into one
    "AppFlags" store) because the IDB schema in idb-adapter.js
-   declares them as 3 separate stores, AND because the W2.2
+   declares them as 4 separate stores, AND because the W2.2
    legacy-LS-fallback path expects one IDB store name per legacy LS
    key — bundling would require a custom fallback that reads the 3
-   old LS keys and constructs the unified state.
+   old LS keys and constructs the unified state. (The fourth has no
+   legacy LS data — it is Wave-0-new — so its fallback simply finds
+   nothing and defaults to false.)
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
@@ -84,3 +89,10 @@ export const AboutSeenFlagStore = buildFlagStore('vot-about-seen');
 
 /** Garden warning acknowledged — read by app.jsx + AppShellOverlays. */
 export const GardenWarningFlagStore = buildFlagStore('vot-garden-warning-acked');
+
+/** AnnotationHint coach-mark dismissed — read by AnnotationHint (bundle-d,
+    via the window bridge). Wave-0 P1-1: the ✕ used to set a session-only
+    window flag, so the pill re-pitched on every cold boot for anyone who
+    dismissed it without ever annotating. IDB schema v7 added the store;
+    no legacy LS data exists for this key. */
+export const AnnHintDismissedFlagStore = buildFlagStore('vot-ann-hint-dismissed');

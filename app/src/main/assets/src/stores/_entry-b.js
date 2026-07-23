@@ -41,7 +41,7 @@ import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_S
 import { showToast, hideToast } from '../utils/toast.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 import { IDBAdapter } from './idb-adapter.js';
-import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore } from './app-flag-stores.js';
+import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore } from './app-flag-stores.js';
 import { ProphecyCardsStore } from './prophecy-cards-store.js';
 import { StateStore } from './state-store.js';
 import { HistoryStore } from './history-store.js';
@@ -160,7 +160,7 @@ Object.assign(window, {
   showToast, hideToast,
   navHandoff,
   IDBAdapter,
-  WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore,
+  WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore,
   ProphecyCardsStore,
   StateStore,
   HistoryStore,
