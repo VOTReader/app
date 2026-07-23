@@ -21,9 +21,20 @@ export function SettingsRow({ label, desc = null, checked, onToggle, disabled = 
         )}
         <span className="settings-row-grow" />
         <label className="settings-toggle">
+          {/* P1-9 (Wave 0): the text label is a SIBLING span, so this
+              wrapping <label> gives the input no accessible name — TalkBack
+              announced "checkbox, checked" with no name on every settings
+              toggle. aria-label supplies the name; role="switch" +
+              aria-checked supply the on/off semantics (the native checkbox
+              stays underneath — app.css styles the track off input:checked,
+              and the focus-visible ring lands on the track via the
+              input:focus-visible ~ .settings-toggle-track rule). */}
           <input
             type="checkbox"
+            role="switch"
             checked={checked}
+            aria-checked={!!checked}
+            aria-label={label}
             disabled={!!disabled}
             onChange={disabled ? undefined : onToggle}
           />

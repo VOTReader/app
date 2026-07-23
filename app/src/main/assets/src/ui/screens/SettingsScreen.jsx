@@ -175,7 +175,11 @@ function NavChip({ label, checked, onToggle, disabled = false }) {
     <label className={"settings-chip" + (disabled ? " settings-row-disabled" : "")}>
       <span className="settings-chip-label">{label}</span>
       <span className="settings-toggle">
-        <input type="checkbox" checked={checked} disabled={!!disabled} onChange={disabled ? undefined : onToggle} />
+        {/* P1-9: same switch contract as SettingsRow — the chip label IS
+            inside the wrapping <label> so the name resolved, but explicit
+            aria-label + role="switch" keeps every toggle in the app on one
+            announced pattern ("<name>, switch, on/off"). */}
+        <input type="checkbox" role="switch" checked={checked} aria-checked={!!checked} aria-label={label} disabled={!!disabled} onChange={disabled ? undefined : onToggle} />
         <span className="settings-toggle-track" />
         <span className="settings-toggle-thumb" />
       </span>
@@ -407,6 +411,19 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
+  // Wave-0 (dual-dismissal fix): the type-DELETE wipe dialog was registered
+  // in NEITHER dismissal system, so hardware Back / Escape navigated away
+  // underneath it (and left it rendering over the previous screen). It now
+  // self-registers with the modal registry — the same pattern NoteSheet /
+  // ConfirmStrip use — so the single dispatcher dismisses the DIALOG first.
+  // The legacy window.__closeSheet system is deliberately NOT involved.
+  const closeWipe = () => { setWipeConfirm(false); setWipeText(''); };
+  useModalRegistry({ id: 'settings-wipe-dialog', dismiss: closeWipe, active: wipeConfirm });
+  // Wave-0: the import-overwrite confirm (formerly the app's last native
+  // window.confirm) is an in-app sheet driven by this state — see
+  // _confirmDegradeApplyReload. Registered for the same Back/Escape reason.
+  const [importConfirm, setImportConfirm] = React.useState(null);
+  useModalRegistry({ id: 'settings-import-confirm', dismiss: () => setImportConfirm(null), active: importConfirm != null });
   // NK5c: diagnostic-log snapshot for the "Your Data" section. The bridge
   // (W1.2 Tier B.2) always exposes getCrashLog: Android merges the native
   // BoundedLogTree with the JS-side DiagnosticLog; web returns the JS
@@ -588,7 +605,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     } catch (e) {
       console.warn('export failed', e);
       hideToast(_TOAST_ID);
-      _showToast('Export failed. See console for details.');
+      // Wave-0: dropped the "See console for details." dev-speak — the detail
+      // is in console.warn above; the user gets the actionable version.
+      _showToast('Export failed. Please try again.');
     }
   };
 
@@ -710,11 +729,24 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         }
       } catch (_e) { /* advisory only — never blocks the import */ }
 
-      const proceed = window.confirm(
-        `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote}${spaceNote} This cannot be undone.\n\nContinue?`
-      );
-      if (!proceed) return;
+      // Wave-0: this was the app's last native window.confirm — a blocking
+      // dialog with no styling, no registry registration (Back navigated
+      // underneath it), and browser chrome. Replaced with the same in-app
+      // sheet pattern as the type-DELETE wipe dialog. The destructive
+      // semantics are KEPT, not weakened: nothing is applied until the user
+      // explicitly taps "Import & Overwrite"; Cancel / Back / Escape all
+      // dismiss without touching data.
+      setImportConfirm({
+        message: `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote}${spaceNote} This cannot be undone.`,
+        proceed: () => { setImportConfirm(null); _applyConfirmedImport(parsed, applyFn); },
+      });
+      return;
+    };
 
+    // The post-confirm tail of an import: progress toast → degraded-store
+    // guard → apply → result toast → reload. Runs ONLY from the confirm
+    // sheet's "Import & Overwrite" button.
+    const _applyConfirmedImport = async (parsed, applyFn) => {
       _showToast('Importing… please wait.', 0);
 
       const storesMap = _exportableStores();
@@ -757,7 +789,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         problems.push(`some records didn't restore (${countMismatches.join(', ')})`);
       }
       if (problems.length) {
-        _showToast(`Import completed — ${problems.join('; ')} (check console). Reloading…`, 0);
+        // Wave-0: dropped "(check console)." dev-speak — details are in console.warn.
+        _showToast(`Import completed — ${problems.join('; ')}. Reloading…`, 0);
       } else {
         _showToast('Import complete. Reloading…', 0);
       }
@@ -995,11 +1028,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         _deleteIdbDatabase('vot-search-cache', false),
         _deleteIdbDatabase('vot-minisearch-cache', false),
       ]);
-      alert('All personal data cleared. The app will now reload.');
-      window.location.reload();
+      // Wave-0: was alert('All personal data cleared…') — a native blocking
+      // dialog. Same toast-then-reload pattern the import path uses: the
+      // persistent toast renders first, the 600ms delay lets it paint.
+      _showToast('All personal data cleared. Reloading…', 0);
+      setTimeout(() => window.location.reload(), 600);
     } catch (e) {
       console.warn('clear all personal data failed', e);
-      alert('Clear failed. See console for details.');
+      // Wave-0: was alert('Clear failed. See console for details.') — native
+      // dialog + dev-speak. The diagnostics still go to console.warn above;
+      // the user gets an actionable message, not a pointer to tooling.
+      _showToast('Clear did not finish. Please try again.');
     }
   };
 
@@ -1277,13 +1316,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             </DataInfoRow>
             <DataActionRow
               label="Export Your Data"
-              desc="Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as a single JSON file. No credentials or login info — just your data. Save the file anywhere you control."
+              desc="Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as one backup file — look for a file named votreader-backup-<date>.votbak in your Downloads or the folder you chose. No credentials or login info — just your data. Save the file anywhere you control."
             >
               <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); exportPersonalData(); }}>Export</button>
             </DataActionRow>
             <DataActionRow
               label="Import from Backup"
-              desc="Restore a previously exported JSON file. Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten."
+              desc="Restore a previously exported backup file (a .votbak file). Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten."
             >
               <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); importPersonalData(); }}>Import</button>
             </DataActionRow>
@@ -1314,7 +1353,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             </DataActionRow>
           </div>
           {(() => {
-            const closeWipe = () => { setWipeConfirm(false); setWipeText(''); };
+            // closeWipe now lives at component scope (shared with the
+            // useModalRegistry registration above) — same dialog, same
+            // dismiss paths, but Back/Escape now close THIS first.
             return (
               <>
                 {wipeConfirm && (
@@ -1361,6 +1402,35 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                           onClick={(e) => { e.stopPropagation(); if (!wipeOk) return; closeWipe(); clearAllPersonalData(); }}
                         >
                           Delete Everything
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Wave-0: the import-overwrite confirm sheet (replaces the
+                    native window.confirm). Same overlay/sheet classes as the
+                    wipe dialog; the danger-styled action button keeps the
+                    weight of the choice visible. `proceed` closes the sheet
+                    itself before applying. */}
+                {importConfirm && (
+                  <div
+                    className="note-sheet-overlay"
+                    onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) setImportConfirm(null); }}
+                  >
+                    <div className="note-sheet" onClick={(e) => e.stopPropagation()}>
+                      <div className="note-sheet-header">
+                        <div className="note-sheet-title">Import from Backup</div>
+                      </div>
+                      <div style={{ color: "var(--cream)", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "18px", whiteSpace: "pre-line" }}>
+                        {importConfirm.message}
+                      </div>
+                      <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                        <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); setImportConfirm(null); }}>Cancel</button>
+                        <button
+                          className="settings-clear-btn danger"
+                          onClick={(e) => { e.stopPropagation(); importConfirm.proceed(); }}
+                        >
+                          Import &amp; Overwrite
                         </button>
                       </div>
                     </div>

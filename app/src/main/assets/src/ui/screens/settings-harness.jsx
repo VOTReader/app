@@ -43,6 +43,9 @@ function fakeStore(extra) {
   return {
     subscribe: () => () => {}, getVersion: () => 0, all: () => ({}), count: () => 0,
     get: () => null, set: () => {}, remove: () => {}, clear: () => {},
+    // The import flow's degraded-store guard reads getState() on every
+    // exportable store before applying — 'ready' = hydrated, safe to write.
+    getState: () => 'ready',
     ...extra,
   };
 }

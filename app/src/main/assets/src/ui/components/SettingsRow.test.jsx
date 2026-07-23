@@ -8,6 +8,11 @@
      C) No ⓘ button renders when there is no description.
      D) The toggle still fires onToggle, and a disabled row neither fires
         onToggle nor swallows its disabledReason hint.
+     E) P1-9 (Wave 0): the toggle is a NAMED switch. The text label is a
+        sibling span of the <label> that wraps the input, so without an
+        explicit accessible name TalkBack announced "checkbox, checked"
+        with no name on every one of the ~19 settings toggles. The input
+        now carries role="switch" + aria-checked + aria-label={label}.
 */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -41,7 +46,7 @@ describe('SettingsRow (compact + ⓘ reveal)', () => {
   it('fires onToggle when the switch is changed', () => {
     const onToggle = vi.fn();
     render(<SettingsRow label="X" desc="d" checked={false} onToggle={onToggle} />);
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('switch'));
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
@@ -54,8 +59,33 @@ describe('SettingsRow (compact + ⓘ reveal)', () => {
         onToggle={onToggle}
       />
     );
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('switch'));
     expect(onToggle).not.toHaveBeenCalled();
     expect(screen.getByText('Turn on Search first.')).toBeTruthy();
+  });
+});
+
+describe('SettingsRow — P1-9 named switch (TalkBack)', () => {
+  it('exposes the row label as the switch’s accessible name', () => {
+    render(<SettingsRow label="Modern Fonts" desc="d" checked={false} onToggle={() => {}} />);
+    // Name lookup would FAIL pre-fix: the wrapping <label> contains only the
+    // track/thumb divs, so the input had no accessible name at all.
+    expect(screen.getByRole('switch', { name: 'Modern Fonts' })).toBeTruthy();
+  });
+
+  it('announces switch semantics with an explicit aria-checked state', () => {
+    const { rerender } = render(<SettingsRow label="X" checked={false} onToggle={() => {}} />);
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false');
+    rerender(<SettingsRow label="X" checked={true} onToggle={() => {}} />);
+    expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('keeps the native checkbox semantics underneath (CSS :checked + form behavior)', () => {
+    render(<SettingsRow label="X" checked={true} onToggle={() => {}} />);
+    const input = screen.getByRole('switch');
+    // The app.css track/thumb styling keys off input:checked — the fix must
+    // not trade the visual switch for the accessible one.
+    expect(input.getAttribute('type')).toBe('checkbox');
+    expect(/** @type {HTMLInputElement} */ (input).checked).toBe(true);
   });
 });
