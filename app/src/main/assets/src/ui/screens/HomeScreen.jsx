@@ -300,6 +300,11 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
         </div>
         {isFirstVisit && <span className="home-rearrange-hint">Hold to rearrange</span>}
         {showSurprise && (
+          /* Wave 0: the breathing dice was visually anonymous — a sighted
+             user had no way to know what it does. The visible caption
+             matches the accessible name (label-in-name) so the two never
+             drift; aria-hidden keeps the name sourced from aria-label
+             alone. */
           <button className="surprise-fab" onClick={onSurprise} title="Open a Random Chapter or Letter" aria-label="Surprise Me">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="3.5" />
@@ -309,6 +314,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
               <circle cx="8" cy="16" r="1.15" fill="currentColor" stroke="none" />
               <circle cx="16" cy="16" r="1.15" fill="currentColor" stroke="none" />
             </svg>
+            <span className="surprise-fab-caption" aria-hidden="true">Surprise Me</span>
           </button>
         )}
       </div>

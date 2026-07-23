@@ -64,10 +64,16 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
 
   // ── Tile metadata (static) ──────────────────────────────────────────
   // Defined inline so the SVG JSX resolves in component scope.
+  // Wave 0: each EMPTY tile also carries `guide` — a one-line "how X
+  // happens" caption in the voice of the destination screen's own empty
+  // state (NotesIndexScreen / BookmarksScreen / LinksScreen /
+  // HighlightsScreen / JournalHubScreen). Rendered only while the tile
+  // is empty; real counts replace it.
   const TILES_BY_ID = {
     notes: {
       id: 'notes', eyebrow: 'My Notes', title: 'Notes',
       detail: noteCount === 0 ? 'No notes yet' : (noteCount + (noteCount === 1 ? ' note' : ' notes')),
+      guide: noteCount === 0 ? 'Long-press text in any chapter and tap Note.' : null,
       onClick: onOpenNotes,
       icon: (
         <svg viewBox="0 0 24 24">
@@ -81,6 +87,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     links: {
       id: 'links', eyebrow: 'My Links', title: 'Links',
       detail: linkCount === 0 ? 'No links yet' : (linkCount + (linkCount === 1 ? ' link' : ' links')),
+      guide: linkCount === 0 ? 'Select text, tap Link, and pick a destination.' : null,
       onClick: onOpenLinks,
       icon: (
         <svg viewBox="0 0 24 24">
@@ -92,6 +99,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     journal: {
       id: 'journal', eyebrow: 'My Journal', title: 'Journal',
       detail: journalCount === 0 ? 'No entries yet' : (journalCount + (journalCount === 1 ? ' entry' : ' entries')),
+      guide: journalCount === 0 ? 'Tap "New Entry" in the Journal to write your first reflection.' : null,
       onClick: onOpenJournal,
       icon: (
         <svg viewBox="0 0 24 24">
@@ -104,6 +112,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     bookmarks: {
       id: 'bookmarks', eyebrow: 'My Bookmarks', title: 'Bookmarks',
       detail: bookmarkCount === 0 ? 'No bookmarks yet' : (bookmarkCount + (bookmarkCount === 1 ? ' bookmark' : ' bookmarks')),
+      guide: bookmarkCount === 0 ? 'Select text and tap Bookmark in the toolbar.' : null,
       onClick: onOpenBookmarks,
       icon: (
         <svg viewBox="0 0 24 24">
@@ -114,6 +123,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     highlights: {
       id: 'highlights', eyebrow: 'My Marks', title: 'Highlights & Underlines',
       detail: highlightCount === 0 ? 'No marks yet' : (highlightCount + (highlightCount === 1 ? ' mark' : ' marks')),
+      guide: highlightCount === 0 ? 'Select a passage and tap a color to highlight or underline it.' : null,
       onClick: onOpenHighlights,
       icon: (
         <svg viewBox="0 0 24 24">
@@ -125,6 +135,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     progress: {
       id: 'progress', eyebrow: 'My Progress', title: 'Progress',
       detail: !readCount ? 'Nothing read yet' : (readCount + ' read'),
+      guide: !readCount ? 'Chapters you read are counted here.' : null,
       onClick: onOpenProgress,
       icon: (
         <svg viewBox="0 0 24 24">
@@ -329,6 +340,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
               <span className="library-tile-eyebrow">{tile.eyebrow}</span>
               <span className="library-tile-title">{tile.title}</span>
               <span className="library-tile-detail">{tile.detail}</span>
+              {tile.guide && <span className="library-tile-guide">{tile.guide}</span>}
               <span className="library-tile-arrow">›</span>
             </button>
           ))}

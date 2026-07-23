@@ -1,0 +1,107 @@
+// @ts-nocheck — free-var globals stubbed per test (bundle-d screen contract)
+/* ChapterIndex tests — Wave 0 MISC-SCREENS items (1) + (2).
+   ──────────────────────────────────────
+   (1) Back affordance mislabeled "← Books": when the index was reached
+       from a scripture genre (or Studies / Home for Matthew), the tooltip
+       + TalkBack label must name the REAL destination. The destination
+       NAME arrives as the backLabel prop; the component only owns honest
+       rendering of it.
+   (2) Current-chapter marker was silently coupled to the unrelated
+       reading-dot setting (settings.showReadingDot gates the resume dot
+       in the top nav — nothing else). The route-level selection logic is
+       extracted to the pure helper chapterIndexCurrentChapter so the
+       decoupling is pinned here.
+*/
+
+import { describe, it, expect, afterEach } from 'vitest';
+import { render, cleanup } from '@testing-library/react';
+import { ChapterIndex } from './ChapterIndex.jsx';
+import * as routes from '../screen-routes.jsx';
+
+const GLOBALS = ['ScreenLayout', 'HomeBtn', 'NavButtons'];
+
+function setupGlobals() {
+  globalThis.ScreenLayout = ({ children, navChildren }) => (
+    <div data-testid="screen-layout">{navChildren}{children}</div>
+  );
+  globalThis.HomeBtn = () => null;
+  globalThis.NavButtons = () => null;
+  // jsdom lacks scrollIntoView; the mount effect scrolls the current card
+  // into view on a timer.
+  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
+}
+
+afterEach(() => {
+  cleanup();
+  GLOBALS.forEach((k) => { delete globalThis[k]; });
+});
+
+const BOOK = {
+  id: 'psalms',
+  title: 'Psalms',
+  subtitle: '150 Chapters',
+  chapters: [
+    { num: 1, title: 'Blessed Is the Man' },
+    { num: 2, title: 'The Reign of the Anointed' },
+    { num: 3, title: 'A Psalm of David' },
+  ],
+};
+
+const renderIndex = (props = {}) => render(
+  <ChapterIndex
+    book={BOOK}
+    onSelect={() => {}}
+    onBack={() => {}}
+    currentChapter={null}
+    isRead={() => false}
+    markAsReadEnabled={false}
+    theme="dark"
+    onThemeChange={() => {}}
+    {...props}
+  />
+);
+
+const backBtn = () => document.querySelector('.nav-back-icon');
+
+describe('ChapterIndex — back affordance names the real destination', () => {
+  it('falls back to "Back to Books" when no backLabel is given (legacy call sites)', () => {
+    setupGlobals();
+    renderIndex();
+    expect(backBtn().getAttribute('aria-label')).toBe('Back to Books');
+    expect(backBtn().getAttribute('title')).toBe('← Books');
+  });
+
+  it('names the genre destination in tooltip + TalkBack label when backLabel is passed', () => {
+    setupGlobals();
+    renderIndex({ backLabel: 'Poetry & Wisdom' });
+    expect(backBtn().getAttribute('aria-label')).toBe('Back to Poetry & Wisdom');
+    expect(backBtn().getAttribute('title')).toBe('← Poetry & Wisdom');
+  });
+});
+
+describe('ChapterIndex — current-chapter marker', () => {
+  it('marks only the current chapter card with is-current', () => {
+    setupGlobals();
+    renderIndex({ currentChapter: 2 });
+    const cards = document.querySelectorAll('.chapter-card-btn');
+    expect(cards).toHaveLength(3);
+    expect(cards[1].className).toContain('is-current');
+    expect(cards[0].className).not.toContain('is-current');
+    expect(cards[2].className).not.toContain('is-current');
+  });
+});
+
+describe('chapterIndexCurrentChapter — reading-dot decouple (route helper)', () => {
+  it('returns the last-read chapter whenever the book is the active read', () => {
+    // The reading-dot toggle (settings.showReadingDot) is deliberately NOT
+    // an input: the index marker answers "where was I in this book", which
+    // the nav-dot setting has no business hiding.
+    expect(routes.chapterIndexCurrentChapter('psalms', 'psalms', { psalms: 23 })).toBe(23);
+  });
+  it('returns null for a book that is not the active read', () => {
+    expect(routes.chapterIndexCurrentChapter('psalms', 'genesis', { psalms: 23 })).toBe(null);
+  });
+  it('returns null when nothing was read in the active book', () => {
+    expect(routes.chapterIndexCurrentChapter('psalms', 'psalms', {})).toBe(null);
+  });
+});

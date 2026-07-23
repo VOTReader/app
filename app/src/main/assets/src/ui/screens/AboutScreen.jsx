@@ -76,7 +76,15 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
             <span className="about-diamond" />
             <span className="about-diamond" />
           </div>
-          <button className="about-continue" onClick={handleContinue} aria-label="Continue">Continue</button>
+          {/* Wave 0: the FINAL page of first-run onboarding ends with a
+              warm, action-oriented CTA ("Begin Reading") instead of the
+              flat "Continue"; page 1 keeps "Continue" because it genuinely
+              continues to page 2. */}
+          <button
+            className="about-continue"
+            onClick={handleContinue}
+            aria-label={page === 2 ? 'Begin Reading' : 'Continue'}
+          >{page === 2 ? 'Begin Reading' : 'Continue'}</button>
         </div>
       </div>
     </ScreenLayout>

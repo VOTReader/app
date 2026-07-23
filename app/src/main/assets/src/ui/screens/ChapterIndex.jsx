@@ -2,7 +2,7 @@
    ChapterIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterIndex({ book, onSelect, onBack, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, markAsReadEnabled, restoredNames, showChapterTitle }) {
+export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, markAsReadEnabled, restoredNames, showChapterTitle }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
     if (currentRef.current) {
@@ -20,11 +20,16 @@ export function ChapterIndex({ book, onSelect, onBack, onSearch, onHistory, onSe
     }
     return ch.title;
   };
+  // Wave 0: the back affordance must name its REAL destination. Callers
+  // pass backLabel ("Poetry & Wisdom", "Studies", "Home", …); "Books" is
+  // the legacy fallback for any call site that doesn't. One string feeds
+  // BOTH the tooltip and the TalkBack label so they can never disagree.
+  const backDest = backLabel || "Books";
   return (
     <ScreenLayout
       navChildren={
         <>
-          <button className="nav-home nav-back-icon" onClick={onBack} title="← Books" aria-label="Back to Books">{"‹"}</button>
+          <button className="nav-home nav-back-icon" onClick={onBack} title={"← " + backDest} aria-label={"Back to " + backDest}>{"‹"}</button>
           <HomeBtn />
           <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
         </>
