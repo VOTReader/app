@@ -9,9 +9,10 @@
    [[callback-flow-unification]]):
      window.__onMicPermissionResult(granted: boolean)
        Fires after PlatformBridge.requestMicPermission().
-     window.__onNativeRecordingComplete(base64: string|null, durMs: number, mime: string, blob?: Blob)
+     window.__onNativeRecordingComplete(base64: string|null, durMs: number, mime: string, blob?: Blob, url?: string)
        Fires after PlatformBridge.nativeRecordStop() finalizes the recording.
-       Web (J3) passes the Blob directly (base64 null); Android passes base64.
+       Web (J3) passes the Blob directly (4th arg); Android passes a served-file
+       URL (5th arg, #1 fetch bridge) or base64 (1st arg, fallback).
    The component installs both callbacks at mount, removes them on unmount.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -20,6 +21,10 @@ import { PlatformBridge } from '../../utils/platform-bridge.js';
 /** Bars stored for a saved voice-memo waveform (JRNL-3). Matches the live
  *  display count; bounds the inline waveform data to a constant size. */
 const WAVE_STORE_BARS = 48;
+
+/** Foreground recording-length cap (NTV-1): the seconds tick auto-stops here.
+ *  Bounds the native stop() whole-file read (96 kbps × 5 min ≈ 3.6 MB). */
+const MAX_RECORDING_SECONDS = 300; // 5 min
 
 /**
  * Max-pool a raw amplitude array down to `buckets` bars (JRNL-3). Peaks survive
@@ -241,38 +246,11 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       accumulatedMsRef.current = 0;
       setStage('recording');
 
-      // Seconds counter — auto-stops at MAX_RECORDING_SECONDS. NTV-1: this IS the
-      // recording length cap (the blind audit's "no cap anywhere" was wrong — it
-      // grepped for setMaxDuration and missed this inline foreground stop). It
-      // bounds the native stop() whole-file read: 96 kbps × 5 min ≈ 3.6 MB, well
-      // within budget-device heap, so the audit's unbounded-43 MB/hour scenario
-      // cannot occur on the foreground path. (A native setMaxDuration/File backstop
-      // for a backgrounded recording past the cap is device-walk-gated — it touches
-      // the OEM MediaRecorder auto-stop behavior the native path exists to avoid.)
-      var MAX_RECORDING_SECONDS = 300; // 5 min
-      tickRef.current = setInterval(function() {
-        var sinceResume = Date.now() - startTimeRef.current;
-        var totalMs = accumulatedMsRef.current + sinceResume;
-        var s = Math.floor(totalMs / 1000);
-        setSeconds(s);
-        if (s >= MAX_RECORDING_SECONDS) {
-          previewDurationRef.current = s;
-          stopRecording();
-        }
-      }, 200);
-
-      // Amplitude polling — bridge handles the platform branch. Android:
-      // MediaRecorder.getMaxAmplitude (one-shot 0-32767 peak). Web: AnalyserNode
-      // RMS via pre-allocated Uint8Array buffer per [[amplitude-buffer-preallocation]]
-      // mapped to 0-32767 to match the Android contract. Component then maps
-      // 0-32767 → 0-1 via the Android-tuned sqrt formula for the waveform.
-      ampRef.current = setInterval(function() {
-        var amp = 0;
-        try { amp = PlatformBridge.nativeRecordAmplitude() || 0; } catch (_e) { /* best-effort */ }
-        var lvl = Math.min(1, Math.sqrt(amp / 32767) * 1.8);
-        samplesAccumRef.current.push(lvl);
-        setWaveLive(samplesAccumRef.current.slice(-48));
-      }, 80);
+      // Seconds counter + amplitude/waveform polling. Both are started here,
+      // RESTARTED on resume, and CLEARED on pause (see pauseRecording), so paused
+      // time is never counted and the waveform doesn't accrete a flat run.
+      startSecondsTick();
+      startAmpPolling();
     }
 
     // __onMicPermissionResult: fires from PlatformBridge.requestMicPermission.
@@ -321,11 +299,48 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: one recording session per sheet open. setError/setSeconds/setStage/setWaveFinal/setWaveLive are useState setters (identity-stable); persistRecording/stopRecording are local functions whose closure reads the same setters + refs that this effect's closure does — same lifecycle, no stale-value risk.
   }, []);
 
+  // Seconds tick — auto-stops at MAX_RECORDING_SECONDS (NTV-1 foreground cap).
+  // Started on capture + RESTARTED on resume; CLEARED on pause so paused time is
+  // not counted (the fix for "seconds climb while paused, then snap back on
+  // resume" — the tick used to keep running against a stale startTimeRef).
+  function startSecondsTick() {
+    if (tickRef.current) clearInterval(tickRef.current);
+    tickRef.current = setInterval(function() {
+      var totalMs = accumulatedMsRef.current + (Date.now() - startTimeRef.current);
+      var s = Math.floor(totalMs / 1000);
+      setSeconds(s);
+      if (s >= MAX_RECORDING_SECONDS) {
+        previewDurationRef.current = s;
+        stopRecording();
+      }
+    }, 200);
+  }
+
+  // Amplitude polling → live waveform. Android: MediaRecorder.getMaxAmplitude
+  // (0-32767 peak); web: AnalyserNode RMS mapped to the same range, then to 0-1
+  // via the Android-tuned sqrt curve. Started + restarted with the tick; cleared
+  // on pause (a paused recorder reads 0, so the wave would otherwise accrete a
+  // flat run for the pause duration).
+  function startAmpPolling() {
+    if (ampRef.current) clearInterval(ampRef.current);
+    ampRef.current = setInterval(function() {
+      var amp = 0;
+      try { amp = PlatformBridge.nativeRecordAmplitude() || 0; } catch (_e) { /* best-effort */ }
+      var lvl = Math.min(1, Math.sqrt(amp / 32767) * 1.8);
+      samplesAccumRef.current.push(lvl);
+      setWaveLive(samplesAccumRef.current.slice(-WAVE_STORE_BARS));
+    }, 80);
+  }
+
   function pauseRecording() {
     if (stage !== 'recording') return;
     var res = PlatformBridge.nativeRecordPause();
     if (res !== 'ok') return;
     accumulatedMsRef.current += (Date.now() - startTimeRef.current);
+    // Freeze the UI timers while paused — the recorder is paused, so the seconds
+    // counter + waveform must stop too. Both are restarted in resumeRecording.
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = 0; }
+    if (ampRef.current) { clearInterval(ampRef.current); ampRef.current = 0; }
     setStage('paused');
   }
 
@@ -334,6 +349,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     var res = PlatformBridge.nativeRecordResume();
     if (res !== 'ok') return;
     startTimeRef.current = Date.now();
+    startSecondsTick();
+    startAmpPolling();
     setStage('recording');
   }
 

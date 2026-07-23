@@ -16,8 +16,8 @@ vi.mock('../../utils/platform-bridge.js', () => ({
     nativeRecordAmplitude: () => 8000,
     nativeRecordStop: vi.fn(),
     nativeRecordCancel: vi.fn(),
-    nativeRecordPause: vi.fn(),
-    nativeRecordResume: vi.fn(),
+    nativeRecordPause: vi.fn(() => 'ok'),
+    nativeRecordResume: vi.fn(() => 'ok'),
     startAudioSession: vi.fn(),
     endAudioSession: vi.fn(),
   },
@@ -110,5 +110,43 @@ describe('JournalRecordingSheet discard confirm', () => {
     fireEvent.click(screen.getByText('Cancel'));
     expect(onClose).toHaveBeenCalled();
     expect(screen.queryByText('Discard this recording?')).toBeNull();
+  });
+});
+
+/* Pause freezes the on-screen timer (owner-reported).
+   ─────────────────────────────────────────────────────────────────
+   The recorder pauses correctly, but the seconds counter kept climbing while
+   paused and "snapped back" on resume — the display tick was left running
+   against a stale segment-start, double-counting. Pausing must FREEZE the
+   counter; resuming must continue from where it was. */
+describe('JournalRecordingSheet pause freezes the timer', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  const timeText = () => document.querySelector('.jrn-rec-time').textContent;
+
+  it('the seconds counter does not advance while paused, then continues on resume', () => {
+    render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
+    act(() => { vi.advanceTimersByTime(10); });      // permission grant → startCapture
+    act(() => { vi.advanceTimersByTime(2000); });    // ~2s recorded
+    const atPause = timeText();
+
+    fireEvent.click(screen.getByLabelText('Pause'));
+    expect(screen.getByText('Paused')).toBeTruthy();
+
+    // The bug: the tick kept firing here and the counter climbed. It must freeze.
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(timeText()).toBe(atPause);
+
+    fireEvent.click(screen.getByLabelText('Resume'));
+    expect(screen.getByText('Recording')).toBeTruthy();
+
+    // Resumed → the counter advances again (past the pre-pause value), and the
+    // 3s of paused time is NOT counted.
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(timeText()).not.toBe(atPause);
   });
 });
