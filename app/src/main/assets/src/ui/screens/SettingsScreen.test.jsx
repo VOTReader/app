@@ -18,6 +18,7 @@ import { screen, cleanup, fireEvent, within, act } from '@testing-library/react'
 import {
   setupSettingsGlobals, teardownSettingsGlobals, renderSettings, rowLabels, row,
 } from './settings-harness.jsx';
+import { classifyV3ImportBegin as realClassifyV3 } from '../../utils/backup-android.js';
 
 beforeEach(() => {
   setupSettingsGlobals();
@@ -322,6 +323,74 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     await screen.findByText(/will OVERWRITE/);
     act(() => { modalRegistry.peek().dismiss(); });
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
+    expect(applySpy).not.toHaveBeenCalled();
+  });
+});
+
+/* ───────────────────────────────────────────────────────────────────────
+   Android v3 import — the native stream must stay OPEN across the confirm.
+   Regression: the fire-and-forget confirm sheet (after the blocking
+   window.confirm was retired in Wave 0) let _importV3Android's
+   `finally { v3ImportClose() }` run the instant the dialog appeared —
+   66 ms after v3ImportBegin, long before the user tapped Import. That
+   nulled the live native import stream, so the post-confirm applyV3 hit
+   "no_session" and hung forever on "Importing… please wait." The confirm
+   is now fire-AND-AWAIT, so the caller's cleanup brackets the WHOLE import.
+   ─────────────────────────────────────────────────────────────────────── */
+describe('Android v3 import — native stream not closed until the confirm settles', () => {
+  beforeEach(() => modalRegistry._reset());
+  afterEach(restoreLocation);
+
+  const MANIFEST = { app: 'VOTReader', exportVersion: 3, exportDate: '2026-01-01T00:00:00.000Z', stores: {}, media: [] };
+
+  const setupAndroidImport = () => {
+    const closeSpy = vi.fn();
+    // applyV3 faithfully consumes the entries generator — this is exactly where
+    // v3ImportNextBlob would run on-device, and where a prematurely-closed
+    // native stream returned no_session.
+    const applySpy = vi.fn(async (_manifest, entries) => {
+      for await (const _e of entries) { void _e; /* no media in this manifest */ }
+      return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] };
+    });
+    stubLocationReload();
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      PlatformBridge: {
+        isAndroid: true, setKeepScreenOn: () => {}, saveToFile: () => {},
+        openFilePicker: () => {}, openExportSink: () => null,
+        clearGardenCache: () => {}, getCrashLog: () => Promise.resolve(''),
+        v3ImportOpen: () => { setTimeout(() => { if (window.__onV3ImportReady) window.__onV3ImportReady('ok'); }, 0); },
+        v3ImportBegin: () => 'v3:' + JSON.stringify(MANIFEST),
+        v3ImportClose: closeSpy,
+      },
+      classifyV3ImportBegin: realClassifyV3,
+      validateImportEnvelope: () => [],
+      v3AndroidImportEntries: (args) => (async function* () { yield* []; if (args.onDone) args.onDone('absent'); })(),
+      applyV3: applySpy,
+    });
+    renderSettings();
+    return { closeSpy, applySpy };
+  };
+
+  it('holds v3ImportClose until AFTER apply — never while the sheet is up', async () => {
+    const { closeSpy, applySpy } = setupAndroidImport();
+    fireEvent.click(screen.getByText('Import'));
+    await screen.findByText(/will OVERWRITE/);
+    // THE REGRESSION: pre-fix the finally fired here, before the user chose.
+    expect(closeSpy).not.toHaveBeenCalled();
+    expect(applySpy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Import & Overwrite'));
+    await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(closeSpy).toHaveBeenCalled()); // closed only after apply consumed the stream
+  });
+
+  it('cancelling still closes the native stream and applies nothing', async () => {
+    const { closeSpy, applySpy } = setupAndroidImport();
+    fireEvent.click(screen.getByText('Import'));
+    await screen.findByText(/will OVERWRITE/);
+    expect(closeSpy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Cancel'));
+    await vi.waitFor(() => expect(closeSpy).toHaveBeenCalled());
     expect(applySpy).not.toHaveBeenCalled();
   });
 });

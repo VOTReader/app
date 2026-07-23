@@ -423,7 +423,29 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // window.confirm) is an in-app sheet driven by this state — see
   // _confirmDegradeApplyReload. Registered for the same Back/Escape reason.
   const [importConfirm, setImportConfirm] = React.useState(null);
-  useModalRegistry({ id: 'settings-import-confirm', dismiss: () => setImportConfirm(null), active: importConfirm != null });
+  // The confirm sheet is FIRE-AND-AWAIT: _confirmDegradeApplyReload shows it and
+  // AWAITS the user's decision through this resolver, so its caller's cleanup —
+  // the Android native v3ImportClose in _importV3Android's finally — brackets
+  // the WHOLE import instead of firing the instant the dialog appears. That
+  // premature close nulled the live native import stream (regression after the
+  // blocking window.confirm became this async sheet), so the post-confirm apply
+  // hit "no_session" and hung on "Importing… please wait". Settling from ANY
+  // dismiss path (Import / Cancel / backdrop / Back / Escape) resolves it once.
+  const importConfirmResolveRef = React.useRef(null);
+  const _settleImportConfirm = React.useCallback((confirmed) => {
+    setImportConfirm(null);
+    const resolve = importConfirmResolveRef.current;
+    importConfirmResolveRef.current = null;
+    if (resolve) resolve(confirmed);
+  }, []);
+  // Unmounting mid-confirm must not strand the promise (its caller closes the
+  // native import stream in a finally) — settle it false so cleanup still runs.
+  React.useEffect(() => () => {
+    const resolve = importConfirmResolveRef.current;
+    importConfirmResolveRef.current = null;
+    if (resolve) resolve(false);
+  }, []);
+  useModalRegistry({ id: 'settings-import-confirm', dismiss: () => _settleImportConfirm(false), active: importConfirm != null });
   // NK5c: diagnostic-log snapshot for the "Your Data" section. The bridge
   // (W1.2 Tier B.2) always exposes getCrashLog: Android merges the native
   // BoundedLogTree with the JS-side DiagnosticLog; web returns the JS
@@ -736,11 +758,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // semantics are KEPT, not weakened: nothing is applied until the user
       // explicitly taps "Import & Overwrite"; Cancel / Back / Escape all
       // dismiss without touching data.
-      setImportConfirm({
-        message: `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote}${spaceNote} This cannot be undone.`,
-        proceed: () => { setImportConfirm(null); _applyConfirmedImport(parsed, applyFn); },
+      // Show the sheet and AWAIT the user's decision. Resolving happens via
+      // _settleImportConfirm from every dismiss path — so this async function
+      // (and therefore the caller's finally, which closes the native import
+      // stream on Android) does not complete until the import truly settles.
+      const confirmed = await new Promise((resolve) => {
+        importConfirmResolveRef.current = resolve;
+        setImportConfirm({
+          message: `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote}${spaceNote} This cannot be undone.`,
+        });
       });
-      return;
+      if (!confirmed) return;                       // Cancel / backdrop / Back / Escape
+      await _applyConfirmedImport(parsed, applyFn);
     };
 
     // The post-confirm tail of an import: progress toast → degraded-store
@@ -1431,7 +1460,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 {importConfirm && (
                   <div
                     className="note-sheet-overlay"
-                    onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) setImportConfirm(null); }}
+                    onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) _settleImportConfirm(false); }}
                   >
                     <div className="note-sheet" onClick={(e) => e.stopPropagation()}>
                       <div className="note-sheet-header">
@@ -1441,10 +1470,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                         {importConfirm.message}
                       </div>
                       <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-                        <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); setImportConfirm(null); }}>Cancel</button>
+                        <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); _settleImportConfirm(false); }}>Cancel</button>
                         <button
                           className="settings-clear-btn danger"
-                          onClick={(e) => { e.stopPropagation(); importConfirm.proceed(); }}
+                          onClick={(e) => { e.stopPropagation(); _settleImportConfirm(true); }}
                         >
                           Import &amp; Overwrite
                         </button>

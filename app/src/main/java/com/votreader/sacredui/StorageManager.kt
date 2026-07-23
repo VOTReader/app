@@ -200,6 +200,13 @@ class StorageManager(private val context: Context) {
     // java.util.zip.CRC32 — byte-identical to the web codec's crc32().
     private var exportManifestCrc: Long = 0L
     private var importManifestCrc: Long = 0L
+    // BAK-INTEGRITY (hang-safe verify): the file's declared size + a running count of
+    // bytes read, so v3ImportVerify knows EXACTLY how many trailing bytes remain and
+    // NEVER does a speculative read that could BLOCK on a SAF stream that stalls at
+    // EOF instead of returning -1 (that froze the import on a pre-CRC backup). Size
+    // -1 = unknown → verify skips (returns "absent") rather than risk a block.
+    private var importTotalSize: Long = -1L
+    private var importBytesRead: Long = 0L
 
     /**
      * Open [uri] for writing and emit the container header: magic + the
@@ -320,6 +327,7 @@ class StorageManager(private val context: Context) {
      */
     fun beginV3Import(uri: Uri): Result<String> = synchronized(v3Lock) {
         closeImportQuietly()
+        importTotalSize = queryFileSize(uri)   // -1 if the provider doesn't declare it
         return try {
             val raw = context.contentResolver.openInputStream(uri)
                 ?: return Result.Failure("no_input_stream")
@@ -363,6 +371,7 @@ class StorageManager(private val context: Context) {
                 importIn = dis
                 importFrameRemaining = -1L
                 importManifestCrc = CRC32().apply { update(manifestBytes) }.value
+                importBytesRead = CONTAINER_MAGIC.size.toLong() + 8L + manifestLen  // magic + len field + manifest
                 Result.Success("v3:$manifestJson")
             } else {
                 // legacy JSON — rewind and read the whole (bounded) file.
@@ -393,6 +402,7 @@ class StorageManager(private val context: Context) {
             val len = dis.readLong()
             if (len < 0L) return Result.Failure("bad_frame_len")
             importFrameRemaining = len
+            importBytesRead += 8L                          // the frame-length field
             Result.Success(len)
         } catch (e: Exception) {
             Timber.w(e, "v3ImportNextBlob failed")
@@ -420,6 +430,7 @@ class StorageManager(private val context: Context) {
                 read += r
             }
             importFrameRemaining -= read
+            importBytesRead += read
             Result.Success(buf)
         } catch (e: Exception) {
             Timber.w(e, "v3ImportReadChunk failed")
@@ -440,21 +451,32 @@ class StorageManager(private val context: Context) {
      */
     fun v3ImportVerify(): Result<String> = synchronized(v3Lock) {
         val dis = importIn ?: return Result.Failure("no_session")
+        // CRITICAL: never do a speculative trailing read here. A SAF stream can BLOCK
+        // at EOF instead of returning -1, so reading 4 bytes that aren't there froze
+        // the whole import on a pre-CRC backup. Use the declared file size + the
+        // running read count to know EXACTLY how many bytes remain, and only read
+        // when we're certain all 4 are present.
+        val total = importTotalSize
+        if (total < 0L) return Result.Success("absent")   // unknown size → skip verify (never risk a block)
+        val remaining = total - importBytesRead
         return try {
-            val trailer = ByteArray(4)
-            val n = readUpTo(dis, trailer)
-            val result = when {
-                n == 0 -> "absent"
-                n == 4 -> {
-                    val stored = ((trailer[0].toLong() and 0xFF) shl 24) or
-                        ((trailer[1].toLong() and 0xFF) shl 16) or
-                        ((trailer[2].toLong() and 0xFF) shl 8) or
-                        (trailer[3].toLong() and 0xFF)
-                    if (stored == importManifestCrc) "ok" else "mismatch"
+            when (remaining) {
+                0L -> Result.Success("absent")            // an older backup with no CRC trailer
+                4L -> {
+                    val trailer = ByteArray(4)
+                    val n = readUpTo(dis, trailer)        // safe: the size proves 4 bytes are there
+                    if (n < 4) {
+                        Result.Success("malformed")
+                    } else {
+                        val stored = ((trailer[0].toLong() and 0xFF) shl 24) or
+                            ((trailer[1].toLong() and 0xFF) shl 16) or
+                            ((trailer[2].toLong() and 0xFF) shl 8) or
+                            (trailer[3].toLong() and 0xFF)
+                        Result.Success(if (stored == importManifestCrc) "ok" else "mismatch")
+                    }
                 }
-                else -> "malformed"
+                else -> Result.Success("malformed")       // unexpected trailing length (not 0, not 4)
             }
-            Result.Success(result)
         } catch (e: Exception) {
             Timber.w(e, "v3ImportVerify failed")
             Result.Failure(e.message ?: "verify_failed")
@@ -488,6 +510,8 @@ class StorageManager(private val context: Context) {
         importIn = null
         importFrameRemaining = -1L
         importManifestCrc = 0L
+        importTotalSize = -1L
+        importBytesRead = 0L
     }
 
     /** Best-effort delete of a SAF document we created (used on a failed/aborted export). */

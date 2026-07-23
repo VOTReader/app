@@ -59,6 +59,11 @@ class StorageManagerTest {
         context = mockk(relaxed = true)
         cr = mockk(relaxed = false)
         every { context.contentResolver } returns cr
+        // Default size query: unknown (-1) unless a test overrides it. beginV3Import
+        // now queries the file size for the hang-safe v3ImportVerify; tests that don't
+        // exercise the trailing-CRC verify don't care, and an unknown size just makes
+        // verify skip. Specific per-uri stubs in a test take precedence.
+        every { cr.query(any(), any(), any(), any(), any()) } returns null
         storage = StorageManager(context)
     }
 
@@ -516,6 +521,7 @@ class StorageManagerTest {
         // READ it back.
         val importUri = Uri.parse("content://test/v3-imp")
         every { cr.openInputStream(importUri) } returns ByteArrayInputStream(container)
+        every { cr.query(importUri, any(), null, null, null) } returns sizeCursor(container.size.toLong())
         val begin = storage.beginV3Import(importUri)
         assertIs<StorageManager.Result.Success<String>>(begin)
         assertEquals("v3:$manifestJson", begin.value)        // manifest survives verbatim
@@ -549,6 +555,7 @@ class StorageManagerTest {
             write(beInt(wrongCrc))                      // a valid 4-byte trailer, wrong value
         }.toByteArray()
         every { cr.openInputStream(uri) } returns ByteArrayInputStream(container)
+        every { cr.query(uri, any(), null, null, null) } returns sizeCursor(container.size.toLong())
 
         assertIs<StorageManager.Result.Success<String>>(storage.beginV3Import(uri))
         val verify = storage.v3ImportVerify()
@@ -565,9 +572,47 @@ class StorageManagerTest {
             write(beLong(manifest.size.toLong())); write(manifest)   // ends at EOF, no trailer
         }.toByteArray()
         every { cr.openInputStream(uri) } returns ByteArrayInputStream(container)
+        every { cr.query(uri, any(), null, null, null) } returns sizeCursor(container.size.toLong())
 
         assertIs<StorageManager.Result.Success<String>>(storage.beginV3Import(uri))
         val verify = storage.v3ImportVerify()
+        assertIs<StorageManager.Result.Success<String>>(verify)
+        assertEquals("absent", verify.value)
+    }
+
+    @Test
+    fun `v3ImportVerify returns absent WITHOUT a speculative read when the file size is unknown`() {
+        // THE IMPORT-HANG REGRESSION: a pre-CRC backup ends at the last frame, and a
+        // SAF stream can BLOCK at EOF instead of returning -1 — so a speculative
+        // trailing read froze the whole import. With no declared size we cannot know
+        // whether a CRC exists, so verify must SKIP (return "absent") rather than
+        // read past the content. The stream here THROWS on any read past the header,
+        // proving verify never touches it.
+        val uri = Uri.parse("content://test/v3-unknown-size")
+        val manifest = "{\"exportVersion\":3,\"media\":[]}".toByteArray(Charsets.UTF_8)
+        val header = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            write(beLong(manifest.size.toLong())); write(manifest)
+        }.toByteArray()
+        // Serves the header, then FAILS LOUD on any further read (a proxy for a
+        // provider stream that would otherwise block forever at EOF).
+        val trapStream = object : InputStream() {
+            private val src = ByteArrayInputStream(header)
+            override fun read(): Int {
+                val b = src.read()
+                if (b < 0) throw IllegalStateException("verify read past the content (would block on-device)")
+                return b
+            }
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                val n = src.read(b, off, len)
+                if (n < 0) throw IllegalStateException("verify read past the content (would block on-device)")
+                return n
+            }
+        }
+        every { cr.openInputStream(uri) } returns trapStream
+        // queryFileSize → the @Before default returns null → size unknown (-1).
+        assertIs<StorageManager.Result.Success<String>>(storage.beginV3Import(uri))
+        val verify = storage.v3ImportVerify()   // must NOT read → no throw, no hang
         assertIs<StorageManager.Result.Success<String>>(verify)
         assertEquals("absent", verify.value)
     }
