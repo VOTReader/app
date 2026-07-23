@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Rect
 import android.media.AudioManager
 import android.net.Uri
@@ -17,6 +18,7 @@ import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.PixelCopy
+import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
@@ -453,7 +455,13 @@ class MainActivity : AppCompatActivity(), BridgeHost {
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
-            vm.currentScale = 1f
+            // #1: do NOT hard-set vm.currentScale = 1f here. restoreState restores
+            // the WebView's own zoom and onScaleChanged owns the truth from there; a
+            // config-change restore keeps the (surviving) ViewModel's real scale, and
+            // a process-death restore starts from the 1f default anyway. Overwriting
+            // with 1f would strand hit-tests / screenshots on the wrong scale if zoom
+            // were ever re-enabled (disabled today, so this is latent-correctness
+            // hardening, matching deviceToCssPx's scale-awareness).
         } else {
             // Fresh cold start (not a config-change restore). All UI assets
             // are bundled in the APK and served locally by WebViewAssetLoader,
@@ -541,6 +549,17 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             loadWithOverviewMode = false
             useWideViewPort = false
         }
+
+        // #3: native-reader polish. OVER_SCROLL_NEVER drops the edge glow/stretch
+        // (this is a single-page reader — no pull-to-refresh), so scrolling feels
+        // like a book rather than a web page. The dark background (matching the
+        // default dark theme) removes the brief white flash the WebView's default
+        // background could otherwise show before the first CSS paint — the splash
+        // covers this on a normal boot (onAppReady, #1 of the prior batch), so it's
+        // defense-in-depth for the fallback/reload edge; the app's CSS paints a
+        // solid themed bg over it either way.
+        wv.overScrollMode = View.OVER_SCROLL_NEVER
+        wv.setBackgroundColor(Color.BLACK)
 
         // #5 (WebView hardening): the app is entirely local and persists ALL
         // state in DOM storage — no cookies are read or written anywhere, and
@@ -865,7 +884,10 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                     // webView.post would burn budget for no safety win --
                     // the only interpolated values are %.2f-formatted
                     // numbers, which can't contain quote/backslash/newline.
-                    webView.evaluateJavascript(
+                    // #2: evaluate on the LOCAL wv (the instance this callback is
+                    // bound to), consistent with onEnd's requestApplyInsets(wv) —
+                    // never on a replaced instance during a renderer-crash rebuild.
+                    wv.evaluateJavascript(
                         "(function(){var r=document.documentElement&&document.documentElement.style;" +
                             "if(r){r.setProperty('--inset-top','${topDp}px');" +
                             "r.setProperty('--inset-bottom','${bottomDp}px')}})()",
