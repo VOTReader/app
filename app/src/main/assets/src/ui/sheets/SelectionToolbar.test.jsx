@@ -2,6 +2,16 @@
    ────────────────────────────────────────────────────────────
    Locks the pointer-drag and tap-routing behaviors:
 
+     P1-11a every toolbar control has an accessible name: the container is a
+           named role="toolbar", style buttons announce Highlight/Underline/
+           Squiggle (with aria-pressed tracking the active style), and color
+           swatches announce their color (+ pressed when that color is live).
+     P1-15 ▲/▼ scroll-nudge buttons scroll the reading container (.screen-
+           scroll ancestor) by ~60% of its visible height WITHOUT clearing the
+           active selection — the Android freeze where a selection longer than
+           one viewport couldn't be highlighted because drags only EXTEND the
+           selection (the page can't scroll mid-selection).
+
      W4.5  mouse-drag selection (pointerdown → selection → pointerup)
            raises the toolbar; a plain click (collapsed selection) does not.
      tap   a click or brief touch on an existing highlight/note mark or icon
@@ -593,5 +603,155 @@ describe('SelectionToolbar — ANN2 remove-confirm discloses note deletion', () 
     act(() => { call[0].onConfirm(); });
     expect(/** @type {any} */ (globalThis).AnnotationStore.removeGroup).toHaveBeenCalledWith('g1');
     expect(/** @type {any} */ (globalThis).NoteStore.remove).toHaveBeenCalledWith('g1');
+  });
+});
+
+describe('SelectionToolbar — P1-11a accessible names', () => {
+  /** Raise the toolbar over a fresh selection and return its root element. */
+  async function raiseToolbar() {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
+    mount();
+    stubSelection(rangeOver(c, 0, 13)); // "The Revelation"
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    const tb = document.querySelector('.sel-toolbar');
+    expect(tb).not.toBeNull();
+    return /** @type {HTMLElement} */ (tb);
+  }
+
+  it('the container is a named toolbar landmark', async () => {
+    const tb = await raiseToolbar();
+    expect(tb.getAttribute('role')).toBe('toolbar');
+    expect((tb.getAttribute('aria-label') || '').length).toBeGreaterThan(0);
+  });
+
+  it('style buttons have distinct names and aria-pressed tracks the active style', async () => {
+    const tb = await raiseToolbar();
+    const names = () => [...tb.querySelectorAll('.sel-style-btn')].map((b) => b.getAttribute('aria-label'));
+    // All three previously announced as bare "A" (the visible glyph).
+    expect(names()).toEqual(['Highlight', 'Underline', 'Squiggle underline']);
+    // Default style is highlight — pressed there, not on the others.
+    expect(tb.querySelector('.sel-style-btn')?.getAttribute('aria-pressed')).toBe('true');
+    expect(tb.querySelector('.sel-style-btn-underline')?.getAttribute('aria-pressed')).toBe('false');
+    expect(tb.querySelector('.sel-style-btn-squiggle')?.getAttribute('aria-pressed')).toBe('false');
+    // Switching styles flips the pressed state (state-aware naming).
+    act(() => { fire(/** @type {Element} */ (tb.querySelector('.sel-style-btn-squiggle')), 'click'); });
+    expect(tb.querySelector('.sel-style-btn-squiggle')?.getAttribute('aria-pressed')).toBe('true');
+    expect(tb.querySelector('.sel-style-btn')?.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('color swatches announce their color and mark the live color pressed', async () => {
+    // Existing green highlight over the selection → the green swatch is "current".
+    const ann = [{ start: 0, end: 13, groupId: 'g1', kind: 'highlight', color: 'green' }];
+    /** @type {any} */ (globalThis).HighlightStore.get = () => ann;
+    /** @type {any} */ (globalThis).AnnotationStore.get = () => ann;
+    const tb = await raiseToolbar();
+    const swatches = [...tb.querySelectorAll('.sel-color-btn[data-color]')];
+    expect(swatches.length).toBeGreaterThan(0);
+    swatches.forEach((b) => {
+      const color = b.getAttribute('data-color') || '';
+      // Previously nameless (title only): now the name carries the color.
+      expect(b.getAttribute('aria-label') || '').toContain(color);
+    });
+    const pressed = (c) => tb.querySelector('.sel-color-btn[data-color="' + c + '"]')?.getAttribute('aria-pressed');
+    expect(pressed('green')).toBe('true');
+    expect(pressed('yellow')).toBe('false');
+    // The ✕ remove button has an accessible name too.
+    const clear = tb.querySelector('.sel-color-clear');
+    expect(clear).not.toBeNull();
+    expect((clear?.getAttribute('aria-label') || '')).toMatch(/remove/i);
+  });
+});
+
+describe('SelectionToolbar — P1-15 scroll-nudge buttons (selection longer than one viewport)', () => {
+  /** Scrollable reading container (stands in for .screen-scroll), mirroring
+      the placement suite's helper but with real DOM clamping (scrollTop
+      can't go below 0 or past scrollHeight − clientHeight). */
+  function scrollerWithContainer(scrollTop) {
+    const s = document.createElement('div');
+    s.style.overflowY = 'auto';
+    Object.defineProperty(s, 'scrollHeight', { configurable: true, get: () => 2000 });
+    Object.defineProperty(s, 'clientHeight', { configurable: true, get: () => 700 });
+    let st = scrollTop;
+    Object.defineProperty(s, 'scrollTop', {
+      configurable: true,
+      get: () => st,
+      set: (v) => { st = Math.min(Math.max(0, v), 2000 - 700); },
+    });
+    document.body.appendChild(s);
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'bible:test:1:1');
+    p.textContent = 'The Revelation of Jesus Christ';
+    s.appendChild(p);
+    return { scroller: s, container: p };
+  }
+
+  /** Stub the selection over `range`, spying on removeAllRanges so a test can
+      prove the nudge did NOT collapse the selection. */
+  function stubSelectionSpy(range) {
+    const removeAll = vi.fn();
+    window.getSelection = () => /** @type {any} */ ({
+      isCollapsed: !range,
+      rangeCount: range ? 1 : 0,
+      getRangeAt: () => range,
+      removeAllRanges: removeAll,
+      toString: () => (range ? range.toString() : ''),
+    });
+    return removeAll;
+  }
+
+  it('renders ▲/▼ nudge buttons with accessible names while a selection is active', () => {
+    const { container } = scrollerWithContainer(0);
+    mount();
+    stubSelection(rangeOver(container, 0, 14));
+    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
+    const up = document.querySelector('.sel-nudge-btn[aria-label]');
+    const labels = [...document.querySelectorAll('.sel-nudge-btn')].map((b) => b.getAttribute('aria-label'));
+    expect(up).not.toBeNull();
+    expect(labels.some((l) => /scroll/i.test(l || '') && /up/i.test(l || ''))).toBe(true);
+    expect(labels.some((l) => /scroll/i.test(l || '') && /down/i.test(l || ''))).toBe(true);
+  });
+
+  it('▼ scrolls the reading container down by ~60% of its height and keeps the selection', () => {
+    const { scroller, container } = scrollerWithContainer(0);
+    mount();
+    const removeAll = stubSelectionSpy(rangeOver(container, 0, 14));
+    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
+    const down = [...document.querySelectorAll('.sel-nudge-btn')]
+      .find((b) => /down/i.test(b.getAttribute('aria-label') || ''));
+    expect(down).not.toBeNull();
+    act(() => { fire(/** @type {Element} */ (down), 'click'); });
+    expect(scroller.scrollTop).toBe(420);   // 60% of clientHeight 700
+    expect(removeAll).not.toHaveBeenCalled();
+    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+  });
+
+  it('▲ scrolls up by the same step and clamps at the top', () => {
+    const { scroller, container } = scrollerWithContainer(500);
+    mount();
+    stubSelection(rangeOver(container, 0, 14));
+    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
+    const up = [...document.querySelectorAll('.sel-nudge-btn')]
+      .find((b) => /up/i.test(b.getAttribute('aria-label') || ''));
+    expect(up).not.toBeNull();
+    act(() => { fire(/** @type {Element} */ (up), 'click'); });
+    expect(scroller.scrollTop).toBe(80);    // 500 − 420
+    act(() => { fire(/** @type {Element} */ (up), 'click'); });
+    expect(scroller.scrollTop).toBe(0);     // clamped, never negative
+  });
+
+  it('no scrollable ancestor: the nudge is a harmless no-op', () => {
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
+    mount();
+    stubSelection(rangeOver(c, 0, 13));
+    act(() => { fire(c, 'contextmenu', { clientX: 20, clientY: 20 }); });
+    const down = [...document.querySelectorAll('.sel-nudge-btn')]
+      .find((b) => /down/i.test(b.getAttribute('aria-label') || ''));
+    expect(down).not.toBeNull();
+    expect(() => { act(() => { fire(/** @type {Element} */ (down), 'click'); }); }).not.toThrow();
+    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
   });
 });

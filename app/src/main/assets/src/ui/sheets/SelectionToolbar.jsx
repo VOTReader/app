@@ -29,6 +29,7 @@ function hlDisplayText(container, tcText, start, end) {
     work too. Returns null when nothing above the node actually scrolls.
     @param {Node|null} node */
 function findScrollParent(node) {
+
   let el = node && node.nodeType === 3 ? /** @type {Text} */ (node).parentElement : /** @type {Element|null} */ (node);
   while (el && el !== document.body && el !== document.documentElement) {
     if (el.scrollHeight > el.clientHeight + 1) {
@@ -39,6 +40,27 @@ function findScrollParent(node) {
   }
   return null;
 }
+
+/* P1-15: scoped styles for the selection-scroll nudge buttons (▲/▼). app.css
+   is owned by another change in this wave, so these live beside the component
+   — styled to match the existing .sel-style-btn / .sel-action-btn look (same
+   cream-on-dark colors, 8px radius, gold-faint tap feedback). No outline
+   override, so the global gold :focus-visible ring still applies. The row
+   right-aligns the pair so they read as a secondary transport, not a primary
+   action. */
+const NUDGE_STYLE = `
+  .sel-toolbar-nudge-row { justify-content: flex-end; padding-top: 2px; }
+  .sel-nudge-btn {
+    min-width: 44px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--gold-border); cursor: pointer;
+    background: transparent; color: var(--cream-dim);
+    font-size: 0.8rem; line-height: 1; padding: 0 10px;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s;
+  }
+  .sel-nudge-btn:active { background: var(--gold-faint); }
+`;
 
 /** Decide where the toolbar goes relative to the current selection. The
     returned `y` is the toolbar's BOTTOM edge (the element renders with
@@ -714,6 +736,27 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     if (window.__goSearch) window.__goSearch();
   }, [selInfo]);
 
+  // P1-15 — selection-scroll nudge (Android freeze fix). During an active
+  // selection every drag EXTENDS the selection, so the page can't scroll and
+  // a passage longer than one viewport is un-highlightable. The ▲/▼ buttons
+  // scroll the same scrollable ancestor the placement engine targets (see the
+  // layout effect above) by ~60% of its visible height — and, unlike every
+  // other toolbar action, deliberately do NOT clear the selection: the user
+  // nudges, then keeps dragging the selection handle. Best-effort: a vanished
+  // selection or unscrollable context is a silent no-op, never an error.
+  const nudgeScroll = React.useCallback((dir) => {
+    try {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const container = findHlContainer(range.startContainer);
+      const scroller = findScrollParent(container || range.startContainer);
+      if (!scroller) return;
+      const step = Math.max(Math.round((scroller.clientHeight || window.innerHeight) * 0.6), 80);
+      scroller.scrollTop += dir * step; // assignment clamps at both ends natively
+    } catch (_e) { /* selection/DOM gone mid-gesture — nudge is best-effort */ }
+  }, [findHlContainer]);
+
   const handleBookmark = React.useCallback(() => {
     if (!selInfo) return;
     if (typeof StorageHealth !== 'undefined' && StorageHealth.checkFirstDataCreation().shouldBlock) return;
@@ -832,10 +875,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     <div
       ref={toolbarRef}
       className="sel-toolbar"
+      role="toolbar"
+      aria-label="Text selection actions"
       style={{ left: pos.x, top: pos.y, transform: 'translateY(-100%)' }}
       onPointerDown={(e) => { e.stopPropagation(); suppressRef.current = true; }}
       onPointerUp={() => { setTimeout(() => { suppressRef.current = false; }, 300); }}
     >
+      {/* Scoped styles for the P1-15 nudge buttons — see NUDGE_STYLE. */}
+      <style>{NUDGE_STYLE}</style>
       {/* While confirming a remove, the whole toolbar collapses to the
           ConfirmStrip so the user is focused on the single decision (and
           can't accidentally tap an unrelated action). Cancel returns to
@@ -852,43 +899,67 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         />
       ) : (
       <>
-      {/* Top row: style toggle + colors */}
+      {/* Top row: style toggle + colors. Every control carries an accessible
+          name (P1-11a): the style buttons' visible glyph is a bare "A" in
+          three flavors, so the NAME comes from aria-label, with aria-pressed
+          tracking the active style; swatches announce their color. */}
       {showColors && (
         <div className="sel-toolbar-row sel-toolbar-styles">
           <button
+            type="button"
             className={"sel-style-btn" + (activeStyle === 'highlight' ? ' active' : '')}
             onClick={() => setActiveStyle('highlight')}
             title="Highlight"
+            aria-label="Highlight"
+            aria-pressed={activeStyle === 'highlight'}
           >
             A
           </button>
           <button
+            type="button"
             className={"sel-style-btn sel-style-btn-underline" + (activeStyle === 'underline' ? ' active' : '')}
             onClick={() => setActiveStyle('underline')}
             title="Underline"
+            aria-label="Underline"
+            aria-pressed={activeStyle === 'underline'}
           >
             A
           </button>
           <button
+            type="button"
             className={"sel-style-btn sel-style-btn-squiggle" + (activeStyle === 'squiggle' ? ' active' : '')}
             onClick={() => setActiveStyle('squiggle')}
             title="Squiggle underline"
+            aria-label="Squiggle underline"
+            aria-pressed={activeStyle === 'squiggle'}
           >
             A
           </button>
           <div className="sel-toolbar-divider" />
           <div className="sel-toolbar-colors">
-            {HL_COLORS.map(c => (
-              <button
-                key={c}
-                className={"sel-color-btn sel-color-" + activeStyle + (selInfo.existingHl && selInfo.existingHl.color === c && (selInfo.existingHl.kind || 'highlight') === activeStyle ? ' active' : '')}
-                data-color={c}
-                onClick={() => applyHighlight(c)}
-                title={c}
-              />
-            ))}
+            {HL_COLORS.map(c => {
+              // "Current color" = the existing annotation over this exact
+              // selection already uses this swatch in the active style — the
+              // same condition that paints the .active ring, now also exposed
+              // as aria-pressed so the state is announced, not just shown.
+              const isCurrent = !!(selInfo.existingHl && selInfo.existingHl.color === c
+                && (selInfo.existingHl.kind || 'highlight') === activeStyle);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  className={"sel-color-btn sel-color-" + activeStyle + (isCurrent ? ' active' : '')}
+                  data-color={c}
+                  onClick={() => applyHighlight(c)}
+                  title={c}
+                  aria-label={c + ' ' + activeStyle}
+                  aria-pressed={isCurrent}
+                />
+              );
+            })}
             {(selInfo.existingHl || mvHasExisting) && (
               <button
+                type="button"
                 className="sel-color-btn sel-color-clear"
                 onClick={() => {
                   let n = 0;
@@ -897,6 +968,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
                   setConfirmingRemove(true);
                 }}
                 title="Remove highlight"
+                aria-label="Remove highlight"
               >
                 ✕
               </button>
@@ -958,6 +1030,33 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
           <span>Bookmark</span>
+        </button>
+      </div>
+      {/* P1-15 scroll nudges — the toolbar only renders while a selection is
+          active, so these are visible exactly then. Real <button>s (TalkBack
+          reachable, named) that scroll the reading container WITHOUT touching
+          the selection, so a passage longer than one viewport can finally be
+          highlighted: nudge ▼, then keep dragging the selection handle. They
+          live on their own right-aligned row so the six primary actions keep
+          their existing spacing inside the 360px max-width toolbar. */}
+      <div className="sel-toolbar-row sel-toolbar-nudge-row">
+        <button
+          type="button"
+          className="sel-nudge-btn"
+          onClick={() => nudgeScroll(-1)}
+          title="Scroll text up (keeps the selection)"
+          aria-label="Scroll text up"
+        >
+          ▲
+        </button>
+        <button
+          type="button"
+          className="sel-nudge-btn"
+          onClick={() => nudgeScroll(1)}
+          title="Scroll text down (keeps the selection)"
+          aria-label="Scroll text down"
+        >
+          ▼
         </button>
       </div>
       </>
