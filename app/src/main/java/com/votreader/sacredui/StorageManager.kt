@@ -10,6 +10,7 @@ import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.InputStream
+import java.util.zip.CRC32
 import timber.log.Timber
 
 /**
@@ -194,6 +195,12 @@ class StorageManager(private val context: Context) {
     // Bytes still unread in the current frame; -1 = no frame advanced yet.
     private var importFrameRemaining: Long = -1L
 
+    // BAK-INTEGRITY: CRC-32 of the manifest bytes, computed at begin* and used to
+    // append (export) / verify (import) a trailing 4-byte checksum frame. Standard
+    // java.util.zip.CRC32 — byte-identical to the web codec's crc32().
+    private var exportManifestCrc: Long = 0L
+    private var importManifestCrc: Long = 0L
+
     /**
      * Open [uri] for writing and emit the container header: magic + the
      * manifest frame ([manifestBytes] is the UTF-8 JSON the JS side built via
@@ -211,6 +218,7 @@ class StorageManager(private val context: Context) {
             out.write(manifestBytes)
             exportOut = out
             exportFrameRemaining = 0L
+            exportManifestCrc = CRC32().apply { update(manifestBytes) }.value
             Result.Success(Unit)
         } catch (e: Exception) {
             Timber.w(e, "beginV3Export failed")
@@ -277,6 +285,10 @@ class StorageManager(private val context: Context) {
                     uri?.let { deleteDocumentQuietly(it) }
                     return Result.Failure("frame_incomplete")
                 }
+                // BAK-INTEGRITY: append the manifest CRC-32 as a trailing 4-byte
+                // frame (big-endian; writeInt is BE). Older readers ignore trailing
+                // bytes; new readers verify it (v3ImportVerify / web readContainer).
+                out.writeInt(exportManifestCrc.toInt())
                 out.flush()
                 out.close()
                 Result.Success(Unit)
@@ -350,6 +362,7 @@ class StorageManager(private val context: Context) {
                 }
                 importIn = dis
                 importFrameRemaining = -1L
+                importManifestCrc = CRC32().apply { update(manifestBytes) }.value
                 Result.Success("v3:$manifestJson")
             } else {
                 // legacy JSON — rewind and read the whole (bounded) file.
@@ -414,6 +427,40 @@ class StorageManager(private val context: Context) {
         }
     }
 
+    /**
+     * BAK-INTEGRITY: verify the trailing manifest CRC-32 after the last media frame.
+     * A new-format backup ends with a 4-byte big-endian CRC of the manifest bytes; an
+     * older one ends at EOF. Reads whatever trailing bytes remain and returns:
+     *   "ok"        — 4 trailing bytes that match the manifest CRC
+     *   "mismatch"  — 4 trailing bytes that DON'T match (likely corruption)
+     *   "absent"    — no trailing bytes (an older backup with no CRC)
+     *   "malformed" — 1-3 trailing bytes (a truncated trailer)
+     * NEVER blocks the import — the caller surfaces a warning on "mismatch". Call
+     * AFTER the last frame is consumed, BEFORE closeV3Import.
+     */
+    fun v3ImportVerify(): Result<String> = synchronized(v3Lock) {
+        val dis = importIn ?: return Result.Failure("no_session")
+        return try {
+            val trailer = ByteArray(4)
+            val n = readUpTo(dis, trailer)
+            val result = when {
+                n == 0 -> "absent"
+                n == 4 -> {
+                    val stored = ((trailer[0].toLong() and 0xFF) shl 24) or
+                        ((trailer[1].toLong() and 0xFF) shl 16) or
+                        ((trailer[2].toLong() and 0xFF) shl 8) or
+                        (trailer[3].toLong() and 0xFF)
+                    if (stored == importManifestCrc) "ok" else "mismatch"
+                }
+                else -> "malformed"
+            }
+            Result.Success(result)
+        } catch (e: Exception) {
+            Timber.w(e, "v3ImportVerify failed")
+            Result.Failure(e.message ?: "verify_failed")
+        }
+    }
+
     /** Close the import stream (success, cancel, or error cleanup). Idempotent. */
     fun closeV3Import(): Result<Unit> = synchronized(v3Lock) {
         closeImportQuietly()
@@ -433,12 +480,14 @@ class StorageManager(private val context: Context) {
         try { exportOut?.close() } catch (_: Exception) { /* best-effort */ }
         exportOut = null
         exportFrameRemaining = 0L
+        exportManifestCrc = 0L
     }
 
     private fun closeImportQuietly() {
         try { importIn?.close() } catch (_: Exception) { /* best-effort */ }
         importIn = null
         importFrameRemaining = -1L
+        importManifestCrc = 0L
     }
 
     /** Best-effort delete of a SAF document we created (used on a failed/aborted export). */

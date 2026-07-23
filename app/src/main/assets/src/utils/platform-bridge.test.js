@@ -51,6 +51,7 @@ const METHODS = [
   'v3ImportBegin',
   'v3ImportNextBlob',
   'v3ImportReadChunk',
+  'v3ImportVerify',
   'v3ImportClose',
   'getCrashLog',
   'clearGardenCache',
@@ -94,6 +95,7 @@ function mockAndroidBridge() {
     v3ImportBegin: vi.fn(() => 'v3:{"app":"VOTReader","exportVersion":3}'),
     v3ImportNextBlob: vi.fn(() => '42'),
     v3ImportReadChunk: vi.fn(() => ''),
+    v3ImportVerify: vi.fn(() => 'ok'),
     v3ImportClose: vi.fn(),
     getCrashLog: vi.fn(() => '[{"ts":0,"tag":"x","msg":"y"}]'),
     clearGardenCache: vi.fn(),
@@ -133,7 +135,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     delete (/** @type {any} */ (globalThis.window).AndroidBridge);
   });
 
-  it('exposes exactly the 36 expected keys', () => {
+  it('exposes exactly the 37 expected keys', () => {
     const actual = Object.keys(bridge).sort();
     const expected = [...METHODS].sort();
     expect(actual).toEqual(expected);
@@ -199,6 +201,7 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['v3ImportBegin', [], 'v3:{"app":"VOTReader","exportVersion":3}'],
     ['v3ImportNextBlob', [], '42'],
     ['v3ImportReadChunk', [65536], ''],
+    ['v3ImportVerify', [], 'ok'],
   ];
   it.each(valueCases)('value method %s returns native result and forwards args %o', async (name, args, expected) => {
     let result = bridge[name](...args);

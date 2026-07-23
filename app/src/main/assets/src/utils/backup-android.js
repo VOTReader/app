@@ -46,6 +46,7 @@
  *   v3ImportBegin: () => string,
  *   v3ImportNextBlob: () => string,
  *   v3ImportReadChunk: (maxBytes: number) => string,
+ *   v3ImportVerify?: () => string,
  *   v3ImportClose?: () => void,
  * }} V3ImportBridge
  */
@@ -163,6 +164,10 @@ export function classifyV3ImportBegin(begin) {
  * @param {Array<any>} args.media                       manifest.media (per-blob metas)
  * @param {number} [args.chunkSize]                     default ANDROID_V3_CHUNK
  * @param {(b64: string) => Uint8Array} [args.b64ToU8]  default base64ToU8
+ * @param {(result: string) => void} [args.onDone]      BAK-INTEGRITY: called with
+ *   the trailing manifest-CRC verify result ("ok"/"absent"/"mismatch"/"malformed")
+ *   ONLY after every frame is consumed — so a cancelled/aborted import (the
+ *   generator never exhausts) never fires a spurious integrity warning.
  * @returns {AsyncGenerator<{ id: any, meta: any, blob: Blob }>}
  */
 export async function* v3AndroidImportEntries(args) {
@@ -202,5 +207,14 @@ export async function* v3AndroidImportEntries(args) {
       meta: meta || null,
       blob: new Blob(parts, { type: (meta && meta.mime) || 'application/octet-stream' }),
     };
+  }
+  // BAK-INTEGRITY: every frame consumed → the stream is now at the trailing
+  // manifest CRC. Verify it (warn-and-allow; result handed to the caller). Runs
+  // only on the fully-consumed (non-cancelled) path, so no spurious warning.
+  if (typeof args.onDone === 'function') {
+    let verify = 'absent';
+    try { if (typeof bridge.v3ImportVerify === 'function') verify = bridge.v3ImportVerify(); }
+    catch (_e) { /* best-effort */ }
+    args.onDone(verify);
   }
 }

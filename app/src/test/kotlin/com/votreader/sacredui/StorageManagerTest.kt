@@ -489,11 +489,12 @@ class StorageManagerTest {
             write(beLong(manifest.size.toLong())); write(manifest)
             write(beLong(blob1.size.toLong())); write(blob1)
             write(beLong(blob2.size.toLong())); write(blob2)
+            write(crcTrailer(manifest))                 // BAK-INTEGRITY: trailing manifest CRC-32
         }.toByteArray()
 
         assertTrue(
             sink.toByteArray().contentEquals(expected),
-            "native v3 framing must match backup-container.js byte-for-byte"
+            "native v3 framing (incl. the trailing manifest CRC) must match backup-container.js byte-for-byte"
         )
     }
 
@@ -529,7 +530,46 @@ class StorageManagerTest {
         assertEquals(5L, n2.value)
         assertTrue(readWholeFrame().contentEquals(m2))
 
+        // BAK-INTEGRITY: the trailing CRC verifies against the manifest (round-trip).
+        val verify = storage.v3ImportVerify()
+        assertIs<StorageManager.Result.Success<String>>(verify)
+        assertEquals("ok", verify.value)
+
         assertIs<StorageManager.Result.Success<Unit>>(storage.closeV3Import())
+    }
+
+    @Test
+    fun `v3ImportVerify reports mismatch when the trailing CRC is wrong (never throws)`() {
+        val uri = Uri.parse("content://test/v3-badcrc")
+        val manifest = "{\"exportVersion\":3,\"media\":[]}".toByteArray(Charsets.UTF_8)
+        val wrongCrc = java.util.zip.CRC32().apply { update(manifest) }.value.toInt() xor 0x01
+        val container = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            write(beLong(manifest.size.toLong())); write(manifest)
+            write(beInt(wrongCrc))                      // a valid 4-byte trailer, wrong value
+        }.toByteArray()
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(container)
+
+        assertIs<StorageManager.Result.Success<String>>(storage.beginV3Import(uri))
+        val verify = storage.v3ImportVerify()
+        assertIs<StorageManager.Result.Success<String>>(verify)
+        assertEquals("mismatch", verify.value)
+    }
+
+    @Test
+    fun `v3ImportVerify reports absent for an older backup with no CRC trailer`() {
+        val uri = Uri.parse("content://test/v3-nocrc")
+        val manifest = "{\"exportVersion\":3,\"media\":[]}".toByteArray(Charsets.UTF_8)
+        val container = ByteArrayOutputStream().apply {
+            write("VOTBACK1".toByteArray(Charsets.US_ASCII))
+            write(beLong(manifest.size.toLong())); write(manifest)   // ends at EOF, no trailer
+        }.toByteArray()
+        every { cr.openInputStream(uri) } returns ByteArrayInputStream(container)
+
+        assertIs<StorageManager.Result.Success<String>>(storage.beginV3Import(uri))
+        val verify = storage.v3ImportVerify()
+        assertIs<StorageManager.Result.Success<String>>(verify)
+        assertEquals("absent", verify.value)
     }
 
     @Test
@@ -699,6 +739,16 @@ class StorageManagerTest {
         for (i in 0 until 8) b[i] = (v ushr (8 * (7 - i))).toByte()
         return b
     }
+
+    private fun beInt(v: Int): ByteArray {
+        val b = ByteArray(4)
+        for (i in 0 until 4) b[i] = (v ushr (8 * (3 - i))).toByte()
+        return b
+    }
+
+    /** The 4-byte big-endian CRC-32 trailer the v3 export appends (BAK-INTEGRITY). */
+    private fun crcTrailer(manifest: ByteArray): ByteArray =
+        beInt(java.util.zip.CRC32().apply { update(manifest) }.value.toInt())
 
     private fun sizeCursor(size: Long): MatrixCursor {
         val c = MatrixCursor(arrayOf(OpenableColumns.SIZE))

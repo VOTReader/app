@@ -54,6 +54,7 @@ class BridgeContractTest {
         "v3ImportBegin" to 0,
         "v3ImportNextBlob" to 0,
         "v3ImportReadChunk" to 1,
+        "v3ImportVerify" to 0,
         "v3ImportClose" to 0,
         "getCrashLog" to 0,
         "clearGardenCache" to 0,

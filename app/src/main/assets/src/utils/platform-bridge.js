@@ -77,6 +77,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => string} v3ImportBegin
  * @property {() => string} v3ImportNextBlob
  * @property {(maxBytes: number) => string} v3ImportReadChunk
+ * @property {() => string} v3ImportVerify
  * @property {() => void} v3ImportClose
  * @property {() => string} getCrashLog
  * @property {() => void} clearGardenCache
@@ -170,6 +171,7 @@ const androidImpl = {
   v3ImportBegin: () => /** @type {any} */ (window).AndroidBridge.v3ImportBegin(),
   v3ImportNextBlob: () => /** @type {any} */ (window).AndroidBridge.v3ImportNextBlob(),
   v3ImportReadChunk: (n) => /** @type {any} */ (window).AndroidBridge.v3ImportReadChunk(n),
+  v3ImportVerify: () => /** @type {any} */ (window).AndroidBridge.v3ImportVerify(),
   v3ImportClose: () => /** @type {any} */ (window).AndroidBridge.v3ImportClose(),
   // Merge the Kotlin BoundedLogTree with the JS DiagnosticLog (W7.4).
   getCrashLog: () => mergeCrashLog(/** @type {any} */ (window).AndroidBridge.getCrashLog()),
@@ -1031,6 +1033,7 @@ const webImpl = {
   v3ImportBegin: v3AndroidOnly('v3ImportBegin'),
   v3ImportNextBlob: v3AndroidOnly('v3ImportNextBlob'),
   v3ImportReadChunk: v3AndroidOnly('v3ImportReadChunk'),
+  v3ImportVerify: v3AndroidOnly('v3ImportVerify'),
   v3ImportClose: v3AndroidOnly('v3ImportClose'),
   setImmersiveMode: webSetImmersiveMode,     // Tier B.3 (Fullscreen API, best-effort)
   setZoomEnabled: webSetZoomEnabled,         // Tier B.3 (no-op — browsers handle zoom natively)

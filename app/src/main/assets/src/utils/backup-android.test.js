@@ -162,6 +162,54 @@ describe('round-trip export → import asserts byte-identity (multi-frame)', () 
   });
 });
 
+describe('BAK-INTEGRITY: v3AndroidImportEntries onDone verify callback', () => {
+  const mkBridge = (verifyResult) => ({
+    v3ImportBegin: () => 'v3:{"exportVersion":3,"media":[]}',
+    v3ImportNextBlob: () => '0',
+    v3ImportReadChunk: () => '',
+    v3ImportVerify: () => verifyResult,
+  });
+
+  it('calls onDone with the verify result after every frame is consumed', async () => {
+    let done = null;
+    for await (const _e of v3AndroidImportEntries({ bridge: mkBridge('ok'), media: [], onDone: (v) => { done = v; } })) { /* drain */ }
+    expect(done).toBe('ok');
+  });
+
+  it('propagates a mismatch result to onDone', async () => {
+    let done = null;
+    for await (const _e of v3AndroidImportEntries({ bridge: mkBridge('mismatch'), media: [], onDone: (v) => { done = v; } })) { /* drain */ }
+    expect(done).toBe('mismatch');
+  });
+
+  it('onDone gets "absent" when the bridge has no v3ImportVerify (older native)', async () => {
+    let done = null;
+    const bridge = { v3ImportBegin: () => 'v3:x', v3ImportNextBlob: () => '0', v3ImportReadChunk: () => '' };
+    for await (const _e of v3AndroidImportEntries({ bridge: /** @type {any} */ (bridge), media: [], onDone: (v) => { done = v; } })) { /* drain */ }
+    expect(done).toBe('absent');
+  });
+
+  it('does NOT call onDone if iteration is abandoned early (no spurious warning on cancel)', async () => {
+    let called = false;
+    let readCount = 0;
+    const bridge = {
+      v3ImportBegin: () => 'v3:x',
+      v3ImportNextBlob: () => '3',
+      v3ImportReadChunk: () => { readCount += 1; return readCount === 1 ? btoa('abc') : ''; },
+      v3ImportVerify: () => 'ok',
+    };
+    const gen = v3AndroidImportEntries({
+      bridge: /** @type {any} */ (bridge),
+      media: [{ id: 'a', mime: 'x', size: 3 }],
+      chunkSize: 1024,
+      onDone: () => { called = true; },
+    });
+    await gen.next();       // pull the (only) frame
+    await gen.return();     // abandon before the generator reaches its post-loop onDone
+    expect(called).toBe(false);
+  });
+});
+
 describe('export aborts the open sink on any bridge failure (no truncated backup)', () => {
   const failAt = (step) => {
     const calls = [];

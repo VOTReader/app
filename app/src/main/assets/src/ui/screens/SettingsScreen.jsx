@@ -798,6 +798,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       setTimeout(() => window.location.reload(), 600);
     };
 
+    // BAK-INTEGRITY: a v3 backup carries a trailing CRC-32 of its manifest (all the
+    // structured store data). A mismatch means it may be corrupted — but we NEVER
+    // block the restore (the data still imports); we warn the user + record durably.
+    const _warnBackupIntegrity = (platform) => {
+      console.warn('[import] v3 backup integrity check failed (CRC mismatch)');
+      try { if (window.DiagnosticLog) window.DiagnosticLog.warn('import', 'v3 backup CRC mismatch (' + platform + ')'); } catch (_e) { /* best-effort */ }
+      _showToast('Warning: this backup failed its integrity check — some data may be corrupted, though it was imported.', 5000);
+    };
+
     // v3 streaming container import (web): read the file, validate, apply via applyV3.
     const _importV3Container = async (file) => {
       let read;
@@ -808,6 +817,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         return;
       }
       const { manifest, entries } = read;
+      if (read.integrity === 'mismatch') _warnBackupIntegrity('web');
       const envelopeErrors = validateImportEnvelope(manifest);
       if (envelopeErrors.length) {
         console.warn('import envelope invalid:', envelopeErrors);
@@ -913,9 +923,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       //    consumes it, reassembling each blob bounded (one frame at a time) from
       //    <=512 KB base64 chunks. A size mismatch or truncation throws — applyV3's
       //    fail-safe ordering keeps existing media (utils/backup-android.js — TEST-1).
+      // BAK-INTEGRITY: onDone fires (with the trailing manifest-CRC verify result)
+      // ONLY once every frame is consumed — so cancelling the confirm below never
+      // triggers a spurious warning (the generator never reaches onDone).
+      let integrityResult = 'absent';
       const entries = v3AndroidImportEntries({
         bridge: PlatformBridge,
         media: Array.isArray(manifest.media) ? manifest.media : [],
+        onDone: (v) => { integrityResult = v; },
       });
       // 5. Confirm + degraded-guard + apply + reload (shared helper). Close the
       //    native stream no matter what (success, cancel at the confirm, or error).
@@ -926,6 +941,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           mediaStore: JournalMediaStore,
           validateStorePayload: validateStorePayload,
         }));
+        if (integrityResult === 'mismatch') _warnBackupIntegrity('android');
       } catch (e) {
         console.warn('android v3 import failed', e);
         hideToast(_TOAST_ID);

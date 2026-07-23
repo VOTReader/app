@@ -433,6 +433,17 @@ class AppInterface(
         is StorageManager.Result.Failure -> "error:${r.reason}"
     }
 
+    /** BAK-INTEGRITY: verify the trailing manifest CRC-32 (call after the last frame
+     *  is consumed, before v3ImportClose). Returns "ok" / "absent" (an older backup
+     *  with no CRC) / "mismatch" (likely corruption) / "malformed", or
+     *  "error:<reason>". Never blocks the import — the JS driver surfaces a warning
+     *  on "mismatch". */
+    @JavascriptInterface
+    fun v3ImportVerify(): String = when (val r = vm.storage.v3ImportVerify()) {
+        is StorageManager.Result.Success -> r.value
+        is StorageManager.Result.Failure -> "error:${r.reason}"
+    }
+
     /** Close the import stream (success, cancel, or error cleanup). Clears the
      *  stashed URI. */
     @JavascriptInterface

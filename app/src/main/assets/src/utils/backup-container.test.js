@@ -11,6 +11,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   writeContainer, readContainer, isContainerMagic,
   encodeUint64BE, decodeUint64BE, CONTAINER_MAGIC,
+  crc32, encodeCrc32BE, CONTAINER_CRC_LEN,
 } from './backup-container.js';
 
 // Collect writeContainer's streamed chunks into one Blob (copy each chunk so a
@@ -106,6 +107,49 @@ describe('writeContainer / readContainer round-trip', () => {
     const { entries } = await readContainer(blob);
     expect(entries.length).toBe(N);
     for (let i = 0; i < N; i++) expect(eqBytes(await bytesOf(entries[i].blob), pattern(10 + i, i))).toBe(true);
+  });
+});
+
+describe('BAK-INTEGRITY: manifest CRC-32 (corruption detection)', () => {
+  it('crc32 matches the standard IEEE check value (byte-identical to java.util.zip.CRC32)', () => {
+    // The canonical CRC-32 test vector: crc32("123456789") === 0xCBF43926.
+    expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xCBF43926);
+    expect(crc32(new Uint8Array(0))).toBe(0);            // empty input → 0
+  });
+
+  it('a fresh export ends with a 4-byte CRC of the manifest bytes', async () => {
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [] };
+    const mBytes = new TextEncoder().encode(JSON.stringify(manifest));
+    const noCrc = new Blob([CONTAINER_MAGIC, encodeUint64BE(mBytes.length), mBytes]); // old format
+    const { blob } = await pack(manifest, []);
+    expect(blob.size).toBe(noCrc.size + CONTAINER_CRC_LEN);   // exactly the 4-byte trailer added
+    const all = await bytesOf(blob);
+    expect(Array.from(all.slice(all.length - CONTAINER_CRC_LEN)))
+      .toEqual(Array.from(encodeCrc32BE(crc32(mBytes))));
+  });
+
+  it('a round-tripped container verifies (integrity "ok")', async () => {
+    const manifest = { app: 'VOTReader', exportVersion: 3, stores: { x: 1 }, media: [{ id: 'a', size: 3 }] };
+    const { blob } = await pack(manifest, [{ blob: blobOf(pattern(3)) }]);
+    expect((await readContainer(blob)).integrity).toBe('ok');
+  });
+
+  it('a corrupted CRC is reported "mismatch" — but the data STILL imports (warn-and-allow)', async () => {
+    const manifest = { app: 'VOTReader', exportVersion: 3, media: [] };
+    const all = await bytesOf((await pack(manifest, [])).blob);
+    all[all.length - 1] ^= 0xFF;                          // flip one CRC byte → guaranteed mismatch
+    const read = await readContainer(new Blob([all]));
+    expect(read.integrity).toBe('mismatch');
+    expect(read.manifest).toEqual(manifest);             // never blocks the restore
+  });
+
+  it('an older backup with no CRC trailer is "absent" (backward compatible)', async () => {
+    const manifest = { app: 'VOTReader', exportVersion: 3, stores: {}, media: [] };
+    const mBytes = new TextEncoder().encode(JSON.stringify(manifest));
+    const legacy = new Blob([CONTAINER_MAGIC, encodeUint64BE(mBytes.length), mBytes]); // no trailer
+    const read = await readContainer(legacy);
+    expect(read.integrity).toBe('absent');
+    expect(read.manifest).toEqual(manifest);
   });
 });
 

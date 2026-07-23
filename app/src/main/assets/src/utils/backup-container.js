@@ -65,6 +65,49 @@ export function decodeUint64BE(bytes) {
   return dv.getUint32(0, false) * 0x100000000 + dv.getUint32(4, false);
 }
 
+// BAK-INTEGRITY: a 4-byte CRC-32 of the MANIFEST bytes is appended as a trailing
+// frame (new exports) so silent corruption of the manifest — where every
+// structured store lives — is detected on import. The manifest is the critical,
+// irreplaceable data; media frames are already length-checked. A plain checksum
+// (not a crypto hash) is the right tool for accidental bit-flips and is trivially
+// byte-identical to Kotlin's java.util.zip.CRC32 (both are standard IEEE CRC-32).
+// Old readers already tolerate trailing bytes (see readContainer's trailing-byte
+// warning), so this is backward- AND forward-compatible with no magic bump.
+export const CONTAINER_CRC_LEN = 4;
+
+/** @type {Uint32Array | null} */
+let _crcTable = null;
+function _crc32Table() {
+  if (_crcTable) return _crcTable;
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  _crcTable = t;
+  return t;
+}
+
+/** Standard CRC-32 (IEEE 802.3, reflected poly 0xEDB88320) of [bytes] → uint32.
+ *  Byte-for-byte identical to java.util.zip.CRC32 (the Kotlin export/import side).
+ *  Exported for known-vector testing (crc32("123456789") === 0xCBF43926). */
+export function crc32(bytes) {
+  const t = _crc32Table();
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = t[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+/** Encode a uint32 CRC as 4 big-endian bytes. Exported for testing. */
+export function encodeCrc32BE(crc) {
+  const b = new Uint8Array(CONTAINER_CRC_LEN);
+  new DataView(b.buffer).setUint32(0, crc >>> 0, false);
+  return b;
+}
+
 function _bytesEqual(a, b) {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) return false; }
@@ -104,6 +147,8 @@ export async function writeContainer(manifest, mediaEntries, write) {
     }
     mediaCount += 1;
   }
+  // BAK-INTEGRITY: append the manifest CRC-32 as a trailing 4-byte frame.
+  await emit(encodeCrc32BE(crc32(manifestBytes)));
   return { bytesWritten, mediaCount };
 }
 
@@ -117,7 +162,9 @@ export async function writeContainer(manifest, mediaEntries, write) {
  * the manifest's declared `size` (corruption detection).
  *
  * @param {Blob} blob - the whole container file (a File from the picker)
- * @returns {Promise<{ manifest: any, entries: Array<{id: any, meta: any, blob: Blob}> }>}
+ * @returns {Promise<{ manifest: any, entries: Array<{id: any, meta: any, blob: Blob}>, integrity: string }>}
+ *   integrity: 'ok' (CRC verified) | 'mismatch' (corrupt) | 'absent' (older backup,
+ *   no CRC) | 'trailing' (unexpected non-CRC trailing bytes). Never throws on these.
  */
 export async function readContainer(blob) {
   if (blob.size < CONTAINER_MAGIC.length + 8) {
@@ -164,13 +211,28 @@ export async function readContainer(blob) {
       blob: blob.slice(dataStart, dataStart + len),
     });
   }
-  // BAK-4: a complete container ends exactly at EOF. Extra trailing bytes after the
-  // last declared frame indicate truncation-then-append or corruption. The frames we
-  // needed are all read, so surface it as a warning rather than a hard failure.
-  if (off < blob.size) {
-    console.warn('[backup-container] ' + (blob.size - off) + ' unexpected trailing byte(s) after the last media frame — file may be corrupt.');
+  // BAK-INTEGRITY: the container MAY carry a trailing 4-byte CRC-32 of the manifest
+  // bytes (new exports do; older ones end exactly at EOF). Verify it if present — a
+  // mismatch is a corruption WARNING surfaced to the caller (integrity: 'mismatch'),
+  // NOT a hard failure: the data still imports (user-data-safe; the checksum can
+  // never block a restore). 'ok' = verified, 'absent' = an older backup with no CRC.
+  let integrity = 'absent';
+  const trailing = blob.size - off;
+  if (trailing === CONTAINER_CRC_LEN) {
+    const s = await _sliceBytes(blob, off, off + CONTAINER_CRC_LEN);
+    const stored = ((s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3]) >>> 0;
+    const computed = crc32(new Uint8Array(manifestBytes));
+    integrity = stored === computed ? 'ok' : 'mismatch';
+    if (integrity === 'mismatch') {
+      console.warn('[backup-container] manifest integrity check FAILED (CRC mismatch) — the backup may be corrupted.');
+    }
+  } else if (trailing > 0) {
+    // BAK-4: unexpected trailing bytes that are NOT a 4-byte CRC — truncation-then-
+    // append or corruption. The frames we needed are all read, so warn, don't fail.
+    console.warn('[backup-container] ' + trailing + ' unexpected trailing byte(s) after the last media frame — file may be corrupt.');
+    integrity = 'trailing';
   }
-  return { manifest, entries };
+  return { manifest, entries, integrity };
 }
 
 /** Cheap format sniff: true if `head` (first bytes of a file) is a v3 container,
