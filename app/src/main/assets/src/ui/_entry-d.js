@@ -75,6 +75,7 @@ import { srchGroupKey } from '../utils/search.js';
 import { buildExportPayload, applyImportPayload, buildV3Manifest, applyV3, formatImportSpaceWarning } from '../utils/backup.js';
 import { writeContainer, readContainer, isContainerMagic } from '../utils/backup-container.js';
 import { runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries } from '../utils/backup-android.js';
+import { summarizeBackupManifest, formatVerifyReport } from '../utils/backup-verify.js';
 
 // ── Late stores + data ──────────────────────────────────────────────────
 import {
@@ -219,6 +220,7 @@ Object.assign(window, {
   buildExportPayload, applyImportPayload, buildV3Manifest, applyV3, formatImportSpaceWarning,
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
+  summarizeBackupManifest, formatVerifyReport,
   // Late stores + data
   THUMB_DB, THUMB_STORE, _thumbDbPromise,
   openThumbDB, idbPut, idbDelete, idbReadAll,

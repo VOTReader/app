@@ -237,4 +237,5 @@ DONE LOG
   2026-07-03  [3] My Progress dashboard — hero read/streak/entries, per-collection bars (mark-as-read table extracted to utils/progress-stats.js, shared with Settings), library counts, most-annotated top-5 (Hidden Manna filtered); Library tile via growth-tolerant LibraryOrderStore (+32 tests).
   2026-07-03  [6] Journal block drag-to-reorder — left-gutter grip per block (instant grab, touch-action:none), variable-height FLIP, edge autoscroll, JournalHelpers.moveBlock commit; hardened lifecycle shared with the tabs-drag fix (+7 tests).
   2026-07-03  (unplanned, owner-reported) tab/home/library drag lock-up fixed — see CLAUDE.md 2026-07-03 entry (swallowed grab in the 240ms snap window, any-finger early commit, poisonable refs).
+  2026-07-28  [15] Backup Verify — Settings → Your Data → "Verify a Backup": full read-path check (magic/frames/CRC via readContainer on web, the v3Import* drain + native CRC on Android) without applying; always-visible result row; utils/backup-verify.js summarize+format (+9 unit, +3 harness e2e with a real in-test .votbak).
 ═══════════════════════════════════════════════════════════════════════════

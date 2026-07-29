@@ -411,6 +411,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
+  // Verify-a-Backup result — { message, level:'ok'|'warn' } | null. Rendered
+  // as a row under the Verify button; screen-local (clears on nav away).
+  const [verifyReport, setVerifyReport] = React.useState(
+    /** @type {null | { message: string, level: 'ok' | 'warn' }} */ (null)
+  );
   // Wave-0 (dual-dismissal fix): the type-DELETE wipe dialog was registered
   // in NEITHER dismissal system, so hardware Back / Escape navigated away
   // underneath it (and left it rendering over the previous screen). It now
@@ -1019,6 +1024,119 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     })();
   };
 
+  // ── Verify a Backup (FABLE5-BACKLOG [15]) ────────────────────────────────
+  // Read-only .votbak inspection: run the ENTIRE import read path — magic,
+  // manifest parse, envelope validation, per-frame size checks, trailing
+  // CRC — and report what the file contains WITHOUT applying anything.
+  // Catches a corrupt only-backup BEFORE the day it's needed. The result
+  // renders as a row under the button (setVerifyReport); hard read failures
+  // land there too, so the outcome is always visible in place.
+  const _verifyFail = (msg) => {
+    hideToast(_TOAST_ID);
+    setVerifyReport({ message: msg, level: 'warn' });
+  };
+  const verifyBackupFile = () => {
+    const _report = (manifest, integrity, kind) => {
+      hideToast(_TOAST_ID);
+      setVerifyReport(formatVerifyReport(summarizeBackupManifest(manifest), integrity, kind));
+    };
+    // Both platforms: envelope-validate the parsed manifest/payload first so a
+    // random JSON file reports "not a backup", not a zero-count summary.
+    const _checkEnvelope = (parsed) => {
+      const errs = validateImportEnvelope(parsed);
+      if (errs.length) {
+        console.warn('verify: envelope invalid', errs);
+        _verifyFail('This file does not look like a VOTReader backup.');
+        return false;
+      }
+      return true;
+    };
+
+    if (PlatformBridge.isAndroid) {
+      (async () => {
+        const ready = await new Promise((resolve) => {
+          window.__onV3ImportReady = (status) => { window.__onV3ImportReady = null; resolve(status); };
+          PlatformBridge.v3ImportOpen();
+        });
+        if (ready === 'cancelled') return;
+        if (ready !== 'ok') { console.warn('verify open failed:', ready); _verifyFail('Could not open the file. Please try again.'); return; }
+        let begin;
+        try { begin = PlatformBridge.v3ImportBegin(); }
+        catch (e) { console.warn('verify begin failed', e); try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ } _verifyFail('Could not read the file.'); return; }
+        const sniff = classifyV3ImportBegin(begin);
+        try {
+          if (sniff.kind === 'error') {
+            _verifyFail(sniff.reason === 'too_large'
+              ? 'That file is too large to be a VOTReader backup (over 50 MB).'
+              : 'This backup file is corrupt or incomplete and could not be read.');
+            return;
+          }
+          if (sniff.kind === 'legacy') {
+            let parsed;
+            try { parsed = JSON.parse(sniff.json); }
+            catch (e) { console.warn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+            if (!_checkEnvelope(parsed)) return;
+            _report(parsed, 'absent', 'legacy');
+            return;
+          }
+          if (sniff.kind !== 'v3') { _verifyFail('This file does not look like a VOTReader backup.'); return; }
+          let manifest;
+          try { manifest = JSON.parse(sniff.manifestJson); }
+          catch (e) { console.warn('verify manifest parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+          if (!_checkEnvelope(manifest)) return;
+          // Drain every media frame (discarding the bytes) so the stream reaches
+          // the trailing CRC — the generator runs the native verify via onDone.
+          // Any frame-size mismatch or truncation throws = corruption caught.
+          _showToast('Checking backup…', 0);
+          let integrity = 'absent';
+          try {
+            const entries = v3AndroidImportEntries({
+              bridge: PlatformBridge,
+              media: Array.isArray(manifest.media) ? manifest.media : [],
+              onDone: (v) => { integrity = v; },
+            });
+            for await (const _entry of entries) { /* verify-only: bytes discarded */ }
+          } catch (e) {
+            console.warn('verify frame walk failed', e);
+            _verifyFail('This backup file is corrupt or incomplete — a media frame failed its size check.');
+            return;
+          }
+          _report(manifest, integrity, 'v3');
+        } finally {
+          try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
+        }
+      })();
+      return;
+    }
+
+    // Web: same routing as importPersonalData's picker path, minus the apply.
+    (async () => {
+      try {
+        const file = await PlatformBridge.pickImportFile();
+        if (!file) return;
+        const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+        if (isContainerMagic(head)) {
+          _showToast('Checking backup…', 0);
+          let read;
+          try { read = await readContainer(file); }  // frame sizes verified inside
+          catch (e) { console.warn('verify container read failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+          if (!_checkEnvelope(read.manifest)) return;
+          _report(read.manifest, read.integrity, 'v3');
+        } else {
+          if (file.size > 50 * 1024 * 1024) { _verifyFail('That file is too large to be a VOTReader backup (over 50 MB).'); return; }
+          let parsed;
+          try { parsed = JSON.parse(await file.text()); }
+          catch (e) { console.warn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }
+          if (!_checkEnvelope(parsed)) return;
+          _report(parsed, 'absent', 'legacy');
+        }
+      } catch (e) {
+        console.warn('verify failed', e);
+        _verifyFail('This backup file is corrupt or incomplete and could not be read.');
+      }
+    })();
+  };
+
   /**
    * Wrap `indexedDB.deleteDatabase(name)` in a Promise that resolves
    * on success, error, blocked, or timeout. Critical deletes get a
@@ -1371,6 +1489,25 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             >
               <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); importPersonalData(); }}>Import</button>
             </DataActionRow>
+            <DataActionRow
+              label="Verify a Backup"
+              desc="Check a backup file without importing it: reads the whole file, verifies its structure and integrity checksum, and reports what it contains. Nothing on this device changes."
+            >
+              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); setVerifyReport(null); verifyBackupFile(); }}>Verify</button>
+            </DataActionRow>
+            {verifyReport && (
+              /* Always-visible result (NOT DataActionRow — its desc hides
+                 behind the ⓘ toggle; a report the user just asked for must
+                 not need a second tap). */
+              <div className={'settings-row' + (verifyReport.level === 'warn' ? ' danger-zone' : '')}>
+                <div className="settings-row-head">
+                  <span className="settings-row-label">Verify Result</span>
+                  <span className="settings-row-grow" />
+                  <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); setVerifyReport(null); }}>Dismiss</button>
+                </div>
+                <div className="settings-row-desc">{verifyReport.message}</div>
+              </div>
+            )}
             <SettingsRow
               label="Backup Reminder"
               desc="On (default): if your last Export is more than 30 days old — or you've never exported — show a reminder at launch, at most once a week. Only fires once you have data worth protecting. Off: never remind."
