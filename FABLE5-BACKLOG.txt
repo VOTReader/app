@@ -238,4 +238,15 @@ DONE LOG
   2026-07-03  [6] Journal block drag-to-reorder — left-gutter grip per block (instant grab, touch-action:none), variable-height FLIP, edge autoscroll, JournalHelpers.moveBlock commit; hardened lifecycle shared with the tabs-drag fix (+7 tests).
   2026-07-03  (unplanned, owner-reported) tab/home/library drag lock-up fixed — see CLAUDE.md 2026-07-03 entry (swallowed grab in the 240ms snap window, any-finger early commit, poisonable refs).
   2026-07-28  [15] Backup Verify — Settings → Your Data → "Verify a Backup": full read-path check (magic/frames/CRC via readContainer on web, the v3Import* drain + native CRC on Android) without applying; always-visible result row; utils/backup-verify.js summarize+format (+9 unit, +3 harness e2e with a real in-test .votbak).
+  2026-07-28  [13] Focus traps — hooks/use-focus-trap.js (Tab containment, topmost-trap stack, focus restore, respects dialog autoFocus) on NoteSheet/NotebookPicker/RecordingSheet/TabActionSheet/wipe/import-confirm/garden/disable-tabs (+10 tests). TalkBack DEVICE walk still owner-side.
+  2026-07-28  [8] Search filter chips (Scriptures·Volumes·WTLB·Studies + counts, client-side over fetched results) + relevance|book-order sort for verse groups; pure halves in utils/search.js (+9 tests).
+  2026-07-28  [9] Scope chip from INDEX screens — goSearch context now covers bible-idx/matthew-idx/volume indexes via COL_BY_INDEX_SC (+3 tests).
+  2026-07-28  [16] Journal session undo — 6s Undo toast on confirmed block deletes (text/image/voice); media cleanup deferred past the window + re-checked at fire time (+4 tests).
+  2026-07-28  [7] Tab rename + pin — TabActionSheet inline rename (customTitle overrides everywhere incl. document.title); pin moves to pinned prefix + survives Close-others/Close-right/Clear-all; gold pin badge (+7 tests).
+  2026-07-28  [11] Notebook color tags — NotebookStore.setColor, drilled-header swatch row (HL_COLORS + gold default), card dot + tinted note-row chips (+3 tests).
+  2026-07-28  [12] Holy Days Year view — List|Year toggle (new HolyDaysIndex); gold-rail vertical timeline of the same 16 entries in data order, zero new content (+3 tests).
+  2026-07-28  [10] True Black (OLED) — dark-theme MODIFIER (settings.trueBlack + body.amoled; --bg2/--bg3 only) instead of a third theme value: nav cycle + thumbnail slots untouched; boot pre-paint applies it (+2 tests).
+  2026-07-28  [14] app.jsx joined tsc (clean) + the 124-prop ScreenRouteDeps typed-assignment route contract (RED-proven: renamed prop = TS2561). Canary 800/800.
+  2026-07-28  [18] ARCHITECTURE.md — FlexSearch mentions retired + a Current-systems addendum (MiniSearch, 8 bundles, v3 container, modal registry/focus traps, pager peeks, thumbnails, frame pacing, themes).
+  SKIPPED (with reasons): [17] 200% zoom walk — needs a visible browser pane (blocked in the 07-28 environment); [19] golden-suite expansion — needs the owner's real search vocabulary (ask him); [20] device-walk day — owner time.
 ═══════════════════════════════════════════════════════════════════════════

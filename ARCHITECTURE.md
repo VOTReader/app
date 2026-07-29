@@ -4,6 +4,21 @@ Deep dives into annotation, navigation, state management, and rendering. Read wh
 
 ---
 
+## Current-systems addendum (2026-07-28 refresh — [18])
+
+The sections below this one predate several landed systems. This addendum is the CURRENT index of them; each system's full contract lives in its module header (the file IS the deep doc — read it before editing).
+
+- **Search = MiniSearch only** (`src/search/`, bundle-e, `window.VotSearchMini`): BM25 + fuzzy + synonyms + warm IDB cache; Classic/FlexSearch retired 2026-07-02. Query parse (refs/commands) in `query-parse.js`; golden-quality suite `src/search/golden.test.js`. Result-side filter chips + canonical verse sort are CLIENT views in `utils/search.js` ([8]).
+- **8 bundles**: a (react + boot data), a-bible / a-matthew / a-vot (lazy corpora), b (stores/hooks/bridge), c (renderer), d (screens/sheets/utils), e (lazy Settings/Search/Garden). `--target=chrome108` mandatory (Permanent Rule 6). Entry files (`_entry-b/-d` etc.) Object.assign every export onto window — bare-name globals + the 460-entry generated eslint/tsc globals.
+- **Backup v3 streaming container** (`VOTBACK1`, `utils/backup-container.js` + `utils/backup-android.js` + Kotlin `StorageManager`): manifest frame + per-media frames + trailing manifest CRC-32; GB-scale bounded memory on both platforms. Read-only **Verify a Backup** in Settings runs the whole read path without applying ([15]).
+- **Modal registry + focus traps** (`hooks/use-modal-registry.js`, `hooks/use-focus-trap.js`): Escape is dispatched ONLY by the app-level W1.5(c) dispatcher via the registry's z-ordered stack; Tab is contained per-dialog by useFocusTrap (topmost-trap-wins stack, focus restore on close) ([13]).
+- **Real-inert pager peeks** (swipe navigation): the peek IS the destination screen rendered inert (`.pager-peek-*`, ViewPager2-style finger-follow); commit is a flushSync single task. Peeks must gate on entry SHAPE, not resolution (the Holy Days mixed-format lesson).
+- **Tab thumbnails** (`hooks/use-thumbnails.js`): dual-theme clone renders (html2canvas via the bridge) captured ONLY after nav / overview-open heal / resize — the scroll-stop capture path is RETIRED (on-device profiling; do not re-add) and non-urgent captures wait out the interaction calm gate. Tabs also carry `customTitle` + `pinned` ([7]; pinned survive bulk closes).
+- **Android frame pacing**: MainActivity votes the WebView at panel peak refresh (View + window votes, API 35+); Battery Saver's system 60 Hz cap outranks them by design. `backdrop-filter` is banned on chrome that overlays live scrolling content (alpha-bumped instead).
+- **Theme**: dark-first `:root` tokens, `body.light` full swap, `body.amoled` True-Black surface modifier on dark ([10], `settings.trueBlack`, boot pre-paint applies all classes).
+
+---
+
 ## Tab state machine
 
 `index.html` was a pre-compiled (Babel-output `React.createElement`) single-file React app. Today `function App()` lives in `app/src/main/assets/src/app.jsx` (extracted Q2.7-1, converted to JSX Q2.7-2). Screen state is held per-tab in a tab state machine.
@@ -696,9 +711,9 @@ COLLECTIONS.forEach(function(col) {
 | Engine | Used by | Indexes | Purpose |
 |---|---|---|---|
 | `searchNavIndex()` + `buildNavIndex()` | LinkPicker, RecentNavStore | ~2000 navigable destination titles + aliases | "Navigate to Proverbs 2:6" — alias-based fuzzy match |
-| `VotSearch` (FlexSearch, `search.js`) | SearchScreen | ~200K+ text segments across all content | "Find verses about mercy" — full-text phrase match |
+| `VotSearchMini` (MiniSearch, bundle-e `src/search/`) | SearchScreen | every verse/letter/entry/study segment | "Find verses about mercy" — BM25 + fuzzy full-text match |
 
-These solve different UX problems: content search vs. destination lookup. Using FlexSearch for the nav picker would be over-engineering; using alias matching for content search would be inadequate.
+These solve different UX problems: content search vs. destination lookup. Using the full-text engine for the nav picker would be over-engineering; using alias matching for content search would be inadequate. (Classic/FlexSearch retired 2026-07-02 — MiniSearch is THE content engine.)
 
 **buildNavIndex derives from COLLECTIONS**: loops `COLLECTIONS` with per-kind alias generation via `NAV_ALIAS_BASES` lookup. Bible chapters, Bible Studies, and Matthew Study remain as separate loops (not in COLLECTIONS).
 
@@ -894,7 +909,7 @@ New `_validateTabState(s)` function runs on both `s` (legacy) and each `s.tabs[i
 
 ### 19.4 Key architectural insights from the audit
 
-**Two search engines are intentional:** `searchNavIndex()` (alias-based, ~2000 items) is for destination lookup in LinkPicker. `VotSearch` (FlexSearch, ~200K+ segments) is for content search in SearchScreen. Different UX problems, different engines. Do NOT merge.
+**Two search engines are intentional:** `searchNavIndex()` (alias-based, ~2000 items) is for destination lookup in LinkPicker. `VotSearchMini` (MiniSearch, bundle-e) is for content search in SearchScreen. Different UX problems, different engines. Do NOT merge.
 
 **`navigateToLink` vs `openInAppLetter`:** Both navigate to letters, but from different UX flows. `openInAppLetter` handles footnote tap-throughs (knows the source letter title for back-pill label). `navigateToLink` handles cross-reference link card taps (source may be Bible, study, or letter — no guaranteed source title). Both now push onto `fromLetterStack`.
 
