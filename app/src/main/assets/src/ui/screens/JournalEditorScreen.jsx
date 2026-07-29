@@ -354,34 +354,74 @@ export function JournalEditorScreen(props) {
     scheduleSave();
   }
   function deleteBlock(idx) {
+    // [16] SESSION UNDO: a confirmed block delete (text, image, or voice
+    // memo) gets the same 6s Undo toast the tab-close uses — snapshot the
+    // removed block + index, splice it back on Undo. The media blob's
+    // cleanup is DEFERRED past the undo window (a restored block must not
+    // point at a deleted blob) and re-evaluated at fire time against the
+    // CURRENT blocks (blocksRef), so a re-add inside the window survives.
+    var removedSnap = null;
     setBlocks(function(arr) {
       var next = arr.slice();
-      var removed = next.splice(idx, 1)[0];
-      // Drop the media blob too — but ONLY when nothing else needs it:
-      //  1. not an embed of another entry's media (sourceJournalId set), AND
-      //  2. no OTHER entry embeds this same mediaId (symmetric protection —
-      //     deleting the SOURCE block must not orphan embeds elsewhere), AND
-      //  3. this entry doesn't reuse the same mediaId in another block.
-      if (removed && (removed.type === 'image' || removed.type === 'audio') && removed.mediaId) {
-        var isLinkedEmbed = !!removed.sourceJournalId;
-        var reusedHere = next.some(function(bb) {
-          return (bb.type === 'image' || bb.type === 'audio') && bb.mediaId === removed.mediaId;
-        });
-        var referencedElsewhere = false;
-        try {
-          referencedElsewhere = (typeof JournalStore !== 'undefined' && JournalStore.isMediaReferencedElsewhere)
-            ? JournalStore.isMediaReferencedElsewhere(removed.mediaId, entryIdRef.current)
-            : false;
-        } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
-        if (!isLinkedEmbed && !reusedHere && !referencedElsewhere) {
-          try { JournalMediaStore.delete(removed.mediaId); } catch (_e) { /* recorder cleanup — best-effort; ignore if already stopped / released */ }
-        }
-      }
+      removedSnap = next.splice(idx, 1)[0] || null;
       return next.length === 0 ? JournalHelpers.defaultBlocks() : next;
     });
     setConfirmDelIdx(null);
     setConfirmAudioDelete(null);
     scheduleSave();
+    // Macrotask so React has flushed the splice above (the tab-close idiom).
+    setTimeout(function() {
+      var removed = removedSnap;
+      if (!removed) return;
+      var undone = false;
+      var restore = function() {
+        undone = true;
+        hideToast('vot-toast-undo');
+        setBlocks(function(arr) {
+          var next = arr.slice();
+          // Deleting the last block left the pristine default paragraph —
+          // replace it instead of restoring alongside it.
+          if (next.length === 1 && next[0] && next[0].type === 'p' && !((next[0].text || '').trim())) next = [];
+          next.splice(Math.min(idx, next.length), 0, removed);
+          return next;
+        });
+        scheduleSave();
+      };
+      var label = removed.type === 'audio' ? 'Voice memo removed.'
+        : removed.type === 'image' ? 'Image removed.' : 'Block deleted.';
+      showToast({
+        id: 'vot-toast-undo',
+        className: 'vot-toast vot-toast-undo',
+        html: label + ' <button type="button" class="vot-undo-btn">Undo</button>',
+        durationMs: 6000,
+      });
+      var el = (typeof document !== 'undefined') && document.getElementById('vot-toast-undo');
+      var btn = el && el.querySelector('.vot-undo-btn');
+      if (btn) btn.addEventListener('click', restore, { once: true });
+      // Deferred media cleanup — the SAME only-when-nothing-needs-it rules
+      // as before ((1) not an embed of another entry's media, (2) no other
+      // entry embeds it, (3) this entry doesn't reuse it), now checked
+      // AFTER the undo window with call-time-fresh state.
+      if ((removed.type === 'image' || removed.type === 'audio') && removed.mediaId) {
+        setTimeout(function() {
+          if (undone) return;
+          var isLinkedEmbed = !!removed.sourceJournalId;
+          var cur = blocksRef.current || [];
+          var reusedHere = cur.some(function(bb) {
+            return (bb.type === 'image' || bb.type === 'audio') && bb.mediaId === removed.mediaId;
+          });
+          var referencedElsewhere = false;
+          try {
+            referencedElsewhere = (typeof JournalStore !== 'undefined' && JournalStore.isMediaReferencedElsewhere)
+              ? JournalStore.isMediaReferencedElsewhere(removed.mediaId, entryIdRef.current)
+              : false;
+          } catch (_e) { /* best-effort */ }
+          if (!isLinkedEmbed && !reusedHere && !referencedElsewhere) {
+            try { JournalMediaStore.delete(removed.mediaId); } catch (_e) { /* best-effort */ }
+          }
+        }, 6500);
+      }
+    }, 0);
   }
   function insertBlockAt(idx, block) {
     setBlocks(function(arr) {
