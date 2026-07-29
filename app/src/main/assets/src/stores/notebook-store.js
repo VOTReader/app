@@ -20,9 +20,12 @@ import { NoteStore } from './note-store.js';
  *   name: string,
  *   sortIndex: number,
  *   created: number,
- *   updated: number
+ *   updated: number,
+ *   color?: string
  * }} Notebook
  */
+/* [11] `color` is an optional HL_COLORS name (color tag); absent = the
+   default gold treatment everywhere it renders. */
 
 /**
  * On-disk shape: { list: Notebook[] } (wrapped so future fields can be
@@ -96,6 +99,25 @@ export const NotebookStore = extendStore(
       const data = this._load();
       const nb = (data.list || []).find(n => n.id === id);
       if (nb) { nb.name = trimmed; nb.updated = Date.now(); this._save(); this._bump(); }
+    },
+
+    /**
+     * [11] Set (or clear) a notebook's color tag. `color` is an HL_COLORS
+     * name; null/'' clears it. Migration-safe: records without a `color`
+     * field render as the default gold everywhere.
+     * @param {string} id
+     * @param {string | null} color
+     * @returns {void}
+     */
+    setColor(id, color) {
+      if (this._shouldDefer('setColor', id, color)) return;
+      const data = this._load();
+      const nb = (data.list || []).find(n => n.id === id);
+      if (!nb) return;
+      if (color) nb.color = color; else delete nb.color;
+      nb.updated = Date.now();
+      this._save();
+      this._bump();
     },
 
     /**

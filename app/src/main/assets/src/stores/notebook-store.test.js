@@ -254,3 +254,27 @@ describe('NotebookStore — get() and list()', () => {
     expect(NotebookStore.list().length).toBe(2);
   });
 });
+
+describe('NotebookStore — [11] setColor()', () => {
+  it('sets a color tag, updates the timestamp, and bumps the version', () => {
+    const nb = NotebookStore.add('Devotional');
+    const v0 = NotebookStore.getVersion();
+    NotebookStore.setColor(nb.id, 'teal');
+    const got = NotebookStore.get(nb.id);
+    expect(got.color).toBe('teal');
+    expect(NotebookStore.getVersion()).toBeGreaterThan(v0);
+  });
+
+  it('null/empty clears the tag (field removed — migration-safe default)', () => {
+    const nb = NotebookStore.add('Study');
+    NotebookStore.setColor(nb.id, 'red');
+    NotebookStore.setColor(nb.id, null);
+    expect('color' in NotebookStore.get(nb.id)).toBe(false);
+  });
+
+  it('unknown id is a no-op', () => {
+    const v0 = NotebookStore.getVersion();
+    NotebookStore.setColor('nb_nope', 'blue');
+    expect(NotebookStore.getVersion()).toBe(v0);
+  });
+});

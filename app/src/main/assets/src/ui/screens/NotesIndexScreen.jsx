@@ -59,6 +59,8 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const [newNbName, setNewNbName] = React.useState('');
   const [renaming, setRenaming] = React.useState(false);
   const [renameValue, setRenameValue] = React.useState('');
+  // [11] notebook color-tag swatch row (drilled header's Color action).
+  const [colorPicking, setColorPicking] = React.useState(false);
   const [confirmDeleteNb, setConfirmDeleteNb] = React.useState(false);
   const [allNotesSort, setAllNotesSort] = React.useState('newest'); // 'newest' | 'oldest'
   const [drilledSort, setDrilledSort] = React.useState('newest');
@@ -177,14 +179,14 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   // is skipped. popDrill is the single source of that transition — used by the
   // nav-bar back arrow, the in-content ‹ button, AND the global back router
   // (Android hardware back / web Escape), which calls window.__screenBack.
-  const popDrill = () => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); };
+  const popDrill = () => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); setColorPicking(false); };
   const handleNavBack = () => { if (drilledNbId) { popDrill(); } else { onBack(); } };
   React.useEffect(() => {
     // Register the screen-back interceptor only while drilled in. When not
     // drilled, no interceptor → the global router falls through to its normal
     // notes-index → origin route. See use-android-back.js §(1b).
     if (!drilledNbId) return undefined;
-    const fn = () => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); return true; };
+    const fn = () => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); setColorPicking(false); return true; };
     window.__screenBack = fn;
     return () => { if (window.__screenBack === fn) window.__screenBack = null; };
   }, [drilledNbId]);
@@ -252,11 +254,33 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                     )}
                     {drilledNb && <>
                       <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>
+                      <button className="nb-drilled-action" onClick={() => setColorPicking(v => !v)} title="Color tag">Color</button>
                       <button className="nb-drilled-action danger" onClick={() => setConfirmDeleteNb(true)} title="Delete notebook">Delete</button>
                     </>}
                   </>
               }
             </div>
+            {/* [11] color-tag picker — the HL_COLORS swatches + a gold
+                "default" swatch that clears the tag. */}
+            {colorPicking && drilledNb && (
+              <div className="nb-color-row" role="radiogroup" aria-label="Notebook color">
+                <button
+                  className={'nb-color-swatch default' + (!drilledNb.color ? ' selected' : '')}
+                  style={{ background: 'var(--gold)' }}
+                  aria-label="Default gold"
+                  onClick={() => { NotebookStore.setColor(drilledNb.id, null); setColorPicking(false); }}
+                />
+                {(typeof HL_COLORS !== 'undefined' ? HL_COLORS : []).map(c => (
+                  <button
+                    key={c}
+                    className={'nb-color-swatch' + (drilledNb.color === c ? ' selected' : '')}
+                    style={{ background: 'var(--hl-' + c + ')' }}
+                    aria-label={c}
+                    onClick={() => { NotebookStore.setColor(drilledNb.id, c); setColorPicking(false); }}
+                  />
+                ))}
+              </div>
+            )}
             {confirmDeleteNb && (
               <ConfirmStrip
                 style={{ marginBottom: '0.8rem' }}
@@ -327,7 +351,11 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                 onClick={() => setDrilledNbId(nb.id)}
               >
                 <span className="nb-card-eyebrow">Notebook</span>
-                <span className="nb-card-name">{nb.name}</span>
+                <span className="nb-card-name">
+                  {/* [11] color-tag dot — absent color renders gold. */}
+                  <span className="nb-card-dot" style={{ background: nb.color ? 'var(--hl-' + nb.color + ')' : 'var(--gold)' }} />
+                  {nb.name}
+                </span>
                 <span className="nb-card-count">{(counts[nb.id] || 0)}{(counts[nb.id] || 0) === 1 ? " note" : " notes"}</span>
                 <span className="nb-card-arrow">›</span>
               </button>

@@ -2569,6 +2569,12 @@
       text-shadow:0 1px 2px rgba(0,0,0,0.85);
     }
     body.light .tab-card-eyebrow { color:rgba(122,92,16,0.85); text-shadow:0 1px 2px rgba(247,242,232,0.8); }
+    /* [11] notebook color tags — card dot + drilled-header swatch row. */
+    .nb-card-dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.4rem; vertical-align:0.02rem; box-shadow:0 0 0 1px rgba(0,0,0,0.35); }
+    .nb-color-row { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; padding:0.4rem 0 0.7rem; }
+    .nb-color-swatch { width:1.5rem; height:1.5rem; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; }
+    .nb-color-swatch.selected { border-color:var(--cream); box-shadow:0 0 0 2px var(--gold-border); }
+    .nb-color-swatch.default { position:relative; }
     /* [7] pin badge on bulk-close-immune tabs. */
     .tab-card-pin { width:0.7rem; height:0.7rem; vertical-align:-0.12rem; margin-right:0.25rem; color:var(--gold); }
     /* [7] inline rename editor inside the TabActionSheet. */
