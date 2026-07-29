@@ -132,7 +132,6 @@ import { LinkCard } from './components/LinkCard.jsx';
 import { LinkIcon } from './components/LinkIcon.jsx';
 import { BookmarkIcon } from './components/BookmarkIcon.jsx';
 import { HolyDaysPlaylistHeader } from './components/HolyDaysPlaylistHeader.jsx';
-import { HolyDaysIndex } from './screens/HolyDaysIndex.jsx';
 import { StorageHealthBanner, useStorageHealth } from './components/StorageHealthBanner.jsx';
 import { Safari7DayModal, IosPwaWelcomeCard } from './components/SafariFlows.jsx';
 import { AppShellOverlays } from './components/AppShellOverlays.jsx';
@@ -245,7 +244,7 @@ Object.assign(window, {
   FootnoteListSection, StickyChapterNav, ClearProgressRow, ConfirmStrip,
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, VolumeLetterIndex, HistoryEntryCard,
-  NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader, HolyDaysIndex,
+  NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
   StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
   AppShellOverlays, AppShellSheets, AnnotationDomSync,
   buildScreenRoutes,

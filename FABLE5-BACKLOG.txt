@@ -244,7 +244,7 @@ DONE LOG
   2026-07-28  [16] Journal session undo — 6s Undo toast on confirmed block deletes (text/image/voice); media cleanup deferred past the window + re-checked at fire time (+4 tests).
   2026-07-28  [7] Tab rename + pin — TabActionSheet inline rename (customTitle overrides everywhere incl. document.title); pin moves to pinned prefix + survives Close-others/Close-right/Clear-all; gold pin badge (+7 tests).
   2026-07-28  [11] Notebook color tags — NotebookStore.setColor, drilled-header swatch row (HL_COLORS + gold default), card dot + tinted note-row chips (+3 tests).
-  2026-07-28  [12] Holy Days Year view — List|Year toggle (new HolyDaysIndex); gold-rail vertical timeline of the same 16 entries in data order, zero new content (+3 tests).
+  2026-07-28  [12] Holy Days Year view — shipped, then REMOVED 2026-07-29 on owner review ("take away year view" — didn't earn its tap). List view was never touched. Do not re-add.
   2026-07-28  [10] True Black (OLED) — dark-theme MODIFIER (settings.trueBlack + body.amoled; --bg2/--bg3 only) instead of a third theme value: nav cycle + thumbnail slots untouched; boot pre-paint applies it (+2 tests).
   2026-07-28  [14] app.jsx joined tsc (clean) + the 124-prop ScreenRouteDeps typed-assignment route contract (RED-proven: renamed prop = TS2561). Canary 800/800.
   2026-07-28  [18] ARCHITECTURE.md — FlexSearch mentions retired + a Current-systems addendum (MiniSearch, 8 bundles, v3 container, modal registry/focus traps, pager peeks, thumbnails, frame pacing, themes).

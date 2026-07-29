@@ -928,8 +928,8 @@ export function buildScreenRoutes({
 
     'holy-days-index': () => _wrapVot((
       <ScreenLayout navChildren={_idxNav()}>
-        {/* [12] List | Year-view toggle lives in HolyDaysIndex. */}
-        <HolyDaysIndex letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} />
+        <HolyDaysPlaylistHeader />
+        <VolumeLetterIndex volumeTitle="Regarding The Holy Days" eyebrow="The Appointed Times" letters={colLetterArr(COL_BY_KEY.get('holydays')).map((e) => ({ ...e, date: e.date || e.sourceLabel || '' }))} {...colIdxProps('holydays')} />
       </ScreenLayout>
     )),
 

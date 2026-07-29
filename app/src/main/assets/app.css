@@ -2577,25 +2577,6 @@
       text-shadow:0 1px 2px rgba(0,0,0,0.85);
     }
     body.light .tab-card-eyebrow { color:rgba(122,92,16,0.85); text-shadow:0 1px 2px rgba(247,242,232,0.8); }
-    /* [12] Holy Days — List | Year-view toggle + the vertical timeline. */
-    .hd-view-toggle { display:flex; gap:0.4rem; justify-content:center; padding:0.5rem 1.2rem 0; }
-    .hd-view-btn { background:transparent; border:1px solid var(--gold-border); border-radius:20px; padding:0.38rem 1rem; font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; }
-    .hd-view-btn.active { background:var(--gold-faint); color:var(--gold-bright); border-color:var(--gold-dim); }
-    .hd-timeline { max-width:640px; margin:0 auto; padding:1.2rem 1.2rem 3rem; }
-    .hd-timeline-eyebrow { font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); text-align:center; margin-bottom:0.4rem; }
-    .hd-timeline-title { font-family:'Cinzel Decorative',serif; font-size:1.6rem; color:var(--cream); text-align:center; margin:0 0 1.4rem; }
-    .hd-timeline-rail { position:relative; padding-left:0.2rem; }
-    /* the vertical gold rail runs through the node column */
-    .hd-timeline-rail::before { content:''; position:absolute; left:calc(0.2rem + 0.55rem); top:0.9rem; bottom:0.9rem; width:1px; background:linear-gradient(to bottom, transparent, var(--gold-border) 8%, var(--gold-border) 92%, transparent); }
-    .hd-timeline-row { display:flex; align-items:flex-start; gap:0.85rem; width:100%; background:none; border:none; padding:0.55rem 0; cursor:pointer; text-align:left; position:relative; }
-    .hd-timeline-node { flex:0 0 auto; width:1.1rem; display:flex; justify-content:center; padding-top:0.35rem; }
-    .hd-timeline-dot { width:0.55rem; height:0.55rem; border-radius:50%; background:var(--bg2); border:1px solid var(--gold-dim); transition:background 0.18s, border-color 0.18s; }
-    .hd-timeline-row:active .hd-timeline-dot, .hd-timeline-row.current .hd-timeline-dot { background:var(--gold); border-color:var(--gold); }
-    .hd-timeline-body { display:flex; flex-direction:column; min-width:0; }
-    .hd-timeline-num { font-family:'Cinzel',serif; font-size:0.55rem; letter-spacing:0.2em; color:var(--gold-dim); }
-    .hd-timeline-name { font-family:'Cinzel',serif; font-size:0.95rem; color:var(--gold); line-height:1.3; }
-    .hd-timeline-read { color:var(--gold-dim); font-size:0.7rem; margin-left:0.4rem; }
-    .hd-timeline-src { font-family:'EB Garamond',serif; font-style:italic; font-size:0.82rem; color:var(--cream-muted); margin-top:0.1rem; }
     /* [11] notebook color tags — card dot + drilled-header swatch row. */
     .nb-card-dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.4rem; vertical-align:0.02rem; box-shadow:0 0 0 1px rgba(0,0,0,0.35); }
     .nb-color-row { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; padding:0.4rem 0 0.7rem; }
