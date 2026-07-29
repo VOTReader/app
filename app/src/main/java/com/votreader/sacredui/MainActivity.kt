@@ -40,7 +40,6 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
-import androidx.core.graphics.scale
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
@@ -59,7 +58,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.math.abs
-import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -1018,9 +1016,17 @@ class MainActivity : AppCompatActivity(), BridgeHost {
 
     /**
      * Hop to Dispatchers.Main, capture the WebView via [capturePixelCopy],
-     * crop / scale / JPEG-encode the result, and return the data URI. The
+     * JPEG-encode the result, and return the data URI. The
      * @JavascriptInterface entry point wraps this in runBlocking +
      * withTimeoutOrNull so JS still sees a synchronous String return.
+     *
+     * SINGLE-ALLOCATION PIPELINE: PixelCopy scales its srcRect into whatever
+     * Bitmap it's handed, so the nav crop (srcRect top edge) and the maxDim
+     * downscale (dest allocated at final thumbnail size) both happen inside
+     * the hardware copy. The old pipeline held up to three concurrent
+     * bitmaps (full screen ≈ w*h*4 bytes, cropped, scaled); now only the
+     * ~thumbnail-sized dest ever exists. Geometry math is pure —
+     * MainActivityLogic.screenshotGeometry, unit-tested.
      *
      * The zoom-reset dance preserves the legacy behavior: thumbnails are
      * always at 1x for consistent visual appearance, even when the user
@@ -1033,9 +1039,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     ): String {
         // (U9) PixelCopy needs the LIVE WebView surface and the zoom bracket is a
         // WebView API call, so the CAPTURE must run on Main — but ONLY that. The
-        // crop → downscale → JPEG-compress → base64 below is pure CPU work on the
-        // captured bitmap; it was needlessly tying up the UI thread. It now runs
-        // on Dispatchers.Default, freeing Main the moment the surface is copied.
+        // JPEG-compress → base64 below is pure CPU work on the captured bitmap;
+        // it runs on Dispatchers.Default, freeing Main the moment the surface
+        // is copied.
         //
         // (The @JavascriptInterface entry still runBlocking()s on the BINDER
         // thread — NOT Main, so there's no main-thread ANR to "fix" by going
@@ -1043,26 +1049,27 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // source]. A window.__onScreenshotComplete async-contract rewrite is a
         // cross-bridge change needing device verification for marginal gain over
         // this off-Main encode, so it's deliberately deferred.)
-        val capture: Pair<Bitmap, Int>? = withContext(Dispatchers.Main) {
+        val capture: Bitmap? = withContext(Dispatchers.Main) {
             val w = webView.width
             val h = webView.height
-            if (w <= 0 || h <= 0) return@withContext null
+            val geo = MainActivityLogic.screenshotGeometry(
+                w, h, topCropDp, resources.displayMetrics.density, maxDim
+            ) ?: return@withContext null
 
             val originalScale = vm.currentScale
             val needsZoomReset = originalScale > 0f && abs(originalScale - 1f) > 0.005f
             if (needsZoomReset) webView.zoomBy(1f / originalScale)
 
             try {
-                val density = resources.displayMetrics.density
-                val topCropPx = (topCropDp * density).toInt().coerceIn(0, h - 1)
-                if (h - topCropPx <= 0) return@withContext null
-
                 val location = IntArray(2).also { webView.getLocationInWindow(it) }
-                val srcRect = Rect(location[0], location[1], location[0] + w, location[1] + h)
-                val full = createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                val ok = capturePixelCopy(srcRect, full)
-                if (!ok) { full.recycle(); return@withContext null }
-                Pair(full, topCropPx)
+                val srcRect = Rect(
+                    location[0], location[1] + geo.topCropPx,
+                    location[0] + w, location[1] + h
+                )
+                val dest = createBitmap(geo.destWidth, geo.destHeight, Bitmap.Config.ARGB_8888)
+                val ok = capturePixelCopy(srcRect, dest)
+                if (!ok) { dest.recycle(); return@withContext null }
+                dest
             } finally {
                 // Restore zoom immediately after the capture, still on Main.
                 if (needsZoomReset) webView.zoomBy(originalScale)
@@ -1071,38 +1078,17 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         if (capture == null) return ""
 
         return withContext(Dispatchers.Default) {
-            val (full, topCropPx) = capture
-            // Recycle bookkeeping: full/cropped/scaled live OUTSIDE the try so
-            // the finally can release every allocation on ALL paths. Previously
-            // the recycles were inline on the happy path only — any exception
-            // mid-pipeline (createBitmap OOM, compress failure) skipped them
-            // all, leaking multi-MB native bitmap allocations per failed shot.
-            var cropped: Bitmap? = null
-            var scaled: Bitmap? = null
             try {
-                val c = Bitmap.createBitmap(full, 0, topCropPx, full.width, full.height - topCropPx)
-                cropped = c
-                val longest = max(c.width, c.height)
-                val scale = if (longest > maxDim) maxDim.toFloat() / longest else 1f
-                val s = if (scale < 1f) {
-                    val sw = (c.width * scale).toInt().coerceAtLeast(1)
-                    val sh = (c.height * scale).toInt().coerceAtLeast(1)
-                    c.scale(sw, sh, filter = true)
-                } else c
-                scaled = s
                 val stream = ByteArrayOutputStream()
-                s.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
+                capture.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(30, 100), stream)
                 "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
             } catch (e: Exception) {
                 Timber.w(e, "Screenshot encode failed")
                 ""
             } finally {
-                // createBitmap()/scale() may return their SOURCE bitmap for a
-                // no-op (zero-height crop / scale == 1f), so compare by
-                // identity and recycle each distinct instance exactly once.
-                scaled?.takeIf { it !== cropped && it !== full }?.recycle()
-                cropped?.takeIf { it !== full }?.recycle()
-                full.recycle()
+                // Recycle in finally so a compress failure can't leak the
+                // (small) dest allocation.
+                capture.recycle()
             }
         }
     }

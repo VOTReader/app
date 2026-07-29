@@ -245,4 +245,57 @@ class MainActivityLogicTest {
         )
         assertEquals("Garden asset HTTP 503 for host <unknown>", msg)
     }
+
+    // ── screenshotGeometry ─────────────────────────────────────────────
+    // The single-allocation screenshot pipeline: PixelCopy crops + scales
+    // inside the hardware copy, so THIS math decides the srcRect top edge
+    // and the one dest Bitmap's dimensions. Wrong crop = nav bar in the
+    // thumbnail; wrong dims = distorted or over-allocated capture.
+
+    @Test
+    fun `crop converts dp to px and dest scales the cropped area to maxDim`() {
+        // 1080x2400 view, 56dp nav at density 2.5 -> 140px crop, src 1080x2260.
+        val g = MainActivityLogic.screenshotGeometry(1080, 2400, 56, 2.5f, 1440)!!
+        assertEquals(140, g.topCropPx)
+        // longest side (2260) > 1440 -> scale 1440/2260; aspect preserved.
+        assertEquals(1440, g.destHeight)
+        assertEquals((1080 * 1440f / 2260).toInt(), g.destWidth)
+    }
+
+    @Test
+    fun `no upscale when view already fits maxDim`() {
+        val g = MainActivityLogic.screenshotGeometry(720, 1280, 0, 2f, 1440)!!
+        assertEquals(0, g.topCropPx)
+        assertEquals(720, g.destWidth)
+        assertEquals(1280, g.destHeight)
+    }
+
+    @Test
+    fun `zero-size view returns null`() {
+        assertNull(MainActivityLogic.screenshotGeometry(0, 2400, 0, 2f, 1440))
+        assertNull(MainActivityLogic.screenshotGeometry(1080, 0, 0, 2f, 1440))
+    }
+
+    @Test
+    fun `oversized crop clamps to leave at least one source row`() {
+        // 500dp crop at density 3 = 1500px > the 800px view -> clamped to 799.
+        val g = MainActivityLogic.screenshotGeometry(600, 800, 500, 3f, 1440)!!
+        assertEquals(799, g.topCropPx)
+        assertEquals(1, g.destHeight)  // 1px-tall src, no scaling needed
+        assertEquals(600, g.destWidth)
+    }
+
+    @Test
+    fun `degenerate maxDim still yields a 1x1-or-larger dest`() {
+        val g = MainActivityLogic.screenshotGeometry(1080, 2400, 0, 2f, 0)!!
+        assertTrue(g.destWidth >= 1)
+        assertTrue(g.destHeight >= 1)
+    }
+
+    @Test
+    fun `landscape view scales by width as the longest side`() {
+        val g = MainActivityLogic.screenshotGeometry(2400, 1080, 0, 2f, 1200)!!
+        assertEquals(1200, g.destWidth)
+        assertEquals((1080 * 1200f / 2400).toInt(), g.destHeight)
+    }
 }

@@ -102,6 +102,47 @@ object MainActivityLogic {
     fun shouldTrimWebViewCache(level: Int): Boolean =
         level >= TRIM_MEMORY_MODERATE_LEVEL
 
+    /** Source crop + final thumbnail dimensions for a screenshot capture. */
+    data class ScreenshotGeometry(
+        val topCropPx: Int,
+        val destWidth: Int,
+        val destHeight: Int
+    )
+
+    /**
+     * Geometry for a single-allocation screenshot: PixelCopy accepts a source
+     * Rect and scales it into whatever Bitmap it's given, so the nav-bar crop
+     * AND the maxDim downscale both happen inside the hardware copy — the
+     * full-resolution and cropped intermediate bitmaps the old pipeline
+     * allocated (up to ~3 concurrent copies of the screen) are never needed.
+     * MainActivity turns [topCropPx] into the srcRect top edge and allocates
+     * the dest Bitmap at [destWidth]×[destHeight].
+     *
+     * Mirrors the old inline math exactly: crop clamped to leave ≥1 source
+     * row, aspect preserved, dims floor()ed then clamped to ≥1 (so a
+     * degenerate maxDim still yields a 1×1 capture rather than a crash).
+     * Returns null when the view has no drawable area (zero/negative size).
+     */
+    fun screenshotGeometry(
+        viewWidth: Int,
+        viewHeight: Int,
+        topCropDp: Int,
+        density: Float,
+        maxDim: Int
+    ): ScreenshotGeometry? {
+        if (viewWidth <= 0 || viewHeight <= 0) return null
+        val topCropPx = (topCropDp * density).toInt().coerceIn(0, viewHeight - 1)
+        val srcH = viewHeight - topCropPx
+        if (srcH <= 0) return null
+        val longest = maxOf(viewWidth, srcH)
+        val scale = if (longest > maxDim) maxDim.toFloat() / longest else 1f
+        return ScreenshotGeometry(
+            topCropPx,
+            (viewWidth * scale).toInt().coerceAtLeast(1),
+            (srcH * scale).toInt().coerceAtLeast(1)
+        )
+    }
+
     /**
      * Decide what (if anything) MainActivity's WebViewClient should Timber-log
      * from an onReceivedHttpError callback. HTTP-level failures (404/500) never
