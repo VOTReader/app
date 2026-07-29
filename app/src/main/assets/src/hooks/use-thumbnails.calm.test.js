@@ -122,18 +122,20 @@ describe('useThumbnails — interaction calm gate', () => {
     expect(takeThemedScreenshot).toHaveBeenCalledWith('dark', 1440, 90);
   });
 
-  it('scroll-stop capture waits for 1200ms of scroll silence, not 300', async () => {
+  it('scrolling triggers NO capture — the scroll-stop path is retired', async () => {
+    // On-device profiling (2026-07-28, Pixel 9 Pro): scroll-stop captures were
+    // ~13% of the main thread while reading. after-nav + overview heal cover
+    // freshness; a scroll must never schedule a render again.
     const el = document.createElement('div');
     g.__scrollEl = el;
     renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
-    await advance(400);                       // attach poll + swallow the after-nav capture
+    await advance(400);                       // after-nav primary capture
+    await advance(1000);                      // its deferred other-theme render
     takeThemedScreenshot.mockClear();
     stampCalm();
     el.dispatchEvent(new Event('scroll'));
-    await advance(300);                       // old cadence — must NOT fire yet
+    await advance(5000);                      // any old cadence would have fired by now
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
-    await advance(900);                       // 1200ms total of silence
-    expect(takeThemedScreenshot).toHaveBeenCalled();
   });
 
   it('the deferred other-theme render also waits for calm', async () => {

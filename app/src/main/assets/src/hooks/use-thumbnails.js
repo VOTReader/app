@@ -23,8 +23,6 @@
                                    was touched for CAPTURE_CALM_MS, so a
                                    capture task never lands where the next
                                    tap/scroll queues behind it)
-     - scroll-stop capture effect (attaches to __scrollEl with polling;
-                                   fires after 1200 ms of scroll silence)
      - aspect-ratio CSS var effect (sets --card-ar on resize; a settled
                                    resize also RECAPTURES the active tab —
                                    stored thumbs would be the wrong aspect)
@@ -39,8 +37,6 @@
    DOES NOT OWN:
      - tabContentKey / idbReadAll / idbPut / idbDelete — global helpers
        in Cluster A (bundle-a.js); accessed as bare names via window.
-     - __scrollEl — window global set by the main scroll container's ref
-       callback in App(); read directly as a global (no import needed).
      - tabsOverviewOpenRef — callers pass tabsOverviewOpen as a param;
        an internal ref mirror provides the synchronous read inside the
        capture callback.
@@ -71,9 +67,9 @@
 
    ┌─ HARD INVARIANT — captureActiveTabThumbnail identity stability ───────┐
    │ captureActiveTabThumbnail MUST be the direct return value of          │
-   │ React.useCallback with dependency array [tabsEnabled]. The scroll-    │
-   │ stop and after-nav effects list it in their dep arrays and re-attach  │
-   │ their listeners when its identity changes — stability is load-bearing.│
+   │ React.useCallback with dependency array [tabsEnabled]. The after-nav, │
+   │ heal, and resize effects list it in their dep arrays and re-run when  │
+   │ its identity changes — stability is load-bearing.                     │
    └───────────────────────────────────────────────────────────────────────┘
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -200,9 +196,9 @@ export function classifyThumbTheme(dataUrl) {
 }
 
 /**
- * Per-tab thumbnail capture + IDB persistence + scroll-stop refresh.
+ * Per-tab thumbnail capture + IDB persistence.
  * Owns the tabThumbnails state, the captureActiveTabThumbnail callback,
- * the IDB load-on-mount effect, and the scroll-listener attach effect.
+ * the IDB load-on-mount effect, and the after-nav / heal / resize triggers.
  *
  * @param {{
  *   tabs: any[],
@@ -353,12 +349,10 @@ export function useThumbnails({
     if (captureInFlightRef.current) return;
     // AUTO-SCROLL SUPPRESSION. A capture is an html2canvas clone render plus a
     // ~900ms-deferred second render for the other theme — main-thread work that
-    // competes directly with a main-thread scroll. The scroll-stop path already
-    // starves itself while motion is continuous (its idle window never
-    // arrives), but the after-nav capture fires on every auto-advance, which
-    // on short entries would mean two full-page renders per page. Suppress
-    // every path at this one choke point; the scroll-stop capture fires once
-    // the reader rests, and the overview-open heal covers anything still stale.
+    // competes directly with a main-thread scroll. The after-nav capture fires
+    // on every auto-advance, which on short entries would mean two full-page
+    // renders per page. Suppress every path at this one choke point; the
+    // overview-open heal covers anything still stale.
     if (typeof document !== 'undefined' && document.body
       && document.body.classList.contains('autoscroll-running')) return;
     // CALM GATE (see the module header). A render that starts within a beat
@@ -483,8 +477,8 @@ export function useThumbnails({
     } finally {
       captureInFlightRef.current = false;
     }
-    // BOUNDED RETRY: a failed capture used to wait for the next scroll-stop
-    // or nav — on a tab the user just opens the overview from, that's never,
+    // BOUNDED RETRY: a failed capture used to wait for the next nav —
+    // on a tab the user just opens the overview from, that's never,
     // and the card stays a blank ✦ forever (owner's PC). Retry up to 3
     // consecutive times, 2.5s apart, seq-guarded so a real capture (or a
     // newer failure chain) supersedes the pending retry. Success resets the
@@ -513,8 +507,8 @@ export function useThumbnails({
   // ── Calm-tracker listeners ─────────────────────────────────────────────
   // Feed the module-level interaction tracker the calm gate reads. Document
   // CAPTURE phase (nothing can starve it — the tab-drag lesson) + passive
-  // (never blocks scrolling). tabsEnabled-gated like the scroll-stop effect:
-  // with tabs off there are no captures to place, so no listeners either.
+  // (never blocks scrolling). tabsEnabled-gated: with tabs off there are
+  // no captures to place, so no listeners either.
   React.useEffect(() => {
     if (!tabsEnabled) return undefined;
     const now = () => performance.now();
@@ -562,39 +556,19 @@ export function useThumbnails({
     return () => clearTimeout(timer);
   }, [tabsOverviewOpen, tabsEnabled, captureActiveTabThumbnail]);
 
-  // ── Scroll-stop capture effect ─────────────────────────────────────────
-  // Keep tab thumbnails fresh: capture on scroll-stop (300ms idle).
-  React.useEffect(() => {
-    // SHELL-2: when tabs are off (a common/default config) there is nothing to
-    // capture, so don't run the 400ms re-attach poll + scroll listener for the
-    // app's lifetime. The effect re-runs when tabsEnabled flips (it's a dep), so
-    // turning tabs on re-establishes the listener.
-    if (!tabsEnabled) return undefined;
-    let scrollTimer = null;
-    let currentEl = null;
-    const onScroll = () => {
-      clearTimeout(scrollTimer);
-      // 1200ms of scroll silence, not 300: the old value fired the render in
-      // the gap BETWEEN reading flicks (and 300ms after every auto-scroll
-      // pause) — exactly where the next touch lands. Waiting for a real lull
-      // costs nothing (the calm gate would defer the early attempts anyway)
-      // and the overview-open heal covers a tab left mid-scroll.
-      scrollTimer = setTimeout(captureActiveTabThumbnail, 1200);
-    };
-    const attach = () => {
-      if (__scrollEl !== currentEl) {
-        if (currentEl) currentEl.removeEventListener("scroll", onScroll);
-        currentEl = __scrollEl;
-        if (currentEl) currentEl.addEventListener("scroll", onScroll, { passive: true });
-      }
-    };
-    attach();
-    const poll = setInterval(attach, 400);
-    return () => {
-      clearInterval(poll); clearTimeout(scrollTimer);
-      if (currentEl) currentEl.removeEventListener("scroll", onScroll);
-    };
-  }, [captureActiveTabThumbnail, tabsEnabled]);
+  // ── (RETIRED 2026-07-28) Scroll-stop capture effect ────────────────────
+  // The scroll-stop path (capture after 1.2s of scroll silence) is GONE.
+  // On-device CDP profiling with the owner reading showed it was the app's
+  // dominant main-thread load: every reading pause fired an html2canvas
+  // clone render (+ the other-theme render ~900ms later) — ~450-550ms
+  // long tasks each on a Pixel 9 Pro, ~13% of the main thread blocked over
+  // a 2-minute reading window, worst first-touch-after-pause input delay
+  // 381ms. Its only product was a scroll-position-fresh card picture that
+  // nobody sees: the after-nav capture keeps every card CONTENT-fresh, and
+  // the overview-open heal urgently recaptures the active card the moment
+  // cards actually become visible. Do not re-add a scroll-driven capture;
+  // if a future need arises, it must be at-most-once-per-minutes throttled.
+  // (Removing it also removed this hook's 400ms __scrollEl re-attach poll.)
 
   // ── Aspect-ratio CSS var effect ────────────────────────────────────────
   // Keep tab-card aspect ratio in sync with the APP COLUMN (.screen-layout —
