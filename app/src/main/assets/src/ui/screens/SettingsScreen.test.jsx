@@ -394,3 +394,18 @@ describe('Android v3 import — native stream not closed until the confirm settl
     expect(applySpy).not.toHaveBeenCalled();
   });
 });
+
+/* [10] True Black — an OLED modifier on the DARK theme; the row collapses
+   (unmounts) in the light theme, same disclosure discipline as auto-scroll. */
+describe('True Black (OLED) disclosure', () => {
+  it('renders in the dark theme and toggles settings.trueBlack', () => {
+    const onToggle = vi.fn();
+    renderSettings({}, { theme: 'dark', onToggle });
+    expect(row('True Black (OLED)')).toBeTruthy();
+  });
+
+  it('is UNMOUNTED in the light theme', () => {
+    renderSettings({}, { theme: 'light' });
+    expect(row('True Black (OLED)')).toBeUndefined();
+  });
+});

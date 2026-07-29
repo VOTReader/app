@@ -156,6 +156,9 @@ export function useSettings({ savedSettings, theme }) {
   // invisible. Do NOT add the other 6 deps back.
   React.useEffect(() => {
     document.body.classList.toggle("light", theme === "light");
+    // [10] True Black — an OLED modifier on the DARK theme only (surfaces
+    // --bg2/--bg3 drop to pure/near black; everything else untouched).
+    document.body.classList.toggle("amoled", theme !== "light" && !!settings.trueBlack);
     document.body.classList.toggle("no-gear", !settings.showSettingsGear);
     document.body.classList.toggle("no-search", settings.searchEnabled === false);
     document.body.classList.toggle("no-history", settings.historyEnabled === false);

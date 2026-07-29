@@ -1271,6 +1271,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={theme === "light"}
               onToggle={() => onThemeChange(theme === "light" ? "dark" : "light")}
             />
+            {/* [10] True Black — OLED variant of the dark theme; collapsed
+                (unmounted) while the light theme is active, matching the
+                auto-scroll disclosure pattern. */}
+            {theme !== "light" && (
+              <SettingsRow
+                label="True Black (OLED)"
+                desc="On: card and sheet surfaces drop to pure black, so OLED screens turn those pixels fully off — deeper contrast and a little battery saved. Off (default): the dark theme's standard near-black surfaces."
+                checked={!!settings.trueBlack}
+                onToggle={() => onToggle("trueBlack")}
+              />
+            )}
           </div>
         </div>
 

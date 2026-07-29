@@ -270,6 +270,14 @@
         --white:            #ffffff;       /* pure white (theme-agnostic) */
       }
       /* ── LIGHT THEME OVERRIDES ── */
+      /* [10] True Black (OLED) — a DARK-theme modifier: only the raised
+         surfaces move (cards/sheets to pure black, the deepest layer to a
+         hair above so hairline borders still read). Text, gold, highlight,
+         and annotation colors are untouched — contrast only improves. */
+      body.amoled {
+        --bg2: #000000;
+        --bg3: #070707;
+      }
       body.light {
         --bg:          #f7f2e8;
         --bg2:         #ede7d8;
