@@ -25,6 +25,7 @@
 
 import * as React from 'react';
 import { modalRegistry, useModalRegistry } from './app/src/main/assets/src/hooks/use-modal-registry.js';
+import { useFocusTrap } from './app/src/main/assets/src/hooks/use-focus-trap.js';
 
 // (1) React as a global.
 globalThis.React = React;
@@ -37,6 +38,9 @@ globalThis.React = React;
 //      throw "useModalRegistry is not defined".
 globalThis.useModalRegistry = useModalRegistry;
 globalThis.modalRegistry = modalRegistry;
+// (1c) [13] — useFocusTrap as a global, same free-variable reality for
+//      every trapped sheet/dialog (NoteSheet, pickers, TabActionSheet…).
+globalThis.useFocusTrap = useFocusTrap;
 
 // (2) window.__* bridges. Stub each as a no-op so hook bodies that touch
 //     them at attach time (window.__closeSheet = onClose, etc.) don't

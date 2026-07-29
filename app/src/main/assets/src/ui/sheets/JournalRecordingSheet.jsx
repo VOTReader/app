@@ -102,6 +102,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   // destroyed an in-progress take silently. The sheet only exists while
   // mounted, so the registration needs no `active` gate.
   useModalRegistry({ id: 'journal-recording-sheet', dismiss: function() { requestDiscard(); } });
+  // [13] focus trap — Tab stays inside the sheet (mounted = open).
+  const trapRef = useFocusTrap(true);
 
   // Refs the component owns for UI display + IDB save. The bridge owns the
   // recorder + MediaStream + AudioContext + AnalyserNode; nothing about
@@ -629,7 +631,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
 
   return (
     <div className="note-sheet-overlay" onClick={function(e) { if (e.target === e.currentTarget) requestDiscard(); }}>
-      <div className="note-sheet jrn-rec-sheet" onClick={function(e) { e.stopPropagation(); }}>
+      <div className="note-sheet jrn-rec-sheet" ref={trapRef} onClick={function(e) { e.stopPropagation(); }}>
         <div className="note-sheet-header">
           <span className="note-sheet-title" style={{ flex: 1 }}>{stage === 'preview' ? 'Review Recording' : 'Voice Recording'}</span>
           {stage !== 'preview' && (

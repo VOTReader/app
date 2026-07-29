@@ -42,6 +42,8 @@ export function NotebookPickerSheet({ groupId, onClose }) {
   // Escape / Android back must route through requestClose so the unsaved-
   // changes discard gate applies to every dismissal path, not just the ×.
   useModalRegistry({ id: 'notebook-picker-sheet', dismiss: () => requestClose() });
+  // [13] focus trap — Tab stays inside the picker (mounted = open).
+  const trapRef = useFocusTrap(true);
 
   if (!note) return null;
 
@@ -101,7 +103,7 @@ export function NotebookPickerSheet({ groupId, onClose }) {
 
   return (
     <div className="nb-picker-overlay" onClick={requestClose}>
-      <div className="nb-picker" onClick={e => e.stopPropagation()}>
+      <div className="nb-picker" ref={trapRef} onClick={e => e.stopPropagation()}>
         <div className="nb-picker-header">
           <span className="nb-picker-title">{storedIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"}</span>
           <button className="nb-picker-close" onClick={requestClose} aria-label="Close">×</button>

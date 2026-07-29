@@ -424,6 +424,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // The legacy window.__closeSheet system is deliberately NOT involved.
   const closeWipe = () => { setWipeConfirm(false); setWipeText(''); };
   useModalRegistry({ id: 'settings-wipe-dialog', dismiss: closeWipe, active: wipeConfirm });
+  // [13] focus traps: Tab must not walk out of an open dialog into the
+  // inert page behind it. One trap per dialog, engaged by the same flag
+  // that renders it; the ref goes on the dialog's root element.
+  const wipeTrapRef = useFocusTrap(wipeConfirm);
   // Wave-0: the import-overwrite confirm (formerly the app's last native
   // window.confirm) is an in-app sheet driven by this state — see
   // _confirmDegradeApplyReload. Registered for the same Back/Escape reason.
@@ -451,6 +455,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     if (resolve) resolve(false);
   }, []);
   useModalRegistry({ id: 'settings-import-confirm', dismiss: () => _settleImportConfirm(false), active: importConfirm != null });
+  const importTrapRef = useFocusTrap(importConfirm != null);
   // NK5c: diagnostic-log snapshot for the "Your Data" section. The bridge
   // (W1.2 Tier B.2) always exposes getCrashLog: Android merges the native
   // BoundedLogTree with the JS-side DiagnosticLog; web returns the JS
@@ -1545,7 +1550,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                     className="note-sheet-overlay"
                     onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) closeWipe(); }}
                   >
-                    <div className="note-sheet" onClick={(e) => e.stopPropagation()}>
+                    <div className="note-sheet" ref={wipeTrapRef} onClick={(e) => e.stopPropagation()}>
                       <div className="note-sheet-header">
                         <div className="note-sheet-title">Delete All Personal Data</div>
                       </div>
@@ -1599,7 +1604,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                     className="note-sheet-overlay"
                     onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) _settleImportConfirm(false); }}
                   >
-                    <div className="note-sheet" onClick={(e) => e.stopPropagation()}>
+                    <div className="note-sheet" ref={importTrapRef} onClick={(e) => e.stopPropagation()}>
                       <div className="note-sheet-header">
                         <div className="note-sheet-title">Import from Backup</div>
                       </div>

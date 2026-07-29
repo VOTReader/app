@@ -63,6 +63,11 @@ export function AppShellOverlays({
     dismiss: () => setGardenWarningOpen(false),
     active: !!gardenWarningOpen,
   });
+  // [13] focus traps — Tab stays inside the open dialog (Escape already
+  // routes through the registry above). Refs land on each dialog's root.
+  const disableTabsTrapRef = useFocusTrap(!!disableTabsPromptOpen);
+  const gardenTrapRef = useFocusTrap(!!gardenWarningOpen);
+  // (TabActionSheet traps itself — it mounts only while open.)
 
   return (
     // ERR3: a crash in any overlay is caught HERE (fallback={null} → it vanishes
@@ -117,7 +122,7 @@ export function AppShellOverlays({
 
       {disableTabsPromptOpen && (
         <div className="disable-tabs-overlay" onClick={() => setDisableTabsPromptOpen(false)}>
-          <div className="disable-tabs-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="disable-tabs-dialog" ref={disableTabsTrapRef} onClick={(e) => e.stopPropagation()}>
             <div className="disable-tabs-eyebrow">You keep closing your last tab</div>
             <h2 className="disable-tabs-title">Disable tabs?</h2>
             <div className="disable-tabs-body">{"Tabs let you juggle multiple reading places — a chapter, a letter, a study in parallel. If you only read one at a time, disabling tabs hides the switcher and this close button. You can re-enable tabs anytime in Settings — your open tabs will be waiting."}</div>
@@ -145,7 +150,7 @@ export function AppShellOverlays({
         const selectedTier = getGardenTier(settings.gardenTier);
         return (
           <div className="garden-warning-overlay" onClick={() => setGardenWarningOpen(false)}>
-            <div className="garden-warning-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="garden-warning-modal" ref={gardenTrapRef} onClick={(e) => e.stopPropagation()}>
               <div className="garden-warning-title">Before You Begin</div>
               <div className="garden-warning-body">
                 <em>A Return to The Garden</em> contains <strong>209 high-resolution photographs</strong> totaling approximately <strong>{selectedTier.size}</strong> at the selected quality. Pages stream from the internet as you read and are cached on your device.

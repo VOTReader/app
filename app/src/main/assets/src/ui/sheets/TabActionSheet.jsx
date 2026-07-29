@@ -20,6 +20,9 @@ export function TabActionSheet({ idx, total, onCloseOthers, onCloseToRight, onDi
   }, [idx, onDismiss]);
   // A fresh open (different tab) starts on the plain options, never mid-confirm.
   React.useEffect(() => { setConfirming(null); }, [idx]);
+  // [13] focus trap — Tab stays inside the sheet while it's open (Escape
+  // already routes through the modal registry in AppShellOverlays).
+  const trapRef = useFocusTrap(idx != null);
   if (idx == null) return null;
   const tabNum = idx + 1;
   const hasOthers = total > 1;
@@ -29,7 +32,7 @@ export function TabActionSheet({ idx, total, onCloseOthers, onCloseToRight, onDi
   return (
     <>
       <div className="select-sheet-backdrop open" onClick={onDismiss} />
-      <div className="select-sheet" onClick={(e) => e.stopPropagation()}>
+      <div className="select-sheet" ref={trapRef} onClick={(e) => e.stopPropagation()}>
         <div className="select-sheet-handle" />
         <div className="select-sheet-eyebrow">Tab {tabNum}</div>
         <div className="select-sheet-title">Tab actions</div>

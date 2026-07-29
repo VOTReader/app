@@ -49,6 +49,8 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   // backdrop — a bare setNoteSheetTarget(null) used to strand a fresh
   // never-saved note group ("Save" looked cosmetic; owner-reported).
   useModalRegistry({ id: 'note-sheet', dismiss: () => requestClose() });
+  // [13] focus trap — Tab stays inside the sheet (mounted = open).
+  const trapRef = useFocusTrap(true);
 
   if (!note || !segs.length) {
     // Note record went missing — close
@@ -155,7 +157,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
 
   return (
     <div className="note-sheet-overlay" onClick={requestClose}>
-      <div className="note-sheet" onClick={e => e.stopPropagation()}>
+      <div className="note-sheet" ref={trapRef} onClick={e => e.stopPropagation()}>
         {/* Header: color dot (tappable) · "Note" · ⋯ menu (read mode only) */}
         <div className="note-sheet-header">
           <button
