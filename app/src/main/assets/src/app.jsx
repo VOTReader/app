@@ -668,7 +668,7 @@ function App() {
   // sharedViewProps/_navToChapter) live INSIDE buildScreenRoutes since
   // they're only used by ROUTES entries; the factory's destructure
   // already captures every primitive they need.
-  const ROUTES = buildScreenRoutes({
+  /** @type {import('./ui/screen-routes.jsx').ScreenRouteDeps} */ const _routeDeps = { // [14] typed assignment (not a cast) so a missing/renamed/extra prop is a tsc error
     screen, setScreen,
     bookId, setBookId, chapterNum, setChapterNum,
     letterId, setLetterId,
@@ -713,7 +713,7 @@ function App() {
     setFromWtlb,
     boundaryConfig,
     gardenPage, setGardenPage,
-  });
+  }; const ROUTES = buildScreenRoutes(_routeDeps);
 
   return (
     <TabsContext.Provider value={tabsCtxValue}>

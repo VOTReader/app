@@ -44,6 +44,142 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
 }
 
+/**
+ * [14] THE ROUTE CONTRACT — every dependency App() must hand to
+ * buildScreenRoutes, name-checked by tsc on the app.jsx call site (a
+ * missing or renamed prop is a typecheck error, not a silent undefined
+ * inside a route). Per-field types are deliberately `*` for now —
+ * the NAME contract is the load-bearing half; tighten types field-by-
+ * field as they prove worth pinning.
+ * @typedef {Object} ScreenRouteDeps
+ * @property {*} screen
+ * @property {*} setScreen
+ * @property {*} bookId
+ * @property {*} setBookId
+ * @property {*} chapterNum
+ * @property {*} setChapterNum
+ * @property {*} letterId
+ * @property {*} setLetterId
+ * @property {*} studyId
+ * @property {*} [setStudyId]
+ * @property {*} studyChapterId
+ * @property {*} setStudyChapterId
+ * @property {*} fromStudies
+ * @property {*} setFromStudies
+ * @property {*} fromSearch
+ * @property {*} setFromSearch
+ * @property {*} mode
+ * @property {*} setMode
+ * @property {*} showStudy
+ * @property {*} setShowStudy
+ * @property {*} genreId
+ * @property {*} setGenreId
+ * @property {*} surpriseAnchor
+ * @property {*} setSurpriseAnchor
+ * @property {*} theme
+ * @property {*} setTheme
+ * @property {*} settings
+ * @property {*} setSettings
+ * @property {*} toggleSetting
+ * @property {*} updateSetting
+ * @property {*} titleFocusHidden
+ * @property {*} setTitleFocusHidden
+ * @property {*} headingsFocusHidden
+ * @property {*} setHeadingsFocusHidden
+ * @property {*} activeReadKey
+ * @property {*} setActiveReadKey
+ * @property {*} lastReadChapters
+ * @property {*} setLastReadChapters
+ * @property {*} lastReadLetterMap
+ * @property {*} setLastReadForVol
+ * @property {*} readItems
+ * @property {*} readHistory
+ * @property {*} markRead
+ * @property {*} unmarkRead
+ * @property {*} isRead
+ * @property {*} clearReadForBook
+ * @property {*} clearAllProgress
+ * @property {*} clearHistory
+ * @property {*} pruneHistoryDay
+ * @property {*} activeLetter
+ * @property {*} activeVolKey
+ * @property {*} book
+ * @property {*} chapter
+ * @property {*} goHome
+ * @property {*} goNavOrigin
+ * @property {*} goSearch
+ * @property {*} goHistory
+ * @property {*} goSettings
+ * @property {*} goAbout
+ * @property {*} goVolumesHome
+ * @property {*} goScripturesHome
+ * @property {*} goScriptureGenre
+ * @property {*} goBibleIdx
+ * @property {*} goMatthewIdx
+ * @property {*} goStudiesHome
+ * @property {*} goNotesIndex
+ * @property {*} goLinksIndex
+ * @property {*} goBookmarksIndex
+ * @property {*} goJournalHub
+ * @property {*} goHighlightsIndex
+ * @property {*} goProgress
+ * @property {*} goJournalViewer
+ * @property {*} goJournalEditor
+ * @property {*} goSearchOrigin
+ * @property {*} goColIdx
+ * @property {*} handleSelect
+ * @property {*} handleSurprise
+ * @property {*} handleScriptureSelect
+ * @property {*} handleVolumeSelect
+ * @property {*} handleSearchSelect
+ * @property {*} handleSearchCommand
+ * @property {*} selectMatthewCh
+ * @property {*} selectBibleCh
+ * @property {*} selectStudy
+ * @property {*} selectStudyChapter
+ * @property {*} getStudyById
+ * @property {*} getStudyChapter
+ * @property {*} studyReadKey
+ * @property {*} prevChainEntry
+ * @property {*} nextChainEntry
+ * @property {*} goToChainEntryFirst
+ * @property {*} goToChainEntryLast
+ * @property {*} studiesLoading
+ * @property {*} studiesError
+ * @property {*} retryStudies
+ * @property {*} UNIFIED_CHAIN
+ * @property {*} searchQuery
+ * @property {*} setSearchQuery
+ * @property {*} searchScope
+ * @property {*} setSearchScope
+ * @property {*} searchContext
+ * @property {*} journalEntryId
+ * @property {*} createAndEditJournal
+ * @property {*} openInAppLetter
+ * @property {*} openLinkSidebar
+ * @property {*} navigateToLink
+ * @property {*} backHint
+ * @property {*} tapThroughBack
+ * @property {*} goToLetterFromMatthew
+ * @property {*} setNavOrigin
+ * @property {*} setNoteSheetTarget
+ * @property {*} bcvPrevBook
+ * @property {*} bcvNextBook
+ * @property {*} bcvOnPrevBook
+ * @property {*} bcvOnNextBook
+ * @property {*} bcvPrevBoundaryTitle
+ * @property {*} bcvNextBoundaryTitle
+ * @property {*} prophecyCardStatesRef
+ * @property {*} saveProphecyCardStates
+ * @property {*} fromMatthewChRef
+ * @property {*} setFromMatthewCh
+ * @property {*} setFromWtlb
+ * @property {*} boundaryConfig
+ * @property {*} gardenPage
+ * @property {*} setGardenPage
+ */
+
+/** @param {ScreenRouteDeps} deps */
 export function buildScreenRoutes({
   // ── State + setters (tab-field-backed) ──
   screen, setScreen,

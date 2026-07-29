@@ -22,7 +22,8 @@
     "app/src/main/assets/src/data/scripture-resolution.js",
     "app/src/main/assets/src/data/journal-helpers.js",
     "app/src/main/assets/src/data/letter-linking.js",
-    "app/src/main/assets/src/search/**/*"
+    "app/src/main/assets/src/search/**/*",
+    "app/src/main/assets/src/app.jsx"
   ],
   "exclude": [
     "app/src/main/assets/src/stores/_entry-b.js",
