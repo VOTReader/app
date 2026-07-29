@@ -14,6 +14,7 @@ import {
   srchFilterCategories as realSrchFilterCategories,
   srchApplyFilter as realSrchApplyFilter,
   srchSortCanonical as realSrchSortCanonical,
+  SRCH_CANONICAL_BOOK_INDEX as realCanonIndex,
 } from '../../utils/search.js';
 
 const MAP = {
@@ -169,6 +170,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     /** @type {any} */ (globalThis).srchFilterCategories = realSrchFilterCategories;
     /** @type {any} */ (globalThis).srchApplyFilter = realSrchApplyFilter;
     /** @type {any} */ (globalThis).srchSortCanonical = realSrchSortCanonical;
+    /** @type {any} */ (globalThis).SRCH_CANONICAL_BOOK_INDEX = realCanonIndex;
     /** @type {any} */ (window).VotSearchMini = {
       getState: () => ({ ready: true }),
       init: () => Promise.resolve(),

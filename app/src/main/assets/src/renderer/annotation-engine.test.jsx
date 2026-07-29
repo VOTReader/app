@@ -22,6 +22,7 @@ import {
   HighlightableText,
   applyDOMHighlights,
   applyNoteIcons,
+  noteNotebookColor,
   annDomSig,
   snapRangeToWords,
   blockBoundaryOffsets,
@@ -791,5 +792,89 @@ describe('ANN4 — applyNoteIcons normalizes the imperative container', () => {
     expect(adjacentTextPairs).toBe(0);
     expect(c.textContent).toContain('tailmore'); // text preserved, just merged
     expect(c.querySelectorAll('.hl-note-icon').length).toBe(1); // icon still painted
+  });
+});
+
+/* [11b] Notebook color tags on inline note ICONS — the icon (organization
+   chrome) takes the first colored notebook's color; the highlight keeps the
+   user's own marking color. Both render paths + the pure lookup pinned. */
+describe('noteNotebookColor + icon tinting [11b]', () => {
+  beforeEach(() => {
+    window.NoteStore = {
+      _notes: {},
+      get: (gid) => window.NoteStore._notes[gid] || null,
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+    window.NotebookStore = {
+      _nbs: {},
+      get: (id) => window.NotebookStore._nbs[id] || null,
+      subscribe: () => () => {},
+      getVersion: () => 0,
+    };
+    window.AnnotationStore = {
+      get: () => [],
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.innerHTML = '';
+    delete window.NoteStore;
+    delete window.NotebookStore;
+    delete window.AnnotationStore;
+  });
+
+  it('lookup: first COLORED notebook wins; uncolored skipped; no stores/none -> null', () => {
+    window.NotebookStore._nbs = { a: { id: 'a', name: 'A' }, b: { id: 'b', name: 'B', color: 'teal' } };
+    window.NoteStore._notes['g1'] = { groupId: 'g1', notebookIds: ['a', 'b'] };
+    expect(noteNotebookColor('g1')).toBe('teal');
+    window.NoteStore._notes['g2'] = { groupId: 'g2', notebookIds: ['a'] };
+    expect(noteNotebookColor('g2')).toBe(null);
+    expect(noteNotebookColor('missing')).toBe(null);
+    delete window.NotebookStore;
+    expect(noteNotebookColor('g1')).toBe(null);
+  });
+
+  it('imperative path: applyNoteIcons tints the icon svg with the notebook color', () => {
+    window.NotebookStore._nbs = { nb1: { id: 'nb1', name: 'Study', color: 'purple' } };
+    window.NoteStore._notes['gn'] = { groupId: 'gn', notebookIds: ['nb1'] };
+    const c = document.createElement('p');
+    c.setAttribute('data-hl-dom', '');
+    c.setAttribute('data-hl-key', 'letter:x:0');
+    c.innerHTML = '<mark class="hl-mark hl-note hl-yellow" data-group-id="gn">noted</mark> tail';
+    document.body.appendChild(c);
+    applyNoteIcons();
+    const svg = /** @type {SVGElement} */ (c.querySelector('.hl-note-icon svg'));
+    expect(svg).not.toBeNull();
+    expect(svg.style.stroke).toBe('var(--hl-purple)');
+  });
+
+  it('imperative path: NO notebook color leaves the svg stroke untinted (class-driven as before)', () => {
+    window.NoteStore._notes['gn'] = { groupId: 'gn', notebookIds: [] };
+    const c = document.createElement('p');
+    c.setAttribute('data-hl-dom', '');
+    c.setAttribute('data-hl-key', 'letter:x:0');
+    c.innerHTML = '<mark class="hl-mark hl-note hl-yellow" data-group-id="gn">noted</mark> tail';
+    document.body.appendChild(c);
+    applyNoteIcons();
+    const svg = /** @type {SVGElement} */ (c.querySelector('.hl-note-icon svg'));
+    expect(svg).not.toBeNull();
+    expect(svg.style.stroke).toBe('');
+  });
+
+  it('React path: HighlightableText renders the icon svg with the notebook stroke', () => {
+    window.AnnotationStore.get = (k) => (k === 'k' ? [
+      ann({ id: 'g1', color: 'blue', start: 0, end: 5, created: 1 }),
+    ] : []);
+    window.NotebookStore._nbs = { nb1: { id: 'nb1', name: 'Study', color: 'teal' } };
+    window.NoteStore._notes['g1'] = { groupId: 'g1', text: 'memo', notebookIds: ['nb1'] };
+    const { container } = render(<HighlightableText text="Hello world" hlKey="k" />);
+    const svg = /** @type {SVGElement} */ (container.querySelector('.hl-note-icon svg'));
+    expect(svg).not.toBeNull();
+    expect(svg.style.stroke).toBe('var(--hl-teal)');
   });
 });

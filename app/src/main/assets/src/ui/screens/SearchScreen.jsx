@@ -197,19 +197,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const [groupFilter, setGroupFilter] = React.useState('all');
   const [sortMode, setSortMode] = React.useState('relevance'); // 'relevance' | 'canonical'
   React.useEffect(() => { setGroupFilter('all'); setSortMode('relevance'); }, [query]);
-  // Canonical book positions (Object.keys(BOOKS) is Genesis→Revelation
-  // authoring order). Built once; empty map when the corpus isn't loaded —
-  // srchSortCanonical then leaves order unchanged.
-  const bookIndex = React.useMemo(() => {
-    const m = new Map();
-    try {
-      if (typeof BOOKS !== 'undefined' && BOOKS) {
-        Object.keys(BOOKS).forEach((id, i) => m.set(id, i));
-        m.set('matthew', m.has('matthew') ? m.get('matthew') : m.size);
-      }
-    } catch (_e) { /* corpus not loaded — relevance order stands */ }
-    return m;
-  }, []);
+  // Canonical book positions: the CONSTANT map (utils/search.js) — never
+  // the lazy corpus, which usually isn't loaded on this screen (the first
+  // cut read Object.keys(BOOKS) and silently no-opped; owner-caught).
+  const bookIndex = SRCH_CANONICAL_BOOK_INDEX;
 
   // Group results by source
   const grouped = React.useMemo(() => {

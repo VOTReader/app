@@ -234,10 +234,35 @@ function annMarkClass(ann, isFirst, isLast, suppress) {
    (kept global — classList-only, so safe on React-owned DOM) treat both paths
    alike. Because React renders it, there's no splitText into React's verse DOM
    (the latent NotFoundError applyNoteIcons caused). */
+/**
+ * [11b] The notebook color a note's inline ICON should carry: the first of
+ * the note's notebooks that has a color tag, or null (annotation color /
+ * default gold stands). Reads the store globals defensively — bundle-c can
+ * run in tests/boot orders where they aren't installed yet.
+ * @param {string} gid - the note's groupId
+ * @returns {string | null} an HL_COLORS name or null
+ */
+export function noteNotebookColor(gid) {
+  try {
+    if (typeof NoteStore === 'undefined' || typeof NotebookStore === 'undefined') return null;
+    const note = NoteStore.get(gid);
+    const ids = (note && note.notebookIds) || [];
+    for (let i = 0; i < ids.length; i++) {
+      const nb = NotebookStore.get(ids[i]);
+      if (nb && nb.color) return nb.color;
+    }
+    return null;
+  } catch (_e) { return null; }
+}
+
 function renderNoteIcon(segIdx, entries, hlKey) {
   const gids = entries.map((e) => e.gid);
   const multi = gids.length > 1;
   const color = entries[0].color ? ' hl-' + entries[0].color : '';
+  // [11b] a colored NOTEBOOK outranks the annotation color on the icon —
+  // the icon is note-organization chrome; the highlight underneath keeps
+  // the user's own marking color.
+  const nbColor = noteNotebookColor(gids[0]);
   const open = (x, y) => {
     if (multi && window.__showMultiNote) window.__showMultiNote(gids, x, y);
     else if (window.__openNote) window.__openNote(gids[0]);
@@ -253,7 +278,7 @@ function renderNoteIcon(segIdx, entries, hlKey) {
       title={multi ? gids.length + ' notes here' : 'Open note'}
       onClick={(e) => { e.stopPropagation(); open(e.clientX, e.clientY); }}
     >
-      <svg viewBox="0 0 24 24">
+      <svg viewBox="0 0 24 24" style={nbColor ? { stroke: 'var(--hl-' + nbColor + ')' } : undefined}>
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <polyline points="14 2 14 8 20 8" />
         <line x1="8" y1="13" x2="16" y2="13" />
@@ -484,6 +509,13 @@ export function applyNoteIcons() {
     if (entries.length > 1) icon.setAttribute('data-count', String(entries.length));
     icon.title = entries.length > 1 ? (entries.length + ' notes here') : 'Open note';
     icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>';
+    // [11b] notebook color tag outranks the annotation color on the ICON
+    // (inline stroke beats every stylesheet rule, incl. body.light's).
+    var _nbColor = noteNotebookColor(primary.gid);
+    if (_nbColor) {
+      var _sv = icon.querySelector('svg');
+      if (_sv) _sv.style.stroke = 'var(--hl-' + _nbColor + ')';
+    }
     var _openIcon = function(x, y) {
       if (entries.length > 1 && window.__showMultiNote) {
         window.__showMultiNote(allGids, x, y);

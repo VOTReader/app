@@ -71,7 +71,7 @@ import {
 } from '../utils/scripture-parse.js';
 import { normalizeForHighlight, splitWithHighlight, highlightExcerptInDom } from '../utils/highlight.jsx';
 import { renderTextWithScripRefs } from '../utils/render-text.jsx';
-import { srchGroupKey, SRCH_FILTER_CATS, srchFilterCategories, srchApplyFilter, srchSortCanonical } from '../utils/search.js';
+import { srchGroupKey, SRCH_FILTER_CATS, srchFilterCategories, srchApplyFilter, srchSortCanonical, SRCH_CANONICAL_BOOK_IDS, SRCH_CANONICAL_BOOK_INDEX } from '../utils/search.js';
 import { buildExportPayload, applyImportPayload, buildV3Manifest, applyV3, formatImportSpaceWarning } from '../utils/backup.js';
 import { writeContainer, readContainer, isContainerMagic } from '../utils/backup-container.js';
 import { runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries } from '../utils/backup-android.js';
@@ -218,6 +218,7 @@ Object.assign(window, {
   normalizeForHighlight, splitWithHighlight, highlightExcerptInDom,
   renderTextWithScripRefs,
   srchGroupKey, SRCH_FILTER_CATS, srchFilterCategories, srchApplyFilter, srchSortCanonical,
+  SRCH_CANONICAL_BOOK_IDS, SRCH_CANONICAL_BOOK_INDEX,
   buildExportPayload, applyImportPayload, buildV3Manifest, applyV3, formatImportSpaceWarning,
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,

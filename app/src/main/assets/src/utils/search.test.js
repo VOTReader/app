@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   srchGroupKey, SRCH_FILTER_CATS, srchFilterCategories, srchApplyFilter, srchSortCanonical,
+  SRCH_CANONICAL_BOOK_INDEX,
 } from './search.js';
 
 /* srchGroupKey buckets a FlexSearch result doc by its source collection so
@@ -119,5 +120,23 @@ describe('srchSortCanonical', () => {
   it('empty map = order unchanged', () => {
     const items = [v('john', 3, 16), v('genesis', 1, 1)];
     expect(srchSortCanonical(items, new Map())).toEqual(items);
+  });
+});
+
+describe('SRCH_CANONICAL_BOOK_INDEX (constant — never the lazy corpus)', () => {
+  it('covers the whole canon, in order, with matthew sharing matthew-plain\'s slot', () => {
+    expect(SRCH_CANONICAL_BOOK_INDEX.get('genesis')).toBe(0);
+    expect(SRCH_CANONICAL_BOOK_INDEX.get('malachi')).toBe(38);
+    expect(SRCH_CANONICAL_BOOK_INDEX.get('matthew-plain')).toBe(39);
+    expect(SRCH_CANONICAL_BOOK_INDEX.get('matthew')).toBe(39);
+    expect(SRCH_CANONICAL_BOOK_INDEX.get('revelation')).toBe(65);
+    expect(SRCH_CANONICAL_BOOK_INDEX.size).toBe(67); // 66 ranks + the shared alias
+  });
+
+  it('actually reorders a relevance-ordered result set (the owner\'s doubt)', () => {
+    const v = (bookId, ch, vs) => ({ doc: { kind: 'verse', bookId, chapterNum: ch, verseNum: vs } });
+    const relevance = [v('revelation', 22, 21), v('psalms', 23, 1), v('genesis', 1, 1), v('john', 3, 16)];
+    const sorted = srchSortCanonical(relevance, SRCH_CANONICAL_BOOK_INDEX);
+    expect(sorted.map((e) => e.doc.bookId)).toEqual(['genesis', 'psalms', 'john', 'revelation']);
   });
 });

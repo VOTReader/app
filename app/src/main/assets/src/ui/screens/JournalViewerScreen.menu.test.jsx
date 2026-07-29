@@ -106,7 +106,7 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     expect(window.JournalStore.togglePin).toHaveBeenCalledWith('e1');
   });
 
-  it('delete still runs the FULL triple confirm (type DELETE) before removing + navigating back', () => {
+  it('delete runs the triple confirm (NO type-DELETE — owner call 2026-07-28: typing is reserved for the Settings erase-all wipe)', () => {
     setupGlobals();
     const onBack = vi.fn();
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={onBack} onEdit={() => {}} />);
@@ -115,11 +115,8 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     expect(screen.getByText('Delete this entry?')).toBeTruthy();
     fireEvent.click(screen.getByText('Continue'));
     fireEvent.click(screen.getByText('I am sure'));
-    const input = container.querySelector('.jrn-tripledel-input');
-    expect(input).toBeTruthy();
+    expect(container.querySelector('.jrn-tripledel-input')).toBeNull();
     const finalBtn = /** @type {HTMLButtonElement} */ (screen.getByText('Delete forever'));
-    expect(finalBtn.disabled).toBe(true);
-    fireEvent.change(input, { target: { value: 'DELETE' } });
     expect(finalBtn.disabled).toBe(false);
     fireEvent.click(finalBtn);
     expect(window.JournalStore.remove).toHaveBeenCalledWith('e1');

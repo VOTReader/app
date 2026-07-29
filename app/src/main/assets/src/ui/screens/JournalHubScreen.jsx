@@ -7,8 +7,6 @@ export function JournalCardMenu(props) {
   var entry = props.entry;
   var _step = useState(0);
   var step = _step[0]; var setStep = _step[1];
-  var _typed = useState('');
-  var typed = _typed[0]; var setTyped = _typed[1];
   if (!entry) return null;
 
   function close() { props.onClose && props.onClose(); }
@@ -44,7 +42,7 @@ export function JournalCardMenu(props) {
               </svg>
               <span>{entry.pinned ? 'Unpin Entry' : 'Pin Entry'}</span>
             </button>
-            <button className="link-action-btn link-action-btn-danger" onClick={function() { setStep(1); setTyped(''); }}>
+            <button className="link-action-btn link-action-btn-danger" onClick={function() { setStep(1); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6" />
                 <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -60,7 +58,7 @@ export function JournalCardMenu(props) {
             <div className="jrn-tripledel-question">
               {step === 1 ? 'Delete this entry?'
                 : step === 2 ? 'Are you sure? This cannot be undone.'
-                : 'Type DELETE to permanently remove this entry.'}
+                : 'Last step: permanently remove this entry?'}
             </div>
             {(function () {
               var summary = (typeof JournalStore !== 'undefined' && JournalStore.associatedDataSummary)
@@ -71,18 +69,11 @@ export function JournalCardMenu(props) {
                 </div>
               );
             })()}
-            {step === 3 && (
-              <input
-                type="text"
-                className="jrn-tripledel-input"
-                placeholder="Type DELETE"
-                value={typed}
-                autoFocus
-                onChange={function(e) { setTyped(e.target.value); }}
-              />
-            )}
+            {/* Owner call 2026-07-28: the triple confirm alone gates an entry
+                delete — the type-DELETE ritual is RESERVED for the Settings
+                erase-all-app-data wipe, so its weight stays meaningful. */}
             <div className="jrn-tripledel-actions">
-              <button className="jrn-tripledel-cancel" onClick={function() { setStep(0); setTyped(''); }}>Cancel</button>
+              <button className="jrn-tripledel-cancel" onClick={function() { setStep(0); }}>Cancel</button>
               {step < 3 && (
                 <button className="jrn-tripledel-next" onClick={function() { setStep(step + 1); }}>
                   {step === 1 ? 'Continue' : 'I am sure'}
@@ -91,7 +82,6 @@ export function JournalCardMenu(props) {
               {step === 3 && (
                 <button
                   className="jrn-tripledel-final"
-                  disabled={typed.trim().toUpperCase() !== 'DELETE'}
                   onClick={function() { props.onDelete(); close(); }}
                 >
                   Delete forever

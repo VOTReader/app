@@ -80,6 +80,38 @@ export function srchApplyFilter(groups, catId) {
   return groups.filter((g) => cat.keys.indexOf(g.key) !== -1);
 }
 
+/** Canonical Bible order as a CONSTANT — the canon doesn't change, so the
+ *  sort must never depend on the lazy bible corpus being loaded (it usually
+ *  ISN'T on the Search screen, which silently no-opped the first cut of
+ *  this sort — owner-caught 2026-07-28). 'matthew' (the Study Bible) shares
+ *  Matthew's slot with 'matthew-plain'. */
+export const SRCH_CANONICAL_BOOK_IDS = [
+  'genesis', 'exodus', 'leviticus', 'numbers', 'deuteronomy',
+  'joshua', 'judges', 'ruth', '1samuel', '2samuel', '1kings', '2kings',
+  '1chronicles', '2chronicles', 'ezra', 'nehemiah', 'esther',
+  'job', 'psalms', 'proverbs', 'ecclesiastes', 'songofsolomon',
+  'isaiah', 'jeremiah', 'lamentations', 'ezekiel', 'daniel',
+  'hosea', 'joel', 'amos', 'obadiah', 'jonah', 'micah', 'nahum',
+  'habakkuk', 'zephaniah', 'haggai', 'zechariah', 'malachi',
+  'matthew-plain', 'matthew', 'mark', 'luke', 'john', 'acts',
+  'romans', '1corinthians', '2corinthians', 'galatians',
+  'ephesians', 'philippians', 'colossians', '1thessalonians', '2thessalonians',
+  '1timothy', '2timothy', 'titus', 'philemon', 'hebrews',
+  'james', '1peter', '2peter', '1john', '2john', '3john', 'jude', 'revelation',
+];
+
+/** bookId → canonical position, built once from the constant above.
+ *  matthew-plain and matthew share a rank (same book, two editions). */
+export const SRCH_CANONICAL_BOOK_INDEX = (() => {
+  const m = new Map();
+  let rank = 0;
+  for (const id of SRCH_CANONICAL_BOOK_IDS) {
+    if (id === 'matthew') { m.set(id, m.get('matthew-plain') ?? rank); continue; }
+    m.set(id, rank++);
+  }
+  return m;
+})();
+
 /**
  * Sort verse-family result items into canonical book order (book, chapter,
  * verse) instead of relevance. Non-verse docs (or verses whose book isn't

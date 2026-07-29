@@ -84,6 +84,13 @@ export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNot
     React.useCallback((cb) => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, []),
     () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
   );
+  // [11b] notebook COLOR tags tint inline note icons, so a color change (or
+  // notebook delete) must repaint the icon pass — same contract as the four
+  // stores above.
+  const nbV = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof NotebookStore !== 'undefined') ? NotebookStore.subscribe(cb) : () => {}, []),
+    () => (typeof NotebookStore !== 'undefined') ? NotebookStore.getVersion() : 0
+  );
 
   // Lazy-corpus readiness (bundle-a-bible / matthew / vot). A reading screen
   // renders a "Loading…" placeholder — NOT its [data-hl-key] verse DOM — until
@@ -150,7 +157,7 @@ export function useDomAnnotationSync({ screen, letterId, noteSheetTarget, setNot
     }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setNoteSheetTarget is a useState setter passed in as a param (identity-stable per React invariant; eslint can't trace it through the destructured hook-return at the call site).
-  }, [annV, noteV, linkV, bkmV, screen, letterId, bibleCorpusV, matthewCorpusV, votCorpusV]);
+  }, [annV, noteV, linkV, bkmV, nbV, screen, letterId, bibleCorpusV, matthewCorpusV, votCorpusV]);
 
   // Toggle .is-active on every mark/icon belonging to the open note's group.
   // Default state: notes show only the trailing 📝 icon (no tint, no ribbon).
