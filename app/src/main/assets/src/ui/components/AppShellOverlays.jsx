@@ -28,6 +28,7 @@ export function AppShellOverlays({
   tabs, activeTabIdx, tabThumbnails, MAX_TABS,
   switchToTab, closeTab, openNewTab,
   closeOtherTabs, closeTabsToTheRight, closeAllTabs, deduplicateTabs, reorderTabs,
+  renameTab, togglePinTab,
   tabActionIdx, setTabActionIdx,
   lastTabCloseStrikesRef,
   // Disable-tabs prompt
@@ -112,8 +113,11 @@ export function AppShellOverlays({
             <TabActionSheet
               idx={tabActionIdx}
               total={tabs.length}
+              tab={tabs[tabActionIdx] || null}
               onCloseOthers={() => {closeOtherTabs(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
               onCloseToRight={() => {closeTabsToTheRight(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
+              onRename={(title) => renameTab(tabActionIdx, title)}
+              onTogglePin={() => togglePinTab(tabActionIdx)}
               onDismiss={() => setTabActionIdx(null)}
             />
           )}

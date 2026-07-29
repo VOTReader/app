@@ -2569,6 +2569,16 @@
       text-shadow:0 1px 2px rgba(0,0,0,0.85);
     }
     body.light .tab-card-eyebrow { color:rgba(122,92,16,0.85); text-shadow:0 1px 2px rgba(247,242,232,0.8); }
+    /* [7] pin badge on bulk-close-immune tabs. */
+    .tab-card-pin { width:0.7rem; height:0.7rem; vertical-align:-0.12rem; margin-right:0.25rem; color:var(--gold); }
+    /* [7] inline rename editor inside the TabActionSheet. */
+    .tab-rename-row { display:flex; gap:0.45rem; align-items:center; padding:0.35rem 0; }
+    .tab-rename-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:'EB Garamond',serif; font-size:1rem; padding:0.5rem 0.7rem; outline:none; }
+    .tab-rename-input:focus { border-color:var(--gold-dim); }
+    body.light .tab-rename-input { background:rgba(0,0,0,0.04); }
+    .tab-rename-save, .tab-rename-cancel { background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0.45rem 0.7rem; font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; }
+    .tab-rename-save { color:var(--gold-bright); background:var(--gold-faint); border-color:var(--gold-dim); }
+    .tab-rename-cancel { color:var(--cream-muted); }
     .tab-card-title {
       font-family:'Cinzel Decorative',serif; font-size:0.98rem;
       color:var(--white); line-height:1.18;

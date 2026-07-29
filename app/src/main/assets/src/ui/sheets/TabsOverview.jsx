@@ -306,7 +306,8 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
           // fallback), use the label remembered on the tab from when it was
           // last viewed (useTabTitleMemo) so a tab never forgets what it was.
           const _d = describeTab(t);
-          const title = _d.resolved ? _d.title : (t.title || _d.title);
+          // [7] a user-set custom title outranks everything.
+          const title = t.customTitle || (_d.resolved ? _d.title : (t.title || _d.title));
           const subtitle = _d.resolved ? _d.subtitle : (t.subtitle || _d.subtitle);
           const scrollKey = scrollKeyForTab(t);
           const saved = t.scrollPositions && t.scrollPositions[scrollKey];
@@ -385,7 +386,15 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                 <div className="tab-card-thumb-scrim" />
               </div>
               <div className="tab-card-body">
-                <div className="tab-card-eyebrow">Tab {i + 1} / {total}</div>
+                <div className="tab-card-eyebrow">
+                  {t.pinned && (
+                    /* [7] pin badge — bulk-close-immune tab. */
+                    <svg className="tab-card-pin" viewBox="0 0 24 24" fill="currentColor" aria-label="Pinned">
+                      <path d="M16 3a1 1 0 0 1 1 1v1l-1 6 3 3v2h-6v5l-1 2-1-2v-5H5v-2l3-3-1-6V4a1 1 0 0 1 1-1h8z" />
+                    </svg>
+                  )}
+                  Tab {i + 1} / {total}
+                </div>
                 <div className="tab-card-title">{title}</div>
                 <div className="tab-card-subtitle">{subtitle}</div>
                 {/* UX8: only show the progress bar once there's REAL progress.

@@ -163,3 +163,70 @@ describe('useTabActions — tab cap + feedback (Wave 0)', () => {
     );
   });
 });
+
+/* FABLE5 [7] — rename + pin. Same captured-updater technique: apply the
+   functional setTabs updater to a known array and assert the output. */
+describe('useTabActions — [7] rename + pin', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  const apply = (ts, arr, call = 0) => ts.setTabs.mock.calls[call][0](arr);
+
+  it('renameTab sets customTitle; empty/whitespace clears it', () => {
+    const ts = makeTabState([tab('a'), tab('b')]);
+    const { result } = mount(ts);
+    act(() => { result.current.renameTab(1, '  My Study  '); });
+    expect(apply(ts, [tab('a'), tab('b')])[1].customTitle).toBe('My Study');
+    ts.setTabs.mockClear();
+    act(() => { result.current.renameTab(1, '   '); });
+    expect('customTitle' in apply(ts, [tab('a'), { ...tab('b'), customTitle: 'My Study' }])[1]).toBe(false);
+  });
+
+  it('togglePinTab pins + moves the tab to the end of the pinned prefix', () => {
+    const ts = makeTabState([{ ...tab('p1'), pinned: true }, tab('a'), tab('b')]);
+    const { result } = mount(ts);
+    act(() => { result.current.togglePinTab(2); });
+    const next = apply(ts, [{ ...tab('p1'), pinned: true }, tab('a'), tab('b')]);
+    expect(next.map((t) => t.id)).toEqual(['p1', 'b', 'a']);
+    expect(next[1].pinned).toBe(true);
+  });
+
+  it('togglePinTab on a pinned tab unpins in place', () => {
+    const ts = makeTabState([{ ...tab('p1'), pinned: true }, tab('a')]);
+    const { result } = mount(ts);
+    act(() => { result.current.togglePinTab(0); });
+    const next = apply(ts, [{ ...tab('p1'), pinned: true }, tab('a')]);
+    expect(next.map((t) => t.id)).toEqual(['p1', 'a']);
+    expect(next[0].pinned).toBe(false);
+  });
+
+  it('closeOtherTabs keeps the kept tab AND every pinned tab', () => {
+    const ts = makeTabState([{ ...tab('p1'), pinned: true }, tab('a'), tab('b'), { ...tab('p2'), pinned: true }]);
+    const { result } = mount(ts);
+    act(() => { result.current.closeOtherTabs(2); });
+    const next = apply(ts, [{ ...tab('p1'), pinned: true }, tab('a'), tab('b'), { ...tab('p2'), pinned: true }]);
+    expect(next.map((t) => t.id)).toEqual(['p1', 'b', 'p2']);
+  });
+
+  it('closeTabsToTheRight spares pinned tabs to the right', () => {
+    const ts = makeTabState([tab('a'), tab('b'), { ...tab('p1'), pinned: true }, tab('c')]);
+    const { result } = mount(ts);
+    act(() => { result.current.closeTabsToTheRight(0); });
+    const next = apply(ts, [tab('a'), tab('b'), { ...tab('p1'), pinned: true }, tab('c')]);
+    expect(next.map((t) => t.id)).toEqual(['a', 'p1']);
+  });
+
+  it('closeAllTabs keeps only pinned tabs; full reset when none are pinned', () => {
+    const ts = makeTabState([tab('a'), { ...tab('p1'), pinned: true }]);
+    const { result } = mount(ts);
+    act(() => { result.current.closeAllTabs(); });
+    const next = apply(ts, [tab('a'), { ...tab('p1'), pinned: true }]);
+    expect(next.map((t) => t.id)).toEqual(['p1']);
+
+    const ts2 = makeTabState([tab('a'), tab('b')]);
+    const { result: r2 } = mount(ts2);
+    act(() => { r2.current.closeAllTabs(); });
+    const reset = ts2.setTabs.mock.calls[0][0]([tab('a'), tab('b')]);
+    expect(reset.length).toBe(1);
+    expect(reset[0].screen).toBeDefined(); // DEFAULT_TAB shape
+  });
+});

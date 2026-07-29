@@ -381,7 +381,7 @@ function App() {
      src/hooks/use-tab-actions.js. */
   const {
     openNewTab, switchToTab, closeTab, closeOtherTabs,
-    closeTabsToTheRight, closeAllTabs, deduplicateTabs, reorderTabs,
+    closeTabsToTheRight, closeAllTabs, deduplicateTabs, reorderTabs, renameTab, togglePinTab,
     tabActionIdx, setTabActionIdx,
     disableTabsPromptOpen, setDisableTabsPromptOpen,
     lastTabCloseStrikes, MAX_TABS,
@@ -736,7 +736,7 @@ function App() {
         switchToTab={switchToTab} closeTab={closeTab} openNewTab={openNewTab}
         closeOtherTabs={closeOtherTabs} closeTabsToTheRight={closeTabsToTheRight}
         closeAllTabs={closeAllTabs} deduplicateTabs={deduplicateTabs} reorderTabs={reorderTabs}
-        tabActionIdx={tabActionIdx} setTabActionIdx={setTabActionIdx}
+        renameTab={renameTab} togglePinTab={togglePinTab} tabActionIdx={tabActionIdx} setTabActionIdx={setTabActionIdx}
         lastTabCloseStrikesRef={lastTabCloseStrikes}
         disableTabsPromptOpen={disableTabsPromptOpen} setDisableTabsPromptOpen={setDisableTabsPromptOpen}
         gardenWarningOpen={gardenWarningOpen} setGardenWarningOpen={setGardenWarningOpen}

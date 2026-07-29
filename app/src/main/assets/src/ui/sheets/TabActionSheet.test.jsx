@@ -17,8 +17,9 @@ afterEach(cleanup);
 
 function renderSheet(overrides = {}) {
   const props = {
-    idx: 1, total: 4,
+    idx: 1, total: 4, tab: null,
     onCloseOthers: vi.fn(), onCloseToRight: vi.fn(), onDismiss: vi.fn(),
+    onRename: vi.fn(), onTogglePin: vi.fn(),
     ...overrides,
   };
   render(<TabActionSheet {...props} />);

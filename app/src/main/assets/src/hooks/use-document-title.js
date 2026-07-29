@@ -30,7 +30,9 @@ export function useDocumentTitle({ activeTab }) {
     // Prefer the live label; if its corpus isn't loaded yet (resolved:false),
     // fall back to the label remembered on the tab (useTabTitleMemo) so the
     // window title doesn't flash a generic "Reading" on a cold boot.
-    const label = (d && !d.resolved && activeTab && activeTab.title) ? activeTab.title : (d && d.title);
+    // [7] a user-set custom tab name outranks the automatic label.
+    const label = (activeTab && activeTab.customTitle)
+      || ((d && !d.resolved && activeTab && activeTab.title) ? activeTab.title : (d && d.title));
     // describeTab's Home/default label → just the app name; otherwise prefix it.
     if (label && label !== 'Home') title = `${label} — ${APP_NAME}`;
   } catch (_e) { /* describeTab reads lazy corpus globals; fall back to app name */ }

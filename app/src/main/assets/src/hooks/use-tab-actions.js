@@ -90,6 +90,8 @@ const _tabCapToast = () => showToast({
  *   closeAllTabs: () => void,
  *   deduplicateTabs: () => void,
  *   reorderTabs: (from: number, to: number) => void,
+ *   renameTab: (idx: number, title: string) => void,
+ *   togglePinTab: (idx: number) => void,
  *   restoreClosedTab: () => void,
  *   tabActionIdx: number | null,
  *   setTabActionIdx: (val: any) => void,
@@ -205,21 +207,73 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
     }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin) + restoreClosedTab is a stable useCallback; see header above.
   }, [restoreClosedTab]);
+  // [7] PINNED TABS survive every BULK close (Close-others / Close-to-the-
+  //-right / Clear-all). The single per-tab × still closes a pinned tab —
+  // that's an explicit, targeted act with its own Undo toast.
   const closeOtherTabs = React.useCallback((keepIdx) => {
     setTabs((prev) => {
       if (prev.length <= 1) return prev;
       const kept = prev[keepIdx];
       if (!kept) return prev;
-      setActiveTabIdx(0);
-      return [kept];
+      const next = prev.filter((t, i) => i === keepIdx || t.pinned);
+      if (next.length === prev.length) return prev;
+      setActiveTabIdx(Math.max(0, next.indexOf(kept)));
+      return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
   const closeTabsToTheRight = React.useCallback((keepIdx) => {
     setTabs((prev) => {
       if (keepIdx >= prev.length - 1) return prev;
-      setActiveTabIdx((cur) => Math.min(cur, keepIdx));
-      return prev.slice(0, keepIdx + 1);
+      const next = prev.filter((t, i) => i <= keepIdx || t.pinned);
+      if (next.length === prev.length) return prev;
+      setActiveTabIdx((cur) => {
+        const ni = next.indexOf(prev[cur]);
+        return ni >= 0 ? ni : Math.min(cur, keepIdx);
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
+  }, []);
+  // [7] Rename: a persisted custom title that OVERRIDES the remembered
+  // describeTab label everywhere it renders. Empty/whitespace clears it.
+  const renameTab = React.useCallback((idx, title) => {
+    setTabs((prev) => {
+      if (!prev[idx]) return prev;
+      const next = prev.slice();
+      const t = { ...next[idx] };
+      const v = (title || '').trim();
+      if (v) t.customTitle = v; else delete t.customTitle;
+      next[idx] = t;
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
+  }, []);
+  // [7] Pin/unpin. Pinning MOVES the tab to the end of the pinned prefix
+  // (pinned tabs sort first); unpinning just clears the flag in place —
+  // the user can drag it wherever afterward. Active tab tracked across
+  // the move.
+  const togglePinTab = React.useCallback((idx) => {
+    setTabs((prev) => {
+      const t = prev[idx];
+      if (!t) return prev;
+      if (t.pinned) {
+        const next = prev.slice();
+        next[idx] = { ...t, pinned: false };
+        return next;
+      }
+      const next = prev.slice();
+      next.splice(idx, 1);
+      let insertAt = 0;
+      while (insertAt < next.length && next[insertAt].pinned) insertAt++;
+      next.splice(insertAt, 0, { ...t, pinned: true });
+      setActiveTabIdx((cur) => {
+        if (cur === idx) return insertAt;
+        if (idx < cur && insertAt >= cur) return cur - 1;
+        if (idx > cur && insertAt <= cur) return cur + 1;
+        return cur;
+      });
+      return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
@@ -244,9 +298,17 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
   const closeAllTabs = React.useCallback(() => {
-    setTabs([{ ...DEFAULT_TAB }]);
-    setActiveTabIdx(0);
-    setTabThumbnails({});
+    setTabs((prev) => {
+      // [7] pinned tabs survive Clear All; the thumbnail wipe only happens
+      // on the true full reset (the GC effect prunes the rest).
+      const pinned = prev.filter((t) => t.pinned);
+      setActiveTabIdx(0);
+      if (pinned.length === 0) {
+        setTabThumbnails({});
+        return [{ ...DEFAULT_TAB }];
+      }
+      return pinned;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState + setTabThumbnails param (all useState origin); see header above.
   }, []);
   // Merge duplicates: if two tabs have the same content signature, drop later duplicates
@@ -278,6 +340,7 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
   return {
     openNewTab, switchToTab, closeTab, closeOtherTabs,
     closeTabsToTheRight, closeAllTabs, deduplicateTabs, reorderTabs,
+    renameTab, togglePinTab,  // [7] custom titles + pinning
     restoreClosedTab,  // UX7: re-insert the last-closed tab (wired to the undo toast)
     tabActionIdx, setTabActionIdx,
     disableTabsPromptOpen, setDisableTabsPromptOpen,
