@@ -155,6 +155,8 @@
                                 (book title lookup).
      COL_BY_LETTER_SC           For goSearch's volume-context lookup
                                 from the current screen.
+     COL_BY_INDEX_SC            [9] same lookup for volume INDEX screens
+                                (chapter/letter lists offer the chip too).
      COL_BY_SEARCH_ID           Used by srchVolLookup +
                                 srchResolveLetterId.
      colLetterArr, colPreface   Used by srchResolveLetterId for
@@ -241,13 +243,16 @@ export function useSearch({
     // reading screen (home/indexes/settings) → no chip shown.
     // searchScope always starts null (global); user taps chip to apply.
     let ctx = null;
-    if (screen === 'matthew-ch') {
+    if (screen === 'matthew-ch' || screen === 'matthew-idx') {
+      // [9] index screens offer the same scope chip as their reading
+      // screens — browsing a book's chapter list (or a volume's letter
+      // list) is just as clear a "search HERE" context as reading it.
       ctx = { kind: 'book', bookId: 'matthew', label: 'Matthew' };
-    } else if (screen === 'bible-ch' && bookId) {
+    } else if ((screen === 'bible-ch' || screen === 'bible-idx') && bookId) {
       const bk = BOOKS[bookId];
       ctx = { kind: 'book', bookId, label: bk ? bk.title : bookId };
     } else {
-      const _scCol = COL_BY_LETTER_SC.get(screen);
+      const _scCol = COL_BY_LETTER_SC.get(screen) || COL_BY_INDEX_SC.get(screen);
       if (_scCol) ctx = { kind: 'volume', volumeId: _scCol.searchVolId, label: _scCol.label };
     }
     setSearchContext(ctx);

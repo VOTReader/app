@@ -81,6 +81,10 @@ beforeEach(() => {
   window.COL_BY_LETTER_SC = new Map([
     ['vol-two-letter', { volKey: 'two', searchVolId: 'vot-two', label: 'Volume Two' }],
   ]);
+  // [9] index screens offer the scope chip too.
+  window.COL_BY_INDEX_SC = new Map([
+    ['vol-two-index', { volKey: 'two', searchVolId: 'vot-two', label: 'Volume Two' }],
+  ]);
   // Map<searchVolId, collection-like { letterScreen, volKey, arr fn... }>
   window.COL_BY_SEARCH_ID = new Map([
     ['vot-two', { letterScreen: 'vol-two-letter', volKey: 'two' }],
@@ -106,6 +110,7 @@ beforeEach(() => {
 afterEach(() => {
   window.BOOKS = _prevBOOKS;
   window.COL_BY_LETTER_SC = _prevCOL_BY_LETTER_SC;
+  delete window.COL_BY_INDEX_SC;
   window.COL_BY_SEARCH_ID = _prevCOL_BY_SEARCH_ID;
   window.colLetterArr = _prevColLetterArr;
   window.colPreface = _prevColPreface;
@@ -211,6 +216,30 @@ describe('useSearch — goSearch', () => {
   it('builds a volume-context when on a letter screen registered in COL_BY_LETTER_SC', () => {
     const tabField = makeTabField();
     const { result } = setup({ tabField, screen: 'vol-two-letter' });
+    act(() => { result.current.goSearch(); });
+    const [, setSearchContext] = tabField('searchContext');
+    expect(setSearchContext).toHaveBeenCalledWith({ kind: 'volume', volumeId: 'vot-two', label: 'Volume Two' });
+  });
+
+  it('[9] builds a book-context from the bible-idx chapter list', () => {
+    const tabField = makeTabField();
+    const { result } = setup({ tabField, screen: 'bible-idx', bookId: 'genesis' });
+    act(() => { result.current.goSearch(); });
+    const [, setSearchContext] = tabField('searchContext');
+    expect(setSearchContext).toHaveBeenCalledWith({ kind: 'book', bookId: 'genesis', label: 'Genesis' });
+  });
+
+  it('[9] builds a book-context from matthew-idx', () => {
+    const tabField = makeTabField();
+    const { result } = setup({ tabField, screen: 'matthew-idx' });
+    act(() => { result.current.goSearch(); });
+    const [, setSearchContext] = tabField('searchContext');
+    expect(setSearchContext).toHaveBeenCalledWith({ kind: 'book', bookId: 'matthew', label: 'Matthew' });
+  });
+
+  it('[9] builds a volume-context from a volume INDEX screen (COL_BY_INDEX_SC)', () => {
+    const tabField = makeTabField();
+    const { result } = setup({ tabField, screen: 'vol-two-index' });
     act(() => { result.current.goSearch(); });
     const [, setSearchContext] = tabField('searchContext');
     expect(setSearchContext).toHaveBeenCalledWith({ kind: 'volume', volumeId: 'vot-two', label: 'Volume Two' });

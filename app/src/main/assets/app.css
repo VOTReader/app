@@ -2125,6 +2125,16 @@
     .srch-corpus-btn { flex:1; background:transparent; border:1px solid var(--gold-border); border-radius:20px; padding:0.4rem 0.6rem; font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; }
     .srch-corpus-btn.active { background:var(--gold-faint); color:var(--gold-bright); border-color:var(--gold-dim); }
     .srch-corpus-btn:active { background:rgba(200,164,86,0.15); }
+    /* [8] result-filter chips + verse sort toggle — same pill language as
+       the corpus row, but content-sized (chips carry per-category counts)
+       and horizontally scrollable when they overflow a phone width. */
+    .srch-filter-row { display:flex; gap:0.35rem; padding:0.55rem 1.2rem 0.15rem; overflow-x:auto; scrollbar-width:none; align-items:center; }
+    .srch-filter-row::-webkit-scrollbar { display:none; }
+    .srch-filter-chip { flex:0 0 auto; background:transparent; border:1px solid var(--gold-border); border-radius:20px; padding:0.34rem 0.7rem; font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; white-space:nowrap; }
+    .srch-filter-chip.active { background:var(--gold-faint); color:var(--gold-bright); border-color:var(--gold-dim); }
+    .srch-filter-chip:active { background:rgba(200,164,86,0.15); }
+    .srch-sort-btn { flex:0 0 auto; margin-left:auto; background:none; border:none; border-bottom:1px dashed var(--gold-border); padding:0.3rem 0.1rem; font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); cursor:pointer; white-space:nowrap; }
+    .srch-sort-btn:active { color:var(--gold); }
 
     /* ── SEARCH v2 (Orama) ── */
 

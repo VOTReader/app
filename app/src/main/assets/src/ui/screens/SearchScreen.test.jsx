@@ -10,6 +10,11 @@ import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import {
   expandSnippetTerms, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT,
 } from './SearchScreen.jsx';
+import {
+  srchFilterCategories as realSrchFilterCategories,
+  srchApplyFilter as realSrchApplyFilter,
+  srchSortCanonical as realSrchSortCanonical,
+} from '../../utils/search.js';
 
 const MAP = {
   shepherd: ['shepherd', 'pastor'],
@@ -159,6 +164,11 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     /** @type {any} */ (globalThis).SRCH_GROUP_META = {};
     /** @type {any} */ (globalThis).SRCH_KIND_LABEL = {};
     /** @type {any} */ (globalThis).srchGroupKey = () => 'g';
+    // [8] chips/sort helpers — real fns are pure; use the real ones so the
+    // screen's memos behave (empty chip list for the single 'g' group).
+    /** @type {any} */ (globalThis).srchFilterCategories = realSrchFilterCategories;
+    /** @type {any} */ (globalThis).srchApplyFilter = realSrchApplyFilter;
+    /** @type {any} */ (globalThis).srchSortCanonical = realSrchSortCanonical;
     /** @type {any} */ (window).VotSearchMini = {
       getState: () => ({ ready: true }),
       init: () => Promise.resolve(),

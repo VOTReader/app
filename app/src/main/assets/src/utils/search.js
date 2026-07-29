@@ -1,9 +1,12 @@
 /* ===================================================================
-   Search helpers — currently just srchGroupKey (used by SearchScreen to bucket results by volume/collection)
+   Search helpers — srchGroupKey (result bucketing) + the FABLE5 [8]
+   result-filter chips / canonical-sort pure halves
    ===================================================================
    Global-scope module. Concatenates with index.html via <script src>.
    Bundled helpers (P5e):
    - srchGroupKey
+   - SRCH_FILTER_CATS / srchFilterCategories / srchApplyFilter
+   - srchSortCanonical
    =================================================================== */
 
 
@@ -28,5 +31,79 @@ export function srchGroupKey(doc) {
   if (k === 'holy-day' || k === 'holy-day-title') return 'holydays';
   if (k === 'bible-study') return 'bible-studies';
   return 'other';
+}
+
+/* ── FABLE5 [8] — result filter chips + canonical verse sort ─────────
+   These are CLIENT-SIDE views over the already-fetched result set (the
+   engine's corpus/scope options narrow what is SEARCHED; these chips
+   narrow what is RENDERED — instant, no re-query). */
+
+/** Category → group-key map for the filter chips. Order = chip order.
+ *  ('hidden-manna' is deliberately absent — never indexed, per policy.) */
+export const SRCH_FILTER_CATS = [
+  { id: 'scriptures', label: 'Scriptures', keys: ['bible', 'matthew'] },
+  { id: 'volumes',    label: 'Volumes',    keys: ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'timothy', 'flock', 'rebuke', 'letters', 'holydays'] },
+  { id: 'wtlb',       label: 'WTLB',       keys: ['wtlb1', 'wtlb2', 'blessed'] },
+  { id: 'studies',    label: 'Studies',    keys: ['bible-studies', 'matthew-study'] },
+];
+
+/**
+ * Which filter categories are PRESENT in a grouped result set, with match
+ * counts. Returns [] when 0 or 1 category is present — chips that can't
+ * change anything are noise, so the caller renders nothing.
+ *
+ * @param {Array<{key: string, items: any[]}>} groups
+ * @returns {Array<{id: string, label: string, count: number}>}
+ */
+export function srchFilterCategories(groups) {
+  const out = [];
+  for (const cat of SRCH_FILTER_CATS) {
+    let count = 0;
+    for (const g of groups) if (cat.keys.indexOf(g.key) !== -1) count += g.items.length;
+    if (count > 0) out.push({ id: cat.id, label: cat.label, count });
+  }
+  return out.length > 1 ? out : [];
+}
+
+/**
+ * Filter grouped results to one category ('all' passes everything through,
+ * including 'other'-keyed groups no category claims).
+ *
+ * @param {Array<{key: string, items: any[]}>} groups
+ * @param {string} catId - 'all' or a SRCH_FILTER_CATS id
+ * @returns {Array<{key: string, items: any[]}>}
+ */
+export function srchApplyFilter(groups, catId) {
+  if (!catId || catId === 'all') return groups;
+  const cat = SRCH_FILTER_CATS.find((c) => c.id === catId);
+  if (!cat) return groups;
+  return groups.filter((g) => cat.keys.indexOf(g.key) !== -1);
+}
+
+/**
+ * Sort verse-family result items into canonical book order (book, chapter,
+ * verse) instead of relevance. Non-verse docs (or verses whose book isn't
+ * in the index map) sink to the end, keeping their relative order — the
+ * sort is stable.
+ *
+ * @param {Array<{doc?: {kind?: string, bookId?: string, chapterNum?: number, verseNum?: number}}>} items
+ * @param {Map<string, number>} bookIndex - bookId → canonical position
+ * @returns {Array<{doc?: {kind?: string, bookId?: string, chapterNum?: number, verseNum?: number}}>} a NEW array (input untouched)
+ */
+export function srchSortCanonical(items, bookIndex) {
+  const rank = (e) => {
+    const d = e && e.doc;
+    if (!d || !d.bookId || !bookIndex.has(d.bookId)) return null;
+    return [bookIndex.get(d.bookId), d.chapterNum || 0, d.verseNum || 0];
+  };
+  return items
+    .map((e, i) => ({ e, i, r: rank(e) }))
+    .sort((a, b) => {
+      if (a.r === null && b.r === null) return a.i - b.i;
+      if (a.r === null) return 1;
+      if (b.r === null) return -1;
+      return (a.r[0] - b.r[0]) || (a.r[1] - b.r[1]) || (a.r[2] - b.r[2]) || (a.i - b.i);
+    })
+    .map((x) => x.e);
 }
 

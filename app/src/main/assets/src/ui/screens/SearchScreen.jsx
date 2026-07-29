@@ -190,6 +190,27 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: effect should fire only when parsed-result changes. Adding onCommand would re-fire on every parent re-render that rebuilds the callback, calling the command handler multiple times for the same parsed.command. Closure always picks up the latest onCommand at the point state.parsed actually changes.
   }, [state.parsed]);
 
+  // [8] Result filter chips + canonical sort — client-side views over the
+  // fetched set (the corpus pills above narrow what is SEARCHED; these
+  // narrow/sort what is RENDERED — instant, no re-query). Both reset on a
+  // new query so a stale filter can't hide fresh results.
+  const [groupFilter, setGroupFilter] = React.useState('all');
+  const [sortMode, setSortMode] = React.useState('relevance'); // 'relevance' | 'canonical'
+  React.useEffect(() => { setGroupFilter('all'); setSortMode('relevance'); }, [query]);
+  // Canonical book positions (Object.keys(BOOKS) is Genesis→Revelation
+  // authoring order). Built once; empty map when the corpus isn't loaded —
+  // srchSortCanonical then leaves order unchanged.
+  const bookIndex = React.useMemo(() => {
+    const m = new Map();
+    try {
+      if (typeof BOOKS !== 'undefined' && BOOKS) {
+        Object.keys(BOOKS).forEach((id, i) => m.set(id, i));
+        m.set('matthew', m.has('matthew') ? m.get('matthew') : m.size);
+      }
+    } catch (_e) { /* corpus not loaded — relevance order stands */ }
+    return m;
+  }, []);
+
   // Group results by source
   const grouped = React.useMemo(() => {
     if (!state.results.length) return [];
@@ -209,6 +230,24 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     });
     return keys.map((k) => ({ key: k, items: groups[k] }));
   }, [state.results]);
+
+  // Chip categories present in THIS result set (empty = don't render chips),
+  // the filtered view, and the canonical re-sort of scripture groups.
+  const filterCats = React.useMemo(() => srchFilterCategories(grouped), [grouped]);
+  const visibleGroups = React.useMemo(() => {
+    const filtered = srchApplyFilter(grouped, groupFilter);
+    if (sortMode !== 'canonical') return filtered;
+    return filtered.map((g) => (
+      (g.key === 'bible' || g.key === 'matthew')
+        ? { key: g.key, items: srchSortCanonical(g.items, bookIndex) }
+        : g
+    ));
+  }, [grouped, groupFilter, sortMode, bookIndex]);
+  // Sort toggle only matters when a scripture group with ≥2 verses is visible.
+  const sortToggleVisible = React.useMemo(
+    () => visibleGroups.some((g) => (g.key === 'bible' || g.key === 'matthew') && g.items.length > 1),
+    [visibleGroups]
+  );
 
   // Build "direct" fake entries from parsed ref/passage/book (shown at top before results).
   // Engine-gated: Scriptures corpus shows only bible/book/named-passage refs;
@@ -465,6 +504,33 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
+        {/* [8] filter chips (rendered only when >1 category is present) +
+            the relevance/book-order sort toggle for verse results. */}
+        {filterCats.length > 0 && (
+          <div className="srch-filter-row" role="tablist" aria-label="Filter results">
+            <button
+              className={"srch-filter-chip" + (groupFilter === 'all' ? ' active' : '')}
+              role="tab" aria-selected={groupFilter === 'all'}
+              onClick={() => setGroupFilter('all')}
+            >All</button>
+            {filterCats.map((c) => (
+              <button
+                key={c.id}
+                className={"srch-filter-chip" + (groupFilter === c.id ? ' active' : '')}
+                role="tab" aria-selected={groupFilter === c.id}
+                onClick={() => setGroupFilter(groupFilter === c.id ? 'all' : c.id)}
+              >{c.label} · {c.count}</button>
+            ))}
+            {sortToggleVisible && (
+              <button
+                className="srch-sort-btn"
+                aria-label={sortMode === 'relevance' ? 'Sort verses in book order' : 'Sort verses by relevance'}
+                onClick={() => setSortMode(sortMode === 'relevance' ? 'canonical' : 'relevance')}
+              >{sortMode === 'relevance' ? 'Book order' : 'Relevance'}</button>
+            )}
+          </div>
+        )}
+
         {directEntries.length > 0 && (
           <div className="srch-groups">
             {directEntries.map((d, i) => (
@@ -473,7 +539,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {topResults.length > 0 && (
+        {/* Best Matches are a cross-corpus view — hidden while a chip filter
+            narrows the set (they could show results the filter excludes). */}
+        {topResults.length > 0 && groupFilter === 'all' && (
           <div className="srch-top-results">
             <div className="srch-section-label">Best Matches</div>
             {topResults.map((entry, i) => (
@@ -482,16 +550,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {grouped.length > 0 && (
+        {visibleGroups.length > 0 && (
           <div className="srch-groups">
-            {grouped.map((g, i) => (
+            {visibleGroups.map((g, i) => (
               <SrchGroup
-                key={g.key + '|' + query}
+                key={g.key + '|' + query + '|' + sortMode}
                 gkey={g.key}
                 items={g.items}
                 terms={state.terms}
                 onSelect={handleSelect}
-                defaultOpen={state.results.length <= 30 || i < 5}
+                defaultOpen={state.results.length <= 30 || i < 5 || groupFilter !== 'all'}
               />
             ))}
           </div>

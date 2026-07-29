@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 460 distinct identifiers.
+// Total: 464 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -199,6 +199,7 @@ declare const Renderer: any;
 declare const ResumeReadingNavBtn: any;
 declare const SCRIPTURE_GENRES: any;
 declare const SCRIPTURE_LAYOUT_OPTIONS: any;
+declare const SRCH_FILTER_CATS: any;
 declare const SRCH_GROUP_META: any;
 declare const SRCH_KIND_LABEL: any;
 declare const SRCH_QUICK_PICKS: any;
@@ -413,7 +414,10 @@ declare const snapRangeToWords: any;
 declare const snapSelectionRange: any;
 declare const splitIntoVerses: any;
 declare const splitWithHighlight: any;
+declare const srchApplyFilter: any;
+declare const srchFilterCategories: any;
 declare const srchGroupKey: any;
+declare const srchSortCanonical: any;
 declare const studyAbbrev: any;
 declare const studyHlKey: any;
 declare const studyShortTitle: any;
