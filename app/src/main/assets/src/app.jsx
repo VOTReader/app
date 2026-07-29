@@ -497,7 +497,7 @@ function App() {
   const goTabs = () => {
     if (!settings.tabsEnabled) return;
     flushScrollToActiveTab(); // capture current scroll before overlay mounts
-    captureActiveTabThumbnail(); // grab visual of current screen for this tab's card
+    captureActiveTabThumbnail({ urgent: true }); // the user is about to look at this card — bypass the calm gate
     setTabsOverviewOpen(true);
   };
   const goNavOrigin = () => {

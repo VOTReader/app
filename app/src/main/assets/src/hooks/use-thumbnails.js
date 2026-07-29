@@ -15,15 +15,26 @@
      - GC effect          (debounced, removes stale keys no longer tied
                            to any open tab)
      - captureActiveTabThumbnail  (React.useCallback, stable on tabsEnabled;
-                                   failed captures retry up to 3× @2.5s)
-     - scroll-stop capture effect (attaches to __scrollEl with polling)
+                                   failed captures retry up to 3× @2.5s;
+                                   takes { urgent } — non-urgent calls defer
+                                   through the interaction CALM GATE below)
+     - the interaction calm gate  (module tracker + listener effect: renders
+                                   wait until no finger is down and nothing
+                                   was touched for CAPTURE_CALM_MS, so a
+                                   capture task never lands where the next
+                                   tap/scroll queues behind it)
+     - scroll-stop capture effect (attaches to __scrollEl with polling;
+                                   fires after 1200 ms of scroll silence)
      - aspect-ratio CSS var effect (sets --card-ar on resize; a settled
                                    resize also RECAPTURES the active tab —
                                    stored thumbs would be the wrong aspect)
-     - capture-after-nav effect   (fires 350 ms after screen/tab change)
+     - capture-after-nav effect   (fires 350 ms after screen/tab change,
+                                   then waits out the calm gate)
      - overview-open heal effect  (opening the overview captures the active
-                                   content tab — safe: clone renders exclude
-                                   the overlay; heals blank/stale cards)
+                                   content tab URGENTLY — safe: clone renders
+                                   exclude the overlay; heals blank/stale
+                                   cards; goTabs in app.jsx is the other
+                                   urgent caller)
 
    DOES NOT OWN:
      - tabContentKey / idbReadAll / idbPut / idbDelete — global helpers
@@ -91,6 +102,66 @@ function updateCardAr() {
   document.documentElement.style.setProperty('--card-ar', Math.round(w) + ' / ' + h);
 }
 
+/* ── Interaction calm gate ──────────────────────────────────────────────
+   A capture is an html2canvas full-DOM clone render (plus a second one for
+   the other theme) — a 150ms main-thread task on a desktop and up to ~1s on
+   a phone. The OLD cadence (300ms after scroll-stop, 350ms after nav) put
+   those renders EXACTLY where the next interaction lands: the finger lifts,
+   the render starts, and the follow-up tap or scroll queues behind it — the
+   owner's "taps and scroll take a second to respond" (worst around the
+   auto-scroll pill, whose every pause is a scroll-stop). The renders are
+   unavoidable; their PLACEMENT is not. Every non-urgent capture now waits
+   until the user has been calm — no finger down, nothing touched for
+   CAPTURE_CALM_MS — and defers itself in CALM_RECHECK_MS steps otherwise.
+   Urgent captures (the Tabs-overview open + its heal, where the user is
+   about to LOOK at the card) bypass the gate — that is today's behavior.
+
+   Tracking is module state fed by document-level capture+passive listeners
+   (installed by the hook, tabsEnabled-gated): touch events are the truth on
+   touch devices; pointer events cover the mouse (pointerType-filtered so a
+   touch never double-drives both flags). pointermove is deliberately NOT
+   stamped — desktop hover motion would starve captures forever; touchmove
+   IS stamped, so a live drag (selection handles, press-drag reorder) stays
+   busy however long it runs. A held-down flag older than DOWN_STALE_MS
+   stops counting as busy: a swallowed touchend (the documented WebView
+   non-bubbling failure) must not disable captures for the session, and
+   capturing under a genuinely parked-motionless-for-10s finger is fine —
+   the screen is static. */
+export const CAPTURE_CALM_MS = 1000;
+export const CALM_RECHECK_MS = 700;
+const DOWN_STALE_MS = 10000;
+let _touchDown = false;
+let _mouseDown = false;
+let _lastInteractTs = -Infinity;
+
+/**
+ * Feed the calm tracker. Exported for the listener wiring below and for
+ * tests (jsdom TouchEvents don't carry real touches lists reliably).
+ * @param {'touch-down'|'touch-up'|'mouse-down'|'mouse-up'|'pulse'} kind
+ * @param {number} now   performance.now()-domain timestamp
+ * @param {number} [remainingTouches]  touches still down after a touch-up
+ */
+export function noteCaptureInteraction(kind, now, remainingTouches) {
+  if (kind === 'touch-down') _touchDown = true;
+  else if (kind === 'touch-up') _touchDown = (remainingTouches || 0) > 0;
+  else if (kind === 'mouse-down') _mouseDown = true;
+  else if (kind === 'mouse-up') _mouseDown = false;
+  _lastInteractTs = now;
+}
+
+/**
+ * True when a thumbnail render can start without landing on an interaction:
+ * no finger/button down (self-healing after DOWN_STALE_MS of event silence)
+ * and nothing touched for CAPTURE_CALM_MS. Vacuously calm before any
+ * interaction, so non-interactive hosts (tests, cold boot) capture freely.
+ * @param {number} now
+ * @returns {boolean}
+ */
+export function captureIsCalm(now) {
+  const down = (_touchDown || _mouseDown) && (now - _lastInteractTs) <= DOWN_STALE_MS;
+  return !down && (now - _lastInteractTs) >= CAPTURE_CALM_MS;
+}
+
 /**
  * Classify which theme a legacy (pre-metadata) thumbnail was captured under
  * by its average luminance: the dark theme's background (#07070e, luma ~8)
@@ -144,7 +215,7 @@ export function classifyThumbTheme(dataUrl) {
  * @returns {{
  *   tabThumbnails: Record<string, { dark?: string, light?: string, unknown?: string }>,
  *   setTabThumbnails: (val: any) => void,
- *   captureActiveTabThumbnail: () => void
+ *   captureActiveTabThumbnail: (opts?: { urgent?: boolean }) => void
  * }}
  */
 export function useThumbnails({
@@ -269,24 +340,41 @@ export function useThumbnails({
   const captureRetryCountRef = React.useRef(0);
   const captureRetryTimerRef = React.useRef(/** @type {any} */ (null));
 
+  // Pending calm-gate deferral (see the gate at the top of the callback).
+  const calmDeferTimerRef = React.useRef(/** @type {any} */ (null));
+
   // ── Capture callback ───────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
   // Single async-await path: clone render (takeThemedScreenshot) for content
   // tabs, true-pixel shot (takeScreenshot) for Garden — see the primary-
   // capture comment below.
-  const captureActiveTabThumbnail = React.useCallback(async () => {
+  const captureActiveTabThumbnail = React.useCallback(async (opts) => {
     if (!tabsEnabled) return;
     if (captureInFlightRef.current) return;
     // AUTO-SCROLL SUPPRESSION. A capture is an html2canvas clone render plus a
     // ~900ms-deferred second render for the other theme — main-thread work that
     // competes directly with a main-thread scroll. The scroll-stop path already
-    // starves itself while motion is continuous (its 300ms idle never arrives),
-    // but the after-nav capture fires on every auto-advance, which on short
-    // entries would mean two full-page renders per page. Suppress every path at
-    // this one choke point; the scroll-stop capture fires the moment the reader
-    // pauses, and the overview-open heal covers anything still stale.
+    // starves itself while motion is continuous (its idle window never
+    // arrives), but the after-nav capture fires on every auto-advance, which
+    // on short entries would mean two full-page renders per page. Suppress
+    // every path at this one choke point; the scroll-stop capture fires once
+    // the reader rests, and the overview-open heal covers anything still stale.
     if (typeof document !== 'undefined' && document.body
       && document.body.classList.contains('autoscroll-running')) return;
+    // CALM GATE (see the module header). A render that starts within a beat
+    // of a touch is a render the NEXT tap or scroll queues behind — the felt
+    // "input takes a second" defect. Non-urgent captures wait for calm and
+    // re-check on a short timer (each check is trivial; the one capture runs
+    // when the user actually rests). Urgent captures — the overview open/heal,
+    // where the user is about to look at the card — run regardless.
+    if (calmDeferTimerRef.current) { clearTimeout(calmDeferTimerRef.current); calmDeferTimerRef.current = null; }
+    if (!(opts && opts.urgent) && !captureIsCalm(performance.now())) {
+      calmDeferTimerRef.current = setTimeout(() => {
+        calmDeferTimerRef.current = null;
+        captureActiveTabThumbnail();
+      }, CALM_RECHECK_MS);
+      return;
+    }
     const tab = tabsRef.current[activeTabIdxRef.current];
     if (!tab) return;
     // Garden pages are photographs — theme-neutral content where a themed
@@ -349,18 +437,24 @@ export function useThumbnails({
     // visible page is never touched. (The old `capturing-thumb` body class
     // hid the floating chrome ON SCREEN for the full render — the owner's
     // "dice/dot/arrows blink out for a split second" glitch. Never re-add it.)
-    const scheduleOtherTheme = () => {
+    const scheduleOtherTheme = (delayMs) => {
       if (isGarden) return;
       variantTimerRef.current = setTimeout(async () => {
         variantTimerRef.current = null;
         if (captureSeqRef.current !== seq) return;        // superseded
+        // Same calm gate as the primary: this render is just as heavy, and
+        // 900ms after a capture is prime follow-up-tap territory. Re-defer
+        // (seq-guarded) rather than land on an interaction. Urgency does not
+        // carry over — the overview only ever shows the CURRENT theme's
+        // variant right away; the other-theme render can always wait.
+        if (!captureIsCalm(performance.now())) { scheduleOtherTheme(CALM_RECHECK_MS); return; }
         try {
           const dataUrl = await PlatformBridge.takeThemedScreenshot(otherTheme, 1440, 90);
           if (captureSeqRef.current === seq) mergeVariant(otherTheme, dataUrl);
         } catch (_e) {
           // best-effort — the overview falls back to the flip filter
         }
-      }, 900);
+      }, delayMs == null ? 900 : delayMs);
     };
 
     // Primary capture — CONTENT tabs render from a DOM clone in the CURRENT
@@ -413,7 +507,43 @@ export function useThumbnails({
   React.useEffect(() => () => {
     if (variantTimerRef.current) clearTimeout(variantTimerRef.current);
     if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
+    if (calmDeferTimerRef.current) clearTimeout(calmDeferTimerRef.current);
   }, []);
+
+  // ── Calm-tracker listeners ─────────────────────────────────────────────
+  // Feed the module-level interaction tracker the calm gate reads. Document
+  // CAPTURE phase (nothing can starve it — the tab-drag lesson) + passive
+  // (never blocks scrolling). tabsEnabled-gated like the scroll-stop effect:
+  // with tabs off there are no captures to place, so no listeners either.
+  React.useEffect(() => {
+    if (!tabsEnabled) return undefined;
+    const now = () => performance.now();
+    const onTouchStart = () => noteCaptureInteraction('touch-down', now());
+    const onTouchEnd = (e) => noteCaptureInteraction('touch-up', now(), e.touches ? e.touches.length : 0);
+    const onTouchMove = () => noteCaptureInteraction('pulse', now());
+    const onPointerDown = (e) => { if (e.pointerType === 'mouse') noteCaptureInteraction('mouse-down', now()); };
+    const onPointerUp = (e) => { if (e.pointerType === 'mouse') noteCaptureInteraction('mouse-up', now()); };
+    const onWheel = () => noteCaptureInteraction('pulse', now());
+    const opts = { capture: true, passive: true };
+    document.addEventListener('touchstart', onTouchStart, opts);
+    document.addEventListener('touchend', onTouchEnd, opts);
+    document.addEventListener('touchcancel', onTouchEnd, opts);
+    document.addEventListener('touchmove', onTouchMove, opts);
+    document.addEventListener('pointerdown', onPointerDown, opts);
+    document.addEventListener('pointerup', onPointerUp, opts);
+    document.addEventListener('pointercancel', onPointerUp, opts);
+    document.addEventListener('wheel', onWheel, opts);
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart, true);
+      document.removeEventListener('touchend', onTouchEnd, true);
+      document.removeEventListener('touchcancel', onTouchEnd, true);
+      document.removeEventListener('touchmove', onTouchMove, true);
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('pointerup', onPointerUp, true);
+      document.removeEventListener('pointercancel', onPointerUp, true);
+      document.removeEventListener('wheel', onWheel, true);
+    };
+  }, [tabsEnabled]);
 
   // ── Overview-open heal ─────────────────────────────────────────────────
   // The moment the overview opens is the one guaranteed chance to refresh
@@ -426,7 +556,9 @@ export function useThumbnails({
   // tab was live) and a stale-geometry thumb after a window resize.
   React.useEffect(() => {
     if (!tabsEnabled || !tabsOverviewOpen) return undefined;
-    const timer = setTimeout(captureActiveTabThumbnail, 60);
+    // URGENT: the user is looking at this card right now — the calm gate
+    // must not defer the heal behind the tap that opened the overview.
+    const timer = setTimeout(() => captureActiveTabThumbnail({ urgent: true }), 60);
     return () => clearTimeout(timer);
   }, [tabsOverviewOpen, tabsEnabled, captureActiveTabThumbnail]);
 
@@ -442,7 +574,12 @@ export function useThumbnails({
     let currentEl = null;
     const onScroll = () => {
       clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(captureActiveTabThumbnail, 300);
+      // 1200ms of scroll silence, not 300: the old value fired the render in
+      // the gap BETWEEN reading flicks (and 300ms after every auto-scroll
+      // pause) — exactly where the next touch lands. Waiting for a real lull
+      // costs nothing (the calm gate would defer the early attempts anyway)
+      // and the overview-open heal covers a tab left mid-scroll.
+      scrollTimer = setTimeout(captureActiveTabThumbnail, 1200);
     };
     const attach = () => {
       if (__scrollEl !== currentEl) {
