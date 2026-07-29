@@ -559,6 +559,30 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         wv.overScrollMode = View.OVER_SCROLL_NEVER
         wv.setBackgroundColor(Color.BLACK)
 
+        // #FPS (owner-reported "feels choppy / low fps", 2026-07-28): on ARR
+        // (adaptive-refresh) devices — Pixel 9 Pro, Android 15+ — the system
+        // renders each view at its VOTED frame rate, and a WebView lands in the
+        // "normal" category (60 Hz on this panel) even mid-fling, while the
+        // launcher and native apps scroll at 120. Measured on-device: rAF locked
+        // at ~17 ms with zero long tasks during active scrolling — the content
+        // was fine; the SURFACE was half-rate. Vote the WebView at the panel's
+        // peak so flings composite at full refresh. Battery stays adaptive: the
+        // vote only applies while the view is actually producing frames; a
+        // static page still lets the panel idle down. API-gated: the View
+        // frame-rate vote is Android 15+ (API 35); older devices keep today's
+        // behavior. Never throws — a missing display just skips the vote.
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            try {
+                val peak = display?.supportedModes?.maxOfOrNull { it.refreshRate } ?: 0f
+                if (peak > 60f) {
+                    wv.requestedFrameRate = peak
+                    Timber.i("WebView frame-rate vote: %.0f Hz (panel peak)", peak)
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "frame-rate vote failed — staying at default")
+            }
+        }
+
         // #5 (WebView hardening): the app is entirely local and persists ALL
         // state in DOM storage — no cookies are read or written anywhere, and
         // external links open in a SEPARATE app via ACTION_VIEW (with its own

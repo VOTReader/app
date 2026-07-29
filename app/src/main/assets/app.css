@@ -513,7 +513,11 @@
            Accounts for camera cutout, status bar, notch — whatever this device
            has. 0px fallback = no cutout device. No hardcoded numbers. */
         padding-top: calc(var(--inset-top, 0px) + 0.7rem);
-        background: rgba(0,0,0,0.95); backdrop-filter: blur(16px);
+        /* No backdrop-filter (2026-07-28): blur(16px) behind 95%-opaque black
+           was visually nil but forced a backdrop readback+blur every composited
+           frame — at the 120 Hz ARR vote that's half the raster budget on an
+           always-visible surface. Alpha bumped to compensate. */
+        background: rgba(0,0,0,0.97);
         border-bottom: 1px solid var(--gold-border);
       }
       .nav-home {
@@ -600,7 +604,10 @@
         pointer-events: auto;
         width: 2.75rem; height: 2.75rem; padding: 0;
         display: inline-flex; align-items: center; justify-content: center;
-        background: rgba(0,0,0,0.72); backdrop-filter: blur(12px);
+        /* No backdrop-filter (2026-07-28): these arrows float OVER the live
+           scrolling text — the blur re-rasterized on every scrolled frame.
+           Slightly higher alpha keeps the glyph legible over any verse. */
+        background: rgba(0,0,0,0.85);
         border: 1px solid var(--gold-border); border-radius: 50%;
         color: var(--gold); cursor: pointer;
         font-family: 'Cinzel', serif; font-weight: 500;
@@ -1058,7 +1065,9 @@
         width: max-content;
         max-width: min(320px, calc(100vw - 5.5rem));
         padding: 10px 6px 10px 14px;
-        background: rgba(20,17,12,0.96); backdrop-filter: blur(12px);
+        /* No backdrop-filter (2026-07-28): floats over scrolling text; the
+           96%-opaque bg needs no blur. */
+        background: rgba(20,17,12,0.96);
         border: 1px solid var(--gold-border); border-radius: 14px;
         box-shadow: 0 6px 24px rgba(0,0,0,0.5);
         animation: annHintIn 0.5s ease;
@@ -1098,14 +1107,14 @@
         letter-spacing: 0.18em; text-transform: uppercase;
         color: var(--gold-dim);
         padding: 2px 8px; border-radius: 8px;
-        background: rgba(0,0,0,0.72); backdrop-filter: blur(8px);
+        background: rgba(0,0,0,0.85); /* was blur(8px) over scrolling text — see .top-nav note */
         margin-right: 6px;
       }
       body.light .mode-toggle-label { background: rgba(247,242,232,0.8); }
       .mode-toggle {
         display: flex; align-items: center; gap: 0; border-radius: 40px;
         border: 1px solid var(--gold-border);
-        background: rgba(0,0,0,0.95); backdrop-filter: blur(16px);
+        background: rgba(0,0,0,0.97); /* was blur(16px) — the auto-scroll pill floats over LIVE scrolling text; see .top-nav note */
         overflow: hidden; box-shadow: 0 4px 32px rgba(0,0,0,0.6);
       }
       .mode-btn {
@@ -2100,6 +2109,10 @@
     /* ── SEARCH ── */
     .search-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:'EB Garamond',serif; font-size:1rem; padding:0.45rem 0.75rem; outline:none; transition:border-color 0.2s; }
     .search-input:focus { border-color:var(--gold-dim); }
+    /* Suppress the UA's own search-cancel × (rendered blue on Android
+       WebView, clashing with the gold accent language) — the row already
+       provides its own gold ✕ (.srch-clear-btn). */
+    .search-input::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; display:none; }
     .search-input::placeholder { color:var(--cream-muted); opacity:0.6; }
     body.light .search-input { background:rgba(0,0,0,0.04); }
     /* .search-screen — no styles needed */
@@ -2528,11 +2541,10 @@
     .tab-card-close {
       position:absolute; top:0.35rem; right:0.35rem;
       width:1.9rem; height:1.9rem; border-radius:50%;
-      background:rgba(0,0,0,0.55); border:0; cursor:pointer;
+      background:rgba(0,0,0,0.7); border:0; cursor:pointer;
       font-size:1.2rem; line-height:1; color:var(--gold);
       display:flex; align-items:center; justify-content:center;
       transition:all 0.18s ease; z-index:3;
-      backdrop-filter:blur(4px);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
     }
@@ -2628,11 +2640,10 @@
     .tab-card-menu {
       position:absolute; top:0.35rem; left:0.35rem;
       width:1.9rem; height:1.9rem; border-radius:50%;
-      background:rgba(0,0,0,0.55); border:0; cursor:pointer;
+      background:rgba(0,0,0,0.7); border:0; cursor:pointer;
       font-size:1.15rem; line-height:1; color:var(--gold);
       display:flex; align-items:center; justify-content:center;
       transition:all 0.18s ease; z-index:3;
-      backdrop-filter:blur(4px);
       -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
     }
