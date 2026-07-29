@@ -571,16 +571,28 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // static page still lets the panel idle down. API-gated: the View
         // frame-rate vote is Android 15+ (API 35); older devices keep today's
         // behavior. Never throws — a missing display just skips the vote.
-        if (android.os.Build.VERSION.SDK_INT >= 35) {
-            try {
-                val peak = display?.supportedModes?.maxOfOrNull { it.refreshRate } ?: 0f
-                if (peak > 60f) {
+        try {
+            val peak = display?.supportedModes?.maxOfOrNull { it.refreshRate } ?: 0f
+            if (peak > 60f) {
+                // View-level vote (API 35+). MEASURED INSUFFICIENT ALONE on the
+                // Pixel 9 Pro: framestats still showed a pure 16.7 ms vsync grid —
+                // Chromium's own 60 Hz content vote outranks the View hint.
+                if (android.os.Build.VERSION.SDK_INT >= 35) {
                     wv.requestedFrameRate = peak
-                    Timber.i("WebView frame-rate vote: %.0f Hz (panel peak)", peak)
                 }
-            } catch (e: Exception) {
-                Timber.w(e, "frame-rate vote failed — staying at default")
+                // Window-level vote: preferredRefreshRate outranks the ARR
+                // "normal" category, putting Choreographer on the fast grid so
+                // WebView fling frames can present at panel peak. This is a
+                // RENDER-RATE vote, not a redraw source — a static page still
+                // produces no frames and the LTPO panel still idles down, so the
+                // battery cost while reading stays ~nil.
+                val lp = window.attributes
+                lp.preferredRefreshRate = peak
+                window.attributes = lp
+                Timber.i("Frame-rate votes: view+window %.0f Hz (panel peak)", peak)
             }
+        } catch (e: Exception) {
+            Timber.w(e, "frame-rate vote failed — staying at default")
         }
 
         // #5 (WebView hardening): the app is entirely local and persists ALL
