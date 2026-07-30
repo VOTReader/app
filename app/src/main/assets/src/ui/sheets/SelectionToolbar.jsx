@@ -305,9 +305,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   // EDGE AUTO-SCROLL while a native selection handle is being dragged. The
   // handle drag fires `selectionchange` continuously, so no touch tracking is
   // needed: whenever the selection's moving edge sits inside the edge band we
-  // step the container toward it on an interval, and stop the moment the edge
-  // leaves the band, the selection collapses, or the toolbar hides. Step size
-  // is small (one line-ish) so the text glides rather than jumping.
+  // step the container toward it on an interval. The band is RE-PROBED ON
+  // EVERY TICK, not only on selectionchange — after the handle is released
+  // inside the band no further events arrive (Android swallows the
+  // post-selection pointerup/touchend, and scrolling alone doesn't change the
+  // selection), so an event-only stop would run away to the container end.
+  // Per-tick probing stops the moment the edge leaves the band (a released
+  // edge glides at most BAND px before scrolling out of it), the selection
+  // collapses, or the toolbar hides, and re-reads direction each step so a
+  // focus jump straight from one band to the other can't keep a stale
+  // direction. Step size is small (one line-ish) so the text glides.
   React.useEffect(() => {
     if (!visible) return undefined;
     const BAND = 90;      // px from the scroller's edge that arms auto-scroll
@@ -316,9 +323,11 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     let timer = null;
     const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
 
-    const evaluate = () => {
+    // Where does the selection's MOVING edge sit? { dir, scroller } while the
+    // edge is inside a band, null when auto-scroll should not run.
+    const probe = () => {
       const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { stop(); return; }
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
       let scroller = null;
       let focusRect = null;
       try {
@@ -327,13 +336,13 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         // The MOVING edge is the focus node — collapse a clone onto it so the
         // band test tracks the handle the user is actually dragging, not the
         // whole (possibly viewport-spanning) selection.
-        const probe = document.createRange();
-        probe.setStart(sel.focusNode, sel.focusOffset);
-        probe.setEnd(sel.focusNode, sel.focusOffset);
-        const rects = probe.getClientRects();
+        const pr = document.createRange();
+        pr.setStart(sel.focusNode, sel.focusOffset);
+        pr.setEnd(sel.focusNode, sel.focusOffset);
+        const rects = pr.getClientRects();
         focusRect = (rects && rects.length) ? rects[0] : range.getBoundingClientRect();
-      } catch (_e) { stop(); return; }
-      if (!scroller || !focusRect) { stop(); return; }
+      } catch (_e) { return null; }
+      if (!scroller || !focusRect) return null;
       const box = scroller.getBoundingClientRect();
       const dir = computeEdgeAutoScroll({
         focusTop: focusRect.top,
@@ -342,15 +351,20 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         boxBottom: box.bottom,
         band: BAND,
       });
-      if (dir === 0) { stop(); return; }
-      if (timer) return;                      // already stepping in this direction
-      timer = setInterval(() => {
-        const s = window.getSelection();
-        if (!s || s.isCollapsed) { stop(); return; }
-        const before = scroller.scrollTop;
-        scroller.scrollTop += dir * STEP;     // assignment clamps at both ends
-        if (scroller.scrollTop === before) stop();  // hit an end — nothing more to give
-      }, TICK);
+      return dir === 0 ? null : { dir, scroller };
+    };
+
+    const tick = () => {
+      const hit = probe();
+      if (!hit) { stop(); return; }
+      const before = hit.scroller.scrollTop;
+      hit.scroller.scrollTop += hit.dir * STEP;   // assignment clamps at both ends
+      if (hit.scroller.scrollTop === before) stop();  // hit an end — nothing more to give
+    };
+
+    const evaluate = () => {
+      if (!probe()) { stop(); return; }
+      if (!timer) timer = setInterval(tick, TICK);
     };
 
     document.addEventListener('selectionchange', evaluate);

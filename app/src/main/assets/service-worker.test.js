@@ -53,15 +53,17 @@ function bootSW({ fail = [], fetchImpl = null } = {}) {
   // the FakeCaches' own fetch (for install cache.add) stays the install one.
   const fetchFn = fetchImpl || installFetch;
   const caches = new FakeCaches(installFetch);
+  const claimed = { count: 0 };
   const self = {
     addEventListener: (t, fn) => { handlers[t] = fn; },
     location: { origin: 'https://app.test' },
     skipWaiting: () => {},
+    clients: { claim: async () => { claimed.count += 1; } },
   };
   // eslint-disable-next-line no-new-func
   const run = new Function('self', 'caches', 'fetch', 'console', SW_SRC);
   run(self, caches, fetchFn, { log() {}, warn() {}, error() {} });
-  return { handlers, caches };
+  return { handlers, caches, claimed };
 }
 
 // Drive the fetch handler: returns the promise passed to respondWith, or
@@ -194,5 +196,10 @@ describe('service-worker fetch + activate runtime (TEST-2)', () => {
     expect(after).toContain(curCorpus);
     expect(after).not.toContain('vot-core-OLD');   // stale core evicted (CACHE_VERSION bust)
     expect(after).not.toContain('vot-corpus-OLD'); // stale corpus evicted (CORPUS_VERSION bust)
+    // clients.claim() must run during activation: skipWaiting alone never
+    // fires controllerchange in open tabs, so without claim() an existing tab
+    // keeps the old controller while its old core cache is deleted above —
+    // sw-register's reload never happens and the tab 503s offline.
+    expect(sw.claimed.count).toBe(1);
   });
 });

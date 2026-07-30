@@ -721,7 +721,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     // toast + reload. `parsed` is the v2 JSON payload OR the v3 manifest (same
     // envelope shape); applyFn(storesMap, flagMap) → { importFailures,
     // writeFailures, skippedStores }. ONE source of truth for both formats.
-    const _confirmDegradeApplyReload = async (parsed, applyFn) => {
+    const _confirmDegradeApplyReload = async (parsed, applyFn, getIntegrity) => {
       const exportVersion = parsed.exportVersion || 1;
       const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
       // Forward-compat: warn but proceed with the keys this client understands.
@@ -779,13 +779,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         });
       });
       if (!confirmed) return;                       // Cancel / backdrop / Back / Escape
-      await _applyConfirmedImport(parsed, applyFn);
+      await _applyConfirmedImport(parsed, applyFn, getIntegrity);
     };
 
     // The post-confirm tail of an import: progress toast → degraded-store
     // guard → apply → result toast → reload. Runs ONLY from the confirm
-    // sheet's "Import & Overwrite" button.
-    const _applyConfirmedImport = async (parsed, applyFn) => {
+    // sheet's "Import & Overwrite" button. `getIntegrity` (optional) is read
+    // AFTER applyFn resolves — the Android v3 trailing CRC is only known once
+    // every frame is consumed — and anything other than ok/absent joins the
+    // completion problems.
+    const _applyConfirmedImport = async (parsed, applyFn, getIntegrity) => {
       _showToast('Importing… please wait.', 0);
 
       const storesMap = _exportableStores();
@@ -827,23 +830,33 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       if (countMismatches && countMismatches.length > 0) {
         problems.push(`some records didn't restore (${countMismatches.join(', ')})`);
       }
+      // BAK-INTEGRITY: every verify outcome other than ok/absent ('mismatch',
+      // 'malformed', 'trailing') is a corruption warning — never a block (the
+      // data already imported); warn + record durably.
+      const integ = getIntegrity ? getIntegrity() : null;
+      if (integ && integ !== 'ok' && integ !== 'absent') {
+        console.warn('[import] v3 backup integrity check failed (' + integ + ')');
+        try { if (window.DiagnosticLog) window.DiagnosticLog.warn('import', 'v3 backup integrity ' + integ + ' (android)'); } catch (_e) { /* best-effort */ }
+        problems.push('the file failed its integrity check — some data may be corrupted');
+      }
       if (problems.length) {
         // Wave-0: dropped "(check console)." dev-speak — details are in console.warn.
         _showToast(`Import completed — ${problems.join('; ')}. Reloading…`, 0);
       } else {
         _showToast('Import complete. Reloading…', 0);
       }
-      // Short delay lets the toast render before reload (durability already guaranteed).
-      setTimeout(() => window.location.reload(), 600);
+      // A clean import reloads fast; problems get reading time first — a 600ms
+      // reload used to wipe the warning toast before anyone could read it.
+      setTimeout(() => window.location.reload(), problems.length ? 5000 : 600);
     };
 
     // BAK-INTEGRITY: a v3 backup carries a trailing CRC-32 of its manifest (all the
     // structured store data). A mismatch means it may be corrupted — but we NEVER
     // block the restore (the data still imports); we warn the user + record durably.
-    const _warnBackupIntegrity = (platform) => {
-      console.warn('[import] v3 backup integrity check failed (CRC mismatch)');
-      try { if (window.DiagnosticLog) window.DiagnosticLog.warn('import', 'v3 backup CRC mismatch (' + platform + ')'); } catch (_e) { /* best-effort */ }
-      _showToast('Warning: this backup failed its integrity check — some data may be corrupted, though it was imported.', 5000);
+    const _warnBackupIntegrity = (platform, integrity) => {
+      console.warn('[import] v3 backup integrity check failed (' + integrity + ')');
+      try { if (window.DiagnosticLog) window.DiagnosticLog.warn('import', 'v3 backup integrity ' + integrity + ' (' + platform + ')'); } catch (_e) { /* best-effort */ }
+      _showToast('Warning: this backup failed its integrity check — some data may be corrupted. It can still be imported.', 5000);
     };
 
     // v3 streaming container import (web): read the file, validate, apply via applyV3.
@@ -856,7 +869,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         return;
       }
       const { manifest, entries } = read;
-      if (read.integrity === 'mismatch') _warnBackupIntegrity('web');
+      // Every readContainer outcome other than ok/absent ('mismatch',
+      // 'trailing') is a corruption warning — same classification as the
+      // Verify-a-Backup report. Shown BEFORE the confirm sheet so the user
+      // can still cancel.
+      if (read.integrity !== 'ok' && read.integrity !== 'absent') _warnBackupIntegrity('web', read.integrity);
       const envelopeErrors = validateImportEnvelope(manifest);
       if (envelopeErrors.length) {
         console.warn('import envelope invalid:', envelopeErrors);
@@ -979,8 +996,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           flagMap: flagMap,
           mediaStore: JournalMediaStore,
           validateStorePayload: validateStorePayload,
-        }));
-        if (integrityResult === 'mismatch') _warnBackupIntegrity('android');
+        }), () => integrityResult);
       } catch (e) {
         console.warn('android v3 import failed', e);
         hideToast(_TOAST_ID);

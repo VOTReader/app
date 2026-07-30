@@ -53,6 +53,9 @@ function stubSelection(range) {
     getRangeAt: () => range,
     removeAllRanges: () => {},
     toString: () => (range ? range.toString() : ''),
+    // The edge auto-scroll probe collapses a clone onto the MOVING edge.
+    focusNode: range ? range.endContainer : null,
+    focusOffset: range ? range.endOffset : 0,
   });
 }
 
@@ -742,6 +745,103 @@ describe('computeEdgeAutoScroll — the handle-drag edge decision (2026-07-29)',
 
   it('a degenerate box never scrolls', () => {
     expect(computeEdgeAutoScroll({ focusTop: 0, focusBottom: 0, boxTop: 100, boxBottom: 100, band: 90 })).toBe(0);
+  });
+});
+
+describe('edge auto-scroll interval — per-tick re-probe (2026-07-30)', () => {
+  /* Regression: the interval used to check only isCollapsed per tick; the
+     band/stop evaluation ran only on selectionchange. Releasing the handle
+     INSIDE the band fires no further events (Android swallows the
+     post-selection pointerup/touchend, and scrolling alone doesn't change the
+     selection), so the container kept auto-scrolling to its end. The band is
+     now re-probed on every tick: a released edge glides out of the band and
+     stops, and a focus jump straight into the opposite band reverses instead
+     of keeping the stale closure direction. */
+
+  /** Scroller (box 60..760, band arms below 670 / above 150) holding a
+      [data-hl-key] paragraph, with a MUTABLE focus rect: the probe's collapsed
+      clone yields no rects in jsdom (forced below), so the component falls
+      back to the selection range's getBoundingClientRect — stubbed here to
+      read `focusRect.value`. */
+  function armedScroller(focusRect) {
+    const s = document.createElement('div');
+    s.style.overflowY = 'auto';
+    Object.defineProperty(s, 'scrollHeight', { configurable: true, get: () => 2000 });
+    Object.defineProperty(s, 'clientHeight', { configurable: true, get: () => 700 });
+    let st = 500;
+    Object.defineProperty(s, 'scrollTop', {
+      configurable: true, get: () => st,
+      set: (v) => { st = Math.min(Math.max(0, v), 2000 - 700); },
+    });
+    s.getBoundingClientRect = () => /** @type {any} */ ({ top: 60, bottom: 760, left: 0, right: 400, width: 400, height: 700 });
+    document.body.appendChild(s);
+    const p = document.createElement('p');
+    p.setAttribute('data-hl-key', 'bible:test:1:1');
+    p.textContent = 'The Revelation of Jesus Christ which God gave unto Him';
+    s.appendChild(p);
+    const r = rangeOver(p, 0, 14);
+    r.getBoundingClientRect = () => /** @type {any} */ (focusRect.value);
+    return { scroller: s, container: p, range: r };
+  }
+
+  let _origGetClientRects;
+  beforeEach(() => {
+    _origGetClientRects = Range.prototype.getClientRects;
+    Range.prototype.getClientRects = function () { return /** @type {any} */ ([]); };
+  });
+  afterEach(() => {
+    Range.prototype.getClientRects = _origGetClientRects;
+    vi.useRealTimers();
+  });
+
+  /** Raise the toolbar, then dispatch one selectionchange (under fake timers)
+      to arm the auto-scroll interval. All advances stay < 350ms so the
+      unrelated computeAndShow debounce never fires. */
+  function arm(focusRect) {
+    const parts = armedScroller(focusRect);
+    mount();
+    stubSelection(parts.range);
+    act(() => { fire(parts.container, 'contextmenu', { clientX: 20, clientY: 20 }); });
+    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+    vi.useFakeTimers();
+    act(() => { document.dispatchEvent(new Event('selectionchange')); });
+    return parts;
+  }
+
+  it('released inside the band: scrolling stops once the edge scrolls out (RED pre-fix: ran to the container end)', () => {
+    const focusRect = { value: { top: 700, bottom: 716 } };   // bottom band
+    const { scroller } = arm(focusRect);
+    act(() => { vi.advanceTimersByTime(48); });               // 3 ticks × 24px
+    expect(scroller.scrollTop).toBe(500 + 3 * 24);
+    // Handle released — NO further selectionchange arrives. The scrolled
+    // content carried the frozen edge out of the band.
+    focusRect.value = { top: 400, bottom: 416 };
+    act(() => { vi.advanceTimersByTime(16); });               // first out-of-band probe stops it
+    const settled = scroller.scrollTop;
+    act(() => { vi.advanceTimersByTime(160); });              // event silence — must stay put
+    expect(scroller.scrollTop).toBe(settled);
+  });
+
+  it('a focus jump straight into the OPPOSITE band reverses direction (no stale closure dir)', () => {
+    const focusRect = { value: { top: 700, bottom: 716 } };   // bottom band → stepping down
+    const { scroller } = arm(focusRect);
+    act(() => { vi.advanceTimersByTime(32); });
+    const high = scroller.scrollTop;
+    expect(high).toBeGreaterThan(500);
+    focusRect.value = { top: 80, bottom: 96 };                // top band, no event in between
+    act(() => { vi.advanceTimersByTime(32); });
+    expect(scroller.scrollTop).toBeLessThan(high);            // now stepping UP
+  });
+
+  it('collapse mid-scroll stops the interval', () => {
+    const focusRect = { value: { top: 700, bottom: 716 } };
+    const { scroller } = arm(focusRect);
+    act(() => { vi.advanceTimersByTime(32); });
+    stubSelection(null);                                      // selection collapsed
+    act(() => { vi.advanceTimersByTime(16); });
+    const settled = scroller.scrollTop;
+    act(() => { vi.advanceTimersByTime(160); });
+    expect(scroller.scrollTop).toBe(settled);
   });
 });
 
