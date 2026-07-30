@@ -41,26 +41,6 @@ function findScrollParent(node) {
   return null;
 }
 
-/* P1-15: scoped styles for the selection-scroll nudge buttons (▲/▼). app.css
-   is owned by another change in this wave, so these live beside the component
-   — styled to match the existing .sel-style-btn / .sel-action-btn look (same
-   cream-on-dark colors, 8px radius, gold-faint tap feedback). No outline
-   override, so the global gold :focus-visible ring still applies. The row
-   right-aligns the pair so they read as a secondary transport, not a primary
-   action. */
-const NUDGE_STYLE = `
-  .sel-toolbar-nudge-row { justify-content: flex-end; padding-top: 2px; }
-  .sel-nudge-btn {
-    min-width: 44px; height: 34px; border-radius: 8px;
-    border: 1px solid var(--gold-border); cursor: pointer;
-    background: transparent; color: var(--cream-dim);
-    font-size: 0.8rem; line-height: 1; padding: 0 10px;
-    display: flex; align-items: center; justify-content: center;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 0.12s;
-  }
-  .sel-nudge-btn:active { background: var(--gold-faint); }
-`;
 
 /** Decide where the toolbar goes relative to the current selection. The
     returned `y` is the toolbar's BOTTOM edge (the element renders with
@@ -91,10 +71,42 @@ export function computeToolbarPlacement({ selTop, selBottom, toolbarH, navBottom
   const above = selTop - gap;
   if (above >= minY) return { y: above, scrollUp: 0 };
   const deficit = minY - above;
-  if (deficit <= maxScrollUp) return { y: minY, scrollUp: deficit };
+  // ASSIST-SCROLL GUARD (2026-07-29). The assist exists for a selection sitting
+  // JUST under the nav: scroll up a little, and the toolbar fits above it. It
+  // must never fire for a selection whose START is already off-screen above —
+  // there is no "room above" to reveal, and the scroll would be enormous.
+  // Measured before this guard: extending a selection down past the viewport
+  // (now easy, with real scrolling + edge auto-scroll) left selTop ~-1900, so
+  // the release yanked the reader back ~2000px. The selection must also still
+  // be the thing on screen: cap the assist at one toolbar-plus-gap of travel.
+  const assistable = selTop >= navBottom && deficit <= toolbarH + gap;
+  if (assistable && deficit <= maxScrollUp) return { y: minY, scrollUp: deficit };
   const below = selBottom + gap + toolbarH;
   if (below <= viewportH - margin) return { y: below, scrollUp: 0 };
   return { y: minY, scrollUp: 0 };
+}
+
+/** Which way (if any) the reading container should auto-scroll while a native
+    selection handle is dragged. The dragged (focus) edge sitting inside the
+    `band` at either end of the scroller's box means the user is reaching past
+    the viewport, so the container steps toward that edge — the standard
+    e-reader gesture, and the replacement for the retired ▲/▼ nudge buttons.
+
+    Extracted as a pure helper (same discipline as computeToolbarPlacement) so
+    the decision is pinned by test without jsdom layout: jsdom does no layout,
+    so an effect that reads live rects can't be exercised faithfully.
+
+    @param {{ focusTop: number, focusBottom: number, boxTop: number,
+              boxBottom: number, band: number }} a
+    @returns {-1|0|1} -1 = scroll up, 1 = scroll down, 0 = leave it alone */
+export function computeEdgeAutoScroll({ focusTop, focusBottom, boxTop, boxBottom, band }) {
+  if (!(boxBottom > boxTop)) return 0;              // degenerate box — never scroll
+  // A band taller than half the box would arm both ends at once; clamp so the
+  // middle of a short container is always a no-scroll zone.
+  const b = Math.max(0, Math.min(band, (boxBottom - boxTop) / 2));
+  if (focusTop < boxTop + b) return -1;
+  if (focusBottom > boxBottom - b) return 1;
+  return 0;
 }
 
 export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkRequest }) {
@@ -179,8 +191,13 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   //       covering the text and the native drag handles (owner-reported on
   //       Android). The scroll (scrollTop -= scrollUp) is synchronous here,
   //       so content and toolbar land together in one frame.
-  React.useLayoutEffect(() => {
-    if (!visible) return;
+  // SCROLL-FOLLOW (2026-07-29): extracted from the layout effect so the SAME
+  // placement math runs both on commit AND on every scroll frame while the
+  // toolbar is up. `allowAssistScroll` is the one difference: the initial
+  // placement may scroll the container up to make room (the near-top assist),
+  // but a scroll-driven re-place must NEVER move the container — that would
+  // fight the user's own finger.
+  const placeFromSelection = React.useCallback((allowAssistScroll) => {
     const el = toolbarRef.current;
     if (!el) return;
     const w = el.offsetWidth;
@@ -191,6 +208,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const navEl = document.querySelector('.top-nav');
     const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 60;
     let placed = null;
+    let selX = null;
     try {
       const sel = window.getSelection();
       if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
@@ -211,20 +229,133 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             navBottom,
             viewportH: window.innerHeight,
             lineH,
-            maxScrollUp: scroller ? scroller.scrollTop : 0,
+            maxScrollUp: allowAssistScroll && scroller ? scroller.scrollTop : 0,
           });
-          if (placed.scrollUp > 0 && scroller) scroller.scrollTop -= placed.scrollUp;
+          if (allowAssistScroll && placed.scrollUp > 0 && scroller) scroller.scrollTop -= placed.scrollUp;
+          // Track the selection horizontally too, so a scroll-follow re-place
+          // stays centred on the (possibly re-wrapped) selection.
+          selX = rect.left + rect.width / 2 - w / 2;
         }
       }
     } catch (_e) { /* selection gone mid-frame — fall through to the plain clamp */ }
     setPos((p) => {
-      const x = Math.min(Math.max(margin, p.x), maxLeft);
+      const baseX = selX == null ? p.x : selX;
+      const x = Math.min(Math.max(margin, baseX), maxLeft);
       // No live rect (selection cleared between commit and effect): keep the
       // old defensive clamp so the toolbar at least never overlaps the nav.
       const y = placed ? placed.y : Math.max(p.y, navBottom + h + margin);
       return (x === p.x && y === p.y) ? p : { x, y };
     });
-  }, [visible, selInfo, findHlContainer]);
+  }, [findHlContainer]);
+
+  React.useLayoutEffect(() => {
+    if (!visible) return;
+    placeFromSelection(true);
+  }, [visible, selInfo, placeFromSelection]);
+
+  // ── Scroll-follow + edge auto-scroll (2026-07-29, owner-reported) ────────
+  // The owner: "once you open highlight it locks scroll ... it'd be better if
+  // you could just scroll normally." VERIFIED ON-DEVICE (vot_api34, CDP): the
+  // native selection layer does NOT block scrolling — an identical synthetic
+  // drag scrolled 192px both with and without a live selection, and the
+  // selection survived. So P1-15's premise ("the page can't scroll") was
+  // wrong. What actually made scrolling feel broken:
+  //   (a) the toolbar was placed ONCE and never moved — measured: content
+  //       scrolled 200px, toolbar moved 0px. A stranded 196px-tall pane
+  //       hovering over unrelated text reads as "the page is stuck", and it
+  //       covers the very lines you were trying to reach (a drag started on
+  //       the pane hits the pane, not the scroller);
+  //   (b) extending a selection PAST the viewport had no natural gesture, so
+  //       ▲/▼ nudge buttons were added instead.
+  // Fixes: the toolbar now re-places from the live selection rect on every
+  // scroll frame (rAF-coalesced), and dragging a selection handle into the
+  // top/bottom edge band auto-scrolls the container — the standard e-reader
+  // gesture. The ▲/▼ row is retired.
+  React.useEffect(() => {
+    if (!visible) return undefined;
+    const sel = window.getSelection();
+    let scroller = null;
+    try {
+      if (sel && sel.rangeCount > 0) {
+        const r = sel.getRangeAt(0);
+        scroller = findScrollParent(findHlContainer(r.startContainer) || r.startContainer);
+      }
+    } catch (_e) { /* selection gone — nothing to follow */ }
+    if (!scroller) return undefined;
+
+    let rafId = 0;
+    const onScroll = () => {
+      if (rafId) return;                       // coalesce to one re-place per frame
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        const s = window.getSelection();
+        if (!s || s.isCollapsed || s.rangeCount === 0) return;
+        placeFromSelection(false);             // never move the container here
+      });
+    };
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      scroller.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [visible, selInfo, placeFromSelection, findHlContainer]);
+
+  // EDGE AUTO-SCROLL while a native selection handle is being dragged. The
+  // handle drag fires `selectionchange` continuously, so no touch tracking is
+  // needed: whenever the selection's moving edge sits inside the edge band we
+  // step the container toward it on an interval, and stop the moment the edge
+  // leaves the band, the selection collapses, or the toolbar hides. Step size
+  // is small (one line-ish) so the text glides rather than jumping.
+  React.useEffect(() => {
+    if (!visible) return undefined;
+    const BAND = 90;      // px from the scroller's edge that arms auto-scroll
+    const STEP = 24;      // px per tick
+    const TICK = 16;      // ms
+    let timer = null;
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+
+    const evaluate = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { stop(); return; }
+      let scroller = null;
+      let focusRect = null;
+      try {
+        const range = sel.getRangeAt(0);
+        scroller = findScrollParent(findHlContainer(range.startContainer) || range.startContainer);
+        // The MOVING edge is the focus node — collapse a clone onto it so the
+        // band test tracks the handle the user is actually dragging, not the
+        // whole (possibly viewport-spanning) selection.
+        const probe = document.createRange();
+        probe.setStart(sel.focusNode, sel.focusOffset);
+        probe.setEnd(sel.focusNode, sel.focusOffset);
+        const rects = probe.getClientRects();
+        focusRect = (rects && rects.length) ? rects[0] : range.getBoundingClientRect();
+      } catch (_e) { stop(); return; }
+      if (!scroller || !focusRect) { stop(); return; }
+      const box = scroller.getBoundingClientRect();
+      const dir = computeEdgeAutoScroll({
+        focusTop: focusRect.top,
+        focusBottom: focusRect.bottom,
+        boxTop: box.top,
+        boxBottom: box.bottom,
+        band: BAND,
+      });
+      if (dir === 0) { stop(); return; }
+      if (timer) return;                      // already stepping in this direction
+      timer = setInterval(() => {
+        const s = window.getSelection();
+        if (!s || s.isCollapsed) { stop(); return; }
+        const before = scroller.scrollTop;
+        scroller.scrollTop += dir * STEP;     // assignment clamps at both ends
+        if (scroller.scrollTop === before) stop();  // hit an end — nothing more to give
+      }, TICK);
+    };
+
+    document.addEventListener('selectionchange', evaluate);
+    return () => { stop(); document.removeEventListener('selectionchange', evaluate); };
+  }, [visible, findHlContainer]);
 
   React.useEffect(() => {
     // Compute and show the toolbar from the current selection
@@ -736,26 +867,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     if (window.__goSearch) window.__goSearch();
   }, [selInfo]);
 
-  // P1-15 — selection-scroll nudge (Android freeze fix). During an active
-  // selection every drag EXTENDS the selection, so the page can't scroll and
-  // a passage longer than one viewport is un-highlightable. The ▲/▼ buttons
-  // scroll the same scrollable ancestor the placement engine targets (see the
-  // layout effect above) by ~60% of its visible height — and, unlike every
-  // other toolbar action, deliberately do NOT clear the selection: the user
-  // nudges, then keeps dragging the selection handle. Best-effort: a vanished
-  // selection or unscrollable context is a silent no-op, never an error.
-  const nudgeScroll = React.useCallback((dir) => {
-    try {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
-      const range = sel.getRangeAt(0);
-      const container = findHlContainer(range.startContainer);
-      const scroller = findScrollParent(container || range.startContainer);
-      if (!scroller) return;
-      const step = Math.max(Math.round((scroller.clientHeight || window.innerHeight) * 0.6), 80);
-      scroller.scrollTop += dir * step; // assignment clamps at both ends natively
-    } catch (_e) { /* selection/DOM gone mid-gesture — nudge is best-effort */ }
-  }, [findHlContainer]);
 
   const handleBookmark = React.useCallback(() => {
     if (!selInfo) return;
@@ -881,8 +992,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       onPointerDown={(e) => { e.stopPropagation(); suppressRef.current = true; }}
       onPointerUp={() => { setTimeout(() => { suppressRef.current = false; }, 300); }}
     >
-      {/* Scoped styles for the P1-15 nudge buttons — see NUDGE_STYLE. */}
-      <style>{NUDGE_STYLE}</style>
       {/* While confirming a remove, the whole toolbar collapses to the
           ConfirmStrip so the user is focused on the single decision (and
           can't accidentally tap an unrelated action). Cancel returns to
@@ -1030,33 +1139,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
           <span>Bookmark</span>
-        </button>
-      </div>
-      {/* P1-15 scroll nudges — the toolbar only renders while a selection is
-          active, so these are visible exactly then. Real <button>s (TalkBack
-          reachable, named) that scroll the reading container WITHOUT touching
-          the selection, so a passage longer than one viewport can finally be
-          highlighted: nudge ▼, then keep dragging the selection handle. They
-          live on their own right-aligned row so the six primary actions keep
-          their existing spacing inside the 360px max-width toolbar. */}
-      <div className="sel-toolbar-row sel-toolbar-nudge-row">
-        <button
-          type="button"
-          className="sel-nudge-btn"
-          onClick={() => nudgeScroll(-1)}
-          title="Scroll text up (keeps the selection)"
-          aria-label="Scroll text up"
-        >
-          ▲
-        </button>
-        <button
-          type="button"
-          className="sel-nudge-btn"
-          onClick={() => nudgeScroll(1)}
-          title="Scroll text down (keeps the selection)"
-          aria-label="Scroll text down"
-        >
-          ▼
         </button>
       </div>
       </>

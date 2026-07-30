@@ -31,7 +31,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
-import { SelectionToolbar, computeToolbarPlacement } from './SelectionToolbar.jsx';
+import { SelectionToolbar, computeToolbarPlacement, computeEdgeAutoScroll } from './SelectionToolbar.jsx';
 
 let _origGetSelection;
 
@@ -488,6 +488,30 @@ describe('computeToolbarPlacement — near-top placement policy', () => {
       .toEqual({ y: 218, scrollUp: 0 });
   });
 
+  it('a selection starting OFF-SCREEN above never triggers the assist scroll (no yank-back)', () => {
+    // Reachable now that real scrolling + edge auto-scroll let a selection run
+    // far past the viewport: measured on-device, the release yanked the reader
+    // ~2000px back up. selTop -1900 is above navBottom 60 -> assist refused;
+    // selBottom 700 leaves no room below either, so it clamps under the nav.
+    expect(computeToolbarPlacement({ ...base, selTop: -1900, selBottom: 700, maxScrollUp: 2563 }))
+      .toEqual({ y: 218, scrollUp: 0 });
+    // Same off-screen start, but with room below -> flips below, still no scroll.
+    expect(computeToolbarPlacement({ ...base, selTop: -1900, selBottom: 200, maxScrollUp: 2563 }))
+      .toEqual({ y: 406, scrollUp: 0 });
+  });
+
+  it('the assist is capped at one toolbar-plus-gap of travel (a huge deficit flips instead)', () => {
+    // selTop 70 is on-screen, but deficit = 218 - (70-56) = 204 > 150+56=206?
+    // no: 204 <= 206, so this one still assists (the near-top case it exists for).
+    expect(computeToolbarPlacement({ ...base, selTop: 70, selBottom: 90, maxScrollUp: 900 }))
+      .toEqual({ y: 218, scrollUp: 204 });
+    // A taller toolbar makes minY larger, pushing the deficit past the cap.
+    const tall = { ...base, toolbarH: 40 };  // minY = 108, cap = 40+56 = 96
+    // selTop 20 -> above = -36, deficit = 144 > 96 -> refuse, flip below.
+    expect(computeToolbarPlacement({ ...tall, selTop: 20, selBottom: 40, maxScrollUp: 900 }))
+      .toEqual({ y: 136, scrollUp: 0 });
+  });
+
   it('the gap tracks the text line height (2 lines) and is sane-bounded', () => {
     // Largest text size: lineH 48 → gap 96.
     expect(computeToolbarPlacement({ ...base, lineH: 48, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(404);
@@ -666,10 +690,62 @@ describe('SelectionToolbar — P1-11a accessible names', () => {
   });
 });
 
-describe('SelectionToolbar — P1-15 scroll-nudge buttons (selection longer than one viewport)', () => {
-  /** Scrollable reading container (stands in for .screen-scroll), mirroring
-      the placement suite's helper but with real DOM clamping (scrollTop
-      can't go below 0 or past scrollHeight − clientHeight). */
+describe('computeEdgeAutoScroll — the handle-drag edge decision (2026-07-29)', () => {
+  /* The owner: "once you open highlight it locks scroll ... it'd be better if
+     you could just scroll normally." Verified on-device (vot_api34, CDP) that
+     the NATIVE layer never blocked scrolling — an identical synthetic drag
+     scrolled 192px both with and without a live selection, and the selection
+     survived. What actually broke the feel: a toolbar placed once and never
+     moved (content scrolled 200px, toolbar moved 0px), and no natural gesture
+     for extending a selection past the viewport. The ▲/▼ nudge row is retired
+     in favour of real scrolling + this edge auto-scroll. */
+  const BOX = { boxTop: 60, boxBottom: 760, band: 90 };
+
+  it('a focus edge in the BOTTOM band scrolls down', () => {
+    expect(computeEdgeAutoScroll({ focusTop: 740, focusBottom: 750, ...BOX })).toBe(1);
+  });
+
+  it('a focus edge in the TOP band scrolls up', () => {
+    expect(computeEdgeAutoScroll({ focusTop: 80, focusBottom: 100, ...BOX })).toBe(-1);
+  });
+
+  it('mid-container is a no-scroll zone', () => {
+    expect(computeEdgeAutoScroll({ focusTop: 400, focusBottom: 420, ...BOX })).toBe(0);
+  });
+
+  it('the band edges are exact (just inside arms, just outside does not)', () => {
+    // bottom band arms below 760 − 90 = 670
+    expect(computeEdgeAutoScroll({ focusTop: 660, focusBottom: 671, ...BOX })).toBe(1);
+    expect(computeEdgeAutoScroll({ focusTop: 640, focusBottom: 670, ...BOX })).toBe(0);
+    // top band arms above 60 + 90 = 150
+    expect(computeEdgeAutoScroll({ focusTop: 149, focusBottom: 169, ...BOX })).toBe(-1);
+    expect(computeEdgeAutoScroll({ focusTop: 150, focusBottom: 170, ...BOX })).toBe(0);
+  });
+
+  it('an oversized band is clamped to half the box, so the two ends can never both arm', () => {
+    // A band wider than half the box would otherwise make every point satisfy
+    // BOTH edge tests (up and down at once = thrash). Clamped to 350 here, the
+    // regions meet at the midpoint (410) and the split stays single-valued.
+    const tall = { boxTop: 60, boxBottom: 760, band: 5000 };
+    expect(computeEdgeAutoScroll({ focusTop: 409, focusBottom: 409, ...tall })).toBe(-1);
+    expect(computeEdgeAutoScroll({ focusTop: 411, focusBottom: 411, ...tall })).toBe(1);
+    // Sweeping a collapsed edge end to end: every -1 precedes every 1 (one
+    // clean crossover, no flip-flop), and the only non-directional point is
+    // the exact midpoint knife-edge — never a whole dead zone.
+    const dirs = [];
+    for (let y = 60; y <= 760; y += 25) {
+      dirs.push(computeEdgeAutoScroll({ focusTop: y, focusBottom: y, ...tall }));
+    }
+    expect(dirs.lastIndexOf(-1)).toBeLessThan(dirs.indexOf(1));
+    expect(dirs.filter((d) => d === 0).length).toBeLessThanOrEqual(1);
+  });
+
+  it('a degenerate box never scrolls', () => {
+    expect(computeEdgeAutoScroll({ focusTop: 0, focusBottom: 0, boxTop: 100, boxBottom: 100, band: 90 })).toBe(0);
+  });
+});
+
+describe('SelectionToolbar — the ▲/▼ nudge row is retired', () => {
   function scrollerWithContainer(scrollTop) {
     const s = document.createElement('div');
     s.style.overflowY = 'auto';
@@ -677,8 +753,7 @@ describe('SelectionToolbar — P1-15 scroll-nudge buttons (selection longer than
     Object.defineProperty(s, 'clientHeight', { configurable: true, get: () => 700 });
     let st = scrollTop;
     Object.defineProperty(s, 'scrollTop', {
-      configurable: true,
-      get: () => st,
+      configurable: true, get: () => st,
       set: (v) => { st = Math.min(Math.max(0, v), 2000 - 700); },
     });
     document.body.appendChild(s);
@@ -689,69 +764,12 @@ describe('SelectionToolbar — P1-15 scroll-nudge buttons (selection longer than
     return { scroller: s, container: p };
   }
 
-  /** Stub the selection over `range`, spying on removeAllRanges so a test can
-      prove the nudge did NOT collapse the selection. */
-  function stubSelectionSpy(range) {
-    const removeAll = vi.fn();
-    window.getSelection = () => /** @type {any} */ ({
-      isCollapsed: !range,
-      rangeCount: range ? 1 : 0,
-      getRangeAt: () => range,
-      removeAllRanges: removeAll,
-      toString: () => (range ? range.toString() : ''),
-    });
-    return removeAll;
-  }
-
-  it('renders ▲/▼ nudge buttons with accessible names while a selection is active', () => {
+  it('no nudge buttons render while a selection is active (real scrolling replaced them)', () => {
     const { container } = scrollerWithContainer(0);
     mount();
     stubSelection(rangeOver(container, 0, 14));
     act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
-    const up = document.querySelector('.sel-nudge-btn[aria-label]');
-    const labels = [...document.querySelectorAll('.sel-nudge-btn')].map((b) => b.getAttribute('aria-label'));
-    expect(up).not.toBeNull();
-    expect(labels.some((l) => /scroll/i.test(l || '') && /up/i.test(l || ''))).toBe(true);
-    expect(labels.some((l) => /scroll/i.test(l || '') && /down/i.test(l || ''))).toBe(true);
-  });
-
-  it('▼ scrolls the reading container down by ~60% of its height and keeps the selection', () => {
-    const { scroller, container } = scrollerWithContainer(0);
-    mount();
-    const removeAll = stubSelectionSpy(rangeOver(container, 0, 14));
-    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
-    const down = [...document.querySelectorAll('.sel-nudge-btn')]
-      .find((b) => /down/i.test(b.getAttribute('aria-label') || ''));
-    expect(down).not.toBeNull();
-    act(() => { fire(/** @type {Element} */ (down), 'click'); });
-    expect(scroller.scrollTop).toBe(420);   // 60% of clientHeight 700
-    expect(removeAll).not.toHaveBeenCalled();
     expect(document.querySelector('.sel-toolbar')).not.toBeNull();
-  });
-
-  it('▲ scrolls up by the same step and clamps at the top', () => {
-    const { scroller, container } = scrollerWithContainer(500);
-    mount();
-    stubSelection(rangeOver(container, 0, 14));
-    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
-    const up = [...document.querySelectorAll('.sel-nudge-btn')]
-      .find((b) => /up/i.test(b.getAttribute('aria-label') || ''));
-    expect(up).not.toBeNull();
-    act(() => { fire(/** @type {Element} */ (up), 'click'); });
-    expect(scroller.scrollTop).toBe(80);    // 500 − 420
-    act(() => { fire(/** @type {Element} */ (up), 'click'); });
-    expect(scroller.scrollTop).toBe(0);     // clamped, never negative
-  });
-
-  it('no scrollable ancestor: the nudge is a harmless no-op', () => {
-    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ');
-    mount();
-    stubSelection(rangeOver(c, 0, 13));
-    act(() => { fire(c, 'contextmenu', { clientX: 20, clientY: 20 }); });
-    const down = [...document.querySelectorAll('.sel-nudge-btn')]
-      .find((b) => /down/i.test(b.getAttribute('aria-label') || ''));
-    expect(down).not.toBeNull();
-    expect(() => { act(() => { fire(/** @type {Element} */ (down), 'click'); }); }).not.toThrow();
-    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
+    expect(document.querySelector('.sel-nudge-btn')).toBeNull();
   });
 });
