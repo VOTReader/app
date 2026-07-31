@@ -297,15 +297,32 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
   };
   afterEach(restoreLocation);
 
+  /* The sheet's TEXT lands at commit, but useModalRegistry registers in a
+     PASSIVE effect — and the setState that opens the sheet runs in an async
+     continuation (pickImportFile -> … -> setImportConfirm) outside act(), so
+     React is free to flush that effect a tick after the DOM update. Asserting
+     on modalRegistry straight after findByText therefore raced the
+     registration and failed roughly 1 run in 5 ("expected null to be
+     'settings-import-confirm'"). Wait for the registry entry itself, which is
+     the thing these tests are actually about. Nothing is weakened: the id is
+     still asserted, just not before it can exist. */
+  const findImportSheet = async () => {
+    await screen.findByText(/will OVERWRITE/);
+    await vi.waitFor(() => {
+      expect(modalRegistry.peek()).not.toBeNull();
+    });
+    return modalRegistry.peek();
+  };
+
   it('asks via a registered sheet and applies NOTHING until Import is tapped', async () => {
     const { confirmSpy, applySpy } = setupImport();
     fireEvent.click(screen.getByText('Import'));
-    await screen.findByText(/will OVERWRITE/);
+    const sheet = await findImportSheet();
     // The destructive semantics are intact — a real choice, in-app…
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(applySpy).not.toHaveBeenCalled();
     // …and Back/Escape would dismiss the sheet, not navigate underneath it.
-    expect(modalRegistry.peek() && modalRegistry.peek().id).toBe('settings-import-confirm');
+    expect(sheet.id).toBe('settings-import-confirm');
     fireEvent.click(screen.getByText('Import & Overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
   });
@@ -313,15 +330,15 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
   it('dismissing the sheet (Cancel OR the Back/Escape registry path) applies nothing', async () => {
     const { applySpy } = setupImport();
     fireEvent.click(screen.getByText('Import'));
-    await screen.findByText(/will OVERWRITE/);
+    await findImportSheet();
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
     expect(applySpy).not.toHaveBeenCalled();
 
     // Re-open and take the registry dismiss route this time.
     fireEvent.click(screen.getByText('Import'));
-    await screen.findByText(/will OVERWRITE/);
-    act(() => { modalRegistry.peek().dismiss(); });
+    const sheet = await findImportSheet();
+    act(() => { sheet.dismiss(); });
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
     expect(applySpy).not.toHaveBeenCalled();
   });
