@@ -38,21 +38,6 @@ export function JournalChip({ refKey, onClick, label }) {
 export function jrnRefKeyForLetter(volKey, letterId) {
   return (volKey && letterId) ? ('letter:' + volKey + '/' + letterId) : null;
 }
-export function jrnRefKeyForChapter(bookId, chapter) {
-  return (bookId && chapter != null) ? ('chapter:' + bookId + ':' + chapter) : null;
-}
 export function jrnRefKeyForBookmark(bookmarkId) {
   return bookmarkId ? ('bookmark:' + bookmarkId) : null;
-}
-
-/* Resolve a letter refKey from the collection's display label (e.g.
-   'Volume Two') and a letterId. */
-export function jrnRefKeyForLetterByLabel(volumeLabel, letterId) {
-  if (!volumeLabel || !letterId || typeof COLLECTIONS === 'undefined') return null;
-  for (var i = 0; i < COLLECTIONS.length; i++) {
-    if (COLLECTIONS[i].label === volumeLabel) {
-      return 'letter:' + COLLECTIONS[i].volKey + '/' + letterId;
-    }
-  }
-  return null;
 }

@@ -145,8 +145,7 @@ import * as EditorScreen from '../ui/screens/JournalEditorScreen.jsx';
 // ── Renderer ────────────────────────────────────────────────────────────
 import {
   JournalChip,
-  jrnRefKeyForLetter, jrnRefKeyForChapter,
-  jrnRefKeyForBookmark, jrnRefKeyForLetterByLabel,
+  jrnRefKeyForLetter, jrnRefKeyForBookmark,
 } from '../renderer/dom-journal-chip.jsx';
 
 // Expose every public symbol on window so classic-script consumers
@@ -237,8 +236,7 @@ Object.assign(window, {
   JournalRecordingSheet, JournalInsertSheet, JournalInboundSheet,
   // Renderer
   JournalChip,
-  jrnRefKeyForLetter, jrnRefKeyForChapter,
-  jrnRefKeyForBookmark, jrnRefKeyForLetterByLabel,
+  jrnRefKeyForLetter, jrnRefKeyForBookmark,
 });
 
 // Journal UI screens — wildcard imports above let us spread ALL exports

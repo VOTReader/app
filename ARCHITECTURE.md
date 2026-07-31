@@ -16,6 +16,8 @@ The sections below this one predate several landed systems. This addendum is the
 - **Tab thumbnails** (`hooks/use-thumbnails.js`): dual-theme clone renders (html2canvas via the bridge) captured ONLY after nav / overview-open heal / resize — the scroll-stop capture path is RETIRED (on-device profiling; do not re-add) and non-urgent captures wait out the interaction calm gate. Tabs also carry `customTitle` + `pinned` ([7]; pinned survive bulk closes).
 - **Android frame pacing**: MainActivity votes the WebView at panel peak refresh (View + window votes, API 35+); Battery Saver's system 60 Hz cap outranks them by design. `backdrop-filter` is banned on chrome that overlays live scrolling content (alpha-bumped instead).
 - **Theme**: dark-first `:root` tokens, `body.light` full swap, `body.amoled` True-Black surface modifier on dark ([10], `settings.trueBlack`, boot pre-paint applies all classes).
+- **Auto-scroll reading transport** (`hooks/use-autoscroll.js` + `ui/components/AutoScrollControl.jsx`): lines/min over a MEASURED line height, the scrollTop lease, `.reading-end` reading-zone stop, dwell + auto-advance via the pager's own boundary policy. Full map in **§20**.
+- **One shared top-nav**: `ui/components/LibraryNav.jsx` renders every screen's nav (2026-07-30; SearchScreen + GardenView are the two documented exceptions). Full map, and its selector/measurement couplings, in **§18.10b**.
 
 ---
 
@@ -27,16 +29,27 @@ The sections below this one predate several landed systems. This addendum is the
 - **Per-tab fields** via `tabField('screen')` — each tab maintains independent `screen`, `letterId`, `bookId`, `chapterNum`, `studyId`, `studyChapterId`, scroll positions, etc.
 - **`tabs` + `activeTabIdx`** arrays — multi-tab in-app browsing.
 - **`fromLetterStack`** per tab — drives **back-pill** navigation. Capped at 50 entries (was unbounded — caught in audit item 40).
-- **Source screen restore** in `handleAndroidBack` — pops `fromLetterStack` and restores `sourceScreen` / `sourceLetterId` / `sourceBookId`.
+- **Source screen restore** in `handleAndroidBack` — pops `fromLetterStack` and restores the popped entry's captured position.
 
-### Back-pill (top of letter screen)
+### Back-pill (System 1 — the canonical one)
 
-- CSS class: `.back-hint-pill`
-- Renders only when `fromLetterStack.length > 0` (i.e. user arrived via tap-through)
-- Shown in `LetterView`, `WtlbEntryView`, `BibleChapterView`, and `ChapterView`
-- `backHint` object built from top of `fromLetterStack`
-- Android hardware back: pops `fromLetterStack` and restores source state
-- `openInAppLetter` is the function that pushes onto the stack — **always use this for tap-through**
+Owned by `hooks/use-from-letter-stack.js`. **That module header is the contract; this is the map.** Current as of 2026-07-30/31 — the pill now renders on every reading/destination screen EXCEPT History, which is the owner's deliberate exception.
+
+- CSS class: `.back-hint-pill`, inside a `position: sticky` `.back-hint-row`. **One pill maximum per screen** — two sticky rows double-cover the content.
+- **SEVEN tracked position fields**, both in a pushed entry's `source*` capture and in its `destSnapshot`: `screen`, `bookId`, `chapterNum`, `letterId`, `studyId`, `studyChapterId`, and (added 07-30) **`journalEntryId`**. `journalEntryId` is App()-local `useState`, not a tabField, but is threaded identically.
+- **`destSnapshot`** records the expected destination at PUSH time. The pill renders only while every non-nullish snapshot field still matches current state, and a prune effect pops a stale top entry. `!= null` (not `=== undefined`) is the don't-care test — push paths explicitly null out unused fields, and old persisted tabs deserialize without `journalEntryId` at all; both must mean "don't care".
+- **`backHint` vs `backActive` are NOT the same thing** (07-30 split). An entry pushed with **`silent: true`** suppresses the PILL but stays a live back target — History pushes these, because the owner does not want a pill on links tapped from History, but hardware back must still return there. So: `backHint` = the `{title, volumeLabel}` the pill renders (null for silent entries), `backActive` = "a live top entry exists, silent or not". **Hardware back keys off `backActive`. The pill keys off `backHint`.** Wiring one to the other reintroduces the bug.
+- `tapThroughBack()` pops the top and restores its captured position; it also clears the `pendingHighlight` nav-handoff slot.
+- **`pushFromLetter` is the only writer.** `openInAppLetter` / `goToLetterFromMatthew` / the deferred `_navToLinkRef.current` body all call it. Legacy pushes without a `destSnapshot` keep the multi-level letter→letter behavior.
+- **journal-viewer precedence** (`JournalViewerScreen`): the private journal→journal stack wins; only if it is empty does the cross-screen `backHint` render. The pill calls `tapThroughBack` **directly**, not `window.handleAndroidBack` — the hardware-back handler's journal branch walks the same precedence in the same order (see `hooks/use-android-back.js`), and routing the pill through it would mean re-deriving the decision twice.
+
+### The three pill systems (all live — know which one you are in)
+
+1. **`fromLetterStack` / `backHint`** — THE canonical cross-screen back pill, above. Any new tap-through goes here.
+2. **The journal→journal private stack** (`__journalBackStack`, JournalViewerScreen) — entry-to-entry navigation WITHIN the journal. A satellite: it never leaves the journal, and it takes precedence over System 1 on that one screen.
+3. **`notesReturnCtx`** (`utils/nav-handoff.js`, set by NotesIndexScreen / screen-routes, consumed by NotesIndexScreen on mount) — a one-shot handoff that restores the notes hub's `{tab, drilledNbId}` and its own `backPill` label when you come back. Also a satellite: it restores UI STATE, it is not a nav stack.
+
+Systems 2 and 3 are deliberate and stay. Do not "unify" them into System 1 — but do not add a fourth.
 
 ---
 
@@ -387,7 +400,9 @@ body.light .hl-blue/...                   /* light-mode variants */
 - A list of `NoteRow`s with: color swatch · source label (Cinzel gold) · relative date · 2-line body preview · 1-line italic anchored quote · subtle Cinzel notebook chips (first 2 + `+N` overflow).
 - Empty states: "No Notes Yet" with a hint pointing the user to long-press text in any chapter, OR "No Matches" when filter/search excludes everything.
 
-Tapping a row navigates to the source chapter via `navigateToLink(noteSourceNav(note))`, and stashes the groupId on `window.__pendingOpenNote`. The post-render effect in `App` consumes the flag and opens the NoteSheet on arrival, with a 60ms inner timeout so the marks have rendered first.
+Tapping a row navigates to the source chapter via `navigateToLink(…)` and stashes the groupId for the destination to consume; `use-dom-annotation-sync` takes it and opens the NoteSheet on arrival, once the marks have rendered. **`window.__pendingOpenNote` is STALE (corrected 07-31)** — the stash is a `utils/nav-handoff.js` slot named `pendingOpenNote`, alongside `notesReturnCtx` / `pendingHighlight` / `pendingScrollHlKey` / `pendingSearchQuery`; the ad-hoc `window.__*` globals were consolidated into that one registry (its module header documents every slot's writer/reader/clearer — read it before adding one).
+
+**Per-segment row taps (07-30).** A note can span several chapters, and the row used to be one tap target that navigated to the first key only. `noteSourceSegments(note)` (in `utils/note-source.js`) now returns one `{label, nav}` per chapter group, and `NoteRow` renders each as its own tap target. Both it and `noteSourceLabel` are built on the same `_chapterGroups()` grouping, so **a row's label and its tap targets can never drift apart**. Each segment's `nav` carries `verse` and, when the group spans more than one verse, **`verseEnd`** — so arriving flashes the whole range rather than the first verse.
 
 **NotebookStore** is a list-based store on `vot-notebooks` (`{ list: [{ id, name, sortIndex, created, updated }] }`). Notebooks have NO color (kept simple per user direction); the color belongs to the note. CRUD: `add(name)`, `rename(id, name)`, `remove(id)` (cascades via `NoteStore.pruneNotebook(id)`), `list()`, `get(id)`.
 
@@ -457,9 +472,9 @@ function snapRangeToWords(text, start, end) {
 
 ### 17.16 Back-pill on Bible/Matthew + Notebook Manager
 
-**1. Tap-through back-pill on Bible chapter destinations.** `BibleChapterView` and `ChapterView` now accept `backHint` and `onTapThroughBack` props. New `tapThroughBack()` helper in App pops the top of `fromLetterStack` (via `fromLetterRef.current` — `tabField` setters' updater functions run async) and restores state.
+**1. Tap-through back-pill on Bible chapter destinations.** `BibleChapterView` and `ChapterView` now accept `backHint` and `onTapThroughBack` props. New `tapThroughBack()` helper in App pops the top of `fromLetterStack` (via `fromLetterRef.current` — `tabField` setters' updater functions run async) and restores state. *(Since 07-30 this is no longer a Bible/Matthew special case — the pill renders on every destination screen except History, and `tapThroughBack` now lives in `useFromLetterStack`. See "Back-pill (System 1)" at the top of this file.)*
 
-**2. Notebook management from the Notes index.** The Notes index has a Notebooks button that opens `NotebookManagerSheet` — a bottom sheet that lists every notebook with note count, ✎ rename, × delete, and a `[name input] [Create]` strip. Distinct from `NotebookPickerSheet`: the picker has checkbox rows that toggle membership for a specific note; the manager has no note context, just CRUD.
+**2. Notebook management from the Notes index.** ~~`NotebookManagerSheet`~~ **— STALE, corrected 07-31: no such component exists.** Notebook CRUD lives inline in `NotesIndexScreen` instead: the Notebooks tab's card grid carries the `+ New Notebook` inline form, and rename/delete are inline controls in the drilled-in header (see §17.17). `NotebookPickerSheet` is real and unchanged — checkbox rows toggling membership for one specific note.
 
 ### 17.17 Notes hub restructure — tabs + notebook cards + drilled view
 
@@ -471,8 +486,8 @@ The Notes hub is a tabbed two-screen layout:
 - Last card: **+ New Notebook** (dashed, gold-dim) — tap → inline `[name input] [Cancel] [Create]` form.
 - Tap any card → drills into that notebook's notes.
 
-**Drilled-in view**:
-- Header row: `‹` back arrow · notebook title · **Rename** button · **Delete** button (omitted for Uncategorized).
+**Drilled-in view** *(header restructured 07-30 — the name used to share one row with the actions and got crushed at high `--font-scale`, and the hub's "My Notes" header stacked on top of it)*:
+- **Two rows.** `.nb-drilled-titlerow` = `‹` back arrow + `h1.nb-drilled-title` (the notebook name) + `.nb-drilled-count`. `.nb-drilled-actions` sits on its own row below: **Share** (only when the notebook has notes) · **Rename** · **Color** · **Delete** — the last three are user-notebook-only, so Uncategorized shows Share alone. Rename mode swaps the whole action row for Save / Cancel. The hub's "My Notes" header is suppressed while drilled (`!drilledNbId`) — rendering both stacked two headers on top of each other. Action targets are **44px**, not the old 24px.
 - Rename: inline text input replaces the title; Enter/blur commits, Esc cancels.
 - Delete: inline confirm strip ("Notes will move to Uncategorized") → cascades.
 - Sort toggle button: "Newest first ↓" / "Oldest first ↑" — single-click toggle.
@@ -492,13 +507,20 @@ The Notes hub is a tabbed two-screen layout:
 
 User feedback: the "Back to My Notes" pill persisted after the user navigated to a different chapter. It should only show on the IMMEDIATE destination of the tap-through and disappear the moment the user moves on.
 
-Fix: each entry pushed by `_navToLinkRef.current` records a **`destSnapshot`** — the expected `{screen, bookId, chapterNum, letterId, studyId, studyChapterId}` of the destination, computed from the endpoint type BEFORE the state changes happen.
+Fix: each entry pushed by `_navToLinkRef.current` records a **`destSnapshot`** — the expected destination, computed from the endpoint type BEFORE the state changes happen. **Seven fields since 07-30**: `{screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId}`.
 
 Two consumers:
 1. **`backHint` computation** — when the top stack entry has a `destSnapshot`, the pill renders ONLY if every snapshot field matches the current state.
 2. **Prune effect** — a useEffect that pops the entry if `destSnapshot` doesn't match the current state. Keeps the stack clean.
 
-Legacy push paths (like `openInAppLetter` used by letter→letter footnote tap-throughs) don't set `destSnapshot`, so they keep the existing multi-level back behavior — only the Notes-index path opts into single-shot semantics.
+Legacy push paths (like `openInAppLetter` used by letter→letter footnote tap-throughs) don't set `destSnapshot`, so they keep the existing multi-level back behavior — only paths that opt in get single-shot semantics.
+
+**Two corrections landed 07-30, both worth knowing before touching `_destMatches`:**
+
+- **The nullish test is `!= null`, not `=== undefined`.** Push paths explicitly null out the fields they don't constrain, so a strict-undefined check treated an explicit `null` as a real constraint, compared it against live state, failed, and **silently pruned the pill in the primary cross-screen flow** (Notes index → Bible/Study → the expected "Back to My Notes"). Both `null` and `undefined` must mean "don't care" — which also covers old persisted tabs deserializing without `journalEntryId` at all.
+- **The journal branch's snapshot used to contradict itself**, so a notes→journal pill was pruned on the very frame it arrived. Fixed alongside adding `journalEntryId` as the 7th field.
+
+**`silent: true`** (History's push flag) is separate from `destSnapshot` and does NOT prune anything: it suppresses the pill while leaving the entry a live back target. See "Back-pill (System 1)" at the top of this file for the `backHint`/`backActive` split it forced.
 
 ### 17.11b Default-vs-active note rendering
 
@@ -590,6 +612,19 @@ Five shared functions replace duplicate ref-parsing codepaths:
 
 Used by: `parseScriptureRef`, `lookupVersesFromBooks`, `searchNavIndex`, `resolveVerseText`, `buildNavIndex`, `navItemPreview`, `findEntryContext`, `VOT_LETTER_REGISTRY`, `MATTHEW_CHAIN_ENTRY`.
 
+**`splitCompoundRef(refStr)` (added 2026-07-30)** — THE shared splitter for compound references. `parseRefStr` handles ONE reference; a great many cites in the corpus are compounds, and before this they rendered as a single tap target that navigated to the first passage (or, for `the-blessed.js`'s `{{ref:}}` chips, to nothing at all — silent dead taps). Returns `{ref, index, parsed}[]`, where `ref` is a canonical self-contained string and `index` is the part's ordinal among the source's `;`/`,`-delimited chunks.
+
+- Semicolon split, with **book carry-forward**: `"Daniel 9:27; 11:31; 12:11"` → 3 parts, segments 2..N inheriting `Daniel`.
+- Comma expansion: `"Matthew 5:3-4, 7"` → 2 parts.
+- **Chapter-qualified comma tails**: a tail inherits the book AND the chapter *unless it names its own* — `"Exodus 20:12, 21:17"` is two different chapters. Found by auditing all 23 compound cites in `matthew.js`, not guessed.
+- Cross-chapter ranges (`"Revelation 21:1-22:5"`) navigate to the START.
+- Dash normalization (Permanent Rule 1) runs FIRST, and is 1-char→1-char so chunk ordinals still line up with the raw string.
+- Chunks that parse to nothing are dropped individually — the rest of the compound still works.
+
+`index` is what lets a renderer rebuild the ORIGINAL string character-for-character (separators and all) while making each chunk its own tap target. **That is load-bearing, not cosmetic**: journal blocks are annotatable and highlight offsets walk that text, so a re-render that changed even one character would shift every annotation on the entry.
+
+**`parseRefStr` was deliberately NOT changed to return an array.** Its single-object shape is a pinned contract (4 `toEqual` tests) and it is the search-ranking choke point — `nav-index.js` gives its hits a 1000-point boost. The split belongs at the callers, in ONE place, which is what `splitCompoundRef` is. Consumers: `GoToRefButton`, the journal `{{ref:}}` chips. `lookupVersesFromBooks` is untouched for the same reason.
+
 ### 18.4 Consolidated navigation
 
 - **14 `goVotXxxIdx` functions → 1 `goColIdx(volKey)`**
@@ -661,9 +696,33 @@ Extracted presentational component (`src/ui/components/NavButtons.js`) rendering
 - `theme`, `onThemeChange` — passed through to `ThemeBtn`
 - `reading` (optional) — when truthy, adds `nav-history-reading` CSS class to the history button (reading-mode styling)
 
-**Intentionally left inline (2 screens):**
+**Intentionally left inline (2 screens):** *(superseded 2026-07-30 — NavButtons gained a per-icon `hide` array, so these two screens now go through LibraryNav like everything else, passing `hide={['history']}` / `hide={['settings']}`.)*
 - `HistoryScreen` renders settings + search + theme but NO history button
 - `SettingsScreen` renders history + search + theme but NO settings button
+
+### 18.10b LibraryNav — THE top-nav module (2026-07-30)
+
+`ui/components/LibraryNav.jsx`. Before this, **19 hand-rolled nav implementations** across 54 routes; the back arrow was only enlarged on the ones that happened to spell the class list right. Two separate bugs came out of that, and both were structural rather than cosmetic:
+
+1. **LetterView's `nav-volume`.** Its back button carried `nav-volume` alongside `nav-back-icon`. `.nav-volume` sat AFTER `.nav-back-icon` at equal specificity — in the main block AND again in the px chrome-pin block at the end of app.css — so it **lost the cascade** and shrank the arrow to 11.52px on 13 screens. `.nav-volume` is **deleted**, with a tombstone comment at app.css:549. Do not reintroduce it.
+2. **`_idxNav` never adopted the icon back at all.** The 2026-07-14 icon-back change simply never reached the 14 index screens.
+
+**Call convention: a plain FUNCTION returning a fragment** — `LibraryNav({…})`, never `<LibraryNav …/>`. Every call site and several test stubs depend on that, which also means **it must never hold hooks**.
+
+**Options (all optional):** `onBack`, `backLabel` (destination NAME → title `"← X"` / aria `"Back to X"`), `backTitle` (legacy raw string; `backLabel` wins), `hideBack`, `showHome` (default true), `onHomeBefore`, `leftExtras` / `rightExtras`, `arrows` (`{onPrev, onNext, prevDisabled, nextDisabled, prevTitle, nextTitle, prevLabel, nextLabel}`), `reading`, `chapterBookmark` (`{hlKey, label}`), `hide` (`['settings'|'history'|'search'|'theme']`), plus the `onSettings`/`onHistory`/`onSearch`/`theme`/`onThemeChange` passthroughs.
+
+**The two documented exceptions — both deliberate, both commented at their call site:**
+- **SearchScreen** — the search input row REPLACES the whole right half of the nav (no Home, no icon cluster), and app.css:319 already exempts it via `:not(:has(~ .srch-input-row))`.
+- **GardenView** — the one screen that bypasses `ScreenLayout` entirely for immersive `.garden-top-bar` chrome. Adopting the shared nav would be a rewrite, not a consolidation.
+
+**LOAD-BEARING COUPLINGS — check every one of these before changing this module's markup.** They are all selector- or measurement-based, so none of them fails loudly:
+- The back button keeps **BOTH** classes: `nav-home` (the right-cluster `margin-right: auto` anchor, app.css:318-319) and `nav-back-icon` (the 2.1rem glyph, app.css:544 + the px pin at the end of the file).
+- **`HomeBtn`'s `title="Home"` is a selector**, not a tooltip — app.css:318 anchors the right cluster off `[title="Home"]`.
+- **NavButtons' title strings** `"Settings"` / `"History"` / `"Search"` are what the Settings visibility toggles select on (`body.no-search` / `body.no-history` / `body:not(.history-in-nav)`, app.css:320-338). Renaming a title silently breaks a user setting.
+- The **chrome-pin block** at the end of app.css restates `.nav-home` and `.nav-back-icon` sizes in **px** so nav chrome does not scale with `--font-scale`. Any new nav size must be restated there or it will grow with the text slider.
+- **`top-nav` is in `SCREENSHOT_IGNORE_CLASSES`** (`utils/platform-bridge.js`) — html2canvas drops the whole nav from tab thumbnails. Anything moved INTO the nav disappears from thumbnails; anything moved OUT of it starts appearing in them.
+- **`.top-nav`'s height is measured at runtime** by `ui/sheets/SelectionToolbar.jsx` (placement) and `hooks/use-thumbnails.js` (`navHeightDp` for the native crop). Changing the nav's height silently changes both.
+- `ScreenLayout` appends `ResumeReadingNavBtn` + `TabsNavBtn` itself — **LibraryNav must never render either**, or every screen gets duplicates.
 
 ### 18.11 colReadNavProps + colIdxProps
 
@@ -829,6 +888,56 @@ class ErrorBoundary extends React.Component {
 ```
 
 Uses the app's gold color scheme (`#e0c97f`) so the error screen feels in-brand rather than jarring.
+
+---
+
+## Section 20 — Auto-scroll reading transport
+
+Landed 07-21/22, extended 07-30. Two modules, plus a settings block. **Read `hooks/use-autoscroll.js`'s header before touching any of it** — the model is argued there at length; this section is the map.
+
+### 20.1 The transport (`hooks/use-autoscroll.js`)
+
+**It is a TRANSPORT, not an animation.** It owns the reading container's `scrollTop` over time, competes with the user for that same property, and must yield instantly and losslessly. Both ways an autoscroller feels bad — it fights the finger, or it moves in visible steps — are controller problems, not CSS problems.
+
+Structure mirrors `usePagerGesture`: a **pure controller factory** (`createAutoScroll`) driven by injected I/O (element accessor, frame source, clock, metrics, navigation), so it unit-tests with a manual clock and no DOM. `useAutoScroll` is the thin React wrapper that owns the listeners and the browser-side I/O only.
+
+**THE SCROLLTOP LEASE.** Four writers touch this container's `scrollTop`: the user's finger, `use-scroll-memory`'s `startRestore` (up to 90 rAF attempts, flagged by `body.scroll-restoring`), the pager's swipe settle, and this controller. **At most one may write at a time.** Every pause rule is that one invariant applied to a different revoker — which is why the restore interlock, the pointer yield and the external-nav stop are the same mechanism rather than three special cases.
+
+**Speed is stored in LINES per minute, never px/second.** The app has a continuous 80–160% text-size slider; a px/s speed would silently change reading pace by up to 2× when the reader resizes text. `measureLineHeight(el)` probes `[data-hl-key]` — the annotation engine's marker, carried by body text on all four reading screens — and `lineHeightOf(node)` resolves one node's px line height (with a font-size fallback, because `getComputedStyle` can return the keyword `normal`). Range `MIN_LPM 4` … `MAX_LPM 40`, default 16, via `clampLpm`.
+
+**Motion model:** rAF + a float position accumulator written straight to `scrollTop` (`scrollTo({behavior:'smooth'})` is browser-owned and uninterruptible; `scrollBy()` on an interval quantizes and visibly steps). **Read-first, then write** — reading `scrollTop` back after writing is a forced sync layout 60×/s on the same thread that owns the scroll. `dt` is clamped (`MAX_DT`): a dropped frame must LOSE motion, never bank it. Constant velocity in the steady state; easing lives only in the ramps and the end brake.
+
+**Drift absorb is NOT a pause signal.** Chrome's scroll anchoring rewrites `scrollTop` whenever content above the viewport reflows (lazy images, `content-visibility` resolving, note icons injecting). That is a legitimate external write to absorb, not user intent — conflating them would fire spurious pauses on exactly the screens carrying the most annotations. **Pointer events own pause; scroll deltas own resync only** (`DRIFT_PX` sits clear of device-pixel snapping, which is measurable at 1/DPR).
+
+**End of page = the `.reading-end` sentinel, not `scrollHeight`.** The sentinel sits at the end of BODY text, before the footnote list, the ornament divider and the chain-nav cards — scrolling to `scrollHeight` would grind through a Format A letter's whole footnote apparatus before advancing. `computeEndTarget` rests it at `END_STOP_FRACTION` (2/3) down the viewport, because people read around the MIDDLE of the screen; clamped to the true scroll max, so a short page just bottoms out.
+
+**Auto-advance reuses the pager's own neighbor descriptor**, so boundary policy is inherited rather than reimplemented: `peek('next') === null` → dead end; `desc.kind === 'boundary'` → cross-collection edge, do not auto-cross; `desc.kind === 'screen'` → advance. Navigation runs through `commitReadingNav` — the same atomic flushSync + annotation-apply contract the swipe commit uses — so the new page is painted WITH its highlights before the first frame of resumed motion. There is **no `skipRestore` plumbing**: after an advance the controller waits out `body.scroll-restoring` and resyncs from wherever scroll memory landed.
+
+**Dwell + `rearmDwell()` (07-30).** `armDwell()` sets `advanceAt = dwellStartedAt + max(configured, remaining MIN_PAGE_MS)` — measured from **`dwellStartedAt`, not from now**, which is what makes a mid-countdown edit land on the deadline the new setting describes instead of double-counting time already sat. `rearmDwell()` is the entry point the pill's ± stepper drives (a no-op unless `state === 'enddwell'`); without it, `reachedEnd` had already baked the old value into a timer and the edit would silently apply only to the NEXT page. `clampEndDwell` (0–15s) lives in this module rather than with the provider that used to own it, so the pill can clamp its own stepper without importing its parent (a cycle).
+
+**Runaway guards** (a phone in a pocket must not read the whole Bible): `MIN_PAGE_MS` (4s) floors time-on-page so a run of short WTLB entries cannot chain at timer speed; `MAX_CHAIN` (20) caps consecutive advances with zero user interaction, and any real interaction resets the chain.
+
+States: `idle | running | paused | enddwell | ended | advancing`. Side effects on the active states: `body.autoscroll-running` and the native keep-screen-on flag (released back to the user's own `keepScreenOn` preference, never blindly to false).
+
+### 20.2 The pill (`ui/components/AutoScrollControl.jsx`)
+
+Rendered by `ScreenLayout` on reading screens only (`pager` is passed exclusively by the four reading screens) and **never inside an inert pager peek** — the inert branch returns first, so a peek can never portal a second control onto the live viewport. **Portaled to `<body>`**, because a `position: fixed` element inside `.pager-track` is displaced by the swipe-settle transform (same fix as ScriptureSheet / FootnoteSheet). `body.autoscroll-on` marks the app as carrying the pill so colliding bottom-centre chrome can stand down; distinct from `body.autoscroll-running`.
+
+**Controls:** speed − / play-pause / + / (when auto-continue is on) a timer button that toggles the **dwell row**, plus a readout. During `enddwell` the whole row is replaced by ± around the live countdown plus Cancel — so the dwell row is suppressed then (`showDwellRow` requires `state !== 'enddwell'`), otherwise the ± would be duplicated along with their accessible names. Dwell step is 500ms, the same grain the Settings slider offers, so the two writers agree on which values exist. **Idle fade**: after ~3s of uninterrupted motion the pill drops to a whisper; any touch restores it.
+
+**MEASURED words/min — `measureWordsPerLine(el)`, and the trap in it.** The Settings screen used to show `lpm × 9` as an estimated wpm. That guess is **deleted**. The pill now shows `lines/min × measured words-per-line`, and shows **nothing** when the page yields no measurement — a made-up rate is worse than none.
+
+Counting the LINES is the subtle part, because `data-hl-key` is not always on the same kind of box:
+- On the verse screens it lands on **inline spans**, where `getClientRects()` is one rect per visual line, and `height / line-height` is a line short (an inline's box spans font boxes, not full line boxes).
+- On LetterView it is on the **`<p class="letter-para">` itself — a BLOCK**, whose `getClientRects()` is a single border box no matter how many lines it wraps to.
+
+**The naive per-line map assumed the inline case and would have shipped ~2000 wpm on letters.** Taking `max(getClientRects().length, round(height / lineHeightOf(node)))` is exact in both regimes and needs no display sniffing. Two things must be skipped: the annotation engine also hangs `data-hl-key` on the note **icon** (zero words — drags the average down), and `.letter-para` carries `content-visibility: auto`, so a scrolled-past paragraph is **not laid out** and reports zero height while still returning all its text. **A zero-height box means "no measurement here", never "one line".**
+
+**It forces synchronous layout, so it must never run on the frame path** (the 2026-07-28 responsiveness lesson). Once per page, in `requestIdleCallback` (timeout 1500, `setTimeout(0)` fallback) — which also keeps the forced layout clear of the post-advance scroll restore's own ~1.5s frame loop.
+
+### 20.3 Settings keys
+
+Read in `ui/components/ReadingChromeProvider.jsx`, which builds the `AutoScrollContext` value: `autoScroll` (master enable) · `autoScrollLpm` (speed, clamped by `clampLpm`) · `autoScrollNext` (auto-continue; also gates whether the dwell knob exists at all) · `autoScrollEndMs` (dwell, clamped by `clampEndDwell`) · `keepScreenOn` (the user's global preference the controller must restore to, not override). Config is app-wide and arrives via context; per-screen wiring (the scroll container ref, the pager) arrives as props.
 
 ---
 
