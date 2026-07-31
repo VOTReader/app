@@ -73,6 +73,28 @@ describe('registerServiceWorker — P7pwa visibility-gated reload', () => {
     controllerChangeHandler();
     expect(reloadSpy).toHaveBeenCalledTimes(1);
   });
+
+  /* SW-CLAIM (2026-07-30): the SW's activate calls clients.claim(), which gives
+     an UNCONTROLLED page a controller — firing controllerchange on a page that
+     is already newest. Reloading there is a spurious first-launch reload for
+     users, and it broke smoke:ci outright (all 3 attempts died with "Execution
+     context was destroyed, most likely because of a navigation"). */
+  it('does NOT reload when the page had no controller (first load + clients.claim)', () => {
+    Object.defineProperty(navigator.serviceWorker, 'controller', { configurable: true, value: null });
+    setVisibility('visible');
+    registerServiceWorker();
+    controllerChangeHandler();
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
+  it('still reloads a hidden tab that HAD a controller (a real update is not suppressed)', () => {
+    setVisibility('hidden');
+    registerServiceWorker();
+    controllerChangeHandler();
+    setVisibility('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('registerServiceWorker — auto-update (no toast)', () => {

@@ -8,7 +8,8 @@
  * Update lifecycle (fully automatic — no user prompt):
  *   1. The SW calls self.skipWaiting() on install, so a new SW takes over
  *      immediately rather than waiting for all tabs to close.
- *   2. 'controllerchange' fires here → we reload the page onto the new build.
+ *   2. 'controllerchange' fires here → we reload the page onto the new build,
+ *      but ONLY for a page that already had a controller (see below).
  *      Background tabs defer their reload until they become visible.
  *   3. Belt-and-suspenders: if a SW is already waiting when we register
  *      (installed during a prior visit before this code ran), we post
@@ -22,6 +23,18 @@ export function registerServiceWorker() {
   if (PlatformBridge.isAndroid) return;
   if (!('serviceWorker' in navigator)) return;
 
+  // SW-CLAIM: does this page ALREADY have a controller? Only a controlled page
+  // can be looking at an older build, so only it needs the reload below. An
+  // UNCONTROLLED page (first visit, or a hard reload that bypassed the SW)
+  // fetched every asset straight from the network, so it is ALREADY newest —
+  // and it gains a controller the moment the fresh SW's activate calls
+  // clients.claim(), which fires 'controllerchange' just like a real update.
+  // Reloading there is a pointless first-launch flash for users, and it
+  // destroyed the smoke harness's execution context mid-walk (smoke:ci failed
+  // all 3 attempts with "Execution context was destroyed"). Captured BEFORE
+  // register() so claim() can't flip it first.
+  const hadController = !!navigator.serviceWorker.controller;
+
   // When the new SW takes over, reload onto the new build.
   // Defer if the tab is hidden so we don't yank a backgrounded reader.
   let refreshing = false;
@@ -31,6 +44,7 @@ export function registerServiceWorker() {
     window.location.reload();
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) return;   // first controller — nothing stale to reload onto
     if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
       doReload();
       return;
