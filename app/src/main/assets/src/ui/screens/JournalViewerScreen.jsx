@@ -474,6 +474,20 @@ export function JournalViewerScreen(props) {
   var _menuOpen = useState(false);
   var menuOpen = _menuOpen[0]; var setMenuOpen = _menuOpen[1];
 
+  // A {{ref:}} tap can OUTLIVE this screen: when the Bible corpus is still
+  // loading, onScriptureRef retries for up to 10s (40 x 250ms). Held here so a
+  // newer tap replaces the pending retry and unmount cancels it — otherwise
+  // leaving the entry mid-retry still fires onNavigateToLink when the corpus
+  // lands, yanking the reader to the verse they walked away from. Same shape as
+  // GoToRefButton's retryRef. (Declared ABOVE the !entry early return below —
+  // hooks must run unconditionally.)
+  var refRetryRef = React.useRef(null);
+  React.useEffect(function() {
+    return function() {
+      if (refRetryRef.current) { clearInterval(refRetryRef.current); refRetryRef.current = null; }
+    };
+  }, []);
+
   if (typeof window !== 'undefined' && !window.__journalBackStack) window.__journalBackStack = [];
   var _jstack = (typeof window !== 'undefined' && window.__journalBackStack) || [];
   var jrnBack = (_jstack.length && entry && _jstack[_jstack.length - 1].destId === entry.id)
@@ -569,10 +583,19 @@ export function JournalViewerScreen(props) {
       if (tryNav()) return;
       if (typeof window.__loadBibleCorpus === 'function') {
         window.__loadBibleCorpus();
+        // Newest tap wins: cancel a retry still pending from an earlier tap,
+        // so two quick taps can't race and land on the FIRST verse.
+        if (refRetryRef.current) clearInterval(refRetryRef.current);
         var tries = 0;
-        var timer = setInterval(function() {
-          if (tryNav() || ++tries >= 40) clearInterval(timer);
+        var id = setInterval(function() {
+          if (tryNav() || ++tries >= 40) {
+            clearInterval(id);
+            // Only clear the ref if it's still OURS — a newer tap may already
+            // have stored its own id here.
+            if (refRetryRef.current === id) refRetryRef.current = null;
+          }
         }, 250);
+        refRetryRef.current = id;
       }
     },
     onInlineLink: function(kind, data) {
