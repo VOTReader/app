@@ -534,6 +534,16 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // so the WebView can read content:// URIs delivered by
             // onShowFileChooser (journal image insert) — those are scoped
             // by the OS to whatever the user explicitly picked.
+            //
+            // OPEN QUESTION (2026-07-30 review): this may be droppable. The
+            // IMPORT path already doesn't need it (onCreate hands JS base64
+            // from Kotlin), and nothing in the app loads a content:// URL from
+            // page markup — which is what this setting actually gates. The one
+            // consumer left is the journal image insert's <input type="file">.
+            // Whether the WebView needs this to read back the chooser's URI is
+            // WebView-version-dependent, so it must be PROVEN on-device, not
+            // reasoned about: set false, build, install, insert a journal image.
+            // If the image lands, keep false. Left true until that runs.
             allowFileAccess = false
             allowContentAccess = true
             cacheMode = WebSettings.LOAD_DEFAULT

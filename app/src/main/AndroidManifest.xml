@@ -22,9 +22,17 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
+    <!-- usesCleartextTraffic="false" is DOCUMENTATION, not new hardening: with
+         targetSdk 36 cleartext has been off by default since targetSdk 28, so
+         this changes no behavior. It's here so the guarantee is readable in the
+         manifest instead of inferred from an SDK level, and so a future
+         targetSdk change can't quietly re-enable it. All app resources load
+         from the APK or HTTPS; an http:// link in content leaves via an
+         external intent, so it never rides this WebView. -->
     <application
         android:name=".VOTReaderApp"
         android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
