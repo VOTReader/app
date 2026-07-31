@@ -529,23 +529,27 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             @Suppress("SetJavaScriptEnabled")
             javaScriptEnabled = true
             domStorageEnabled = true
-            // Block raw file:// reads — those could expose any file on disk
-            // the app process has rights to. `allowContentAccess` is enabled
-            // so the WebView can read content:// URIs delivered by
-            // onShowFileChooser (journal image insert) — those are scoped
-            // by the OS to whatever the user explicitly picked.
+            // Both OFF. file:// reads could expose any file on disk the app
+            // process has rights to. allowContentAccess gates loading a
+            // content:// URL from PAGE MARKUP (<img src="content://…">), which
+            // nothing in this app does — it is NOT what feeds the file chooser.
             //
-            // OPEN QUESTION (2026-07-30 review): this may be droppable. The
-            // IMPORT path already doesn't need it (onCreate hands JS base64
-            // from Kotlin), and nothing in the app loads a content:// URL from
-            // page markup — which is what this setting actually gates. The one
-            // consumer left is the journal image insert's <input type="file">.
-            // Whether the WebView needs this to read back the chooser's URI is
-            // WebView-version-dependent, so it must be PROVEN on-device, not
-            // reasoned about: set false, build, install, insert a journal image.
-            // If the image lands, keep false. Left true until that runs.
+            // Neither consumer needs it, and the second was PROVEN on-device
+            // rather than reasoned about (2026-07-30, Pixel/Android 17,
+            // WebView 150.0.7871.124, this flag false):
+            //   - IMPORT hands JS base64 read in Kotlin (see onCreate), so it
+            //     never touched this setting to begin with.
+            //   - JOURNAL IMAGE INSERT (<input type="file"> ->
+            //     onShowFileChooser) still works: the photo picker opened, the
+            //     picked content:// URI came back through filePathCallback, and
+            //     the page read the File to completion — 10,623,375 of
+            //     10,623,375 bytes via FileReader.readAsArrayBuffer. The URI
+            //     arrives with its own read grant from the chooser result; this
+            //     setting is not in that path.
+            // Re-run that check if the chooser wiring or the WebView major
+            // changes: set true only with evidence, not on suspicion.
             allowFileAccess = false
-            allowContentAccess = true
+            allowContentAccess = false
             cacheMode = WebSettings.LOAD_DEFAULT
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             // Audio playback (journal voice memos) must start without a user
