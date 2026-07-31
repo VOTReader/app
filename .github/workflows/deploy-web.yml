@@ -1,12 +1,15 @@
 name: Deploy Web (PWA → GitHub Pages)
 
-# ── MAINTENANCE: Node 24 Actions migration (do before 2026-09-16) ──
-# The actions below (checkout@v4, setup-node@v4, setup-python@v5,
-# configure-pages@v5, upload-pages-artifact@v3, deploy-pages@v4) run on
-# the Node 20 runtime GitHub is retiring (forced to Node 24 2026-06-16,
-# Node 20 removed 2026-09-16). Bump each `uses:` to its current major
-# when you do the same in ci.yml — see ci.yml's MAINTENANCE note for the
-# changelog ref and rationale.
+# ── Actions are SHA-PINNED (2026-07-30) ──
+# Every `uses:` below pins a full commit SHA with its version tag in a
+# trailing comment. THIS workflow is why: it publishes straight to the live
+# PWA the owner reads on, so a moved tag on a compromised action could
+# poison what lands on his phone. A SHA cannot be moved. Read the comment
+# for the human-facing version; Dependabot (.github/dependabot.yml) bumps
+# the SHA and the comment together. Do not hand-edit a SHA — repin from the
+# API (`gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`).
+# (The Node 20 → 24 runtime migration this note used to track is DONE —
+# see ci.yml's MAINTENANCE note.)
 
 # W5.1 — publish the web-facing asset subtree to GitHub Pages.
 #
@@ -65,16 +68,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Node (pinned via .nvmrc)
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'   # B2 — restore ~/.npm keyed on package-lock.json
 
       - name: Set up Python (tools/build.py emits bundle-a)
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.x'
 
@@ -124,15 +126,15 @@ jobs:
           echo "Translations staged into src/data: $(ls _site/src/data/ | wc -l)"
 
       - name: Configure Pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
         with:
           enablement: true
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5

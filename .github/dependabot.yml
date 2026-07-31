@@ -1,0 +1,56 @@
+# Dependabot — keeps the SHA-pinned actions and the dev toolchain fresh.
+#
+# The actions in .github/workflows/*.yml are pinned to full commit SHAs so a
+# moved tag can't change what runs (deploy-web.yml publishes straight to the
+# live PWA). Pinning without automation just rots, so Dependabot maintains the
+# pins: it rewrites the SHA *and* the trailing `# vN` comment together.
+#
+# Everything here is a PULL REQUEST, never an auto-merge — CI's full gate
+# (build, lint, typecheck, vitest, smoke:ci, data validators) is what decides
+# whether a bump is safe, and the owner merges.
+
+version: 2
+updates:
+  # ── GitHub Actions: the supply-chain reason this file exists ──
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(actions)"
+    groups:
+      # One PR for the whole action set — they move together and each needs
+      # the same CI proof anyway.
+      actions:
+        patterns:
+          - "*"
+
+  # ── npm: dev toolchain only (there are no runtime deps) ──
+  # The SHIPPED React is the vendored app/src/main/assets/react.min.js, NOT the
+  # npm package — every entry in package.json is devDependencies, used for
+  # build/test/lint. So an npm bump here can break the gate but cannot ship a
+  # regression to a reader by itself.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Patch/minor land as one PR. Majors are deliberately excluded from the
+      # group so each arrives alone and gets judged on its own — eslint 10,
+      # jsdom 30 and typescript 7 were all declined on 2026-07-30 as churn.
+      dev-minor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # esbuild's target contract is load-bearing: `--target=chrome108` is
+      # Permanent Rule 6, and a major could change output for the WebView
+      # floor. Patch/minor still flow through the group above.
+      - dependency-name: esbuild
+        update-types: ["version-update:semver-major"]

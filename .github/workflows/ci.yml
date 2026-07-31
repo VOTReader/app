@@ -9,6 +9,14 @@ name: CI
 # (deploy-web also: configure-pages@v6, upload-pages-artifact@v5, deploy-pages@v5).
 # Only stable inputs are used, so the major jumps are behavior-compatible.
 # Ref: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+#
+# ── Actions are SHA-PINNED (2026-07-30) ──
+# Each `uses:` carries a full commit SHA with its tag in a trailing comment.
+# A tag can be moved by whoever owns the action; a SHA cannot — and this repo
+# is public, with deploy-web.yml publishing straight to the live PWA. Read the
+# trailing comment for the human-facing version; Dependabot
+# (.github/dependabot.yml) bumps SHA and comment together. Never hand-edit a
+# SHA — repin from the API: gh api repos/<owner>/<repo>/commits/<tag> --jq .sha
 
 # CI pipeline:
 #   Q1   — build all 4 bundles, verify committed dist/ matches source, syntax-check src/
@@ -36,10 +44,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Node (pinned via .nvmrc — matches local)
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'   # B2 — restore ~/.npm keyed on package-lock.json (skips re-fetch each push)
@@ -48,7 +55,7 @@ jobs:
       # so `npm ci` reuses it across pushes instead of re-downloading the browser
       # the smoke:ci render walk drives. The path is puppeteer's default cache dir.
       - name: Cache puppeteer Chromium
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: ~/.cache/puppeteer
           key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -56,7 +63,7 @@ jobs:
       # `npm run build` invokes `python tools/build.py` (which generates
       # bundle-a.js) — setup-python guarantees a `python` on PATH.
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.x'
 
@@ -189,10 +196,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up JDK 21 (matches gradle/gradle-daemon-jvm.properties)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -200,8 +206,7 @@ jobs:
       # Cache the Gradle daemon's caches + wrapper download so subsequent
       # CI runs don't re-download AGP 9.2.1 + Robolectric every time.
       - name: Set up Gradle (with build cache)
-        uses: gradle/actions/setup-gradle@v6
-
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
       - name: Run :app:testDebugUnitTest (JUnit 5 + Robolectric)
         # Zero-tolerance gate. Any failing Kotlin test fails CI, mirroring
         # the JS-side vitest discipline. NK1 lands the smoke harness;
@@ -219,7 +224,7 @@ jobs:
 
       - name: Upload test + coverage reports on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: kotlin-test-and-coverage-report
           path: |
