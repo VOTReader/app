@@ -7,9 +7,12 @@
      - fromLetterStack state    Array<{ sourceScreen, sourceBookId,
                                   sourceChapterNum, sourceLetterId,
                                   sourceStudyId, sourceStudyChapterId,
+                                  sourceJournalEntryId,
                                   sourceLetterTitle, sourceVolumeLabel,
-                                  destSnapshot }>  — a per-tab tabField,
-                                  capped at 50 entries
+                                  destSnapshot, silent }>  — a per-tab
+                                  tabField, capped at 50 entries. `silent`
+                                  suppresses the PILL only (History pushes
+                                  it); back still pops and restores.
      - fromLetterRef            useRefMirror of fromLetterStack — gives
                                   call-time (event-handler) reads of the
                                   current stack without a stale closure
@@ -32,6 +35,11 @@
                                   exactly one — its own state.
      - backHint                 the computed { title, volumeLabel } the
                                   pill renders, or null
+     - backActive               true when a live (destSnapshot-matching)
+                                  top entry exists — INCLUDING a `silent`
+                                  one. Hardware back keys off THIS, not
+                                  backHint, so a History-entered chapter
+                                  still unwinds to History with no pill.
 
    DOES NOT OWN:
      - _navToLinkRef / navigateToLink / the deferred `_navToLinkRef.current
@@ -47,20 +55,23 @@
        studyId/studyChapterId) — owned by the tabs block (P6k); received
        here as params (values for reads, setters for tapThroughBack's
        source-restore).
+     - journalEntryId — App()-local useState (NOT a tabField), the 7th
+       tracked position; same param treatment as the six above.
 
    PARAMS:
      tabField — the per-tab field accessor from App()'s tabs block; called
        as tabField('fromLetterStack') to get [state, setter] (the setter is
        identity-stable, cached per-key by App()).
-     screen, bookId, chapterNum, letterId, studyId, studyChapterId — current
-       navigation position; read by _destMatches / the prune effect deps /
-       backHint.
+     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+       journalEntryId — current navigation position; read by _destMatches /
+       the prune effect deps / backHint.
      setScreen, setBookId, setChapterNum, setLetterId, setStudyId,
-       setStudyChapterId — navigation setters; tapThroughBack calls them to
-       restore the popped entry's captured source position.
+       setStudyChapterId, setJournalEntryId — navigation setters;
+       tapThroughBack calls them to restore the popped entry's captured
+       source position.
 
    RETURNS: { fromLetterStack, setFromLetterStack, pushFromLetter,
-              tapThroughBack, fromLetterRef, backHint }
+              tapThroughBack, fromLetterRef, backHint, backActive }
 
    STORAGE: none directly. fromLetterStack is a tabField, so it rides along
             in the vot-state tab persistence (usePersistedState, P6k+1).
@@ -87,12 +98,14 @@ import { useRefMirror } from './use-ref-mirror.js';
  *   letterId: string | null,
  *   studyId: string | null,
  *   studyChapterId: string | null,
+ *   journalEntryId: string | null,
  *   setScreen: (val: any) => void,
  *   setBookId: (val: any) => void,
  *   setChapterNum: (val: any) => void,
  *   setLetterId: (val: any) => void,
  *   setStudyId: (val: any) => void,
- *   setStudyChapterId: (val: any) => void
+ *   setStudyChapterId: (val: any) => void,
+ *   setJournalEntryId: (val: any) => void
  * }} args
  * @returns {{
  *   fromLetterStack: any[],
@@ -100,13 +113,14 @@ import { useRefMirror } from './use-ref-mirror.js';
  *   pushFromLetter: (entry: any) => void,
  *   tapThroughBack: () => void,
  *   fromLetterRef: { current: any[] },
- *   backHint: any
+ *   backHint: any,
+ *   backActive: boolean
  * }}
  */
 export function useFromLetterStack({
   tabField,
-  screen, bookId, chapterNum, letterId, studyId, studyChapterId,
-  setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
+  screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
+  setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId, setJournalEntryId,
 }) {
   // Multi-level tap-through back-stack — a per-tab tabField so each tab
   // unwinds its own A → B → C tap-through chain independently.
@@ -133,6 +147,7 @@ export function useFromLetterStack({
     if (popped.sourceLetterId !== undefined) setLetterId(popped.sourceLetterId);
     if (popped.sourceStudyId !== undefined) setStudyId(popped.sourceStudyId);
     if (popped.sourceStudyChapterId !== undefined) setStudyChapterId(popped.sourceStudyChapterId);
+    if (popped.sourceJournalEntryId !== undefined) setJournalEntryId(popped.sourceJournalEntryId);
     if (popped.sourceScreen) setScreen(popped.sourceScreen);
   };
 
@@ -151,6 +166,9 @@ export function useFromLetterStack({
     if (dest.letterId != null && dest.letterId !== letterId) return false;
     if (dest.studyId != null && dest.studyId !== studyId) return false;
     if (dest.studyChapterId != null && dest.studyChapterId !== studyChapterId) return false;
+    // 7th field. Old persisted tabs deserialize without it (undefined) — the
+    // same `!= null` don't-care that covers an explicit null covers them.
+    if (dest.journalEntryId != null && dest.journalEntryId !== journalEntryId) return false;
     return true;
   };
 
@@ -166,8 +184,8 @@ export function useFromLetterStack({
     if (!_destMatches(top.destSnapshot)) {
       setFromLetterStack((prev) => prev.slice(0, -1));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- _destMatches is a local helper that closes over screen/bookId/chapterNum/letterId/studyId/studyChapterId — all already in deps — so each re-fire gets a fresh helper. setFromLetterStack is a useState setter from useTabs (identity-stable). Adding either would either re-fire the effect on every render or no-op.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, fromLetterStack]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- _destMatches is a local helper that closes over screen/bookId/chapterNum/letterId/studyId/studyChapterId/journalEntryId — all seven already in deps — so each re-fire gets a fresh helper. setFromLetterStack is a useState setter from useTabs (identity-stable). Adding either would either re-fire the effect on every render or no-op.
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, fromLetterStack]);
 
   // Top-of-stack back-hint — shows above the hero on tap-through destinations
   // so the user knows where Android back will return.
@@ -176,19 +194,25 @@ export function useFromLetterStack({
   // the pill is single-shot, not persistent. Legacy entries without a
   // destSnapshot show the pill unconditionally (preserves the existing
   // letter→letter tap-through multi-level back behavior).
-  const backHint = fromLetterStack.length > 0 ?
+  const _liveTop = fromLetterStack.length > 0 ?
   (() => {
     const top = fromLetterStack[fromLetterStack.length - 1];
     if (top.destSnapshot && !_destMatches(top.destSnapshot)) return null;
-    return {
-      title: top.sourceLetterTitle || "previous",
-      volumeLabel: top.sourceVolumeLabel || null
-    };
+    return top;
   })() :
   null;
+  // A `silent` entry (History pushes them — the owner does NOT want a pill on
+  // links tapped there) is still a live back target: back must return to
+  // History. So the PILL is suppressed here while backActive stays true, and
+  // hardware back keys off backActive.
+  const backHint = (_liveTop && !_liveTop.silent) ? {
+    title: _liveTop.sourceLetterTitle || "previous",
+    volumeLabel: _liveTop.sourceVolumeLabel || null
+  } : null;
+  const backActive = !!_liveTop;
 
   return {
     fromLetterStack, setFromLetterStack, pushFromLetter,
-    tapThroughBack, fromLetterRef, backHint,
+    tapThroughBack, fromLetterRef, backHint, backActive,
   };
 }

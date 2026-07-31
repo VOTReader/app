@@ -15,6 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { LetterView } from './LetterView.jsx';
+import { LibraryNav } from '../components/LibraryNav.jsx';
 
 let capturedPager;
 
@@ -26,6 +27,7 @@ beforeEach(() => {
   globalThis.StickyChapterNav = () => null;
   globalThis.HomeBtn = () => null;
   globalThis.NavButtons = () => null;
+  globalThis.LibraryNav = LibraryNav;
   globalThis.FootnoteSheet = () => null;
   globalThis.useMarkAsRead = () => {};
   globalThis.useModalRegistry = () => {};
@@ -33,7 +35,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
-  for (const k of ['ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'NavButtons', 'FootnoteSheet', 'useMarkAsRead', 'useModalRegistry']) delete globalThis[k];
+  for (const k of ['ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'NavButtons', 'LibraryNav', 'FootnoteSheet', 'useMarkAsRead', 'useModalRegistry']) delete globalThis[k];
 });
 
 const LETTER = {

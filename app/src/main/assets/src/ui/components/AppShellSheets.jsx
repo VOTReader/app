@@ -21,7 +21,8 @@
 
    Same closure-prop pattern as AppShellOverlays: explicit prop interface
    threading every dependency. Free-variable refs (BookmarkStore, bkmId,
-   _bookmarkSourceEndpoint) resolve from window at call time.
+   _bookmarkSourceEndpoint, _bookmarkSourceLabel) resolve from window at
+   call time.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function AppShellSheets({
@@ -44,7 +45,6 @@ export function AppShellSheets({
   bookmarkCreatePending, setBookmarkCreatePending,
   // Journal inbound sheet
   inboundJournalPayload, setInboundJournalPayload,
-  goJournalViewer,
 }) {
   // W1.5(a.2) — Escape-key dispatch registrations for the 11 conditionally-
   // rendered sheets here. SelectionToolbar is always-mounted with internal
@@ -142,7 +142,15 @@ export function AppShellSheets({
       {linkSidebarKey && (
         <LinkSidebar
           hlKey={linkSidebarKey}
-          onClose={closeLinkSidebar} onNavigate={navigateToLink}
+          onClose={closeLinkSidebar}
+          // Name the passage the links hang off, so the destination's pill
+          // reads "‹ Back to John 3:16" instead of the bare "Back to previous"
+          // fallback. _bookmarkSourceLabel is the app's one hlKey→label
+          // resolver (bare-name bundle-d global, typeof-guarded like every
+          // other use of it here).
+          onNavigate={(endpoint, meta) => navigateToLink(endpoint, meta || {
+            sourceLetterTitle: (typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(linkSidebarKey) : null,
+          })}
         />
       )}
       {linkPickerSource && !linkRefineRequest && (
@@ -259,8 +267,21 @@ export function AppShellSheets({
           resourceLabel={inboundJournalPayload.label}
           onClose={() => setInboundJournalPayload(null)}
           onOpenEntry={(entry) => {
+            // This IS a cross-screen link — you're reading a passage, you tap
+            // the journal badge, you leave the passage. It used to call
+            // goJournalViewer (a plain setScreen, no pill). Route it through
+            // navigateToLink so the entry gets the "‹ Back to <passage>" pill,
+            // labelled with the ref the chip was opened on. (The Journal HUB
+            // card still uses goJournalViewer — that one is an in-section
+            // drill-down, not a cross-screen link.)
+            const srcLabel = inboundJournalPayload.label || null;
             setInboundJournalPayload(null);
-            if (entry && entry.id) goJournalViewer(entry.id);
+            if (entry && entry.id) {
+              navigateToLink(
+                { type: 'journal', entryId: entry.id, screen: 'journal-viewer' },
+                { sourceLetterTitle: srcLabel },
+              );
+            }
           }}
         />
       )}

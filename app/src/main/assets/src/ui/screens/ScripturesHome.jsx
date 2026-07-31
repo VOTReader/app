@@ -2,7 +2,7 @@
    ScripturesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, translation }) {
+export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, onCycleLayout, translation }) {
   // Q8: pre-trigger the Bible corpus load when this screen mounts so the
   // user's likely next action (tap a genre tile or book) doesn't pay the
   // full ~7 MB download wait. The subscription re-renders this component
@@ -48,15 +48,58 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
   const allGenres = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt];
   const allBooks = allGenres.flatMap((g) => g.books);
 
-  const navBar = (
-    <>
-      <button className="nav-home nav-back-icon" onClick={onBack} title="← Home" aria-label="Back to Home">{"‹"}</button>
-      <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
-    </>
-  );
+  // showHome:false — this IS a hub landing; its back button (class nav-home)
+  // is the right-cluster margin-right:auto anchor (app.css:319).
+  const navBar = LibraryNav({
+    onBack, backLabel: 'Home', showHome: false,
+    onSettings, onHistory, onSearch, theme, onThemeChange,
+  });
+
+  /* ── Layout cycle button ──
+     Resolves the current option EXACTLY the way the Settings SelectField
+     does (`options.find(o => o.id === value) || options[0]`, SelectField:8),
+     so an unknown persisted value cycles from the head of the table instead
+     of desyncing from the Settings row. Both writers go through the same
+     table + the same React state, so they can never disagree.
+     SCRIPTURE_LAYOUT_OPTIONS is an index.html classic-script const (global
+     LEXICAL env, NOT a window property) — typeof-guard it by bare name. */
+  const layoutOpts = typeof SCRIPTURE_LAYOUT_OPTIONS !== 'undefined' ? SCRIPTURE_LAYOUT_OPTIONS : [];
+  const layoutIdx = Math.max(0, layoutOpts.findIndex((o) => o.id === layout));
+  const nextLayout = layoutOpts.length ? layoutOpts[(layoutIdx + 1) % layoutOpts.length] : null;
+  const [flash, setFlash] = React.useState('');
+  React.useEffect(() => {
+    if (!flash) return undefined;
+    const t = setTimeout(() => setFlash(''), 1500);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  const cycleBtn = nextLayout ? (
+    <div className="scripture-layout-cycle">
+      <button
+        className="scripture-layout-cycle-btn"
+        onClick={() => { setFlash(nextLayout.label); if (onCycleLayout) onCycleLayout(nextLayout.id); }}
+        aria-label="Change Scripture layout"
+        title={`Layout: ${layoutOpts[layoutIdx].label} — tap to change`}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+      </button>
+      {/* Visible caption matching the aria semantics (the Wave-0
+          .surprise-fab-caption precedent). Always-mounted live region so
+          TalkBack announces the insertion; the key restarts the fade. */}
+      <div className="scripture-layout-cycle-caption" role="status" aria-live="polite">
+        {flash ? <span key={flash}>{flash}</span> : null}
+      </div>
+    </div>
+  ) : null;
 
   const hero = (
     <>
+      {cycleBtn}
       <div className="home-eyebrow">{translationName(translation)}</div>
       <h1 className="home-title">The Scriptures of Truth</h1>
       <div className="home-ornament">

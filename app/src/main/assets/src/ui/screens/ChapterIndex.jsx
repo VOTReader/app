@@ -27,13 +27,10 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   const backDest = backLabel || "Books";
   return (
     <ScreenLayout
-      navChildren={
-        <>
-          <button className="nav-home nav-back-icon" onClick={onBack} title={"← " + backDest} aria-label={"Back to " + backDest}>{"‹"}</button>
-          <HomeBtn />
-          <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
-        </>
-      }
+      navChildren={LibraryNav({
+        onBack, backLabel: backDest,
+        onSettings, onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       <div className="vol-index">
         <div className="vol-index-header">

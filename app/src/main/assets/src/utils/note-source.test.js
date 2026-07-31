@@ -18,7 +18,7 @@
 */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav } from './note-source.js';
+import { _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav, noteSourceSegments } from './note-source.js';
 
 const g = /** @type {any} */ (globalThis);
 
@@ -174,5 +174,84 @@ describe('noteSourceNav', () => {
     // 'study:matthew:37' has no -<chapter> to split, so the guard fails and
     // the function falls through to null rather than inventing a chapter.
     expect(noteSourceNav({ keys: ['study:matthew:37'] })).toBeNull();
+  });
+});
+
+/* noteSourceSegments — the per-segment sibling of label+nav.
+   noteSourceLabel flattens a multi-chapter note into one string and
+   noteSourceNav only ever resolves keys[0], so every segment past the first
+   was dead text on the row. This returns one tappable entry per chapter-group
+   (same grouping the label is built from) with verseEnd filled in so the whole
+   span flash-highlights on arrival. Both older functions keep their exact
+   signatures — the 25 assertions above must not need a single edit. */
+describe('noteSourceSegments', () => {
+  it('a single-key bible note yields ONE segment matching the label', () => {
+    g.BIBLE_BOOK_LIST = [{ id: 'genesis', title: 'Genesis' }];
+    const note = { keys: ['bible:genesis:1:5'] };
+    expect(noteSourceSegments(note)).toEqual([{
+      label: 'Genesis 1:5',
+      nav: { type: 'bible', key: 'bible:genesis:1:5', bookId: 'genesis', chapter: 1, verse: 5 },
+    }]);
+    // Label parity with the flat string the row used to show.
+    expect(noteSourceSegments(note).map(s => s.label).join(' · ')).toBe(noteSourceLabel(note));
+  });
+
+  it('a multi-chapter note yields ONE segment per chapter-group, each navigable', () => {
+    g.BIBLE_BOOK_LIST = [{ id: 'john', title: 'John' }];
+    const note = { keys: ['bible:john:3:16', 'bible:john:4:1', 'bible:john:4:2'] };
+    const segs = noteSourceSegments(note);
+    expect(segs.map(s => s.label)).toEqual(['John 3:16', 'John 4:1-2']);
+    // Second segment was unreachable before — the row always went to keys[0].
+    expect(segs[1].nav).toEqual({
+      type: 'bible', key: 'bible:john:4:1', bookId: 'john', chapter: 4, verse: 1, verseEnd: 2,
+    });
+    expect(segs.map(s => s.label).join(' · ')).toBe(noteSourceLabel(note));
+  });
+
+  it('verseEnd is populated for a range so the WHOLE span flash-highlights', () => {
+    g.BIBLE_BOOK_LIST = [{ id: 'psalms', title: 'Psalms' }];
+    const segs = noteSourceSegments({
+      keys: ['bible:psalms:121:5', 'bible:psalms:121:6', 'bible:psalms:121:7', 'bible:psalms:121:8'],
+    });
+    expect(segs[0].nav).toMatchObject({ verse: 5, verseEnd: 8 });
+    // A single-verse group carries no verseEnd (nothing to span).
+    expect(noteSourceSegments({ keys: ['bible:psalms:23:1'] })[0].nav.verseEnd).toBeUndefined();
+  });
+
+  it('a study note splits the fused book-chapter the same way noteSourceNav does', () => {
+    const segs = noteSourceSegments({ keys: ['study:matthew-22:37', 'study:matthew-22:38'] });
+    expect(segs).toEqual([{
+      label: 'Matthew 22:37-38',
+      nav: { type: 'study', key: 'study:matthew-22:37', bookId: 'matthew', chapter: 22, verse: 37, verseEnd: 38 },
+    }]);
+  });
+
+  it('a whole-chapter key navigates to the chapter with no verse anchor', () => {
+    g.BIBLE_BOOK_LIST = [{ id: 'psalms', title: 'Psalms' }];
+    const segs = noteSourceSegments({ keys: ['bible:psalms:23:'] });
+    expect(segs[0].label).toBe('Psalms 23:');
+    // No NaN verse — verseAnchorFor gets nothing and simply opens the chapter.
+    expect(segs[0].nav).toEqual({ type: 'bible', key: 'bible:psalms:23:', bookId: 'psalms', chapter: 23 });
+  });
+
+  it('letter / wtlb / journal notes yield ONE segment reusing label + nav verbatim', () => {
+    g.findEntryContext = () => ({ title: 'The Wide Path', screen: 'volume-one-letter' });
+    const letter = { keys: ['letter:the-wide-path:2', 'letter:the-wide-path:5'] };
+    expect(noteSourceSegments(letter)).toEqual([{
+      label: noteSourceLabel(letter),
+      nav: noteSourceNav(letter),
+    }]);
+
+    g.JournalStore = { get: () => ({ id: 'e1', title: 'Morning' }) };
+    g.JournalHelpers = { entryDisplayTitle: (e) => e.title };
+    const jrn = { keys: ['journal:e1:0'] };
+    expect(noteSourceSegments(jrn)).toEqual([{ label: 'Journal · Morning', nav: noteSourceNav(jrn) }]);
+  });
+
+  it('no keys / unknown kind / malformed study key yield [] — noteSourceNav null semantics', () => {
+    expect(noteSourceSegments({})).toEqual([]);
+    expect(noteSourceSegments({ keys: [] })).toEqual([]);
+    expect(noteSourceSegments({ keys: ['garden:img-7:0'] })).toEqual([]);
+    expect(noteSourceSegments({ keys: ['study:matthew:37'] })).toEqual([]);
   });
 });

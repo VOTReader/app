@@ -2,7 +2,7 @@
    FootnoteListSection — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLink }) {
+export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLink, onGoToRef }) {
   const entries = Object.entries(footnotes);
   if (entries.length === 0) return null;
   const scrollToBubble = (num) => {
@@ -40,6 +40,16 @@ export function FootnoteListSection({ footnotes, nkjv, highlightedFn, onInAppLin
                   return v ? <ExpandableVerse text={v} refStr={fn.ref} /> :
                     <span className="footnote-list-missing">{" — verse text not available"}</span>;
                 })()}
+                {typeof GoToRefButton !== 'undefined' && onGoToRef && (
+                  // The in-body footnote LIST was the one scripture surface with
+                  // no go-to-scripture affordance — the same GoToRefButton the
+                  // footnote SHEET mounts, so a compound cite splits here too.
+                  // The list item is itself role=button (scroll back to the
+                  // bubble); swallow the click so the two don't fight.
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <GoToRefButton refStr={fn.ref} onGo={onGoToRef} />
+                  </span>
+                )}
                 {fn.seeAlso && (
                   <div style={{ marginTop: "0.5rem" }}>
                     <span style={{ fontFamily: "'Cinzel',serif", fontSize: "0.6rem", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" }}>Also see:</span>

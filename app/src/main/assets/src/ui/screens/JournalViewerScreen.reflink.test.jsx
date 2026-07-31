@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { JournalViewerScreen } from './JournalViewerScreen.jsx';
+import { parseRefStr, splitCompoundRef } from '../../data/scripture-resolution.js';
 
 const ENTRY = {
   id: 'e1', title: 'Morning Reflection',
@@ -69,6 +70,7 @@ afterEach(() => {
   delete window.JournalHelpers;
   delete window.__loadBibleCorpus;
   delete (/** @type {any} */ (globalThis).parseRefStr);
+  delete (/** @type {any} */ (globalThis).splitCompoundRef);
   delete (/** @type {any} */ (globalThis).findBook);
 });
 
@@ -137,5 +139,99 @@ describe('JournalViewerScreen — {{ref:}} retry does not outlive the screen', (
     vi.advanceTimersByTime(10000);
 
     expect(onNavigateToLink).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* Compound {{ref:}} chips — the live dead tap.
+   ────────────────────────────────────────────
+   the-blessed.js ships {{ref:Isaiah 40:13; Romans 11:34}}. The handler called
+   parseRefStr on the WHOLE string, which returns null for a compound, and the
+   `if (!p) return true` branch made the gold chip a completely silent no-op.
+   Each part is now its own tap target carrying its own single ref.
+
+   HARD CONSTRAINT: the block's visible text must stay CHARACTER-IDENTICAL.
+   Journal blocks are annotatable (`journal:<entryId>:<blockIdx>` hlKeys) and
+   highlight offsets walk this DOM — one extra or missing character shifts every
+   existing annotation on the block. */
+describe('JournalViewerScreen — a compound {{ref:}} chip splits into per-part taps', () => {
+  /** Real splitter + real parser; findBook resolves every book once "loaded". */
+  function setupCompound(text) {
+    const entry = { ...ENTRY, blocks: [{ type: 'p', text }] };
+    window.ScreenLayout = ({ children }) => <div>{children}</div>;
+    window.LibraryNav = () => null;
+    window.JournalStore = {
+      subscribe: () => () => {}, getVersion: () => 1,
+      get: (id) => (id === entry.id ? entry : null),
+      all: () => [entry], associatedDataSummary: () => null,
+    };
+    window.JournalHelpers = {
+      entryDisplayTitle: (e) => e.title, previewText: () => '', attachmentSummary: () => [],
+      shortDate: () => 'Jul 3', shortTime: () => '9:00 AM', longDate: () => 'July 3, 2024',
+    };
+    /** @type {any} */ (globalThis).parseRefStr = parseRefStr;
+    /** @type {any} */ (globalThis).splitCompoundRef = splitCompoundRef;
+    /** @type {any} */ (globalThis).findBook = (raw) =>
+      String(raw).toLowerCase().replace(/\s+/g, '');
+    window.__loadBibleCorpus = vi.fn();
+    const onNavigateToLink = vi.fn();
+    const r = render(
+      <JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} onNavigateToLink={onNavigateToLink} />,
+    );
+    return { ...r, onNavigateToLink };
+  }
+
+  /** The paragraph the block renders into — the annotation-offset surface. */
+  const para = (container) => container.querySelector('.jrn-inline-ref').closest('p, div');
+
+  it('renders one tap target per part and each navigates its OWN ref', () => {
+    const { container, onNavigateToLink } = setupCompound('See {{ref:Isaiah 40:13; Romans 11:34}} here.');
+    const chips = /** @type {HTMLElement[]} */ ([...container.querySelectorAll('.jrn-inline-ref')]);
+    expect(chips.map(c => c.textContent)).toEqual(['Isaiah 40:13', 'Romans 11:34']);
+
+    chips[1].click();     // used to be a completely silent no-op
+    expect(onNavigateToLink.mock.calls[0][0]).toEqual({ type: 'bible', bookId: 'romans', chapter: 11, verse: 34 });
+    chips[0].click();
+    expect(onNavigateToLink.mock.calls[1][0]).toEqual({ type: 'bible', bookId: 'isaiah', chapter: 40, verse: 13 });
+  });
+
+  it('the visible text is character-identical to the un-split render', () => {
+    const source = 'See {{ref:Isaiah 40:13; Romans 11:34}} here.';
+    const { container } = setupCompound(source);
+    expect(para(container).textContent).toBe('See Isaiah 40:13; Romans 11:34 here.');
+  });
+
+  it('a book-implied continuation keeps the source label, not the expanded ref', () => {
+    // Text shows "11:31" exactly as authored; the TAP carries "Daniel 11:31".
+    const { container, onNavigateToLink } = setupCompound('Read {{ref:Daniel 9:27; 11:31}} again.');
+    const chips = /** @type {HTMLElement[]} */ ([...container.querySelectorAll('.jrn-inline-ref')]);
+    expect(chips.map(c => c.textContent)).toEqual(['Daniel 9:27', '11:31']);
+    expect(para(container).textContent).toBe('Read Daniel 9:27; 11:31 again.');
+    chips[1].click();
+    expect(onNavigateToLink.mock.calls[0][0]).toEqual({ type: 'bible', bookId: 'daniel', chapter: 11, verse: 31 });
+  });
+
+  it('a comma verse list gets its own tap target, text still identical', () => {
+    const { container, onNavigateToLink } = setupCompound('{{ref:Matthew 5:3-4, 7}}');
+    const chips = /** @type {HTMLElement[]} */ ([...container.querySelectorAll('.jrn-inline-ref')]);
+    expect(chips.map(c => c.textContent)).toEqual(['Matthew 5:3-4', '7']);
+    expect(para(container).textContent).toBe('Matthew 5:3-4, 7');
+    chips[1].click();     // verse 7 was silently discarded by parseRefStr
+    expect(onNavigateToLink.mock.calls[0][0]).toEqual({ type: 'bible', bookId: 'matthew', chapter: 5, verse: 7 });
+  });
+
+  it('an unparseable chunk stays PLAIN text — the parseable parts still tap', () => {
+    const { container } = setupCompound('{{ref:see the gloss; Isaiah 12:2}}');
+    const chips = /** @type {HTMLElement[]} */ ([...container.querySelectorAll('.jrn-inline-ref')]);
+    expect(chips.map(c => c.textContent)).toEqual(['Isaiah 12:2']);
+    expect(para(container).textContent).toBe('see the gloss; Isaiah 12:2');
+  });
+
+  it('a plain single ref still renders exactly one chip (no regression)', () => {
+    const { container, onNavigateToLink } = setupCompound('Remember {{ref:John 3:16}} today.');
+    const chips = /** @type {HTMLElement[]} */ ([...container.querySelectorAll('.jrn-inline-ref')]);
+    expect(chips.map(c => c.textContent)).toEqual(['John 3:16']);
+    expect(para(container).textContent).toBe('Remember John 3:16 today.');
+    chips[0].click();
+    expect(onNavigateToLink.mock.calls[0][0]).toEqual({ type: 'bible', bookId: 'john', chapter: 3, verse: 16 });
   });
 });

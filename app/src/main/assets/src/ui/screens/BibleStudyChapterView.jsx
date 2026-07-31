@@ -34,6 +34,12 @@ export function BibleStudyChapterView({
   selectStudy, selectStudyChapter,
   // Nav helpers
   goStudiesHome,
+  // useFromLetterStack — the two jumps below are cross-screen links, so they
+  // raise the same "‹ Back to …" pill every other in-content link does. They
+  // push DIRECTLY rather than routing through navigateToLink, because that
+  // router nulls studyId/studyChapterId — which the `fromStudies` fallback
+  // still needs after the single-shot pill is pruned.
+  pushFromLetter,
   // Common LetterView bundle (theme/search/history/settings/link/etc.)
   sharedViewProps,
 }) {
@@ -103,6 +109,16 @@ export function BibleStudyChapterView({
     return { letter: shimFor(study.chapters[i], i), scrollKey: 'study-' + studyId + '-' + nb.id };
   };
 
+  // Where a link tapped in THIS chapter came from, for the back-pill.
+  const pillSource = (destSnapshot) => ({
+    sourceScreen: 'bible-study-chapter',
+    sourceBookId: null, sourceChapterNum: null, sourceLetterId: null,
+    sourceStudyId: studyId, sourceStudyChapterId: studyChapterId,
+    sourceLetterTitle: ch.title || study.title,
+    sourceVolumeLabel: study.title,
+    destSnapshot: destSnapshot,
+  });
+
   // onStudyNavigate: internal jump to another study. Saves current
   // location so back returns here via existing fromSearch-style logic.
   const jumpToStudy = (targetSlug) => {
@@ -113,10 +129,21 @@ export function BibleStudyChapterView({
     }
     const target = getStudyById(targetSlug);
     if (!target || target.locked) return;
+    // selectStudy lands on bible-study-chapter only for a single-chapter /
+    // singlePage study; a multi-chapter one lands on bible-study-index, which
+    // has no pill renderer — pushing there would be a dead entry the prune
+    // effect evicts on the next tap. matthew-idx (above) likewise.
+    const only = (target.chapters && (target.chapters.length === 1 || target.singlePage)) ? target.chapters[0] : null;
+    if (only && pushFromLetter) {
+      pushFromLetter(pillSource({ screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: targetSlug, studyChapterId: only.id }));
+    }
     selectStudy(targetSlug);
   };
   const handleLetterClick = (lid, sc) => {
     setFromStudies(true);
+    if (pushFromLetter) {
+      pushFromLetter(pillSource({ screen: sc, bookId: null, chapterNum: null, letterId: lid, studyId: null, studyChapterId: null }));
+    }
     setLetterId(lid);
     const _col = COL_BY_LETTER_SC.get(sc);
     if (_col) setActiveReadKey(_col.readKey);

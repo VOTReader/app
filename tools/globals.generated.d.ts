@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 466 distinct identifiers.
+// Total: 469 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -258,6 +258,7 @@ declare const WelcomedFlagStore: any;
 declare const WtlbEntryView: any;
 declare const _BOUNDARY_SHORT: any;
 declare const _BOUNDARY_SHORT_OUTSIDE: any;
+declare const _CROSS_CHAPTER_TAIL: any;
 declare const _HL_COLOR_HEX: any;
 declare const _HL_COLOR_ORDER: any;
 declare const _NAV_ICONS: any;
@@ -393,6 +394,7 @@ declare const navItemToEndpoint: any;
 declare const normalizeForHighlight: any;
 declare const noteSourceLabel: any;
 declare const noteSourceNav: any;
+declare const noteSourceSegments: any;
 declare const openThumbDB: any;
 declare const parseRefRange: any;
 declare const parseRefRanges: any;
@@ -414,6 +416,7 @@ declare const searchNavIndex: any;
 declare const showToast: any;
 declare const snapRangeToWords: any;
 declare const snapSelectionRange: any;
+declare const splitCompoundRef: any;
 declare const splitIntoVerses: any;
 declare const splitWithHighlight: any;
 declare const srchApplyFilter: any;

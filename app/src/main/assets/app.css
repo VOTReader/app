@@ -546,14 +546,11 @@
         min-width: 2rem; justify-content: center; line-height: 1;
         max-width: none; opacity: 1;
       }
-      .nav-volume {
-        font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.18em;
-        text-transform: uppercase; color: var(--gold); opacity: 0.85;
-        transition: opacity var(--transition); cursor: pointer; background: none; border: none;
-        padding: 0.45rem 0.55rem; max-width: 6.5rem; line-height: 1.35;
-        min-height: 44px; display: flex; align-items: center;
-      }
-      @media (hover: hover) { .nav-volume:hover { opacity: 1; } }
+      /* `.nav-volume` was deleted 2026-07-30. It was LetterView's back button
+         only, and because it sat AFTER .nav-back-icon at equal specificity (here
+         AND in the chrome-pin block) it silently shrank that arrow to 11.52px on
+         13 reading screens. LetterView now renders the standard
+         `nav-home nav-back-icon` through LibraryNav. Do not reintroduce. */
       .nav-arrows { display: flex; gap: 0.3rem; flex-shrink: 0; }
       .nav-btn {
         font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.1em;
@@ -2052,6 +2049,35 @@
     .canon-card-title { font-family:'Cinzel',serif; font-size:1.05rem; color:var(--gold); letter-spacing:0.04em; margin-bottom:0.15rem; }
     .canon-card-sub { font-family:'EB Garamond',serif; font-size:0.92rem; color:var(--cream-muted); font-style:italic; line-height:1.3; }
     .canon-card-detail { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-top:0.2rem; }
+    /* ── Scriptures layout cycle (in-content, top-right corner) ───────────
+       Cycles scriptureLayout without digging through Settings. ABSOLUTE on
+       purpose: the genre branch (.scriptures-landing) is an explicit
+       fill-the-screen-without-scrolling design and the [17] 200% zoom audit
+       passes on the current markup — a new row in the shared `hero` would
+       eat that budget in all four layouts. Out of flow = zero vertical cost.
+       This is CONTENT chrome (rem type, scales with --font-scale); it must
+       NOT go in the chrome-pin block at the end of this file. The 44px touch
+       floor stays in px so it can't shrink below the a11y minimum at 80%
+       text size. .home-screen gets the containing block — its only other
+       absolute descendants (.home-nav-item.pressing::after) already resolve
+       against positioned parents inside it, so nothing else moves. */
+    .home-screen { position:relative; }
+    .scripture-layout-cycle { position:absolute; top:0; right:0; display:flex; z-index:3; }
+    .scripture-layout-cycle-btn { background:none; border:none; cursor:pointer; color:var(--gold-dim); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; opacity:0.75; }
+    @media (hover: hover) { .scripture-layout-cycle-btn:hover { color:var(--gold); opacity:1; } }
+    .scripture-layout-cycle-btn:active { color:var(--gold); opacity:1; }
+    .scripture-layout-cycle-btn svg { width:20px; height:20px; }
+    /* The caption is ABSOLUTE inside the cluster, not stacked under the
+       button in flow: an in-flow caption widens the flex column, which
+       re-centers — and visibly JOLTS — the icon sideways the moment it
+       appears (measured: 331px → 294px on "Canonical Scroll"). Out of flow,
+       the cluster stays exactly 44px wide and the icon never moves. It hangs
+       right-aligned under the icon as a small opaque chip, because in the
+       .scriptures-landing context it lands over the tail of .home-title —
+       reading as a deliberate 1.5s toast rather than a text collision. */
+    .scripture-layout-cycle-caption { position:absolute; top:100%; right:0; font-family:'Cinzel',serif; font-size:0.56rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold-dim); text-align:right; white-space:nowrap; pointer-events:none; }
+    .scripture-layout-cycle-caption span { display:inline-block; padding:0.25rem 0.45rem; border:1px solid var(--gold-border); border-radius:4px; background:var(--bg2); animation:layoutCycleFade 1.5s ease forwards; }
+    @keyframes layoutCycleFade { 0% { opacity:0; } 15% { opacity:0.85; } 65% { opacity:0.85; } 100% { opacity:0; } }
     .settings-gear-btn { background:none; border:none; cursor:pointer; color:var(--gold-dim); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; }
     @media (hover: hover) { .settings-gear-btn:hover { color:var(--gold); } }
     .settings-gear-btn svg { width:20px; height:20px; }
@@ -4328,12 +4354,26 @@
     .nb-card-create-input:focus { border-color: var(--gold); }
     .nb-card-create-actions { display: flex; gap: 6px; }
     .nb-card-create-actions button { flex: 1; }
-    /* Drilled view: header with back arrow + notebook name + rename/delete */
+    /* Drilled view header — TWO rows: [‹ back][notebook name][count] over a
+       row of actions. One row for all of it made the name the only flexible
+       item, so at --font-scale 1.6 the uppercase Cinzel buttons ate the row
+       and the name ellipsised to nothing. Split, the name gets nearly the
+       whole title row and the actions wrap among themselves instead. The
+       name is CONTENT (the screen title while drilled), so it stays in rem
+       and scales — deliberately NOT in the chrome-pin block at the end. */
     .nb-drilled-header {
-      display: flex; align-items: center; gap: 0.55rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
       margin-bottom: 0.9rem;
+    }
+    .nb-drilled-titlerow {
+      display: flex; align-items: center; gap: 0.55rem;
+      min-width: 0;
+    }
+    .nb-drilled-actions {
+      display: flex; align-items: center; gap: 0.55rem;
       flex-wrap: wrap;
     }
+    .nb-drilled-actions:empty { display: none; }
     .nb-drilled-back {
       background: transparent; border: 1px solid var(--gold-border);
       color: var(--cream-dim);
@@ -4346,10 +4386,18 @@
     }
     .nb-drilled-back:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
     .nb-drilled-title {
-      font-family: 'Cinzel', serif; font-size: 1.1rem;
+      font-family: 'Cinzel', serif; font-size: 1.2rem; font-weight: normal;
       letter-spacing: 0.08em; color: var(--gold);
       flex: 1; min-width: 0;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    /* Matches .notes-index-count — the same "N notes" eyebrow, for the
+       drilled notebook instead of the whole index. */
+    .nb-drilled-count {
+      font-family: 'Cinzel', serif; font-size: 0.62rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--gold-dim);
+      flex-shrink: 0;
     }
     .nb-drilled-action {
       background: transparent; border: 1px solid var(--gold-border);
@@ -4358,6 +4406,9 @@
       font-family: 'Cinzel', serif; font-size: 0.56rem;
       letter-spacing: 0.10em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
+      /* Own row now, so the label can carry a real touch target. */
+      min-height: 44px;
+      display: inline-flex; align-items: center; justify-content: center;
     }
     .nb-drilled-action:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
     /* Extra gap before the destructive Delete so a tap aimed at Rename
@@ -4465,6 +4516,16 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     body.light .note-row-source { color: var(--gold); }
+    /* Each source segment of a multi-chapter note is its own tap target
+       (NoteRow onTapSegment). Reset the native button and carry the same
+       dotted-underline affordance the inline scripture refs use, so it reads
+       as a link rather than as chrome. */
+    .note-row-source-seg {
+      font: inherit; color: inherit; letter-spacing: inherit;
+      background: none; border: 0; padding: 0; margin: 0;
+      border-bottom: 1px dotted var(--tap-ref-sub);
+      cursor: pointer;
+    }
     .note-row-date {
       font-family: 'Cinzel', serif; font-size: 0.54rem;
       letter-spacing: 0.14em; text-transform: uppercase;
@@ -5415,7 +5476,7 @@
       position: fixed; left: 50%; transform: translateX(-50%);
       bottom: max(1.4rem, calc(var(--inset-bottom, 0px) + 0.4rem));
       z-index: 195;
-      display: flex; align-items: center; gap: 2px;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
       width: max-content; max-width: calc(100vw - 24px);
       padding: 3px 10px 3px 4px;
       background: rgba(20,20,24,0.94);
@@ -5448,6 +5509,23 @@
       white-space: nowrap; padding-left: 4px;
     }
     .ascroll-readout-wide { padding: 0 4px 0 12px; }
+    /* The pill is a COLUMN of rows so the dwell stepper can appear below the
+       transport instead of competing with it for width — the always-visible
+       row is already four controls wide on a phone. */
+    .ascroll-row { display: flex; align-items: center; gap: 2px; }
+    /* A stadium end-cap looks wrong once the pill is two rows tall. */
+    .ascroll-pill.is-expanded { border-radius: 20px; padding-bottom: 5px; }
+    .ascroll-timer svg { width: 19px; height: 19px; }
+    .ascroll-dwell-row { gap: 2px; padding-left: 6px; }
+    .ascroll-dwell-label, .ascroll-dwell-value {
+      font-family: var(--font-cinzel, Georgia, serif);
+      color: var(--cream-dim); letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    /* Both sizes are restated in px in the chrome-pin block at the end of the
+       file — keep the pairs in sync (0.56rem = 8.96px, 0.68rem = 10.88px). */
+    .ascroll-dwell-label { font-size: 0.56rem; text-transform: uppercase; padding-right: 2px; }
+    .ascroll-dwell-value { font-size: 0.68rem; min-width: 42px; text-align: center; color: var(--gold); }
     /* A reader who has switched auto-scroll on is not the audience for the
        first-run annotation tip, and both sit bottom-centre. */
     body.autoscroll-on .ann-hint-pill { display: none; }
@@ -5467,7 +5545,6 @@
     .top-nav { gap: 1.92px; padding: 11.2px 8px 11.2px; padding-top: calc(var(--inset-top, 0px) + 11.2px); }
     .nav-home { font-size: 11.52px; padding: 7.2px 8.8px; }
     .nav-back-icon { font-size: 33.6px; padding: 0 5.6px; min-width: 32px; }
-    .nav-volume { font-size: 11.52px; padding: 7.2px 8.8px; max-width: 104px; }
     .nav-theme-btn, .nav-search-btn { padding: 8px; }
     .reading-dot-nav { width: 40px; height: 40px; }
     .tabs-nav-btn { font-size: 10.88px; padding: 5.6px 8px; gap: 4px; margin-left: 2.4px; }
@@ -5481,6 +5558,8 @@
     .ascroll-step { font-size: 20px; }
     .ascroll-cancel { font-size: 9.6px; }
     .ascroll-readout { font-size: 10.88px; }
+    .ascroll-dwell-label { font-size: 8.96px; }
+    .ascroll-dwell-value { font-size: 10.88px; }
     .mode-btn { font-size: 9.92px; padding: 8.8px 16px; gap: 7.2px; }
     @media (max-width: 500px) { .mode-btn { font-size: 9.28px; padding: 8px 12px; } }
 

@@ -5,10 +5,22 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
 /**
- * @param {{ note: any, onTap: any, hideNotebookId?: any }} props
+ * @param {{ note: any, onTap: any, onTapSegment?: any, hideNotebookId?: any }} props
  */
-export function NoteRow({ note, onTap, hideNotebookId }) {
+export function NoteRow({ note, onTap, onTapSegment, hideNotebookId }) {
   const sourceLabel = noteSourceLabel(note);
+  // A multi-chapter note ("John 3:16 · John 4:1-2") used to be one inert string
+  // over a row that always navigated to keys[0] — every segment past the first
+  // was dead text. Each segment is now its own tap target with its own endpoint.
+  // The row itself keeps its whole-note behavior; segment taps stopPropagation
+  // so they don't fire it too (the ExpandableText precedent).
+  const segments = (typeof noteSourceSegments === 'function' && onTapSegment)
+    ? noteSourceSegments(note) : [];
+  const tapSegment = (e, nav) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onTapSegment(note, nav);
+  };
   const date = relativeDate(note.updated || note.created);
   // Inside a drilled notebook every row belongs to that notebook, so its chip
   // is pure noise — the host passes hideNotebookId to suppress just that one.
@@ -34,7 +46,27 @@ export function NoteRow({ note, onTap, hideNotebookId }) {
       <span className="note-row-swatch" style={{ background: swatchBg }} />
       <span className="note-row-body">
         <span className="note-row-source-line">
-          <span className="note-row-source">{sourceLabel}</span>
+          {segments.length > 0 ? (
+            <span className="note-row-source">
+              {segments.map((seg, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && " · "}
+                  <button
+                    type="button"
+                    className="note-row-source-seg"
+                    title={"Go to " + seg.label}
+                    onClick={(e) => tapSegment(e, seg.nav)}
+                    // The row wrapper is role=button with its own Enter/Space
+                    // handler; a native button already activates on those keys,
+                    // so stop the keydown here or the row fires a second time.
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
+                  >{seg.label}</button>
+                </React.Fragment>
+              ))}
+            </span>
+          ) : (
+            <span className="note-row-source">{sourceLabel}</span>
+          )}
           {date && <span className="note-row-date">{date}</span>}
         </span>
         {bodyText && (Exp && bodyText.length > 160

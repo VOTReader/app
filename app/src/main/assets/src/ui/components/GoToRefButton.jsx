@@ -11,9 +11,12 @@
    Android-back (via the from-letter stack).
 
    COMPOUND CITES: the Matthew study cites are often semicolon lists
-   ("Psalm 118:14; Isaiah 12:2") — each segment that parses gets its OWN
-   button, so every listed passage is one tap away. A ref string with no
-   parseable segment renders nothing.
+   ("Psalm 118:14; Isaiah 12:2") — each part gets its OWN button, so every
+   listed passage is one tap away. splitCompoundRef (data/scripture-resolution)
+   is the shared decomposer: it also carries the book forward across bookless
+   segments ("Daniel 9:27; 11:31") and expands comma verse lists
+   ("Matthew 5:3-4, 7"), both of which the old local `.split(';')` dropped on
+   the floor. A ref string with no parseable part renders nothing.
 
    findBook needs the lazy Bible corpus. The mount effect pre-warms
    __loadBibleCorpus (idempotent, async-notify-only — the Q8 loader
@@ -33,8 +36,8 @@ export function GoToRefButton({ refStr, onGo }) {
       if (retryRef.current) { clearInterval(retryRef.current); retryRef.current = null; }
     };
   }, []);
-  const targets = (refStr && typeof parseRefStr === 'function')
-    ? String(refStr).split(';').map((s) => parseRefStr(s.trim())).filter((p) => p && p.chapter)
+  const targets = (refStr && typeof splitCompoundRef === 'function')
+    ? splitCompoundRef(refStr)
     : [];
   if (targets.length === 0 || !onGo) return null;
   const go = (parsed) => {
@@ -57,21 +60,17 @@ export function GoToRefButton({ refStr, onGo }) {
   };
   return (
     <>
-      {targets.map((parsed, i) => {
-        // Human label from the parsed parts — drops any "(TAG)" translation
-        // suffix and normalizes dash variants the source ref may carry.
-        const label = parsed.rawBook + ' ' + parsed.chapter +
-          (parsed.verse != null ? ':' + parsed.verse + (parsed.verseEnd != null ? '-' + parsed.verseEnd : '') : '');
-        return (
-          <button key={i} type="button" className="fn-sheet-link-btn sc-sheet-goto-btn" onClick={() => go(parsed)}>
-            <span className="fn-sheet-link-body">
-              <span className="fn-sheet-link-eyebrow">Go to Scripture</span>
-              <span className="fn-sheet-link-title">{label}</span>
-            </span>
-            <span className="fn-sheet-link-chevron">{"›"}</span>
-          </button>
-        );
-      })}
+      {targets.map((part, i) => (
+        // part.ref is the canonical self-contained label — "(TAG)" suffix
+        // dropped, dash variants normalized, an inherited book spelled out.
+        <button key={i} type="button" className="fn-sheet-link-btn sc-sheet-goto-btn" onClick={() => go(part.parsed)}>
+          <span className="fn-sheet-link-body">
+            <span className="fn-sheet-link-eyebrow">Go to Scripture</span>
+            <span className="fn-sheet-link-title">{part.ref}</span>
+          </span>
+          <span className="fn-sheet-link-chevron">{"›"}</span>
+        </button>
+      ))}
     </>
   );
 }

@@ -10,15 +10,16 @@
 import { it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { GoToRefButton } from './GoToRefButton.jsx';
-import { parseRefStr, findBook } from '../../data/scripture-resolution.js';
+import { parseRefStr, splitCompoundRef, findBook } from '../../data/scripture-resolution.js';
 
 const Btn = /** @type {any} */ (GoToRefButton);
 const g = /** @type {any} */ (globalThis);
 
 beforeEach(() => {
   // The component reads these as free-var globals (window-attached in prod).
-  // Real parse + real findBook over a stub BOOKS = integration-pair fidelity.
+  // Real splitter + real findBook over a stub BOOKS = integration-pair fidelity.
   g.parseRefStr = parseRefStr;
+  g.splitCompoundRef = splitCompoundRef;
   g.findBook = findBook;
   window.BOOKS = {
     isaiah: { id: 'isaiah', title: 'Isaiah' },
@@ -30,6 +31,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   delete g.parseRefStr;
+  delete g.splitCompoundRef;
   delete g.findBook;
   delete window.BOOKS;
   delete window.__loadBibleCorpus;
@@ -87,6 +89,29 @@ it('an unparseable segment in a compound cite is skipped, parseable ones survive
   const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
   expect(btns.length).toBe(1);
   expect(btns[0].querySelector('.fn-sheet-link-title').textContent).toBe('Isaiah 12:2');
+});
+
+it('a book-implied continuation carries the book forward (12 of matthew.js 23 compound cites)', () => {
+  window.BOOKS.daniel = { id: 'daniel', title: 'Daniel' };
+  const onGo = vi.fn();
+  const { container } = render(<Btn refStr="Daniel 9:27; 11:31; 12:11" onGo={onGo} />);
+  const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
+  expect(btns.map(b => b.querySelector('.fn-sheet-link-title').textContent))
+    .toEqual(['Daniel 9:27', 'Daniel 11:31', 'Daniel 12:11']);
+  click(btns[2]);
+  expect(onGo).toHaveBeenCalledWith({ type: 'bible', bookId: 'daniel', chapter: 12, verse: 11 });
+});
+
+it('a comma verse list becomes its own button (bible-studies.js "1 John 4:9-10, 14")', () => {
+  window.BOOKS['1john'] = { id: '1john', title: '1 John' };
+  const onGo = vi.fn();
+  const { container } = render(<Btn refStr="1 John 4:9-10, 14" onGo={onGo} />);
+  const btns = [...container.querySelectorAll('.sc-sheet-goto-btn')];
+  expect(btns.map(b => b.querySelector('.fn-sheet-link-title').textContent))
+    .toEqual(['1 John 4:9-10', '1 John 4:14']);
+  // Verse 14 used to be swallowed by parseRefStr's comma group — unreachable.
+  click(btns[1]);
+  expect(onGo).toHaveBeenCalledWith({ type: 'bible', bookId: '1john', chapter: 4, verse: 14 });
 });
 
 it('pre-warms the Bible corpus on mount', () => {

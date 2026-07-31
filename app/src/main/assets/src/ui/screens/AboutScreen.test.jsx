@@ -10,8 +10,10 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import { AboutScreen } from './AboutScreen.jsx';
+import { LibraryNav } from '../components/LibraryNav.jsx';
+import { NavButtons } from '../components/NavButtons.jsx';
 
-const GLOBALS = ['ScreenLayout', 'HomeBtn', 'ThemeBtn'];
+const GLOBALS = ['ScreenLayout', 'HomeBtn', 'ThemeBtn', 'LibraryNav', 'NavButtons'];
 
 function setupGlobals() {
   globalThis.ScreenLayout = ({ children, navChildren }) => (
@@ -19,6 +21,8 @@ function setupGlobals() {
   );
   globalThis.HomeBtn = () => null;
   globalThis.ThemeBtn = () => null;
+  globalThis.LibraryNav = LibraryNav;
+  globalThis.NavButtons = NavButtons;
 }
 
 afterEach(() => {

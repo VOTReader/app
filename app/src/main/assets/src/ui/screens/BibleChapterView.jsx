@@ -105,39 +105,19 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         prevLabel="Previous chapter"
         nextLabel="Next chapter"
       />}
-      navChildren={
-        <>
-          <button className="nav-home nav-back-icon" onClick={onIndex} title={`← ${book.title}`} aria-label={`Back to ${book.title}`}>‹</button>
-          <HomeBtn />
-          <div className="nav-arrows">
-            <button
-              className="nav-arrow-btn"
-              disabled={!prevCh && !prevBook}
-              onClick={goPrevCh}
-              title="Previous"
-              aria-label="Previous chapter"
-            >‹</button>
-            <button
-              className="nav-arrow-btn"
-              disabled={!nextCh && !nextBook}
-              onClick={goNextCh}
-              title="Next"
-              aria-label="Next chapter"
-            >›</button>
-          </div>
-          <NavButtons
-            onSettings={onSettings}
-            onHistory={onHistory}
-            onSearch={onSearch}
-            theme={theme}
-            onThemeChange={onThemeChange}
-            reading={true}
-            chapterBookmark={(book && chapter) ? { hlKey: 'bible:' + book.id + ':' + chapter.num, label: (book.title || book.id) + ' ' + chapter.num } : null}
-            journalRefKey={(book && chapter && typeof jrnRefKeyForChapter === 'function') ? jrnRefKeyForChapter(book.id, chapter.num) : null}
-            journalRefLabel={(book && chapter) ? ((book.title || book.id) + ' ' + chapter.num) : null}
-          />
-        </>
-      }
+      navChildren={LibraryNav({
+        // onIndex — NOT onBack. onBack is the in-content back-hint pill.
+        onBack: onIndex, backLabel: book.title,
+        arrows: {
+          onPrev: goPrevCh, onNext: goNextCh,
+          prevDisabled: !prevCh && !prevBook,
+          nextDisabled: !nextCh && !nextBook,
+          prevLabel: 'Previous chapter', nextLabel: 'Next chapter',
+        },
+        reading: true,
+        chapterBookmark: (book && chapter) ? { hlKey: 'bible:' + book.id + ':' + chapter.num, label: (book.title || book.id) + ' ' + chapter.num } : null,
+        onSettings, onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       {backHint && (
         <div className="back-hint-row">

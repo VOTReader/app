@@ -245,8 +245,12 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
   });
 
   return (
-    <ScreenLayout navChildren={
-      <>
+    <ScreenLayout navChildren={LibraryNav({
+      // Home has no back and no Home button. The About button keeps its INLINE
+      // marginRight:'auto' — with neither of the CSS anchors present it is the
+      // right-cluster anchor on this screen. Do not add a second auto-margin.
+      hideBack: true, showHome: false, hide: ['settings', 'history'],
+      leftExtras: (
         <button className="nav-search-btn" onClick={onAbout} title="About VOTReader" aria-label="About VOTReader" style={{ marginRight: 'auto', color: 'var(--gold)' }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="12" cy="12" r="9.5" />
@@ -254,15 +258,9 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
             <circle cx="12" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
           </svg>
         </button>
-        <button className="nav-search-btn" onClick={onSearch} title="Search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </button>
-        <ThemeBtn theme={theme} onThemeChange={onThemeChange} />
-      </>
-    }>
+      ),
+      onSearch, theme, onThemeChange,
+    })}>
       <div className={`home-screen home-screen-app${isFirstVisit ? "" : " home-fast"}`}>
         <h1 className="home-main-title">The Volumes of Truth</h1>
         <div className="home-main-amp" aria-hidden="true">&amp;</div>

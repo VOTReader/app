@@ -87,14 +87,15 @@ export function AppShellOverlays({
               killing scroll recording on the screen underneath until the next
               nav. The overview's own scrolling is unaffected (it scrolls
               natively; scroll-memory just doesn't track it). */}
-          <ScreenLayout trackScroll={false} navChildren={
-            <>
-              <button className="nav-home" onClick={() => setTabsOverviewOpen(false)}>{"← Back"}</button>
-              {/* __goHome changes the screen UNDER this overlay — close the
-                  overlay too or the tap looks like a dead button. */}
-              <HomeBtn beforeGo={() => setTabsOverviewOpen(false)} />
-            </>
-          }>
+          {/* The overlay nav carries back + Home only — hide the whole right
+              cluster. onHomeBefore: __goHome changes the screen UNDER this
+              overlay, so close it too or the tap looks like a dead button. */}
+          <ScreenLayout trackScroll={false} navChildren={LibraryNav({
+            onBack: () => setTabsOverviewOpen(false),
+            backTitle: 'Back',
+            onHomeBefore: () => setTabsOverviewOpen(false),
+            hide: ['settings', 'history', 'search', 'theme'],
+          })}>
             <TabsOverview
               tabs={tabs}
               activeTabIdx={activeTabIdx}

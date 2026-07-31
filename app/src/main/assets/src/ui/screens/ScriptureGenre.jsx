@@ -8,13 +8,10 @@ export function ScriptureGenre({ genreId, onSelect, onBack, onSearch, onHistory,
   const testament = SCRIPTURE_GENRES.nt.some((g) => g.id === genreId) ? "New Testament" : "Old Testament";
   return (
     <ScreenLayout
-      navChildren={
-        <>
-          <button className="nav-home nav-back-icon" onClick={onBack} title="← Scriptures" aria-label="Back to Scriptures">{"‹"}</button>
-          <HomeBtn />
-          <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
-        </>
-      }
+      navChildren={LibraryNav({
+        onBack, backLabel: 'Scriptures',
+        onSettings, onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       <div className="vol-index">
         <div className="vol-index-header">

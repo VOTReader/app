@@ -47,13 +47,10 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
     );
   };
 
-  const navBar = (
-    <>
-      <button className="nav-home nav-back-icon" onClick={onBack} title="← Studies" aria-label="Back to Studies">{"‹"}</button>
-      <HomeBtn />
-      <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
-    </>
-  );
+  const navBar = LibraryNav({
+    onBack, backLabel: 'Studies',
+    onSettings, onHistory, onSearch, theme, onThemeChange,
+  });
 
   return (
     <ScreenLayout navChildren={navBar}>

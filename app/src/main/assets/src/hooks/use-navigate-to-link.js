@@ -49,8 +49,10 @@
    PARAMS:
      closeLinkSidebar — useSheetOrchestration; closes the sidebar before nav.
      pushFromLetter   — useFromLetterStack; records the back-stack entry.
-     screen, bookId, chapterNum, letterId, studyId, studyChapterId —
-       current nav position; captured into the pushed back-stack entry.
+     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+     journalEntryId — current nav position; captured into the pushed
+       back-stack entry (journalEntryId is the 7th tracked field, so a
+       link tapped INSIDE a journal entry can restore it).
      setScreen, setBookId, setChapterNum, setLetterId, setStudyId,
        setStudyChapterId — nav setters; the jump.
      setSurpriseAnchor — tabField setter; scroll-to-verse highlight on
@@ -90,6 +92,11 @@ export function verseAnchorFor(endpoint) {
   return { type: 'verse', verses };
 }
 
+/* Endpoint kinds whose navigation is driven by a resolved `screen` (set from
+   findEntryContext). Without one there is no branch to take — see the guard at
+   the top of the deferred body. */
+const _NEEDS_SCREEN = { letter: 1, wtlb: 1, blessed: 1, 'holy-days': 1 };
+
 /**
  * Cross-screen navigation handler. Returns a stable `navigateToLink`
  * function (identity-fresh closure refreshed every render via ref) that
@@ -105,6 +112,7 @@ export function verseAnchorFor(endpoint) {
  *   letterId: string | null,
  *   studyId: string | null,
  *   studyChapterId: string | null,
+ *   journalEntryId: string | null,
  *   setScreen: (val: any) => void,
  *   setBookId: (val: any) => void,
  *   setChapterNum: (val: any) => void,
@@ -118,7 +126,7 @@ export function verseAnchorFor(endpoint) {
  */
 export function useNavigateToLink({
   closeLinkSidebar, pushFromLetter,
-  screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+  screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
   setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
   setSurpriseAnchor, setJournalEntryId,
 }) {
@@ -136,6 +144,17 @@ export function useNavigateToLink({
   // navigation is going TO) so the back-pill can hide itself the moment the
   // user navigates away — the pill is single-shot, not persistent.
   _navToLinkRef.current = (endpoint, meta) => {
+    // A letter/WTLB/Blessed/Holy-Days endpoint needs a resolved `screen` to
+    // match any branch below — findEntryContext returns null (so screen null)
+    // until the VOT corpus has loaded. Such an endpoint used to run the WHOLE
+    // prologue (pendingScrollHlKey, destSnapshot, pushFromLetter) and then
+    // match nothing: a silent dead tap that ALSO left a junk back-stack entry.
+    // Bail before any of that and kick the corpus; a re-tap works once it lands
+    // (note rows re-tap fine — no retry loop needed).
+    if (endpoint && _NEEDS_SCREEN[endpoint.type] && !endpoint.screen) {
+      if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
+      return;
+    }
     closeLinkSidebar();
     // Library-origin endpoints (bookmark / note / highlight / underline)
     // carry the source hlKey. Stash the block-container key (strip any
@@ -171,6 +190,14 @@ export function useNavigateToLink({
       destSnapshot = { screen: 'matthew-ch', bookId: 'matthew', chapterNum: endpoint.chapter, letterId: null, studyId: null, studyChapterId: null };
     } else if (endpoint.type === 'study-letter' && endpoint.studyId && endpoint.studyChapterId) {
       destSnapshot = { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: endpoint.studyId, studyChapterId: endpoint.studyChapterId };
+    } else if (endpoint.type === 'journal' && endpoint.entryId) {
+      // Journal entries live on journalEntryId, and the nav branch below
+      // NULLS letterId. Without this branch a journal endpoint fell into the
+      // generic `endpoint.screen` case below and recorded letterId = entryId —
+      // a snapshot that contradicted the nav it described, so _destMatches
+      // failed and the prune effect popped the entry on the very next render
+      // (the "no way back from a journal-sourced note" report).
+      destSnapshot = { screen: 'journal-viewer', bookId: null, chapterNum: null, letterId: null, studyId: null, studyChapterId: null, journalEntryId: endpoint.entryId };
     } else if (endpoint.screen) {
       destSnapshot = { screen: endpoint.screen, bookId: null, chapterNum: null, letterId: endpoint.letterId || endpoint.entryId || null, studyId: null, studyChapterId: null };
     }
@@ -178,8 +205,12 @@ export function useNavigateToLink({
       sourceScreen: screen, sourceLetterId: letterId,
       sourceBookId: bookId, sourceChapterNum: chapterNum,
       sourceStudyId: studyId, sourceStudyChapterId: studyChapterId,
+      sourceJournalEntryId: journalEntryId,
       sourceLetterTitle: (meta && meta.sourceLetterTitle) || null,
       sourceVolumeLabel: (meta && meta.sourceVolumeLabel) || null,
+      // `silent` suppresses the pill but not the back target — History links
+      // are the one path the owner wants pill-less (see useFromLetterStack).
+      silent: !!(meta && meta.silent),
       destSnapshot: destSnapshot
     });
     if (endpoint.type === 'bible' && endpoint.bookId && endpoint.bookId !== 'matthew') {
@@ -207,6 +238,12 @@ export function useNavigateToLink({
         }).catch(function (e) { console.warn('navigateToLink: bible corpus load failed', e); });
       }
     } else if (endpoint.type === 'study' || (endpoint.type === 'bible' && endpoint.bookId === 'matthew')) {
+      // MATTHEW lives in bundle-a-matthew — same lazy-corpus race the bible
+      // branch above guards. This branch never kicked the loader, so a
+      // study-sourced tap made before the corpus resolved landed on the
+      // "Loading Matthew…" view with nothing pulling it in. Idempotent kick;
+      // the route's own _corpusView finishes the job when it resolves.
+      if (typeof window.__loadMatthewCorpus === 'function') window.__loadMatthewCorpus();
       setBookId('matthew');
       setChapterNum(endpoint.chapter);
       setScreen('matthew-ch');

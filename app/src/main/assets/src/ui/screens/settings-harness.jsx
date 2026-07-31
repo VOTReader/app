@@ -32,6 +32,8 @@ import { SettingsRow } from '../components/SettingsRow.jsx';
 import { SelectField } from '../components/SelectField.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import { ClearProgressRow } from '../components/ClearProgressRow.jsx';
+import { LibraryNav } from '../components/LibraryNav.jsx';
+import { NavButtons } from '../components/NavButtons.jsx';
 import { clampLpm } from '../../hooks/use-autoscroll.js';
 import { clampEndDwell } from '../components/ReadingChromeProvider.jsx';
 
@@ -69,6 +71,8 @@ export function setupSettingsGlobals(overrides = {}) {
   ));
   put('HomeBtn', () => null);
   put('ThemeBtn', () => null);
+  put('LibraryNav', LibraryNav);
+  put('NavButtons', NavButtons);
 
   // Select option tables (index.html globals in the real app).
   put('TRANSLATION_OPTIONS', [{ id: 'nkjv', label: 'NKJV', desc: '' }]);

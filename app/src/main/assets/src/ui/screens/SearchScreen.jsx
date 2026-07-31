@@ -324,6 +324,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   };
 
   return (
+    /* NOT LibraryNav (documented exception): the search input row REPLACES the
+       whole right half of the nav — no Home, no icon cluster — and app.css:319
+       exempts this screen from the right-cluster anchor via :not(:has(~ .srch-input-row)). */
     <ScreenLayout hideTabsBtn={true} navChildren={
       <>
         <button className="nav-home nav-back-icon" onClick={onBack} title="Back" aria-label="Back">{"‹"}</button>

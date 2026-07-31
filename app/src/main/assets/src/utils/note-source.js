@@ -7,6 +7,7 @@
    - _verseRangeLabel
    - noteSourceLabel
    - noteSourceNav
+   - noteSourceSegments
    =================================================================== */
 
 /**
@@ -56,6 +57,53 @@ export function _verseRangeLabel(nums) {
 }
 
 /**
+ * Group a bible/study note's hlKeys by chapter — the ONE grouping both
+ * noteSourceLabel (→ display string) and noteSourceSegments (→ per-chapter
+ * tap targets) are built on, so a row's label and its tap targets can never
+ * drift apart. Insertion order = key order, which is what makes the joined
+ * label read in the order the note was made.
+ *
+ * Key shapes differ:
+ *   bible:bookId:chapter:verse   (4 parts)
+ *   study:bookId-chapter:verse   (3 parts — chapter is FUSED into p[1])
+ *
+ * @param {string[]} keys
+ * @param {string} kind
+ * @returns {{ book: string, chap: string, title: string, key: string, verses: number[] }[]}
+ */
+function _chapterGroups(keys, kind) {
+  const byChap = new Map();
+  keys.forEach(k => {
+    const p = k.split(':');
+    let book, chap, verse;
+    if (kind === 'study') {
+      // p[1] = "matthew-22" (book + chap fused); p[2] = verse
+      book = p[1];
+      chap = (p[1].match(/-(\d+)$/) || [])[1] || '';
+      verse = parseInt(p[2] || '0', 10);
+    } else {
+      book = p[1];
+      chap = p[2];
+      verse = parseInt(p[3] || '0', 10);
+    }
+    const ck = book + ':' + chap;
+    let g = byChap.get(ck);
+    if (!g) {
+      const title = kind === 'bible' ? _bookTitle(book) :
+        // study key shape e.g. "matthew-22"; strip off the chapter half
+        (function() {
+          const m = book.match(/^(.+)-(\d+)$/);
+          return m ? (m[1].charAt(0).toUpperCase() + m[1].slice(1)) : book;
+        })();
+      g = { book, chap, title, key: k, verses: [] };
+      byChap.set(ck, g);
+    }
+    g.verses.push(verse);
+  });
+  return [...byChap.values()];
+}
+
+/**
  * Human-readable label for a note's source — e.g. "Genesis 1:1-3, 5" for a
  * Bible annotation, "The Wide Path" for a Letter, "Journal · Title" for a
  * journal-block annotation. Multi-key notes spanning multiple chapters
@@ -72,39 +120,9 @@ export function noteSourceLabel(note) {
   const parts0 = first.split(':');
   const kind = parts0[0];
   if (kind === 'bible' || kind === 'study') {
-    // Key shapes differ:
-    //   bible:bookId:chapter:verse   (4 parts)
-    //   study:bookId-chapter:verse   (3 parts — chapter is fused into p[1])
-    const byChap = new Map();
-    keys.forEach(k => {
-      const p = k.split(':');
-      let book, chap, verse;
-      if (kind === 'study') {
-        // p[1] = "matthew-22" (book + chap fused); p[2] = verse
-        book = p[1];
-        chap = (p[1].match(/-(\d+)$/) || [])[1] || '';
-        verse = parseInt(p[2] || '0', 10);
-      } else {
-        book = p[1];
-        chap = p[2];
-        verse = parseInt(p[3] || '0', 10);
-      }
-      const ck = book + ':' + chap;
-      if (!byChap.has(ck)) byChap.set(ck, []);
-      byChap.get(ck).push(verse);
-    });
-    const segs = [];
-    byChap.forEach((verses, ck) => {
-      const [book, chap] = ck.split(':');
-      const title = kind === 'bible' ? _bookTitle(book) :
-        // study key shape e.g. "matthew-22"; strip off the chapter half
-        (function() {
-          const m = book.match(/^(.+)-(\d+)$/);
-          return m ? (m[1].charAt(0).toUpperCase() + m[1].slice(1)) : book;
-        })();
-      segs.push(title + ' ' + chap + ':' + _verseRangeLabel(verses.filter(Boolean)));
-    });
-    return segs.join(' · ');
+    return _chapterGroups(keys, kind)
+      .map(g => g.title + ' ' + g.chap + ':' + _verseRangeLabel(g.verses.filter(Boolean)))
+      .join(' · ');
   }
   if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
     // The same letter spans multiple block indices — title is enough
@@ -177,5 +195,55 @@ export function noteSourceNav(note) {
     };
   }
   return null;
+}
+
+/**
+ * Per-source-segment labels + nav endpoints for a note row. noteSourceLabel
+ * flattens a multi-chapter note into ONE string ("John 3:16 · John 4:1-2") and
+ * noteSourceNav only ever resolves keys[0] — so every segment after the first
+ * was dead text. This returns one entry per chapter-group (the SAME grouping
+ * the label is built from, via _chapterGroups), each independently tappable.
+ *
+ * Two deliberate differences from noteSourceNav, which keeps its exact
+ * signature and shape because 25 tests pin it:
+ *   - `verseEnd` is populated for a multi-verse group, so verseAnchorFor
+ *     flash-highlights the WHOLE span instead of just the first verse.
+ *   - `verse` is omitted (not NaN) for a whole-chapter key, so the arrival
+ *     simply opens the chapter.
+ * Non-scripture kinds (letter / wtlb / blessed / holy-days / journal) have one
+ * source, so they yield a single segment reusing noteSourceLabel/-Nav verbatim.
+ * Unknown kinds yield [] — noteSourceNav's null semantics.
+ *
+ * @param {NoteShape} note
+ * @returns {{ label: string, nav: any }[]}
+ */
+export function noteSourceSegments(note) {
+  const keys = (note && note.keys) || [];
+  if (!keys.length) return [];
+  const kind = keys[0].split(':')[0];
+  if (kind === 'bible' || kind === 'study') {
+    const segs = [];
+    _chapterGroups(keys, kind).forEach(g => {
+      const chapter = parseInt(g.chap, 10);
+      // A malformed fused study key ("study:matthew:37") has no chapter to
+      // split out — drop it rather than invent one (noteSourceNav returns null).
+      if (!chapter) return;
+      const verses = g.verses.filter(Boolean).sort((a, b) => a - b);
+      const nav = {
+        type: kind,
+        key: g.key,
+        bookId: kind === 'study' ? g.book.replace(/-\d+$/, '') : g.book,
+        chapter,
+      };
+      if (verses.length) {
+        nav.verse = verses[0];
+        if (verses[verses.length - 1] > verses[0]) nav.verseEnd = verses[verses.length - 1];
+      }
+      segs.push({ label: g.title + ' ' + g.chap + ':' + _verseRangeLabel(verses), nav });
+    });
+    return segs;
+  }
+  const nav = noteSourceNav(note);
+  return nav ? [{ label: noteSourceLabel(note), nav }] : [];
 }
 

@@ -82,17 +82,21 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
     return 'My Notes';
   };
 
+  // ONE navigation path for both the whole-row tap and a per-segment tap on the
+  // source line — same pendingOpenNote stash, same notesReturnCtx, same pill
+  // title; only the endpoint differs.
+  const navToSource = (note, nav) => {
+    window.navHandoff.set('pendingOpenNote', note.groupId);
+    // Remember which tab/notebook we're in so the back-pill returns the
+    // user to the exact list they tapped from (consumed on next mount).
+    window.navHandoff.set('notesReturnCtx', { tab: tab, drilledNbId: drilledNbId });
+    onNavigateToSource(nav, { sourceLetterTitle: currentSourceTitle() });
+  };
+
   const onRowTap = (note) => {
     const nav = noteSourceNav(note);
-    if (nav) {
-      window.navHandoff.set('pendingOpenNote', note.groupId);
-      // Remember which tab/notebook we're in so the back-pill returns the
-      // user to the exact list they tapped from (consumed on next mount).
-      window.navHandoff.set('notesReturnCtx', { tab: tab, drilledNbId: drilledNbId });
-      onNavigateToSource(nav, { sourceLetterTitle: currentSourceTitle() });
-    } else {
-      onOpenNote(note.groupId);
-    }
+    if (nav) navToSource(note, nav);
+    else onOpenNote(note.groupId);
   };
 
   // Count notes per notebook for the cards
@@ -206,10 +210,15 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
             </button>
           </div>
         )}
-        <div className="notes-index-header">
-          <h1 className="notes-index-title">My Notes</h1>
-          <span className="notes-index-count">{allNotes.length}{allNotes.length === 1 ? " note" : " notes"}</span>
-        </div>
+        {/* Top-level header only. While drilled, the notebook's own name IS
+            the screen title (.nb-drilled-title below) — rendering both stacked
+            two headers on top of each other. */}
+        {!drilledNbId && (
+          <div className="notes-index-header">
+            <h1 className="notes-index-title">My Notes</h1>
+            <span className="notes-index-count">{allNotes.length}{allNotes.length === 1 ? " note" : " notes"}</span>
+          </div>
+        )}
         {/* Tab strip — hidden while drilled in */}
         {!drilledNbId && (
           <div className="notes-tabs">
@@ -226,39 +235,50 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
         {/* ── DRILLED VIEW (inside a notebook) ── */}
         {drilledNbId && (
           <>
+            {/* Two rows: the name owns the title row (with the back chevron and
+                a right-aligned count), the actions sit below it. One flex row
+                for all of it made the name the only shrinkable item, so at a
+                large --font-scale the buttons crushed it to an ellipsis. */}
             <div className="nb-drilled-header">
-              <button className="nb-drilled-back" onClick={popDrill} title="Back to Notebooks" aria-label="Back to Notebooks">‹</button>
-              {renaming
-                ? <input
-                    className="nb-drilled-rename"
-                    autoFocus type="text" value={renameValue}
-                    onChange={e => setRenameValue(e.target.value)}
-                    // No onBlur commit — explicit Save/Cancel buttons own the
-                    // commit so tapping a button doesn't race the blur handler
-                    // (Android has no Escape key; blur-commit was non-obvious).
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') setRenaming(false); }}
-                    maxLength={60}
-                  />
-                : <span className="nb-drilled-title">{drilledTitle}</span>
-              }
+              <div className="nb-drilled-titlerow">
+                <button className="nb-drilled-back" onClick={popDrill} title="Back to Notebooks" aria-label="Back to Notebooks">‹</button>
+                {renaming
+                  ? <input
+                      className="nb-drilled-rename"
+                      autoFocus type="text" value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      // No onBlur commit — explicit Save/Cancel buttons own the
+                      // commit so tapping a button doesn't race the blur handler
+                      // (Android has no Escape key; blur-commit was non-obvious).
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') setRenaming(false); }}
+                      maxLength={60}
+                    />
+                  : <>
+                      <h1 className="nb-drilled-title">{drilledTitle}</h1>
+                      <span className="nb-drilled-count">{drilledNotes.length}{drilledNotes.length === 1 ? " note" : " notes"}</span>
+                    </>
+                }
+              </div>
               {/* Rename mode: explicit Save / Cancel. Otherwise (user notebooks
                   only, not Uncategorized): Rename / Delete. */}
-              {renaming
-                ? <>
-                    <button className="nb-drilled-action" onClick={commitRename} title="Save name">Save</button>
-                    <button className="nb-drilled-action" onClick={() => setRenaming(false)} title="Cancel rename">Cancel</button>
-                  </>
-                : <>
-                    {drilledNotes.length > 0 && (
-                      <button className="nb-drilled-action" onClick={() => exportNotes(drilledTitle, drilledNotes)} title="Share notebook as text">Share</button>
-                    )}
-                    {drilledNb && <>
-                      <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>
-                      <button className="nb-drilled-action" onClick={() => setColorPicking(v => !v)} title="Color tag">Color</button>
-                      <button className="nb-drilled-action danger" onClick={() => setConfirmDeleteNb(true)} title="Delete notebook">Delete</button>
-                    </>}
-                  </>
-              }
+              <div className="nb-drilled-actions">
+                {renaming
+                  ? <>
+                      <button className="nb-drilled-action" onClick={commitRename} title="Save name">Save</button>
+                      <button className="nb-drilled-action" onClick={() => setRenaming(false)} title="Cancel rename">Cancel</button>
+                    </>
+                  : <>
+                      {drilledNotes.length > 0 && (
+                        <button className="nb-drilled-action" onClick={() => exportNotes(drilledTitle, drilledNotes)} title="Share notebook as text">Share</button>
+                      )}
+                      {drilledNb && <>
+                        <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>
+                        <button className="nb-drilled-action" onClick={() => setColorPicking(v => !v)} title="Color tag">Color</button>
+                        <button className="nb-drilled-action danger" onClick={() => setConfirmDeleteNb(true)} title="Delete notebook">Delete</button>
+                      </>}
+                    </>
+                }
+              </div>
             </div>
             {/* [11] color-tag picker — the HL_COLORS swatches + a gold
                 "default" swatch that clears the tag. */}
@@ -326,7 +346,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                   )
                 : (
                     <div className="notes-index-list">
-                      {drilledNotesShown.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} hideNotebookId={drilledNbId} />)}
+                      {drilledNotesShown.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} onTapSegment={navToSource} hideNotebookId={drilledNbId} />)}
                     </div>
                   )
             }
@@ -432,7 +452,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                   )
                 : (
                     <div className="notes-index-list">
-                      {allNotesShown.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} />)}
+                      {allNotesShown.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} onTapSegment={navToSource} />)}
                     </div>
                   )
             }

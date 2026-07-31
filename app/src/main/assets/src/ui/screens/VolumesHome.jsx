@@ -43,12 +43,10 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
 
   return (
     <ScreenLayout
-      navChildren={
-        <>
-          <button className="nav-home nav-back-icon" onClick={onBack} title="← Home" aria-label="Back to Home">{"‹"}</button>
-          <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
-        </>
-      }
+      navChildren={LibraryNav({
+        onBack, backLabel: 'Home', showHome: false,
+        onSettings, onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       <div className="home-screen volumes-landing">
         <div className="home-eyebrow">Prophetic Letters</div>

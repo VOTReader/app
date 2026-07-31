@@ -108,37 +108,20 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         prevLabel="Previous chapter"
         nextLabel="Next chapter"
       />}
-      navChildren={
-        <>
-          <button className="nav-home nav-back-icon" onClick={onIndex} title={`← ${book.title}`} aria-label={`Back to ${book.title}`}>‹</button>
-          <HomeBtn />
-          <div className="nav-arrows">
-            <button
-              className="nav-arrow-btn"
-              disabled={!prevCh && !prevBoundary}
-              onClick={() => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary()}
-              title="Previous"
-              aria-label="Previous chapter"
-            >‹</button>
-            <button
-              className="nav-arrow-btn"
-              disabled={!nextCh && !nextBoundary}
-              onClick={() => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary()}
-              title="Next"
-              aria-label="Next chapter"
-            >›</button>
-          </div>
-          <NavButtons
-            onSettings={onSettings}
-            onHistory={onHistory}
-            onSearch={onSearch}
-            theme={theme}
-            onThemeChange={onThemeChange}
-            reading={true}
-            chapterBookmark={chapter ? { hlKey: 'study:matthew-' + chapter.num, label: 'Matthew ' + chapter.num + ' (Study)' } : null}
-          />
-        </>
-      }
+      navChildren={LibraryNav({
+        // onIndex — NOT onBack. onBack is the in-content back-hint pill.
+        onBack: onIndex, backLabel: book.title,
+        arrows: {
+          onPrev: () => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary(),
+          onNext: () => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary(),
+          prevDisabled: !prevCh && !prevBoundary,
+          nextDisabled: !nextCh && !nextBoundary,
+          prevLabel: 'Previous chapter', nextLabel: 'Next chapter',
+        },
+        reading: true,
+        chapterBookmark: chapter ? { hlKey: 'study:matthew-' + chapter.num, label: 'Matthew ' + chapter.num + ' (Study)' } : null,
+        onSettings, onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       {backHint && (
         <div className="back-hint-row">

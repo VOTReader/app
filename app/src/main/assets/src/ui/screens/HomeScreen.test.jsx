@@ -10,14 +10,18 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/react';
 import { HomeScreen } from './HomeScreen.jsx';
+import { LibraryNav } from '../components/LibraryNav.jsx';
+import { NavButtons } from '../components/NavButtons.jsx';
 
-const GLOBALS = ['ScreenLayout', 'ThemeBtn', 'HomeOrderStore', 'createPressDrag', 'translationLabel'];
+const GLOBALS = ['ScreenLayout', 'ThemeBtn', 'HomeOrderStore', 'createPressDrag', 'translationLabel', 'LibraryNav', 'NavButtons'];
 
 function setupGlobals() {
   globalThis.ScreenLayout = ({ children, navChildren }) => (
     <div data-testid="screen-layout">{navChildren}{children}</div>
   );
   globalThis.ThemeBtn = () => null;
+  globalThis.LibraryNav = LibraryNav;
+  globalThis.NavButtons = NavButtons;
   globalThis.HomeOrderStore = {
     get: () => ['volumes', 'scriptures', 'studies', 'library', 'settings', 'history'],
     set: () => {},

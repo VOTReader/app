@@ -7,6 +7,13 @@
    index screens use) with sourceLetterTitle 'History', keeping the
    setActiveReadKey dwell-gate bookkeeping navigateToLink doesn't do.
 
+   Phase 3 (back-pill sweep): History is the ONE link surface that must NOT
+   raise a "‹ Back to …" pill, so the meta now carries `silent: true`. The
+   back-stack entry is still pushed and Back still unwinds to History —
+   only the visible pill is suppressed (useFromLetterStack's backHint
+   returns null for a silent top, while backActive stays true). Removing
+   the entry outright would resurrect the filed P1-12 bug.
+
    Sticky-genre fix: entering content from History or selecting a search
    result is a non-genre entry — genreId must be cleared so a later
    index-level Back can't misroute into a genre visited in an earlier
@@ -88,7 +95,7 @@ describe('screen-routes — P1-12 History onSelect routes through navigateToLink
     routes.history().props.onSelect({ type: 'chapter', bookId: 'john', chapterNum: 3 });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'john', chapter: 3 },
-      { sourceLetterTitle: 'History' },
+      { sourceLetterTitle: 'History', silent: true },
     );
     // The dwell-gate / last-read bookkeeping stays (navigateToLink doesn't do it).
     expect(props.setActiveReadKey).toHaveBeenCalledWith('john', expect.any(Function));
@@ -101,7 +108,7 @@ describe('screen-routes — P1-12 History onSelect routes through navigateToLink
     routes.history().props.onSelect({ type: 'chapter', bookId: 'matthew', chapterNum: 5 });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'matthew', chapter: 5 },
-      { sourceLetterTitle: 'History' },
+      { sourceLetterTitle: 'History', silent: true },
     );
   });
 
@@ -110,7 +117,7 @@ describe('screen-routes — P1-12 History onSelect routes through navigateToLink
     routes.history().props.onSelect({ type: 'letter', letterId: 'wide-path', volume: 1 });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { screen: 'vot-one-letter', letterId: 'wide-path' },
-      { sourceLetterTitle: 'History' },
+      { sourceLetterTitle: 'History', silent: true },
     );
     expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:one', expect.any(Function));
   });
@@ -120,7 +127,7 @@ describe('screen-routes — P1-12 History onSelect routes through navigateToLink
     routes.history().props.onSelect({ type: 'letter', letterId: 'wide-path', volumeScreen: 'vot-one-index', volume: 2 });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { screen: 'vot-one-letter', letterId: 'wide-path' },
-      { sourceLetterTitle: 'History' },
+      { sourceLetterTitle: 'History', silent: true },
     );
   });
 
@@ -129,7 +136,7 @@ describe('screen-routes — P1-12 History onSelect routes through navigateToLink
     routes.history().props.onSelect({ type: 'study-chapter', studyId: 'purity', studyChapterId: 'ch1' });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'study-letter', studyId: 'purity', studyChapterId: 'ch1' },
-      { sourceLetterTitle: 'History' },
+      { sourceLetterTitle: 'History', silent: true },
     );
     expect(props.setActiveReadKey).toHaveBeenCalledWith('study:purity', expect.any(Function));
   });

@@ -13,11 +13,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { BibleChapterView } from './BibleChapterView.jsx';
+import { LibraryNav } from '../components/LibraryNav.jsx';
 
 let capturedPager;
 
 const STUBBED = [
-  'ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'NavButtons',
+  'ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'NavButtons', 'LibraryNav',
   'useMarkAsRead', 'useModalRegistry',
   'OT_BOOK_IDS', 'HighlightableText', 'translateVerse', 'bibleHlKey',
   'LinkIcon', 'BookmarkIcon',
@@ -30,6 +31,7 @@ beforeEach(() => {
   globalThis.StickyChapterNav = () => null;
   globalThis.HomeBtn = () => null;
   globalThis.NavButtons = () => null;
+  globalThis.LibraryNav = LibraryNav;
   globalThis.useMarkAsRead = () => {};
   globalThis.useModalRegistry = () => {};
   globalThis.OT_BOOK_IDS = new Set();

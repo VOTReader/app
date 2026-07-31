@@ -17,12 +17,10 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
   const list = studies || [];
   return (
     <ScreenLayout
-      navChildren={
-        <>
-          <button className="nav-home nav-back-icon" onClick={onBack} title="← Home" aria-label="Back to Home">{"‹"}</button>
-          <NavButtons onSettings={onSettings} onHistory={onHistory} onSearch={onSearch} theme={theme} onThemeChange={onThemeChange} />
-        </>
-      }
+      navChildren={LibraryNav({
+        onBack, backLabel: 'Home', showHome: false,
+        onSettings, onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       <div className="vol-index">
         <div className="vol-index-header">

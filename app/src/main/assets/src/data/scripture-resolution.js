@@ -24,7 +24,7 @@
      READING_CHAIN, _isWtlbFamily, _boundaryShort
      colLetters, colPreface, colLetterArr, LETTER_SCREEN_SET
      _allBooks, _matthew, _studies
-     parseRefStr, findBook, parseScriptureRef
+     parseRefStr, splitCompoundRef, findBook, parseScriptureRef
      resolveVerseText, findEntryContext, lookupVersesFromBooks
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -133,6 +133,79 @@ export function parseRefStr(str) {
     verseEnd: m[4] ? parseInt(m[4], 10) : null,
     tag,
   };
+}
+
+/* A cross-chapter span ("Revelation 21:1-22:5"). parseRefStr can't express two
+   chapters in one result, so the tail is dropped and we navigate to the START
+   verse — the reader lands at the top of the passage and reads on. ZERO refs of
+   this shape ship in the corpus today; this is robustness, not a live fix. */
+const _CROSS_CHAPTER_TAIL = /:(\d+)\s*-\s*\d+\s*:\s*\d+\s*$/;
+
+/** Canonical single-range ref string rebuilt from parsed parts (drops "(TAG)"). */
+function _partRef(p) {
+  return p.rawBook + ' ' + p.chapter +
+    (p.verse != null ? ':' + p.verse + (p.verseEnd != null ? '-' + p.verseEnd : '') : '');
+}
+
+/**
+ * Split a compound reference into self-contained, individually-navigable parts.
+ * THE shared splitter — every surface that makes a ref tappable per-passage
+ * (GoToRefButton, the journal {{ref:}} chips) goes through this, so a compound
+ * behaves identically everywhere.
+ *
+ *   "Isaiah 40:13; Romans 11:34" → 2 parts (plain semicolon list)
+ *   "Daniel 9:27; 11:31; 12:11"  → 3 parts — segments 2..N INHERIT the book
+ *   "Matthew 5:3-4, 7"           → 2 parts — the comma list is EXPANDED
+ *   "Revelation 21:1-22:5"       → 1 part navigating to the start (21:1)
+ *
+ * `ref` is the canonical self-contained string; `index` is the part's ordinal
+ * among the source's `;`/`,`-delimited chunks, which lets a renderer rebuild
+ * the ORIGINAL string character-for-character (separators and all) while
+ * making each chunk its own tap target — load-bearing for the journal, whose
+ * blocks are annotatable and whose highlight offsets walk that text.
+ * Chunks that parse to nothing even with the carried book are dropped
+ * individually — the rest of the compound still works.
+ *
+ * NOTE: parseRefStr itself is deliberately untouched. Its single-object return
+ * shape is a pinned contract (4 toEqual tests) and it is the search-ranking
+ * choke point (nav-index.js gives its hits a 1000-point boost); the split
+ * belongs at the callers, in ONE place, which is this function.
+ *
+ * @param {string | null | undefined} refStr
+ * @returns {{ ref: string, index: number, parsed: ReturnType<typeof parseRefStr> }[]}
+ */
+export function splitCompoundRef(refStr) {
+  if (!refStr) return [];
+  // Permanent Rule 1: en/em-dash → ASCII hyphen BEFORE any range parsing.
+  // 1-char→1-char, so chunk ordinals still line up with the raw string.
+  const src = String(refStr).replace(/[–—]/g, '-');
+  const out = [];
+  let carryBook = null;   // last book seen — inherited by a bookless segment
+  let index = -1;         // chunk ordinal across the whole string
+  src.split(';').forEach((segment) => {
+    let segBook = null, segChapter = null;
+    segment.split(',').forEach((chunk, i) => {
+      index++;
+      const text = chunk.trim();
+      if (!text) return;
+      const base = text.replace(_CROSS_CHAPTER_TAIL, ':$1');
+      let parsed = null;
+      if (i === 0) {
+        parsed = parseRefStr(base);
+        if ((!parsed || !parsed.chapter) && carryBook) parsed = parseRefStr(carryBook + ' ' + base);
+      } else if (segBook && segChapter != null && /^\d/.test(base)) {
+        // A comma tail inherits the book, and the chapter too UNLESS it names
+        // its own ("Exodus 20:12, 21:17" — matthew.js ships exactly this).
+        parsed = parseRefStr(/^\d+\s*:/.test(base)
+          ? segBook + ' ' + base
+          : segBook + ' ' + segChapter + ':' + base);
+      }
+      if (!parsed || !parsed.chapter) return;
+      if (i === 0) { segBook = parsed.rawBook; segChapter = parsed.chapter; carryBook = parsed.rawBook; }
+      out.push({ ref: _partRef(parsed), index, parsed });
+    });
+  });
+  return out;
 }
 
 // SC3 — standard book abbreviations, consulted AFTER the exact pass and BEFORE

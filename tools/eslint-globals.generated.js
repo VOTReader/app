@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 466 distinct identifiers.
+// Total: 469 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -257,6 +257,7 @@ export const projectGlobals = {
   WtlbEntryView: "readonly",
   _BOUNDARY_SHORT: "readonly",
   _BOUNDARY_SHORT_OUTSIDE: "readonly",
+  _CROSS_CHAPTER_TAIL: "readonly",
   _HL_COLOR_HEX: "readonly",
   _HL_COLOR_ORDER: "readonly",
   _NAV_ICONS: "readonly",
@@ -392,6 +393,7 @@ export const projectGlobals = {
   normalizeForHighlight: "readonly",
   noteSourceLabel: "readonly",
   noteSourceNav: "readonly",
+  noteSourceSegments: "readonly",
   openThumbDB: "readonly",
   parseRefRange: "readonly",
   parseRefRanges: "readonly",
@@ -413,6 +415,7 @@ export const projectGlobals = {
   showToast: "readonly",
   snapRangeToWords: "readonly",
   snapSelectionRange: "readonly",
+  splitCompoundRef: "readonly",
   splitIntoVerses: "readonly",
   splitWithHighlight: "readonly",
   srchApplyFilter: "readonly",

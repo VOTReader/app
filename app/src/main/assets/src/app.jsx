@@ -189,14 +189,17 @@ function App() {
      destSnapshot prune effect + the backHint computation + the
      fromLetterRef mirror. Extracted to src/hooks/use-from-letter-stack.js
      (P6i). setFromLetterStack is returned because __goHome and
-     handleAndroidBack (both still in App()) mutate the stack directly. */
+     handleAndroidBack (both still in App()) mutate the stack directly.
+     journalEntryId is declared HERE (not at useScrollMemory below, which
+     also reads it) because it is the 7th tracked back-stack field. */
+  const [journalEntryId, setJournalEntryId] = useState(null);
   const {
     setFromLetterStack, pushFromLetter,
-    tapThroughBack, fromLetterRef, backHint,
+    tapThroughBack, fromLetterRef, backHint, backActive,
   } = useFromLetterStack({
     tabField,
-    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
-    setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
+    setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId, setJournalEntryId,
   });
 
   /* useTapThrough() call → moved below, after useReadingDwell (which
@@ -300,11 +303,9 @@ function App() {
   const navOriginRef = useRefMirror(navOrigin);
 
   /* useScrollMemory — per-tab/per-screen scroll position capture +
-     restore. Extracted to src/hooks/use-scroll-memory.js (P6e).
-     journalEntryId is declared here (not at useNav below) because the
-     journal viewer/editor scroll keys are PER-ENTRY — one shared key made
-     every entry restore the previous entry's offset. */
-  const [journalEntryId, setJournalEntryId] = useState(null);
+     restore (P6e). The journal viewer/editor scroll keys are PER-ENTRY —
+     one shared key made every entry restore the previous entry's offset —
+     so journalEntryId (declared up at useFromLetterStack) is threaded in. */
   const { flushScrollToActiveTab } = useScrollMemory({
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
     journalEntryId,
@@ -467,7 +468,7 @@ function App() {
      point. P6j. */
   const { navigateToLink } = useNavigateToLink({
     closeLinkSidebar, pushFromLetter,
-    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId,
     setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
     setSurpriseAnchor, setJournalEntryId,
   });
@@ -632,8 +633,8 @@ function App() {
      after every nav helper it threads (goStudiesHome is the last one). */
   useAndroidBack({
     screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb, fromSurprise,
-    tabsOverviewOpen, journalEntryId, fromLetterRef, tapThroughBack, backHint,
-    setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId,
+    tabsOverviewOpen, journalEntryId, fromLetterRef, tapThroughBack, backActive,
+    setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId, setJournalEntryId,
     setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh, setFromSurprise,
     setTabsOverviewOpen, setSurpriseAnchor,
     cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
@@ -703,7 +704,7 @@ function App() {
     studiesLoading, studiesError, retryStudies: loadStudies, UNIFIED_CHAIN,
     searchQuery, setSearchQuery, searchScope, setSearchScope, searchContext,
     journalEntryId, createAndEditJournal,
-    openInAppLetter, openLinkSidebar, navigateToLink,
+    openInAppLetter, openLinkSidebar, navigateToLink, pushFromLetter,
     backHint, tapThroughBack, goToLetterFromMatthew,
     setNavOrigin, setNoteSheetTarget,
     bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
@@ -789,7 +790,6 @@ function App() {
         bookmarkPopoverPayload={bookmarkPopoverPayload} setBookmarkPopoverPayload={setBookmarkPopoverPayload}
         bookmarkCreatePending={bookmarkCreatePending} setBookmarkCreatePending={setBookmarkCreatePending}
         inboundJournalPayload={inboundJournalPayload} setInboundJournalPayload={setInboundJournalPayload}
-        goJournalViewer={goJournalViewer}
       />
     </ReadingChromeProvider>
     </TabsContext.Provider>

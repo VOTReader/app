@@ -366,6 +366,9 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
   }, [applyZoom, clampZoom]);
 
   return (
+    /* NOT LibraryNav (documented exception): this is the one screen that bypasses
+       ScreenLayout entirely — its own immersive .garden-top-bar chrome, not a
+       .top-nav. Adopting the shared nav would be a rewrite, not a consolidation. */
     <div className="garden-fullscreen">
       <div className="garden-top-bar">
         <button className="garden-back-btn" onClick={onBack} title="Back" aria-label="Back">

@@ -235,39 +235,24 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         prevLabel="Previous letter"
         nextLabel="Next letter"
       />}
-      navChildren={
-        <>
-          <button className="nav-volume nav-back-icon" onClick={onHome} title={`← ${volumeLabel || "Volume Two"}`} aria-label={`Back to ${volumeLabel || "Volume Two"}`}>‹</button>
-          <HomeBtn />
-          <div className="nav-arrows">
-            <button
-              className="nav-arrow-btn"
-              disabled={!letter.prevLetter && !prevBoundary}
-              onClick={() => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary()}
-              title="Previous"
-              aria-label="Previous letter"
-            >‹</button>
-            <button
-              className="nav-arrow-btn"
-              disabled={!letter.nextLetter && !nextBoundary}
-              onClick={() => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary()}
-              title="Next"
-              aria-label="Next letter"
-            >›</button>
-          </div>
-          <NavButtons
-            onSettings={onSettings}
-            onHistory={onHistory}
-            onSearch={onSearch}
-            theme={theme}
-            onThemeChange={onThemeChange}
-            reading={true}
-            chapterBookmark={letter ? { hlKey: 'letter:' + letter.id, label: letter.title || 'Letter bookmark' } : null}
-            journalRefKey={(typeof jrnRefKeyForLetterByLabel === 'function') ? jrnRefKeyForLetterByLabel(volumeLabel || 'Volume Two', letter && letter.id) : null}
-            journalRefLabel={letter && letter.title}
-          />
-        </>
-      }
+      navChildren={LibraryNav({
+        // The back button was the app's ONLY `nav-volume` — and app.css's
+        // .nav-volume rule sits AFTER .nav-back-icon at equal specificity, so
+        // it shrank this arrow to 11.52px on 13 screens. LibraryNav renders
+        // `nav-home nav-back-icon` like every other screen. `nav-volume` is gone.
+        // onHome — NOT onBack. onBack is the in-content back-hint pill.
+        onBack: onHome, backLabel: volumeLabel || "Volume Two",
+        arrows: {
+          onPrev: () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary(),
+          onNext: () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary(),
+          prevDisabled: !letter.prevLetter && !prevBoundary,
+          nextDisabled: !letter.nextLetter && !nextBoundary,
+          prevLabel: 'Previous letter', nextLabel: 'Next letter',
+        },
+        reading: true,
+        chapterBookmark: letter ? { hlKey: 'letter:' + letter.id, label: letter.title || 'Letter bookmark' } : null,
+        onSettings, onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       {backHint && (
         <div className="back-hint-row">
@@ -424,7 +409,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             {/* Reading-end sentinel: positioned at the actual end of body text. */}
             <div className="reading-end" />
 
-            {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} highlightedFn={highlightedFn} onInAppLink={wrappedInAppLink} />}
+            {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} highlightedFn={highlightedFn} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} />}
 
             <div className="ornament-divider">
               <div className="ornament-divider-line" />

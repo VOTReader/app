@@ -6,7 +6,7 @@
    a corrupt or out-of-range persisted value (a hand-edited backup, a older
    build's preset, a stray string) can never reach the transport. */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { ReadingChromeProvider, clampEndDwell } from './ReadingChromeProvider.jsx';
 import { AutoScrollContext } from './AutoScrollControl.jsx';
@@ -17,8 +17,8 @@ const Probe = () => { seen = React.useContext(AutoScrollContext); return null; }
 beforeEach(() => { seen = null; });
 afterEach(() => cleanup());
 
-const provide = (settings) => render(
-  <ReadingChromeProvider screen="bible-ch" dotEnabled={false} onGo={() => {}} settings={settings} updateSetting={() => {}}>
+const provide = (settings, updateSetting = () => {}) => render(
+  <ReadingChromeProvider screen="bible-ch" dotEnabled={false} onGo={() => {}} settings={settings} updateSetting={updateSetting}>
     <Probe />
   </ReadingChromeProvider>
 );
@@ -72,6 +72,21 @@ describe('auto-scroll config handed to the pill', () => {
   it('survives a missing settings object entirely', () => {
     expect(() => provide(null)).not.toThrow();
     expect(seen.enabled).toBe(false);
+  });
+
+  it('gives the pill a write-back for BOTH knobs, each clamped at this seam', () => {
+    // The dwell one is what makes the countdown adjustable without a trip to
+    // Settings; clamping here means the pill's stepper cannot persist junk.
+    const updateSetting = vi.fn();
+    provide({ autoScroll: true, autoScrollNext: true, autoScrollEndMs: '2500' }, updateSetting);
+    seen.onSpeedChange(24);
+    expect(updateSetting).toHaveBeenCalledWith('autoScrollLpm', '24');
+    seen.onDwellChange(4000);
+    expect(updateSetting).toHaveBeenCalledWith('autoScrollEndMs', '4000');
+    seen.onDwellChange(99999);
+    expect(updateSetting).toHaveBeenCalledWith('autoScrollEndMs', '15000');
+    seen.onDwellChange(-1);
+    expect(updateSetting).toHaveBeenCalledWith('autoScrollEndMs', '0');
   });
 
   it('treats keepScreenOn as opt-OUT so the wake lock release restores the user’s own preference', () => {

@@ -22,6 +22,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { WtlbEntryView } from './WtlbEntryView.jsx';
+import { LibraryNav } from '../components/LibraryNav.jsx';
 
 let capturedPager;
 
@@ -32,6 +33,7 @@ beforeEach(() => {
   globalThis.StickyChapterNav = () => null;
   globalThis.HomeBtn = () => null;
   globalThis.NavButtons = () => null;
+  globalThis.LibraryNav = LibraryNav;
   globalThis.useMarkAsRead = () => {};
   globalThis.useModalRegistry = () => {};
   globalThis.WTLB_PART_LABELS = { holydays: 'Regarding The Holy Days' };
@@ -49,7 +51,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
-  for (const k of ['ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'NavButtons',
+  for (const k of ['ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'NavButtons', 'LibraryNav',
     'useMarkAsRead', 'useModalRegistry', 'WTLB_PART_LABELS', 'COL_BY_KEY', 'colLetterArr', 'colPreface',
     'wtlbHlKey', 'ExpandableVerse', 'GoToRefButton', 'ScriptureVerseText', 'lookupVersesFromBooks', 'StaticSubtree']) {
     delete globalThis[k];

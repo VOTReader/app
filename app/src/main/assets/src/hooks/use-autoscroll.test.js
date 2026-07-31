@@ -386,6 +386,65 @@ describe('end of page', () => {
     ctrl.destroy();
   });
 
+  it('re-arms a RUNNING countdown when the reader changes the dwell', () => {
+    // The pill's dwell stepper is only worth having if it moves the countdown
+    // the reader is looking at. reachedEnd bakes the value into a timer, so a
+    // re-arm has to recompute against the moment the dwell STARTED — not now,
+    // or the seconds already sat would be charged twice.
+    const { io, state } = makeIo();
+    state.autoNext = true;
+    state.endDwell = 10000;
+    state.el = makeEl({ scrollHeight: 5000, clientHeight: 800, endTop: 900 });
+    state.lpm = 40;
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 900, 50);
+    expect(ctrl.getState().state).toBe('enddwell');
+    const startedAt = state.t;
+    expect(ctrl.getState().advanceAt).toBe(startedAt + 10000);
+
+    // Three seconds in, the reader shortens it to 5s.
+    runTimers(state, 3000);
+    state.endDwell = 5000;
+    ctrl.rearmDwell();
+    expect(ctrl.getState().advanceAt).toBe(startedAt + 5000); // NOT now + 5000
+    expect(state.advanced).toBe(0);
+    runTimers(state, 2100);
+    expect(state.advanced).toBe(1);
+    ctrl.destroy();
+  });
+
+  it('a re-arm still cannot undercut the minimum time-on-page', () => {
+    // Dropping the dwell to zero mid-countdown must not let a short entry
+    // flick past — the 4s floor is the whole reason it exists.
+    const { io, state } = makeIo();
+    state.autoNext = true;
+    state.endDwell = 10000;
+    state.el = makeEl({ scrollHeight: 400, clientHeight: 800, endTop: 200 });
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 5);
+    expect(ctrl.getState().state).toBe('enddwell');
+    const pageStart = 0; // start() ran at t=0
+    state.endDwell = 0;
+    ctrl.rearmDwell();
+    expect(ctrl.getState().advanceAt).toBe(pageStart + 4000); // MIN_PAGE_MS
+    ctrl.destroy();
+  });
+
+  it('ignores a dwell change when no countdown is armed', () => {
+    const { io, state } = makeIo();
+    const ctrl = createAutoScroll(io);
+    ctrl.start();
+    runFrames(state, 3);
+    expect(ctrl.getState().state).toBe('running');
+    const before = state.snaps.length;
+    ctrl.rearmDwell();
+    expect(ctrl.getState().state).toBe('running');
+    expect(state.snaps.length).toBe(before); // no snapshot, no timer churn
+    ctrl.destroy();
+  });
+
   it('waits out a post-advance scroll restore before resuming motion', () => {
     const { io, state } = makeIo();
     state.autoNext = true;

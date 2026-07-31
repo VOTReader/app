@@ -158,6 +158,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {*} openInAppLetter
  * @property {*} openLinkSidebar
  * @property {*} navigateToLink
+ * @property {*} pushFromLetter
  * @property {*} backHint
  * @property {*} tapThroughBack
  * @property {*} goToLetterFromMatthew
@@ -227,7 +228,7 @@ export function buildScreenRoutes({
   // ── Journal ──
   journalEntryId, createAndEditJournal,
   // ── Tap through / linking / overlays ──
-  openInAppLetter, openLinkSidebar, navigateToLink,
+  openInAppLetter, openLinkSidebar, navigateToLink, pushFromLetter,
   backHint, tapThroughBack, goToLetterFromMatthew,
   setNavOrigin, setNoteSheetTarget,
   // ── Bible chapter boundary props (from useReadingChainNav) ──
@@ -278,13 +279,14 @@ export function buildScreenRoutes({
       markAsReadEnabled: settings.markAsRead,
     };
   };
-  const _idxNav = () => (
-    <>
-      <button className="nav-home" onClick={goVolumesHome}>{"← Volumes"}</button>
-      <HomeBtn />
-      <NavButtons onSettings={goSettings} onHistory={goHistory} onSearch={goSearch} theme={theme} onThemeChange={setTheme} />
-    </>
-  );
+  // Shared nav for the 14 volume/WTLB/Blessed/Holy-Days index screens. Was a
+  // hand-rolled TEXT back button ("← Volumes") that never adopted the 2026-07-14
+  // icon-only arrow; LibraryNav owns the markup now, so these get the enlarged ‹.
+  const _idxNav = () => LibraryNav({
+    onBack: goVolumesHome, backLabel: 'Volumes',
+    onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
+    theme, onThemeChange: setTheme,
+  });
   const sharedViewProps = {
     onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
     theme, onThemeChange: setTheme, surpriseAnchor,
@@ -294,7 +296,16 @@ export function buildScreenRoutes({
     onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
     markAsReadEnabled: settings.markAsRead, showProgressBar: settings.showProgressBar,
   };
-  const _navToChapter = (bid, ch) => { setFromWtlb(screen); setBookId(bid); setChapterNum(ch); setScreen('bible-ch'); };
+  // {{nav:bookId:chapter}} inside a WTLB/Blessed/Holy-Days entry. Routed
+  // through navigateToLink so it raises the same "‹ Back to <entry>" pill
+  // every other in-content cross-screen link does (and gets the lazy
+  // bible-corpus kick for free). The older `fromWtlb` breadcrumb stays exactly
+  // as it was — hardware back consumes it at use-android-back.js once the
+  // single-shot pill has been used or pruned.
+  const _navToChapter = (bid, ch, srcTitle) => {
+    setFromWtlb(screen);
+    navigateToLink({ type: 'bible', bookId: bid, chapter: ch }, { sourceLetterTitle: srcTitle || null });
+  };
 
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
   // every VOT route (indexes + letter views + WTLB entries + Holy Days +
@@ -496,21 +507,25 @@ export function buildScreenRoutes({
           // Wave 0 (sticky genreId): entering content from History is a
           // non-genre entry — clear genreId so a later index-level Back
           // can't misroute into a genre visited in an earlier session leg.
+          // `silent: true` — History is the ONE link surface the owner wants
+          // pill-less (you already know where you came from). The back-stack
+          // entry is still pushed, so Back from the destination returns to
+          // History; only the visible pill is suppressed.
           if (entry.type === 'study-chapter') {
             const study = getStudyById(entry.studyId);
             if (!study) return;
             setGenreId(null);
             setActiveReadKey(studyReadKey(study.slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(study.slug)]: entry.studyChapterId })));
-            navigateToLink({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History' });
+            navigateToLink({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History', silent: true });
           } else if (entry.type === 'letter') {
             var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get('one') : COL_BY_KEY.get('two'));
             setGenreId(null);
             setActiveReadKey('vol:' + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
-            navigateToLink({ screen: _hc.letterScreen, letterId: entry.letterId }, { sourceLetterTitle: 'History' });
+            navigateToLink({ screen: _hc.letterScreen, letterId: entry.letterId }, { sourceLetterTitle: 'History', silent: true });
           } else {
             setGenreId(null);
             setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
-            navigateToLink({ type: 'bible', bookId: entry.bookId, chapter: entry.chapterNum }, { sourceLetterTitle: 'History' });
+            navigateToLink({ type: 'bible', bookId: entry.bookId, chapter: entry.chapterNum }, { sourceLetterTitle: 'History', silent: true });
           }
         }}
         onSearch={goSearch}
@@ -581,6 +596,11 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
+    // backHint/tapThroughBack: the cross-screen pill. A note in a notebook, a
+    // Links/Bookmarks/Highlights row whose source is a journal paragraph, or a
+    // journal card from another entry all land HERE and used to have no way
+    // back. The viewer renders exactly ONE pill — its private journal→journal
+    // stack first, this one otherwise.
     'journal-viewer': () => typeof JournalViewerScreen !== 'undefined' && _kickVot(
       <JournalViewerScreen
         onSettings={goSettings}
@@ -588,6 +608,8 @@ export function buildScreenRoutes({
         onBack={() => setScreen('journal-home')}
         onHome={goHome}
         onEdit={() => setScreen('journal-editor')}
+        backHint={backHint}
+        tapThroughBack={tapThroughBack}
         onNavigateToLink={(endpoint, meta) => {
           if (endpoint) {
             setNavOrigin({ screen: 'journal-viewer' });
@@ -693,6 +715,7 @@ export function buildScreenRoutes({
         onMatthewStudy={() => { setBookId('matthew'); setChapterNum(null); setScreen('matthew-idx'); }}
         theme={theme} onThemeChange={setTheme}
         layout={settings.scriptureLayout}
+        onCycleLayout={(nextId) => updateSetting('scriptureLayout', nextId)}
         translation={settings.translation}
       />
     ),
@@ -922,6 +945,7 @@ export function buildScreenRoutes({
         selectStudy={selectStudy}
         selectStudyChapter={selectStudyChapter}
         goStudiesHome={goStudiesHome}
+        pushFromLetter={pushFromLetter}
         sharedViewProps={sharedViewProps}
       />
     ),

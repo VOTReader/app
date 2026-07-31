@@ -58,7 +58,7 @@ import {
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
   contentDocToNavItem, buildNavTree,
 } from '../utils/nav-index.js';
-import { _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav } from '../utils/note-source.js';
+import { _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav, noteSourceSegments } from '../utils/note-source.js';
 import {
   READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
   countReadFor, groupBooks, tallyGroup,
@@ -207,7 +207,7 @@ Object.assign(window, {
   createPressDrag,
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
   contentDocToNavItem, buildNavTree,
-  _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav,
+  _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav, noteSourceSegments,
   READ_VERSION_ID, progressCorporaReady, buildProgressGroups,
   countReadFor, groupBooks, tallyGroup,
   annotationSourceForKey, mostAnnotatedSources,

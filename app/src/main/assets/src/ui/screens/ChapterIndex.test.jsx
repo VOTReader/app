@@ -16,9 +16,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { ChapterIndex } from './ChapterIndex.jsx';
+import { LibraryNav } from '../components/LibraryNav.jsx';
 import * as routes from '../screen-routes.jsx';
 
-const GLOBALS = ['ScreenLayout', 'HomeBtn', 'NavButtons'];
+const GLOBALS = ['ScreenLayout', 'HomeBtn', 'NavButtons', 'LibraryNav'];
 
 function setupGlobals() {
   globalThis.ScreenLayout = ({ children, navChildren }) => (
@@ -26,6 +27,9 @@ function setupGlobals() {
   );
   globalThis.HomeBtn = () => null;
   globalThis.NavButtons = () => null;
+  // The REAL shared nav — the back-button assertions below are the contract
+  // ChapterIndex delegates to it, so stubbing it would test nothing.
+  globalThis.LibraryNav = LibraryNav;
   // jsdom lacks scrollIntoView; the mount effect scrolls the current card
   // into view on a timer.
   if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};

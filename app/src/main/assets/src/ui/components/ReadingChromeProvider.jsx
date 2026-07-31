@@ -14,18 +14,12 @@
 
 import { ReadingDotContext } from './ResumeReadingNavBtn.jsx';
 import { AutoScrollContext } from './AutoScrollControl.jsx';
-import { clampLpm } from '../../hooks/use-autoscroll.js';
+import { clampLpm, clampEndDwell } from '../../hooks/use-autoscroll.js';
 
-/**
- * End-of-page dwell before an auto-advance, in ms, clamped to the range the
- * Settings slider offers (0 = no pause, 15s = a long sit with the closing
- * line). Legacy preset values (1500/2500/4000/6000) all fall inside it.
- */
-export function clampEndDwell(v) {
-  const n = parseFloat(String(v));
-  if (!Number.isFinite(n)) return 2500;
-  return Math.min(15000, Math.max(0, n));
-}
+// The dwell clamp moved next to clampLpm in the transport module (the pill's
+// own stepper needs it, and importing this file from there would be a cycle).
+// Re-exported here because this is the seam everything else already imports.
+export { clampEndDwell };
 
 export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, updateSetting, children }) {
   const s = settings || {};
@@ -39,6 +33,9 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, upda
     endDwellMs: clampEndDwell(s.autoScrollEndMs),
     keepScreenOnPref: s.keepScreenOn !== false,
     onSpeedChange: (lpm) => { if (updateSetting) updateSetting('autoScrollLpm', String(lpm)); },
+    // Same write-back shape for the dwell, so the countdown can be tuned from
+    // the pill without a trip to Settings. Clamped here, not at the caller.
+    onDwellChange: (ms) => { if (updateSetting) updateSetting('autoScrollEndMs', String(clampEndDwell(ms))); },
   }), [s.autoScroll, s.autoScrollLpm, s.autoScrollNext, s.autoScrollEndMs, s.keepScreenOn, updateSetting]);
 
   return (

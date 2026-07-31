@@ -276,7 +276,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         // Guard with typeof; fall back to a readable book name until it loads.
         const bookTitle = (typeof BOOKS !== 'undefined' && BOOKS[bookId]?.title) || _prettyBookId(bookId);
         return (
-          <a key={si} className="fn-link" href="#" onClick={(e) => { e.preventDefault(); onNavToChapter(bookId, ch); }}>
+          <a key={si} className="fn-link" href="#" onClick={(e) => { e.preventDefault(); onNavToChapter(bookId, ch, entry.title); }}>
             [{bookTitle} {ch}]
           </a>
         );
@@ -300,37 +300,20 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         prevLabel="Previous entry"
         nextLabel="Next entry"
       />}
-      navChildren={
-        <>
-          <button className="nav-home nav-back-icon" onClick={onHome} title="← Index" aria-label="Back to Index">‹</button>
-          <HomeBtn />
-          <div className="nav-arrows">
-            <button
-              className="nav-arrow-btn"
-              disabled={!prevEntry && !prevBoundary}
-              onClick={() => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary()}
-              title="Previous"
-              aria-label="Previous entry"
-            >‹</button>
-            <button
-              className="nav-arrow-btn"
-              disabled={!nextEntry && !nextBoundary}
-              onClick={() => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary()}
-              title="Next"
-              aria-label="Next entry"
-            >›</button>
-          </div>
-          <NavButtons
-            onSettings={onSettings}
-            onHistory={onHistory}
-            onSearch={onSearch}
-            theme={theme}
-            onThemeChange={onThemeChange}
-            reading={true}
-            chapterBookmark={entry ? { hlKey: 'wtlb:' + entry.id, label: entry.title || (partLabel ? partLabel + ' — Entry ' + entry.num : 'Bookmark') } : null}
-          />
-        </>
-      }
+      navChildren={LibraryNav({
+        // onHome — NOT onBack. onBack is the in-content back-hint pill.
+        onBack: onHome, backLabel: 'Index',
+        arrows: {
+          onPrev: () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary(),
+          onNext: () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary(),
+          prevDisabled: !prevEntry && !prevBoundary,
+          nextDisabled: !nextEntry && !nextBoundary,
+          prevLabel: 'Previous entry', nextLabel: 'Next entry',
+        },
+        reading: true,
+        chapterBookmark: entry ? { hlKey: 'wtlb:' + entry.id, label: entry.title || (partLabel ? partLabel + ' — Entry ' + entry.num : 'Bookmark') } : null,
+        onSettings, onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       {backHint && (
         <div className="back-hint-row">

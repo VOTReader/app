@@ -13,6 +13,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { NotesIndexScreen, filterNotesByQuery } from './NotesIndexScreen.jsx';
 import { NoteRow } from '../components/NoteRow.jsx';
+import { noteSourceSegments } from '../../utils/note-source.js';
 
 const SRC = {
   'bible:genesis:1:1': 'Genesis 1:1',
@@ -30,6 +31,9 @@ const NBS = [{ id: 'nb1', name: 'Faith' }];
 
 function setupGlobals() {
   window.noteSourceLabel = (n) => SRC[(n.keys || [])[0]] || 'Note';
+  // NoteRow is the REAL component and renders one tap target per source
+  // segment, so the segmenter it reads has to be here too.
+  window.noteSourceSegments = noteSourceSegments;
   window.relativeDate = () => '1w ago';
   window.NoteStore = {
     subscribe: () => () => {},
@@ -47,7 +51,7 @@ function setupGlobals() {
   window.NoteRow = NoteRow;
 }
 
-const GLOBALS = ['noteSourceLabel', 'relativeDate', 'NoteStore', 'NotebookStore', 'ScreenLayout', 'LibraryNav', 'NoteRow'];
+const GLOBALS = ['noteSourceLabel', 'noteSourceSegments', 'relativeDate', 'NoteStore', 'NotebookStore', 'ScreenLayout', 'LibraryNav', 'NoteRow'];
 
 beforeEach(setupGlobals);
 afterEach(() => {
@@ -112,6 +116,29 @@ describe('NotesIndexScreen — link-out back pill', () => {
   it('shows no back pill on a normal open (no backPill in the return context)', () => {
     const { container } = render(<NotesIndexScreen {...props} />);
     expect(container.querySelector('.back-hint-pill')).toBeNull();
+  });
+});
+
+describe('NotesIndexScreen drilled header', () => {
+  it('shows the "My Notes" index header at the top level', () => {
+    const { container } = render(<NotesIndexScreen {...props} />);
+    expect(container.querySelector('.notes-index-title').textContent).toBe('My Notes');
+    expect(container.querySelector('.nb-drilled-title')).toBeNull();
+  });
+
+  it('replaces it with the notebook name as the drilled title (no stacked headers)', () => {
+    const { container, getByText } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(getByText('Faith'));
+    expect(container.querySelector('.nb-drilled-title').textContent).toBe('Faith');
+    expect(container.querySelector('.notes-index-title')).toBeNull();
+  });
+
+  it('counts the drilled notebook’s notes, not the whole index', () => {
+    const { container, getByText } = render(<NotesIndexScreen {...props} />);
+    // 3 notes total, 2 of them in Faith (g1 + g3).
+    expect(container.querySelector('.notes-index-count').textContent).toBe('3 notes');
+    fireEvent.click(getByText('Faith'));
+    expect(container.querySelector('.nb-drilled-count').textContent).toBe('2 notes');
   });
 });
 

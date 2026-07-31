@@ -35,9 +35,9 @@ function baseProps(overrides) {
     screen: 'home', bookId: null, genreId: null,
     fromSearch: false, fromStudies: false, fromMatthewCh: null, studyId: null, fromWtlb: null, fromSurprise: false,
     tabsOverviewOpen: false, journalEntryId: null, fromLetterRef: { current: [] },
-    tapThroughBack: vi.fn(), backHint: null,
+    tapThroughBack: vi.fn(), backActive: false,
     setScreen: vi.fn(), setBookId: vi.fn(), setChapterNum: vi.fn(), setLetterId: vi.fn(),
-    setStudyId: vi.fn(), setStudyChapterId: vi.fn(),
+    setStudyId: vi.fn(), setStudyChapterId: vi.fn(), setJournalEntryId: vi.fn(),
     setFromLetterStack: vi.fn(), setFromSearch: vi.fn(), setFromStudies: vi.fn(),
     setFromWtlb: vi.fn(), setFromMatthewCh: vi.fn(), setFromSurprise: vi.fn(),
     setTabsOverviewOpen: vi.fn(), setSurpriseAnchor: vi.fn(),
@@ -160,12 +160,15 @@ describe('useAndroidBack — "Back to …" pill parity on chapter tap-throughs',
   // LETTER_SCREEN_SET) and show the cross-screen back-pill. Hardware-back must
   // match the pill: call tapThroughBack (the pill's own handler), not the
   // chapter-index route.
+  // The gate is `backActive`, not `backHint` — a History-pushed entry is
+  // `silent` (no pill) but is still a live back target, and back from a
+  // History-entered chapter must still return to History.
   const pillStack = [{ sourceScreen: 'notes-index', sourceLetterTitle: 'My Notes' }];
 
   it('bible-ch with the pill showing pops the tap-through stack (not bible-idx)', () => {
     const props = baseProps({
       screen: 'bible-ch', bookId: 'genesis',
-      fromLetterRef: { current: pillStack }, backHint: { title: 'My Notes', volumeLabel: null },
+      fromLetterRef: { current: pillStack }, backActive: true,
     });
     renderHook(() => useAndroidBack(props));
     const res = window.handleAndroidBack();
@@ -178,7 +181,7 @@ describe('useAndroidBack — "Back to …" pill parity on chapter tap-throughs',
   it('matthew-ch with the pill showing pops the tap-through stack (not matthew-idx)', () => {
     const props = baseProps({
       screen: 'matthew-ch',
-      fromLetterRef: { current: pillStack }, backHint: { title: 'My Notes', volumeLabel: null },
+      fromLetterRef: { current: pillStack }, backActive: true,
     });
     renderHook(() => useAndroidBack(props));
     const res = window.handleAndroidBack();
@@ -188,7 +191,7 @@ describe('useAndroidBack — "Back to …" pill parity on chapter tap-throughs',
   });
 
   it('bible-ch with NO pill still backs to the book index (regression guard)', () => {
-    const props = baseProps({ screen: 'bible-ch', bookId: 'genesis', backHint: null });
+    const props = baseProps({ screen: 'bible-ch', bookId: 'genesis', backActive: false });
     renderHook(() => useAndroidBack(props));
     window.handleAndroidBack();
     expect(props.tapThroughBack).not.toHaveBeenCalled();
@@ -198,7 +201,7 @@ describe('useAndroidBack — "Back to …" pill parity on chapter tap-throughs',
   it('the pill wins over a stale fromSearch on bible-ch (pill is the user intent)', () => {
     const props = baseProps({
       screen: 'bible-ch', fromSearch: true,
-      fromLetterRef: { current: pillStack }, backHint: { title: 'My Notes', volumeLabel: null },
+      fromLetterRef: { current: pillStack }, backActive: true,
     });
     renderHook(() => useAndroidBack(props));
     window.handleAndroidBack();
@@ -294,17 +297,75 @@ describe('useAndroidBack — P1-12 History tap-through return path', () => {
     expect(props.setScreen).toHaveBeenCalledWith('history');
   });
 
+  // journalEntryId is the 7th tracked field — step 3's source-restore must
+  // put it back, or a letter reached FROM a journal entry backs into the
+  // viewer with the wrong entry loaded.
+  it('step 3 restores a captured sourceJournalEntryId', () => {
+    const stack = [{ sourceScreen: 'journal-viewer', sourceJournalEntryId: 'e7' }];
+    const props = baseProps({ screen: 'vot-one-letter', fromLetterRef: { current: stack } });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setJournalEntryId).toHaveBeenCalledWith('e7');
+    expect(props.setScreen).toHaveBeenCalledWith('journal-viewer');
+  });
+
+  // Phase 3: History entries are now `silent` (no pill), so backHint is null
+  // for them — backActive is what keeps this return path alive.
   it('back from a chapter entered via History defers to the back-pill handler (tapThroughBack)', () => {
     const props = baseProps({
       screen: 'bible-ch', bookId: 'john',
-      fromLetterRef: { current: [{ sourceScreen: 'history', sourceLetterTitle: 'History' }] },
-      backHint: { title: 'History', volumeLabel: null },
+      fromLetterRef: { current: [{ sourceScreen: 'history', sourceLetterTitle: 'History', silent: true }] },
+      backActive: true,
     });
     renderHook(() => useAndroidBack(props));
     const res = window.handleAndroidBack();
     expect(res).toBe('true');
     expect(props.tapThroughBack).toHaveBeenCalledTimes(1);
     expect(props.setScreen).not.toHaveBeenCalledWith('bible-idx');
+  });
+});
+
+describe('useAndroidBack — journal-viewer back mirrors the viewer’s one pill', () => {
+  // The viewer renders ONE pill with a fixed precedence: its private
+  // journal→journal stack (window.__journalBackStack) first, then the
+  // cross-screen back target. Hardware back walks the same order — before
+  // Phase 3 it unconditionally went to the journal hub, stranding anyone who
+  // arrived from a notebook note.
+  afterEach(() => { delete window.__journalBackStack; });
+
+  it('pops the journal→journal stack when its top targets the open entry', () => {
+    window.__journalBackStack = [{ destId: 'e2', fromId: 'e1', fromTitle: 'Morning' }];
+    const props = baseProps({ screen: 'journal-viewer', journalEntryId: 'e2', backActive: true });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.goJournalViewer).toHaveBeenCalledWith('e1');
+    expect(window.__journalBackStack).toHaveLength(0);
+    expect(props.tapThroughBack).not.toHaveBeenCalled();
+    expect(props.setScreen).not.toHaveBeenCalledWith('journal-home');
+  });
+
+  it('a journal→journal top for a DIFFERENT entry is ignored (matches jrnBack’s destId gate)', () => {
+    window.__journalBackStack = [{ destId: 'other', fromId: 'e1', fromTitle: 'Morning' }];
+    const props = baseProps({ screen: 'journal-viewer', journalEntryId: 'e2' });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.goJournalViewer).not.toHaveBeenCalled();
+    expect(props.setScreen).toHaveBeenCalledWith('journal-home');
+  });
+
+  it('with no journal stack but a live back target, pops the cross-screen stack', () => {
+    const props = baseProps({ screen: 'journal-viewer', journalEntryId: 'e2', backActive: true });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.tapThroughBack).toHaveBeenCalledTimes(1);
+    expect(props.setScreen).not.toHaveBeenCalledWith('journal-home');
+  });
+
+  it('with neither, still falls back to the journal hub (regression guard)', () => {
+    const props = baseProps({ screen: 'journal-viewer', journalEntryId: 'e2' });
+    renderHook(() => useAndroidBack(props));
+    expect(window.handleAndroidBack()).toBe('true');
+    expect(props.setScreen).toHaveBeenCalledWith('journal-home');
   });
 });
 

@@ -134,6 +134,21 @@ export function clampLpm(v) {
 }
 
 /**
+ * End-of-page dwell before an auto-advance, in ms, clamped to the range both
+ * writers offer (0 = no pause, 15s = a long sit with the closing line):
+ * the Settings slider and the pill's ± stepper. Legacy preset values
+ * (1500/2500/4000/6000) all fall inside it.
+ *
+ * Lives here rather than with the provider that used to own it so the pill
+ * can clamp its own stepper without importing its parent (a cycle).
+ */
+export function clampEndDwell(v) {
+  const n = parseFloat(String(v));
+  if (!Number.isFinite(n)) return 2500;
+  return Math.min(15000, Math.max(0, n));
+}
+
+/**
  * Resolve the reading line height (px) for a scroll container.
  *
  * Speed is stored as lines/minute, never px/second: this app has a
@@ -148,10 +163,22 @@ export function clampLpm(v) {
  */
 export function measureLineHeight(el) {
   if (!el || typeof el.querySelector !== 'function') return null;
-  const probe = el.querySelector('[data-hl-key]');
-  if (!probe || typeof getComputedStyle !== 'function') return null;
+  return lineHeightOf(el.querySelector('[data-hl-key]'));
+}
+
+/**
+ * One node's rendered line height in px, or null.
+ *
+ * getComputedStyle can return the keyword "normal", hence the font-size
+ * fallback. Split out from measureLineHeight because the pill's words/line
+ * measurement needs it PER element (poetry, verse text and letter prose all
+ * set different line heights) and a second copy of the "normal" fallback is
+ * exactly the sort of thing that drifts out of sync.
+ */
+export function lineHeightOf(node) {
+  if (!node || typeof getComputedStyle !== 'function') return null;
   let cs;
-  try { cs = getComputedStyle(probe); } catch (_e) { return null; }
+  try { cs = getComputedStyle(node); } catch (_e) { return null; }
   if (!cs) return null;
   const lh = parseFloat(cs.lineHeight);
   if (Number.isFinite(lh) && lh > 0) return lh;
@@ -250,6 +277,9 @@ export function createAutoScroll(io) {
   let pageStartedAt = 0;
   let chain = 0;
   let advanceAt = 0;
+  // When the current end-dwell began. The anchor a re-arm measures from, so
+  // raising the dwell mid-countdown never double-counts the time already sat.
+  let dwellStartedAt = 0;
   let dwellToken = null;
   let resumeToken = null;
   let settleToken = null;
@@ -386,22 +416,33 @@ export function createAutoScroll(io) {
     setState('paused', reason);
   }
 
+  /**
+   * (Re)compute the end dwell and arm the advance timer.
+   *
+   * The dwell is whichever is longer: the configured end dwell, or the
+   * remainder of the minimum time-on-page. A page shorter than the viewport
+   * reaches "the end" immediately and would otherwise chain at timer speed.
+   *
+   * Everything is measured from `dwellStartedAt`, not from now, so a re-arm
+   * lands on the same absolute deadline the reader's new setting describes.
+   */
+  function armDwell() {
+    if (dwellToken != null) { try { io.cancelScheduled(dwellToken); } catch (_e) { /* ignore */ } dwellToken = null; }
+    const configured = Math.max(0, io.endDwellMs());
+    const minRemain = (pageStartedAt + MIN_PAGE_MS) - dwellStartedAt;
+    advanceAt = dwellStartedAt + Math.max(configured, minRemain, 0);
+    dwellToken = io.schedule(doAdvance, Math.max(0, advanceAt - io.now()));
+  }
+
   /** End of body text. Decide between chaining onward and stopping. */
   function reachedEnd() {
     stopFrames();
     if (!io.autoNext()) { setState('ended', 'end-of-page'); return; }
     if (!io.canAdvance()) { setState('ended', 'boundary'); return; }
     if (chain >= MAX_CHAIN) { trace('chain cap reached (' + chain + ') — stopping'); setState('ended', 'chain-cap'); return; }
-    // The dwell is whichever is longer: the configured end dwell, or the
-    // remainder of the minimum time-on-page. A page shorter than the
-    // viewport reaches "the end" immediately and would otherwise chain at
-    // timer speed.
-    const configured = Math.max(0, io.endDwellMs());
-    const minRemain = (pageStartedAt + MIN_PAGE_MS) - io.now();
-    const wait = Math.max(configured, minRemain, 0);
-    advanceAt = io.now() + wait;
+    dwellStartedAt = io.now();
+    armDwell();
     setState('enddwell', 'end-of-page');
-    dwellToken = io.schedule(doAdvance, wait);
   }
 
   function doAdvance() {
@@ -582,6 +623,17 @@ export function createAutoScroll(io) {
       stopFrames();
       setState('paused', 'hidden');
     },
+    /**
+     * The reader changed the dwell while the countdown is on screen (the
+     * pill's ± stepper). `reachedEnd` baked the old value into a timer, so
+     * without this the edit would silently apply only to the NEXT page.
+     * A no-op unless a dwell is actually armed.
+     */
+    rearmDwell() {
+      if (destroyed || state !== 'enddwell') return;
+      armDwell();
+      emit();
+    },
     /** Live speed change — no restart, no discontinuity. */
     setSpeed() {
       if (destroyed) return;
@@ -760,6 +812,13 @@ export function useAutoScroll(scrollRef, opts) {
   React.useEffect(() => {
     if (ctrlRef.current) ctrlRef.current.setSpeed();
   }, [speedLpm]);
+
+  // …and a dwell edit reaches the countdown ALREADY on screen, so the pill's
+  // stepper adjusts the pause the reader is watching, not the next one.
+  const endDwellMs = opts.endDwellMs;
+  React.useEffect(() => {
+    if (ctrlRef.current) ctrlRef.current.rearmDwell();
+  }, [endDwellMs]);
 
   return {
     state: snap.state,

@@ -59,8 +59,10 @@ function TextSizeSliderRow({ value, onChange }) {
    Size slider spans 80–160%, and a px/s speed would silently change reading
    pace by up to 2× when the reader resizes text. The controller derives px
    from a measured line height, so this number means the same thing at every
-   text size. The words/min estimate assumes ~9 words per line on a phone —
-   it's an orientation aid, not a promise. */
+   text size. A words/min figure is deliberately NOT offered here: it depends
+   on how many words a line actually holds, which nothing on this screen can
+   know. The reading pill measures that from the page in front of the reader
+   and shows the real number there. */
 function AutoScrollDwellRow({ value, onChange }) {
   const ms = clampEndDwell(value);
   const secs = Math.round(ms / 100) / 10;
@@ -93,8 +95,9 @@ function AutoScrollDwellRow({ value, onChange }) {
       <div className="settings-row-desc">
         How long to wait at the end of the text before moving to the next page.
         The countdown stays visible on the pill the whole time, and tapping
-        Cancel stops it. Very short pages hold a little longer than this so a
-        run of brief entries can’t flick past.
+        Cancel stops it. The pill’s ± adjust this too — even mid-countdown.
+        Very short pages hold a little longer than this so a run of brief
+        entries can’t flick past.
       </div>
     </div>
   );
@@ -102,7 +105,6 @@ function AutoScrollDwellRow({ value, onChange }) {
 
 function AutoScrollSpeedRow({ value, onChange }) {
   const v = clampLpm(value);
-  const wpm = Math.round(v * 9);
   return (
     <div className="settings-row">
       <div className="settings-row-head">
@@ -121,7 +123,7 @@ function AutoScrollSpeedRow({ value, onChange }) {
           onChange={(e) => onChange(String(clampLpm(e.target.value)))}
           aria-label="Auto-scroll speed in lines per minute"
         />
-        <span className="txtsize-value">≈{wpm} wpm</span>
+        <span className="txtsize-value">{v}/min</span>
         <button
           type="button"
           className="txtsize-reset"
@@ -131,7 +133,8 @@ function AutoScrollSpeedRow({ value, onChange }) {
       </div>
       <div className="settings-row-desc">
         How fast the page moves on its own. The ± buttons on the reading
-        pill adjust this too, without leaving the page.
+        pill adjust this too, without leaving the page — and the pill shows
+        your words per minute, measured from the page you are on.
       </div>
     </div>
   );
@@ -1228,25 +1231,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
   return (
     <ScreenLayout
-      navChildren={
-        <>
-          <button className="nav-home nav-back-icon" onClick={onBack} title="Back" aria-label="Back">‹</button>
-          <HomeBtn />
-          <button className="nav-search-btn" onClick={onHistory} title="History">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 .49-5.01" />
-            </svg>
-          </button>
-          <button className="nav-search-btn" onClick={onSearch} title="Search">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </button>
-          <ThemeBtn theme={theme} onThemeChange={onThemeChange} />
-        </>
-      }
+      navChildren={LibraryNav({
+        // hide:['settings'] — you are already on Settings. The three icons
+        // used to be hand-copied SVGs inline purely to omit the gear.
+        onBack, backTitle: 'Back', hide: ['settings'],
+        onHistory, onSearch, theme, onThemeChange,
+      })}
     >
       <div className="settings-screen">
         <div className="settings-header">

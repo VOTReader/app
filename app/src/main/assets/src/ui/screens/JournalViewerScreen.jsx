@@ -19,15 +19,55 @@ export function jrnRenderInline(text, callbacks) {
       nodes.push(<em key={'i' + (keyCounter++)}>{m[2]}</em>);
     } else if (m[3] != null) {
       var ref = m[3].trim();
-      nodes.push(
-        <span
-          key={'i' + (keyCounter++)}
-          className="jrn-inline-ref"
-          onClick={(function(rr) { return function() { callbacks.onScriptureRef && callbacks.onScriptureRef(rr); }; })(ref)}
-        >
-          {ref}
-        </span>
-      );
+      // A COMPOUND chip ("Isaiah 40:13; Romans 11:34" — live in the-blessed.js)
+      // used to be one span whose tap silently did nothing, because the handler
+      // called parseRefStr on the whole string. Each part is now its own tap
+      // target carrying its OWN single ref. The separators (and any junk chunk)
+      // stay PLAIN TEXT at their original offsets, so the block's textContent is
+      // character-identical — journal blocks are annotatable (journal:<id>:<idx>
+      // hlKeys) and highlight offsets walk this DOM.
+      var refParts = (typeof splitCompoundRef === 'function') ? splitCompoundRef(ref) : [];
+      // Take the per-chunk path only for an actual list AND only when the
+      // splitter resolved something — a ref whose ONLY comma lives inside a
+      // parenthetical ("John 3:16 (NIV, 1984)") resolves nothing chunk-wise and
+      // falls back to the whole-string chip, which parses it correctly.
+      var refChunks = (refParts.length && /[;,]/.test(ref)) ? ref.split(/([;,])/) : null;
+      if (refChunks) {
+        refChunks.forEach(function(chunk, ci) {
+          if (ci % 2) { nodes.push(chunk); return; }             // the ';' / ',' itself
+          var part = refParts.find(function(p) { return p.index === ci / 2; });
+          var lead = /^\s*/.exec(chunk)[0];
+          var body = chunk.trim();
+          if (!part || !body) { nodes.push(chunk); return; }     // unparseable chunk
+          if (lead) nodes.push(lead);
+          nodes.push(
+            <span
+              key={'i' + (keyCounter++)}
+              className="jrn-inline-ref"
+              onClick={(function(rr) { return function() { callbacks.onScriptureRef && callbacks.onScriptureRef(rr); }; })(part.ref)}
+            >
+              {body}
+            </span>
+          );
+          var trail = chunk.slice(lead.length + body.length);
+          if (trail) nodes.push(trail);
+        });
+      } else {
+        // Single ref: label stays the source string, but the TAP carries the
+        // canonical part when there is one — so a cross-chapter span
+        // ("Revelation 21:1-22:5"), which parseRefStr alone returns null for,
+        // still opens at its start verse instead of doing nothing.
+        var soleRef = refParts.length === 1 ? refParts[0].ref : ref;
+        nodes.push(
+          <span
+            key={'i' + (keyCounter++)}
+            className="jrn-inline-ref"
+            onClick={(function(rr) { return function() { callbacks.onScriptureRef && callbacks.onScriptureRef(rr); }; })(soleRef)}
+          >
+            {ref}
+          </span>
+        );
+      }
     } else if (m[4] != null) {
       var kind = m[4]; var data = m[5].trim();
       var label = data;
@@ -460,6 +500,11 @@ export function JournalViewerScreen(props) {
   var onNavigateToLink = props.onNavigateToLink;
   var onOpenJournalEntry = props.onOpenJournalEntry;
   var onOpenNotebook = props.onOpenNotebook;
+  // The cross-screen back-pill (useFromLetterStack). Non-null when the user
+  // arrived here from a notebook note / Links row / journal card — the case
+  // that previously stranded them. jrnBack (below) takes precedence: ONE pill.
+  var backHint = props.backHint;
+  var tapThroughBack = props.tapThroughBack;
 
   // Subscribe to JournalStore — viewer re-renders when entry mutates.
   React.useSyncExternalStore(
@@ -492,11 +537,16 @@ export function JournalViewerScreen(props) {
   var _jstack = (typeof window !== 'undefined' && window.__journalBackStack) || [];
   var jrnBack = (_jstack.length && entry && _jstack[_jstack.length - 1].destId === entry.id)
     ? _jstack[_jstack.length - 1] : null;
+  // Also the nav-bar back arrow, so all three affordances (arrow, pill,
+  // hardware back — use-android-back.js's journal-viewer branch) agree on the
+  // same precedence: journal→journal stack, then the cross-screen pill, then
+  // the journal hub.
   function jrnGoBack() {
     if (jrnBack && _jstack.length) {
       _jstack.pop();
       if (onOpenJournalEntry) { onOpenJournalEntry(jrnBack.fromId); return; }
     }
+    if (!jrnBack && backHint && tapThroughBack) { tapThroughBack(); return; }
     onBack && onBack();
   }
 
@@ -643,14 +693,25 @@ export function JournalViewerScreen(props) {
   return (
     <ScreenLayout navChildren={buildNavChildren({ right: navExtras })}>
       <div className="jrn-viewer">
-        {jrnBack && (
+        {jrnBack ? (
           <div className="back-hint-row">
             <button className="back-hint-pill" onClick={jrnGoBack} aria-label={'Back to ' + jrnBack.fromTitle}>
               <span className="back-hint-arrow">‹</span>Back to{' '}
               <span className="back-hint-title">{jrnBack.fromTitle}</span>
             </button>
           </div>
-        )}
+        ) : backHint ? (
+          // ONE pill max — .back-hint-row is position:sticky, so two of them
+          // would double-cover the entry. tapThroughBack is called DIRECTLY,
+          // not via window.handleAndroidBack, whose journal-viewer branch
+          // would have to re-derive this same decision.
+          <div className="back-hint-row">
+            <button className="back-hint-pill" onClick={function() { tapThroughBack && tapThroughBack(); }} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' + backHint.title : backHint.title)}>
+              <span className="back-hint-arrow">‹</span>Back to{' '}
+              <span className="back-hint-title">{backHint.volumeLabel ? backHint.volumeLabel + ' · ' + backHint.title : backHint.title}</span>
+            </button>
+          </div>
+        ) : null}
         <div className="jrn-viewer-meta">
           <h1 className={'jrn-viewer-title' + (displayTitle ? '' : ' untitled')}>{displayTitle || 'Untitled'}</h1>
           <div className="jrn-viewer-date">

@@ -18,7 +18,7 @@ import {
   READING_CHAIN, _NAV_ICONS, COL_NAV_ICON, LETTER_SCREEN_SET,
   _isWtlbFamily, _boundaryShort,
   colLetters, colPreface, colLetterArr,
-  parseRefStr, findBook, parseScriptureRef, resolveVerseText,
+  parseRefStr, splitCompoundRef, findBook, parseScriptureRef, resolveVerseText,
   findEntryContext, lookupVersesFromBooks,
 } from './scripture-resolution.js';
 
@@ -209,6 +209,93 @@ describe('parseRefStr', () => {
   });
   it('drops a non-alphanumeric parenthetical, fail-soft — SC4', () => {
     expect(parseRefStr('John 3:16 (see also!)')).toMatchObject({ verse: 16, tag: null });
+  });
+});
+
+/* ── splitCompoundRef ─────────────────────────────────────────────
+   THE shared decomposer: every surface that makes a compound ref tappable
+   per-passage goes through it, so "each part individually" behaves the same
+   on a sheet, in a journal chip, and on a footnote list. parseRefStr stays
+   untouched (its single-object return is pinned four times over). */
+describe('splitCompoundRef', () => {
+  const refs = (s) => splitCompoundRef(s).map(p => p.ref);
+
+  it('a single ref passes through unchanged', () => {
+    expect(refs('John 3:16')).toEqual(['John 3:16']);
+    expect(refs('Psalms 121:5-8')).toEqual(['Psalms 121:5-8']);
+  });
+  it('splits a semicolon compound into one part per passage', () => {
+    // Ships today in the-blessed.js as a {{ref:}} chip.
+    expect(refs('Isaiah 40:13; Romans 11:34')).toEqual(['Isaiah 40:13', 'Romans 11:34']);
+  });
+  it('carries the book forward across bookless segments', () => {
+    // 12 of the 23 compound cites in matthew.js are this shape; every segment
+    // after the first used to be dropped on the floor.
+    expect(refs('Daniel 9:27; 11:31; 12:11')).toEqual(['Daniel 9:27', 'Daniel 11:31', 'Daniel 12:11']);
+    expect(refs('Genesis 1:27; 5:2')).toEqual(['Genesis 1:27', 'Genesis 5:2']);
+  });
+  it('expands a comma verse list into separate parts', () => {
+    // parseRefStr alone silently swallows ", 7" (pinned by SC4) — verse 7 was
+    // unreachable. bible-studies.js ships "1 John 4:9-10, 14".
+    expect(refs('Matthew 5:3-4, 7')).toEqual(['Matthew 5:3-4', 'Matthew 5:7']);
+    expect(refs('1 John 4:9-10, 14')).toEqual(['1 John 4:9-10', '1 John 4:14']);
+    expect(refs('John 3:16, 18-20')).toEqual(['John 3:16', 'John 3:18-20']);
+  });
+  it('a comma tail that names its own chapter keeps the book, not the chapter', () => {
+    // Live in matthew.js: "Deuteronomy 5:16; Exodus 20:12, 21:17" — the tail is
+    // Exodus TWENTY-ONE:17, not verse 21 of chapter 20.
+    expect(refs('Deuteronomy 5:16; Exodus 20:12, 21:17'))
+      .toEqual(['Deuteronomy 5:16', 'Exodus 20:12', 'Exodus 21:17']);
+  });
+  it('covers every compound cite shape shipping in matthew.js', () => {
+    expect(refs('John 13:33; 14:19; 16:5, 28'))
+      .toEqual(['John 13:33', 'John 14:19', 'John 16:5', 'John 16:28']);
+    expect(refs('Genesis 39:1-6, 21-23; 41:37-45'))
+      .toEqual(['Genesis 39:1-6', 'Genesis 39:21-23', 'Genesis 41:37-45']);
+    expect(refs('Matthew 1:1, 6; Luke 3:31')).toEqual(['Matthew 1:1', 'Matthew 1:6', 'Luke 3:31']);
+    expect(refs('2 Kings 2:11; Jude 1:9; Revelation 11:3-7'))
+      .toEqual(['2 Kings 2:11', 'Jude 1:9', 'Revelation 11:3-7']);
+    expect(refs('Psalm 65:7; 89:9; 107:29')).toEqual(['Psalm 65:7', 'Psalm 89:9', 'Psalm 107:29']);
+  });
+  it('handles a mixed compound (semicolons AND commas, with carry-forward)', () => {
+    expect(refs('Matthew 5:3-4, 7; John 3:16')).toEqual(['Matthew 5:3-4', 'Matthew 5:7', 'John 3:16']);
+    expect(refs('Daniel 9:27, 30; 11:31')).toEqual(['Daniel 9:27', 'Daniel 9:30', 'Daniel 11:31']);
+  });
+  it('a cross-chapter span emits ONE part navigating to the start', () => {
+    // parseRefStr returns null for this shape outright. No such ref ships
+    // today — robustness, so the tap opens the passage rather than dying.
+    expect(splitCompoundRef('Revelation 21:1-22:5')).toMatchObject([
+      { ref: 'Revelation 21:1', parsed: { chapter: 21, verse: 1, verseEnd: null } },
+    ]);
+  });
+  it('numbered and Roman-numeral books survive the split', () => {
+    expect(refs('1 John 4:4')).toEqual(['1 John 4:4']);
+    expect(refs('1 Corinthians 16:13; 2 Timothy 1:7')).toEqual(['1 Corinthians 16:13', '2 Timothy 1:7']);
+    expect(refs('I Corinthians 16:13; II Timothy 1:7')).toEqual(['I Corinthians 16:13', 'II Timothy 1:7']);
+  });
+  it('normalizes en/em dashes first — Permanent Rule 1', () => {
+    expect(refs('John 3:16–18; Isaiah 12:2')).toEqual(['John 3:16-18', 'Isaiah 12:2']);
+    expect(refs('Matthew 5:3—4, 7')).toEqual(['Matthew 5:3-4', 'Matthew 5:7']);
+  });
+  it('drops ONLY the junk segments — the rest of the compound still works', () => {
+    expect(refs('see the gloss; Isaiah 12:2')).toEqual(['Isaiah 12:2']);
+    expect(refs('Isaiah 12:2; ; John 3:16')).toEqual(['Isaiah 12:2', 'John 3:16']);
+    expect(refs('Isaiah 12:2, and later')).toEqual(['Isaiah 12:2']);
+  });
+  it('empty / unparseable input yields no parts at all', () => {
+    expect(splitCompoundRef('')).toEqual([]);
+    expect(splitCompoundRef(null)).toEqual([]);
+    expect(splitCompoundRef('not a reference')).toEqual([]);
+    expect(splitCompoundRef('11:31')).toEqual([]); // no book, nothing to carry
+  });
+  it('reports each part chunk ordinal so a renderer can rebuild the source text', () => {
+    // The journal chip relies on this to keep the block's textContent
+    // character-identical while splitting the tap targets.
+    expect(splitCompoundRef('Matthew 5:3-4, 7; John 3:16').map(p => p.index)).toEqual([0, 1, 2]);
+    expect(splitCompoundRef('see the gloss; Isaiah 12:2').map(p => p.index)).toEqual([1]);
+  });
+  it('strips a translation tag from the canonical part ref', () => {
+    expect(refs('John 14:6 (CJB)')).toEqual(['John 14:6']);
   });
 });
 

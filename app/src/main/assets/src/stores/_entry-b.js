@@ -127,7 +127,7 @@ import {
   _BOUNDARY_SHORT, _BOUNDARY_SHORT_OUTSIDE, READING_CHAIN,
   _isWtlbFamily, _boundaryShort, colLetters, colPreface, colLetterArr,
   LETTER_SCREEN_SET, _allBooks, _matthew, _studies,
-  parseRefStr, findBook, parseScriptureRef, resolveVerseText,
+  parseRefStr, splitCompoundRef, findBook, parseScriptureRef, resolveVerseText,
   findEntryContext, lookupVersesFromBooks,
 } from '../data/scripture-resolution.js';
 import { linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna } from '../data/letter-linking.js';
@@ -230,7 +230,7 @@ Object.assign(window, {
   _BOUNDARY_SHORT, _BOUNDARY_SHORT_OUTSIDE, READING_CHAIN,
   _isWtlbFamily, _boundaryShort, colLetters, colPreface, colLetterArr,
   LETTER_SCREEN_SET, _allBooks, _matthew, _studies,
-  parseRefStr, findBook, parseScriptureRef, resolveVerseText,
+  parseRefStr, splitCompoundRef, findBook, parseScriptureRef, resolveVerseText,
   findEntryContext, lookupVersesFromBooks,
   linkWtlbEntries, linkPreface, resolveVotLetter, isHiddenManna,
   // Journal UI (sheets)
