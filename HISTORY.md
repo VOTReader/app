@@ -8,6 +8,10 @@ Append-only record. Read when you need context on past decisions. Not required f
 
 These are the dated “Current state / Previous state” narrative entries that lived at the top of CLAUDE.md. They were relocated here verbatim (headings demoted one level) to keep CLAUDE.md — which auto-loads into every session’s context — lean. New sessions PREPEND their detailed entry here; CLAUDE.md keeps only the short summary + one-liner index.
 
+### 2026-07-31 — About page 2 rewritten as a terse Library/Tools rundown
+
+Owner call: the "What You Can Do" onboarding page (AboutScreen page 2) was seven bold-lead paragraphs (~130 words) for a screen tapped past once. Replaced with two headed groups — **The Library** (complete VOT corpus; the Bible in **ten** translations including the two custom Restored Name editions; every PDF, Bible study, and letter study) and **Your Tools** (annotate anywhere; private on-device journal; full-text search; fully offline, no downloads except the *Return to the Garden* images) — ~60 words total, copy drafted by the owner and tightened. The old text also undercounted translations ("eight") — predating rnkjv/rkjv; the shipped list in TRANSLATION_OPTIONS is ten. New `.about-subhead` style (small gold Cinzel, matches `.about-heading`); `.about-features p` spacing tightened to 0.8rem. Page 1, dots, diamonds, and the "Begin Reading" CTA untouched; AboutScreen tests don't pin body copy, so no test churn. Verified rendered in preview (both pages). Committed `2b0593d`, pushed, APK built + installed on the test device.
+
 ### Current state (2026-07-30/31) — the six-item UX batch: one nav module, notebook header, universal back pill, compound refs, layout cycle, autoscroll honesty
 
 **One commit (`5f3e8c7`), six owner-reported phases, each gated green before the next started.** Two of the six were reported as one-line cosmetic complaints and turned out to be two root causes each — that is the part worth reading.
