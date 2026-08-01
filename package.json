@@ -48,7 +48,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "subset-font": "^2.5.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.7"
   },
   "lint-staged": {
