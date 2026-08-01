@@ -42,13 +42,15 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
               <>
                 <h1 className="about-heading">What You Can Do</h1>
                 <div className="about-body about-features">
-                  <p><strong>Complete library.</strong> All 7 Volumes, A Testament Against The World: The Lord’s Rebuke, WTLB Parts One and Two, The Blessed, Letters to the Flock, Letters from Timothy, Holy Days, the <em>Return to the Garden</em> visual journey, and every Bible and letter study.</p>
-                  <p><strong>Eight Bible translations.</strong> Read the whole Bible in NKJV, KJV, WEB, BSB, and four more — switch versions whenever you like.</p>
-                  <p><strong>Matthew Study Bible.</strong> The full Gospel in PDF and Inline reading modes, with tappable footnotes and letter references.</p>
-                  <p><strong>Mark up anything.</strong> Highlight, underline, or bookmark any passage, and attach your own notes, links, and references — anywhere in the app, including your journal entries.</p>
-                  <p><strong>Personal journal.</strong> Write entries, add photos and voice memos, and link out to any Bible chapter or letter. Stored privately on this device.</p>
-                  <p><strong>Full-text search.</strong> Search every letter, scripture, and Bible verse at once, with synonym expansion that surfaces related passages.</p>
-                  <p><strong>Fully offline.</strong> Works with no internet connection after the first load. Your data never leaves this device.</p>
+                  <p className="about-subhead">The Library</p>
+                  <p>The complete Volumes of Truth corpus.</p>
+                  <p>The entire Bible in ten translations, including two custom Restored Name editions.</p>
+                  <p>Every PDF, Bible study, and letter study.</p>
+                  <p className="about-subhead">Your Tools</p>
+                  <p>Highlight, underline, bookmark, and note — anywhere.</p>
+                  <p>A private journal with photos, voice memos, and a full feature suite — kept on your device.</p>
+                  <p>Full-text search across the entire library.</p>
+                  <p>Fully offline. Your data never leaves this device; nothing is downloaded except the <em>Return to the Garden</em> images.</p>
                 </div>
               </>
             )}

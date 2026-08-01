@@ -1954,6 +1954,10 @@
     .about-page-dot { width:7px; height:7px; border-radius:50%; background:var(--gold-border); transition:background 0.18s ease; }
     .about-page-dot.active { background:var(--gold); }
     .about-features p strong { color:var(--cream); font-style:normal; }
+    .about-features p { margin-bottom:0.8rem; }
+    .about-body p.about-subhead { font-family:'Cinzel',serif; font-size:0.8rem; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); margin:1.2rem 0 0.85rem; }
+    .about-body p.about-subhead:first-child { margin-top:0; }
+    body.light .about-body p.about-subhead { color:var(--gold); }
     .about-continue { display:inline-block; font-family:'Cinzel',serif; font-size:0.85rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); background:transparent; border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem 2.4rem; cursor:pointer; transition:background 0.18s ease, border-color 0.18s ease; }
     .about-continue:hover, .about-continue:focus-visible { background:rgba(200,164,86,0.08); border-color:var(--gold); }
     body.light .about-card { background:var(--bg2); border-color:var(--gold-border); }
