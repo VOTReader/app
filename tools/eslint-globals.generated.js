@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 467 distinct identifiers.
+// Total: 474 distinct identifiers.
 
 export const projectGlobals = {
   ARROW_LAYOUT_OPTIONS: "readonly",
@@ -72,6 +72,7 @@ export const projectGlobals = {
   ErrorBoundary: "readonly",
   ExpandableText: "readonly",
   ExpandableVerse: "readonly",
+  FontPickerRow: "readonly",
   FootnoteListSection: "readonly",
   FootnoteSheet: "readonly",
   GARDEN_CACHE_MAX: "readonly",
@@ -186,6 +187,8 @@ export const projectGlobals = {
   ProphecyExpandToggle: "readonly",
   ProphecyGroup: "readonly",
   READING_CHAIN: "readonly",
+  READING_FONTS: "readonly",
+  READING_FONT_CACHE: "readonly",
   READING_SCREENS: "readonly",
   READ_VERSION_ID: "readonly",
   React: "readonly",
@@ -337,6 +340,7 @@ export const projectGlobals = {
   data: "readonly",
   describeTab: "readonly",
   echoVersesForRef: "readonly",
+  ensureReadingFont: "readonly",
   findBook: "readonly",
   findEntryContext: "readonly",
   findNoteIconInsertionPoint: "readonly",
@@ -367,6 +371,7 @@ export const projectGlobals = {
   idbReadAll: "readonly",
   isContainerMagic: "readonly",
   isHiddenManna: "readonly",
+  isReadingFontCached: "readonly",
   jrnId: "readonly",
   jrnPinIcon: "readonly",
   jrnRefKeyForBookmark: "readonly",
@@ -400,6 +405,8 @@ export const projectGlobals = {
   persistLink: "readonly",
   progressCorporaReady: "readonly",
   readContainer: "readonly",
+  readingFontById: "readonly",
+  readingFontCss: "readonly",
   relativeDate: "readonly",
   removeRecentSearch: "readonly",
   renderCommentaryCite: "readonly",

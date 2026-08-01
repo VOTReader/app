@@ -324,7 +324,7 @@ export function JournalImageBlock({ mediaId, caption }) {
     <div className="jrn-embed-image">
       {src
         ? <img src={src} alt={caption || ''} />
-        : <div style={{ width: '100%', height: '180px', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dim)', fontStyle: 'italic', fontFamily: 'EB Garamond, serif' }}>Image unavailable</div>}
+        : <div style={{ width: '100%', height: '180px', background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-dim)', fontStyle: 'italic', fontFamily: 'var(--font-body)' }}>Image unavailable</div>}
       {caption && <div className="jrn-img-caption" style={{ padding: '8px 14px' }}>{caption}</div>}
     </div>
   );

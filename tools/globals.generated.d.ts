@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 467 distinct identifiers.
+// Total: 474 distinct identifiers.
 
 // Cross-bundle bare-name globals — all `any` by design.
 declare const ARROW_LAYOUT_OPTIONS: any;
@@ -73,6 +73,7 @@ declare const EXPAND_THRESHOLD: any;
 declare const ErrorBoundary: any;
 declare const ExpandableText: any;
 declare const ExpandableVerse: any;
+declare const FontPickerRow: any;
 declare const FootnoteListSection: any;
 declare const FootnoteSheet: any;
 declare const GARDEN_CACHE_MAX: any;
@@ -187,6 +188,8 @@ declare const ProphecyCardsStore: any;
 declare const ProphecyExpandToggle: any;
 declare const ProphecyGroup: any;
 declare const READING_CHAIN: any;
+declare const READING_FONTS: any;
+declare const READING_FONT_CACHE: any;
 declare const READING_SCREENS: any;
 declare const READ_VERSION_ID: any;
 declare const React: any;
@@ -338,6 +341,7 @@ declare const createPressDrag: any;
 declare const data: any;
 declare const describeTab: any;
 declare const echoVersesForRef: any;
+declare const ensureReadingFont: any;
 declare const findBook: any;
 declare const findEntryContext: any;
 declare const findNoteIconInsertionPoint: any;
@@ -368,6 +372,7 @@ declare const idbPut: any;
 declare const idbReadAll: any;
 declare const isContainerMagic: any;
 declare const isHiddenManna: any;
+declare const isReadingFontCached: any;
 declare const jrnId: any;
 declare const jrnPinIcon: any;
 declare const jrnRefKeyForBookmark: any;
@@ -401,6 +406,8 @@ declare const parseScriptureRef: any;
 declare const persistLink: any;
 declare const progressCorporaReady: any;
 declare const readContainer: any;
+declare const readingFontById: any;
+declare const readingFontCss: any;
 declare const relativeDate: any;
 declare const removeRecentSearch: any;
 declare const renderCommentaryCite: any;

@@ -125,6 +125,7 @@ import { SrchSnippet } from './components/SrchSnippet.jsx';
 import { SrchGroup } from './components/SrchGroup.jsx';
 import { SettingsRow } from './components/SettingsRow.jsx';
 import { SelectField } from './components/SelectField.jsx';
+import { FontPickerRow } from './components/FontPickerRow.jsx';
 import { VolumeLetterIndex } from './components/VolumeLetterIndex.jsx';
 import { HistoryEntryCard } from './components/HistoryEntryCard.jsx';
 import { NoteRow } from './components/NoteRow.jsx';
@@ -243,7 +244,7 @@ Object.assign(window, {
   commitReadingNav,
   FootnoteListSection, StickyChapterNav, ClearProgressRow, ConfirmStrip,
   SrchCard, SrchSnippet, SrchGroup,
-  SettingsRow, SelectField, VolumeLetterIndex, HistoryEntryCard,
+  SettingsRow, SelectField, FontPickerRow, VolumeLetterIndex, HistoryEntryCard,
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
   StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
   AppShellOverlays, AppShellSheets, AnnotationDomSync,

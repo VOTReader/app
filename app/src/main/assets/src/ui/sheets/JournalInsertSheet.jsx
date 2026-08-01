@@ -379,7 +379,7 @@ export function JournalInsertSheet(props) {
                   <button key={n.groupId} type="button" className="jrn-picker-item" onClick={function() { chooseNote(n); }}>
                     <span className="jrn-picker-spine">NT</span>
                     <span className="jrn-picker-text">
-                      <span className="jrn-picker-label" style={{ fontStyle: 'italic', textTransform: 'none', fontFamily: 'EB Garamond, serif' }}>{label}</span>
+                      <span className="jrn-picker-label" style={{ fontStyle: 'italic', textTransform: 'none', fontFamily: 'var(--font-body)' }}>{label}</span>
                       <span className="jrn-picker-cat">{src}</span>
                     </span>
                   </button>

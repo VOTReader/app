@@ -190,6 +190,28 @@ function NavChip({ label, checked, onToggle, disabled = false }) {
   );
 }
 
+/* SettingsGroup — collapsible section shell (Settings redesign 2026-07-31).
+   Every section is an accordion group: a 48px tappable header (Cinzel
+   label + one-line plain-language summary + chevron) over an unmounted-
+   while-closed body. Unmounted, not hidden — the auto-scroll disclosure
+   discipline: closed content is out of tab order and screen-reader order,
+   and the screen opens as a compact 8-line overview instead of a wall.
+   Module scope so React identity is stable across SettingsScreen renders. */
+function SettingsGroup({ label, sub, open, onToggle, children = null }) {
+  return (
+    <div className={'settings-section' + (open ? ' open' : '')}>
+      <button type="button" className="settings-group-head" aria-expanded={open} onClick={onToggle}>
+        <span className="settings-group-titles">
+          <span className="settings-section-label">{label}</span>
+          {sub && <span className="settings-group-sub">{sub}</span>}
+        </span>
+        <span className={'settings-group-chevron' + (open ? ' open' : '')} aria-hidden="true">▾</span>
+      </button>
+      {open && <div className="settings-group-body">{children}</div>}
+    </div>
+  );
+}
+
 /* DataInfoRow — compact label + value (+ optional action button) for "Your Data". */
 function DataInfoRow({ label, value = null, children = null }) {
   return (
@@ -362,6 +384,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
   );
   const [openSections, setOpenSections] = React.useState(new Set());
+  // Accordion state for the top-level setting GROUPS (redesign 2026-07-31).
+  // All collapsed on entry — the screen reads as a scannable table of
+  // contents; session-local on purpose (a fresh visit starts compact).
+  const [openGroups, setOpenGroups] = React.useState(() => new Set());
+  const toggleGroup = (id) => setOpenGroups((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const groupProps = (id) => ({ open: openGroups.has(id), onToggle: () => toggleGroup(id) });
 
   // W2.5 — navigator.storage estimate + persist. The hook reads once
   // on mount; the derived display strings below pick the right text
@@ -1249,28 +1281,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           </div>
         </div>
 
-        <div className="settings-section">
-          <div className="settings-section-label">Appearance</div>
+        <SettingsGroup label="Appearance" sub="Theme, text size & reading font" {...groupProps('appearance')}>
           <div className="settings-card">
-            <SelectField
-              eyebrow="Appearance"
-              title="Bible Translation"
-              label="Bible Translation"
-              desc={<TranslationInfoDesc />}
-              value={settings.translation || "nkjv"}
-              options={TRANSLATION_OPTIONS}
-              onChange={(v) => onSetting("translation", v)}
-            />
-            <TextSizeSliderRow
-              value={settings.fontScale || "1"}
-              onChange={(v) => onSetting("fontScale", v)}
-            />
-            <SettingsRow
-              label="Modern Fonts"
-              desc="Use Cinzel headings and EB Garamond body text instead of your device's built-in serif font. The classic look is larger and more familiar; modern is more elegant."
-              checked={settings.fontStyle === "modern"}
-              onToggle={() => onSetting("fontStyle", settings.fontStyle === "modern" ? "classic" : "modern")}
-            />
             <SettingsRow
               label="Light Theme"
               desc="Switch between the dark (default) and light reading themes. Also available as the sun/moon icon in the top nav, unless you hide it under Top-Nav Buttons."
@@ -1288,12 +1300,32 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 onToggle={() => onToggle("trueBlack")}
               />
             )}
+            <TextSizeSliderRow
+              value={settings.fontScale || "1"}
+              onChange={(v) => onSetting("fontScale", v)}
+            />
+            {/* Reading Font (2026-07-31) — replaces the two-state "Modern
+                Fonts" toggle. settings.fontStyle now holds any READING_FONTS
+                id; "classic"/"modern" keep their historical meanings so
+                persisted + backup-imported values stay valid. */}
+            <FontPickerRow
+              value={settings.fontStyle || "classic"}
+              onSelect={(id) => onSetting("fontStyle", id)}
+            />
           </div>
-        </div>
+        </SettingsGroup>
 
-        <div className="settings-section">
-          <div className="settings-section-label">Reading</div>
+        <SettingsGroup label="Reading" sub="Translation, headings & reading aids" {...groupProps('reading')}>
           <div className="settings-card">
+            <SelectField
+              eyebrow="Reading"
+              title="Bible Translation"
+              label="Bible Translation"
+              desc={<TranslationInfoDesc />}
+              value={settings.translation || "nkjv"}
+              options={TRANSLATION_OPTIONS}
+              onChange={(v) => onSetting("translation", v)}
+            />
             <SettingsRow
               label="Chapter Titles"
               desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."
@@ -1306,14 +1338,19 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={settings.showSectionHeadings !== false}
               onToggle={() => onToggle("showSectionHeadings")}
             />
-            <SettingsRow
-              label="Restored Names"
-              desc="Uses the proper Name of The Father (YAHUWAH) and The Son (YahuShua) in chapter titles and section headings — only where the underlying verses bear the Name. Verse text itself is never altered."
-              checked={!!settings.restoredNames}
-              onToggle={() => onToggle("restoredNames")}
-              disabled={settings.showChapterTitle === false && settings.showSectionHeadings === false}
-              disabledReason="Turn on Chapter Titles or Section Headings to use Restored Names — the Names only appear in those."
-            />
+            {/* Redesign 2026-07-31: dependent settings are UNMOUNTED, not
+                disabled, while their dependency is off (the auto-scroll
+                disclosure discipline, now applied screen-wide). Restored
+                Names only ever appears inside titles/headings, so with both
+                off the row is gone — it returns when either comes back. */}
+            {!(settings.showChapterTitle === false && settings.showSectionHeadings === false) && (
+              <SettingsRow
+                label="Restored Names"
+                desc="Uses the proper Name of The Father (YAHUWAH) and The Son (YahuShua) in chapter titles and section headings — only where the underlying verses bear the Name. Verse text itself is never altered."
+                checked={!!settings.restoredNames}
+                onToggle={() => onToggle("restoredNames")}
+              />
+            )}
             <SelectField
               eyebrow="Reading"
               title="Chapter Arrows"
@@ -1323,38 +1360,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               options={ARROW_LAYOUT_OPTIONS}
               onChange={(v) => onSetting("arrowLayout", v)}
             />
-            <SettingsRow
-              label="Auto-Scroll"
-              desc="Adds a small play/pause pill to chapter and letter screens that scrolls the page for you at a steady reading pace. Touching the screen pauses it instantly; it picks back up a moment after you lift your finger. The pill fades out of the way while it runs."
-              checked={!!settings.autoScroll}
-              onToggle={() => onToggle("autoScroll")}
-            />
-            {/* Auto-scroll's sub-settings are COLLAPSED, not merely disabled,
-                while the feature is off: a greyed control still occupies the
-                page and still reads as something you might be able to use.
-                They are unmounted, so they are also unreachable by tab/screen
-                reader. Auto-Continue Pause nests one level deeper — it means
-                nothing at all unless Auto-Continue is on. */}
-            {!!settings.autoScroll && (
-              <>
-                <AutoScrollSpeedRow
-                  value={settings.autoScrollLpm || "16"}
-                  onChange={(v) => onSetting("autoScrollLpm", v)}
-                />
-                <SettingsRow
-                  label="Auto-Continue"
-                  desc="When auto-scroll reaches the end of the text, count down and move to the next chapter or letter on its own. It stops at the end of a book, a volume, or a study rather than crossing into a different collection — and it stops after a long unattended run."
-                  checked={!!settings.autoScrollNext}
-                  onToggle={() => onToggle("autoScrollNext")}
-                />
-                {!!settings.autoScrollNext && (
-                  <AutoScrollDwellRow
-                    value={settings.autoScrollEndMs || "2500"}
-                    onChange={(v) => onSetting("autoScrollEndMs", v)}
-                  />
-                )}
-              </>
-            )}
             <SelectField
               eyebrow="Reading"
               title="Scripture Browser"
@@ -1413,23 +1418,62 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               onToggle={() => onToggle("keepScreenOn")}
             />
           </div>
-        </div>
+        </SettingsGroup>
 
-        <div className="settings-section">
-          <div className="settings-section-label">Top-Nav Buttons</div>
+        <SettingsGroup label="Auto-Scroll" sub="Hands-free reading" {...groupProps('autoscroll')}>
+          <div className="settings-card">
+            <SettingsRow
+              label="Auto-Scroll"
+              desc="Adds a small play/pause pill to chapter and letter screens that scrolls the page for you at a steady reading pace. Touching the screen pauses it instantly; it picks back up a moment after you lift your finger. The pill fades out of the way while it runs."
+              checked={!!settings.autoScroll}
+              onToggle={() => onToggle("autoScroll")}
+            />
+            {/* Auto-scroll's sub-settings are COLLAPSED, not merely disabled,
+                while the feature is off: a greyed control still occupies the
+                page and still reads as something you might be able to use.
+                They are unmounted, so they are also unreachable by tab/screen
+                reader. Auto-Continue Pause nests one level deeper — it means
+                nothing at all unless Auto-Continue is on. */}
+            {!!settings.autoScroll && (
+              <>
+                <AutoScrollSpeedRow
+                  value={settings.autoScrollLpm || "16"}
+                  onChange={(v) => onSetting("autoScrollLpm", v)}
+                />
+                <SettingsRow
+                  label="Auto-Continue"
+                  desc="When auto-scroll reaches the end of the text, count down and move to the next chapter or letter on its own. It stops at the end of a book, a volume, or a study rather than crossing into a different collection — and it stops after a long unattended run."
+                  checked={!!settings.autoScrollNext}
+                  onToggle={() => onToggle("autoScrollNext")}
+                />
+                {!!settings.autoScrollNext && (
+                  <AutoScrollDwellRow
+                    value={settings.autoScrollEndMs || "2500"}
+                    onChange={(v) => onSetting("autoScrollEndMs", v)}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </SettingsGroup>
+
+        <SettingsGroup label="Top-Nav Buttons" sub="Icons in the reading bar" {...groupProps('topnav')}>
           <div className="settings-card">
             <div className="settings-chip-note">Which icons appear in the top bar of chapter and letter views.</div>
             <div className="settings-chips">
               <NavChip label="Settings Gear" checked={settings.showSettingsGear} onToggle={() => onToggle("showSettingsGear")} />
-              <NavChip label="History" checked={!!settings.historyInNav} disabled={settings.historyEnabled === false} onToggle={() => onToggle("historyInNav")} />
+              {/* Hidden (not greyed) while History itself is off — the chip
+                  returns with the feature (Search, Tabs & History group). */}
+              {settings.historyEnabled !== false && (
+                <NavChip label="History" checked={!!settings.historyInNav} onToggle={() => onToggle("historyInNav")} />
+              )}
               <NavChip label="Bookmark" checked={settings.showBookmarkNav !== false} onToggle={() => onToggle("showBookmarkNav")} />
               <NavChip label="Theme" checked={settings.showThemeBtn !== false} onToggle={() => onToggle("showThemeBtn")} />
             </div>
           </div>
-        </div>
+        </SettingsGroup>
 
-        <div className="settings-section">
-          <div className="settings-section-label">Search, Tabs &amp; History</div>
+        <SettingsGroup label="Search, Tabs & History" sub="Find, multitask, revisit" {...groupProps('features')}>
           <div className="settings-card">
             <SettingsRow
               label="Search"
@@ -1437,22 +1481,24 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               checked={settings.searchEnabled !== false}
               onToggle={() => onToggle("searchEnabled")}
             />
-            <SettingsRow
-              label="Synonym Search"
-              desc="On (default): also match scripture synonyms — searching 'mercy' finds 'compassion', 'shepherd' finds 'pastor', 'faith' finds 'belief' and 'trust'. Exact-word matches always rank first. Off: match only the words you type."
-              checked={settings.searchSynonyms !== false}
-              onToggle={() => onToggle("searchSynonyms")}
-              disabled={settings.searchEnabled === false}
-              disabledReason="Turn on Search to enable this."
-            />
-            <SettingsRow
-              label="Filter Stop Words in Search"
-              desc="On (default): strip filler words (the, is, of, and, this, that, etc.) from queries of 5+ words so results focus on meaningful terms. Off: match every word exactly as typed. Turn off if a search is missing results you know are there — especially with KJV-style phrasing."
-              checked={settings.searchUseStopWords !== false}
-              onToggle={() => onToggle("searchUseStopWords")}
-              disabled={settings.searchEnabled === false}
-              disabledReason="Turn on Search to enable this."
-            />
+            {/* Search's sub-settings unmount with it (redesign 2026-07-31 —
+                formerly greyed with a "Turn on Search" hint). */}
+            {settings.searchEnabled !== false && (
+              <>
+                <SettingsRow
+                  label="Synonym Search"
+                  desc="On (default): also match scripture synonyms — searching 'mercy' finds 'compassion', 'shepherd' finds 'pastor', 'faith' finds 'belief' and 'trust'. Exact-word matches always rank first. Off: match only the words you type."
+                  checked={settings.searchSynonyms !== false}
+                  onToggle={() => onToggle("searchSynonyms")}
+                />
+                <SettingsRow
+                  label="Filter Stop Words in Search"
+                  desc="On (default): strip filler words (the, is, of, and, this, that, etc.) from queries of 5+ words so results focus on meaningful terms. Off: match every word exactly as typed. Turn off if a search is missing results you know are there — especially with KJV-style phrasing."
+                  checked={settings.searchUseStopWords !== false}
+                  onToggle={() => onToggle("searchUseStopWords")}
+                />
+              </>
+            )}
             <SettingsRow
               label="Tabs"
               desc="Run up to 999 independent reading places in parallel — flip between a chapter, a letter, a study, and back. All tabs share settings, theme, mark-as-read, history, and reading progress. Disabling preserves all your open tabs — they'll be waiting when you turn it back on."
@@ -1467,10 +1513,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             />
           </div>
           <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
-        </div>
+        </SettingsGroup>
 
-        <div className="settings-section">
-          <div className="settings-section-label">A Return to The Garden</div>
+        <SettingsGroup label="A Return to The Garden" sub="Image quality" {...groupProps('garden')}>
           <div className="settings-card">
             <SelectField
               eyebrow="A Return to The Garden"
@@ -1486,10 +1531,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               onChange={(v) => onSetting("gardenTier", v)}
             />
           </div>
-        </div>
+        </SettingsGroup>
 
-        <div className="settings-section">
-          <div className="settings-section-label">Your Data</div>
+        <SettingsGroup label="Your Data" sub="Backup, storage & privacy" {...groupProps('data')}>
           <div className="settings-card">
             <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
             <DataInfoRow label="Total app data" value={appDataDisplayText} />
@@ -1556,7 +1600,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               <button className="settings-clear-btn danger" onClick={(e) => { e.stopPropagation(); setWipeText(''); setWipeConfirm(true); }}>Clear All My Data</button>
             </DataActionRow>
           </div>
-          {(() => {
+        </SettingsGroup>
+
+        {/* The wipe + import-overwrite overlays live OUTSIDE the accordion
+            groups (redesign 2026-07-31): they are fixed-position sheets whose
+            mount must not depend on a group's open state — the import
+            confirm in particular arrives ASYNC after a native file picker. */}
+        {(() => {
             // closeWipe now lives at component scope (shared with the
             // useModalRegistry registration above) — same dialog, same
             // dismiss paths, but Back/Escape now close THIS first.
@@ -1643,10 +1693,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               </>
             );
           })()}
-        </div>
 
-        <div className="settings-section">
-          <div className="settings-section-label">Mark as Read</div>
+        <SettingsGroup label="Mark as Read" sub="Reading progress by book" {...groupProps('progress')}>
           <div className="settings-card">
             <SettingsRow
               label="Mark as Read"
@@ -1707,7 +1755,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               <AllProgressClearRow totalRead={totalRead} totalItems={totalItems} onClearAll={onClearAll} />
             </div>
           )}
-        </div>
+        </SettingsGroup>
       </div>
     </ScreenLayout>
   );

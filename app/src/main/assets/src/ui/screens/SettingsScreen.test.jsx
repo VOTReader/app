@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, cleanup, fireEvent, within, act } from '@testing-library/react';
 import {
   setupSettingsGlobals, teardownSettingsGlobals, renderSettings, rowLabels, row,
+  groupHeads, groupHead,
 } from './settings-harness.jsx';
 import { classifyV3ImportBegin as realClassifyV3 } from '../../utils/backup-android.js';
 
@@ -409,6 +410,114 @@ describe('Android v3 import — native stream not closed until the confirm settl
     fireEvent.click(screen.getByText('Cancel'));
     await vi.waitFor(() => expect(closeSpy).toHaveBeenCalled());
     expect(applySpy).not.toHaveBeenCalled();
+  });
+});
+
+/* ───────────────────────────────────────────────────────────────────────
+   Settings redesign (2026-07-31) — the accordion group contract.
+   Groups are COLLAPSED on entry (the screen reads as a table of contents);
+   a closed group's body is UNMOUNTED, not hidden — out of tab order and
+   screen-reader order, same discipline as the auto-scroll disclosure.
+   ─────────────────────────────────────────────────────────────────────── */
+describe('settings groups — collapsible accordion', () => {
+  const GROUPS = ['Appearance', 'Reading', 'Auto-Scroll', 'Top-Nav Buttons',
+    'Search, Tabs & History', 'A Return to The Garden', 'Your Data', 'Mark as Read'];
+
+  it('renders all 8 group headers, every one collapsed on entry', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    expect(groupHeads().length).toBe(GROUPS.length);
+    for (const label of GROUPS) {
+      const head = groupHead(label);
+      expect(head).toBeTruthy();
+      expect(head.getAttribute('aria-expanded')).toBe('false');
+    }
+    // Collapsed means UNMOUNTED — zero setting rows exist yet.
+    expect(rowLabels().length).toBe(0);
+    expect(document.querySelectorAll('.settings-card').length).toBe(0);
+  });
+
+  it('opening a group mounts its rows; closing unmounts them again', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    fireEvent.click(groupHead('Appearance'));
+    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
+    expect(row('Light Theme')).toBeTruthy();
+    expect(row('Reading Position Dot')).toBeUndefined(); // other groups stay closed
+    fireEvent.click(groupHead('Appearance'));
+    expect(row('Light Theme')).toBeUndefined();
+  });
+
+  it('groups open independently', () => {
+    renderSettings({}, {}, { expandGroups: false });
+    fireEvent.click(groupHead('Reading'));
+    fireEvent.click(groupHead('Your Data'));
+    expect(row('Chapter Titles')).toBeTruthy();
+    expect(row('Export Your Data')).toBeTruthy();
+    expect(row('Light Theme')).toBeUndefined();
+  });
+
+  it('Auto-Scroll lives in its own group and keeps its nested disclosure', () => {
+    renderSettings({ autoScroll: true, autoScrollNext: true }, {}, { expandGroups: false });
+    fireEvent.click(groupHead('Auto-Scroll'));
+    expect(row('Auto-Scroll')).toBeTruthy();
+    expect(row('Scroll Speed')).toBeTruthy();
+    expect(row('Auto-Continue Pause')).toBeTruthy();
+  });
+});
+
+/* Redesign: settings whose DEPENDENCY is off are unmounted, not greyed —
+   the auto-scroll discipline applied screen-wide. */
+describe('dependency-gated rows unmount with their dependency', () => {
+  it('search sub-settings vanish while Search is off', () => {
+    renderSettings({ searchEnabled: false });
+    expect(row('Search')).toBeTruthy();
+    expect(row('Synonym Search')).toBeUndefined();
+    expect(row('Filter Stop Words in Search')).toBeUndefined();
+    cleanup();
+    renderSettings({ searchEnabled: true });
+    expect(row('Synonym Search')).toBeTruthy();
+    expect(row('Filter Stop Words in Search')).toBeTruthy();
+  });
+
+  it('Restored Names vanishes only when BOTH title surfaces are off', () => {
+    renderSettings({ showChapterTitle: false, showSectionHeadings: false });
+    expect(row('Restored Names')).toBeUndefined();
+    cleanup();
+    renderSettings({ showChapterTitle: false, showSectionHeadings: true });
+    expect(row('Restored Names')).toBeTruthy();
+    cleanup();
+    renderSettings({});
+    expect(row('Restored Names')).toBeTruthy();
+  });
+
+  it('the History nav chip vanishes while History itself is off', () => {
+    renderSettings({ historyEnabled: false });
+    // Only the feature row remains under the "History" name…
+    expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);
+    cleanup();
+    renderSettings({});
+    // …with History on, the Top-Nav chip joins it.
+    expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(2);
+  });
+});
+
+/* Reading Font picker — integration through the real SettingsScreen wiring
+   (component-level behavior is FontPickerRow.test.jsx). */
+describe('Reading Font picker wiring', () => {
+  it('replaces the old Modern Fonts toggle inside Appearance', () => {
+    renderSettings();
+    expect(row('Modern Fonts')).toBeUndefined();
+    expect(row('Reading Font')).toBeTruthy();
+  });
+
+  it('selecting a built-in font writes settings.fontStyle through onSetting', async () => {
+    const onSetting = vi.fn();
+    renderSettings({ fontStyle: 'classic' }, { onSetting });
+    fireEvent.click(within(row('Reading Font')).getByRole('button', { name: /Reading Font/ }));
+    const chips = [...document.querySelectorAll('.font-chip')];
+    expect(chips.length).toBeGreaterThan(10);
+    const eb = chips.find((c) => c.querySelector('.font-chip-name').textContent === 'EB Garamond');
+    fireEvent.click(eb);
+    await vi.waitFor(() => expect(onSetting).toHaveBeenCalledWith('fontStyle', 'modern'));
   });
 });
 

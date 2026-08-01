@@ -21,7 +21,7 @@ export function JournalInboundSheet({ refKey, resourceLabel, onClose, onOpenEntr
           <button className="note-sheet-menu-btn" onClick={onClose} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
         </div>
         {entries.length === 0
-          ? <div style={{ padding: '40px 20px', textAlign: 'center', fontStyle: 'italic', color: 'var(--cream-dim)', fontFamily: 'EB Garamond, serif' }}>No journal entries reference this yet.</div>
+          ? <div style={{ padding: '40px 20px', textAlign: 'center', fontStyle: 'italic', color: 'var(--cream-dim)', fontFamily: 'var(--font-body)' }}>No journal entries reference this yet.</div>
           : <div className="jrn-inbound-list">
               {entries.map(function(e) {
                 var title = JournalHelpers.entryDisplayTitle(e) || 'Untitled';

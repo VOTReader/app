@@ -40,6 +40,7 @@ import '../styles/journal-styles.js';
 import { CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST } from './cached-store.js';
 import { showToast, hideToast } from '../utils/toast.js';
 import { navHandoff } from '../utils/nav-handoff.js';
+import { READING_FONTS, READING_FONT_CACHE, readingFontById, readingFontCss, ensureReadingFont, isReadingFontCached } from '../utils/reading-fonts.js';
 import { IDBAdapter } from './idb-adapter.js';
 import { WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore } from './app-flag-stores.js';
 import { ProphecyCardsStore } from './prophecy-cards-store.js';
@@ -159,6 +160,7 @@ Object.assign(window, {
   CachedStore, hydrateAllStores, hasAnyPendingStores, clearLegacyLs, LS_SKIP_LIST,
   showToast, hideToast,
   navHandoff,
+  READING_FONTS, READING_FONT_CACHE, readingFontById, readingFontCss, ensureReadingFont, isReadingFontCached,
   IDBAdapter,
   WelcomedFlagStore, AboutSeenFlagStore, GardenWarningFlagStore, AnnHintDismissedFlagStore,
   ProphecyCardsStore,

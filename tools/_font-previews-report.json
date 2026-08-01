@@ -1,0 +1,381 @@
+[
+  {
+    "id": "lora",
+    "label": "Lora",
+    "kb": 77,
+    "previewBytes": 1692,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/lora:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/lora:vf@latest/latin-wght-normal.woff2",
+        "bytes": 37788
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/lora:vf@latest/latin-wght-italic.woff2",
+        "weight": "100 900",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/lora:vf@latest/latin-wght-italic.woff2",
+        "bytes": 40772
+      }
+    ]
+  },
+  {
+    "id": "literata",
+    "label": "Literata",
+    "kb": 104,
+    "previewBytes": 2672,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/literata:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/literata:vf@latest/latin-wght-normal.woff2",
+        "bytes": 52496
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/literata:vf@latest/latin-wght-italic.woff2",
+        "weight": "100 900",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/literata:vf@latest/latin-wght-italic.woff2",
+        "bytes": 53728
+      }
+    ]
+  },
+  {
+    "id": "merriweather",
+    "label": "Merriweather",
+    "kb": 146,
+    "previewBytes": 1768,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/merriweather@latest/latin-400-normal.woff2",
+        "weight": "400",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/merriweather@latest/latin-400-normal.woff2",
+        "bytes": 49168
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/merriweather@latest/latin-700-normal.woff2",
+        "weight": "700",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/merriweather@latest/latin-700-normal.woff2",
+        "bytes": 48660
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/merriweather@latest/latin-400-italic.woff2",
+        "weight": "400",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/merriweather@latest/latin-400-italic.woff2",
+        "bytes": 51836
+      }
+    ]
+  },
+  {
+    "id": "crimson-pro",
+    "label": "Crimson Pro",
+    "kb": 97,
+    "previewBytes": 3548,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/crimson-pro:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/crimson-pro:vf@latest/latin-wght-normal.woff2",
+        "bytes": 48200
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/crimson-pro:vf@latest/latin-wght-italic.woff2",
+        "weight": "100 900",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/crimson-pro:vf@latest/latin-wght-italic.woff2",
+        "bytes": 51432
+      }
+    ]
+  },
+  {
+    "id": "source-serif-4",
+    "label": "Source Serif 4",
+    "kb": 100,
+    "previewBytes": 4424,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/source-serif-4:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/source-serif-4:vf@latest/latin-wght-normal.woff2",
+        "bytes": 50824
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/source-serif-4:vf@latest/latin-wght-italic.woff2",
+        "weight": "100 900",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/source-serif-4:vf@latest/latin-wght-italic.woff2",
+        "bytes": 51516
+      }
+    ]
+  },
+  {
+    "id": "libre-baskerville",
+    "label": "Libre Baskerville",
+    "kb": 61,
+    "previewBytes": 1936,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/libre-baskerville@latest/latin-400-normal.woff2",
+        "weight": "400",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/libre-baskerville@latest/latin-400-normal.woff2",
+        "bytes": 20108
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/libre-baskerville@latest/latin-700-normal.woff2",
+        "weight": "700",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/libre-baskerville@latest/latin-700-normal.woff2",
+        "bytes": 20436
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/libre-baskerville@latest/latin-400-italic.woff2",
+        "weight": "400",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/libre-baskerville@latest/latin-400-italic.woff2",
+        "bytes": 21564
+      }
+    ]
+  },
+  {
+    "id": "cardo",
+    "label": "Cardo",
+    "kb": 52,
+    "previewBytes": 1140,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/cardo@latest/latin-400-normal.woff2",
+        "weight": "400",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/cardo@latest/latin-400-normal.woff2",
+        "bytes": 15500
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/cardo@latest/latin-700-normal.woff2",
+        "weight": "700",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/cardo@latest/latin-700-normal.woff2",
+        "bytes": 19192
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/cardo@latest/latin-400-italic.woff2",
+        "weight": "400",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/cardo@latest/latin-400-italic.woff2",
+        "bytes": 18968
+      }
+    ]
+  },
+  {
+    "id": "gentium-book-plus",
+    "label": "Gentium Book Plus",
+    "kb": 90,
+    "previewBytes": 4360,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/gentium-book-plus@latest/latin-400-normal.woff2",
+        "weight": "400",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/gentium-book-plus@latest/latin-400-normal.woff2",
+        "bytes": 21564
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/gentium-book-plus@latest/latin-700-normal.woff2",
+        "weight": "700",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/gentium-book-plus@latest/latin-700-normal.woff2",
+        "bytes": 21536
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/gentium-book-plus@latest/latin-400-italic.woff2",
+        "weight": "400",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/gentium-book-plus@latest/latin-400-italic.woff2",
+        "bytes": 24588
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/gentium-book-plus@latest/latin-700-italic.woff2",
+        "weight": "700",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/gentium-book-plus@latest/latin-700-italic.woff2",
+        "bytes": 24632
+      }
+    ]
+  },
+  {
+    "id": "noto-serif",
+    "label": "Noto Serif",
+    "kb": 83,
+    "previewBytes": 3904,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/noto-serif:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/noto-serif:vf@latest/latin-wght-normal.woff2",
+        "bytes": 36756
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/noto-serif:vf@latest/latin-wght-italic.woff2",
+        "weight": "100 900",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/noto-serif:vf@latest/latin-wght-italic.woff2",
+        "bytes": 47936
+      }
+    ]
+  },
+  {
+    "id": "spectral",
+    "label": "Spectral",
+    "kb": 66,
+    "previewBytes": 3496,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/spectral@latest/latin-400-normal.woff2",
+        "weight": "400",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/spectral@latest/latin-400-normal.woff2",
+        "bytes": 21696
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/spectral@latest/latin-600-normal.woff2",
+        "weight": "600",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/spectral@latest/latin-600-normal.woff2",
+        "bytes": 22936
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/spectral@latest/latin-400-italic.woff2",
+        "weight": "400",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/spectral@latest/latin-400-italic.woff2",
+        "bytes": 22712
+      }
+    ]
+  },
+  {
+    "id": "vollkorn",
+    "label": "Vollkorn",
+    "kb": 92,
+    "previewBytes": 2380,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/vollkorn:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/vollkorn:vf@latest/latin-wght-normal.woff2",
+        "bytes": 46356
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/vollkorn:vf@latest/latin-wght-italic.woff2",
+        "weight": "100 900",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/vollkorn:vf@latest/latin-wght-italic.woff2",
+        "bytes": 47528
+      }
+    ]
+  },
+  {
+    "id": "alegreya",
+    "label": "Alegreya",
+    "kb": 86,
+    "previewBytes": 2768,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/alegreya:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/alegreya:vf@latest/latin-wght-normal.woff2",
+        "bytes": 43476
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/alegreya:vf@latest/latin-wght-italic.woff2",
+        "weight": "100 900",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/alegreya:vf@latest/latin-wght-italic.woff2",
+        "bytes": 44456
+      }
+    ]
+  },
+  {
+    "id": "bitter",
+    "label": "Bitter",
+    "kb": 66,
+    "previewBytes": 2100,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/bitter:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/bitter:vf@latest/latin-wght-normal.woff2",
+        "bytes": 34072
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/bitter:vf@latest/latin-wght-italic.woff2",
+        "weight": "100 900",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/bitter:vf@latest/latin-wght-italic.woff2",
+        "bytes": 33320
+      }
+    ]
+  },
+  {
+    "id": "atkinson-hyperlegible",
+    "label": "Atkinson Hyperlegible",
+    "kb": 70,
+    "previewBytes": 3900,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@latest/latin-400-normal.woff2",
+        "weight": "400",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@latest/latin-400-normal.woff2",
+        "bytes": 17208
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@latest/latin-700-normal.woff2",
+        "weight": "700",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@latest/latin-700-normal.woff2",
+        "bytes": 17524
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@latest/latin-400-italic.woff2",
+        "weight": "400",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@latest/latin-400-italic.woff2",
+        "bytes": 18292
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@latest/latin-700-italic.woff2",
+        "weight": "700",
+        "style": "italic",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible@latest/latin-700-italic.woff2",
+        "bytes": 18484
+      }
+    ]
+  },
+  {
+    "id": "lexend",
+    "label": "Lexend",
+    "kb": 39,
+    "previewBytes": 2168,
+    "files": [
+      {
+        "url": "https://cdn.jsdelivr.net/fontsource/fonts/lexend:vf@latest/latin-wght-normal.woff2",
+        "weight": "100 900",
+        "style": "normal",
+        "resolvedUrl": "https://cdn.jsdelivr.net/fontsource/fonts/lexend:vf@latest/latin-wght-normal.woff2",
+        "bytes": 39680
+      }
+    ]
+  }
+]

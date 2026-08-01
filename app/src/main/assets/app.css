@@ -220,6 +220,32 @@
         color: #5a5040; border-color: rgba(90,69,32,0.2);
       }
 
+      /* ── Reading Font PREVIEW subsets (2026-07-31) ─────────────────────
+         Each is a ~2–4 KB name-glyph-only WOFF2 (tools/gen-font-previews.mjs)
+         so the Settings picker renders every font's NAME in that font
+         without shipping the full files. Browsers fetch an @font-face file
+         only when its family is actually used, so these cost nothing until
+         the picker opens. Paths are ../ because this file is served as
+         dist/app.min.css (build:css minifies in place, no url rebasing).
+         The FULL fonts are NOT @font-face'd anywhere: they arrive as
+         FontFace objects from src/utils/reading-fonts.js. */
+      @font-face { font-family: 'p-modern'; src: url('../fonts/previews/modern.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-lora'; src: url('../fonts/previews/lora.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-literata'; src: url('../fonts/previews/literata.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-merriweather'; src: url('../fonts/previews/merriweather.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-crimson-pro'; src: url('../fonts/previews/crimson-pro.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-source-serif-4'; src: url('../fonts/previews/source-serif-4.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-libre-baskerville'; src: url('../fonts/previews/libre-baskerville.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-cardo'; src: url('../fonts/previews/cardo.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-gentium-book-plus'; src: url('../fonts/previews/gentium-book-plus.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-noto-serif'; src: url('../fonts/previews/noto-serif.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-spectral'; src: url('../fonts/previews/spectral.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-vollkorn'; src: url('../fonts/previews/vollkorn.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-alegreya'; src: url('../fonts/previews/alegreya.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-bitter'; src: url('../fonts/previews/bitter.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-atkinson-hyperlegible'; src: url('../fonts/previews/atkinson-hyperlegible.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'p-lexend'; src: url('../fonts/previews/lexend.woff2') format('woff2'); font-display: swap; }
+
       :root {
         --bg:          #000000;
         --bg2:         #06060e;
@@ -238,7 +264,15 @@
         --radius:      6px;
         --transition:  0.2s ease;
         --font-cinzel:   'Cinzel', serif;
-        --font-garamond: 'EB Garamond', serif;
+        /* --font-body: THE body-text font. use-settings.js overwrites this
+           on <html> from settings.fontStyle (Reading Font picker). The
+           default doubles as the "classic" look: with #custom-fonts
+           disabled, 'EB Garamond' resolves to the system serif. Every
+           former literal 'EB Garamond' font-family in this file routes
+           through it (2026-07-31); --font-garamond aliases it so the
+           injected journal styles follow the same choice. */
+        --font-body:     'EB Garamond', serif;
+        --font-garamond: var(--font-body);
         /* Shared color for all tappable inline refs (scripture, letter-links, footnote numbers).
            Dark mode: scripture gold. Light mode: letter-link warm gold (see body.light). */
         --tap-ref:        var(--gold);
@@ -352,7 +386,7 @@
          mirrors live changes. px font sizes do NOT scale — the journal +
          highlights injected CSS was converted to rem so they track the scale. */
       html { font-size: calc(100% * var(--font-scale, 1)); }
-      body { font-family: 'EB Garamond', serif; background: var(--bg); color: var(--cream); min-height: 100vh; transition: background 0.3s ease, color 0.3s ease; overflow-x: hidden; max-width: 100vw; }
+      body { font-family: var(--font-body); background: var(--bg); color: var(--cream); min-height: 100vh; transition: background 0.3s ease, color 0.3s ease; overflow-x: hidden; max-width: 100vw; }
       /* Kill lingering tap/focus highlights globally (Android WebView) */
       * { -webkit-tap-highlight-color: transparent; }
       button, a, [role="button"] { -webkit-tap-highlight-color: transparent; outline: none; }
@@ -758,7 +792,7 @@
         overflow-wrap: break-word; word-wrap: break-word;
       }
       .hero-subtitle {
-        font-family: 'EB Garamond', serif; font-size: 1.05rem; font-style: italic;
+        font-family: var(--font-body); font-size: 1.05rem; font-style: italic;
         color: var(--cream-muted); max-width: 500px;
         margin: 0.35rem auto 1.4rem; line-height: 1.5;
       }
@@ -1092,7 +1126,7 @@
       @keyframes annHintIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
       .ann-hint-icon { width: 22px; height: 22px; color: var(--gold); flex-shrink: 0; }
       .ann-hint-text {
-        font-family: 'EB Garamond', serif; font-style: italic;
+        font-family: var(--font-body); font-style: italic;
         font-size: 0.88rem; line-height: 1.35; color: var(--cream-dim);
       }
       .ann-hint-close {
@@ -1226,7 +1260,7 @@
     .study-image-caption { padding:0.5rem 1.5rem 0; font-size:0.78rem; color:var(--cream-dim); font-style:italic; }
 
     .section-intro-quote { padding:1.5rem 1.5rem 0; text-align:center; }
-    .section-intro-text { font-family:'EB Garamond',serif; font-size:1.08rem; line-height:1.85; color:var(--cream); font-style:italic; margin-bottom:1rem; }
+    .section-intro-text { font-family:var(--font-body); font-size:1.08rem; line-height:1.85; color:var(--cream); font-style:italic; margin-bottom:1rem; }
     .section-intro-text .letter-link-ref { font-style:italic; }
     .prophecy-group { margin:2rem 0 2.5rem; }
     .prophecy-group-label { font-family:'Cinzel',serif; font-size:0.95rem; letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; text-align:center; margin-bottom:1.2rem; line-height:1.4; }
@@ -1277,7 +1311,7 @@
     .poetry-line { font-size:1.05rem; line-height:1.9; color:var(--cream); font-style:italic; display:block; white-space:nowrap; }
     @media (max-width:480px) { .poetry-line { font-size:0.98rem; white-space:normal; } }
     .stanza-break { height:0.9rem; display:block; }
-    .letter-closing { text-align:center; font-family:'EB Garamond',serif; font-size:1.1rem; font-style:italic; color:var(--cream-dim); margin-top:2rem; padding-top:2rem; border-top:1px solid var(--gold-border); }
+    .letter-closing { text-align:center; font-family:var(--font-body); font-size:1.1rem; font-style:italic; color:var(--cream-dim); margin-top:2rem; padding-top:2rem; border-top:1px solid var(--gold-border); }
     .letter-closing-fn { text-align:center; margin-top:0.5rem; }
     .bold-italic { font-weight:600; font-style:italic; }
     .italic-text { font-style:italic; color:var(--cream-dim); }
@@ -1573,7 +1607,7 @@
     /* Decorative ampersand between the two titles — EB Garamond italic has a beautiful & glyph.
        Colored between the gold title and cream secondary for visual variety. */
     .home-main-amp {
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       font-style: italic;
       font-weight: 500;
       font-size: 1.9rem;
@@ -1590,7 +1624,7 @@
     }
     /* Secondary title — EB Garamond italic for a graceful contrast */
     .home-main-title2 {
-      font-family: 'EB Garamond', 'Cinzel', serif;
+      font-family: var(--font-body);
       font-weight: 500;
       font-style: italic;
       font-size: 1.42rem;
@@ -1743,7 +1777,7 @@
     }
     .hni-detail {
       display: block;
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       font-style: italic;
       font-size: 0.88rem;
       color: var(--cream-muted);
@@ -1751,7 +1785,7 @@
     }
     .hni-arrow {
       display: block;
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       font-size: 1.5rem;
       color: var(--gold-dim);
       opacity: 0.42;
@@ -1767,8 +1801,8 @@
     .genre-tile.locked { opacity:0.38; pointer-events:none; }
     .genre-tile-title { font-family:'Cinzel',serif; font-size:0.88rem; color:var(--gold); letter-spacing:0.04em; line-height:1.3; }
     .genre-tile-badge { display:inline-block; margin-top:0.3rem; font-family:'Cinzel',serif; font-size:0.46rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); background:rgba(200,164,86,0.12); border:1px solid rgba(200,164,86,0.3); border-radius:3px; padding:0.1rem 0.4rem; }
-    .genre-tile-sub { font-family:'EB Garamond',serif; font-size:0.78rem; color:var(--cream-dim); margin-top:0.15rem; font-style:italic; }
-    .studies-empty { font-family:'EB Garamond',serif; font-style:italic; color:var(--cream-dim); padding:1.2rem 0.5rem; text-align:center; }
+    .genre-tile-sub { font-family:var(--font-body); font-size:0.78rem; color:var(--cream-dim); margin-top:0.15rem; font-style:italic; }
+    .studies-empty { font-family:var(--font-body); font-style:italic; color:var(--cream-dim); padding:1.2rem 0.5rem; text-align:center; }
     /* Studies home — stacked full-width tiles */
     .genre-full-width { grid-column:1 / -1; margin-left:10%; margin-right:10%; }
     .genre-full-width .genre-tile-title { font-size:1.05rem; }
@@ -1872,6 +1906,40 @@
     .settings-section { width:100%; max-width:520px; margin-bottom:1.5rem; }
     .settings-section-label { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
+    /* ── Accordion groups (Settings redesign 2026-07-31) ──────────────────
+       Each section is a 52px tappable header card; the body (the familiar
+       .settings-card) mounts below it only while open. The header reuses
+       .settings-section-label but promotes it to the tap-target size. */
+    .settings-group-head { display:flex; align-items:center; width:100%; gap:0.6rem; min-height:52px; padding:0.6rem 0.9rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; cursor:pointer; text-align:left; transition:border-color 0.2s ease, background 0.2s ease; }
+    @media (hover:hover){ .settings-group-head:hover { border-color:var(--gold-dim); } }
+    .settings-section.open > .settings-group-head { border-color:var(--gold-dim); background:linear-gradient(var(--gold-faint), var(--gold-faint)) var(--bg2); }
+    .settings-group-titles { display:flex; flex-direction:column; gap:0.3rem; flex:1; min-width:0; }
+    .settings-group-head .settings-section-label { margin-bottom:0; font-size:0.72rem; color:var(--gold); }
+    .settings-group-head .settings-section-label::after { content:none; }
+    .settings-group-sub { font-family:var(--font-body); font-size:0.8rem; font-style:italic; color:var(--cream-muted); line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .settings-group-chevron { color:var(--gold-dim); font-size:1rem; line-height:1; transition:transform 0.2s ease; flex-shrink:0; }
+    .settings-group-chevron.open { transform:rotate(180deg); color:var(--gold); }
+    .settings-group-body { margin-top:0.55rem; }
+    /* Collapsed groups sit tighter than the old always-open sections. */
+    .settings-section { margin-bottom:0.7rem; }
+    .settings-section.open { margin-bottom:1.3rem; }
+    /* ── Reading Font picker (2026-07-31) ─────────────────────────────────
+       Chip names render in their font via the bundled 'p-<id>' preview
+       subsets (name glyphs only — see @font-face block near :root). */
+    .font-picker-head { display:flex; align-items:center; gap:0.5rem; width:100%; min-height:46px; padding:0.62rem 0.95rem; background:transparent; border:none; cursor:pointer; text-align:left; }
+    .font-picker-current { font-size:1.02rem; color:var(--gold); line-height:1.2; max-width:55%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .font-picker-chevron { color:var(--gold-dim); font-size:0.95rem; line-height:1; transition:transform 0.2s ease; flex-shrink:0; }
+    .font-picker-chevron.open { transform:rotate(180deg); color:var(--gold); }
+    .font-picker-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; padding:0.15rem 0.95rem 0.9rem; }
+    .font-chip { display:flex; flex-direction:column; align-items:flex-start; gap:0.24rem; padding:0.62rem 0.72rem; min-height:44px; background:var(--bg); border:1px solid var(--gold-border); border-radius:8px; cursor:pointer; text-align:left; transition:border-color 0.15s ease, background 0.15s ease; }
+    @media (hover:hover){ .font-chip:hover { border-color:var(--gold-dim); } }
+    .font-chip.active { border-color:var(--gold); background:var(--gold-faint); }
+    .font-chip.pending { opacity:0.6; }
+    .font-chip-name { font-size:1.08rem; color:var(--cream); line-height:1.25; }
+    .font-chip-sub { font-size:0.68rem; color:var(--cream-muted); font-style:italic; line-height:1.3; }
+    .font-chip-status { font-family:'Cinzel',serif; font-size:0.55rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); }
+    .font-chip-status.active { color:var(--gold); }
+    @media (max-width:380px){ .font-picker-grid { grid-template-columns:1fr; } }
     /* ── Compact card layout (Settings redesign — Option B) ───────────────
        Each section's controls live in ONE bordered card; rows are separated
        by thin dividers, and each row's long description is hidden by default
@@ -1941,7 +2009,7 @@
     .about-diamond { width:6px; height:6px; background:var(--gold); transform:rotate(45deg); display:inline-block; }
     .about-heading { font-family:'Cinzel',serif; font-size:1.05rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin:1.4rem 0 1.8rem; font-weight:500; }
     .about-body { text-align:center; }
-    .about-body p { font-family:'EB Garamond',Georgia,serif; font-size:1.05rem; line-height:1.65; color:var(--cream-dim); margin:0 0 1.4rem; }
+    .about-body p { font-family:var(--font-body); font-size:1.05rem; line-height:1.65; color:var(--cream-dim); margin:0 0 1.4rem; }
     .about-body p:last-child { margin-bottom:0; }
     .about-body p em { color:var(--cream); font-style:italic; }
     .about-body p a { color:inherit; text-decoration:none; }
@@ -2064,7 +2132,7 @@
     .canon-card-num { font-family:'Cinzel',serif; font-size:1.1rem; font-weight:600; color:var(--gold); opacity:0.3; min-width:1.8rem; text-align:center; line-height:1; }
     .canon-card-body { flex:1; min-width:0; }
     .canon-card-title { font-family:'Cinzel',serif; font-size:1.05rem; color:var(--gold); letter-spacing:0.04em; margin-bottom:0.15rem; }
-    .canon-card-sub { font-family:'EB Garamond',serif; font-size:0.92rem; color:var(--cream-muted); font-style:italic; line-height:1.3; }
+    .canon-card-sub { font-family:var(--font-body); font-size:0.92rem; color:var(--cream-muted); font-style:italic; line-height:1.3; }
     .canon-card-detail { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); margin-top:0.2rem; }
     /* ── Scriptures layout cycle (in-content, top-right corner) ───────────
        Cycles scriptureLayout without digging through Settings. ABSOLUTE on
@@ -2154,11 +2222,11 @@
     .verses-block.is-poetry .verse { display:block; margin-bottom:0.5rem; text-indent:0; padding-left:1.8rem; position:relative; }
     .verses-block.is-poetry .verse .verse-num { position:absolute; left:0; top:0.15rem; }
     .section-heading-psalm119 { display:flex; align-items:center; gap:0.75rem; margin-bottom:0.7rem; padding-bottom:0.4rem; border-bottom:1px solid var(--gold-border); }
-    .hebrew-letter { font-size:3.2rem; line-height:1; color:transparent; -webkit-text-stroke:1.5px var(--gold); font-family:'EB Garamond',Georgia,serif; flex-shrink:0; }
+    .hebrew-letter { font-size:3.2rem; line-height:1; color:transparent; -webkit-text-stroke:1.5px var(--gold); font-family:var(--font-body); flex-shrink:0; }
     .hebrew-letter-name { font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); }
 
     /* ── SEARCH ── */
-    .search-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:'EB Garamond',serif; font-size:1rem; padding:0.45rem 0.75rem; outline:none; transition:border-color 0.2s; }
+    .search-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:var(--font-body); font-size:1rem; padding:0.45rem 0.75rem; outline:none; transition:border-color 0.2s; }
     .search-input:focus { border-color:var(--gold-dim); }
     /* Suppress the UA's own search-cancel × (rendered blue on Android
        WebView, clashing with the gold accent language) — the row already
@@ -2167,7 +2235,7 @@
     .search-input::placeholder { color:var(--cream-muted); opacity:0.6; }
     body.light .search-input { background:rgba(0,0,0,0.04); }
     /* .search-screen — no styles needed */
-    .search-no-results { padding:3rem 1.5rem; text-align:center; font-family:'EB Garamond',serif; font-size:1.05rem; color:var(--cream-muted); }
+    .search-no-results { padding:3rem 1.5rem; text-align:center; font-family:var(--font-body); font-size:1.05rem; color:var(--cream-muted); }
     .search-highlight { background:rgba(200,164,86,0.25); color:var(--cream); border-radius:2px; }
     body.light .search-highlight { background:rgba(122,92,16,0.2); }
 
@@ -2201,11 +2269,11 @@
     .srch-suggest-item { display:flex; align-items:center; gap:0.6rem; padding:0.5rem 1rem; cursor:pointer; border-bottom:1px solid rgba(200,164,86,0.08); width:100%; text-align:left; background:none; border-left:none; border-right:none; border-top:none; color:inherit; }
     .srch-suggest-item:active { background:var(--gold-faint); }
     .srch-suggest-kind { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); border:1px solid var(--gold-border); border-radius:3px; padding:0.08rem 0.35rem; flex-shrink:0; }
-    .srch-suggest-label { font-family:'EB Garamond',serif; font-size:0.95rem; color:var(--cream); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .srch-suggest-label { font-family:var(--font-body); font-size:0.95rem; color:var(--cream); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .srch-suggest-hint { font-family:'Cinzel',serif; font-size:0.55rem; letter-spacing:0.1em; color:var(--gold-dim); flex-shrink:0; }
 
     .srch-top-results { border-bottom:2px solid var(--gold-border); padding-bottom:0.3rem; margin-bottom:0.2rem; }
-    .srch-results-summary { padding:0.55rem 1rem; font-family:'EB Garamond',serif; font-size:0.78rem; color:var(--gold); background:var(--bg2); border-bottom:1px solid var(--gold-border); font-style:italic; }
+    .srch-results-summary { padding:0.55rem 1rem; font-family:var(--font-body); font-size:0.78rem; color:var(--gold); background:var(--bg2); border-bottom:1px solid var(--gold-border); font-style:italic; }
     .srch-results-summary strong { color:var(--gold-bright); font-weight:600; font-style:normal; }
     .srch-groups { display:block; }
     .srch-group { border-bottom:1px solid var(--gold-border); }
@@ -2227,16 +2295,16 @@
     .srch-card-badge.badge-footnote { color:var(--gold-dim); }
     .srch-card-badge.badge-letter { color:var(--gold-bright); }
     .srch-card-badge.badge-heading { color:var(--gold-dim); font-style:italic; }
-    .srch-card-snippet { font-family:'EB Garamond',serif; font-size:0.93rem; line-height:1.5; color:var(--cream-muted); }
+    .srch-card-snippet { font-family:var(--font-body); font-size:0.93rem; line-height:1.5; color:var(--cream-muted); }
     .srch-snippet-scroll { max-height:4.2rem; overflow:hidden; }
     .srch-card.card-direct { background:var(--gold-faint); }
     .srch-card.card-direct .srch-card-ref { color:var(--gold-bright); font-size:0.72rem; }
     .srch-card.card-direct .srch-card-snippet { color:var(--gold-dim); font-size:0.58rem; letter-spacing:0.14em; text-transform:uppercase; font-family:'Cinzel',serif; margin-top:0.2rem; }
 
-    .srch-did-you-mean { padding:0.7rem 1.2rem; background:var(--gold-faint); border-bottom:1px solid var(--gold-border); font-family:'EB Garamond',serif; font-size:0.92rem; color:var(--cream-dim); }
-    .srch-did-you-mean button { background:none; border:none; color:var(--gold-bright); font-family:'EB Garamond',serif; font-size:0.92rem; font-style:italic; cursor:pointer; padding:0; text-decoration:underline dotted; }
+    .srch-did-you-mean { padding:0.7rem 1.2rem; background:var(--gold-faint); border-bottom:1px solid var(--gold-border); font-family:var(--font-body); font-size:0.92rem; color:var(--cream-dim); }
+    .srch-did-you-mean button { background:none; border:none; color:var(--gold-bright); font-family:var(--font-body); font-size:0.92rem; font-style:italic; cursor:pointer; padding:0; text-decoration:underline dotted; }
 
-    .srch-empty-hero { padding:2rem 1.5rem 1rem; text-align:center; font-family:'EB Garamond',serif; color:var(--cream-muted); }
+    .srch-empty-hero { padding:2rem 1.5rem 1rem; text-align:center; font-family:var(--font-body); color:var(--cream-muted); }
     .srch-empty-hero h3 { font-family:'Cinzel Decorative',serif; font-size:1.1rem; letter-spacing:0.1em; color:var(--gold); font-weight:400; margin-bottom:0.5rem; }
     .srch-empty-hero p { font-size:0.95rem; line-height:1.5; }
     .srch-quick-row { display:flex; flex-wrap:wrap; gap:0.45rem; justify-content:center; padding:0.6rem 1rem 1.2rem; }
@@ -2251,7 +2319,7 @@
     .srch-chip-remove { position:absolute; right:0.1rem; top:50%; transform:translateY(-50%); min-width:28px; min-height:28px; background:none; border:none; color:var(--gold-dim); cursor:pointer; font-size:0.7rem; line-height:1; padding:0 0.2rem; }
     .srch-chip-remove:active { color:var(--gold); }
 
-    .srch-error { padding:1rem 1.2rem; color:#d98888; font-family:'EB Garamond',serif; font-size:0.9rem; background:rgba(217,136,136,0.06); border-bottom:1px solid rgba(217,136,136,0.3); }
+    .srch-error { padding:1rem 1.2rem; color:#d98888; font-family:var(--font-body); font-size:0.9rem; background:rgba(217,136,136,0.06); border-bottom:1px solid rgba(217,136,136,0.3); }
     .srch-progress { padding:0.5rem 1rem; background:var(--bg2); color:var(--gold-dim); font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; }
     .srch-progress-bar { height:2px; background:var(--gold-border); margin-top:0.35rem; border-radius:1px; overflow:hidden; }
     .srch-progress-bar-fill { height:100%; background:var(--gold); transition:width 0.2s; }
@@ -2291,7 +2359,7 @@
     }
     .chapter-cards.two-col .chapter-card-btn.is-current .two-col-num { color:var(--gold); }
     .chapter-cards.two-col .two-col-title {
-      font-family:'EB Garamond',serif; font-size:0.96rem;
+      font-family:var(--font-body); font-size:0.96rem;
       line-height:1.3; font-style:italic; color:var(--cream);
     }
     .chapter-card-btn { display:flex; align-items:center; gap:0.9rem; width:100%; text-align:left; cursor:pointer; background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; padding:0.85rem 1.1rem; transition:border-color 0.18s, background 0.18s; position:relative; }
@@ -2304,7 +2372,7 @@
     .chapter-card-divider { width:1px; align-self:stretch; background:var(--gold-border); flex-shrink:0; min-height:1.8rem; }
     .chapter-card-info { flex:1; min-width:0; }
     .chapter-card-label { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
-    .chapter-card-title { font-family:'EB Garamond',serif; font-size:1rem; color:var(--cream); line-height:1.3; font-style:italic; }
+    .chapter-card-title { font-family:var(--font-body); font-size:1rem; color:var(--cream); line-height:1.3; font-style:italic; }
     .chapter-card-title.untitled { font-style:normal; color:var(--cream-muted); font-size:0.88rem; }
     .chapter-card-btn.is-locked { opacity:0.45; cursor:default; }
     .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
@@ -2317,8 +2385,8 @@
     body.light .part-group-card.is-expanded { background:var(--gold-faint); }
     .part-group-num { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.18rem; }
     .part-group-card.is-expanded .part-group-num { color:var(--gold); }
-    .part-group-title { font-family:'EB Garamond',serif; font-size:1rem; font-style:italic; color:var(--cream); line-height:1.3; }
-    .part-group-subtitle { font-family:'EB Garamond',serif; font-size:0.82rem; color:var(--cream-dim); font-style:italic; line-height:1.35; margin-top:0.2rem; }
+    .part-group-title { font-family:var(--font-body); font-size:1rem; font-style:italic; color:var(--cream); line-height:1.3; }
+    .part-group-subtitle { font-family:var(--font-body); font-size:0.82rem; color:var(--cream-dim); font-style:italic; line-height:1.35; margin-top:0.2rem; }
     .part-group-info { flex:1; min-width:0; }
     .part-chevron { font-size:1.25rem; color:var(--gold-dim); transition:transform 0.2s; flex-shrink:0; margin-left:auto; line-height:1; }
     .part-chevron.is-open { transform:rotate(90deg); }
@@ -2336,7 +2404,7 @@
     .reading-dot-nav .rdg-inner { width:10px; height:10px; border-radius:50%; background:var(--gold); animation: dot-pulse 2.8s ease-in-out infinite; }
     .history-empty {
       text-align:center; color:var(--cream-dim);
-      font-family:'EB Garamond',serif; padding:3.5rem 1.5rem 4rem;
+      font-family:var(--font-body); padding:3.5rem 1.5rem 4rem;
       max-width:460px; margin:0 auto;
     }
     .history-empty-sigil {
@@ -2635,7 +2703,7 @@
     .tab-card-pin { width:0.7rem; height:0.7rem; vertical-align:-0.12rem; margin-right:0.25rem; color:var(--gold); }
     /* [7] inline rename editor inside the TabActionSheet. */
     .tab-rename-row { display:flex; gap:0.45rem; align-items:center; padding:0.35rem 0; }
-    .tab-rename-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:'EB Garamond',serif; font-size:1rem; padding:0.5rem 0.7rem; outline:none; }
+    .tab-rename-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:var(--font-body); font-size:1rem; padding:0.5rem 0.7rem; outline:none; }
     .tab-rename-input:focus { border-color:var(--gold-dim); }
     body.light .tab-rename-input { background:rgba(0,0,0,0.04); }
     .tab-rename-save, .tab-rename-cancel { background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0.45rem 0.7rem; font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; }
@@ -2764,7 +2832,7 @@
       color:var(--gold-bright); margin:0 0 0.95rem; line-height:1.15;
     }
     .disable-tabs-body {
-      font-family:'EB Garamond',serif; font-size:1rem; line-height:1.55;
+      font-family:var(--font-body); font-size:1rem; line-height:1.55;
       color:var(--cream-dim); margin-bottom:1.5rem;
       max-width:40ch; margin-left:auto; margin-right:auto;
     }
@@ -2990,7 +3058,7 @@
       min-width: 220px;
     }
     .ann-chip-confirm-q {
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       font-size: 0.92rem;
       color: var(--cream);
       flex: 1;
@@ -3280,7 +3348,7 @@
     }
     .link-sidebar-date {
       padding: 4px 18px 12px;
-      font-family: 'EB Garamond', serif; font-size: 0.85rem;
+      font-family: var(--font-body); font-size: 0.85rem;
       color: var(--cream-muted);
       display: flex; align-items: center; gap: 8px;
     }
@@ -3292,7 +3360,7 @@
     }
     .link-sidebar-body { padding: 4px 14px 18px; display: flex; flex-direction: column; gap: 12px; }
     .link-sidebar-empty {
-      color: var(--cream-muted); font-family: 'EB Garamond',serif;
+      color: var(--cream-muted); font-family: var(--font-body);
       font-size: 0.95rem; text-align: center; padding: 32px 0;
     }
     .link-card {
@@ -3319,7 +3387,7 @@
       flex-shrink: 0;
     }
     .link-card-cat {
-      font-family: 'EB Garamond', serif; font-size: 0.72rem;
+      font-family: var(--font-body); font-size: 0.72rem;
       color: var(--cream-muted); margin-bottom: 6px;
     }
     /* Created date stamp under the category line. Same visual treatment as
@@ -3330,7 +3398,7 @@
       color: var(--gold-dim); margin-bottom: 6px;
     }
     .link-card-preview {
-      font-family: 'EB Garamond', serif; font-size: 0.88rem;
+      font-family: var(--font-body); font-size: 0.88rem;
       color: var(--cream-dim); line-height: 1.45;
       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
       overflow: hidden;
@@ -3466,7 +3534,7 @@
       background: rgba(70,62,48,0.55);
       border: 1px solid transparent; border-radius: 999px;
       color: var(--cream-dim);
-      font-family: 'EB Garamond', serif; font-size: 0.98rem;
+      font-family: var(--font-body); font-size: 0.98rem;
       outline: none; transition: border-color 0.15s, background 0.15s;
     }
     body.light .navpick-search-input { background: var(--bg); color: var(--input-text); border-color: var(--gold-border); }
@@ -3489,7 +3557,7 @@
       background: transparent; border: none;
       border-bottom: 1px solid rgba(110,98,76,0.12);
       cursor: pointer; text-align: left;
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       -webkit-tap-highlight-color: transparent;
       transition: background 0.12s;
     }
@@ -3530,7 +3598,7 @@
       color: var(--cream-dim); margin-bottom: 8px;
     }
     .navpick-empty-hint {
-      font-family: 'EB Garamond', serif; font-size: 0.92rem;
+      font-family: var(--font-body); font-size: 0.92rem;
       color: var(--cream-muted); line-height: 1.5;
     }
     /* ── LinkPicker mode tabs (Search / Browse / Recent) ── */
@@ -3603,7 +3671,7 @@
     .navpick-ch-btn {
       min-height: 44px; border-radius: 8px;
       background: rgba(200,164,86,0.07); border: 1px solid var(--gold-border);
-      color: var(--cream); font-family: 'EB Garamond', serif; font-size: 1.02rem;
+      color: var(--cream); font-family: var(--font-body); font-size: 1.02rem;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: background 0.12s ease;
     }
@@ -3616,7 +3684,7 @@
       overflow: hidden;
     }
     .navpick-hintline {
-      font-family: 'EB Garamond', serif; font-size: 0.9rem; font-style: italic;
+      font-family: var(--font-body); font-size: 0.9rem; font-style: italic;
       color: var(--cream-muted); padding: 12px 4px 8px; line-height: 1.4;
     }
     /* ── Recent links — the link network (From ⇄ To endpoint chips) ── */
@@ -3640,7 +3708,7 @@
       text-transform: uppercase; color: var(--gold-dim);
     }
     .navpick-link-ep-label {
-      font-family: 'EB Garamond', serif; font-size: 0.95rem; color: var(--cream);
+      font-family: var(--font-body); font-size: 0.95rem; color: var(--cream);
       line-height: 1.25;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden;
@@ -3655,7 +3723,7 @@
       flex: 1; min-width: 0; min-height: 40px;
       padding: 8px 14px; border-radius: 999px;
       background: rgba(0,0,0,0.25); border: 1px solid var(--gold-border);
-      color: var(--cream); font-family: 'EB Garamond', serif; font-size: 0.98rem;
+      color: var(--cream); font-family: var(--font-body); font-size: 0.98rem;
     }
     body.light .picker-find-input { background: var(--bg); color: var(--input-text); }
     .picker-find-input::placeholder { color: var(--cream-muted); }
@@ -3673,7 +3741,7 @@
     }
     .picker-find-nav:disabled { opacity: 0.35; cursor: default; }
     .picker-find-none {
-      font-family: 'EB Garamond', serif; font-style: italic; font-size: 0.94rem;
+      font-family: var(--font-body); font-style: italic; font-size: 0.94rem;
       color: var(--cream-muted); padding: 14px 2px;
     }
     /* Current find hit — the letters' highlight wash, block-scoped and
@@ -3689,7 +3757,7 @@
       border-left: 2px solid var(--link-blue);
       border-radius: 0 6px 6px 0;
       color: #b9d8e9;
-      font-family: 'EB Garamond', serif; font-size: 0.95rem;
+      font-family: var(--font-body); font-size: 0.95rem;
       animation: navpickFlashIn 0.18s ease-out;
     }
     .navpick-flash svg { width: 18px; height: 18px; flex-shrink: 0; }
@@ -3747,10 +3815,10 @@
     }
     .picker-empty {
       text-align: center; padding: 48px 24px;
-      color: var(--cream-muted); font-family: 'EB Garamond', serif;
+      color: var(--cream-muted); font-family: var(--font-body);
     }
     .picker-verses {
-      font-family: 'EB Garamond', serif; font-size: 1.05rem;
+      font-family: var(--font-body); font-size: 1.05rem;
       color: var(--cream-dim); line-height: 1.7;
       user-select: text; -webkit-user-select: text;
     }
@@ -3807,7 +3875,7 @@
       margin-bottom: 18px;
     }
     .picker-selection-hint {
-      font-family: 'EB Garamond', serif; font-size: 0.92rem;
+      font-family: var(--font-body); font-size: 0.92rem;
       padding: 10px 14px; margin: 0 0 18px;
       background: rgba(31,121,165,0.18);
       border-left: 2px solid var(--link-blue);
@@ -3822,7 +3890,7 @@
       font-style: italic;
     }
     .picker-letter-block {
-      font-family: 'EB Garamond', serif; font-size: 1.05rem;
+      font-family: var(--font-body); font-size: 1.05rem;
       color: var(--cream-dim); line-height: 1.7;
       margin: 0 0 14px; padding: 0;
       /* Allow native text selection */
@@ -3894,7 +3962,7 @@
     .note-sheet-menu-btn:active { background: rgba(224,201,127,0.10); color: var(--gold); }
     .note-sheet-menu-btn svg { width: 18px; height: 18px; }
     .note-sheet-anchor {
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       font-size: 0.92rem; font-style: italic;
       color: var(--cream-muted); line-height: 1.5;
       padding: 8px 12px; margin-bottom: 12px;
@@ -3909,13 +3977,13 @@
       margin: -8px 0 12px;
     }
     .note-sheet-body {
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       font-size: 1.02rem; color: var(--cream);
       line-height: 1.6; white-space: pre-wrap; word-break: break-word;
       padding: 4px 2px 10px;
     }
     .note-sheet-empty {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.95rem; color: var(--cream-muted);
       padding: 14px 2px; text-align: center;
     }
@@ -3939,7 +4007,7 @@
       width: 100%; min-height: 120px; padding: 10px 14px;
       background: var(--bg); border: 1px solid var(--gold-border);
       border-radius: 8px; color: var(--cream-dim); resize: vertical;
-      font-family: 'EB Garamond', serif; font-size: 1rem;
+      font-family: var(--font-body); font-size: 1rem;
       outline: none; transition: border-color 0.15s;
       box-sizing: border-box;
     }
@@ -4050,7 +4118,7 @@
       text-align: center; margin-bottom: 0.6rem;
     }
     .library-sub {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.95rem; color: var(--cream-muted);
       text-align: center; margin-bottom: 2rem;
     }
@@ -4106,7 +4174,7 @@
     }
     .library-tile.placeholder .library-tile-title { color: var(--cream-dim); }
     .library-tile-detail {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.86rem; color: var(--cream-muted);
       line-height: 1.35;
       margin-top: auto;
@@ -4114,13 +4182,13 @@
     /* Wave 0 — empty-tile "how X happens" caption (LibraryScreen guide).
        Sits under the italic detail line; non-italic, plainer, dimmer. */
     .library-tile-guide {
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       font-size: 0.78rem; color: var(--cream-dim);
       line-height: 1.3; opacity: 0.85;
     }
     .library-tile-arrow {
       position: absolute; top: 1.1rem; right: 1.1rem;
-      font-family: 'EB Garamond', serif; font-size: 1.2rem;
+      font-family: var(--font-body); font-size: 1.2rem;
       color: var(--gold-dim); opacity: 0.6;
       line-height: 1;
     }
@@ -4191,7 +4259,7 @@
       margin-top: 0.1rem;
     }
     .prg-stat-sub {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.78rem; color: var(--cream-muted); line-height: 1.25;
     }
     .prg-section { margin-left: auto; margin-right: auto; }
@@ -4233,12 +4301,12 @@
       background: var(--bg);
     }
     .prg-history-label {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.85rem; color: var(--cream-muted); flex: 1;
     }
     .prg-note {
       padding: 0.9rem 1.2rem;
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.9rem; color: var(--cream-muted); line-height: 1.45;
     }
     .prg-src-row {
@@ -4255,7 +4323,7 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .prg-src-col {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.78rem; color: var(--cream-muted);
     }
 
@@ -4328,13 +4396,13 @@
       word-break: break-word;
     }
     .nb-card-count {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.86rem; color: var(--cream-muted);
       margin-top: auto;
     }
     .nb-card-arrow {
       position: absolute; top: 1rem; right: 1rem;
-      font-family: 'EB Garamond', serif; font-size: 1.2rem;
+      font-family: var(--font-body); font-size: 1.2rem;
       color: var(--gold-dim); opacity: 0.6;
       line-height: 1;
     }
@@ -4369,7 +4437,7 @@
       padding: 9px 12px;
       background: var(--bg); border: 1px solid var(--gold-border); border-radius: 8px;
       color: var(--cream-dim);
-      font-family: 'EB Garamond', serif; font-size: 0.94rem;
+      font-family: var(--font-body); font-size: 0.94rem;
       outline: none; width: 100%; box-sizing: border-box;
     }
     body.light .nb-card-create-input { background: var(--bg); color: var(--input-text); }
@@ -4402,7 +4470,7 @@
       width: 32px; height: 32px;
       border-radius: 8px;
       display: inline-flex; align-items: center; justify-content: center;
-      font-family: 'EB Garamond', serif; font-size: 1.3rem; line-height: 1;
+      font-family: var(--font-body); font-size: 1.3rem; line-height: 1;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       flex-shrink: 0;
     }
@@ -4468,7 +4536,7 @@
       background: rgba(70,62,48,0.55);
       border: 1px solid transparent; border-radius: 999px;
       color: var(--cream-dim);
-      font-family: 'EB Garamond', serif; font-size: 0.96rem;
+      font-family: var(--font-body); font-size: 0.96rem;
       outline: none; transition: border-color 0.15s, background 0.15s;
       box-sizing: border-box;
       margin-bottom: 0.85rem;
@@ -4560,7 +4628,7 @@
        visual line-clamp here would re-open the "donut hole" (clipped with an
        ellipsis but under the char threshold, so no Show-more button). */
     .note-row-preview {
-      font-family: 'EB Garamond', serif; font-size: 0.95rem;
+      font-family: var(--font-body); font-size: 0.95rem;
       color: var(--cream); line-height: 1.4;
       overflow-wrap: break-word; word-break: break-word;
     }
@@ -4573,7 +4641,7 @@
     /* Same as .note-row-preview — no clamp; the anchor shows in full until
        the JrnExpandable threshold, then collapses behind "Show more". */
     .note-row-anchor {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.82rem; color: var(--cream-muted);
       line-height: 1.4;
       overflow-wrap: break-word; word-break: break-word;
@@ -4601,7 +4669,7 @@
     }
     .notes-empty {
       padding: 3rem 1rem; text-align: center;
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       color: var(--cream-muted);
     }
     .notes-empty-title {
@@ -4668,7 +4736,7 @@
       border: 1px solid var(--gold-border);
       border-radius: 8px;
       color: var(--cream-dim);
-      font-family: 'EB Garamond', serif; font-size: 0.96rem;
+      font-family: var(--font-body); font-size: 0.96rem;
       outline: none;
     }
     body.light .nb-picker-new-input { background: var(--bg); color: var(--input-text); }
@@ -4718,13 +4786,13 @@
     .nb-picker-check svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
     .nb-picker-name {
       flex: 1; min-width: 0;
-      font-family: 'EB Garamond', serif; font-size: 1rem;
+      font-family: var(--font-body); font-size: 1rem;
       color: var(--cream); line-height: 1.3;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .nb-picker-empty {
       padding: 1.5rem 1rem; text-align: center;
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.9rem; color: var(--cream-muted);
     }
     .nb-picker-row-delete {
@@ -4850,7 +4918,7 @@
       display: flex; flex-direction: column; gap: 2px;
     }
     .multinote-row-preview {
-      font-family: 'EB Garamond', serif; font-size: 0.92rem;
+      font-family: var(--font-body); font-size: 0.92rem;
       color: var(--cream);
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden;
@@ -4910,7 +4978,7 @@
       color: var(--cream-muted);
     }
     .link-row-side-preview {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.85rem; color: var(--cream-muted);
       line-height: 1.4;
       display: -webkit-box; -webkit-line-clamp: 2;
@@ -4959,7 +5027,7 @@
     }
     .links-broken-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
     .links-broken-text {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.92rem; color: var(--cream-muted); line-height: 1.45;
     }
     /* Link action sheet (long-press) */
@@ -5046,7 +5114,7 @@
       color: var(--gold-dim); margin-bottom: 4px;
     }
     .bkm-create-excerpt {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.94rem; color: var(--cream-muted);
       line-height: 1.45;
       padding: 8px 12px; margin-bottom: 18px;
@@ -5069,7 +5137,7 @@
       background: var(--bg2); color: var(--cream);
       border: 1px solid var(--gold-border); border-radius: 8px;
       padding: 10px 12px;
-      font-family: 'EB Garamond', serif;
+      font-family: var(--font-body);
       outline: none; transition: border-color 0.15s;
     }
     .bkm-create-label-input { font-size: 1rem; }
@@ -5174,7 +5242,7 @@
       color: var(--gold);
     }
     .bkm-row-label {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.97rem; color: var(--cream-dim);
       line-height: 1.3; white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis;
@@ -5185,7 +5253,7 @@
        the expanded mode drops the ellipsis and wraps. */
     .bkm-row-thought {
       display: block;
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.82rem; color: var(--cream-muted);
       line-height: 1.35; white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis;
@@ -5221,7 +5289,7 @@
     .bkm-row-edit-input {
       width: 100%; background: var(--bg3);
       border: 1px solid var(--gold-border); border-radius: 6px;
-      color: var(--cream-dim); font-family: 'EB Garamond', serif;
+      color: var(--cream-dim); font-family: var(--font-body);
       font-size: 0.97rem; padding: 4px 8px;
       outline: none;
     }
@@ -5260,7 +5328,7 @@
     }
     .bkm-popover-item:last-child { border-bottom: none; }
     .bkm-popover-label {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.93rem; color: var(--cream-dim);
       padding: 10px 12px 6px; line-height: 1.3;
     }
@@ -5291,7 +5359,7 @@
        Italic Garamond, dim, gold-bordered left rail to distinguish from
        the auto-derived label above. */
     .bkm-popover-thought {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.85rem; color: var(--cream-muted);
       padding: 4px 12px 8px 14px; margin: 0 8px 6px;
       border-left: 2px solid var(--gold-faint);
@@ -5306,7 +5374,7 @@
       background: var(--bg2); color: var(--cream-dim);
       border: 1px solid var(--gold-border); border-radius: 6px;
       padding: 8px 10px;
-      font-family: 'EB Garamond', serif; font-size: 0.9rem;
+      font-family: var(--font-body); font-size: 0.9rem;
       line-height: 1.35;
       outline: none;
     }
@@ -5391,12 +5459,12 @@
       color: var(--gold-dim);
     }
     .navpick-context-source {
-      font-family: 'EB Garamond', serif; font-size: 0.98rem;
+      font-family: var(--font-body); font-size: 0.98rem;
       color: var(--cream);
     }
     body.light .navpick-context-source { color: var(--input-text); }
     .navpick-context-excerpt {
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.88rem; color: var(--cream-muted); line-height: 1.4;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden;
@@ -5415,7 +5483,7 @@
     .navpick-success-check { width: 18px; height: 18px; color: #4caf50; flex-shrink: 0; }
     .navpick-success-text {
       flex: 1; min-width: 0;
-      font-family: 'EB Garamond', serif; font-size: 0.95rem;
+      font-family: var(--font-body); font-size: 0.95rem;
       color: var(--cream);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
@@ -5438,7 +5506,7 @@
     .picker-breadcrumb {
       flex-shrink: 0;
       padding: 9px 22px 11px;
-      font-family: 'EB Garamond', serif; font-style: italic;
+      font-family: var(--font-body); font-style: italic;
       font-size: 0.9rem; color: var(--cream-muted);
       border-bottom: 1px solid rgba(110,98,76,0.10);
     }

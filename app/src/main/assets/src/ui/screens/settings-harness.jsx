@@ -26,12 +26,14 @@
    is what lets it live outside the test-file glob. Callers pass their own
    spies as props to renderSettings. */
 
-import { render } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { SettingsScreen } from './SettingsScreen.jsx';
 import { SettingsRow } from '../components/SettingsRow.jsx';
 import { SelectField } from '../components/SelectField.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import { ClearProgressRow } from '../components/ClearProgressRow.jsx';
+import { FontPickerRow } from '../components/FontPickerRow.jsx';
+import { READING_FONTS, readingFontById } from '../../utils/reading-fonts.js';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
 import { clampLpm } from '../../hooks/use-autoscroll.js';
@@ -64,6 +66,14 @@ export function setupSettingsGlobals(overrides = {}) {
   put('ClearProgressRow', ClearProgressRow);
   put('clampLpm', clampLpm);
   put('clampEndDwell', clampEndDwell);
+  // Reading Font picker — real component + real registry; the two ASYNC
+  // loader fns are stubbed at the far boundary (Cache Storage + FontFace
+  // don't exist in jsdom). Built-ins report cached; downloads resolve.
+  put('FontPickerRow', FontPickerRow);
+  put('READING_FONTS', READING_FONTS);
+  put('readingFontById', readingFontById);
+  put('ensureReadingFont', () => Promise.resolve(true));
+  put('isReadingFontCached', (def) => Promise.resolve(!def || !def.files));
 
   // Chrome the screen renders around its cards.
   put('ScreenLayout', ({ children, navChildren }) => (
@@ -139,12 +149,29 @@ export function teardownSettingsGlobals() {
 
 const DEFAULTS = { translation: 'nkjv', fontScale: '1', arrowLayout: 'split', scriptureLayout: 'genre' };
 
+/** Every accordion group header currently rendered. */
+export const groupHeads = () => [...document.querySelectorAll('.settings-group-head')];
+
+/** The group header whose label matches, or undefined. */
+export const groupHead = (label) => groupHeads()
+  .find((h) => { const l = h.querySelector('.settings-section-label'); return l && l.textContent.trim() === label; });
+
+/** Open every collapsed group (the redesign mounts group bodies lazily). */
+export function expandAllGroups() {
+  for (const head of groupHeads()) {
+    if (head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
+  }
+}
+
 /**
  * Mount SettingsScreen with `settings` merged over sane defaults. Pass
  * `onSetting` / `onToggle` (your own spies) via `props` to assert writes.
+ * Groups default COLLAPSED in production (redesign 2026-07-31); this
+ * helper expands them all post-render so row-level assertions keep
+ * working — pass `{ expandGroups: false }` to test the collapsed state.
  */
-export function renderSettings(settings = {}, props = {}) {
-  return render(
+export function renderSettings(settings = {}, props = {}, { expandGroups = true } = {}) {
+  const result = render(
     <SettingsScreen
       settings={{ ...DEFAULTS, ...settings }}
       onToggle={() => {}}
@@ -162,6 +189,8 @@ export function renderSettings(settings = {}, props = {}) {
       {...props}
     />
   );
+  if (expandGroups) expandAllGroups();
+  return result;
 }
 
 /** Labels of every settings row currently MOUNTED. */
