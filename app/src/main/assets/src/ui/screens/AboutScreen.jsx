@@ -29,10 +29,10 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                 <h1 className="about-heading">About VOTReader</h1>
                 <div className="about-body">
                   <p>The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</p>
-                  <p>This reader was made by a disciple for personal study and reflection. It is not the canonical source.</p>
-                  <p>Your notes, journal, and highlights stay on this device. Use Settings → Export to save them to a file you control.</p>
+                  <p>This reader was made by a disciple for personal study; it is not the canonical source.</p>
+                  <p>Your notes, journal, and highlights stay on this device — use Settings → Export to back them up.</p>
                   <p>
-                    For the canonical text, audio, video, and PDF files, visit{" "}
+                    For the canonical text, audio, video, and PDFs, visit{" "}
                     <a href="https://www.thevolumesoftruth.com" target="_blank" rel="noopener noreferrer"><em>thevolumesoftruth.com</em></a>
                     .
                   </p>
