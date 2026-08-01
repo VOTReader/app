@@ -509,13 +509,20 @@ describe('Reading Font picker wiring', () => {
     expect(row('Reading Font')).toBeTruthy();
   });
 
+  it('is a dropdown: the trigger opens the standard select sheet with all fonts', () => {
+    renderSettings({ fontStyle: 'classic' });
+    expect(document.querySelector('.select-sheet')).toBeNull();
+    fireEvent.click(within(row('Reading Font')).getByText('System Serif'));
+    expect(document.querySelector('.select-sheet')).toBeTruthy();
+    expect(document.querySelectorAll('.select-sheet-option').length).toBeGreaterThan(10);
+  });
+
   it('selecting a built-in font writes settings.fontStyle through onSetting', async () => {
     const onSetting = vi.fn();
     renderSettings({ fontStyle: 'classic' }, { onSetting });
-    fireEvent.click(within(row('Reading Font')).getByRole('button', { name: /Reading Font/ }));
-    const chips = [...document.querySelectorAll('.font-chip')];
-    expect(chips.length).toBeGreaterThan(10);
-    const eb = chips.find((c) => c.querySelector('.font-chip-name').textContent === 'EB Garamond');
+    fireEvent.click(within(row('Reading Font')).getByText('System Serif'));
+    const eb = [...document.querySelectorAll('.select-sheet-option')]
+      .find((o) => o.querySelector('.select-sheet-option-label').textContent === 'EB Garamond');
     fireEvent.click(eb);
     await vi.waitFor(() => expect(onSetting).toHaveBeenCalledWith('fontStyle', 'modern'));
   });

@@ -1,24 +1,27 @@
 // @ts-nocheck — installs free-var globals + DOM-node style reads (the
 // SettingsScreen.test.jsx precedent for classic-script-seam tests).
-/* FontPickerRow tests — the Reading Font picker's contract.
+/* FontPickerRow tests — the Reading Font dropdown's contract.
    ─────────────────────────────────────────────────────────────────────────
    What we lock down:
-     A) Collapsed by default; the head names the CURRENT font and expands
-        to the full registry grid.
-     B) Selecting a built-in (or already-downloaded) font applies straight
+     A) It IS a SelectField dropdown (owner call 2026-07-31): a compact row
+        whose trigger opens the standard bottom sheet — no inline grid.
+     B) Every option's name renders in its preview family ('p-<id>'), with
+        a right-aligned status (Built in / Downloaded / ~KB).
+     C) Selecting a built-in (or already-downloaded) font applies straight
         through ensureReadingFont → onSelect. No confirm.
-     C) Selecting an UN-downloaded font asks first — a size-labeled
-        ConfirmStrip — and applies only on confirm; Cancel applies nothing.
-     D) A failed download leaves the setting UNCHANGED and shows a toast.
-     E) Every chip name carries its preview font-family ('p-<id>').
+     D) Selecting an UN-downloaded font closes the sheet and asks below the
+        row — a size-labeled ConfirmStrip — applying only on confirm;
+        Cancel applies nothing.
+     E) A failed download leaves the setting UNCHANGED and shows a toast.
 
    FontPickerRow resolves its deps as free-var globals (the SettingsScreen
    classic-script seam): READING_FONTS, readingFontById, ensureReadingFont,
-   isReadingFontCached, ConfirmStrip, showToast. Installed per-test. */
+   isReadingFontCached, SelectField, ConfirmStrip, showToast. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { FontPickerRow } from './FontPickerRow.jsx';
+import { SelectField } from './SelectField.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { READING_FONTS, readingFontById } from '../../utils/reading-fonts.js';
 
@@ -34,6 +37,7 @@ beforeEach(() => {
   put('readingFontById', readingFontById);
   put('ensureReadingFont', ensureSpy);
   put('isReadingFontCached', (def) => Promise.resolve(!def || !def.files));
+  put('SelectField', SelectField);
   put('ConfirmStrip', ConfirmStrip);
   put('showToast', toastSpy);
 });
@@ -45,65 +49,72 @@ afterEach(() => {
 const mount = (value = 'classic', onSelect = () => {}) =>
   render(<FontPickerRow value={value} onSelect={onSelect} />);
 
-const openGrid = () => fireEvent.click(screen.getByRole('button', { name: /Reading Font/ }));
-const chip = (label) => [...document.querySelectorAll('.font-chip')]
-  .find((c) => c.querySelector('.font-chip-name').textContent.trim() === label);
+const openSheet = () => fireEvent.click(document.querySelector('.settings-select-trigger'));
+const sheet = () => document.querySelector('.select-sheet');
+const option = (label) => [...document.querySelectorAll('.select-sheet-option')]
+  .find((o) => o.querySelector('.select-sheet-option-label').textContent.trim() === label);
 
-describe('FontPickerRow', () => {
-  it('collapsed by default; head shows the current font in its preview family', () => {
+describe('FontPickerRow (SelectField dropdown)', () => {
+  it('renders as a closed dropdown row; the trigger shows the current font in its preview family', () => {
     mount('modern');
-    expect(document.querySelector('.font-picker-grid')).toBeNull();
-    const current = document.querySelector('.font-picker-current');
-    expect(current.textContent).toBe('EB Garamond');
-    expect(current.style.fontFamily).toContain('p-modern');
+    expect(sheet()).toBeNull();
+    const value = document.querySelector('.settings-row-value');
+    expect(value.textContent).toBe('EB Garamond');
+    expect(value.style.fontFamily).toContain('p-modern');
+    expect(document.querySelector('.settings-row-label').textContent).toBe('Reading Font');
   });
 
   it('a corrupt persisted id degrades to System Serif instead of crashing', () => {
     mount('not-a-font');
-    expect(document.querySelector('.font-picker-current').textContent).toBe('System Serif');
+    expect(document.querySelector('.settings-row-value').textContent).toBe('System Serif');
   });
 
-  it('expanding renders one chip per registry font, named in its own preview font', () => {
+  it('the trigger opens the standard sheet with one option per registry font, named in its own preview font', () => {
     mount();
-    openGrid();
-    const chips = [...document.querySelectorAll('.font-chip')];
-    expect(chips.length).toBe(READING_FONTS.length);
+    openSheet();
+    expect(sheet()).toBeTruthy();
+    const opts = [...document.querySelectorAll('.select-sheet-option')];
+    expect(opts.length).toBe(READING_FONTS.length);
     for (const def of READING_FONTS) {
-      const c = chip(def.label);
-      expect(c).toBeTruthy();
-      const name = c.querySelector('.font-chip-name');
+      const o = option(def.label);
+      expect(o).toBeTruthy();
+      const name = o.querySelector('.select-sheet-option-label');
       expect(name.style.fontFamily).toContain(def.id === 'classic' ? 'serif' : `p-${def.id}`);
+      expect(o.querySelector('.select-sheet-option-desc').textContent).toBe(def.sub);
     }
   });
 
-  it('marks the active font and shows a size hint on un-downloaded ones', async () => {
+  it('marks the active font selected and shows a size status on un-downloaded ones', async () => {
     mount('classic');
-    openGrid();
-    expect(chip('System Serif').querySelector('.font-chip-status').textContent).toBe('✓ Active');
+    openSheet();
+    expect(option('System Serif').className).toContain('selected');
+    expect(option('System Serif').querySelector('.select-sheet-option-check')).toBeTruthy();
+    expect(option('System Serif').querySelector('.select-sheet-option-meta').textContent).toBe('Built in');
     const lora = readingFontById('lora');
     await waitFor(() =>
-      expect(chip('Lora').querySelector('.font-chip-status').textContent).toBe(`~${lora.kb} KB`));
+      expect(option('Lora').querySelector('.select-sheet-option-meta').textContent).toBe(`~${lora.kb} KB`));
   });
 
-  it('built-in select applies immediately — no confirm', async () => {
+  it('built-in select applies immediately and closes the sheet — no confirm', async () => {
     const onSelect = vi.fn();
     mount('classic', onSelect);
-    openGrid();
-    fireEvent.click(chip('EB Garamond'));
+    openSheet();
+    fireEvent.click(option('EB Garamond'));
+    expect(sheet()).toBeNull();
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith('modern'));
-    expect(document.querySelector('.confirm-strip, [class*="confirm"]')?.textContent || '').not.toContain('Download');
+    expect(screen.queryByText(/Download/)).toBeNull();
   });
 
-  it('un-downloaded font asks with the size, applies only on Download', async () => {
+  it('un-downloaded font closes the sheet and asks with the size; applies only on Download', async () => {
     const onSelect = vi.fn();
     mount('classic', onSelect);
-    openGrid();
-    fireEvent.click(chip('Lora'));
+    openSheet();
+    fireEvent.click(option('Lora'));
+    expect(sheet()).toBeNull();
     // Nothing applied yet — the confirm is the gate.
     expect(ensureSpy).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
-    const q = await screen.findByText(/Download Lora \(~77 KB\)/);
-    expect(q).toBeTruthy();
+    await screen.findByText(/Download Lora \(~77 KB\)/);
     fireEvent.click(screen.getByText('Download'));
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith('lora'));
     expect(ensureSpy).toHaveBeenCalledWith(readingFontById('lora'));
@@ -112,8 +123,8 @@ describe('FontPickerRow', () => {
   it('Cancel on the confirm applies nothing', async () => {
     const onSelect = vi.fn();
     mount('classic', onSelect);
-    openGrid();
-    fireEvent.click(chip('Literata'));
+    openSheet();
+    fireEvent.click(option('Literata'));
     await screen.findByText(/Download Literata/);
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByText(/Download Literata/)).toBeNull();
@@ -125,31 +136,44 @@ describe('FontPickerRow', () => {
     ensureSpy.mockImplementation(() => Promise.reject(new Error('offline')));
     const onSelect = vi.fn();
     mount('classic', onSelect);
-    openGrid();
-    fireEvent.click(chip('Lora'));
+    openSheet();
+    fireEvent.click(option('Lora'));
     fireEvent.click(await screen.findByText('Download'));
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('Could not download Lora') })));
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('shows a Downloading status line while the confirmed fetch runs', async () => {
+    let resolveEnsure;
+    ensureSpy.mockImplementation(() => new Promise((r) => { resolveEnsure = r; }));
+    mount('classic');
+    openSheet();
+    fireEvent.click(option('Lora'));
+    fireEvent.click(await screen.findByText('Download'));
+    await screen.findByText('Downloading Lora…');
+    resolveEnsure(true);
+    await waitFor(() => expect(screen.queryByText('Downloading Lora…')).toBeNull());
+  });
+
   it('an already-downloaded font applies without re-asking', async () => {
     put('isReadingFontCached', () => Promise.resolve(true)); // everything cached
     const onSelect = vi.fn();
     mount('classic', onSelect);
-    openGrid();
+    await waitFor(() => expect(onSelect).not.toHaveBeenCalled()); // let the probe land
+    openSheet();
     await waitFor(() =>
-      expect(chip('Lora').querySelector('.font-chip-status').textContent).toBe('Downloaded'));
-    fireEvent.click(chip('Lora'));
+      expect(option('Lora').querySelector('.select-sheet-option-meta').textContent).toBe('Downloaded'));
+    fireEvent.click(option('Lora'));
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith('lora'));
     expect(screen.queryByText(/Download Lora/)).toBeNull();
   });
 
-  it('tapping the ACTIVE font is a no-op', async () => {
+  it('re-selecting the ACTIVE font is a no-op', async () => {
     const onSelect = vi.fn();
     mount('modern', onSelect);
-    openGrid();
-    fireEvent.click(chip('EB Garamond'));
+    openSheet();
+    fireEvent.click(option('EB Garamond'));
     await Promise.resolve();
     expect(onSelect).not.toHaveBeenCalled();
     expect(ensureSpy).not.toHaveBeenCalled();

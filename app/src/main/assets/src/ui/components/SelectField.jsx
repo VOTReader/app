@@ -2,7 +2,13 @@
    SelectField — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function SelectField({ eyebrow, title, label, desc, value, options, onChange }) {
+/* Options are { id, label, desc? } plus two optional presentation fields
+   added for the Reading Font picker (2026-07-31), ignored elsewhere:
+   - labelStyle: inline style for the option's label span (the font picker
+     renders each font's NAME in that font via its preview family);
+   - meta: small right-aligned status text ("Built in" / "~77 KB" / …).
+   `valueStyle` does the same for the closed row's current-value span. */
+export function SelectField({ eyebrow, title, label, desc, value, options, onChange, valueStyle = null }) {
   const [open, setOpen] = React.useState(false);
   const [showDesc, setShowDesc] = React.useState(false);
   const selected = options.find((o) => o.id === value) || options[0];
@@ -29,7 +35,7 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
         )}
         <span className="settings-row-grow" />
         <button type="button" className="settings-select-trigger" onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
-          <span className="settings-row-value">{selected.label}</span>
+          <span className="settings-row-value" style={valueStyle}>{selected.label}</span>
           <span className="settings-select-chev">{"›"}</span>
         </button>
       </div>
@@ -56,7 +62,8 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
                     onClick={() => { onChange(opt.id); setOpen(false); }}
                   >
                     <div className="select-sheet-option-main">
-                      <span className="select-sheet-option-label">{opt.label}</span>
+                      <span className="select-sheet-option-label" style={opt.labelStyle}>{opt.label}</span>
+                      {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
                       {isSelected ? <span className="select-sheet-option-check">{"✓"}</span> : null}
                     </div>
                     {opt.desc ? <div className="select-sheet-option-desc">{opt.desc}</div> : null}
