@@ -1,19 +1,29 @@
-// @ts-nocheck — stubs runtime globals (caches/FontFace/fetch/document.fonts)
-// whose lib.dom types fight the fakes; assertions carry the contract.
-/* reading-fonts tests — the registry contract + the download/cache loader.
+// @ts-nocheck — fs-based sync gates read repo files relative to this test.
+/* reading-fonts tests — the registry contract + the three-way sync gate.
    ─────────────────────────────────────────────────────────────────────────
-   Registry: every id the Settings picker can persist into
-   settings.fontStyle must stay well-formed forever (ids are stored in
-   backups — a rename would orphan users' choices), and every remote file
-   must be an https fontsource URL (the CSP connect-src allowlists exactly
-   that host). Loader: cache-first, fetch-once, all-files-or-nothing, and
-   a clean false (not a throw) when the runtime lacks the font APIs. */
+   Registry: every id the Settings picker can persist into settings.fontStyle
+   must stay well-formed forever (ids are stored in backups — a rename would
+   orphan users' choices), classic/modern keep their historical spots, and
+   the LIST ORDER is the picker order (owner call: scripture-and-classic
+   faces first, sans last).
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  READING_FONTS, READING_FONT_CACHE, readingFontById, readingFontCss,
-  ensureReadingFont, isReadingFontCached,
-} from './reading-fonts.js';
+   Sync gate: all fonts are vendored (2026-07-31 owner call — no CDN, no
+   download step), which puts three artifacts at risk of drifting apart:
+   the registry's `faces`, the files on disk in fonts/reading/, the
+   @font-face block in app.css, and the SW's stable-cache precache list.
+   Each is asserted against the registry here — a font added or renamed in
+   one place fails until all four agree. */
+
+import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { READING_FONTS, readingFontById, readingFontCss } from './reading-fonts.js';
+
+const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const READING_DIR = join(ASSETS, 'fonts', 'reading');
+const APP_CSS = readFileSync(join(ASSETS, 'app.css'), 'utf8');
+const SW = readFileSync(join(ASSETS, 'service-worker.js'), 'utf8');
 
 describe('READING_FONTS registry', () => {
   it('ids are unique and kebab-case', () => {
@@ -22,31 +32,35 @@ describe('READING_FONTS registry', () => {
     for (const id of ids) expect(id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
   });
 
-  it('keeps the two historical built-ins, first, with no files', () => {
+  it('keeps the two historical built-ins first, with no faces', () => {
     expect(READING_FONTS[0].id).toBe('classic');
     expect(READING_FONTS[1].id).toBe('modern');
-    expect(READING_FONTS[0].files).toBeNull();
-    expect(READING_FONTS[1].files).toBeNull();
+    expect(READING_FONTS[0].faces).toEqual([]);
+    expect(READING_FONTS[1].faces).toEqual([]);
   });
 
-  it('offers a real menu of downloadable fonts', () => {
-    const remote = READING_FONTS.filter((f) => f.files);
-    expect(remote.length).toBeGreaterThanOrEqual(12);
-    for (const f of remote) {
-      expect(f.kb).toBeGreaterThan(0);
-      expect(f.files.length).toBeGreaterThan(0);
+  it('orders scripture-and-classic faces to the top and the sans to the bottom', () => {
+    const ids = READING_FONTS.map((f) => f.id);
+    // The scripture block leads right after the built-ins…
+    expect(ids.slice(2, 6)).toEqual(['cormorant-garamond', 'cardo', 'gentium-book-plus', 'rosarivo']);
+    // …and the two readability sans close the list.
+    expect(ids.slice(-2)).toEqual(['atkinson-hyperlegible', 'lexend']);
+  });
+
+  it('offers a real menu of vendored fonts', () => {
+    const vendored = READING_FONTS.filter((f) => f.faces.length);
+    expect(vendored.length).toBeGreaterThanOrEqual(20);
+    for (const f of vendored) {
       expect(f.family).toBeTruthy();
-      // css quotes the family and ends in a generic fallback.
       expect(f.css).toContain(`'${f.family}'`);
       expect(f.css).toMatch(/, (serif|sans-serif)$/);
-      for (const file of f.files) {
-        expect(file.url).toMatch(/^https:\/\/cdn\.jsdelivr\.net\/fontsource\/fonts\//);
-        expect(file.url).toMatch(/\.woff2$/);
-        expect(file.weight).toMatch(/^\d+( \d+)?$/);
-        expect(['normal', 'italic']).toContain(file.style);
+      expect(f.sub.length).toBeGreaterThan(0);
+      // Exactly one regular face minimum; every face is this font's file.
+      expect(f.faces.some((file) => file.includes('-normal'))).toBe(true);
+      for (const file of f.faces) {
+        expect(file.startsWith(f.id + '-latin-')).toBe(true);
+        expect(file).toMatch(/\.woff2$/);
       }
-      // Exactly one regular face to build previews/synthesis from.
-      expect(f.files.filter((x) => x.style === 'normal').length).toBeGreaterThanOrEqual(1);
     }
   });
 
@@ -61,116 +75,42 @@ describe('READING_FONTS registry', () => {
     expect(readingFontCss('some-future-font')).toBe("'EB Garamond', serif");
     expect(readingFontCss(undefined)).toBe("'EB Garamond', serif");
     expect(readingFontCss('lora')).toBe("'Lora', serif");
+    expect(readingFontCss('cormorant-garamond')).toBe("'Cormorant Garamond', serif");
   });
 });
 
-/* ── Loader ─────────────────────────────────────────────────────────────
-   jsdom has neither CacheStorage, FontFace, nor document.fonts — install
-   minimal fakes. Synthetic defs (never registry ids) keep the module-level
-   loaded-set from leaking state between tests. */
+describe('registry ↔ disk ↔ app.css ↔ service-worker sync', () => {
+  const allFaces = READING_FONTS.flatMap((f) => f.faces);
 
-let defSeq = 0;
-const makeDef = (files) => ({
-  id: `test-font-${++defSeq}`, label: 'T', family: 'TestFam',
-  css: "'TestFam', serif", kb: 10, sub: '', files,
-});
-const file = (url) => ({ url, weight: '400', style: 'normal' });
-
-function makeFakeCache() {
-  const store = new Map();
-  return {
-    store,
-    match: vi.fn(async (url) => store.get(url) || undefined),
-    put: vi.fn(async (url, res) => { store.set(url, res); }),
-  };
-}
-const fakeResponse = () => ({
-  ok: true,
-  clone() { return fakeResponse(); },
-  arrayBuffer: async () => new ArrayBuffer(8),
-});
-
-describe('ensureReadingFont / isReadingFontCached', () => {
-  let cache, added;
-
-  beforeEach(() => {
-    cache = makeFakeCache();
-    added = [];
-    vi.stubGlobal('caches', { open: vi.fn(async () => cache) });
-    vi.stubGlobal('FontFace', class {
-      constructor(family, buf, desc) { this.family = family; this.desc = desc; }
-    });
-    Object.defineProperty(document, 'fonts', {
-      configurable: true,
-      value: { add: (f) => added.push(f) },
-    });
-    vi.stubGlobal('fetch', vi.fn(async () => fakeResponse()));
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    delete document.fonts;
+  it('every registry face exists on disk, and no stray files exist', () => {
+    const onDisk = readdirSync(READING_DIR).filter((f) => f.endsWith('.woff2'));
+    expect(new Set(onDisk)).toEqual(new Set(allFaces));
   });
 
-  it('built-ins resolve true without touching any API', async () => {
-    await expect(ensureReadingFont(readingFontById('classic'))).resolves.toBe(true);
-    await expect(ensureReadingFont(readingFontById('modern'))).resolves.toBe(true);
-    await expect(ensureReadingFont(undefined)).resolves.toBe(true);
-    expect(fetch).not.toHaveBeenCalled();
+  it('every face has an app.css @font-face under its font family', () => {
+    for (const f of READING_FONTS) {
+      if (!f.faces.length) continue;
+      for (const file of f.faces) {
+        const line = APP_CSS.split('\n').find((l) => l.includes(`fonts/reading/${file}`));
+        expect(line, `app.css @font-face missing for ${file}`).toBeTruthy();
+        expect(line).toContain(`font-family: '${f.family}'`);
+        expect(line).toContain('font-display: swap');
+        // Variable files carry the full axis; static files their exact weight.
+        if (file.includes('-wght-')) expect(line).toContain('font-weight: 100 900');
+        expect(line).toContain(file.includes('-italic') ? 'font-style: italic' : 'font-style: normal');
+      }
+    }
   });
 
-  it('fetches uncached files ONCE, caches them, and registers every face', async () => {
-    const def = makeDef([file('https://x/a.woff2'), file('https://x/b.woff2')]);
-    await expect(ensureReadingFont(def)).resolves.toBe(true);
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(cache.put).toHaveBeenCalledTimes(2);
-    expect(added.length).toBe(2);
-    expect(added[0].family).toBe('TestFam');
-    // Second ensure: the in-memory loaded set short-circuits everything.
-    await ensureReadingFont(def);
-    expect(fetch).toHaveBeenCalledTimes(2);
+  it('the license file rides along with the vendored fonts', () => {
+    expect(readdirSync(READING_DIR)).toContain('OFL-reading-fonts.txt');
   });
 
-  it('serves from the cache without fetching', async () => {
-    const def = makeDef([file('https://x/c.woff2')]);
-    cache.store.set('https://x/c.woff2', fakeResponse());
-    await expect(ensureReadingFont(def)).resolves.toBe(true);
-    expect(fetch).not.toHaveBeenCalled();
-    expect(added.length).toBe(1);
-  });
-
-  it('REJECTS on a failed fetch and registers no face (all-or-nothing)', async () => {
-    fetch.mockImplementation(async (url) =>
-      url.endsWith('bad.woff2') ? { ok: false, status: 404 } : fakeResponse());
-    const def = makeDef([file('https://x/good.woff2'), file('https://x/bad.woff2')]);
-    await expect(ensureReadingFont(def)).rejects.toThrow('font fetch failed');
-    expect(added.length).toBe(0);
-    // A retry can still succeed (nothing latched as loaded).
-    fetch.mockImplementation(async () => fakeResponse());
-    await expect(ensureReadingFont(def)).resolves.toBe(true);
-    expect(added.length).toBe(2);
-  });
-
-  it('returns false (no throw) when the font APIs are missing', async () => {
-    vi.stubGlobal('FontFace', undefined);
-    const def = makeDef([file('https://x/d.woff2')]);
-    await expect(ensureReadingFont(def)).resolves.toBe(false);
-  });
-
-  it('isReadingFontCached: true only when EVERY file is present', async () => {
-    const def = makeDef([file('https://x/e.woff2'), file('https://x/f.woff2')]);
-    await expect(isReadingFontCached(def)).resolves.toBe(false);
-    cache.store.set('https://x/e.woff2', fakeResponse());
-    await expect(isReadingFontCached(def)).resolves.toBe(false);
-    cache.store.set('https://x/f.woff2', fakeResponse());
-    await expect(isReadingFontCached(def)).resolves.toBe(true);
-    // Built-ins are always "cached".
-    await expect(isReadingFontCached(readingFontById('modern'))).resolves.toBe(true);
-  });
-
-  it('uses the dedicated vot-fonts bucket, not the SW caches', async () => {
-    const def = makeDef([file('https://x/g.woff2')]);
-    await ensureReadingFont(def);
-    expect(caches.open).toHaveBeenCalledWith(READING_FONT_CACHE);
-    expect(READING_FONT_CACHE).toBe('vot-fonts-v1');
+  it('the service worker precaches every face into the stable cache', () => {
+    for (const file of allFaces) {
+      expect(SW, `SW precache missing ${file}`).toContain(`'./fonts/reading/${file}'`);
+    }
+    // …and routes the directory corpusFirst so fonts survive version bumps.
+    expect(SW).toContain("url.pathname.includes('/fonts/reading/')");
   });
 });

@@ -66,14 +66,11 @@ export function setupSettingsGlobals(overrides = {}) {
   put('ClearProgressRow', ClearProgressRow);
   put('clampLpm', clampLpm);
   put('clampEndDwell', clampEndDwell);
-  // Reading Font picker — real component + real registry; the two ASYNC
-  // loader fns are stubbed at the far boundary (Cache Storage + FontFace
-  // don't exist in jsdom). Built-ins report cached; downloads resolve.
+  // Reading Font picker — real component + real registry (all fonts are
+  // vendored + @font-face'd, so there is no loader boundary to stub).
   put('FontPickerRow', FontPickerRow);
   put('READING_FONTS', READING_FONTS);
   put('readingFontById', readingFontById);
-  put('ensureReadingFont', () => Promise.resolve(true));
-  put('isReadingFontCached', (def) => Promise.resolve(!def || !def.files));
 
   // Chrome the screen renders around its cards.
   put('ScreenLayout', ({ children, navChildren }) => (

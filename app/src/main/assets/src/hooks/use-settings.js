@@ -48,7 +48,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { PlatformBridge } from '../utils/platform-bridge.js';
-import { readingFontById, readingFontCss, ensureReadingFont } from '../utils/reading-fonts.js';
+import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
 
 /**
  * Settings object shape. Fields with stable defaults documented inline at
@@ -176,23 +176,15 @@ export function useSettings({ savedSettings, theme }) {
     // disables the #custom-fonts @font-face block so every font-family in
     // app.css falls back to system serif — the pre-existing behavior. Any
     // OTHER choice keeps the block enabled (Cinzel chrome + EB Garamond
-    // fallback) and routes the body text through the --font-body var; a
-    // downloadable font is additionally ensured into document.fonts from
-    // the vot-fonts cache (async — text renders in the fallback serif for
-    // the moment the cache read takes, same class of swap as
-    // font-display:swap). An unknown id (forward-compat backup import)
-    // degrades to the classic look via readingFontCss's fallback.
+    // fallback) and routes the body text through the --font-body var; the
+    // reading fonts themselves are all vendored + @font-face'd in app.css
+    // (fonts/reading/), so the browser lazily fetches exactly the chosen
+    // one. An unknown id (forward-compat backup import) degrades to the
+    // classic look via readingFontCss's fallback.
     const fontDef = readingFontById(settings.fontStyle);
     const customFontsEl = /** @type {HTMLStyleElement | null} */ (document.getElementById("custom-fonts"));
     if (customFontsEl) customFontsEl.disabled = !fontDef || fontDef.id === "classic";
     document.documentElement.style.setProperty("--font-body", readingFontCss(settings.fontStyle));
-    if (fontDef && fontDef.files) {
-      // Fire-and-forget: the picker owns download UX + failure messaging;
-      // this boot-path ensure only re-attaches an already-cached font. If
-      // the cache was cleared AND we're offline, the reject lands here —
-      // body text stays on the fallback serif, which is the honest state.
-      ensureReadingFont(fontDef).catch((e) => console.warn("reading font unavailable", e));
-    }
     // WL1/Session-4 — text-size scale. Mirror settings.fontScale onto the
     // --font-scale CSS var on <html>; app.css multiplies it into the root
     // font-size so all rem/em sizing scales (chrome is px-pinned — see the

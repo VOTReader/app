@@ -220,31 +220,75 @@
         color: #5a5040; border-color: rgba(90,69,32,0.2);
       }
 
-      /* ── Reading Font PREVIEW subsets (2026-07-31) ─────────────────────
-         Each is a ~2–4 KB name-glyph-only WOFF2 (tools/gen-font-previews.mjs)
-         so the Settings picker renders every font's NAME in that font
-         without shipping the full files. Browsers fetch an @font-face file
-         only when its family is actually used, so these cost nothing until
-         the picker opens. Paths are ../ because this file is served as
+      /* ── Reading Fonts — vendored, all-local (2026-07-31 owner call) ───
+         Every Reading Font ships in the app under fonts/reading/ (~1.7 MB,
+         tools/gen-reading-fonts.mjs — regenerate, never hand-edit) and is
+         declared here. Browsers fetch an @font-face file only when its
+         family is actually USED, so unchosen fonts cost nothing at
+         runtime; the SW serves fonts/reading/ from the stable corpus
+         cache for offline. Paths are ../ because this file is served as
          dist/app.min.css (build:css minifies in place, no url rebasing).
-         The FULL fonts are NOT @font-face'd anywhere: they arrive as
-         FontFace objects from src/utils/reading-fonts.js. */
-      @font-face { font-family: 'p-modern'; src: url('../fonts/previews/modern.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-lora'; src: url('../fonts/previews/lora.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-literata'; src: url('../fonts/previews/literata.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-merriweather'; src: url('../fonts/previews/merriweather.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-crimson-pro'; src: url('../fonts/previews/crimson-pro.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-source-serif-4'; src: url('../fonts/previews/source-serif-4.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-libre-baskerville'; src: url('../fonts/previews/libre-baskerville.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-cardo'; src: url('../fonts/previews/cardo.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-gentium-book-plus'; src: url('../fonts/previews/gentium-book-plus.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-noto-serif'; src: url('../fonts/previews/noto-serif.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-spectral'; src: url('../fonts/previews/spectral.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-vollkorn'; src: url('../fonts/previews/vollkorn.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-alegreya'; src: url('../fonts/previews/alegreya.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-bitter'; src: url('../fonts/previews/bitter.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-atkinson-hyperlegible'; src: url('../fonts/previews/atkinson-hyperlegible.woff2') format('woff2'); font-display: swap; }
-      @font-face { font-family: 'p-lexend'; src: url('../fonts/previews/lexend.woff2') format('woff2'); font-display: swap; }
+         These stay OUTSIDE #custom-fonts on purpose — the picker must
+         render every option's name in its font even in classic mode.
+         reading-fonts.test.js gates this block ↔ READING_FONTS ↔ disk. */
+      @font-face { font-family: 'Cormorant Garamond'; font-weight: 400; font-style: normal; src: url('../fonts/reading/cormorant-garamond-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Cormorant Garamond'; font-weight: 700; font-style: normal; src: url('../fonts/reading/cormorant-garamond-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Cormorant Garamond'; font-weight: 400; font-style: italic; src: url('../fonts/reading/cormorant-garamond-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Cardo'; font-weight: 400; font-style: normal; src: url('../fonts/reading/cardo-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Cardo'; font-weight: 700; font-style: normal; src: url('../fonts/reading/cardo-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Cardo'; font-weight: 400; font-style: italic; src: url('../fonts/reading/cardo-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Gentium Book Plus'; font-weight: 400; font-style: normal; src: url('../fonts/reading/gentium-book-plus-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Gentium Book Plus'; font-weight: 700; font-style: normal; src: url('../fonts/reading/gentium-book-plus-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Gentium Book Plus'; font-weight: 400; font-style: italic; src: url('../fonts/reading/gentium-book-plus-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Gentium Book Plus'; font-weight: 700; font-style: italic; src: url('../fonts/reading/gentium-book-plus-latin-700-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Rosarivo'; font-weight: 400; font-style: normal; src: url('../fonts/reading/rosarivo-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Rosarivo'; font-weight: 400; font-style: italic; src: url('../fonts/reading/rosarivo-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Crimson Pro'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/crimson-pro-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Crimson Pro'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/crimson-pro-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Sorts Mill Goudy'; font-weight: 400; font-style: normal; src: url('../fonts/reading/sorts-mill-goudy-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Sorts Mill Goudy'; font-weight: 400; font-style: italic; src: url('../fonts/reading/sorts-mill-goudy-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Old Standard TT'; font-weight: 400; font-style: normal; src: url('../fonts/reading/old-standard-tt-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Old Standard TT'; font-weight: 700; font-style: normal; src: url('../fonts/reading/old-standard-tt-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Old Standard TT'; font-weight: 400; font-style: italic; src: url('../fonts/reading/old-standard-tt-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'IM Fell English'; font-weight: 400; font-style: normal; src: url('../fonts/reading/im-fell-english-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'IM Fell English'; font-weight: 400; font-style: italic; src: url('../fonts/reading/im-fell-english-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Libre Baskerville'; font-weight: 400; font-style: normal; src: url('../fonts/reading/libre-baskerville-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Libre Baskerville'; font-weight: 700; font-style: normal; src: url('../fonts/reading/libre-baskerville-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Libre Baskerville'; font-weight: 400; font-style: italic; src: url('../fonts/reading/libre-baskerville-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Lora'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/lora-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Lora'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/lora-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Literata'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/literata-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Literata'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/literata-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Merriweather'; font-weight: 400; font-style: normal; src: url('../fonts/reading/merriweather-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Merriweather'; font-weight: 700; font-style: normal; src: url('../fonts/reading/merriweather-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Merriweather'; font-weight: 400; font-style: italic; src: url('../fonts/reading/merriweather-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Gelasio'; font-weight: 400; font-style: normal; src: url('../fonts/reading/gelasio-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Gelasio'; font-weight: 700; font-style: normal; src: url('../fonts/reading/gelasio-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Gelasio'; font-weight: 400; font-style: italic; src: url('../fonts/reading/gelasio-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Gelasio'; font-weight: 700; font-style: italic; src: url('../fonts/reading/gelasio-latin-700-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Source Serif 4'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/source-serif-4-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Source Serif 4'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/source-serif-4-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Noto Serif'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/noto-serif-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Noto Serif'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/noto-serif-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Spectral'; font-weight: 400; font-style: normal; src: url('../fonts/reading/spectral-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Spectral'; font-weight: 600; font-style: normal; src: url('../fonts/reading/spectral-latin-600-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Spectral'; font-weight: 400; font-style: italic; src: url('../fonts/reading/spectral-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Vollkorn'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/vollkorn-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Vollkorn'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/vollkorn-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Alegreya'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/alegreya-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Alegreya'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/alegreya-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Bitter'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/bitter-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Bitter'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/bitter-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Neuton'; font-weight: 400; font-style: normal; src: url('../fonts/reading/neuton-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Neuton'; font-weight: 700; font-style: normal; src: url('../fonts/reading/neuton-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Neuton'; font-weight: 400; font-style: italic; src: url('../fonts/reading/neuton-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Playfair Display'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/playfair-display-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Playfair Display'; font-weight: 100 900; font-style: italic; src: url('../fonts/reading/playfair-display-latin-wght-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 400; font-style: normal; src: url('../fonts/reading/atkinson-hyperlegible-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 700; font-style: normal; src: url('../fonts/reading/atkinson-hyperlegible-latin-700-normal.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 400; font-style: italic; src: url('../fonts/reading/atkinson-hyperlegible-latin-400-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Atkinson Hyperlegible'; font-weight: 700; font-style: italic; src: url('../fonts/reading/atkinson-hyperlegible-latin-700-italic.woff2') format('woff2'); font-display: swap; }
+      @font-face { font-family: 'Lexend'; font-weight: 100 900; font-style: normal; src: url('../fonts/reading/lexend-latin-wght-normal.woff2') format('woff2'); font-display: swap; }
 
       :root {
         --bg:          #000000;

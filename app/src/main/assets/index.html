@@ -47,7 +47,7 @@
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
-    connect-src 'self' https://cdn.jsdelivr.net;
+    connect-src 'self';
     media-src blob:;
     object-src 'none';
     frame-src 'none';
@@ -70,13 +70,13 @@
 
        DISABLED BY DEFAULT — system serif is the "System Serif" (classic)
        look users have always seen. Every OTHER Settings → Reading Font
-       choice enables this block (Cinzel chrome + EB Garamond fallback);
-       downloadable reading fonts arrive via the FontFace API on top of it
-       (src/utils/reading-fonts.js — cached in Cache Storage, CSP
-       connect-src https://cdn.jsdelivr.net gates the one-time fetch). The
-       boot script below and the use-settings.js effect toggle this
-       block's .disabled property. Name-glyph PREVIEW subsets for the
-       picker live in fonts/previews/ (@font-face in app.css). */
+       choice enables this block (Cinzel chrome + EB Garamond fallback)
+       and routes body text through --font-body. The reading fonts
+       themselves are ALL vendored locally (fonts/reading/, ~1.7 MB,
+       tools/gen-reading-fonts.mjs) and @font-face'd in app.css — the
+       browser fetches only the chosen one; no CDN, no download step.
+       The boot script below and the use-settings.js effect toggle this
+       block's .disabled property. */
     @font-face { font-family: 'Cinzel'; font-weight: 400; font-style: normal; src: url('fonts/cinzel-latin-400-normal.woff2') format('woff2'); font-display: swap; }
     @font-face { font-family: 'Cinzel'; font-weight: 600 700; font-style: normal; src: url('fonts/cinzel-latin-700-normal.woff2') format('woff2'); font-display: swap; }
     @font-face { font-family: 'Cinzel Decorative'; font-weight: 400; font-style: normal; src: url('fonts/cinzel-decorative-latin-400-normal.woff2') format('woff2'); font-display: swap; }
