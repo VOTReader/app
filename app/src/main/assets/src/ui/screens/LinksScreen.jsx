@@ -146,7 +146,7 @@ export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateT
   return (
     <div className="link-action-overlay" onClick={onClose}>
       <div className="link-action-sheet" onClick={function(e) { e.stopPropagation(); }}>
-        <div className="link-action-handle" />
+        <SheetHandle onClose={onClose} />
         {!confirming && (
           <>
             <button className="link-action-btn" onClick={function() { onNavigateSource(lnk); onClose(); }}>

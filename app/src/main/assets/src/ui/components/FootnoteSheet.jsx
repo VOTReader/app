@@ -29,7 +29,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
     <>
       <div className={`fn-sheet-backdrop${isOpen ? " open" : ""}`} onClick={onClose} />
       <div className={`fn-sheet${isOpen ? " open" : ""}`}>
-        <div className="fn-sheet-handle" />
+        <SheetHandle onClose={onClose} />
         {fn && (
           <>
             <div className="fn-sheet-num-row">

@@ -36,7 +36,7 @@ export function TabActionSheet({ idx, total, tab, onCloseOthers, onCloseToRight,
     <>
       <div className="select-sheet-backdrop open" onClick={onDismiss} />
       <div className="select-sheet" ref={trapRef} onClick={(e) => e.stopPropagation()}>
-        <div className="select-sheet-handle" />
+        <SheetHandle onClose={onDismiss} />
         <div className="select-sheet-eyebrow">Tab {tabNum}</div>
         <div className="select-sheet-title">Tab actions</div>
         <div className="select-sheet-ornament">
@@ -66,7 +66,7 @@ export function TabActionSheet({ idx, total, tab, onCloseOthers, onCloseToRight,
               <button className="tab-rename-cancel" onClick={() => setRenaming(null)}>Cancel</button>
             </div>
           ) : (
-            <button className="select-sheet-option" onClick={() => setRenaming((tab && tab.customTitle) || '')}>
+            <button className="select-sheet-option" data-autofocus onClick={() => setRenaming((tab && tab.customTitle) || '')}>
               <div className="select-sheet-option-main">
                 <span className="select-sheet-option-label">Rename tab…</span>
               </div>

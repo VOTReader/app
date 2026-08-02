@@ -15,7 +15,7 @@ export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
     <>
       <div className={`fn-sheet-backdrop${isOpen ? " open" : ""}`} onClick={onClose} />
       <div className={`fn-sheet${isOpen ? " open" : ""}`}>
-        <div className="fn-sheet-handle" />
+        <SheetHandle onClose={onClose} />
         {activeRef && (
           <>
             <span className="sc-sheet-tag">{"Scripture Reference \xB7 "}{activeRef.ref}</span>

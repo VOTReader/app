@@ -14,7 +14,7 @@ export function JournalCardMenu(props) {
   return (
     <div className="link-action-overlay" onClick={close}>
       <div className="link-action-sheet" onClick={function(e) { e.stopPropagation(); }}>
-        <div className="link-action-handle" />
+        <SheetHandle onClose={close} />
         {step === 0 && (
           <>
             {/* "Open Entry" is meaningless when the menu is launched from

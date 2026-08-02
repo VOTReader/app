@@ -44,7 +44,7 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
         <>
           <div className="select-sheet-backdrop open" onClick={() => setOpen(false)} />
           <div className="select-sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="select-sheet-handle" />
+            <SheetHandle onClose={() => setOpen(false)} />
             {eyebrow ? <div className="select-sheet-eyebrow">{eyebrow}</div> : null}
             <div className="select-sheet-title">{title || label}</div>
             <div className="select-sheet-ornament">

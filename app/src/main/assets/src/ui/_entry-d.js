@@ -96,6 +96,7 @@ import { VerseWithNumbers, _fnTextRedundantWithLink } from './components/VerseWi
 import { InAppLinkButton } from './components/InAppLinkButton.jsx';
 import { GoToRefButton } from './components/GoToRefButton.jsx';
 import { FootnoteSheet } from './components/FootnoteSheet.jsx';
+import { SheetHandle } from './components/SheetHandle.jsx';
 import { ScriptureVerseText } from './components/ScriptureVerseText.jsx';
 import { ScriptureSheet } from './components/ScriptureSheet.jsx';
 import { EXPAND_THRESHOLD, MIN_HIDDEN_WORDS, ExpandableVerse } from './components/ExpandableVerse.jsx';
@@ -232,7 +233,7 @@ Object.assign(window, {
   // Components
   Segments, ProphecyCard, ProphecyGroup,
   VerseWithNumbers, _fnTextRedundantWithLink,
-  InAppLinkButton, GoToRefButton, FootnoteSheet, ScriptureVerseText, ScriptureSheet,
+  InAppLinkButton, GoToRefButton, FootnoteSheet, SheetHandle, ScriptureVerseText, ScriptureSheet,
   EXPAND_THRESHOLD, MIN_HIDDEN_WORDS, ExpandableVerse,
   ThemeBtn, ScreenLayout,
   ModeToggle, renderCommentaryCite,

@@ -43,7 +43,7 @@
        <img>s cross-origin (the one online-only feature). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-6g8LwWhOs0MMxAbpQoqa310E7a9DGXtlxOW2E7ARn3o=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-SjzMm7YEfNApvj8cznQMkgJkgX8DYtu6udJ3jN3UOGE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
+    script-src 'self' 'sha256-ma4+mgaiPVxeOnHGhnzmSoQ8DZl1X+8G9flDpkm02fg=' 'sha256-qUZl0kKGu9+sc5ujRlN+ZZly5AXA9CDwHhN3/rPHPYI=' 'sha256-HrgHNmeA6sV4DLUUyqHYBSJi8rcGu7v3B3wQBpFRqKQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-SjzMm7YEfNApvj8cznQMkgJkgX8DYtu6udJ3jN3UOGE=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com;
     font-src 'self' data:;
@@ -133,7 +133,7 @@
   body.light { background: #f7f2e8; }</style>
 </head>
 <body>
-  <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");if(s.theme!=="light"&&s.settings&&s.settings.trueBlack)document.body.classList.add("amoled");var cf=document.getElementById("custom-fonts");if(cf&&(!s.settings||!s.settings.fontStyle||s.settings.fontStyle==="classic"))cf.disabled=true;var fsc=parseFloat(s.settings&&s.settings.fontScale);if(isFinite(fsc)&&fsc!==1){fsc=Math.min(1.6,Math.max(0.8,fsc));document.documentElement.style.setProperty("--font-scale",String(fsc));}}catch(e){}</script>
+  <script>try{var s=JSON.parse(localStorage.getItem("vot-state")||"{}");if(s.theme==="light")document.body.classList.add("light");if(s.theme!=="light"&&s.settings&&s.settings.trueBlack)document.body.classList.add("amoled");var cf=document.getElementById("custom-fonts");if(cf&&(!s.settings||!s.settings.fontStyle||s.settings.fontStyle==="classic"))cf.disabled=true;var fsc=parseFloat(s.settings&&s.settings.fontScale);if(isFinite(fsc)&&fsc!==1){fsc=Math.min(3,Math.max(0.8,fsc));document.documentElement.style.setProperty("--font-scale",String(fsc));}}catch(e){}</script>
   <div id="root"></div>
   <!-- Cluster A: vendor + (most) corpus + search engine (26 files, ~4.6 MB).
        Concatenated by tools/build.py — DO NOT edit dist/bundle-a.js by hand.

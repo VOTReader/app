@@ -557,7 +557,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       <>
         <div className={`fn-sheet-backdrop${scripRef ? " open" : ""}`} onClick={() => setScripRef(null)} />
         <div className={`fn-sheet${scripRef ? " open" : ""}`}>
-          <div className="fn-sheet-handle" />
+          <SheetHandle onClose={() => setScripRef(null)} />
           {scripRef && (
             <>
               <span className="sc-sheet-tag">Scripture Reference</span>

@@ -435,7 +435,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       <>
         <div className={`fn-sheet-backdrop${scriptureRef ? " open" : ""}`} onClick={() => setScriptureRef(null)} />
         <div className={`fn-sheet${scriptureRef ? " open" : ""}`}>
-          <div className="fn-sheet-handle" />
+          <SheetHandle onClose={() => setScriptureRef(null)} />
           {scriptureRef && (
             <>
               <span className="sc-sheet-tag">Scripture Reference</span>

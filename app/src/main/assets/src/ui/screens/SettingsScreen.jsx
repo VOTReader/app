@@ -9,9 +9,12 @@
    but the row carries its own preview line so the chosen body size is
    visible right in Settings. Icons + navigation chrome are px-pinned in
    app.css and never scale. */
+/* Cap raised 1.6 → 3.0 (2026-08-02, owner: 160% was far too little on PC —
+   he resorted to browser ctrl-zoom). Keep in sync with the SEC-3 clamp in
+   use-settings.js and the boot-script clamp in index.html. */
 function clampFontScale(v) {
   const f = parseFloat(String(v));
-  return Number.isFinite(f) ? Math.min(1.6, Math.max(0.8, f)) : 1;
+  return Number.isFinite(f) ? Math.min(3, Math.max(0.8, f)) : 1;
 }
 
 function TextSizeSliderRow({ value, onChange }) {
@@ -29,7 +32,7 @@ function TextSizeSliderRow({ value, onChange }) {
           type="range"
           className="txtsize-slider"
           min="0.8"
-          max="1.6"
+          max="3"
           step="0.05"
           value={v}
           onChange={(e) => onChange(String(parseFloat(e.target.value)))}
@@ -56,8 +59,8 @@ function TextSizeSliderRow({ value, onChange }) {
 }
 
 /* Auto-scroll speed. Stored in LINES PER MINUTE, not px/second: the Text
-   Size slider spans 80–160%, and a px/s speed would silently change reading
-   pace by up to 2× when the reader resizes text. The controller derives px
+   Size slider spans 80–300%, and a px/s speed would silently change reading
+   pace by several× when the reader resizes text. The controller derives px
    from a measured line height, so this number means the same thing at every
    text size. A words/min figure is deliberately NOT offered here: it depends
    on how many words a line actually holds, which nothing on this screen can

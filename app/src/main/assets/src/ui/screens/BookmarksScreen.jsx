@@ -195,7 +195,7 @@ export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, 
   return (
     <div className="link-action-overlay" onClick={onClose}>
       <div className="link-action-sheet" onClick={function(e) { e.stopPropagation(); }}>
-        <div className="link-action-handle" />
+        <SheetHandle onClose={onClose} />
         {!confirming && (
           <>
             <button className="link-action-btn" onClick={function() { onNavigate(bkm); onClose(); }}>

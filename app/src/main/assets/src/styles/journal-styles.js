@@ -301,8 +301,10 @@
   R('.jrn-del-btn { color: var(--gold-dim); transition: color 0.15s; margin-left: 0.5rem; }');
   R('.jrn-del-btn:hover { color: #c75c4a; }');
 
-  // Insert sheet — grabber handle (matches .fn-sheet-handle / .select-sheet-handle)
-  R('.jrn-insert-sheet::before { content: ""; align-self: center; flex: 0 0 auto; width: 36px; height: 4px; border-radius: 999px; background: var(--gold-border); margin-bottom: 12px; }');
+  // (Insert-sheet cosmetic grabber ::before RETIRED 2026-08-02 — a pill bar
+  // that LOOKS tappable but does nothing is the exact confusion the shared
+  // SheetHandle module was built to kill; this sheet's real header already
+  // carries ‹ back and × close buttons, so the fake bar just went away.)
   R('.jrn-insert-section { padding: 12px 18px 4px; }');
   R('.jrn-insert-section + .jrn-insert-section { border-top: 1px solid var(--gold-border); }');
   R('.jrn-insert-section h4 { font-family: var(--font-cinzel); font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold); opacity: 0.72; margin: 0 0 8px; }');

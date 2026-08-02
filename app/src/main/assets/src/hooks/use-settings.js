@@ -196,7 +196,7 @@ export function useSettings({ savedSettings, theme }) {
     // value would land in the --font-scale CSS var. The old 4-step selector
     // values ("1"/"1.15"/"1.3"/"1.5") all fall inside the range.
     const _fs = parseFloat(String(settings.fontScale));
-    const _fsSafe = Number.isFinite(_fs) ? Math.min(1.6, Math.max(0.8, _fs)) : 1;
+    const _fsSafe = Number.isFinite(_fs) ? Math.min(3, Math.max(0.8, _fs)) : 1;
     document.documentElement.style.setProperty("--font-scale", String(_fsSafe));
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
