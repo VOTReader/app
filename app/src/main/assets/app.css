@@ -1174,6 +1174,11 @@
         position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
         display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
       }
+      /* (column-pin lives NEXT TO the base rule — same specificity, so it
+         must come after it in the cascade; see .link-sidebar note above.) */
+      @media (min-width: 768px) {
+        .mode-toggle-wrap { right: calc(50vw - var(--col-max) / 2 + 1.5rem); }
+      }
       /* ── First-run annotation tip (AnnotationHint) ── */
       .ann-hint-pill {
         position: fixed; left: 50%; transform: translateX(-50%);
