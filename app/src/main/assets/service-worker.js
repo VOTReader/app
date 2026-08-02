@@ -208,11 +208,20 @@ self.addEventListener('install', (event) => {
     // fail the install — corpusFirst still caches it on first use. Skip-
     // if-present so a re-install never re-fetches what's already there.
     const corpus = await caches.open(CORPUS_CACHE);
-    await Promise.allSettled(
-      CORPUS_PRECACHE.concat(READING_FONT_PRECACHE).map(async (url) => {
-        if (!(await corpus.match(url))) await corpus.add(url);
-      })
-    );
+    // Bounded concurrency (4 workers), not one flat allSettled: the list is
+    // ~60 URLs / ~9 MB, and firing them all at once saturates the link on
+    // the very visit that installs the SW — racing the page's own bundle
+    // fetches for first paint. 4 stays under the browser's per-host limit.
+    const precacheQueue = CORPUS_PRECACHE.concat(READING_FONT_PRECACHE);
+    let precacheIdx = 0;
+    await Promise.allSettled(Array.from({ length: 4 }, async () => {
+      while (precacheIdx < precacheQueue.length) {
+        const url = precacheQueue[precacheIdx++];
+        try {
+          if (!(await corpus.match(url))) await corpus.add(url);
+        } catch (_e) { /* best-effort — corpusFirst still caches on first use */ }
+      }
+    }));
   })());
 });
 
