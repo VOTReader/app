@@ -680,10 +680,15 @@
         -webkit-tap-highlight-color: transparent;
         position: relative;
       }
-      /* Invisible hit-area halo: lifts the 30px circle to a ~44px target
+      /* Invisible hit-area halo: lifts the 30px circle to a ~44px-tall target
          without growing the visual (bigger circles float over reading text,
-         and px growth risks the 360px-nav overflow class of bug). */
-      .nav-arrow-btn::before { content: ''; position: absolute; inset: -7px; border-radius: 50%; }
+         and px growth risks the 360px-nav overflow class of bug). Horizontal
+         expansion is only -2px: in the grouped layouts (arrowLayout nav:
+         4.8px gap; right/left: ~8.8px) a symmetric -7px halo overlapped the
+         neighbor by up to 9.2px and the later-painted Next stole taps from
+         Previous's visible edge — same asymmetric-halo pattern as
+         .tabs-nav-btn. */
+      .nav-arrow-btn::before { content: ''; position: absolute; inset: -7px -2px; border-radius: 50%; }
       .nav-arrow-btn:active:not(:disabled) { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); transform: scale(0.94); }
       @media (hover: hover) { .nav-arrow-btn:hover:not(:disabled) { border-color: var(--gold); background: var(--gold-faint); color: var(--gold-bright); } }
       .nav-arrow-btn:disabled { opacity: 0.22; cursor: default; }
