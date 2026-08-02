@@ -87,9 +87,6 @@
         box-shadow: 0 4px 18px rgba(0,0,0,0.4);
       }
       .jrn-milestone-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-      .vot-toast-sw-update { position:fixed; z-index:9999; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + 2rem); max-width:min(92%,32rem); background:rgba(20,20,24,0.96); color:#f0e6d2; border:1px solid var(--gold-border,rgba(255,215,140,0.35)); border-radius:12px; padding:14px 20px; font-family:var(--font-cinzel,Georgia,serif); font-size:0.82rem; letter-spacing:0.04em; line-height:1.45; text-align:center; box-shadow:0 8px 28px rgba(0,0,0,0.55); cursor:pointer; pointer-events:auto; opacity:0; transition:opacity 220ms ease-out; }
-      .vot-toast-sw-update.show { opacity:1; }
-      body.light .vot-toast-sw-update { background:rgba(247,242,232,0.96); color:#2a2018; border-color:rgba(176,144,56,0.5); }
       /* UX7 — tab-close undo toast. Reuses .vot-toast's look but is CLICKABLE
          (base .vot-toast is pointer-events:none), so the Undo control works; it
          already sits at z-index 9998, above the tabs overview (z-index 400).
@@ -2049,7 +2046,6 @@
        font via the bundled 'p-<id>' preview subsets (name glyphs only —
        see @font-face block near :root). The download progress line sits
        under the row while a confirmed fetch runs. */
-    .font-picker-downloading { padding-top:0.5rem; color:var(--gold-dim); }
     /* ── Compact card layout (Settings redesign — Option B) ───────────────
        Each section's controls live in ONE bordered card; rows are separated
        by thin dividers, and each row's long description is hidden by default
@@ -2298,29 +2294,7 @@
     @media (hover: hover) { .settings-clear-btn.warning:hover { background:rgba(209,143,46,0.1); } }
     .settings-clear-btn.danger { color:var(--settings-danger); border-color:var(--settings-danger); font-size:0.55rem; }
     @media (hover: hover) { .settings-clear-btn.danger:hover { background:rgba(192,57,43,0.08); } }
-    /* ── Mark Complete button ── */
-    .mark-complete-row { display:flex; justify-content:center; margin:1.5rem 0 0.5rem; }
-    .mark-complete-btn {
-      font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.18em; text-transform:uppercase;
-      color:var(--gold-dim); background:transparent;
-      border:1px dashed rgba(200,164,86,0.35); border-radius:6px;
-      padding:0.7rem 1.4rem; cursor:pointer;
-      display:flex; align-items:center; gap:0.5rem;
-      transition:all var(--transition);
-    }
-    @media (hover: hover) { .mark-complete-btn:hover { color:var(--gold); border-color:var(--gold-dim); background:rgba(200,164,86,0.06); } }
-    .mark-complete-btn.is-marked {
-      color:var(--gold); border-style:solid; border-color:rgba(200,164,86,0.4);
-      background:rgba(200,164,86,0.06);
-      flex-direction:column; gap:0.2rem; align-items:center;
-    }
-    @media (hover: hover) { .mark-complete-btn.is-marked:hover { color:var(--cream-muted); border-color:var(--gold-border); background:transparent; } }
-    .mark-complete-check { font-size:0.9rem; }
-    .mark-complete-undo {
-      font-size:0.55rem; letter-spacing:0.12em; color:var(--cream-muted); opacity:0;
-      transition:opacity 0.2s;
-    }
-    @media (hover: hover) { .mark-complete-btn.is-marked:hover .mark-complete-undo { opacity:1; } }
+    /* (Mark Complete button styles removed 2026-08-02 — the component was retired; zero source refs.) */
     /* ── Progress table ── */
     .progress-table { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; overflow:hidden; margin-top:-0.6rem; }
     /* flex-wrap + tally nowrap dropped at the extreme: same 300%-cap spill
