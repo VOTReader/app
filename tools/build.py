@@ -55,9 +55,9 @@ MINIFY_JS = os.path.join(_HERE, 'minify-bundle.mjs')
 #   - matthew.js (618 KB Study Bible) → bundle-a-matthew.js (Q8.2)
 #   - all VOT collections (7 volumes + letters families + WTLB + holy
 #     days + hidden manna + blessed, ~3.0 MB) → bundle-a-vot.js (Q8.3)
-# books-restored.js + matthew-plain.js + matthew-nkjv.js stay critical
-# because they're cross-referenced by other paths (restored chrome
-# overrides, BOOKS["matthew-plain"] for inline scripture refs).
+# matthew-nkjv.js stays critical (unguarded derefs on the VOT letter
+# path); books-restored.js + matthew-plain.js moved to A_BIBLE 2026-08-02
+# — every consumer is typeof-guarded or runs post-__finishBibleInit.
 # See BUNDLE-LAZY-LOAD-PLAN.md for the design rationale.
 A = [
     # html2canvas.min.js is NO LONGER concatenated here (U13) — it was ~198 KB
@@ -65,9 +65,14 @@ A = [
     # native PixelCopy). platform-bridge._ensureHtml2canvas() lazy-loads it via
     # <script src="html2canvas.min.js"> on the first web screenshot; the file
     # stays SW-precached (service-worker.js CORE_ASSETS) so it's instant/offline.
+    # books-restored.js + matthew-plain.js moved to A_BIBLE (2026-08-02): every
+    # consumer is typeof-guarded (BibleChapterView:12, ChapterIndex:17,
+    # tabs.js:61) or runs inside __finishBibleInit (index.html:448), which only
+    # fires after bundle-a-bible executes — so they ride the same lazy load.
+    # −353 KB off the cold-boot parse. matthew-nkjv.js STAYS: 3 unguarded
+    # derefs (InlineNotes/ScriptureSheet/StudyPanels) on the VOT letter path.
     'react.min.js', 'react-dom.min.js',
-    'src/data/books-restored.js',
-    'src/data/matthew-plain.js', 'src/data/matthew-nkjv.js',
+    'src/data/matthew-nkjv.js',
     # search-data.js = the SHARED window.VotSearchData index source (books/
     # display names/synonyms) consumed by the MiniSearch engine (bundle-e) +
     # SearchScreen. The Classic engine (search.js) + its flexsearch.min.js
@@ -87,8 +92,6 @@ A = [
 # NOT in the corpus-version gate (that hashes only the lazy a-bible/matthew/vot
 # bundles), so this needs no CORPUS_VERSION bump; the SW content-hash auto-busts.
 MINIFY_A = {
-    'src/data/books-restored.js',
-    'src/data/matthew-plain.js',
     'src/data/matthew-nkjv.js',
 }
 
@@ -100,6 +103,12 @@ MINIFY_A = {
 # __loadBibleCorpus() before rendering / navigating.
 A_BIBLE = [
     'src/data/books.js',
+    # Moved from A (2026-08-02, −353 KB cold boot). MUST live in THIS bundle,
+    # not a sibling: __finishBibleInit (index.html:448) derefs MATTHEW_PLAIN
+    # unguarded, which is safe only because this bundle defines it before the
+    # loader calls the finisher.
+    'src/data/books-restored.js',
+    'src/data/matthew-plain.js',
 ]
 
 # Cluster A-matthew — the Matthew Study Bible. Loaded ON DEMAND via
