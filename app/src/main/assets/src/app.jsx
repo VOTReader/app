@@ -538,40 +538,9 @@ function App() {
 
   const fromMatthewChRef = useRefMirror(fromMatthewCh);  // also used in the render (~line 3001)
 
-  // One-time journal media orphan sweep. JournalStore.remove() deliberately
-  // does NOT delete media blobs (an embed in another entry may still
-  // reference the source's image/audio — shared-media protection). The
-  // trade-off is that the owning entry's deletion orphans its blobs in
-  // IndexedDB. collectAllMediaIds() walks EVERY entry (source + embeds), so
-  // a blob survives as long as any entry still references it; only truly
-  // unreferenced blobs are pruned. Deferred so it never competes with the
-  // first paint. This was wired but never invoked before.
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        if (typeof JournalStore === 'undefined' || typeof JournalMediaStore === 'undefined') return;
-        // U1: only sweep when the journal store is fully hydrated. If it is
-        // still pending/degraded (slow IDB, or a fresh import that hasn't
-        // rebased yet), collectAllMediaIds() under-reports referenced blobs and
-        // the prune would irreversibly delete real (or just-imported) media.
-        // Skipping is safe: an orphan blob is harmless leftover space, swept on
-        // a later boot once the store loads in time.
-        if (!JournalStore.isReady()) {
-          console.info('Journal media orphan sweep skipped — store not ready (' + JournalStore.getState() + ')');
-          return;
-        }
-        // STORE-2: stamp the snapshot moment and pass it as the prune cutoff so a
-        // blob captured AFTER this snapshot (but read by prune's async IDB pass)
-        // is never reclaimed — it's too new to be a real orphan.
-        const sweepStart = Date.now();
-        const referenced = JournalStore.collectAllMediaIds();
-        JournalMediaStore.pruneOrphans(referenced, sweepStart).then((n) => {
-          if (n) console.info('Journal media orphan sweep removed', n, 'blob(s)');
-        }).catch((e) => console.warn('Journal media orphan sweep failed', e));
-      } catch (e) { console.warn('Journal media orphan sweep threw', e); }
-    }, 4000);
-    return () => clearTimeout(t);
-  }, []);
+  /* One-time journal media orphan sweep -> src/hooks/use-journal-media-sweep.js
+     (2026-08-02 -- the one App() effect with zero closure deps). */
+  useJournalMediaSweep();
 
   // Expose the home-button handler globally so <HomeBtn /> can call it
   // without prop drilling. Clears return-breadcrumbs so Home means Home.

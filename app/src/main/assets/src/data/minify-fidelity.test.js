@@ -34,7 +34,7 @@ const DIST = resolve(HERE, '..', '..', 'dist'); // .../assets/dist
 
 // Mirror of tools/build.py A_BIBLE / A_MATTHEW / A_VOT.
 const BUNDLES = [
-  { dist: 'bundle-a-bible.js', sources: ['books.js'] },
+  { dist: 'bundle-a-bible.js', sources: ['books.js', 'books-restored.js', 'matthew-plain.js'] },
   { dist: 'bundle-a-matthew.js', sources: ['matthew.js'] },
   {
     dist: 'bundle-a-vot.js',
