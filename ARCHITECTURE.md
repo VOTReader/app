@@ -17,6 +17,7 @@ The sections below this one predate several landed systems. This addendum is the
 - **Android frame pacing**: MainActivity votes the WebView at panel peak refresh (View + window votes, API 35+); Battery Saver's system 60 Hz cap outranks them by design. `backdrop-filter` is banned on chrome that overlays live scrolling content (alpha-bumped instead).
 - **Theme**: dark-first `:root` tokens, `body.light` full swap, `body.amoled` True-Black surface modifier on dark ([10], `settings.trueBlack`, boot pre-paint applies all classes).
 - **Auto-scroll reading transport** (`hooks/use-autoscroll.js` + `ui/components/AutoScrollControl.jsx`): lines/min over a MEASURED line height, the scrollTop lease, `.reading-end` reading-zone stop, dwell + auto-advance via the pager's own boundary policy. Full map in **§20**.
+- **Reading-measurement engine** (2026-08-03: `utils/word-count.js` + `hooks/use-read-tracker.js` + `stores/reading-stats-store.js`): ONE word-count definition shared by app + the corpus baseline gate; the geometry-sweep read detector (NOT IntersectionObserver — deliberate, see **§21**); count-valued readItems; ReadingStatsStore ledger (IDB v8) + per-item frontiers → resume-at-first-unread. Full map in **§21**.
 - **One shared top-nav**: `ui/components/LibraryNav.jsx` renders every screen's nav (2026-07-30; SearchScreen + GardenView are the two documented exceptions). Full map, and its selector/measurement couplings, in **§18.10b**.
 
 ---
@@ -641,7 +642,7 @@ Common props passed to every LetterView and WtlbEntryView extracted into a reusa
 ```js
 sharedViewProps = {
   onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor,
-  onInAppLink, backHint, hlTick, onLinkOpen, onBack, markAsReadEnabled, showProgressBar
+  onInAppLink, backHint, hlTick, onLinkOpen, onBack, markAsReadEnabled
 };
 // Usage: React.createElement(LetterView, Object.assign({}, sharedViewProps, { letter, volumeLabel, ... }))
 ```
@@ -938,6 +939,57 @@ Counting the LINES is the subtle part, because `data-hl-key` is not always on th
 ### 20.3 Settings keys
 
 Read in `ui/components/ReadingChromeProvider.jsx`, which builds the `AutoScrollContext` value: `autoScroll` (master enable) · `autoScrollLpm` (speed, clamped by `clampLpm`) · `autoScrollNext` (auto-continue; also gates whether the dwell knob exists at all) · `autoScrollEndMs` (dwell, clamped by `clampEndDwell`) · `keepScreenOn` (the user's global preference the controller must restore to, not override). Config is app-wide and arrives via context; per-screen wiring (the scroll container ref, the pager) arrives as props.
+
+---
+
+## Section 21 — Reading-measurement engine (2026-08-03)
+
+Three modules, three bundle homes; module headers are the deep docs (read them
+before editing — this section is the map, not the contract):
+
+- `utils/word-count.js` (bundle-d): `countItemWords` — the SINGLE definition of
+  "how many words is this item" (Format A/B/C/Matthew; body text only; memoized).
+  `tools/validate-schemas.js` imports the SAME shipped module for the word-count
+  baseline gate (`tools/word-count-baseline.json`, per-item; `--update-wordcounts`
+  regenerates), so app and gate cannot disagree. The gate exists to catch
+  eaten/duplicated corpus content BETWEEN full faithfulness audits.
+- `hooks/use-read-tracker.js` (bundle-b; called as a bare global from
+  ScreenLayout on every screen): the detector.
+  **READ ⇔ coverage ≥90% by words AND visibility-honest activeMs ≥
+  clamp(words×100ms, 8s, 300s).** Segments are the `[data-hl-key]` blocks every
+  reading view already stamps (the same attribute the annotation engine §17 and
+  `measureWordsPerLine` trust); credit = 800ms continuous meaningful visibility.
+  ┌─ WHY A GEOMETRY SWEEP, NOT IntersectionObserver ─────────────────────┐
+  │ IO with practical thresholds structurally cannot credit a block      │
+  │ taller than ~2 viewports (long poetry; ALL of Text Size 300%), and   │
+  │ element-keyed IO state dies when a view re-renders content under the │
+  │ same placeKey (the BibleChapterView headings toggle). The 2 Hz       │
+  │ batched gBCR sweep + credit keyed by hl-key STRING fixes both.       │
+  │ Do not "optimize" this back to IO.                                   │
+  └──────────────────────────────────────────────────────────────────────┘
+  Bridges: `__onReadingComplete` (arm flag + completion sink, once per
+  placeKey visit) + `__readTrackerMeta` (frontier key) — see BRIDGES.md; the
+  per-view inert guards keep peek clones from ever claiming either.
+- `stores/reading-stats-store.js` (bundle-b): `vot-reading-stats`, **IDB v8**.
+  Ledger (words/time/completions/rereads/wordsByDay) + wpm samples (median;
+  sampled at VISIT END, never the completion instant — that instant is pinned
+  to the 600wpm floor by construction) + per-item frontiers (credited segment
+  indices; LRU 50; cleared on completion) → resume-at-first-unread-paragraph
+  (>1-viewport jump guard). ★ Adding ANY new CachedStore requires
+  `IDBAdapter.STORE_NAMES` + a DB version bump, or it hydrates `'degraded'`
+  and queues writes silently forever — with a 100%-green unit suite. ★
+- readItems is COUNT-valued (`useMarkAsRead.js`; legacy `true` reads as 1, no
+  migration). Detector completions increment + feed the ledger + record the
+  reading DAY (streak coherence); manual toggles set the first mark only.
+- Consumers: MyProgress (Words Read / Reading Pace / Re-reads / 14-day bars),
+  `~N min` index chips, count-aware `✓ ×N` read marks.
+- **Verification rule:** jsdom has no layout and a non-compositing page
+  (hidden tab, undisplayed Browser pane) delivers no geometry/IO — the ONLY
+  faithful end-to-end check is `npm run e2e:read`
+  (`tools/e2e-read-detector.mjs`, headless compositing Chromium). This drove
+  out the IDB-registration P0 the unit suite could not see.
+- Deliberately absent: skim indicator (owner-HELD, BACKLOG [21]);
+  TTS/milestones/year-in-review/etc. (BACKLOG [22]–[26]).
 
 ---
 

@@ -137,14 +137,31 @@ setup effect.
 - **Consumers:** `renderer/annotation-engine.js:332,338` (drives `applyActiveNoteState` wavy-underline)
 
 ### `__onReadingComplete`
-- **Setter:** `src/hooks/useMarkAsRead.js:40` — useEffect, cleaned to `null` on unmount
+- **Setter:** `src/hooks/useMarkAsRead.js:72` — useEffect while the active reading
+  view's `markAsReadEnabled` holds (inert peek clones pass `enabled=false` and
+  never claim it); cleaned to `null` on unmount.
 - **Cleanup:** `window.__onReadingComplete = null`
-- **Consumers:** `ui/components/ScreenLayout.js:24` (post-scroll-bottom fires it)
+- **Consumers:** `src/hooks/use-read-tracker.js` — the read DETECTOR (2026-08-03;
+  the old ScreenLayout scroll≥90% trigger is deleted). The bridge doubles as the
+  detector's ARM flag (`:211` — a screen with no bridge costs one property check
+  per 500 ms) and the completion sink (`:268` — fired ONCE per screen visit with
+  `{ words, activeMs, coverage }`; `useReadProgress.markRead` turns that payload
+  into the count-valued readItems increment + the ReadingStatsStore record).
 
-### `__onDwellCommit`
-- **Setter:** `src/hooks/use-reading-dwell.js:140` — useEffect, identity-guarded cleanup
-- **Cleanup:** `if (window.__onDwellCommit === commitDwellNow) window.__onDwellCommit = null` (only clears the bridge if it's still mine — prevents racing hooks from clobbering)
-- **Consumers:** none in current src (set up for legacy debug — was the path for forced commit; current code commits via direct ref)
+### `__readTrackerMeta`
+- **Setter:** `src/hooks/useMarkAsRead.js:77` — set alongside `__onReadingComplete`
+  to `{ key: readTrackKey }` (the SAME `v1:<bid>:<cid>` key `markRead` writes, so
+  a completion's ReadingStatsStore record clears exactly the frontier this visit
+  accumulated); nulled with the bridge at `:78`.
+- **Cleanup:** `window.__readTrackerMeta = null`
+- **Consumers:** `src/hooks/use-read-tracker.js:163,215` — snapshotted into a
+  local on first armed sweep (cleanup ordering: the view's effect cleanup may
+  null the global before the tracker's cleanup flushes the final frontier).
+
+(`__onDwellCommit` — DELETED 2026-08-03. It had no callers since the 07-19
+position-is-immediate change; use-reading-dwell.test.js carries a tombstone
+asserting it stays gone. The identity-guarded-cleanup pattern it pioneered
+lives on in `__flushPersistState` below.)
 
 ---
 
@@ -247,7 +264,7 @@ callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")
 
 ### `__flushPersistState`
 - **Setter:** `src/hooks/use-persisted-state.js` (mount effect, contract 5) — `window.__flushPersistState = flush`, the SAME flush used by the visibilitychange/pagehide/beforeunload/unmount listeners.
-- **Cleanup:** `if (window.__flushPersistState === flush) window.__flushPersistState = null` on hook teardown (only clears if still mine — the `__onDwellCommit` pattern).
+- **Cleanup:** `if (window.__flushPersistState === flush) window.__flushPersistState = null` on hook teardown (only clears if still mine — the identity-guarded-cleanup pattern).
 - **Consumer:** `src/ui/screens/SettingsScreen.jsx` (`_exportV3Web` / `_exportV3Android`) — guarded `if (typeof window.__flushPersistState === 'function') window.__flushPersistState();` immediately before `buildV3Manifest(...)`.
 - **Why it exists (U1 + persist-debounce race):** the v3/v2 export reads vot-state STRAIGHT FROM IDB after a `whenSaved()` barrier, but a union still inside the 250 ms persist debounce window has not initiated a `StateStore.set`, so the barrier cannot cover it — a change made within 250 ms of tapping Export would be missing from the ONLY backup. Flushing synchronously first lets the existing barrier await the flushed write. A window bridge (not a module import) because bundle-b (hook) and bundle-d (SettingsScreen) are separate esbuild IIFEs — module-scope registrations do not cross the boundary (same rationale as `navHandoff`). No-op when nothing is pending; clears the pending timer so no duplicate trailing write follows.
 

@@ -57,7 +57,6 @@ const renderCh = (extra) => render(
     chapter={THESS.chapters[2]}   // chapter 3 — the last (the owner's screenshot position)
     translation="nkjv"
     theme="dark"
-    showProgressBar={false}
     markAsReadEnabled={false}
     onNavigate={() => {}}
     {...extra}

@@ -20,6 +20,7 @@
     "lint:fix": "npm run lint:globals && eslint app/src/main/assets/src --fix",
     "smoke-lite": "node tools/smoke-lite.js",
     "smoke:ci": "node tools/smoke-ci.js",
+    "e2e:read": "node tools/e2e-read-detector.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

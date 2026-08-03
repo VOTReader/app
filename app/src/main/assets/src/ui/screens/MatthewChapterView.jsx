@@ -62,7 +62,6 @@ export function MatthewChapterView({
         onMarkRead={(payload) => markRead('matthew', chapterNum, payload)}
         readTrackKey={getReadKey ? getReadKey('matthew', chapterNum) : undefined}
         markAsReadEnabled={settings.markAsRead}
-        showProgressBar={settings.showProgressBar}
         prevBoundary={chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null}
         onPrevBoundary={chainPrev ? () => { setFromStudies(true); goToChainEntryLast(chainPrev.slug)(); } : null}
         nextBoundary={chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null}

@@ -54,7 +54,7 @@ const renderLibrary = (props = {}) => render(
     onOpenJournal={() => {}}
     onOpenHighlights={() => {}}
     onOpenProgress={() => {}}
-    readCount={0}
+    totalReadCount={0}
     theme="dark"
     onThemeChange={() => {}}
     onSearch={() => {}}
@@ -96,7 +96,7 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
 
   it('the Progress tile drops its caption once anything is read', () => {
     setupGlobals();
-    renderLibrary({ readCount: 7 });
+    renderLibrary({ totalReadCount: 7 });
     expect(tileEl('Progress').querySelector('.library-tile-guide')).toBeNull();
     expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(5);
   });

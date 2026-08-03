@@ -50,7 +50,6 @@ const renderLetter = (extra) => render(
     volumeLabel="Study Title"
     studyMode={true}
     theme="dark"
-    showProgressBar={false}
     markAsReadEnabled={false}
     onNavigate={() => {}}
     {...extra}

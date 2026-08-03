@@ -61,7 +61,6 @@ function mount() {
   return render(
     <SL
       hideTabsBtn
-      showProgress={false}
       navChildren={<button data-testid="nav-btn" className="nav-home">nav</button>}
     >
       <button data-testid="content-btn">content</button>

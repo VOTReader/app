@@ -4,7 +4,7 @@
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, showProgressBar, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null }) {
   const [highlightedVerses, setHighlightedVerses] = React.useState([]);
   // Restored-Name chrome lookup. When settings.restoredNames is on and
   // books-restored.js has an entry for this chapter, swap the chrome.
@@ -60,7 +60,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         titleFocusHidden={titleFocusHidden}
         headingsFocusHidden={headingsFocusHidden}
         theme={theme}
-        showProgressBar={showProgressBar}
         markAsReadEnabled={false}
         inert={true}
         restoreScroll={savedScrollFor(bk.id + '-' + ch.num)}
@@ -92,7 +91,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
 
   return (
     <ScreenLayout
-      showProgress={showProgressBar}
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}

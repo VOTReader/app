@@ -29,13 +29,7 @@ function applySavedScrollToEl(el, saved) {
   if (y > 0) el.scrollTop = y;
 }
 
-// showProgress: accepted-unused (the _ prefix convention). Its ONLY runtime
-// consumer was the old scroll≥90% completion trigger (deleted 2026-08-03 —
-// which means the "progress bar" prop was secretly the auto-mark-as-read
-// gate); the VISIBLE notch is driven by body.scroll-notch from settings, not
-// this prop. Kept in the signature so the 50+ call sites stay untouched;
-// candidate for removal in a dedicated sweep.
-export function ScreenLayout({ navChildren, children, showProgress: _showProgress, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '' }) {
+export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '' }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow

@@ -299,7 +299,7 @@ export function buildScreenRoutes({
     onNavigateToLink: navigateToLink,
     onLinkOpen: openLinkSidebar,
     onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
-    markAsReadEnabled: settings.markAsRead, showProgressBar: settings.showProgressBar,
+    markAsReadEnabled: settings.markAsRead,
   };
   // {{nav:bookId:chapter}} inside a WTLB/Blessed/Holy-Days entry. Routed
   // through navigateToLink so it raises the same "‹ Back to <entry>" pill
@@ -549,7 +549,7 @@ export function buildScreenRoutes({
         onOpenJournal={goJournalHub}
         onOpenHighlights={goHighlightsIndex}
         onOpenProgress={goProgress}
-        readCount={Object.keys(readItems).length}
+        totalReadCount={Object.keys(readItems).length}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
@@ -838,7 +838,6 @@ export function buildScreenRoutes({
         onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}
         readTrackKey={getReadKey(bookId, chapterNum)}
         markAsReadEnabled={settings.markAsRead}
-        showProgressBar={settings.showProgressBar}
         translation={settings.translation}
         restoredNames={settings.restoredNames}
         showChapterTitle={settings.showChapterTitle !== false}

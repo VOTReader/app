@@ -72,7 +72,6 @@ const renderEntry = (extra) => render(
     volKey="holydays"
     partLabel="Regarding The Holy Days"
     theme="dark"
-    showProgressBar={false}
     markAsReadEnabled={false}
     footnotesMode={true}
     onNavigate={() => {}}

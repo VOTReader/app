@@ -91,6 +91,21 @@ describe('useReadProgress — markRead', () => {
     } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
   });
 
+  it('a detector completion records the reading DAY (streak coherence with the dwell path)', () => {
+    // UX-walk regression 2026-08-03: two verified ~9s reads left the streak
+    // at 0 because only the 20s dwell timer fed it. A completion is at
+    // least as strong a "read today" signal.
+    const recordReadingDay = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStreakStore = { recordReadingDay };
+    try {
+      const { result } = setup();
+      act(() => { result.current.markRead('matthew', 5); });          // manual — not evidence
+      expect(recordReadingDay).not.toHaveBeenCalled();
+      act(() => { result.current.markRead('matthew', 5, { words: 640, activeMs: 120000 }); });
+      expect(recordReadingDay).toHaveBeenCalledTimes(1);
+    } finally { delete /** @type {any} */ (globalThis).ReadingStreakStore; }
+  });
+
   it('exports getReadKey so routes can hand the tracker the SAME key space', () => {
     const { result } = setup();
     expect(result.current.getReadKey('matthew', 5)).toBe('v1:matthew:5');

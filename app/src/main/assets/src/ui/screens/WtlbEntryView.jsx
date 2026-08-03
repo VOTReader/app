@@ -13,7 +13,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, inert = false, restoreScroll = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, inert = false, restoreScroll = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   const [scriptureText, setScriptureText] = React.useState(null);
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
@@ -141,7 +141,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           scripturesDict={scripturesDict}
           footnotesMode={footnotesMode}
           theme={theme}
-          showProgressBar={showProgressBar}
           markAsReadEnabled={false}
           inert={true}
           restoreScroll={savedScrollFor(letterScrollKey(volKey, full.id))}
@@ -173,7 +172,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           scripturesDict={scripturesDict}
           footnotesMode={footnotesMode}
           theme={theme}
-          showProgressBar={showProgressBar}
           markAsReadEnabled={false}
           inert={true}
           restoreScroll={savedScrollFor(letterScrollKey(b.volKey, full.id))}
@@ -287,7 +285,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
   return (
     <ScreenLayout
-      showProgress={showProgressBar}
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}

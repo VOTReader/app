@@ -175,6 +175,16 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
           });
         } catch (e) { console.warn('reading-stats record failed', e); }
       }
+      // Streak coherence (2026-08-03 UX walk): a VERIFIED completed read is
+      // at least as strong a "read today" signal as the 20-second dwell
+      // timer — a short letter completes in ~9s and must not leave the
+      // streak claiming the user didn't read. Same-day repeats are
+      // store-side no-ops; the dwell path still covers long partial
+      // reading that never completes anything.
+      if (typeof ReadingStreakStore !== 'undefined' && ReadingStreakStore) {
+        try { ReadingStreakStore.recordReadingDay(Date.now()); }
+        catch (e) { console.warn('reading-streak record failed', e); }
+      }
     } else if (!prev) {
       setReadItems((p) => ({ ...p, [key]: 1 }));
     }

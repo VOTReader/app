@@ -1784,7 +1784,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           <div className="settings-card">
             <SettingsRow
               label="Mark as Read"
-              desc="Chapters and letters you've read past 90% are marked with a checkmark. Progress stops recording when this is off, but what's already saved is kept."
+              desc="Chapters and letters are checked off automatically once you've genuinely read them — nearly all of the text seen, for about as long as reading it takes. A quick scroll to the bottom doesn't count. Re-reads add a small ×2, ×3 beside the check. Progress stops recording when this is off, but what's already saved is kept."
               checked={settings.markAsRead}
               onToggle={() => onToggle("markAsRead")}
             />

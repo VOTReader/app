@@ -37,8 +37,10 @@
      tabState — the whole useTabs() return; tabs / activeTabIdx /
        setTabs / setActiveTabIdx are pulled from it.
      cancelDwell — useReadingDwell (P6f); switchToTab cancels an in-flight
-       dwell timer BEFORE flipping tabs so a "90% read" commit can't land
-       on the wrong (newly-active) tab.
+       dwell timer BEFORE flipping tabs so the previous tab's reading-streak
+       day-record timer can't credit time spent on the newly-active tab.
+       (Mark-as-read itself is per-visit in use-read-tracker.js, keyed on
+       placeKey — a tab flip remounts its state and needs no cancel here.)
      setTabThumbnails — useThumbnails (P6d); closeAllTabs clears them.
 
    RETURNS: { openNewTab, switchToTab, closeTab, closeOtherTabs,
@@ -150,9 +152,10 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
   }, []);
   const switchToTab = React.useCallback((idx) => {
-    // Cancel any in-flight dwell timer BEFORE flipping tabs — otherwise
-    // the previous tab's "read 90%, fire commit" timer would land on the
-    // newly-active tab and mark the wrong letter as read.
+    // Cancel any in-flight dwell timer BEFORE flipping tabs — otherwise the
+    // previous tab's streak-dwell timer keeps running and credits a reading
+    // day off time actually spent on the newly-active tab. (Mark-as-read is
+    // NOT at stake here anymore — the read tracker is per-visit/placeKey.)
     cancelDwell();
     setActiveTabIdx((_prev) => {
       if (idx < 0) return 0;

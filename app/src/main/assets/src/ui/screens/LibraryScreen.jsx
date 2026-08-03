@@ -25,7 +25,7 @@ function _libDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, readCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, totalReadCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to all 5 stores so tile counts re-render on any mutation.
   React.useSyncExternalStore(
     React.useCallback((cb) => NoteStore.subscribe(cb), []),
@@ -134,8 +134,8 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     },
     progress: {
       id: 'progress', eyebrow: 'My Progress', title: 'Progress',
-      detail: !readCount ? 'Nothing read yet' : (readCount + ' read'),
-      guide: !readCount ? 'Chapters you read are counted here.' : null,
+      detail: !totalReadCount ? 'Nothing read yet' : (totalReadCount + ' read'),
+      guide: !totalReadCount ? 'Chapters you read are counted here.' : null,
       onClick: onOpenProgress,
       icon: (
         <svg viewBox="0 0 24 24">

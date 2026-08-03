@@ -89,7 +89,6 @@ export function useSettings({ savedSettings, theme }) {
     }
     return {
       showReadingDot: false, showSurpriseButton: false, markAsRead: true,
-      showProgressBar: true,
       // Search defaults — only the values that are actually wired to
       // VotSearch.search() at the call site. Previously this block also
       // declared 12 searchInclude* flags (Notes, Verses, Headings,

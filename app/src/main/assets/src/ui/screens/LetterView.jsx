@@ -4,7 +4,7 @@
 
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, showProgressBar, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [highlightedFn, setHighlightedFn] = React.useState(null);
   const [sheetFn, setSheetFn] = React.useState(null);
@@ -53,7 +53,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           volumeLabel={volumeLabel}
           studyMode={studyMode}
           theme={theme}
-          showProgressBar={showProgressBar}
           markAsReadEnabled={false}
           inert={true}
           restoreScroll={savedScrollFor(custom ? custom.scrollKey : letterScrollKey(volKey, full.id))}
@@ -86,7 +85,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           volumeLabel={destCol.label}
           studyMode={studyMode}
           theme={theme}
-          showProgressBar={showProgressBar}
           markAsReadEnabled={false}
           inert={true}
           restoreScroll={savedScrollFor(letterScrollKey(b.volKey, full.id))}
@@ -222,7 +220,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
   return (
     <ScreenLayout
-      showProgress={showProgressBar}
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
