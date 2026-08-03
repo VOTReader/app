@@ -236,8 +236,15 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       }
 
       var res;
-      try { res = PlatformBridge.nativeRecordStart(); } catch (_e) { res = 'error:exception'; }
+      try {
+        // Android acquires focus/routing atomically inside nativeRecordStart so
+        // MediaRecorder cannot overtake a posted UI task. The browser bridge's
+        // no-op session hook stays here for symmetry and future web handling.
+        if (!PlatformBridge.isAndroid) PlatformBridge.startAudioSession();
+        res = PlatformBridge.nativeRecordStart();
+      } catch (_e) { res = 'error:exception'; }
       if (res !== 'ok') {
+        PlatformBridge.endAudioSession();
         setError(
           res === 'error:unsupported-codec'
             ? 'Recording is not supported in this browser.'
@@ -250,7 +257,6 @@ export function JournalRecordingSheet({ onSave, onClose }) {
         setStage('error');
         return;
       }
-      PlatformBridge.startAudioSession();  // Android: MODE_IN_COMMUNICATION; web: no-op
       samplesAccumRef.current = [];
       startTimeRef.current = Date.now();
       accumulatedMsRef.current = 0;
@@ -376,7 +382,13 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     // handler (Android: native callback; web: MediaRecorder.onstop →
     // FileReader.readAsDataURL). Component transitions to preview eagerly;
     // the callback then populates previewBlobRef + may trigger auto-save.
-    PlatformBridge.nativeRecordStop();
+    try {
+      PlatformBridge.nativeRecordStop();
+    } finally {
+      // Stop owns the transition to preview, so it also owns releasing audio
+      // focus/routing; waiting for Save/Close leaves other apps paused.
+      PlatformBridge.endAudioSession();
+    }
     setStage('preview');
   }
 
@@ -631,9 +643,9 @@ export function JournalRecordingSheet({ onSave, onClose }) {
 
   return (
     <div className="note-sheet-overlay" onClick={function(e) { if (e.target === e.currentTarget) requestDiscard(); }}>
-      <div className="note-sheet jrn-rec-sheet" ref={trapRef} onClick={function(e) { e.stopPropagation(); }}>
+      <div className="note-sheet jrn-rec-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="journal-recording-title" onClick={function(e) { e.stopPropagation(); }}>
         <div className="note-sheet-header">
-          <span className="note-sheet-title" style={{ flex: 1 }}>{stage === 'preview' ? 'Review Recording' : 'Voice Recording'}</span>
+          <span className="note-sheet-title" id="journal-recording-title" style={{ flex: 1 }}>{stage === 'preview' ? 'Review Recording' : 'Voice Recording'}</span>
           {stage !== 'preview' && (
             <button className="note-sheet-menu-btn" onClick={requestDiscard} aria-label="Close" style={{ fontSize: '18px' }}>×</button>
           )}

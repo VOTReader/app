@@ -14,6 +14,7 @@
    "Invisible and uninteractable" means GONE. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import 'fake-indexeddb/auto';
 import { screen, cleanup, fireEvent, within, act } from '@testing-library/react';
 import {
   setupSettingsGlobals, teardownSettingsGlobals, renderSettings, rowLabels, row,
@@ -83,6 +84,25 @@ describe('auto-scroll settings disclosure', () => {
     renderSettings({ autoScroll: true, autoScrollNext: true }); seen.push(rowLabels().length);
     expect(seen[1]).toBe(seen[0] + 2);  // speed + auto-continue
     expect(seen[2]).toBe(seen[1] + 1);  // + pause
+  });
+});
+
+describe('mark-as-read section disclosure', () => {
+  it('uses a keyboard-native disclosure button beside the separate Clear action', () => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      buildProgressGroups: () => [{
+        id: 'scripture', label: 'Scriptures',
+        genres: [{ label: 'Books', books: [{ id: 'genesis', label: 'Genesis', total: 50 }] }],
+      }],
+    });
+    renderSettings({ markAsRead: true });
+
+    const toggle = screen.getByRole('button', { name: /Scriptures\s*0 \/ 50/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('Genesis')).toBeTruthy();
   });
 });
 
@@ -217,6 +237,7 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
     renderSettings({}, props);
     fireEvent.click(screen.getByText('Clear All My Data'));
     expect(screen.getByText('Delete All Personal Data')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Delete All Personal Data' })).toBeTruthy();
   };
 
   it('registers while open and unregisters on Cancel', () => {
@@ -257,7 +278,42 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
         );
       });
       expect(alertSpy).not.toHaveBeenCalled();
+      await vi.waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1));
     } finally {
+      restoreLocation();
+    }
+  });
+
+  it('reports a blocked personal-data deletion as failure and does not reload', async () => {
+    const toastSpy = vi.fn();
+    const deleteSpy = vi.spyOn(indexedDB, 'deleteDatabase').mockImplementation((name) => {
+      const req = {};
+      queueMicrotask(() => {
+        if (name === 'vot-journal-media') req.onblocked && req.onblocked();
+        else req.onsuccess && req.onsuccess();
+      });
+      return req;
+    });
+    localStorage.setItem('vot-clear-probe', 'keep-until-critical-deletes-finish');
+    stubLocationReload();
+    try {
+      teardownSettingsGlobals();
+      setupSettingsGlobals({ showToast: toastSpy });
+      renderSettings();
+      fireEvent.click(screen.getByText('Clear All My Data'));
+      fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+      fireEvent.click(screen.getByText('Delete Everything'));
+
+      await vi.waitFor(() => {
+        expect(toastSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ text: 'Clear did not finish. Please try again.' })
+        );
+      });
+      expect(localStorage.getItem('vot-clear-probe')).toBe('keep-until-critical-deletes-finish');
+      expect(window.location.reload).not.toHaveBeenCalled();
+      expect(deleteSpy).toHaveBeenCalledWith('vot-journal-media');
+    } finally {
+      localStorage.removeItem('vot-clear-probe');
       restoreLocation();
     }
   });
@@ -277,24 +333,26 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     slice: () => ({ arrayBuffer: async () => new Uint8Array(8).buffer }),
     text: async () => LEGACY_BACKUP,
   });
-  const setupImport = () => {
+  const setupImport = (overrides = {}) => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true);
     const applySpy = vi.fn(async () => ({ importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] }));
+    const pickImportFile = vi.fn(async () => fakeFile());
     stubLocationReload();
     teardownSettingsGlobals();
     setupSettingsGlobals({
       PlatformBridge: {
         isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
         openFilePicker: () => {}, openExportSink: () => null,
-        pickImportFile: async () => fakeFile(),
-        clearGardenCache: () => {}, getCrashLog: () => Promise.resolve(''),
+        pickImportFile,
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
       },
       isContainerMagic: () => false,       // route the legacy-JSON path
       validateImportEnvelope: () => [],
       applyImportPayload: applySpy,
+      ...overrides,
     });
     renderSettings();
-    return { confirmSpy, applySpy };
+    return { confirmSpy, applySpy, pickImportFile };
   };
   afterEach(restoreLocation);
 
@@ -337,10 +395,52 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     expect(applySpy).not.toHaveBeenCalled();
 
     // Re-open and take the registry dismiss route this time.
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(false));
     fireEvent.click(screen.getByText('Import'));
     const sheet = await findImportSheet();
     act(() => { sheet.dismiss(); });
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
+    expect(applySpy).not.toHaveBeenCalled();
+  });
+
+  it('locks all backup actions until the active picker and confirmation settle', async () => {
+    const { pickImportFile } = setupImport();
+    fireEvent.click(screen.getByText('Import'));
+    await findImportSheet();
+
+    for (const name of ['Export', 'Import', 'Verify']) {
+      expect(screen.getByRole('button', { name }).disabled).toBe(true);
+    }
+    expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    expect(pickImportFile).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByText('Cancel'));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(false));
+  });
+
+  it('keeps destructive data actions locked after import until the scheduled reload', async () => {
+    const { applySpy } = setupImport();
+    fireEvent.click(screen.getByText('Import'));
+    await findImportSheet();
+    fireEvent.click(screen.getByText('Import & Overwrite'));
+    await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
+  });
+
+  it('refuses import while any structured store is still pending hydration', async () => {
+    const toastSpy = vi.fn();
+    const pendingAnnotations = { ...globalThis.AnnotationStore, getState: () => 'pending' };
+    const { applySpy } = setupImport({ AnnotationStore: pendingAnnotations, showToast: toastSpy });
+    fireEvent.click(screen.getByText('Import'));
+    await findImportSheet();
+    fireEvent.click(screen.getByText('Import & Overwrite'));
+
+    await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Storage is temporarily unavailable. Please try again in a moment.' })
+    ));
     expect(applySpy).not.toHaveBeenCalled();
   });
 });
@@ -376,7 +476,7 @@ describe('Android v3 import — native stream not closed until the confirm settl
       PlatformBridge: {
         isAndroid: true, setKeepScreenOn: () => {}, saveToFile: () => {},
         openFilePicker: () => {}, openExportSink: () => null,
-        clearGardenCache: () => {}, getCrashLog: () => Promise.resolve(''),
+        clearGardenCache: () => {}, getCrashLog: () => '[]',
         v3ImportOpen: () => { setTimeout(() => { if (window.__onV3ImportReady) window.__onV3ImportReady('ok'); }, 0); },
         v3ImportBegin: () => 'v3:' + JSON.stringify(MANIFEST),
         v3ImportClose: closeSpy,

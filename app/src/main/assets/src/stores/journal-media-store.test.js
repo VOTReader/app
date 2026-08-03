@@ -15,15 +15,9 @@
    importing the store so its IIFE module-load + every test sees
    a working Blob type.
 
-   The store closes over a module-private `_dbPromise` and has no
-   public reset hook. We can't reliably wipe state between tests by
-   deleting + re-opening (the held connection blocks deletion until
-   the closure ref drops, which never happens at module scope). The
-   tests below run sequentially and each uses unique ids so the
-   accumulated state doesn't bleed between assertions; the
-   `vot-journal-media` database is deleted ONCE in the top-level
-   beforeAll for total isolation from other test files. Per-test
-   isolation uses `pruneOrphans([])` to wipe between cases.
+   The store closes its cached connection on versionchange so Clear All
+   can delete this database. Per-test isolation still uses
+   `pruneOrphans([])` to keep the ordinary cases cheap.
 
    Per [[user-data-paramount]] orphan pruning is one of the most
    dangerous "user data deleter" surfaces in the app: a bug here
@@ -66,6 +60,7 @@ beforeAll(async () => {
 // goes through the store's own delete path so the URL cache stays
 // consistent with the underlying object store.
 beforeEach(async () => {
+  await JournalMediaStore.abortImportReplace();
   await JournalMediaStore.pruneOrphans([]);
 });
 
@@ -168,6 +163,51 @@ describe('JournalMediaStore — allIds()', () => {
 
     const ids = await JournalMediaStore.allIds();
     expect(new Set(ids)).toEqual(new Set(['m_a', 'm_b', 'm_c']));
+  });
+});
+
+describe('JournalMediaStore — atomic import replacement', () => {
+  it('keeps staged records invisible and abort preserves the live set', async () => {
+    await JournalMediaStore.put({ id: 'old', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    await JournalMediaStore.beginImportReplace();
+    await JournalMediaStore.stageImportRecord({ id: 'new', type: 'audio', blob: makeBlob(12, 'audio/webm') });
+
+    expect(await JournalMediaStore.allIds()).toEqual(['old']);
+    expect(await JournalMediaStore.get('new')).toBeNull();
+
+    await JournalMediaStore.abortImportReplace();
+    expect(await JournalMediaStore.allIds()).toEqual(['old']);
+  });
+
+  it('commits the fully staged set as an exact replacement', async () => {
+    await JournalMediaStore.put({ id: 'stale', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    await JournalMediaStore.beginImportReplace();
+    await JournalMediaStore.stageImportRecord({ id: 'm1', type: 'image', blob: makeBlob(16, 'image/png') });
+    await JournalMediaStore.stageImportRecord({ id: 'm2', type: 'audio', blob: makeBlob(24, 'audio/webm') });
+
+    await JournalMediaStore.commitImportReplace();
+
+    expect(new Set(await JournalMediaStore.allIds())).toEqual(new Set(['m1', 'm2']));
+    expect(await JournalMediaStore.get('stale')).toBeNull();
+    expect((await JournalMediaStore.get('m1')).blob.size).toBe(16);
+    expect((await JournalMediaStore.get('m2')).blob.size).toBe(24);
+  });
+
+  it('merge commit lands staged records by id without deleting existing media', async () => {
+    await JournalMediaStore.put({ id: 'keep', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    await JournalMediaStore.put({ id: 'overwrite', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+    await JournalMediaStore.beginImportReplace();
+    await JournalMediaStore.stageImportRecord({ id: 'overwrite', type: 'image', blob: makeBlob(16, 'image/png') });
+    await JournalMediaStore.stageImportRecord({ id: 'added', type: 'audio', blob: makeBlob(24, 'audio/webm') });
+
+    await JournalMediaStore.commitImportMerge();
+
+    expect(new Set(await JournalMediaStore.allIds())).toEqual(new Set(['keep', 'overwrite', 'added']));
+    expect((await JournalMediaStore.get('overwrite')).blob.size).toBe(16); // staged copy wins by id
+    expect((await JournalMediaStore.get('keep')).blob.size).toBe(8);      // untouched
+    // Staging emptied — a later exact replace can't resurrect these records.
+    await JournalMediaStore.commitImportReplace();
+    expect(await JournalMediaStore.allIds()).toEqual([]);
   });
 });
 
@@ -349,5 +389,22 @@ describe('JournalMediaStore — objectUrl LRU cap (PERF2)', () => {
       URL.createObjectURL = origCreate;
       URL.revokeObjectURL = origRevoke;
     }
+  });
+});
+
+describe('JournalMediaStore connection lifecycle', () => {
+  it('closes on versionchange so Clear All can delete and then reopen the database', async () => {
+    await JournalMediaStore.put({ id: 'before-clear', type: 'image', blob: makeBlob(8, 'image/jpeg') });
+
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.deleteDatabase('vot-journal-media');
+      req.onsuccess = () => resolve(undefined);
+      req.onerror = () => reject(req.error || new Error('delete failed'));
+      req.onblocked = () => reject(new Error('delete was blocked by the cached connection'));
+    });
+
+    await JournalMediaStore.put({ id: 'after-clear', type: 'audio', blob: makeBlob(4, 'audio/webm') });
+    expect(await JournalMediaStore.get('before-clear')).toBeNull();
+    expect((await JournalMediaStore.get('after-clear')).type).toBe('audio');
   });
 });

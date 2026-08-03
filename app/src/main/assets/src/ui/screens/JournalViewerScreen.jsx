@@ -677,7 +677,7 @@ export function JournalViewerScreen(props) {
       onClick={function() { setMenuOpen(true); }}
       title="Entry options"
       aria-label="Entry options"
-      aria-haspopup="menu"
+      aria-haspopup="dialog"
       aria-expanded={menuOpen}
     >
       <svg viewBox="0 0 24 24" fill="currentColor">

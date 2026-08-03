@@ -47,9 +47,8 @@ function fakeStore(extra) {
   return {
     subscribe: () => () => {}, getVersion: () => 0, all: () => ({}), count: () => 0,
     get: () => null, set: () => {}, remove: () => {}, clear: () => {},
-    // The import flow's degraded-store guard reads getState() on every
-    // exportable store before applying — 'ready' = hydrated, safe to write.
-    getState: () => 'ready',
+    // Destructive imports require every store to be fully hydrated.
+    getState: () => 'loaded',
     ...extra,
   };
 }
@@ -111,7 +110,7 @@ export function setupSettingsGlobals(overrides = {}) {
   put('PlatformBridge', {
     isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
     openFilePicker: () => {}, openExportSink: () => null, pickImportFile: () => null,
-    clearGardenCache: () => {}, getCrashLog: () => Promise.resolve(''),
+    clearGardenCache: () => {}, getCrashLog: () => '[]',
   });
   put('DiagnosticLog', { error: () => {}, all: () => [], clear: () => {} });
   put('StorageHealth', {
@@ -135,6 +134,9 @@ export function setupSettingsGlobals(overrides = {}) {
     'writeContainer', 'readContainer', 'isContainerMagic', 'runV3AndroidExport',
     'classifyV3ImportBegin', 'v3AndroidImportEntries', 'validateImportEnvelope',
     'validateStorePayload', 'validateMediaRecord']) put(f, () => {});
+  // Pass-through (NOT a no-op): a stubbed lock must still run the operation,
+  // or every Export/Verify/Clear press in a test would silently do nothing.
+  put('withBackupLock', (op) => op());
 
   for (const [k, v] of Object.entries(overrides)) put(k, v);
 }

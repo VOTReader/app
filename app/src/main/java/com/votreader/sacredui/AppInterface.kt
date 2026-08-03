@@ -47,6 +47,12 @@ class AppInterface(
     private val vm: MainViewModel
 ) {
 
+    // One lifecycle lock orders session acquire/release, recorder start, and
+    // renderer/activity teardown. `audioCaptureAllowed` closes the narrow race
+    // where an already-dispatched bridge call could start after its renderer died.
+    private val audioLifecycleLock = Any()
+    private var audioCaptureAllowed = true
+
     // (U19) Cache the Vibrator lookup — haptic() can fire on many taps and
     // getSystemService on every call is wasteful. The service is process-stable
     // + thread-safe, so a lazy singleton is safe from the binder thread where
@@ -122,6 +128,7 @@ class AppInterface(
      */
     @JavascriptInterface
     fun onAppReady() {
+        synchronized(audioLifecycleLock) { audioCaptureAllowed = true }
         host.postToUi { vm.splashHolding = false }
     }
 
@@ -153,50 +160,54 @@ class AppInterface(
     // capture (AAUDIO_ERROR_DISCONNECTED) or never acquire it (NotReadableError).
     @JavascriptInterface
     fun startAudioSession() {
-        host.postToUi {
-            val am = host.audioSystemService ?: return@postToUi
-            // N2: only capture the prior mode when we're NOT already in a
-            // recording session. A double startAudioSession() without an
-            // intervening endAudioSession() (a recovery re-fire, a re-mounted
-            // sheet, or a start after a failed stop) would otherwise save
-            // MODE_IN_COMMUNICATION as "previous", and endAudioSession() would
-            // then restore TO communication mode and never return to normal —
-            // stranding the device on earpiece routing. The normal path (mode is
-            // NORMAL at start) is unchanged.
-            if (am.mode != AudioManager.MODE_IN_COMMUNICATION) {
-                vm.previousAudioMode = am.mode
-            }
+        synchronized(audioLifecycleLock) {
+            if (audioCaptureAllowed) startAudioSessionNow()
+        }
+    }
+
+    private fun startAudioSessionNow() {
+        val am = host.audioSystemService ?: return
+        // N2: only capture the prior mode when we're NOT already in a
+        // recording session. A double startAudioSession() without an
+        // intervening endAudioSession() (a recovery re-fire, a re-mounted
+        // sheet, or a start after a failed stop) would otherwise save
+        // MODE_IN_COMMUNICATION as "previous", and endAudioSession() would
+        // then restore TO communication mode and never return to normal —
+        // stranding the device on earpiece routing. The normal path (mode is
+        // NORMAL at start) is unchanged.
+        if (am.mode != AudioManager.MODE_IN_COMMUNICATION) {
+            vm.previousAudioMode = am.mode
+        }
+        try {
+            am.mode = AudioManager.MODE_IN_COMMUNICATION
+        } catch (e: Exception) {
+            Timber.w(e, "startAudioSession setMode failed")
+        }
+        // #3 ("polite" journaling): request TRANSIENT-EXCLUSIVE audio focus so
+        // other media (music, a podcast) PAUSES while the user records, then
+        // resumes when we abandon it (endAudioSession / teardown). Idempotent —
+        // a double start (recovery re-fire, re-mounted sheet) keeps the one
+        // existing request rather than stacking a second. AudioFocusRequest +
+        // requestAudioFocus(request) are API 26, so no version guard is needed.
+        if (vm.audioFocusRequest == null) {
             try {
-                am.mode = AudioManager.MODE_IN_COMMUNICATION
+                val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                    )
+                    // No-op listener: we don't duck/resume our OWN capture on a
+                    // focus change — abandoning the stored request object is what
+                    // restores the other app's playback.
+                    .setOnAudioFocusChangeListener { }
+                    .build()
+                vm.audioFocusRequest = req
+                am.requestAudioFocus(req)
             } catch (e: Exception) {
-                Timber.w(e, "startAudioSession setMode failed")
-            }
-            // #3 ("polite" journaling): request TRANSIENT-EXCLUSIVE audio focus so
-            // other media (music, a podcast) PAUSES while the user records, then
-            // resumes when we abandon it (endAudioSession / teardown). Idempotent —
-            // a double start (recovery re-fire, re-mounted sheet) keeps the one
-            // existing request rather than stacking a second. AudioFocusRequest +
-            // requestAudioFocus(request) are API 26, so no version guard is needed.
-            if (vm.audioFocusRequest == null) {
-                try {
-                    val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
-                        .setAudioAttributes(
-                            AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                                .build()
-                        )
-                        // No-op listener: we don't duck/resume our OWN capture on a
-                        // focus change — abandoning the stored request object is what
-                        // restores the other app's playback.
-                        .setOnAudioFocusChangeListener { }
-                        .build()
-                    vm.audioFocusRequest = req
-                    am.requestAudioFocus(req)
-                } catch (e: Exception) {
-                    Timber.w(e, "requestAudioFocus failed")
-                    vm.audioFocusRequest = null
-                }
+                Timber.w(e, "requestAudioFocus failed")
+                vm.audioFocusRequest = null
             }
         }
     }
@@ -206,18 +217,20 @@ class AppInterface(
     // playback routes to the speaker normally, not the earpiece. Idempotent.
     @JavascriptInterface
     fun endAudioSession() {
-        host.postToUi {
-            val am = host.audioSystemService ?: return@postToUi
-            // #3: release audio focus first so the other app's music resumes.
-            vm.audioFocusRequest?.let {
-                try { am.abandonAudioFocusRequest(it) } catch (e: Exception) { Timber.w(e, "abandonAudioFocus failed") }
-            }
-            vm.audioFocusRequest = null
-            try {
-                am.mode = vm.previousAudioMode
-            } catch (e: Exception) {
-                Timber.w(e, "endAudioSession restoreMode failed")
-            }
+        synchronized(audioLifecycleLock) { endAudioSessionNow() }
+    }
+
+    private fun endAudioSessionNow() {
+        val am = host.audioSystemService ?: return
+        // #3: release audio focus first so the other app's music resumes.
+        vm.audioFocusRequest?.let {
+            try { am.abandonAudioFocusRequest(it) } catch (e: Exception) { Timber.w(e, "abandonAudioFocus failed") }
+        }
+        vm.audioFocusRequest = null
+        try {
+            am.mode = vm.previousAudioMode
+        } catch (e: Exception) {
+            Timber.w(e, "endAudioSession restoreMode failed")
         }
     }
 
@@ -236,11 +249,38 @@ class AppInterface(
     // already expects. The string shape stays identical so the JS
     // contract is preserved bit-for-bit.
 
-    /** Start recording. Returns "ok" or "error:<reason>" synchronously. */
+    /** Start recording. Audio focus/mode is acquired synchronously in the same
+     *  native call, so MediaRecorder cannot race ahead of a queued UI task. */
     @JavascriptInterface
-    fun nativeRecordStart(): String = when (val r = vm.audioRecorder.start()) {
-        is NativeAudioRecorder.Result.Success -> "ok"
-        is NativeAudioRecorder.Result.Failure -> "error:${r.reason}"
+    fun nativeRecordStart(): String {
+        synchronized(audioLifecycleLock) {
+            if (!audioCaptureAllowed) return "error:session-unavailable"
+            startAudioSessionNow()
+            return when (val r = vm.audioRecorder.start()) {
+                is NativeAudioRecorder.Result.Success -> "ok"
+                is NativeAudioRecorder.Result.Failure -> {
+                    endAudioSessionNow()
+                    "error:${r.reason}"
+                }
+            }
+        }
+    }
+
+    /** Renderer/activity teardown owns this half of the same lifecycle lock as
+     *  [nativeRecordStart]. Once blocked, no stale bridge call can reopen capture;
+     *  the replacement renderer's [onAppReady] handshake enables it again. */
+    internal fun stopAudioCaptureForTeardown() {
+        synchronized(audioLifecycleLock) {
+            audioCaptureAllowed = false
+            vm.audioRecorder.cancel()
+            // Restore routing only when a session is actually live. A plain app
+            // exit with no recording must not write the device-global audio
+            // mode (another app — a call — may own it right now).
+            val am = host.audioSystemService
+            if (vm.audioFocusRequest != null || am?.mode == AudioManager.MODE_IN_COMMUNICATION) {
+                endAudioSessionNow()
+            }
+        }
     }
 
     @JavascriptInterface

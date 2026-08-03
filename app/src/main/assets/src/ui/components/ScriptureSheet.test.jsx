@@ -16,7 +16,7 @@
       instead, mirroring the FootnoteSheet / inline-ref sheets. */
 
 import { it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, screen } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { ScriptureSheet } from './ScriptureSheet.jsx';
 
@@ -42,6 +42,19 @@ it('portals the sheet OUT of a transformed .pager-track to <body>', () => {
   expect(track.querySelector('.fn-sheet-backdrop')).toBeNull();
   // It still exists in the document — portaled onto <body>.
   expect(document.body.querySelector('.fn-sheet')).not.toBeNull();
+});
+
+it('is an accessible modal while open and becomes inert during its close transition', () => {
+  const active = { ref: '3:16', cite: 'John 3:16' };
+  const { rerender } = render(<Sheet activeRef={active} onClose={() => {}} />);
+  expect(screen.getByRole('dialog', { name: 'Scripture John 3:16' })).toBeTruthy();
+  expect(document.activeElement.closest('.fn-sheet')).not.toBeNull();
+
+  rerender(<Sheet activeRef={null} onClose={() => {}} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.querySelector('.fn-sheet').hasAttribute('inert')).toBe(true);
+  expect(document.querySelector('.fn-sheet').getAttribute('aria-hidden')).toBe('true');
+  expect(document.querySelector('.fn-sheet-backdrop').classList.contains('open')).toBe(false);
 });
 
 it('renders the verse text when the cite is in MATTHEW_NKJV', () => {

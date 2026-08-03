@@ -117,6 +117,7 @@ class GardenImageCacheTest {
         assertFalse(cache.hostAllowed("https://evil.test/garden_001.jpg"))
         assertFalse(cache.hostAllowed("https://github.com.evil.test/garden_001.jpg"))  // look-alike suffix
         assertFalse(cache.hostAllowed("https://raw.githubusercontent.com/x/garden_001.jpg"))  // different gh host
+        assertFalse(cache.hostAllowed("http://github.com/VOTReader/votreader-assets/releases/download/garden-ultra/garden_001.jpg"))
         assertFalse(cache.hostAllowed("not a url"))
         assertFalse(cache.hostAllowed("file:///etc/passwd"))
     }

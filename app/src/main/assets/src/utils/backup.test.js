@@ -549,19 +549,34 @@ describe('verifyImportCounts (BAK3)', () => {
     expect(verifyImportCounts(manifest, 0)).toEqual([]);
   });
 
-  it('applyV3 surfaces a media shortfall via countMismatches', async () => {
+  it('applyV3 salvages a media shortfall: merge commit + countMismatches report', async () => {
     // A v3 manifest declaring 2 media frames, but the entries stream yields 1 →
-    // the count check catches the shortfall the streaming success path can't.
-    const media = { allIds: async () => [], delete: async () => {}, put: async () => {} };
+    // the frame that arrived lands via the MERGE commit (nothing deleted) and
+    // the shortfall surfaces through the counts check.
+    const commits = [];
+    const media = {
+      allIds: async () => [], delete: async () => {}, put: async () => {},
+      beginImportReplace: async () => {}, stageImportRecord: async () => {},
+      commitImportReplace: async () => { commits.push('replace'); },
+      commitImportMerge: async () => { commits.push('merge'); },
+      abortImportReplace: async () => {},
+    };
     async function* oneFrame() {
-      // The fake put() ignores the blob, so a plain Uint8Array stands in for it.
-      yield { id: 'm1', meta: { mime: 'image/png', size: 3 }, blob: new Uint8Array([1, 2, 3]) };
+      // The fake stage write ignores the blob, so a Uint8Array stands in for it.
+      yield { id: 'm1', meta: { type: 'image', mime: 'image/png', size: 3 }, blob: new Uint8Array([1, 2, 3]) };
     }
     const res = await applyV3(
-      { counts: { _media: 2 }, stores: {} },
+      {
+        app: 'VOTReader', exportVersion: 3, data: {}, counts: { _media: 2 }, stores: {},
+        media: [
+          { id: 'm1', type: 'image', mime: 'image/png', size: 3 },
+          { id: 'm2', type: 'audio', mime: 'audio/webm', size: 4 },
+        ],
+      },
       oneFrame(),
       { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: () => [] },
     );
+    expect(commits).toEqual(['merge']);
     expect(res.countMismatches).toEqual(['media 1/2']);
   });
 });
@@ -573,6 +588,9 @@ describe('applyV3', () => {
   beforeEach(() => { localStorage.clear(); });
 
   const okValidate = () => [];
+  const manifest = (stores = {}, media = []) => ({
+    app: 'VOTReader', exportVersion: 3, data: {}, stores, media,
+  });
   function destStore(method, opts = {}) {
     const calls = [];
     return {
@@ -583,12 +601,26 @@ describe('applyV3', () => {
   }
   function destMedia(seed) {
     const store = Object.assign({}, seed);
+    let staged = {};
     const puts = [];
     return {
       puts, _store: store,
       allIds: async () => Object.keys(store),
+      get: async (id) => store[id] || null,
       delete: async (id) => { delete store[id]; },
       put: async (rec) => { store[rec.id] = rec; puts.push(rec); },
+      beginImportReplace: async () => { staged = {}; },
+      stageImportRecord: async (rec) => { staged[rec.id] = rec; puts.push(rec); },
+      commitImportReplace: async () => {
+        Object.keys(store).forEach((id) => { delete store[id]; });
+        Object.assign(store, staged);
+        staged = {};
+      },
+      commitImportMerge: async () => {
+        Object.assign(store, staged);
+        staged = {};
+      },
+      abortImportReplace: async () => { staged = {}; },
     };
   }
   const blobOf = (u8) => new Blob([u8]);
@@ -637,21 +669,71 @@ describe('applyV3', () => {
     expect(Array.from(new Uint8Array(await media.puts[1].blob.arrayBuffer()))).toEqual(Array.from(aud));
   });
 
-  it('SKIPS a store whose payload fails validation (never written)', async () => {
+  it('an invalid store is SKIPPED and demotes media to a no-delete merge', async () => {
+    // The kept-old store may reference existing blobs, so a replace (which
+    // prunes) is forbidden; the merge leaves every current attachment intact.
     const ann = destStore('replaceAll');
+    const media = destMedia({ old: { id: 'old' } });
     const res = await applyV3(
-      { stores: { 'vot-annotations': { bad: true } } }, [],
-      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: destMedia(), validateStorePayload: () => ['shape violation'] },
+      manifest({ 'vot-annotations': { bad: true } }), [],
+      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: media, validateStorePayload: () => ['shape violation'] },
     );
     expect(res.skippedStores).toEqual(['vot-annotations']);
-    expect(ann.calls).toEqual([]);
+    expect(ann.calls).toEqual([]);          // invalid payload never written
+    expect(Object.keys(media._store)).toEqual(['old']); // nothing pruned
+  });
+
+  it('rejects a legacy import while a v3 import holds the cross-tab lock', async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks');
+    let held = false;
+    const fakeLocks = {
+      request: async (_name, _opts, callback) => {
+        if (held) return callback(null);
+        held = true;
+        try { return await callback({ name: 'votreader-backup-import' }); }
+        finally { held = false; }
+      },
+    };
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: fakeLocks });
+
+    let releaseFirst;
+    const firstMedia = destMedia();
+    const stageFirst = firstMedia.stageImportRecord;
+    firstMedia.stageImportRecord = async (record) => {
+      await new Promise((resolve) => { releaseFirst = resolve; });
+      return stageFirst(record);
+    };
+    const entry = { id: 'm1', meta: { type: 'image', mime: 'image/png', size: 1 }, blob: blobOf(new Uint8Array([1])) };
+
+    try {
+      const first = applyV3(
+        manifest({}, [{ id: 'm1', type: 'image', mime: 'image/png', size: 1 }]),
+        [entry],
+        { storesMap: {}, flagMap: {}, mediaStore: firstMedia, validateStorePayload: okValidate },
+      );
+      await vi.waitFor(() => expect(releaseFirst).toBeTypeOf('function'));
+
+      await expect(applyImportPayload(
+        { app: 'VOTReader', exportVersion: 2, data: {}, stores: {}, media: {} },
+        {
+          storesMap: {}, flagMap: {}, mediaStore: destMedia(),
+          validateStorePayload: okValidate, validateMediaRecord: okValidate,
+        },
+      )).rejects.toThrow(/already in progress/);
+
+      releaseFirst();
+      await first;
+    } finally {
+      if (originalDescriptor) Object.defineProperty(navigator, 'locks', originalDescriptor);
+      else delete navigator.locks;
+    }
   });
 
   it('REPLACES media: streamed frames win; stale media (not in the backup) is pruned', async () => {
     const media = destMedia({ old1: { id: 'old1' }, old2: { id: 'old2' } });
     await applyV3(
-      { stores: {} },
-      [{ id: 'new1', meta: { mime: 'image/png' }, blob: blobOf(new Uint8Array([1, 2])) }],
+      manifest({}, [{ id: 'new1', type: 'image', mime: 'image/png', size: 2 }]),
+      [{ id: 'new1', meta: { type: 'image', mime: 'image/png', size: 2 }, blob: blobOf(new Uint8Array([1, 2])) }],
       { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
     );
     expect(Object.keys(media._store)).toEqual(['new1']); // old (stale) media pruned after the stream
@@ -664,38 +746,109 @@ describe('applyV3', () => {
     // the Android path) throws before the prune, so prior media survives.
     const media = destMedia({ old1: { id: 'old1' }, old2: { id: 'old2' } });
     async function* truncated() {
-      yield { id: 'new1', meta: { mime: 'image/png' }, blob: blobOf(new Uint8Array([1, 2])) };
+      yield { id: 'new1', meta: { type: 'image', mime: 'image/png', size: 2 }, blob: blobOf(new Uint8Array([1, 2])) };
       throw new Error('truncated frame');
     }
-    await expect(applyV3(
-      { stores: {} }, truncated(),
+    const res = await applyV3(
+      {
+        ...manifest(
+          {},
+          [
+            { id: 'new1', type: 'image', mime: 'image/png', size: 2 },
+            { id: 'new2', type: 'audio', mime: 'audio/webm', size: 4 },
+          ],
+        ),
+        counts: { _media: 2 },
+      },
+      truncated(),
       { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
-    )).rejects.toThrow(/truncated/);
-    // Prune never ran → existing media intact (plus the one frame that did land).
+    );
+    // Salvage: the frame that made it in lands via merge; NOTHING is deleted
+    // (old media intact) and the shortfall is reported, not thrown.
     expect(Object.keys(media._store).sort()).toEqual(['new1', 'old1', 'old2']);
+    expect(res.countMismatches).toEqual(['media 1/2']);
   });
 
-  it('BAK1: a mid-stream media truncation leaves STORES UNAPPLIED (no half-import)', async () => {
-    // Media streams BEFORE the store apply, so an Android-path truncation throws
-    // with the device's stores still the OLD data — instead of durably overwriting
-    // them and THEN reporting "import failed" (the user would lose data the message
-    // claims is untouched). RED under the old stores-first order.
+  it('BAK1 (salvage): a mid-stream truncation still applies valid stores, merges salvaged media, deletes nothing', async () => {
+    // Owner call 2026-08-02: a damaged backup restores what it can (99% > 0).
+    // The BAK1 protection survives in its essential form — existing media is
+    // never destroyed (merge, not replace) — while valid stores + the salvaged
+    // frames land, and the shortfall is REPORTED via counts, not silently eaten.
     const ann = destStore('replaceAll');
+    const media = destMedia({ old1: { id: 'old1' } });
     async function* truncated() {
-      yield { id: 'new1', meta: { mime: 'image/png' }, blob: blobOf(new Uint8Array([1, 2])) };
+      yield { id: 'new1', meta: { type: 'image', mime: 'image/png', size: 2 }, blob: blobOf(new Uint8Array([1, 2])) };
       throw new Error('truncated frame');
     }
+    const res = await applyV3(
+      {
+        ...manifest(
+          { 'vot-annotations': { k: [{ id: 'a' }] } },
+          [
+            { id: 'new1', type: 'image', mime: 'image/png', size: 2 },
+            { id: 'new2', type: 'audio', mime: 'audio/webm', size: 4 },
+          ],
+        ),
+        counts: { _media: 2 },
+      },
+      truncated(),
+      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
+    );
+    expect(ann.calls.length).toBe(1);   // valid store WAS applied (salvage)
+    expect(Object.keys(media._store).sort()).toEqual(['new1', 'old1']); // merged, nothing deleted
+    expect(res.countMismatches).toEqual(['media 1/2']);
+  });
+
+  it('a media write failure salvages: frame skipped + reported, old media kept, stores still land', async () => {
+    localStorage.setItem('vot-state', 'old-state');
+    const ann = destStore('replaceAll');
+    const media = destMedia({ old1: { id: 'old1' } });
+    media.stageImportRecord = async () => { throw new Error('quota full'); };
+
+    const res = await applyV3(
+      {
+        ...manifest(
+          { 'vot-annotations': { k: [{ id: 'new' }] } },
+          [{ id: 'new1', type: 'image', mime: 'image/png', size: 1 }],
+        ),
+        data: { 'vot-state': 'new-state' },
+        counts: { _media: 1 },
+      },
+      [{ id: 'new1', meta: { type: 'image', mime: 'image/png', size: 1 }, blob: blobOf(new Uint8Array([1])) }],
+      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
+    );
+    expect(res.importFailures).toBe(1);
+    expect(res.countMismatches).toEqual(['media 0/1']);
+    expect(Object.keys(media._store)).toEqual(['old1']); // merge — the failed frame's old copy survives
+    expect(ann.calls.length).toBe(1);                    // valid store still applied
+    expect(localStorage.getItem('vot-state')).toBe('new-state');
+  });
+
+  it('leaves overlapping live records untouched when the atomic commit fails', async () => {
+    const old1 = { id: 'm1', type: 'image', blob: blobOf(new Uint8Array([9])), mime: 'image/png', size: 1 };
+    const old2 = { id: 'm2', type: 'audio', blob: blobOf(new Uint8Array([8])), mime: 'audio/webm', size: 1 };
+    const media = destMedia({ m1: old1, m2: old2 });
+    media.commitImportReplace = async () => { throw new Error('commit failed'); };
+
     await expect(applyV3(
-      { stores: { 'vot-annotations': { k: [{ id: 'a' }] } } }, truncated(),
-      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: destMedia(), validateStorePayload: okValidate },
-    )).rejects.toThrow(/truncated/);
-    expect(ann.calls).toEqual([]);   // stores were NOT written — the import didn't half-land
+      manifest({}, [
+        { id: 'm1', type: 'image', mime: 'image/png', size: 1 },
+        { id: 'm2', type: 'audio', mime: 'audio/webm', size: 1 },
+      ]),
+      [
+        { id: 'm1', meta: { type: 'image', mime: 'image/png', size: 1 }, blob: blobOf(new Uint8Array([1])) },
+        { id: 'm2', meta: { type: 'audio', mime: 'audio/webm', size: 1 }, blob: blobOf(new Uint8Array([2])) },
+      ],
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
+    )).rejects.toThrow(/commit failed/);
+    expect(media._store.m1).toBe(old1);
+    expect(media._store.m2).toBe(old2);
   });
 
   it('reports writeFailures when a store durability barrier resolves false', async () => {
     const ann = destStore('replaceAll', { saved: false });
     const res = await applyV3(
-      { stores: { 'vot-annotations': { k: [] } } }, [],
+      manifest({ 'vot-annotations': { k: [] } }), [],
       { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: destMedia(), validateStorePayload: okValidate },
     );
     expect(res.writeFailures).toBe(1);
@@ -704,10 +857,40 @@ describe('applyV3', () => {
   it('counts importFailures when a store write throws', async () => {
     const ann = destStore('replaceAll', { throws: true });
     const res = await applyV3(
-      { stores: { 'vot-annotations': { k: [] } } }, [],
+      manifest({ 'vot-annotations': { k: [] } }), [],
       { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: destMedia(), validateStorePayload: okValidate },
     );
     expect(res.importFailures).toBe(1);
+  });
+
+  it('rejects missing or malformed media metadata before touching device data', async () => {
+    localStorage.setItem('vot-state', 'old-state');
+    const media = destMedia({ old1: { id: 'old1' } });
+    await expect(applyV3(
+      { app: 'VOTReader', exportVersion: 3, data: { 'vot-state': 'new-state' }, stores: {} }, [],
+      { storesMap: {}, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
+    )).rejects.toThrow(/invalid v3 media manifest/);
+    expect(localStorage.getItem('vot-state')).toBe('old-state');
+    expect(Object.keys(media._store)).toEqual(['old1']);
+  });
+
+  it('a frame absent from the manifest is skipped and demotes the commit to merge', async () => {
+    // Frames match the manifest BY ID. A foreign frame (tampered/corrupt
+    // container) is never staged; the import still completes as a salvage —
+    // nothing pruned, valid stores applied, failure counted.
+    const ann = destStore('replaceAll');
+    const media = destMedia({ old1: { id: 'old1' } });
+    const res = await applyV3(
+      manifest(
+        { 'vot-annotations': { k: [] } },
+        [{ id: 'expected', type: 'image', mime: 'image/png', size: 1 }],
+      ),
+      [{ id: 'different', meta: { type: 'image', mime: 'image/png', size: 1 }, blob: blobOf(new Uint8Array([1])) }],
+      { storesMap: { 'vot-annotations': { store: ann, method: 'replaceAll' } }, flagMap: {}, mediaStore: media, validateStorePayload: okValidate },
+    );
+    expect(res.importFailures).toBe(1);
+    expect(Object.keys(media._store)).toEqual(['old1']); // foreign frame not staged, nothing pruned
+    expect(ann.calls.length).toBe(1);                    // valid store still applied
   });
 });
 

@@ -139,6 +139,44 @@ export function validateStorePayload(name, payload) {
 }
 
 /**
+ * Validate the v3 container manifest's media table before any existing data is
+ * changed. The table is authoritative: applyV3 uses it to prove that every
+ * streamed frame arrived in the declared order before stale media is pruned.
+ *
+ * @param {*} media
+ * @returns {string[]} violations (empty = valid)
+ */
+export function validateV3MediaMetadata(media) {
+  if (!Array.isArray(media)) return ['"media" must be an array for a v3 backup'];
+
+  const errs = [];
+  const ids = new Set();
+  for (let i = 0; i < media.length; i += 1) {
+    const item = media[i];
+    const label = `media[${i}]`;
+    if (!isPlainObject(item)) { errs.push(`${label}: must be an object`); continue; }
+
+    if (typeof item.id !== 'string' || item.id.trim() === '') {
+      errs.push(`${label}: "id" must be a non-empty string`);
+    } else if (ids.has(item.id)) {
+      errs.push(`${label}: duplicate id "${item.id}"`);
+    } else {
+      ids.add(item.id);
+    }
+    if (item.type !== 'image' && item.type !== 'audio') {
+      errs.push(`${label}: "type" must be "image" or "audio"`);
+    }
+    if (!Number.isSafeInteger(item.size) || item.size < 0) {
+      errs.push(`${label}: "size" must be a non-negative safe integer`);
+    }
+    if (item.mime !== undefined && (typeof item.mime !== 'string' || item.mime.trim() === '')) {
+      errs.push(`${label}: "mime" must be a non-empty string when present`);
+    }
+  }
+  return errs;
+}
+
+/**
  * Validate the top-level import envelope (Layer 1). Hard failures mean the
  * file isn't a usable VOTReader backup and import should not proceed.
  *
@@ -153,16 +191,20 @@ export function validateImportEnvelope(parsed) {
   if (unsafe) { errs.push(`backup contains an unsafe key ("${unsafe}")`); return errs; }
   if (parsed.app !== 'VOTReader') errs.push('not a VOTReader backup (missing app="VOTReader")');
   const ver = parsed.exportVersion === undefined ? 1 : parsed.exportVersion;
-  if (typeof ver !== 'number' || ver < 1) errs.push(`invalid exportVersion ${JSON.stringify(parsed.exportVersion)}`);
+  const validVersion = Number.isInteger(ver) && ver >= 1;
+  if (!validVersion) errs.push(`invalid exportVersion ${JSON.stringify(parsed.exportVersion)}`);
+  if (validVersion && ver > 3) errs.push(`unsupported exportVersion ${ver}`);
   // Every backup (V1 and V2) carries `data` (the boot-shim LS keys);
   // V2 adds stores + media. `data` is required; stores/media optional.
   if (!isPlainObject(parsed.data)) errs.push('"data" must be an object');
   if (parsed.stores !== undefined && !isPlainObject(parsed.stores)) errs.push('"stores" must be an object');
-  // media is an OBJECT in v1/v2 (id → {data:base64,…}) but an ARRAY of metadata
-  // in the v3 streaming manifest (the bytes live in the container frames, not
-  // here); accept either so the same envelope check guards both formats.
-  if (parsed.media !== undefined && !isPlainObject(parsed.media) && !Array.isArray(parsed.media)) {
-    errs.push('"media" must be an object or array');
+  // media is an OBJECT in v1/v2 (id → {data:base64,…}) but a required ARRAY of
+  // metadata in v3+ (the bytes live in container frames). Keep the contracts
+  // version-gated so a damaged v3 manifest can never masquerade as no media.
+  if (validVersion && ver === 3) {
+    errs.push(...validateV3MediaMetadata(parsed.media));
+  } else if (parsed.media !== undefined && !isPlainObject(parsed.media)) {
+    errs.push('"media" must be an object for a v1/v2 backup');
   }
   return errs;
 }

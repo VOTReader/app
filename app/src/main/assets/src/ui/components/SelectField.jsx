@@ -11,6 +11,11 @@
 export function SelectField({ eyebrow, title, label, desc, value, options, onChange, valueStyle = null }) {
   const [open, setOpen] = React.useState(false);
   const [showDesc, setShowDesc] = React.useState(false);
+  const fieldId = React.useId();
+  const sheetId = `select-sheet-${fieldId}`;
+  const titleId = `select-sheet-title-${fieldId}`;
+  useModalRegistry({ id: sheetId, dismiss: () => setOpen(false), active: open });
+  const trapRef = useFocusTrap(open);
   const selected = options.find((o) => o.id === value) || options[0];
 
   React.useEffect(() => {
@@ -34,7 +39,7 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
           >i</button>
         )}
         <span className="settings-row-grow" />
-        <button type="button" className="settings-select-trigger" onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+        <button type="button" className="settings-select-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls={sheetId} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
           <span className="settings-row-value" style={valueStyle}>{selected.label}</span>
           <span className="settings-select-chev">{"›"}</span>
         </button>
@@ -42,11 +47,11 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
       {showDesc && desc && <div className="settings-row-desc">{desc}</div>}
       {open && (
         <>
-          <div className="select-sheet-backdrop open" onClick={() => setOpen(false)} />
-          <div className="select-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="select-sheet-backdrop open" aria-hidden="true" onClick={() => setOpen(false)} />
+          <div id={sheetId} className="select-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()}>
             <SheetHandle onClose={() => setOpen(false)} />
             {eyebrow ? <div className="select-sheet-eyebrow">{eyebrow}</div> : null}
-            <div className="select-sheet-title">{title || label}</div>
+            <div className="select-sheet-title" id={titleId}>{title || label}</div>
             <div className="select-sheet-ornament">
               <div className="select-sheet-ornament-line" />
               <div className="select-sheet-ornament-diamond">{"✦"}</div>

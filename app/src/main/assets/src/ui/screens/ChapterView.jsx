@@ -138,14 +138,14 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
           <h1 className="hero-title">Chapter {chapter.num}</h1>
           {chapter.title && showChapterTitle && (
             !titleFocusHidden ? (
-              <div
+              <button
+                type="button"
                 className="hero-subtitle hero-subtitle-tappable"
                 onClick={() => setTitleFocusHidden && setTitleFocusHidden(true)}
                 title="Tap to hide summary"
-                role="button"
               >
                 {chapter.title}
-              </div>
+              </button>
             ) : (
               <button
                 className="hero-subtitle-restore"

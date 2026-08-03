@@ -73,6 +73,7 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     setupGlobals();
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} />);
     expect(container.querySelector('.jrn-entry-menu-btn')).toBeTruthy();
+    expect(container.querySelector('.jrn-entry-menu-btn').getAttribute('aria-haspopup')).toBe('dialog');
     expect(container.querySelector('.jrn-pin-btn')).toBeNull();
     expect(container.querySelector('.jrn-del-btn')).toBeNull();
   });
@@ -87,6 +88,8 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     expect(screen.getByText('Edit Entry')).toBeTruthy();
     expect(screen.getByText('Unpin Entry')).toBeTruthy();      // ENTRY.pinned = true
     expect(screen.getByText('Delete Entry')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Entry options' })).toBeTruthy();
+    expect(modalRegistry.peek().id).toBe('journal-card-menu');
   });
 
   it('the menu Edit item calls onEdit', () => {

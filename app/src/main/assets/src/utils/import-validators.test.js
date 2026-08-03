@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
   validateStorePayload,
   validateImportEnvelope,
+  validateV3MediaMetadata,
   validateMediaRecord,
 } from './import-validators.js';
 
@@ -107,7 +108,7 @@ describe('validateImportEnvelope', () => {
   it('accepts a v3 manifest envelope (media is an ARRAY of metadata)', () => {
     expect(validateImportEnvelope({
       app: 'VOTReader', exportVersion: 3, data: {}, stores: {},
-      media: [{ id: 'm1', mime: 'image/png', size: 10 }],
+      media: [{ id: 'm1', type: 'image', mime: 'image/png', size: 10 }],
     })).toEqual([]);
   });
   it('accepts a V1 envelope (no exportVersion)', () => {
@@ -134,6 +135,19 @@ describe('validateImportEnvelope', () => {
   it('rejects an invalid exportVersion', () => {
     expect(validateImportEnvelope({ app: 'VOTReader', data: {}, exportVersion: 0 }).some((e) => e.includes('exportVersion'))).toBe(true);
     expect(validateImportEnvelope({ app: 'VOTReader', data: {}, exportVersion: 'two' }).some((e) => e.includes('exportVersion'))).toBe(true);
+    expect(validateImportEnvelope({ app: 'VOTReader', data: {}, exportVersion: 2.5 }).some((e) => e.includes('exportVersion'))).toBe(true);
+  });
+  it('requires a v3 media manifest instead of treating a missing list as empty', () => {
+    const errs = validateImportEnvelope({ app: 'VOTReader', exportVersion: 3, data: {}, stores: {} });
+    expect(errs.some((e) => e.includes('media'))).toBe(true);
+  });
+  it('keeps the legacy media object contract for v1/v2', () => {
+    const errs = validateImportEnvelope({ app: 'VOTReader', exportVersion: 2, data: {}, media: [] });
+    expect(errs.some((e) => e.includes('media'))).toBe(true);
+  });
+  it('fails closed on a newer backup format this client cannot safely interpret', () => {
+    const errs = validateImportEnvelope({ app: 'VOTReader', exportVersion: 4, data: {}, stores: {}, media: [] });
+    expect(errs.some((e) => e.includes('unsupported exportVersion 4'))).toBe(true);
   });
   // SE1 — prototype-pollution guard. JSON.parse stores "__proto__" as an OWN
   // property (not the setter), so the payloads are built via JSON.parse to mimic
@@ -154,6 +168,28 @@ describe('validateImportEnvelope', () => {
   it('accepts an envelope with no dangerous keys (SE1 control)', () => {
     const p = JSON.parse('{"app":"VOTReader","exportVersion":2,"data":{"vot-state":{"x":1}},"stores":{},"media":{}}');
     expect(validateImportEnvelope(p)).toEqual([]);
+  });
+});
+
+describe('validateV3MediaMetadata', () => {
+  it('accepts a complete manifest, including an empty one', () => {
+    expect(validateV3MediaMetadata([])).toEqual([]);
+    expect(validateV3MediaMetadata([
+      { id: 'photo-1', type: 'image', mime: 'image/png', size: 12 },
+      { id: 'memo-1', type: 'audio', size: 0 },
+    ])).toEqual([]);
+  });
+
+  it('rejects missing, malformed, and duplicate entries', () => {
+    expect(validateV3MediaMetadata(undefined)[0]).toContain('array');
+    expect(validateV3MediaMetadata([{ id: '', type: 'image', size: 1 }]).join(' ')).toContain('id');
+    expect(validateV3MediaMetadata([{ id: 'm1', type: 'video', size: 1 }]).join(' ')).toContain('type');
+    expect(validateV3MediaMetadata([{ id: 'm1', type: 'image', size: -1 }]).join(' ')).toContain('size');
+    expect(validateV3MediaMetadata([{ id: 'm1', type: 'image', size: 1.5 }]).join(' ')).toContain('size');
+    expect(validateV3MediaMetadata([
+      { id: 'm1', type: 'image', size: 1 },
+      { id: 'm1', type: 'audio', size: 2 },
+    ]).join(' ')).toContain('duplicate');
   });
 });
 

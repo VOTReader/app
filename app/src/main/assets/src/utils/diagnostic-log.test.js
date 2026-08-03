@@ -119,6 +119,26 @@ describe('DiagnosticLog — sanitization (parity with BoundedLogTree)', () => {
     expect(DiagnosticLog.entries()[0].msg).toBe('[path]: permission denied');
   });
 
+  it('redacts HTTP query strings and fragments while keeping the endpoint useful', () => {
+    DiagnosticLog.warn('net', 'failed https://example.test/releases/file.jpg?token=secret#trace');
+    expect(DiagnosticLog.entries()[0].msg).toBe('failed https://example.test/releases/file.jpg[redacted]');
+  });
+
+  it('redacts uppercase-scheme URL credentials and query secrets', () => {
+    DiagnosticLog.warn('net', 'failed HTTPS://user:password@example.test/file?token=secret');
+    expect(DiagnosticLog.entries()[0].msg).toBe('failed HTTPS://[redacted]@example.test/file[redacted]');
+  });
+
+  it('redacts all userinfo through the last authority at sign', () => {
+    DiagnosticLog.warn('net', 'failed https://user:secret@more@example.test/file');
+    expect(DiagnosticLog.entries()[0].msg).toBe('failed https://[redacted]@example.test/file');
+  });
+
+  it('sanitizes URLs in tags too', () => {
+    DiagnosticLog.warn('https://example.test/log?token=secret', 'failed');
+    expect(DiagnosticLog.entries()[0].tag).toBe('https://example.test/log[redacted]');
+  });
+
   it('does not touch non-sensitive text', () => {
     DiagnosticLog.warn('quota', 'usage 95% of 50MB');
     expect(DiagnosticLog.entries()[0].msg).toBe('usage 95% of 50MB');

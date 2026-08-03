@@ -21,6 +21,8 @@
    about exactly what it depends on.
 */
 
+import { validateV3MediaMetadata } from './import-validators.js';
+
 /**
  * @typedef {{ store: any, method: string }} ExportableEntry
  * @typedef {Record<string, ExportableEntry>} StoresMap
@@ -490,7 +492,7 @@ export function verifyImportCounts(manifest, mediaApplied) {
  * @typedef {Object} ApplyImportCtx
  * @property {StoresMap} storesMap
  * @property {FlagMap}   flagMap
- * @property {{ allIds(): Promise<string[]>, delete(id: string): Promise<any>, put(rec: any): Promise<any> }} mediaStore
+ * @property {{ allIds(): Promise<string[]>, delete(id: string): Promise<any>, put(rec: any): Promise<any>, beginImportReplace(): Promise<any>, stageImportRecord(rec: any): Promise<any>, commitImportReplace(): Promise<any>, commitImportMerge(): Promise<any>, abortImportReplace(): Promise<any> }} mediaStore
  * @property {(name: string, payload: any) => string[]} validateStorePayload
  * @property {(id: string, record: any) => string[]} validateMediaRecord
  * @property {string[]} [dataLsKeys]
@@ -513,7 +515,7 @@ export function verifyImportCounts(manifest, mediaApplied) {
  * @param {ApplyImportCtx} ctx
  * @returns {Promise<{ importFailures: number, writeFailures: number, skippedStores: string[], countMismatches: string[] }>}
  */
-export async function applyImportPayload(parsed, ctx) {
+async function _applyImportPayloadUnlocked(parsed, ctx) {
   const {
     storesMap, flagMap, mediaStore,
     validateStorePayload, validateMediaRecord,
@@ -636,6 +638,39 @@ export async function applyImportPayload(parsed, ctx) {
 }
 
 /**
+ * Hold the destructive-import mutex across the complete apply operation. Web
+ * Locks is available on the Chromium-108 floor and releases automatically if a
+ * tab or renderer dies; the fallback retains compatibility in non-window tests.
+ * @template T
+ * @param {() => Promise<T>} operation
+ * @returns {Promise<T>}
+ */
+function _withImportLock(operation) {
+  const locks = globalThis.navigator && globalThis.navigator.locks;
+  if (!locks || typeof locks.request !== 'function') return operation();
+  return locks.request('votreader-backup-import', { mode: 'exclusive', ifAvailable: true }, (lock) => {
+    if (!lock) throw new Error('another backup import is already in progress');
+    return operation();
+  });
+}
+
+/** Apply a legacy v1/v2 import under the same cross-tab lock as v3. */
+export function applyImportPayload(parsed, ctx) {
+  return _withImportLock(() => _applyImportPayloadUnlocked(parsed, ctx));
+}
+
+/**
+ * Run a NON-import backup operation (export / verify / clear-all) under the
+ * same cross-tab lock the apply paths take internally, so e.g. an export in a
+ * second PWA tab can't read a half-replaced state mid-import. Do NOT wrap an
+ * import with this — Web Locks are not reentrant, so the apply function's own
+ * acquisition would see the lock held and refuse.
+ */
+export function withBackupLock(operation) {
+  return _withImportLock(operation);
+}
+
+/**
  * Apply a v3 STREAMING import to the live stores: reseed LS data, apply the
  * manifest's stores + flags (validated, skip-on-violation like applyImportPayload),
  * REPLACE media by streaming each container frame's Blob straight to IDB (no
@@ -659,64 +694,119 @@ export async function applyImportPayload(parsed, ctx) {
  * @param {ApplyImportCtx} ctx
  * @returns {Promise<{ importFailures: number, writeFailures: number, skippedStores: string[], countMismatches: string[] }>}
  */
-export async function applyV3(manifest, entries, ctx) {
+async function _applyV3Unlocked(manifest, entries, ctx) {
   const {
     storesMap, flagMap, mediaStore,
     validateStorePayload,
     dataLsKeys = DEFAULT_DATA_LS_KEYS,
   } = ctx;
 
-  // (1) Reseed the LS shim keys from the manifest's `data`.
-  _reseedLsData(manifest && manifest.data, dataLsKeys);
+  // The manifest is the only proof of which media this backup contains. Refuse
+  // a missing/malformed table before reseeding LS or touching IndexedDB: treating
+  // it as an empty stream would otherwise prune every existing attachment.
+  const mediaErrors = validateV3MediaMetadata(manifest && manifest.media);
+  if (mediaErrors.length) throw new Error(`invalid v3 media manifest: ${mediaErrors.join('; ')}`);
+  const expectedMedia = manifest.media;
+  const stores = (manifest && manifest.stores) || {};
 
-  // (2) REPLACE media FIRST (BAK1) — the media stream is the ONLY step that can
-  // throw on a truncated/corrupt container: the Android path reads frames straight
-  // off the file, so a short/truncated frame throws from the `for await` ITSELF
-  // (only the put is try-wrapped, not the iteration); the web readContainer
-  // pre-validates every frame, so it can't fail there. Running media BEFORE the
-  // store apply means such a truncation throws with the device's STORES still the
-  // old, consistent data — instead of leaving stores durably overwritten while
-  // media + the UI stay old and the import reports "failed" (a silent half-import
-  // on the user's ONLY backup). It is also the correct dependency order: import the
-  // referent (blobs) before the referrer (journal entries that point at them).
-  //
-  // FAIL-SAFE within media too: stream each frame's Blob in FIRST (put = overwrite
-  // by id), recording every id streamed; existing media is NOT cleared up front, so
-  // a partial stream throws BEFORE the prune below and leaves prior media INTACT
-  // rather than wiped (BACKUP-STREAMING-PLAN verification bar). No base64, no
-  // aggregate cap — streaming is bounded per-blob (GB-scale safe).
-  let importFailures = 0;
-  let mediaApplied = 0; // BAK3 — frames successfully written (counts check)
-  // BAK6: a Set (not a plain object) — a media id of "__proto__"/"constructor"
-  // would make object-key bookkeeping (streamedIds[id]) silently lie.
-  /** @type {Set<string>} */
-  const streamedIds = new Set();
-  for await (const entry of entries) {
-    const m = entry.meta || {};
-    streamedIds.add(entry.id);  // intended import — recorded even if the put fails
-    try {
-      await mediaStore.put({
-        id: entry.id, type: m.type, blob: entry.blob,
-        mime: m.mime, size: m.size,
-        width: m.width, height: m.height, duration: m.duration,
-        created: m.created,
-      });
-      mediaApplied += 1;
-    } catch (e) { importFailures += 1; console.warn('media import failed for', entry.id, e); }
+  // Preflight every recognized store. This does NOT fail the restore (owner call
+  // 2026-08-02: a 99%-restorable backup must restore its 99%) — it decides the
+  // media commit mode below. With any invalid store we MERGE media instead of
+  // REPLACE, so a skipped (kept-old) store can never point at blobs a replace
+  // just deleted. The store itself is skipped by _applyStoresAndFlags as usual.
+  const invalidStores = [];
+  for (const name of Object.keys(storesMap)) {
+    if (!(name in stores)) continue;
+    let violations;
+    try { violations = validateStorePayload(name, stores[name]); }
+    catch (_e) { violations = ['validation threw']; }
+    if (violations.length) invalidStores.push(name);
   }
-  // Reached ONLY after the full stream landed (a throw above skips it): prune the
-  // stale media — present on the device but NOT in this backup — so the end state
-  // is an exact REPLACE. An id we tried-but-failed to put stays in streamedIds, so
-  // it is NOT pruned (its existing copy is preserved; the failure is in importFailures).
+
+  // (1) Media FIRST (BAK1) — the media stream is the only step that can fail on
+  // a truncated/corrupt container (the Android path reads frames straight off
+  // the file; the web readContainer pre-validates every frame). Landing media
+  // before the store apply is the correct dependency order: import the referent
+  // (blobs) before the referrer (journal entries that point at them).
+  //
+  // FAIL-SAFE within media too: stream each frame into a separate persistent IDB
+  // staging store; live media is untouched until the commit at the end. Frames
+  // are matched to the manifest BY ID and validated per-frame; a frame that
+  // mismatches or fails to stage is SKIPPED (counted in importFailures), and a
+  // container that dies mid-read keeps everything staged so far. Commit mode:
+  //   - PERFECT stream + every store valid → atomic REPLACE (exact restore,
+  //     stale device media pruned in the same transaction).
+  //   - anything less → MERGE (staged frames land by id, NOTHING is deleted) —
+  //     a damaged backup salvages what it can and can never destroy existing
+  //     media or leave a kept-old store pointing at pruned blobs.
+  // No base64 or aggregate cap: one Blob is staged per transaction, preserving
+  // the GB-scale streaming bound.
+  let importFailures = 0;
+  let mediaApplied = 0; // BAK3 — frames successfully staged (counts check)
+  /** @type {Map<string, any>} */
+  const metaById = new Map(expectedMedia.map((m) => [m.id, m]));
+  /** @type {Set<string>} */
+  const stagedIds = new Set();
+  let streamBroken = false;
+  await mediaStore.beginImportReplace();
   try {
-    const existingIds = await mediaStore.allIds();
-    for (const id of existingIds) { if (!streamedIds.has(id)) await mediaStore.delete(id); }
-  } catch (e) { console.warn('prune stale media failed', e); }
+    for await (const entry of entries) {
+      const m = (entry && entry.meta) || {};
+      const expected = entry && metaById.get(entry.id);
+      const blob = /** @type {any} */ (entry && entry.blob);
+      const blobSize = blob && Number.isSafeInteger(blob.size)
+        ? blob.size
+        : blob && Number.isSafeInteger(blob.byteLength)
+          ? blob.byteLength
+          : -1;
+      if (!expected
+        || stagedIds.has(entry.id)
+        || m.type !== expected.type
+        || m.size !== expected.size
+        || blobSize !== expected.size) {
+        importFailures += 1;
+        console.warn('skipping v3 media frame that does not match the manifest:', entry && entry.id);
+        continue;
+      }
+      try {
+        await mediaStore.stageImportRecord({
+          id: entry.id, type: m.type, blob: entry.blob,
+          mime: m.mime, size: m.size,
+          width: m.width, height: m.height, duration: m.duration,
+          created: m.created,
+        });
+        stagedIds.add(entry.id);
+        mediaApplied += 1;
+      } catch (e) { importFailures += 1; console.warn('media staging failed for', entry.id, e); }
+    }
+  } catch (e) {
+    // The container read itself broke (truncated/corrupt tail). Frames already
+    // staged are still salvageable; the shortfall surfaces via countMismatches.
+    streamBroken = true;
+    console.warn('v3 media stream broke mid-read; salvaging staged frames', e);
+  }
+
+  const exactRestore = !streamBroken
+    && mediaApplied === expectedMedia.length
+    && invalidStores.length === 0;
+  try {
+    if (exactRestore) await mediaStore.commitImportReplace();
+    else await mediaStore.commitImportMerge();
+  } catch (e) {
+    // Commit is a single IDB transaction — a failure rolled it back, so live
+    // media is untouched. Staging cleanup is best-effort (invisible to reads).
+    try { await mediaStore.abortImportReplace(); }
+    catch (cleanupError) { console.warn('media import staging cleanup failed', cleanupError); }
+    throw e;
+  }
+
+  // (2) Reseed the LS shim only after the media commit lands. This keeps even
+  // the small boot-state mirror unchanged when the media phase throws outright.
+  _reseedLsData(manifest && manifest.data, dataLsKeys);
 
   // (3) Apply stores + flags — only AFTER media fully landed, so a media truncation
   // can't leave stores half-overwritten (BAK1). v3 is always v2-shape (no V1
   // fallback; SHARED with applyImportPayload's v2 branch via _applyStoresAndFlags).
-  const stores = (manifest && manifest.stores) || {};
   const applied = _applyStoresAndFlags(stores, storesMap, flagMap, validateStorePayload);
   importFailures += applied.importFailures;
   const skippedStores = applied.skippedStores;
@@ -730,6 +820,16 @@ export async function applyV3(manifest, entries, ctx) {
   const writeFailures = saveResults.filter((ok) => !ok).length;
 
   return { importFailures, writeFailures, skippedStores, countMismatches: verifyImportCounts(manifest, mediaApplied) };
+}
+
+/**
+ * Apply one v3 restore under a cross-tab exclusive lock. Settings already blocks
+ * re-entrancy within one renderer; Web Locks closes the remaining PWA multi-tab
+ * race where two streams could otherwise share the staging store or interleave
+ * their media and structured-store commits.
+ */
+export async function applyV3(manifest, entries, ctx) {
+  return _withImportLock(() => _applyV3Unlocked(manifest, entries, ctx));
 }
 
 /**

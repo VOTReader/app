@@ -842,9 +842,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 val crashed = detail?.didCrash() ?: false
                 Timber.w("WebView renderer died (crashed=%b). Recovering.", crashed)
 
-                // NTV1: the JS endAudioSession() can't fire — the renderer that owned
-                // the recording is gone — so restore the audio mode here.
-                restoreAudioModeIfActive()
+                // NTV1: block stale bridge starts, cancel capture, and restore
+                // focus/mode under the same lock used by nativeRecordStart().
+                appInterface.stopAudioCaptureForTeardown()
 
                 val decision = MainActivityLogic.decideRecovery(
                     vm.firstRecoveryMs, vm.renderRecoveryCount, System.currentTimeMillis()
@@ -1195,29 +1195,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         webView.onResume()
     }
 
-    /**
-     * NTV1: if a recording session is still active when this surface tears down, the
-     * JS endAudioSession() may never fire (renderer crash / activity finish) — leaving
-     * the device stuck in MODE_IN_COMMUNICATION (whole-device earpiece routing) until
-     * something else resets it. Restore the saved prior mode. Guarded on the current
-     * mode AND only called from teardown paths (onRenderProcessGone / onDestroy) where
-     * no live recording can exist, so it can never disturb an in-progress capture.
-     * No-op when audioManager isn't cached yet or the mode was never overridden.
-     */
-    private fun restoreAudioModeIfActive() {
-        val am = audioManager ?: return
-        // #3: release any audio focus we still hold so a crash/finish mid-recording
-        // doesn't leave the user's music paused (the JS endAudioSession may never
-        // fire on these teardown paths).
-        vm.audioFocusRequest?.let {
-            try { am.abandonAudioFocusRequest(it) } catch (e: Exception) { Timber.w(e, "abandonAudioFocus (teardown) failed") }
-        }
-        vm.audioFocusRequest = null
-        if (am.mode == AudioManager.MODE_IN_COMMUNICATION) {
-            try { am.mode = vm.previousAudioMode } catch (e: Exception) { Timber.w(e, "restoreAudioMode failed") }
-        }
-    }
-
     override fun onPause() {
         super.onPause()
         webView.onPause()
@@ -1251,9 +1228,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // #3: drop the pending splash safety hatch — the Activity is gone, so
         // there's nothing left to release (and nothing to leak).
         mainHandler.removeCallbacks(splashSafetyHatch)
-        // NTV1: restore the audio mode if a recording session was still active
-        // (the activity is finishing; the JS teardown may not have run).
-        restoreAudioModeIfActive()
+        // NTV1: share the recorder/session lifecycle lock with nativeRecordStart().
+        appInterface.stopAudioCaptureForTeardown()
         // Resolve any in-flight WebView resource requests before the WebView
         // is torn down. A held PermissionRequest / file-chooser callback is
         // bound to this (dying) WebView; leaving it unresolved leaks it and
@@ -1267,11 +1243,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // callback ("ValueCallback already called" on the next chooser).
         fileChooserCallback?.let { try { it.onReceiveValue(null) } catch (_: Exception) {} }
         fileChooserCallback = null
-        // Recorder cleanup lives in MainViewModel.onCleared -- the
-        // ViewModelStore fires it on isFinishing=true (user exited the
-        // app), and the recorder state survives config-change paths
-        // unconditionally (configChanges in manifest already prevents the
-        // most common recreations, ViewModel covers any that slip through).
         webView.destroy()
         super.onDestroy()
     }

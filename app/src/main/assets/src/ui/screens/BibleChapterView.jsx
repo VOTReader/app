@@ -138,13 +138,17 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
             <div className={`hero-bg${OT_BOOK_IDS.has(book.id) ? " ot" : ""}`} />
             <div className="hero-content">
               <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
-              <h1
-                className={`hero-title${titleIsTappable ? " hero-title-tappable" : ""}`}
-                onClick={titleIsTappable ? () => setTitleFocusHidden && setTitleFocusHidden(true) : undefined}
-                title={titleIsTappable ? "Tap to hide chapter title" : undefined}
-                role={titleIsTappable ? "button" : undefined}
-              >
-                {titleText}
+              <h1 className="hero-title">
+                {titleIsTappable ? (
+                  <button
+                    type="button"
+                    className="hero-title-action"
+                    onClick={() => setTitleFocusHidden && setTitleFocusHidden(true)}
+                    title="Tap to hide chapter title"
+                  >
+                    {titleText}
+                  </button>
+                ) : titleText}
               </h1>
               {canFocusTitle && titleFocusHidden && (
                 <button
@@ -206,8 +210,10 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   <div
                     className="section-heading-psalm119 section-heading-tappable"
                     onClick={() => setHeadingsFocusHidden && setHeadingsFocusHidden(true)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHeadingsFocusHidden && setHeadingsFocusHidden(true); } }}
                     title="Tap to hide headings"
                     role="button"
+                    tabIndex={0}
                   >
                     <span className="hebrew-letter">{sec.letter}</span>
                     <span className="hebrew-letter-name">{getSectionHeading(si, sec)}</span>
@@ -216,8 +222,10 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   <div
                     className="section-heading section-heading-tappable"
                     onClick={() => setHeadingsFocusHidden && setHeadingsFocusHidden(true)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHeadingsFocusHidden && setHeadingsFocusHidden(true); } }}
                     title="Tap to hide headings"
                     role="button"
+                    tabIndex={0}
                   >
                     {getSectionHeading(si, sec)}
                   </div>

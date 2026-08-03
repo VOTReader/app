@@ -3,7 +3,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
-  const isOpen = activeRef !== null;
+  const isOpen = activeRef != null;
+  const trapRef = useFocusTrap(isOpen);
   const verseText = activeRef ? MATTHEW_NKJV[activeRef.cite] : null;
   // position:fixed sheet — portal to <body> so it anchors to the viewport, NOT to
   // the reading screen's `.pager-track`. During a page-swipe settle the track
@@ -13,8 +14,8 @@ export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
   // and drop off-screen while the backdrop still greys the screen.
   return ReactDOM.createPortal(
     <>
-      <div className={`fn-sheet-backdrop${isOpen ? " open" : ""}`} onClick={onClose} />
-      <div className={`fn-sheet${isOpen ? " open" : ""}`}>
+      <div className={`fn-sheet-backdrop${isOpen ? ' open' : ''}`} aria-hidden="true" onClick={isOpen ? onClose : undefined} />
+      <div className={`fn-sheet${isOpen ? ' open' : ''}`} ref={trapRef} role="dialog" aria-modal={isOpen ? 'true' : undefined} aria-hidden={!isOpen} inert={!isOpen ? true : undefined} aria-label={activeRef ? `Scripture ${activeRef.cite}` : 'Scripture'}>
         <SheetHandle onClose={onClose} />
         {activeRef && (
           <>

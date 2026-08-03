@@ -877,6 +877,7 @@
       }
       /* Tappable variant — preserves the original .hero-subtitle look entirely; adds only cursor + press/hover feedback */
       .hero-subtitle-tappable {
+        display: block; padding: 0; background: none; border: 0;
         cursor: pointer; border-radius: 4px;
         transition: background 0.18s ease, color 0.18s ease;
         -webkit-tap-highlight-color: transparent;
@@ -908,15 +909,18 @@
         from { opacity: 0; transform: translateY(-2px); }
         to   { opacity: 0.9; transform: translateY(0); }
       }
-      /* Tappable hero title (66-book flow) — preserves all .hero-title visuals, adds cursor + subtle feedback */
-      .hero-title.hero-title-tappable {
+      /* Tappable hero title (66-book flow) — the button sits inside the h1 so
+         heading navigation and native control semantics both remain intact. */
+      .hero-title-action {
+        padding: 0; background: none; border: 0; color: inherit; font: inherit;
+        line-height: inherit; letter-spacing: inherit;
         cursor: pointer;
         transition: color 0.18s ease;
         -webkit-tap-highlight-color: transparent;
       }
-      .hero-title.hero-title-tappable:active { color: var(--gold); }
+      .hero-title-action:active { color: var(--gold); }
       @media (hover: hover) {
-        .hero-title.hero-title-tappable:hover { color: var(--gold-bright); }
+        .hero-title-action:hover { color: var(--gold-bright); }
       }
       /* Standalone "show section headings" pill lives at the top of the chapter body */
       .headings-restore {
@@ -1349,7 +1353,7 @@
     .prophecy-group { margin:2rem 0 2.5rem; }
     .prophecy-group-label { font-family:'Cinzel',serif; font-size:0.95rem; letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; text-align:center; margin-bottom:1.2rem; line-height:1.4; }
     .prophecy-card { border:1px solid var(--gold-border); border-radius:0.6rem; margin-bottom:0.8rem; overflow:hidden; transition:border-color 0.2s; }
-    .prophecy-card-header { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1rem; cursor:pointer; user-select:none; -webkit-user-select:none; }
+    .prophecy-card-header { display:flex; align-items:center; justify-content:space-between; width:100%; padding:0.75rem 1rem; background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer; user-select:none; -webkit-user-select:none; }
     .prophecy-card-header:active { opacity:0.7; }
     .prophecy-card-tag { font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.16em; text-transform:uppercase; font-weight:600; }
     .prophecy-card-chevron { font-size:0.7rem; transition:transform 0.25s ease; color:var(--cream-dim); }
@@ -2301,6 +2305,7 @@
        fix as .settings-row-head — the tally + Clear button wrap under the
        label instead of running off a 375px screen. Inert at normal sizes. */
     .progress-row { display:flex; flex-wrap:wrap; align-items:center; gap:0.75rem; row-gap:8px; padding:0.8rem 1.2rem; border-bottom:1px solid var(--gold-border); }
+    .progress-section-toggle { display:flex; align-items:center; gap:0.75rem; flex:1 1 auto; min-width:0; padding:0; background:none; border:0; color:inherit; text-align:left; cursor:pointer; }
     .progress-row:last-child { border-bottom:none; }
     .progress-row-label { font-family:'Cinzel',serif; font-size:0.78rem; letter-spacing:0.06em; color:var(--cream); flex:1; }
     .progress-row-tally { font-family:'Cinzel',serif; font-size:0.65rem; letter-spacing:0.1em; color:var(--gold-dim); white-space:nowrap; min-width:4.5rem; text-align:right; }
@@ -3476,6 +3481,10 @@
     }
     .link-card:active { border-color: var(--gold); transform: scale(0.99); }
     body.light .link-card { background: var(--bg3); }
+    .link-card-open {
+      display:block; width:100%; padding:0; background:none; border:0;
+      color:inherit; font:inherit; text-align:left; cursor:pointer;
+    }
     .link-card-header {
       display: flex; align-items: center; justify-content: space-between;
       gap: 10px; margin-bottom: 2px;
@@ -3525,6 +3534,7 @@
     }
     .link-card-remove {
       display: inline-block;
+      background:none; border:0; padding:0;
       font-family: 'Cinzel', serif; font-size: 0.52rem;
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--cream-muted); cursor: pointer;
@@ -3535,6 +3545,7 @@
       display: flex; align-items: center; gap: 10px; margin-top: 6px;
     }
     .link-card-show-more {
+      background:none; border:0; padding:0;
       font-family: 'Cinzel', serif; font-size: 0.52rem;
       letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--gold-dim); cursor: pointer;

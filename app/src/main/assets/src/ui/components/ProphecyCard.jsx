@@ -32,10 +32,10 @@ export function ProphecyCard({ type, tag, label, blocks, fnProps, stateKey, stat
   const cardFnProps = fnProps;
   return (
     <div className={cls}>
-      <div className="prophecy-card-header" onClick={() => setExpanded(e => !e)}>
+      <button type="button" className="prophecy-card-header" aria-label={tag} aria-expanded={expanded} onClick={() => setExpanded(e => !e)}>
         <span className="prophecy-card-tag">{tag}</span>
         <span className={`prophecy-card-chevron${expanded ? "" : " collapsed"}`}>{"▼"}</span>
-      </div>
+      </button>
       <div className={`prophecy-card-body${expanded ? "" : " collapsed"}`}>
         {label && <div className="prophecy-card-sublabel">{label}</div>}
         {blocks.map((block, bi) => {

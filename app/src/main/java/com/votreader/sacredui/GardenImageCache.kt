@@ -130,7 +130,9 @@ class GardenImageCache(cacheRoot: File) {
      *  U7: gates the native fetch so the garden_NNN.jpg page-token regex can't
      *  be abused to fetch arbitrary hosts with the app's network identity. */
     internal fun hostAllowed(url: String): Boolean = try {
-        ALLOWED_HOSTS.contains((URL(url).host ?: "").lowercase())
+        val parsed = URL(url)
+        parsed.protocol.equals("https", ignoreCase = true) &&
+            ALLOWED_HOSTS.contains((parsed.host ?: "").lowercase())
     } catch (_: Exception) { false }
 
     /** Extract the zero-padded page token from a Garden image URL, or null. */

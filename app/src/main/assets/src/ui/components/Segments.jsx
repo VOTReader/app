@@ -3,6 +3,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetterClick, onInAppLink, studyMode: _studyMode, footnotes: _footnotes, highlightText }) {
+  const activateOnKey = (event, activate) => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
+  };
+  // role="link" activates on Enter ONLY (Space stays free to scroll the page,
+  // matching native links + LinkCard); role="button" fn-refs take both keys.
+  const activateLinkOnKey = (event, activate) => {
+    if (event.key === 'Enter') { event.preventDefault(); activate(); }
+  };
   return segments.map((seg, i) => {
     if (seg.t === "fn") {
       // Always render as a gold circled number (Volumes style). Studies
@@ -15,6 +23,10 @@ export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetter
           className={`fn-ref${activeFn === seg.v ? " active" : ""}`}
           data-fn-num={seg.v}
           onClick={() => onFnClick(seg.v)}
+          onKeyDown={(e) => activateOnKey(e, () => onFnClick(seg.v))}
+          role="button"
+          tabIndex={0}
+          aria-label={`Footnote ${seg.v}`}
           title={`Footnote ${seg.v}`}
         >{seg.v}</span>
       );
@@ -26,11 +38,11 @@ export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetter
       //   (b) seg.letterId + seg.screen — legacy matthew.js path.
       if (seg.link && onInAppLink) {
         return (
-          <span key={i} className="letter-link-ref" onClick={() => onInAppLink(seg.link)}>{seg.label}</span>
+          <span key={i} className="letter-link-ref" role="link" tabIndex={0} onClick={() => onInAppLink(seg.link)} onKeyDown={(e) => activateLinkOnKey(e, () => onInAppLink(seg.link))}>{seg.label}</span>
         );
       }
       return (
-        <span key={i} className="letter-link-ref" onClick={() => onLetterClick && onLetterClick(seg.letterId, seg.screen)}>{seg.label}</span>
+        <span key={i} className="letter-link-ref" role="link" tabIndex={0} onClick={() => onLetterClick && onLetterClick(seg.letterId, seg.screen)} onKeyDown={(e) => activateLinkOnKey(e, () => onLetterClick && onLetterClick(seg.letterId, seg.screen))}>{seg.label}</span>
       );
     }
     if (seg.t === "stanza-break") return <div key={i} className="stanza-break" />;

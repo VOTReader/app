@@ -7,13 +7,15 @@ export function JournalCardMenu(props) {
   var entry = props.entry;
   var _step = useState(0);
   var step = _step[0]; var setStep = _step[1];
+  useModalRegistry({ id: 'journal-card-menu', dismiss: close, active: !!entry });
+  var trapRef = useFocusTrap(!!entry);
   if (!entry) return null;
 
   function close() { props.onClose && props.onClose(); }
 
   return (
     <div className="link-action-overlay" onClick={close}>
-      <div className="link-action-sheet" onClick={function(e) { e.stopPropagation(); }}>
+      <div className="link-action-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-label="Entry options" onClick={function(e) { e.stopPropagation(); }}>
         <SheetHandle onClose={close} />
         {step === 0 && (
           <>
@@ -152,6 +154,8 @@ export function JournalHubScreen(props) {
           className="jrn-card-menu-btn"
           onClick={function(e) { e.stopPropagation(); setMenuEntry(entry); }}
           aria-label="Entry options"
+          aria-haspopup="dialog"
+          aria-expanded={!!(menuEntry && menuEntry.id === entry.id)}
           title="Options"
         >
           <svg viewBox="0 0 24 24" fill="currentColor">

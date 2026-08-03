@@ -132,11 +132,31 @@ class BoundedLogTree(
         private val SENSITIVE_PATH =
             Regex("/(?:storage|data|sdcard|cache|system|mnt|root)/[\\w./-]*")
 
+        // Preserve a useful HTTP(S) endpoint while stripping signed-query
+        // credentials and opaque fragments from shareable diagnostics.
+        private val WEB_URL = Regex("https?://\\S+", RegexOption.IGNORE_CASE)
+
         // `internal` so the same-module test set can exercise sanitize()
         // directly. Production callers only reach it via log().
         internal fun sanitize(s: String): String =
             s.replace(SENSITIVE_URI, "[uri]")
                 .replace(SENSITIVE_PATH, "[path]")
+                .replace(WEB_URL) { match ->
+                    val raw = match.value
+                    val query = raw.indexOf('?')
+                    val fragment = raw.indexOf('#')
+                    val cut = when {
+                        query < 0 -> fragment
+                        fragment < 0 -> query
+                        else -> minOf(query, fragment)
+                    }
+                    val endpoint = if (cut < 0) raw else raw.substring(0, cut)
+                    val schemeEnd = endpoint.indexOf("://") + 3
+                    val pathStart = endpoint.indexOf('/', schemeEnd).let { if (it < 0) endpoint.length else it }
+                    val userInfo = endpoint.lastIndexOf('@', pathStart - 1).takeIf { it in schemeEnd until pathStart }
+                    val clean = if (userInfo == null) endpoint else endpoint.substring(0, schemeEnd) + "[redacted]@" + endpoint.substring(userInfo + 1)
+                    clean + if (cut < 0) "" else "[redacted]"
+                }
 
         // Render the four-letter shorthand the Export JSON includes for
         // each entry's level. Confined to the values that survive the

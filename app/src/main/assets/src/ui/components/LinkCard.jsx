@@ -32,7 +32,21 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
   );
   const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); };
   return (
-    <div className="link-card" onClick={confirmRemove ? undefined : (() => onNavigate && onNavigate(other))}>
+    <div className="link-card">
+      <div
+        className="link-card-open"
+        role="link"
+        tabIndex={confirmRemove ? -1 : 0}
+        aria-disabled={confirmRemove}
+        aria-label={`Open linked passage ${other.label}`}
+        onClick={confirmRemove ? undefined : (() => onNavigate && onNavigate(other))}
+        onKeyDown={confirmRemove ? undefined : ((e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onNavigate && onNavigate(other);
+          }
+        })}
+      >
       <div className="link-card-header">
         <div className="link-card-ref">
           <span className="link-card-direction">{isOutbound ? "to " : "from "}</span>
@@ -63,28 +77,31 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
         {usingFromFallback && <em className="link-card-from-label">From: </em>}
         {rawText}
       </div>
+      </div>
       {/* Actions row: show-more toggle + remove (with tap-confirm per §11.1) */}
       {!confirmRemove && (
         <div className="link-card-actions">
           {isLong && (
-            <span
+            <button
+              type="button"
               className="link-card-show-more"
               onClick={(e) => { e.stopPropagation(); setExpanded(x => !x); }}
             >
               {expanded ? "Show less" : "Show more"}
-            </span>
+            </button>
           )}
-          <span
+          <button
+            type="button"
             className="link-card-remove"
             onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }}
           >
             Remove link
-          </span>
+          </button>
         </div>
       )}
       {/* Tap-confirm strip — replaces the actions row when confirmRemove=true.
-          stopPropagation wraps each handler so taps don't bubble to the
-          parent .link-card (which navigates on tap). */}
+          The separate .link-card-open link is disabled during confirmation,
+          so the destructive choice cannot accidentally navigate away. */}
       {confirmRemove && (
         <div onClick={(e) => e.stopPropagation()}>
           <ConfirmStrip

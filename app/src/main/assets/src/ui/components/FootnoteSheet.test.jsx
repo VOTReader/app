@@ -8,7 +8,7 @@
    message; this guards the portal relocation. */
 
 import { it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, screen } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { FootnoteSheet } from './FootnoteSheet.jsx';
 
@@ -34,6 +34,18 @@ it('portals the footnote sheet OUT of a transformed .pager-track to <body>', () 
   const track = container.querySelector('.pager-track');
   expect(track.querySelector('.fn-sheet')).toBeNull();
   expect(document.body.querySelector('.fn-sheet')).not.toBeNull();
+});
+
+it('is an accessible modal while open and becomes inert during its close transition', () => {
+  const { rerender } = render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
+  expect(screen.getByRole('dialog', { name: 'Footnote 1' })).toBeTruthy();
+  expect(document.activeElement.closest('.fn-sheet')).not.toBeNull();
+
+  rerender(<Sheet num={null} fn={null} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.querySelector('.fn-sheet').hasAttribute('inert')).toBe(true);
+  expect(document.querySelector('.fn-sheet').getAttribute('aria-hidden')).toBe('true');
+  expect(document.querySelector('.fn-sheet-backdrop').classList.contains('open')).toBe(false);
 });
 
 it('shows the missing-verse message instead of a blank sheet', () => {

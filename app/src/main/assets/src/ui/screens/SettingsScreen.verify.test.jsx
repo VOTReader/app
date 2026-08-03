@@ -30,7 +30,7 @@ const MANIFEST = {
   counts: { _media: 1, 'vot-notes': 3, 'vot-bookmarks': 2 },
   data: {},
   stores: { 'vot-notes': [1, 2, 3], 'vot-bookmarks': [1, 2] },
-  media: [{ id: 'm1', size: 4, mime: 'application/octet-stream' }],
+  media: [{ id: 'm1', type: 'image', size: 4, mime: 'application/octet-stream' }],
 };
 
 async function buildVotbak() {
@@ -53,7 +53,7 @@ function setup(file) {
     PlatformBridge: {
       isAndroid: false, setKeepScreenOn: () => {}, saveToFile: () => {},
       openFilePicker: () => {}, openExportSink: () => null,
-      clearGardenCache: () => {}, getCrashLog: () => Promise.resolve(''),
+      clearGardenCache: () => {}, getCrashLog: () => '[]',
       pickImportFile: () => Promise.resolve(file),
     },
   });

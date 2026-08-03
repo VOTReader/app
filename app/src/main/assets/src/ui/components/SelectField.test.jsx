@@ -8,11 +8,12 @@
    string path keeps working. (The real TranslationInfoDesc copy is
    preview-verified; its wording is deliberately not pinned here.) */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { SelectField } from './SelectField.jsx';
 
-afterEach(cleanup);
+beforeEach(() => modalRegistry._reset());
+afterEach(() => { cleanup(); modalRegistry._reset(); });
 
 const OPTIONS = [
   { id: 'a', label: 'Alpha', desc: 'first option' },
@@ -44,5 +45,25 @@ describe('SelectField — ⓘ description', () => {
     expect(screen.getByText('rule one')).toBeTruthy();
     fireEvent.click(screen.getByLabelText('Hide description'));
     expect(screen.queryByText(/AI assistance/)).toBeNull();
+  });
+});
+
+describe('SelectField sheet accessibility', () => {
+  it('registers and traps a labelled dialog, then restores focus on close', () => {
+    const onChange = vi.fn();
+    const { container } = render(<SelectField eyebrow="Test" title="Choose a value" label="Row" desc={null} value="a" options={OPTIONS} onChange={onChange} />);
+    const trigger = /** @type {HTMLElement} */ (container.querySelector('.settings-select-trigger'));
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole('dialog', { name: 'Choose a value' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(modalRegistry.peek().id).toContain('select-sheet-');
+
+    fireEvent.click(screen.getByText('Beta'));
+    expect(onChange).toHaveBeenCalledWith('b');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
   });
 });

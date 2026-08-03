@@ -18,9 +18,10 @@
        cleared on page refresh. Matches BoundedLogTree's "in-process only,
        cleared on app kill" and the project's "local data only / no
        security risks" policy (CLAUDE.md User policies).
-     - Sanitization: the SAME two redactions BoundedLogTree applies —
-       content:// / file:// URIs → "[uri]", and absolute paths under the
-       Android-exposed roots → "[path]". Keeps the Export JSON safe to
+     - Sanitization: the SAME redactions BoundedLogTree applies —
+       content:// / file:// URIs → "[uri]", absolute Android paths →
+       "[path]", and HTTP(S) query/fragment data → "[redacted]". Keeps
+       the Export JSON safe to
        share via the user's chosen channel without leaking filesystem
        layout or picked-file identities.
      - Entry shape: { t, lvl, tag, msg } mirrors BoundedLogTree's
@@ -52,9 +53,7 @@
  *  - `lvl` 'W' warn | 'E' error | 'I' info (timing). Matches BoundedLogTree's
  *          W/E plus a JS-only 'I'.
  *  - `tag` developer-supplied channel ('store', 'quota', 'corpus', 'sw',
- *          'render', …) — a code-level identifier, never user content, so
- *          it is NOT sanitized (matches BoundedLogTree, which stores the
- *          inferred tag verbatim).
+ *          'render', …), passed through {@link sanitize} defensively.
  *  - `msg` the message, already passed through {@link sanitize}.
  * @typedef {{ t: number, lvl: 'W'|'E'|'I', tag: string, msg: string }} DiagEntry
  */
@@ -77,15 +76,38 @@ const SENSITIVE_URI = /(?:content|file):\/\/\S+/g;
 // the redaction. Trailing '-' in the class is a literal hyphen, not a range.
 const SENSITIVE_PATH = /\/(?:storage|data|sdcard|cache|system|mnt|root)\/[\w./-]*/g;
 
+// Signed download URLs and failed requests can carry credentials or opaque
+// identifiers in their query/fragment. Preserve the useful endpoint path while
+// stripping everything from the first ? or # onward.
+const WEB_URL = /https?:\/\/\S+/gi;
+
+function redactWebUrl(url) {
+  const query = url.indexOf('?');
+  const fragment = url.indexOf('#');
+  const cut = query < 0 ? fragment : fragment < 0 ? query : Math.min(query, fragment);
+  const endpoint = cut < 0 ? url : url.slice(0, cut);
+  const schemeEnd = endpoint.indexOf('://') + 3;
+  const pathAt = endpoint.indexOf('/', schemeEnd);
+  const pathStart = pathAt < 0 ? endpoint.length : pathAt;
+  const userInfo = endpoint.lastIndexOf('@', pathStart - 1);
+  const clean = userInfo >= schemeEnd && userInfo < pathStart
+    ? endpoint.slice(0, schemeEnd) + '[redacted]@' + endpoint.slice(userInfo + 1)
+    : endpoint;
+  return clean + (cut < 0 ? '' : '[redacted]');
+}
+
 /**
- * Redact filesystem-revealing substrings from a message. URI replace runs
+ * Redact sensitive substrings from a message or tag. URI replace runs
  * first so a `file:///storage/...` URI collapses to "[uri]" whole rather
  * than leaving a "[path]" tail (matches BoundedLogTree's replace order).
  * @param {string} s
  * @returns {string}
  */
 function sanitize(s) {
-  return String(s).replace(SENSITIVE_URI, '[uri]').replace(SENSITIVE_PATH, '[path]');
+  return String(s)
+    .replace(SENSITIVE_URI, '[uri]')
+    .replace(SENSITIVE_PATH, '[path]')
+    .replace(WEB_URL, redactWebUrl);
 }
 
 /* ─── Module state ──────────────────────────────────────────────────── */
@@ -94,15 +116,14 @@ function sanitize(s) {
 let _buffer = [];
 
 /**
- * Append one entry, evicting the oldest when over capacity. The tag is
- * coerced to string but left unsanitized (code-level identifier); the
- * message is coerced and sanitized.
+ * Append one entry, evicting the oldest when over capacity. Both tag and
+ * message are coerced to strings and sanitized.
  * @param {'W'|'E'|'I'} lvl
  * @param {string} tag
  * @param {string} msg
  */
 function _push(lvl, tag, msg) {
-  _buffer.push({ t: Date.now(), lvl, tag: String(tag), msg: sanitize(String(msg)) });
+  _buffer.push({ t: Date.now(), lvl, tag: sanitize(String(tag)), msg: sanitize(String(msg)) });
   if (_buffer.length > CAPACITY) _buffer.shift();
 }
 

@@ -10,7 +10,7 @@
    card. */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, screen } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { BibleChapterView } from './BibleChapterView.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
@@ -65,6 +65,15 @@ const renderCh = (extra) => render(
 );
 
 describe('BibleChapterView pager.peek at a BOOK boundary', () => {
+  it('keeps the tappable chapter title as an h1 containing a native button', () => {
+    globalThis.ScreenLayout = ({ children, pager }) => { capturedPager = pager; return <main>{children}</main>; };
+    renderCh({ showChapterTitle: true, titleFocusHidden: false, setTitleFocusHidden: () => {} });
+    expect(screen.getByRole('heading', { level: 1, name: 'Ch 3' })).toBeTruthy();
+    // The button's accessible name IS the title text (name-from-content) — an
+    // aria-label here would hide the title from screen readers entirely.
+    expect(screen.getByRole('button', { name: 'Ch 3' })).toBeTruthy();
+  });
+
   it('peeks the REAL next book’s first chapter — not a card (the owner’s 2 Thess → 1 Tim case)', () => {
     renderCh({ nextBook: TIMOTHY });
     const desc = capturedPager.peek('next');

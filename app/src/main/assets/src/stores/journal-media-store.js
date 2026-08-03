@@ -16,6 +16,9 @@
      JournalMediaStore.list()         → Promise<Array<record-without-blob>>
      JournalMediaStore.allIds()       → Promise<Array<id>>
      JournalMediaStore.objectUrl(id)  → Promise<string | null>   (cached Blob URLs)
+     JournalMediaStore.beginImportReplace() / stageImportRecord(record) /
+       commitImportReplace() / commitImportMerge() / abortImportReplace()
+       (atomic restore: replace = exact, merge = salvage-without-delete)
 
    Record shape:
      { id, type:'image'|'audio', blob:Blob, mime, size,
@@ -56,8 +59,9 @@
 
 export var JournalMediaStore = (function() {
   var DB_NAME = 'vot-journal-media';
-  var DB_VERSION = 1;
+  var DB_VERSION = 2;
   var STORE = 'media';
+  var IMPORT_STORE = 'import-staging';
   /** @type {Promise<IDBDatabase> | null} */
   var _dbPromise = null;
   // PERF2: an LRU of live object URLs (id -> blob: URL). Each entry pins its blob in
@@ -92,7 +96,7 @@ export var JournalMediaStore = (function() {
    */
   function openDb() {
     if (_dbPromise) return _dbPromise;
-    _dbPromise = new Promise(function(resolve, reject) {
+    var p = new Promise(function(resolve, reject) {
       if (!window.indexedDB) {
         reject(new Error('IndexedDB not available'));
         return;
@@ -103,11 +107,24 @@ export var JournalMediaStore = (function() {
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: 'id' });
         }
+        if (!db.objectStoreNames.contains(IMPORT_STORE)) {
+          db.createObjectStore(IMPORT_STORE, { keyPath: 'id' });
+        }
       };
-      req.onsuccess = function(e) { resolve(/** @type {IDBOpenDBRequest} */ (e.target).result); };
+      req.onsuccess = function(e) {
+        var db = /** @type {IDBOpenDBRequest} */ (e.target).result;
+        db.onversionchange = function() {
+          try { db.close(); } catch (_e) { /* best-effort close */ }
+          if (_dbPromise === p) _dbPromise = null;
+        };
+        resolve(db);
+      };
       req.onerror = function(e) { reject(/** @type {IDBOpenDBRequest} */ (e.target).error); };
+      req.onblocked = function() { reject(new Error('Journal media database open blocked')); };
     });
-    return _dbPromise;
+    p.catch(function() { if (_dbPromise === p) _dbPromise = null; });
+    _dbPromise = p;
+    return p;
   }
 
   /**
@@ -145,7 +162,123 @@ export var JournalMediaStore = (function() {
     t.addEventListener('error', function() { reject(t.error || new Error('media transaction error')); });
   }
 
+  /**
+   * One transaction that lands every staged record into the live store —
+   * clearing live first for an exact REPLACE, or leaving it intact for a
+   * salvage MERGE — then empties staging. All-or-nothing either way: any
+   * request failure aborts the transaction and live media rolls back.
+   * @param {boolean} clearLive
+   * @returns {Promise<void>}
+   */
+  function commitStaged(clearLive) {
+    return openDb().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var transaction = db.transaction([STORE, IMPORT_STORE], 'readwrite');
+        var live = transaction.objectStore(STORE);
+        var staged = transaction.objectStore(IMPORT_STORE);
+        if (clearLive) {
+          var clearReq = live.clear();
+          clearReq.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+        }
+        var cursorReq = staged.openCursor();
+        cursorReq.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+        cursorReq.onsuccess = function(e) {
+          var cursor = /** @type {IDBRequest<IDBCursorWithValue | null>} */ (e.target).result;
+          if (!cursor) {
+            staged.clear();
+            return;
+          }
+          live.put(cursor.value);
+          cursor.continue();
+        };
+        transaction.addEventListener('complete', function() {
+          _urlCache.forEach(function(url) {
+            try { URL.revokeObjectURL(url); } catch (_e) { /* best-effort */ }
+          });
+          _urlCache.clear();
+          resolve();
+        });
+        guardTx(live, reject);
+      });
+    });
+  }
+
+  /**
+   * Clear one object store and settle only after its transaction commits.
+   * @param {string} storeName
+   * @returns {Promise<void>}
+   */
+  function clearStore(storeName) {
+    return openDb().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var transaction = db.transaction([storeName], 'readwrite');
+        var store = transaction.objectStore(storeName);
+        var req = store.clear();
+        req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+        transaction.addEventListener('complete', function() { resolve(); });
+        guardTx(store, reject);
+      });
+    });
+  }
+
   return {
+    /**
+     * Start a fail-safe restore. Incoming records live in a separate IDB store,
+     * so a truncated stream or quota failure cannot overwrite current media.
+     * @returns {Promise<void>}
+     */
+    beginImportReplace: function() {
+      return clearStore(IMPORT_STORE);
+    },
+
+    /**
+     * Durably stage one incoming media record without touching the live store.
+     * Awaiting each transaction preserves the one-Blob-at-a-time stream bound.
+     * @param {MediaRecord} record
+     * @returns {Promise<string>}
+     */
+    stageImportRecord: function(record) {
+      if (!record || !record.id || !record.blob || !record.type) {
+        return Promise.reject(new Error('Invalid staged media record'));
+      }
+      return openDb().then(function(db) {
+        return new Promise(function(resolve, reject) {
+          var transaction = db.transaction([IMPORT_STORE], 'readwrite');
+          var store = transaction.objectStore(IMPORT_STORE);
+          var req = store.put(record);
+          req.onerror = function(e) { reject(/** @type {IDBRequest} */ (e.target).error); };
+          transaction.addEventListener('complete', function() { resolve(record.id); });
+          guardTx(store, reject);
+        });
+      });
+    },
+
+    /**
+     * Atomically replace the live media set with the fully staged import. IDB
+     * transactions roll back the clear + every put together if any request or
+     * the commit itself fails; the old user media therefore remains intact.
+     * @returns {Promise<void>}
+     */
+    commitImportReplace: function() {
+      return commitStaged(true);
+    },
+
+    /**
+     * Salvage commit: land the staged records into the live store BY ID without
+     * clearing or pruning anything. Used when the import stream or manifest was
+     * damaged — a partial restore merges what it could read and can never
+     * delete existing media.
+     * @returns {Promise<void>}
+     */
+    commitImportMerge: function() {
+      return commitStaged(false);
+    },
+
+    /** Discard a failed/incomplete import without touching live media. */
+    abortImportReplace: function() {
+      return clearStore(IMPORT_STORE);
+    },
+
     /**
      * Insert a media record. Auto-generates id/created/size/mime when
      * absent. Pre-warms the URL cache on success so the next render is

@@ -182,6 +182,28 @@ class BoundedLogTreeTest {
     }
 
     @Test
+    fun `sanitize strips HTTP query and fragment secrets but keeps endpoint`() {
+        val out = BoundedLogTree.sanitize(
+            "Failed https://example.test/releases/file.jpg?token=secret#trace"
+        )
+        assertEquals("Failed https://example.test/releases/file.jpg[redacted]", out)
+    }
+
+    @Test
+    fun `sanitize handles uppercase schemes and URL userinfo`() {
+        val out = BoundedLogTree.sanitize(
+            "Failed HTTPS://user:password@example.test/file?token=secret"
+        )
+        assertEquals("Failed HTTPS://[redacted]@example.test/file[redacted]", out)
+    }
+
+    @Test
+    fun `sanitize removes all userinfo through the last authority at sign`() {
+        val out = BoundedLogTree.sanitize("Failed https://user:secret@more@example.test/file")
+        assertEquals("Failed https://[redacted]@example.test/file", out)
+    }
+
+    @Test
     fun `log applies sanitize before storing`() {
         // End-to-end: a log payload that includes a sensitive substring
         // should land redacted, not raw.

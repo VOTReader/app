@@ -6,13 +6,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { downsampleWave, JournalRecordingSheet } from './JournalRecordingSheet.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
+import { PlatformBridge } from '../../utils/platform-bridge.js';
 
 vi.mock('../../utils/platform-bridge.js', () => ({
   PlatformBridge: {
+    isAndroid: false,
     requestMicPermission: () => {
       setTimeout(() => { if (window.__onMicPermissionResult) window.__onMicPermissionResult(true); }, 0);
     },
-    nativeRecordStart: () => 'ok',
+    nativeRecordStart: vi.fn(() => 'ok'),
     nativeRecordAmplitude: () => 8000,
     nativeRecordStop: vi.fn(),
     nativeRecordCancel: vi.fn(),
@@ -22,6 +24,8 @@ vi.mock('../../utils/platform-bridge.js', () => ({
     endAudioSession: vi.fn(),
   },
 }));
+
+const MockBridge = /** @type {any} */ (PlatformBridge);
 
 describe('downsampleWave (JRNL-3)', () => {
   it('returns arrays at/under the bucket count unchanged', () => {
@@ -58,6 +62,12 @@ describe('downsampleWave (JRNL-3)', () => {
    gate is non-vacuous. */
 
 /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  MockBridge.isAndroid = false;
+  MockBridge.nativeRecordStart.mockReturnValue('ok');
+});
 
 /** Mount + grant mic + let ~1.3s of "recording" elapse (seconds > 0). */
 function renderRecording(onClose) {
@@ -148,6 +158,46 @@ describe('JournalRecordingSheet pause freezes the timer', () => {
     // 3s of paused time is NOT counted.
     act(() => { vi.advanceTimersByTime(2000); });
     expect(timeText()).not.toBe(atPause);
+  });
+});
+
+describe('JournalRecordingSheet audio-session lifecycle', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it('acquires the web audio session before capture and releases it on Finish', () => {
+    render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: 'Voice Recording' })).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(10); });
+
+    expect(MockBridge.startAudioSession).toHaveBeenCalledTimes(1);
+    expect(MockBridge.nativeRecordStart).toHaveBeenCalledTimes(1);
+    expect(MockBridge.startAudioSession.mock.invocationCallOrder[0])
+      .toBeLessThan(MockBridge.nativeRecordStart.mock.invocationCallOrder[0]);
+
+    fireEvent.click(screen.getByLabelText('Finish'));
+    expect(MockBridge.endAudioSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves Android session acquisition to the atomic native start call', () => {
+    MockBridge.isAndroid = true;
+    render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
+    act(() => { vi.advanceTimersByTime(10); });
+
+    expect(MockBridge.startAudioSession).not.toHaveBeenCalled();
+    expect(MockBridge.nativeRecordStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the audio session when capture fails to start', () => {
+    MockBridge.nativeRecordStart.mockReturnValueOnce('error:permission');
+    render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
+    act(() => { vi.advanceTimersByTime(10); });
+
+    expect(screen.getByText(/Microphone permission denied/)).toBeTruthy();
+    expect(MockBridge.endAudioSession).toHaveBeenCalledTimes(1);
   });
 });
 

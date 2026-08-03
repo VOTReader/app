@@ -3,7 +3,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate, onGoToRef }) {
-  const isOpen = num !== null;
+  const isOpen = num != null;
+  const trapRef = useFocusTrap(isOpen);
   // SC5: fall back to the global BOOKS corpus when this letter's own nkjv dict
   // doesn't carry the ref — the inline ref sheet (LetterView) already does this;
   // the data gate is a backstop, not the sole source.
@@ -27,8 +28,8 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   // ScriptureSheet for the full rationale).
   return ReactDOM.createPortal(
     <>
-      <div className={`fn-sheet-backdrop${isOpen ? " open" : ""}`} onClick={onClose} />
-      <div className={`fn-sheet${isOpen ? " open" : ""}`}>
+      <div className={`fn-sheet-backdrop${isOpen ? ' open' : ''}`} aria-hidden="true" onClick={isOpen ? onClose : undefined} />
+      <div className={`fn-sheet${isOpen ? ' open' : ''}`} ref={trapRef} role="dialog" aria-modal={isOpen ? 'true' : undefined} aria-hidden={!isOpen} inert={!isOpen ? true : undefined} aria-label={fn ? `Footnote ${num}` : 'Footnote'}>
         <SheetHandle onClose={onClose} />
         {fn && (
           <>

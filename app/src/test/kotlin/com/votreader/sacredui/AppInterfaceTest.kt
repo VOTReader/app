@@ -11,6 +11,7 @@ import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * NK8 — AppInterface tests.
@@ -59,6 +60,76 @@ class AppInterfaceTest {
         every { vm.audioRecorder.start() } returns NativeAudioRecorder.Result.Failure("permission")
         val (app, _, _) = newSubject(vm = vm)
         assertEquals("error:permission", app.nativeRecordStart())
+    }
+
+    @Test
+    fun `nativeRecordStart establishes audio mode before opening recorder`() {
+        val order = mutableListOf<String>()
+        val am = mockk<AudioManager>(relaxed = true)
+        every { am.mode } returns AudioManager.MODE_NORMAL
+        every { am.mode = AudioManager.MODE_IN_COMMUNICATION } answers { order.add("session"); Unit }
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.audioFocusRequest } returns null
+        every { vm.audioRecorder.start() } answers {
+            order.add("recorder")
+            NativeAudioRecorder.Result.Success(Unit)
+        }
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        assertEquals("ok", app.nativeRecordStart())
+        assertEquals(listOf("session", "recorder"), order)
+    }
+
+    @Test
+    fun `idle teardown never writes the device audio mode`() {
+        val am = mockk<AudioManager>(relaxed = true)
+        every { am.mode } returns AudioManager.MODE_NORMAL
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.audioFocusRequest } returns null
+        every { vm.audioRecorder.cancel() } just Runs
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.stopAudioCaptureForTeardown()
+
+        verify(exactly = 0) { am.mode = any() }
+    }
+
+    @Test
+    fun `teardown during a live session restores the audio mode`() {
+        val am = mockk<AudioManager>(relaxed = true)
+        every { am.mode } returns AudioManager.MODE_IN_COMMUNICATION
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.audioFocusRequest } returns null
+        every { vm.previousAudioMode } returns AudioManager.MODE_NORMAL
+        every { vm.audioRecorder.cancel() } just Runs
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.stopAudioCaptureForTeardown()
+
+        verify { am.mode = AudioManager.MODE_NORMAL }
+    }
+
+    @Test
+    fun `teardown blocks stale native starts until replacement renderer is ready`() {
+        var starts = 0
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.audioRecorder.cancel() } just Runs
+        every { vm.audioRecorder.start() } answers {
+            starts++
+            NativeAudioRecorder.Result.Success(Unit)
+        }
+        val (app, _, _) = newSubject(vm = vm)
+
+        app.stopAudioCaptureForTeardown()
+        assertEquals("error:session-unavailable", app.nativeRecordStart())
+        assertEquals(0, starts)
+
+        app.onAppReady()
+        assertEquals("ok", app.nativeRecordStart())
+        assertEquals(1, starts)
     }
 
     // ─── NTV3: native Garden-cache wipe delegation ────────────────────
@@ -437,6 +508,24 @@ class AppInterfaceTest {
         app.endAudioSession()
 
         verify { am.mode = AudioManager.MODE_NORMAL }
+    }
+
+    @Test
+    fun `endAudioSession is synchronous with native start instead of queued to UI`() {
+        val am = mockk<AudioManager>(relaxed = true)
+        every { am.mode = any() } just Runs
+        val host = FakeBridgeHost().apply {
+            audioSystemService = am
+            executePostedImmediately = false
+        }
+        val vm = mockk<MainViewModel>(relaxed = true)
+        every { vm.previousAudioMode } returns AudioManager.MODE_NORMAL
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.endAudioSession()
+
+        verify { am.mode = AudioManager.MODE_NORMAL }
+        assertTrue(host.postedActions.isEmpty())
     }
 
     // ─── Keep-screen-on toggle ────────────────────────────────────────

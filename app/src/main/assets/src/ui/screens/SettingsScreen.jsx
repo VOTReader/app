@@ -454,6 +454,42 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const [verifyReport, setVerifyReport] = React.useState(
     /** @type {null | { message: string, level: 'ok' | 'warn' }} */ (null)
   );
+  // Android's backup bridge completes through one global callback per picker.
+  // Keep Export / Import / Verify mutually exclusive so a rapid second tap
+  // cannot replace the callback or consume the first operation's native stream.
+  const backupBusyRef = React.useRef(false);
+  const backupReloadPendingRef = React.useRef(false);
+  const [backupBusy, setBackupBusy] = React.useState(false);
+  const _runBackupOperation = async (operation) => {
+    if (backupBusyRef.current) return;
+    backupBusyRef.current = true;
+    backupReloadPendingRef.current = false;
+    setBackupBusy(true);
+    try { await operation(); }
+    finally {
+      // A completed import deliberately keeps the lock until its scheduled
+      // reload. Re-enabling controls in that 0.6-5s window permits a second
+      // picker/stream to start against data that is about to be torn down.
+      if (!backupReloadPendingRef.current) {
+        backupBusyRef.current = false;
+        setBackupBusy(false);
+      }
+    }
+  };
+  // Export / Verify / Clear additionally hold the CROSS-TAB Web Lock the apply
+  // paths take internally, so a second PWA tab can't export/verify/wipe against
+  // a half-imported state. Import must NOT go through this wrapper — Web Locks
+  // are not reentrant, and applyV3/applyImportPayload acquire the lock themselves.
+  const _runLockedBackupOperation = (operation) => _runBackupOperation(async () => {
+    try { await withBackupLock(operation); }
+    catch (e) {
+      if (/already in progress/.test(String(e && e.message))) {
+        _showToast('Another backup operation is running in a different tab. Please wait for it to finish.');
+        return;
+      }
+      throw e;
+    }
+  });
   // Wave-0 (dual-dismissal fix): the type-DELETE wipe dialog was registered
   // in NEITHER dismissal system, so hardware Back / Escape navigated away
   // underneath it (and left it rendering over the previous screen). It now
@@ -754,18 +790,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     if (ok) onSetting('lastExportAt', Date.now());
   };
 
-  const importPersonalData = () => {
+  const importPersonalData = async () => {
     // Shared import tail: confirm dialog + degraded-store guard + apply + result
     // toast + reload. `parsed` is the v2 JSON payload OR the v3 manifest (same
     // envelope shape); applyFn(storesMap, flagMap) → { importFailures,
     // writeFailures, skippedStores }. ONE source of truth for both formats.
     const _confirmDegradeApplyReload = async (parsed, applyFn, getIntegrity) => {
-      const exportVersion = parsed.exportVersion || 1;
       const dateLabel = parsed.exportDate ? new Date(parsed.exportDate).toLocaleString() : 'unknown date';
-      // Forward-compat: warn but proceed with the keys this client understands.
-      const forwardCompatNote = exportVersion > 3
-        ? '\n\nNOTE: This backup was created with a newer version of VOTReader. Some data may not be imported.'
-        : '';
       // Summarize what's about to land for the confirm dialog.
       const summaryParts = [];
       if (parsed.stores && typeof parsed.stores === 'object') {
@@ -813,7 +844,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       const confirmed = await new Promise((resolve) => {
         importConfirmResolveRef.current = resolve;
         setImportConfirm({
-          message: `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${forwardCompatNote}${spaceNote} This cannot be undone.`,
+          message: `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${spaceNote} This cannot be undone.`,
         });
       });
       if (!confirmed) return;                       // Cancel / backdrop / Back / Escape
@@ -832,11 +863,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       const storesMap = _exportableStores();
       const flagMap = _flagStores();
 
-      // Guard: if any store is 'degraded' (IDB hydration timed out), the apply
-      // would queue in memory and be lost on the upcoming reload.
-      const hasDegraded = Object.values(storesMap).some(({ store }) => store.getState() === 'degraded')
-        || Object.values(flagMap).some((s) => s.getState() === 'degraded');
-      if (hasDegraded) {
+      // Pending and degraded stores queue mutations in memory instead of
+      // durably saving them. Import only after every store is loaded.
+      const hasUnavailableStore = Object.values(storesMap).some(({ store }) => store.getState() !== 'loaded')
+        || Object.values(flagMap).some((s) => s.getState() !== 'loaded');
+      if (hasUnavailableStore) {
         hideToast(_TOAST_ID);
         _showToast('Storage is temporarily unavailable. Please try again in a moment.');
         return;
@@ -845,7 +876,19 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // Apply + WAIT for every write to durably land before reloading (U1
       // barrier). applyFn SKIPS any section that fails shape validation so a
       // corrupt section can't overwrite good data.
-      const { importFailures, writeFailures, skippedStores, countMismatches } = await applyFn(storesMap, flagMap);
+      let applied;
+      try { applied = await applyFn(storesMap, flagMap); }
+      catch (e) {
+        // The apply paths hold a cross-tab Web Lock; contention gets its own
+        // message instead of the generic corrupt-file one downstream.
+        if (/already in progress/.test(String(e && e.message))) {
+          hideToast(_TOAST_ID);
+          _showToast('Another backup operation is running in a different tab. Please wait for it to finish.');
+          return;
+        }
+        throw e;
+      }
+      const { importFailures, writeFailures, skippedStores, countMismatches } = applied;
 
       hideToast(_TOAST_ID);
 
@@ -885,6 +928,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       }
       // A clean import reloads fast; problems get reading time first — a 600ms
       // reload used to wipe the warning toast before anyone could read it.
+      backupReloadPendingRef.current = true;
       setTimeout(() => window.location.reload(), problems.length ? 5000 : 600);
     };
 
@@ -1046,14 +1090,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
     // Android: v3 streaming import (native sniffs v3 vs legacy v1/v2).
     if (PlatformBridge.isAndroid) {
-      _importV3Android();
+      await _importV3Android();
       return;
     }
 
     // Web: pick a File, sniff the first bytes, route a v3 container vs a legacy
     // v1/v2 JSON backup. pickImportFile() opens the picker synchronously in this
     // user gesture (the async IIFE runs sync up to the first await).
-    (async () => {
+    await (async () => {
       try {
         const file = await PlatformBridge.pickImportFile();
         if (!file) return; // user cancelled
@@ -1112,7 +1156,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     };
 
     if (PlatformBridge.isAndroid) {
-      (async () => {
+      return (async () => {
         const ready = await new Promise((resolve) => {
           window.__onV3ImportReady = (status) => { window.__onV3ImportReady = null; resolve(status); };
           PlatformBridge.v3ImportOpen();
@@ -1165,11 +1209,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
           try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
         }
       })();
-      return;
     }
 
     // Web: same routing as importPersonalData's picker path, minus the apply.
-    (async () => {
+    return (async () => {
       try {
         const file = await PlatformBridge.pickImportFile();
         if (!file) return;
@@ -1198,30 +1241,30 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
   /**
    * Wrap `indexedDB.deleteDatabase(name)` in a Promise that resolves
-   * on success, error, blocked, or timeout. Critical deletes get a
+   * with whether deletion actually succeeded. Critical deletes get a
    * longer timeout because hanging on those is worse than hanging
    * on a cache database.
    *
    * @param {string} name
    * @param {boolean} critical
-   * @returns {Promise<void>}
+   * @returns {Promise<boolean>} true only when deletion completed
    */
   const _deleteIdbDatabase = (name, critical) => new Promise((resolve) => {
     let settled = false;
-    const finish = () => { if (!settled) { settled = true; resolve(); } };
+    const finish = (ok) => { if (!settled) { settled = true; resolve(ok); } };
     try {
       const req = indexedDB.deleteDatabase(name);
-      req.onsuccess = finish;
-      req.onerror = finish;
-      req.onblocked = finish; // open connections — our IDBAdapter handles
-                              // versionchange but a stuck listener could
-                              // block; proceed anyway.
+      req.onsuccess = () => finish(true);
+      req.onerror = () => finish(false);
+      req.onblocked = () => finish(false); // open connections should close on
+                                           // versionchange; otherwise fail visibly.
       // Timeout fallback so a stuck deletion doesn't block the UI
       // forever. 3s for user-data DBs, 1s for caches.
-      setTimeout(finish, critical ? 3000 : 1000);
-    } catch (_e) { finish(); }
+      setTimeout(() => finish(false), critical ? 3000 : 1000);
+    } catch (_e) { finish(false); }
   });
 
+  // Runs via _runLockedBackupOperation (mutex + cross-tab lock live there).
   const clearAllPersonalData = async () => {
     try {
       // NTV3: wipe the native Garden image disk cache too (Android: cacheDir/garden,
@@ -1229,7 +1272,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // touched IDB + localStorage). Best-effort + a no-op on web; never block the
       // data wipe on it.
       try { PlatformBridge.clearGardenCache(); } catch (_e) { /* best-effort native cache wipe */ }
-      _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
       // W2.4 + W2.4-hotfix: Clear ALL user-data IDB databases. The
       // pre-hotfix version fired deleteDatabase() then reloaded
       // immediately — the deletion is async and the reload raced
@@ -1243,17 +1285,24 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       // onblocked never hangs the UI; vot-thumbs + the two search-index
       // caches (Classic + MiniSearch) are regenerable caches and get a
       // 1s timeout each.
-      await Promise.all([
+      const deleteResults = await Promise.all([
         _deleteIdbDatabase('votreader', true),
         _deleteIdbDatabase('vot-journal-media', true),
         _deleteIdbDatabase('vot-thumbs', false),
         _deleteIdbDatabase('vot-search-cache', false),
         _deleteIdbDatabase('vot-minisearch-cache', false),
       ]);
+      if (!deleteResults[0] || !deleteResults[1]) {
+        throw new Error('A personal-data database could not be deleted');
+      }
+      _collectVotKeys().forEach((k) => { try { localStorage.removeItem(k); } catch (_e) { /* localStorage access — disabled / quota / privacy mode non-fatal */ } });
       // Wave-0: was alert('All personal data cleared…') — a native blocking
       // dialog. Same toast-then-reload pattern the import path uses: the
       // persistent toast renders first, the 600ms delay lets it paint.
       _showToast('All personal data cleared. Reloading…', 0);
+      // Keep the backup controls disabled through the reload window — a new
+      // import starting against the just-wiped state would race the teardown.
+      backupReloadPendingRef.current = true;
       setTimeout(() => window.location.reload(), 600);
     } catch (e) {
       console.warn('clear all personal data failed', e);
@@ -1550,19 +1599,19 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               label="Export Your Data"
               desc="Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as one backup file — look for a file named votreader-backup-<date>.votbak in your Downloads or the folder you chose. No credentials or login info — just your data. Save the file anywhere you control."
             >
-              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); exportPersonalData(); }}>Export</button>
+              <button className="settings-clear-btn" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); _runLockedBackupOperation(exportPersonalData); }}>Export</button>
             </DataActionRow>
             <DataActionRow
               label="Import from Backup"
               desc="Restore a previously exported backup file (a .votbak file). Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten."
             >
-              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); importPersonalData(); }}>Import</button>
+              <button className="settings-clear-btn" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); _runBackupOperation(importPersonalData); }}>Import</button>
             </DataActionRow>
             <DataActionRow
               label="Verify a Backup"
               desc="Check a backup file without importing it: reads the whole file, verifies its structure and integrity checksum, and reports what it contains. Nothing on this device changes."
             >
-              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); setVerifyReport(null); verifyBackupFile(); }}>Verify</button>
+              <button className="settings-clear-btn" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); setVerifyReport(null); _runLockedBackupOperation(verifyBackupFile); }}>Verify</button>
             </DataActionRow>
             {verifyReport && (
               /* Always-visible result (NOT DataActionRow — its desc hides
@@ -1600,7 +1649,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               label="Clear All Personal Data"
               desc="Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, and search cache. App settings will reset to defaults. This cannot be undone — export first if you want a backup."
             >
-              <button className="settings-clear-btn danger" onClick={(e) => { e.stopPropagation(); setWipeText(''); setWipeConfirm(true); }}>Clear All My Data</button>
+              <button className="settings-clear-btn danger" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); setWipeText(''); setWipeConfirm(true); }}>Clear All My Data</button>
             </DataActionRow>
           </div>
         </SettingsGroup>
@@ -1620,9 +1669,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                     className="note-sheet-overlay"
                     onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) closeWipe(); }}
                   >
-                    <div className="note-sheet" ref={wipeTrapRef} onClick={(e) => e.stopPropagation()}>
+                    <div className="note-sheet" ref={wipeTrapRef} role="dialog" aria-modal="true" aria-labelledby="settings-wipe-title" onClick={(e) => e.stopPropagation()}>
                       <div className="note-sheet-header">
-                        <div className="note-sheet-title">Delete All Personal Data</div>
+                        <div className="note-sheet-title" id="settings-wipe-title">Delete All Personal Data</div>
                       </div>
                       <div style={{ color: "var(--cream)", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "14px" }}>
                         This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, and the search cache, then resets all settings to defaults.{' '}
@@ -1642,7 +1691,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                         placeholder="DELETE"
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => setWipeText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && wipeOk) { closeWipe(); clearAllPersonalData(); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && wipeOk) { closeWipe(); _runLockedBackupOperation(clearAllPersonalData); } }}
                         style={{
                           width: "100%", boxSizing: "border-box", textAlign: "center",
                           fontFamily: "'Cinzel', serif", fontSize: "1rem", letterSpacing: "0.22em",
@@ -1656,7 +1705,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                         <button
                           className="settings-clear-btn danger"
                           disabled={!wipeOk}
-                          onClick={(e) => { e.stopPropagation(); if (!wipeOk) return; closeWipe(); clearAllPersonalData(); }}
+                          onClick={(e) => { e.stopPropagation(); if (!wipeOk) return; closeWipe(); _runLockedBackupOperation(clearAllPersonalData); }}
                         >
                           Delete Everything
                         </button>
@@ -1674,9 +1723,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                     className="note-sheet-overlay"
                     onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) _settleImportConfirm(false); }}
                   >
-                    <div className="note-sheet" ref={importTrapRef} onClick={(e) => e.stopPropagation()}>
+                    <div className="note-sheet" ref={importTrapRef} role="dialog" aria-modal="true" aria-labelledby="settings-import-title" onClick={(e) => e.stopPropagation()}>
                       <div className="note-sheet-header">
-                        <div className="note-sheet-title">Import from Backup</div>
+                        <div className="note-sheet-title" id="settings-import-title">Import from Backup</div>
                       </div>
                       <div style={{ color: "var(--cream)", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "18px", whiteSpace: "pre-line" }}>
                         {importConfirm.message}
@@ -1716,14 +1765,20 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                   <React.Fragment key={grp.id}>
                     <div
                       className="progress-row"
-                      style={{ background: "var(--bg)", cursor: "pointer" }}
-                      onClick={(e) => { e.stopPropagation(); toggleSection(grp.id); }}
+                      style={{ background: "var(--bg)" }}
                     >
-                      <span style={{ color: "var(--gold-dim)", fontSize: "0.75rem", minWidth: "0.75rem" }}>
-                        {isOpen ? "▾" : "▸"}
-                      </span>
-                      <span className="progress-row-label" style={{ color: "var(--gold)" }}>{grp.label}</span>
-                      <span className="progress-row-tally">{sRead} / {sTotal}</span>
+                      <button
+                        type="button"
+                        className="progress-section-toggle"
+                        aria-expanded={isOpen}
+                        onClick={(e) => { e.stopPropagation(); toggleSection(grp.id); }}
+                      >
+                        <span aria-hidden="true" style={{ color: "var(--gold-dim)", fontSize: "0.75rem", minWidth: "0.75rem" }}>
+                          {isOpen ? "▾" : "▸"}
+                        </span>
+                        <span className="progress-row-label" style={{ color: "var(--gold)" }}>{grp.label}</span>
+                        <span className="progress-row-tally">{sRead} / {sTotal}</span>
+                      </button>
                       <SectionClearBtn
                         label={grp.label}
                         disabled={sRead === 0}
