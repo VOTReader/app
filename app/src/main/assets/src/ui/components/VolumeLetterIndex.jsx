@@ -2,7 +2,19 @@
    VolumeLetterIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, markAsReadEnabled, columns }) {
+/* Read marks are COUNT-aware (2026-08-03): a re-read letter shows ✓ ×N.
+   Rendered as one shared element so every index surface stays identical. */
+export function ReadCheck({ count }) {
+  if (!count) return null;
+  return (
+    <span className="read-check" style={{ marginLeft: '0.4rem' }} aria-label={count > 1 ? `Read ${count} times` : 'Read'}>
+      {"✓"}
+      {count > 1 && <span className="read-check-count" aria-hidden="true">{"×" + count}</span>}
+    </span>
+  );
+}
+
+export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSelect, onSelectPreface, currentLetter, isRead, readCount, markAsReadEnabled, columns }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
     if (currentRef.current) {
@@ -49,7 +61,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
             </div>
             {minChip(preface)}
             {markAsReadEnabled && isRead(preface.id) && (
-              <span className="read-check" style={{ marginLeft: '0.4rem' }}>{"✓"}</span>
+              <ReadCheck count={readCount ? readCount(preface.id) : 1} />
             )}
           </button>
         ))}
@@ -86,7 +98,7 @@ export function VolumeLetterIndex({ volumeTitle, eyebrow, letters, preface, onSe
               </div>
               {minChip(letter)}
               {markAsReadEnabled && isRead(letter.id) && (
-                <span className="read-check" style={{ marginLeft: '0.4rem' }}>{"✓"}</span>
+                <ReadCheck count={readCount ? readCount(letter.id) : 1} />
               )}
             </button>
           );

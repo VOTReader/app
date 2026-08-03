@@ -81,3 +81,24 @@ describe('VolumeLetterIndex — "~N min" reading-time chip', () => {
     expect(document.querySelector('.idx-min-chip')).toBeNull();
   });
 });
+
+describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
+  it('a once-read letter renders the plain check, no count', () => {
+    const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true, readCount: () => 1 });
+    expect(container.querySelector('.read-check')).not.toBeNull();
+    expect(container.querySelector('.read-check-count')).toBeNull();
+  });
+
+  it('a re-read letter renders ✓ ×N with an AT label', () => {
+    const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true, readCount: () => 3 });
+    const mark = container.querySelector('.read-check');
+    expect(mark.getAttribute('aria-label')).toBe('Read 3 times');
+    expect(container.querySelector('.read-check-count').textContent).toBe('×3');
+  });
+
+  it('legacy callers without readCount still get the plain check (guard path)', () => {
+    const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true });
+    expect(container.querySelector('.read-check')).not.toBeNull();
+    expect(container.querySelector('.read-check-count')).toBeNull();
+  });
+});

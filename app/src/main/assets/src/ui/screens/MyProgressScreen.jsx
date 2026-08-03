@@ -176,6 +176,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     { num: journalCount, label: journalCount === 1 ? 'Entry' : 'Entries', sub: 'in your journal' },
     ...(readingStats ? [{ num: _fmtWords(readingStats.totalWordsRead || 0), label: 'Words Read', sub: 'across your reading' }] : []),
     ...(measuredWpm ? [{ num: measuredWpm, label: 'Reading Pace', sub: 'words per minute' }] : []),
+    // Re-reads only appear once one exists — a zero here would just be noise.
+    ...(readingStats && readingStats.rereads > 0
+      ? [{ num: readingStats.rereads, label: 'Re-reads', sub: readingStats.rereads === 1 ? 'letter or chapter revisited' : 'letters & chapters revisited' }] : []),
   ];
   const libraryRows = [
     { label: 'Notes', count: noteCount },

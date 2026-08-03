@@ -2,7 +2,7 @@
    ChapterIndex — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, markAsReadEnabled, restoredNames, showChapterTitle }) {
+export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHistory, onSettings, currentChapter, theme, onThemeChange, isRead, readCount, markAsReadEnabled, restoredNames, showChapterTitle }) {
   const currentRef = React.useRef(null);
   React.useEffect(() => {
     if (currentRef.current) {
@@ -74,7 +74,12 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
                   })()}
                 </div>
                 {minChip(ch)}
-                {markAsReadEnabled && isRead(ch.num) && <span className="read-check">✓</span>}
+                {markAsReadEnabled && isRead(ch.num) && (
+                  <span className="read-check" aria-label={(readCount && readCount(ch.num) > 1) ? `Read ${readCount(ch.num)} times` : 'Read'}>
+                    {"✓"}
+                    {readCount && readCount(ch.num) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.num)}</span>}
+                  </span>
+                )}
               </button>
             );
           })}

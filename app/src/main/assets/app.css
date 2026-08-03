@@ -2297,6 +2297,10 @@
     .settings-gear-btn svg { width:20px; height:20px; }
     /* ── Mark as Read ── */
     .read-check { font-size:0.75rem; color:var(--gold); opacity:0.7; flex-shrink:0; align-self:center; margin-left:0.5rem; }
+    /* Re-read count (2026-08-03): ✓ ×N once the detector has credited a
+       second full read. Dimmer + smaller than the check so a once-read row
+       stays visually identical to before. */
+    .read-check-count { font-size:0.62rem; color:var(--gold-dim); margin-left:0.15rem; letter-spacing:0.03em; }
     /* white-space:nowrap → normal + max-width (300%-cap spill fix): at the
        Text Size extreme, "Clear All" as one unbreakable line ran off a 375px
        screen; letting the label wrap inside the button keeps it on-screen. */

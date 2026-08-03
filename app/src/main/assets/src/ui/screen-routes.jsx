@@ -280,6 +280,7 @@ export function buildScreenRoutes({
       onSelectPreface: col.prefaceGlobal ? nav : undefined,
       currentLetter: settings.showReadingDot && activeReadKey === ('vol:' + volKey) ? lastReadLetterMap[volKey] || null : null,
       isRead: (id) => isRead(col.readKey, id),
+      readCount: (id) => Number(readItems[getReadKey(col.readKey, id)]) || 0,
       markAsReadEnabled: settings.markAsRead,
     };
   };
@@ -768,6 +769,7 @@ export function buildScreenRoutes({
           onSettings={goSettings}
           currentChapter={chapterIndexCurrentChapter('matthew', activeReadKey, lastReadChapters)}
           isRead={(num) => isRead('matthew', num)}
+          readCount={(num) => Number(readItems[getReadKey('matthew', num)]) || 0}
           markAsReadEnabled={settings.markAsRead}
           theme={theme} onThemeChange={setTheme}
         />
@@ -814,6 +816,7 @@ export function buildScreenRoutes({
           onSettings={goSettings}
           currentChapter={chapterIndexCurrentChapter(bookId, activeReadKey, lastReadChapters)}
           isRead={(num) => isRead(bookId, num)}
+          readCount={(num) => Number(readItems[getReadKey(bookId, num)]) || 0}
           markAsReadEnabled={settings.markAsRead}
           restoredNames={settings.restoredNames}
           showChapterTitle={settings.showChapterTitle !== false}
@@ -917,6 +920,7 @@ export function buildScreenRoutes({
           onSettings={goSettings}
           currentChapter={settings.showReadingDot && activeReadKey === studyReadKey(study.slug) ? lastReadChapters[studyReadKey(study.slug)] || null : null}
           isRead={(chId) => isRead(studyReadKey(study.slug), chId)}
+          readCount={(chId) => Number(readItems[getReadKey(studyReadKey(study.slug), chId)]) || 0}
           markAsReadEnabled={settings.markAsRead}
           theme={theme} onThemeChange={setTheme}
         />
