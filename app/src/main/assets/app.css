@@ -609,7 +609,7 @@
         html { font-size: calc(112.5% * var(--font-scale, 1)); } /* 18px base */
       }
       @media (min-width: 1600px) {
-        :root { --col-max: 980px; }
+        :root { --col-max: 1040px; }
         html { font-size: calc(125% * var(--font-scale, 1)); }   /* 20px base */
       }
       .top-nav {
@@ -754,8 +754,17 @@
       .chapter-nav-sticky-arrow:disabled { opacity: 0.18; cursor: default; }
 
       /* ── CHAPTER INDEX ── */
+      /* ── DESKTOP WIDTH MODEL (2026-08-03) ──
+         Inner surface caps are REM, not px. The root font-size steps up with
+         the viewport tiers (16→18→20px), so a px cap silently SHRINKS in rem
+         terms on desktop — Settings was 32.5rem on a phone but 26rem at 1600px,
+         which is why content "floats squeezed" inside the shell borders.
+         Rem caps hold the same proportions at every tier (and mobile ≤768px is
+         byte-identical: 16px root × the same /16 value). Reading surfaces keep
+         a ~constant CHARACTER measure by the same mechanism. The shell
+         (--col-max) and fixed sheets stay px — they anchor overlay geometry. */
       .vol-index {
-        max-width: 680px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem;
+        max-width: 42.5rem; margin: 0 auto; padding: 2.5rem 1.5rem 5rem;
       }
       .vol-index-header { text-align: center; margin-bottom: 2.5rem; }
       .vol-index-eyebrow {
@@ -783,7 +792,7 @@
       }
       /* Holy Days playlist buttons */
       .hd-playlists {
-        display: flex; gap: 0.9rem; margin: 0.75rem auto 2rem; max-width: 680px;
+        display: flex; gap: 0.9rem; margin: 0.75rem auto 2rem; max-width: 42.5rem;
         flex-wrap: wrap; justify-content: center; padding-top: 0.5rem;
       }
       .hd-playlist-btn {
@@ -872,7 +881,7 @@
       }
       .hero-subtitle {
         font-family: var(--font-body); font-size: 1.05rem; font-style: italic;
-        color: var(--cream-muted); max-width: 500px;
+        color: var(--cream-muted); max-width: 31.25rem;
         margin: 0.35rem auto 1.4rem; line-height: 1.5;
       }
       /* Tappable variant — preserves the original .hero-subtitle look entirely; adds only cursor + press/hover feedback */
@@ -953,7 +962,7 @@
     
       /* ── PAGE / CHAPTER BODY ── */
       .page-wrapper {
-        max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 6rem;
+        max-width: 45rem; margin: 0 auto; padding: 2rem 1.5rem 6rem;
       }
       .chapter-body { font-size: 1.08rem; line-height: 1.85; }
       /* .section-block and .section-heading defined in Bible reader section below */
@@ -1671,7 +1680,7 @@
     .home-eyebrow { font-family:'Cinzel',serif; font-size:0.72rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.75rem; }
     .home-title { font-family:'Cinzel Decorative',serif; font-size:2rem; color:var(--cream); text-align:center; margin-bottom:0.4rem; line-height:1.2; }
     .home-sub { font-size:1.05rem; color:var(--cream-muted); text-align:center; font-style:italic; margin-bottom:2rem; }
-    .home-ornament { display:flex; align-items:center; gap:0.75rem; margin-bottom:2.5rem; width:100%; max-width:400px; }
+    .home-ornament { display:flex; align-items:center; gap:0.75rem; margin-bottom:2.5rem; width:100%; max-width:25rem; }
     /* ── Volumes landing: fill screen, no scroll ── */
     .volumes-landing { padding:1.2rem 1.2rem 0.8rem; justify-content:flex-start; }
     .volumes-landing .home-eyebrow { margin-bottom:0.3rem; }
@@ -1689,7 +1698,7 @@
     .scriptures-landing .home-eyebrow { margin-bottom:0.4rem; }
     .scriptures-landing .home-title { font-size:1.65rem; margin-bottom:0.2rem; }
     .scriptures-landing .home-ornament { margin-bottom:1.2rem; }
-    .scriptures-landing .genre-columns { max-width:540px; gap:0.65rem; }
+    .scriptures-landing .genre-columns { max-width:33.75rem; gap:0.65rem; }
     .scriptures-landing .genre-tile { padding:0.85rem 0.95rem; }
     .scriptures-landing .genre-tile-title { font-size:1.05rem; }
     .scriptures-landing .genre-tile-sub { font-size:0.82rem; }
@@ -1761,7 +1770,7 @@
     .home-rearrange-hint {
       display: block;
       width: 100%;
-      max-width: 480px;
+      max-width: 30rem;
       margin: 0.9rem auto 0;
       padding: 0 0.5rem;
       text-align: center;
@@ -1795,7 +1804,7 @@
     /* Nav list — premium cards */
     .home-nav-list {
       width: 100%;
-      max-width: 480px;
+      max-width: 30rem;
       display: flex;
       flex-direction: column;
       gap: 0.65rem;
@@ -1916,7 +1925,7 @@
     }
 
     /* ── TWO-COLUMN GENRE GRID ── */
-    .genre-columns { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; width:100%; max-width:520px; }
+    .genre-columns { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; width:100%; max-width:32.5rem; }
     .genre-col-label { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.5rem; padding-bottom:0.35rem; border-bottom:1px solid var(--gold-border); }
     .genre-tile { background:var(--bg2); border:1px solid var(--gold-border); border-radius:8px; padding:0.9rem 1rem; cursor:pointer; text-align:left; transition:all var(--transition); }
     @media (hover: hover) { .genre-tile:hover { border-color:var(--gold); background:var(--gold-faint); } }
@@ -2018,14 +2027,14 @@
       }
     /* ── SETTINGS SCREEN ── */
     .settings-screen { min-height:100%; display:flex; flex-direction:column; align-items:center; padding:2.5rem 1.5rem; }
-    .settings-header { width:100%; max-width:520px; text-align:center; margin-bottom:2.5rem; }
+    .settings-header { width:100%; max-width:32.5rem; text-align:center; margin-bottom:2.5rem; }
     .settings-eyebrow { font-family:'Cinzel',serif; font-size:0.68rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.6rem; }
     .settings-title { font-family:'Cinzel Decorative',serif; font-size:1.6rem; color:var(--cream); margin-bottom:1.5rem; }
     .settings-ornament { display:flex; align-items:center; gap:0.75rem; margin:0 auto; max-width:280px; }
     .settings-ornament-line { flex:1; height:1px; background:linear-gradient(to right,transparent,var(--gold-border),transparent); }
     .settings-ornament-line.r { background:linear-gradient(to left,transparent,var(--gold-border),transparent); }
     .settings-ornament-diamond { width:6px; height:6px; background:var(--gold-dim); transform:rotate(45deg); flex-shrink:0; }
-    .settings-section { width:100%; max-width:520px; margin-bottom:1.5rem; }
+    .settings-section { width:100%; max-width:32.5rem; margin-bottom:1.5rem; }
     .settings-section-label { font-family:'Cinzel',serif; font-size:0.6rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
     /* ── Accordion groups (Settings redesign 2026-07-31) ──────────────────
@@ -2121,7 +2130,7 @@
     .settings-toggle input:focus-visible ~ .settings-toggle-track { outline: 2px solid var(--gold); outline-offset: 2px; }
     /* ── ABOUT SCREEN ── */
     .about-screen { min-height:100%; display:flex; align-items:flex-start; justify-content:center; padding:2rem 1.25rem 4rem; }
-    .about-card { width:100%; max-width:560px; background:var(--bg2); border:1px solid var(--gold-border); border-radius:14px; padding:2rem 1.6rem 2.2rem; text-align:center; }
+    .about-card { width:100%; max-width:35rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:14px; padding:2rem 1.6rem 2.2rem; text-align:center; }
     .about-diamonds { display:flex; align-items:center; justify-content:center; gap:1.5rem; margin:0 auto; }
     .about-diamond { width:6px; height:6px; background:var(--gold); transform:rotate(45deg); display:inline-block; }
     .about-heading { font-family:'Cinzel',serif; font-size:1.05rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold); margin:1.4rem 0 1.8rem; font-weight:500; }
@@ -2227,7 +2236,7 @@
     .select-sheet-option-meta { font-family:'Cinzel',serif; font-size:0.56rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); flex-shrink:0; white-space:nowrap; }
     .select-sheet-option-desc { font-size:0.82rem; color:var(--cream-muted); font-style:italic; margin-top:0.3rem; line-height:1.45; }
     /* ── COMPACT LIST LAYOUT ── */
-    .compact-list { width:100%; max-width:520px; }
+    .compact-list { width:100%; max-width:32.5rem; }
     .compact-list-group { margin-bottom:1rem; }
     .compact-list-header { font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--gold-dim); padding:0.5rem 0; border-bottom:1px solid var(--gold-border); margin-bottom:0.35rem; }
     .compact-list-item { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0.8rem; background:var(--bg2); border:1px solid var(--gold-border); border-radius:6px; cursor:pointer; text-align:left; margin-bottom:0.3rem; position:relative; }
@@ -2235,7 +2244,7 @@
     .compact-list-title { font-family:'Cinzel',serif; font-size:0.82rem; color:var(--gold); flex:1; letter-spacing:0.03em; }
     .compact-list-detail { font-family:'Cinzel',serif; font-size:0.5rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); }
     /* ── FLAT GRID LAYOUT ── */
-    .flat-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; width:100%; max-width:520px; }
+    .flat-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; width:100%; max-width:32.5rem; }
     .flat-grid-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:8px; padding:0.8rem 0.6rem; cursor:pointer; text-align:center; position:relative; }
     .flat-grid-card:active { background:var(--gold-faint); border-color:var(--gold); }
     .flat-grid-title { font-family:'Cinzel',serif; font-size:0.72rem; color:var(--gold); letter-spacing:0.03em; line-height:1.25; }
@@ -2245,7 +2254,7 @@
       0%, 100% { box-shadow: 0 0 0 transparent; border-color: var(--gold-border); }
       50% { box-shadow: 0 0 14px var(--gold-glow), 0 0 4px var(--gold-faint); border-color: var(--gold-dim); }
     }
-    .canon-scroll { width:100%; max-width:520px; display:flex; flex-direction:column; }
+    .canon-scroll { width:100%; max-width:32.5rem; display:flex; flex-direction:column; }
     .canon-scroll-divider { font-family:'Cinzel Decorative',serif; font-size:0.72rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold); text-align:center; padding:1.5rem 0 0.8rem; }
     .canon-card { display:flex; width:100%; align-items:center; gap:1rem; background:var(--bg2); border:1px solid var(--gold-border); border-left:3px solid var(--gold-dim); border-radius:8px; padding:1rem 1.2rem; cursor:pointer; text-align:left; position:relative; margin-bottom:0.55rem; animation:canonBreathe 5s ease-in-out infinite; }
     .canon-card:active { background:var(--gold-faint); border-color:var(--gold); }
@@ -2510,7 +2519,7 @@
     .history-empty {
       text-align:center; color:var(--cream-dim);
       font-family:var(--font-body); padding:3.5rem 1.5rem 4rem;
-      max-width:460px; margin:0 auto;
+      max-width:28.75rem; margin:0 auto;
     }
     .history-empty-sigil {
       font-family:'Cinzel Decorative',serif; font-size:2.4rem;
@@ -2670,7 +2679,7 @@
     /* Top/bottom padding uses calc(<design> + <inset>) so the tab-management
        chrome clears the status bar / camera cutout AND the gesture bar /
        system nav on every device. */
-    .tabs-overview { max-width:880px; margin:0 auto; padding:calc(1.5rem + var(--inset-top, 0px)) 1rem calc(5rem + var(--inset-bottom, 0px)); }
+    .tabs-overview { max-width:55rem; margin:0 auto; padding:calc(1.5rem + var(--inset-top, 0px)) 1rem calc(5rem + var(--inset-bottom, 0px)); }
     .tabs-overview-header { text-align:center; margin-bottom:1.8rem; padding:0 0.5rem; }
     .tabs-overview-eyebrow {
       font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.28em;
@@ -4218,7 +4227,7 @@
        render as professional Coming-Soon placeholders.
        ════════════════════════════════════════════════════════════ */
     .library-screen {
-      max-width: 640px; margin: 0 auto;
+      max-width: 40rem; margin: 0 auto;
       padding: 1.5rem 1.2rem 4rem;
       width: 100%;
     }
@@ -4242,7 +4251,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.85rem;
-      max-width: 520px;
+      max-width: 32.5rem;
       margin: 0 auto;
     }
     .library-tile {
@@ -4340,14 +4349,14 @@
        source rows) are defined here.
        ════════════════════════════════════════════════════════════ */
     .prg-screen {
-      max-width: 640px; margin: 0 auto;
+      max-width: 40rem; margin: 0 auto;
       padding: 1.5rem 1.2rem 4rem;
       width: 100%;
       display: flex; flex-direction: column; align-items: center;
     }
     .prg-hero {
       display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem;
-      width: 100%; max-width: 520px;
+      width: 100%; max-width: 32.5rem;
       margin-bottom: 1.8rem;
     }
     /* 4 stats: 4-up on wide screens, a 2×2 grid on phones so the
@@ -4449,7 +4458,7 @@
        preview, anchored quote, and any notebook chips.
        ════════════════════════════════════════════════════════════ */
     .notes-index-screen {
-      max-width: 720px; margin: 0 auto;
+      max-width: 45rem; margin: 0 auto;
       padding: 1.2rem 1rem 4rem;
       width: 100%;
     }
@@ -5048,7 +5057,7 @@
 
     /* ── Links Screen ── */
     .links-screen {
-      max-width: 720px; margin: 0 auto;
+      max-width: 45rem; margin: 0 auto;
       padding: 1.2rem 1rem 4rem;
       width: 100%;
     }
@@ -5323,7 +5332,7 @@
 
     /* ── Bookmarks Screen ── */
     .bkm-screen {
-      max-width: 720px; margin: 0 auto;
+      max-width: 45rem; margin: 0 auto;
       padding: 1.2rem 1rem 4rem;
       width: 100%;
     }

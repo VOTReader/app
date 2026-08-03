@@ -81,6 +81,11 @@ async function runAttempt(url) {
       protocolTimeout: 240000,
     });
     const page = await browser.newPage();
+    // Desktop viewport, not Puppeteer's 800x600 default: the app's responsive
+    // tiers (768/1100/1600 media queries + the rem-based inner caps) otherwise
+    // run the whole walk in a geometry no real desktop uses. 1920x1080 exercises
+    // the 1600 tier (--col-max 1040, 20px root) — the least-tested layout.
+    await page.setViewport({ width: 1920, height: 1080 });
     page.setDefaultTimeout(30000);
     const pageErrors = [];
     page.on('pageerror', (e) => pageErrors.push(String(e)));
@@ -106,6 +111,16 @@ async function runAttempt(url) {
     await page.evaluate(smokeSrc);
 
     const report = await page.evaluate(() => window.votSmoke());
+    // Horizontal-overflow tripwire at the desktop tier: any screen leaking past
+    // the viewport width is a layout regression (body is overflow-x:hidden, so
+    // this catches document-level leaks; per-element audits stay manual).
+    const overflowX = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    if (overflowX > 1) {
+      report.ok = false;
+      report.summary += ` | HORIZONTAL OVERFLOW ${overflowX}px at 1920x1080`;
+    }
     return { report, pageErrors };
   } finally {
     if (browser) { try { await browser.close(); } catch { /* wedged browser — ignore */ } }
